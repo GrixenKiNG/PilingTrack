@@ -1,0 +1,241 @@
+version: '3.8'
+
+# ============================================================
+# PilingTrack — Production Docker Compose
+#
+# Services:
+# - app: Next.js application (port 3000)
+# - ws: WebSocket real-time server (port 3001)
+# - redis: Redis for Pub/Sub + caching
+# - postgres: Primary database
+# - pgadmin: Database management (dev only)
+#
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose logs -f app    # Follow app logs
+#   docker compose down           # Stop all services
+# ============================================================
+
+services:
+  # ============================================================
+  # Next.js Application
+  # ============================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: pilingtrack-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - REDIS_URL=redis://redis:6379
+      - WS_URL=ws://ws:3001
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
+      - NEXT_PUBLIC_WS_URL=ws://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # Worker Service — Outbox + Projections + PDF
+  # ============================================================
+  # Runs background workers as a separate process for:
+  # - Failure isolation (workers don't crash API)
+  # - Independent scaling (scale workers without scaling API)
+  # - Resource limits (CPU/memory per worker group)
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile.workers
+      target: runner
+    container_name: pilingtrack-workers
+    restart: unless-stopped
+    ports:
+      - "3002:3002"  # Health check port
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - REDIS_URL=redis://redis:6379
+      - WORKER_HEALTH_PORT=3002
+      - OUTBOX_INTERVAL_MS=10000
+      - PROJECTION_INTERVAL_MS=5000
+      - PDF_WORKER_CONCURRENCY=2
+      # Control which workers to enable: outbox,projection,pdf
+      - ENABLED_WORKERS=outbox,projection,pdf
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # WebSocket Real-Time Server
+  # ============================================================
+  ws:
+    build:
+      context: .
+      dockerfile: Dockerfile.ws
+      target: runner
+    container_name: pilingtrack-ws
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - REDIS_URL=redis://redis:6379
+      - WS_PORT=3001
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # PgBouncer — Connection Pooling (правило #19)
+  # ============================================================
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1
+    container_name: pilingtrack-pgbouncer
+    restart: unless-stopped
+    ports:
+      - "6432:6432"
+    environment:
+      - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=20
+      - ADMIN_USERS=piling
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # Redis — Pub/Sub + Cache
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: pilingtrack-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # PostgreSQL — Primary Database
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: pilingtrack-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=piling
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the environment or .env}
+      - POSTGRES_DB=pilingtrack
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-rls.sql:/docker-entrypoint-initdb.d/init-rls.sql:ro
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U piling"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # PgAdmin — Database Management (dev/stage only)
+  # ============================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pilingtrack-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@pilingtrack.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set when the dev profile is enabled}
+    profiles:
+      - dev
+    depends_on:
+      - postgres
+    networks:
+      - pilingtrack
+
+# ============================================================
+# Volumes
+# ============================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ============================================================
+# Networks
+# ============================================================
+networks:
+  pilingtrack:
+    driver: bridge

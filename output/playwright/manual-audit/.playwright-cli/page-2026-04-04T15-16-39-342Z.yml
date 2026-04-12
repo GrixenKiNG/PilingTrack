@@ -1,0 +1,129 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Объекты
+              - generic: "3"
+            - button:
+              - img
+              - text: Новый объект
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - generic:
+                          - paragraph: М-11, Переезд через реку
+                        - generic:
+                          - generic:
+                            - img
+                            - generic: "150"
+                            - text: свай
+                          - generic:
+                            - img
+                            - generic: "120"
+                            - text: м
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - generic:
+                          - paragraph: МКАД-Юг, Участок 3
+                          - generic:
+                            - generic: 2 плана бурения
+                        - generic:
+                          - generic:
+                            - img
+                            - generic: "240"
+                            - text: свай
+                          - generic:
+                            - img
+                            - generic: "180.5"
+                            - text: м
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - generic:
+                          - paragraph: ВСМЖ
+                        - generic:
+                          - generic:
+                            - img
+                            - generic: "0"
+                            - text: свай
+                          - generic:
+                            - img
+                            - generic: "0"
+                            - text: м
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+  - list
+  - alert
+  - dialog "Операторы на объекте" [ref=e432]:
+    - heading "Операторы на объекте" [level=2] [ref=e434]
+    - generic [ref=e436]:
+      - paragraph [ref=e437]: Доступные операторы
+      - generic [ref=e438]:
+        - generic [ref=e439]:
+          - generic [ref=e440]:
+            - paragraph [ref=e441]: Герасимов Сергей
+            - paragraph [ref=e442]: sas02@rambler.ru
+          - button "Назначить" [ref=e443]:
+            - img
+            - text: Назначить
+        - generic [ref=e444]:
+          - generic [ref=e445]:
+            - paragraph [ref=e446]: Иванов И.П.
+            - paragraph [ref=e447]: operator@piling.ru
+          - button "Назначить" [ref=e448]:
+            - img
+            - text: Назначить
+    - button "Close" [active] [ref=e449]:
+      - img
+      - generic [ref=e450]: Close

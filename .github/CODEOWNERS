@@ -1,0 +1,114 @@
+# CODEOWNERS — PilingTrack
+#
+# Defines code ownership for each module.
+# Required reviewers are automatically requested on PRs.
+#
+# Format: path_pattern @owner1 @owner2
+#
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ============================================================
+# Core Infrastructure
+# ============================================================
+src/lib/db.ts @pilingtrack/core-team
+src/lib/redis-cache.ts @pilingtrack/core-team
+src/lib/rate-limiter.ts @pilingtrack/core-team
+src/lib/api-cache.ts @pilingtrack/core-team
+src/lib/backpressure.ts @pilingtrack/core-team
+src/lib/tenant-middleware.ts @pilingtrack/core-team
+src/lib/tenant-rate-limiter.ts @pilingtrack/core-team
+
+src/core/ @pilingtrack/core-team
+
+# ============================================================
+# Reports Module (DDD Bounded Context)
+# ============================================================
+src/modules/reports/ @pilingtrack/reports-team
+src/services/reports/ @pilingtrack/reports-team
+
+# ============================================================
+# Sync Engine (Offline-First)
+# ============================================================
+src/mobile/sync/ @pilingtrack/core-team @pilingtrack/mobile-team
+src/modules/reports/application/sync-engine-v2.ts @pilingtrack/core-team
+src/app/api/sync/ @pilingtrack/core-team
+
+# ============================================================
+# Auth & Security
+# ============================================================
+src/services/auth/ @pilingtrack/core-team
+src/lib/validation-schemas.ts @pilingtrack/core-team
+src/lib/csrf-protection.ts @pilingtrack/core-team
+src/core/security/ @pilingtrack/core-team
+
+# ============================================================
+# Observability
+# ============================================================
+src/core/observability/ @pilingtrack/core-team
+src/core/event-bus/ @pilingtrack/core-team
+src/core/infrastructure/circuit-breakers.ts @pilingtrack/core-team
+src/core/infrastructure/staleness-detector.ts @pilingtrack/core-team
+src/core/infrastructure/raw-queries.ts @pilingtrack/core-team
+
+# ============================================================
+# Workers
+# ============================================================
+src/workers/ @pilingtrack/core-team
+
+# ============================================================
+# API Routes
+# ============================================================
+src/app/api/reports/ @pilingtrack/reports-team
+src/app/api/sync/ @pilingtrack/core-team
+src/app/api/auth/ @pilingtrack/core-team
+src/app/api/sites/ @pilingtrack/core-team
+src/app/api/crews/ @pilingtrack/core-team
+src/app/api/equipment/ @pilingtrack/core-team
+src/app/api/users/ @pilingtrack/core-team
+src/app/api/telemetry/ @pilingtrack/core-team
+src/app/api/system/ @pilingtrack/core-team
+src/app/api/feedback/ @pilingtrack/core-team
+src/app/api/notifications/ @pilingtrack/core-team
+src/app/api/dictionary/ @pilingtrack/core-team
+
+# ============================================================
+# Frontend Components
+# ============================================================
+src/components/piling/ @pilingtrack/frontend-team
+src/components/ui/ @pilingtrack/frontend-team
+src/app/page.tsx @pilingtrack/frontend-team
+src/app/layout.tsx @pilingtrack/frontend-team
+
+# ============================================================
+# Infrastructure & Deployment
+# ============================================================
+infra/ @pilingtrack/core-team
+docker-compose*.yml @pilingtrack/core-team
+Dockerfile* @pilingtrack/core-team
+.github/workflows/ @pilingtrack/core-team
+
+# ============================================================
+# Database
+# ============================================================
+prisma/ @pilingtrack/core-team
+scripts/apply-full-ddl.sql @pilingtrack/core-team
+scripts/migrate-sqlite-to-postgres.js @pilingtrack/core-team
+
+# ============================================================
+# Documentation
+# ============================================================
+docs/ @pilingtrack/core-team
+README.md @pilingtrack/core-team
+CONTRIBUTING.md @pilingtrack/core-team
+
+# ============================================================
+# Tests
+# ============================================================
+tests/ @pilingtrack/core-team
+src/**/*.test.ts @pilingtrack/core-team
+e2e/ @pilingtrack/core-team
+
+# ============================================================
+# Scripts
+# ============================================================
+scripts/ @pilingtrack/core-team

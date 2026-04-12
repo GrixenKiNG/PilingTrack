@@ -1,0 +1,74 @@
+# ============================================================
+# Prometheus Alert Rules
+# ============================================================
+
+groups:
+  - name: pilingtrack-alerts
+    rules:
+      # High API latency
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="pilingtrack-app"}[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 API latency > 200ms"
+          description: "API p95 latency is {{ $value }}s for the last 5 minutes"
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{job="pilingtrack-app",status=~"5.."}[5m]) / rate(http_requests_total{job="pilingtrack-app"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "{{ $value | humanizePercentage }} of requests are failing"
+
+      # WebSocket connections dropping
+      - alert: WebSocketConnectionsDropping
+        expr: rate(ws_connections_closed_total{job="pilingtrack-ws"}[5m]) > rate(ws_connections_opened_total{job="pilingtrack-ws"}[5m])
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket connections being dropped"
+
+      # PostgreSQL connection pool exhausted
+      - alert: PostgresConnectionPoolExhausted
+        expr: pg_stat_activity_count{datname="pilingtrack"} >= 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted"
+          description: "{{ $value }} active connections out of 100"
+
+      # Redis memory usage
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage > 80%"
+
+      # Outbox events stuck
+      - alert: OutboxEventsStuck
+        expr: outbox_events_pending_total > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox events backlog > 1000"
+          description: "{{ $value }} events pending processing"
+
+      # Target down
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.instance }} has been unreachable for 2 minutes"

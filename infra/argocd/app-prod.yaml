@@ -1,0 +1,77 @@
+# ============================================================
+# ArgoCD Application — PilingTrack Production
+# ============================================================
+# Deploys PilingTrack to production namespace.
+# Manual approval required — no auto-sync.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilingtrack-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: pilingtrack
+    environment: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: pilingtrack
+
+  source:
+    repoURL: https://github.com/pilingtrack/pilingtrack.git
+    targetRevision: refs/tags/v*  # Only deploy tagged releases
+    path: infra/helm/pilingtrack
+    helm:
+      valueFiles:
+        - values-prod.yaml
+      parameters:
+        - name: image.tag
+          value: ""  # Use chart appVersion (pinned release)
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pilingtrack-prod
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false  # No auto-self-heal in prod — alert on drift
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    - group: "apps"
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Allow manual scaling
+
+  revisionHistoryLimit: 20
+
+  # Health check for application
+  health:
+    healthCheck: |
+      hs = {}
+      if obj.status ~= nil then
+        if obj.status.phase == "Running" or obj.status.phase == "Synced" then
+          hs.status = "Healthy"
+          hs.message = "Application synced"
+          return hs
+        end
+      end
+      hs.status = "Progressing"
+      hs.message = "Waiting for sync"
+      return hs

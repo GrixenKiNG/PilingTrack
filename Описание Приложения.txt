@@ -1,0 +1,179 @@
+PilingTrack — это full-stack платформа для управления свайными работами и сменной производственной отчётностью. По текущему состоянию это уже не просто CRUD-приложение, а доменно-ориентированная система с ролями, журналированием, PDF-генерацией, feedback loops, production-контуром и подготовкой к переходу SQLite -> PostgreSQL.
+
+Фактически система покрывает 4 основных контура:
+
+производственный: объекты, установки, бригады, отчёты, простои;
+диспетчерский: сводки, контроль объектов, аналитика;
+административный: пользователи, справочники, доступы, Telegram-конфиги;
+эксплуатационный: audit, readiness, diagnostics, feedback center, stage/prod pipeline.
+Ключевые точки входа:
+
+shell приложения и маршрутизация ролей: page.tsx
+типы домена: types.ts
+схема данных: schema.prisma
+Функциональность
+Есть 4 роли: ADMIN, DISPATCHER, OPERATOR, ASSISTANT. Ролевая модель описана в authorization-service.ts, а object-level доступы по объектам и владельцам отчётов — в resource-access-service.ts.
+
+Пользовательский слой разделён на 2 больших интерфейса:
+
+операторский контур:
+логин: login-page.tsx
+дашборд оператора: operator-dashboard.tsx
+форма отчёта: report-form.tsx
+история отчётов: report-history.tsx
+предпросмотр PDF: pdf-preview-dialog.tsx
+админский/диспетчерский контур:
+панель: admin-dashboard.tsx
+объекты: admin-sites.tsx
+установки: admin-equipment.tsx
+бригады: admin-crews.tsx
+справочники: admin-dictionaries.tsx
+отчёты: admin-reports.tsx
+пользователи: admin-users.tsx
+Telegram: admin-telegram.tsx
+С точки зрения бизнеса приложение умеет:
+
+вести объекты с иерархией поле -> куст -> пикет;
+задавать планы по сваям и лидерному бурению;
+назначать пользователей на объекты;
+управлять установками и бригадами;
+создавать/редактировать сменные отчёты;
+считать забитые сваи в шт. / м.п.;
+считать лидерное бурение как шт. * м = объём;
+учитывать простои с причинами;
+видеть, кто последним редактировал отчёт;
+экспортировать и печатать PDF.
+Серверный доменный центр отчётов — report-service.ts. Там есть:
+
+upsert отчёта;
+проверка окна редактирования;
+контроль даты отчёта;
+валидация простоев в пределах смены;
+проверка against site plans;
+audit diff по изменению отчётов.
+Архитектура
+Архитектурный стиль сейчас — modular monolith внутри Next.js App Router:
+
+UI-компоненты: src/components/piling
+API handlers: src/app/api
+service layer: src/services
+shared lib/runtime: src/lib
+Фактический паттерн исполнения такой:
+UI -> route handler -> auth/policy -> service layer -> Prisma -> DB
+
+Главные сервисные домены:
+
+auth: src/services/auth
+reports: src/services/reports
+sites: src/services/sites
+users: src/services/users
+equipment: src/services/equipment
+crews: src/services/crews
+dictionaries: src/services/dictionaries
+analytics: src/services/analytics
+telegram: src/services/telegram
+feedback/audit/system/tenancy:
+feedback
+audit
+system
+tenancy
+Аутентификация уже не псевдо-token по userId, а signed session cookie/JWT-like токен:
+
+токен/кука: session-service.ts
+проверка сессии: auth.ts
+Доступ к данным строится в 2 слоя:
+
+ability-based RBAC: authorization-service.ts
+resource-level access: resource-access-service.ts
+Данные
+Текущая основная схема находится в schema.prisma. Основные сущности:
+
+User
+Site, PileField, Cluster, Picket
+Equipment
+Crew, CrewAssistant
+UserSiteAssignment
+Report, PileWork, LeaderDrilling, ReportDowntime
+PileGrade, DrillingType, DowntimeReason
+TelegramConfig
+FeedbackEvent, FeedbackEventRead
+То есть модель уже покрывает и операционный контур, и наблюдаемость/обратную связь.
+
+База данных сейчас работает в dual-runtime режиме:
+
+sqlite по умолчанию;
+postgres через generated client.
+Это переключается в db.ts.
+API
+Основные API-группы:
+
+auth: src/app/api/auth
+reports: src/app/api/reports
+sites: src/app/api/sites
+equipment: src/app/api/equipment
+crews: src/app/api/crews
+dictionary: src/app/api/dictionary
+users: src/app/api/users
+analytics: src/app/api/analytics
+telegram: src/app/api/telegram
+feedback: src/app/api/feedback
+readiness/system: ready, system
+Feedback Loops и эксплуатация
+В приложении уже встроен industrial-like feedback contour:
+
+UI-центр обратной связи: feedback-center.tsx
+хранение feedback events: feedback-event-service.ts
+audit -> feedback bridge: audit-service.ts
+API событий и stream: events route, stream route
+Сейчас контур умеет:
+
+локальные и серверные сигналы;
+read/unread;
+acknowledge для админа/диспетчера;
+приоритеты инцидентов;
+requestId-трассировку;
+health/readiness сигналы.
+Диагностика системы:
+
+readiness: system-service.ts
+runtime diagnostics: system route
+Инфраструктура и production
+Production-контур уже подготовлен:
+
+Docker image: Dockerfile
+compose с Postgres: docker-compose.production.yml
+stage миграции и runbook:
+postgres-stage-runbook.md
+build-known-issues.md
+Есть отдельные скрипты на:
+
+build/typecheck/lint/smoke;
+генерацию Postgres schema/client;
+перенос данных SQLite -> PostgreSQL;
+stage doctor и cutover.
+Технологический стек
+
+Next.js 16, React 19, TypeScript
+Prisma
+SQLite / PostgreSQL
+Zustand
+Radix UI, shadcn/ui, Tailwind
+Framer Motion
+PDFKit
+Sentry groundwork
+Playwright для e2e
+Текущее состояние зрелости
+По структуре это уже хороший industrial operational platform core, а не просто демо. Сильные стороны:
+
+доменная модель;
+service layer;
+auth/policy/resource access;
+PDF и отчётный контур;
+feedback loops;
+production/stage foundation.
+Ограничения текущего снимка:
+
+местами ещё остались артефакты битой кириллицы в UI/строках;
+observability пока базовая, не полный enterprise SRE stack;
+multi-tenant заложен как groundwork, но не включён полноценно;
+часть industrial extensions уровня IIoT/telemetry/ML ещё впереди.

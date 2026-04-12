@@ -1,0 +1,103 @@
+/**
+ * POST /api/sync/v2
+ *
+ * FAANG-grade sync engine with:
+ * - Version-based conflict resolution
+ * - Idempotency (opId deduplication)
+ * - Field-level merge for conflict auto-resolution
+ * - Device tracking
+ *
+ * Request:
+ * {
+ *   "deviceId": "device-uuid",
+ *   "tenantId": "tenant-uuid",
+ *   "lastSyncAt": "2026-04-07T10:00:00Z",
+ *   "changes": [
+ *     {
+ *       "entity": "report",
+ *       "op": "upsert",
+ *       "data": { "id": "...", "status": "draft", ... },
+ *       "baseVersion": 3,
+ *       "opId": "uuid"
+ *     }
+ *   ]
+ * }
+ *
+ * Response:
+ * {
+ *   "serverChanges": [...],
+ *   "conflicts": [...],
+ *   "newSyncAt": "2026-04-07T11:00:00Z",
+ *   "syncStatus": "idle",
+ *   "stats": { "applied": 5, "conflicts": 1, "skipped": 2 }
+ * }
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { withCsrf } from '@/lib/csrf-protection';
+import { assertCan } from '@/services/auth/authorization-service';
+import { ServiceError } from '@/services/service-error';
+import { handleSync, type SyncRequest } from '@/modules/reports/application/sync-engine-v2';
+import { getRequestId } from '@/lib/request-context';
+
+export const runtime = 'nodejs';
+
+export async function POST(request: NextRequest) {
+  const csrfResponse = withCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
+  const { user, error } = await requireAuth(request);
+  if (error) return error;
+
+  // Authorization — sync v2 can mutate any entity
+  assertCan(user!, 'reports.manage_all');
+
+  const requestId = getRequestId(request);
+
+  try {
+    const body = await request.json();
+    const syncRequest: SyncRequest = {
+      deviceId: body.deviceId,
+      tenantId: user!.tenantId || process.env.DEFAULT_TENANT_ID || 'default',
+      userId: user!.id,
+      lastSyncAt: body.lastSyncAt || '1970-01-01T00:00:00Z',
+      changes: body.changes || [],
+    };
+
+    // Validate
+    if (!syncRequest.deviceId) {
+      return NextResponse.json(
+        { error: 'deviceId is required' },
+        { status: 400, headers: { 'X-Request-Id': requestId || '' } }
+      );
+    }
+
+    if (!Array.isArray(syncRequest.changes)) {
+      return NextResponse.json(
+        { error: 'changes must be an array' },
+        { status: 400, headers: { 'X-Request-Id': requestId || '' } }
+      );
+    }
+
+    // Execute sync
+    const result = await handleSync(syncRequest);
+
+    return NextResponse.json(result, {
+      headers: { 'X-Request-Id': requestId || '' },
+    });
+  } catch (caughtError) {
+    if (caughtError instanceof ServiceError) {
+      return NextResponse.json(
+        { error: caughtError.message },
+        { status: caughtError.status, headers: { 'X-Request-Id': requestId || '' } }
+      );
+    }
+
+    console.error('[Sync v2] Internal error:', caughtError);
+    return NextResponse.json(
+      { error: 'Internal sync error' },
+      { status: 500, headers: { 'X-Request-Id': requestId || '' } }
+    );
+  }
+}

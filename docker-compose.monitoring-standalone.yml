@@ -1,0 +1,136 @@
+# ============================================================
+# Docker Compose — Observability Stack (Standalone)
+# ============================================================
+# Monitoring: Prometheus, Grafana, Loki, Tempo, AlertManager
+# No external dependencies — runs independently.
+#
+# Usage:
+#   docker compose -f docker-compose.monitoring-standalone.yml up -d
+#
+# Ports:
+#   Prometheus:   http://localhost:9090
+#   Grafana:      http://localhost:3010 (admin/admin)
+#   Loki:         http://localhost:3100
+#   Tempo:        http://localhost:3200
+#   AlertManager: http://localhost:9093
+#   Pushgateway:  http://localhost:9091
+
+services:
+  # ============================================================
+  # Prometheus — Metrics Collection
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pilingtrack-prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./observability/prometheus/prometheus-standalone.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================================
+  # Grafana — Visualization
+  # ============================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pilingtrack-grafana
+    ports:
+      - '3010:3000'
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3010
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards/files:ro
+      - ./observability/grafana/datasources/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  # ============================================================
+  # Loki — Log Aggregation
+  # ============================================================
+  loki:
+    image: grafana/loki:latest
+    container_name: pilingtrack-loki
+    ports:
+      - '3100:3100'
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================================
+  # Tempo — Distributed Tracing
+  # ============================================================
+  tempo:
+    image: grafana/tempo:latest
+    container_name: pilingtrack-tempo
+    ports:
+      - '3200:3200'
+      - '4317:4317'  # OTLP gRPC
+      - '4318:4318'  # OTLP HTTP
+    volumes:
+      - ./observability/tempo/tempo-config.yml:/etc/tempo/config.yaml:ro
+      - tempo-data:/tmp/tempo
+    command: -config.file=/etc/tempo/config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================================
+  # AlertManager — Alert Routing
+  # ============================================================
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: pilingtrack-alertmanager
+    ports:
+      - '9093:9093'
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # ============================================================
+  # Push Gateway — for k6 results
+  # ============================================================
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pilingtrack-pushgateway
+    ports:
+      - '9091:9091'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  tempo-data:
+
+networks:
+  monitoring:
+    driver: bridge

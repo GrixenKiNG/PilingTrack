@@ -1,0 +1,199 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Бригады
+              - generic: "3"
+            - button:
+              - img
+              - text: Добавить
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: "?????? ????"
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: "???????? ????????"
+                          - generic:
+                            - img
+                            - text: Kopernik-SD-20
+                          - generic:
+                            - img
+                            - text: ВСМЖ
+                        - generic:
+                          - generic:
+                            - img
+                            - text: "???????? ????????"
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: Экипаж Герасимова
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Герасимов Сергей
+                          - generic:
+                            - img
+                            - text: Liebherr LRH 100 №1
+                          - generic:
+                            - img
+                            - text: МКАД-Юг, Участок 3
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Морозов А.Н.
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: Экипаж Иванова
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Иванов И.П.
+                          - generic:
+                            - img
+                            - text: PVE 50PR
+                          - generic:
+                            - img
+                            - text: МКАД-Юг, Участок 3
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Сидоров К.А.
+                          - generic:
+                            - img
+                            - text: Козлов М.В.
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+  - list
+  - alert
+  - dialog:
+    - generic:
+      - heading [level=2]:
+        - img
+        - text: Новая бригада
+    - generic:
+      - generic:
+        - generic:
+          - text: Оператор
+          - generic: "*"
+        - combobox:
+          - generic:
+            - generic:
+              - img
+              - text: Полевой Тестер
+          - img
+      - generic:
+        - generic:
+          - text: Установка
+          - generic: "*"
+        - combobox [expanded]:
+          - generic: Выберите установку
+          - img
+      - generic:
+        - generic:
+          - text: Объект
+          - generic: "*"
+        - combobox:
+          - generic: Выберите объект
+          - img
+      - generic:
+        - generic: Название (необязательно)
+        - textbox:
+          - /placeholder: Бригада №1
+      - generic:
+        - generic:
+          - img
+          - text: Помощники (ФИО)
+        - generic:
+          - generic:
+            - textbox:
+              - /placeholder: ФИО помощника
+            - button:
+              - img
+        - paragraph: 0 помощник(ов)
+    - generic:
+      - button: Отмена
+      - button [disabled]: Создать
+    - button:
+      - img
+      - generic: Close
+  - listbox [ref=e777]:
+    - option "Kopernik-SD-20" [active] [ref=e778]:
+      - generic [ref=e781]:
+        - img
+        - text: Kopernik-SD-20
+    - option "Liebherr LRH 100 №1" [ref=e782]:
+      - generic [ref=e785]:
+        - img
+        - text: Liebherr LRH 100 №1
+    - option "Liebherr LRH 100 №2" [ref=e786]:
+      - generic [ref=e789]:
+        - img
+        - text: Liebherr LRH 100 №2
+    - option "PVE 50PR" [ref=e790]:
+      - generic [ref=e793]:
+        - img
+        - text: PVE 50PR
+    - option "КБУРГ-16.02 №1" [ref=e794]:
+      - generic [ref=e797]:
+        - img
+        - text: КБУРГ-16.02 №1
+    - option "КБУРГ-16.02 №2" [ref=e798]:
+      - generic [ref=e801]:
+        - img
+        - text: КБУРГ-16.02 №2

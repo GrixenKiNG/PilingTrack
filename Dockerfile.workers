@@ -1,0 +1,89 @@
+# ============================================================
+# Dockerfile — Worker Service (Outbox + Projections + PDF)
+# ============================================================
+# Runs background workers as a separate process from the Next.js app.
+# Provides:
+# - Failure isolation (workers don't affect API availability)
+# - Independent scaling (scale workers without scaling API)
+# - Resource limits (CPU/memory per worker group)
+# - Health check endpoint (port 3002)
+# ============================================================
+
+# ============================================================
+# Stage 1: Dependencies
+# ============================================================
+FROM node:22-alpine AS deps
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat
+
+COPY package.json package-lock.json ./
+RUN npm ci --prefer-offline --no-audit --ignore-scripts
+
+# ============================================================
+# Stage 2: Build
+# ============================================================
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client for PostgreSQL
+RUN npx prisma generate --schema prisma/schema.postgres.prisma
+
+# Build Next.js standalone (needed for path resolution)
+RUN npm run build
+
+# Prune dev dependencies
+RUN npm prune --production
+
+# ============================================================
+# Stage 3: Worker Runner
+# ============================================================
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Install dependencies for health checks and Prisma
+RUN apk add --no-cache curl tini openssl
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy standalone output (for shared modules)
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+
+# Copy worker source (tsx will resolve @/ paths via tsconfig)
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/tsconfig.paths.json ./tsconfig.paths.json 2>/dev/null || true
+
+# Install tsx for running TypeScript directly
+RUN npm install -g tsx
+
+# Set ownership
+RUN chown -R nextjs:nodejs /app
+
+# Use tini as init system (proper signal handling)
+ENTRYPOINT ["/sbin/tini", "--"]
+
+USER nextjs
+
+ENV NODE_ENV=production
+ENV WORKER_HEALTH_PORT=3002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  curl -f http://localhost:3002/health || exit 1
+
+EXPOSE 3002
+
+# Start all workers (can override via ENABLED_WORKERS env var)
+CMD ["tsx", "src/workers/unified-worker.ts"]

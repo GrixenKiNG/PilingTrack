@@ -1,0 +1,58 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e36]:
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - img [ref=e41]
+        - heading "PilingTrack" [level=1] [ref=e47]
+      - generic [ref=e48]:
+        - generic [ref=e49]: "???????? ????????"
+        - button [ref=e50]:
+          - img
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - heading "Добро пожаловать, ????????" [level=1] [ref=e54]
+        - generic [ref=e55]:
+          - img [ref=e56]
+          - generic [ref=e58]: суббота, 4 апреля 2026 г.
+      - generic [ref=e61] [cursor=pointer]:
+        - generic [ref=e62]:
+          - img [ref=e64]
+          - generic [ref=e67]:
+            - paragraph [ref=e68]: Отчёт за сегодня
+            - paragraph [ref=e69]: Нажмите, чтобы создать отчёт
+        - generic [ref=e70]:
+          - generic [ref=e71]: Создать
+          - img [ref=e72]
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - img [ref=e77]
+          - text: Объект
+        - combobox [ref=e80]:
+          - generic: ВСМЖ
+          - img
+      - generic [ref=e81]:
+        - generic [ref=e83]:
+          - img [ref=e86]
+          - paragraph [ref=e91]: "0"
+          - paragraph [ref=e92]: Свай забито
+        - generic [ref=e94]:
+          - img [ref=e97]
+          - paragraph [ref=e99]: "0"
+          - paragraph [ref=e100]: Метров бурения
+      - button "Создать отчёт за смену" [ref=e102]:
+        - img
+        - text: Создать отчёт за смену
+    - navigation [ref=e103]:
+      - generic [ref=e104]:
+        - button "Главная" [ref=e105]:
+          - img [ref=e107]
+          - generic [ref=e112]: Главная
+        - button "Отчёт" [ref=e113]:
+          - img [ref=e115]
+          - generic [ref=e116]: Отчёт
+        - button "История" [ref=e117]:
+          - img [ref=e119]
+          - generic [ref=e123]: История
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e35]

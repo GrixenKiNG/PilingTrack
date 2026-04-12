@@ -1,0 +1,16 @@
+apiVersion: v2
+name: pilingtrack
+description: PilingTrack — Enterprise construction management platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">= 1.24.0"
+icon: https://pilingtrack.com/icon.png
+keywords:
+  - construction
+  - management
+  - pwa
+  - offline-first
+maintainers:
+  - name: PilingTrack Team
+    email: ops@pilingtrack.com

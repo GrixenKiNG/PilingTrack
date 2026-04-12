@@ -1,0 +1,104 @@
+# Production Values для Kind кластера (local production simulation)
+global:
+  environment: "production"
+
+api:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: pilingtrack
+    pullPolicy: IfNotPresent
+    tag: "prod"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  podDisruptionBudget:
+    enabled: false
+  probes:
+    liveness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 20
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      path: /api/ready
+      port: 3000
+      initialDelaySeconds: 10
+      periodSeconds: 15
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+workers:
+  outbox:
+    enabled: false
+  projection:
+    enabled: false
+  pdf:
+    enabled: false
+
+websocket:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pilingtrack
+    pullPolicy: IfNotPresent
+    tag: "prod"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: app.pilingtrack.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: api
+          servicePort: 3000
+    - host: ws.pilingtrack.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: websocket
+          servicePort: 4000
+  tls: []
+
+secrets:
+  databaseUrl: ""
+  redisUrl: ""
+  sessionSecret: ""
+  encryptionKey: ""
+
+networkPolicy:
+  enabled: false
+
+podSecurity:
+  enabled: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  seccompProfile: RuntimeDefault
+  capabilities:
+    drop:
+      - ALL
+
+observability:
+  openTelemetry:
+    enabled: false

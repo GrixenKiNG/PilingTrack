@@ -1,0 +1,336 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "pilingtrack-redis",
+    "title": "PilingTrack — Redis Performance",
+    "tags": ["pilingtrack", "redis", "cache", "performance"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "time": { "from": "now-1h", "to": "now" },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cache Hit Rate",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+            "legendFormat": "Hit Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 0.5 },
+                { "color": "green", "value": 0.8 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Ops Per Second",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 12, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(redis_commands_processed_total[1m])",
+            "legendFormat": "Total Ops/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(redis_keyspace_hits_total[1m])",
+            "legendFormat": "Cache Hits/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(redis_keyspace_misses_total[1m])",
+            "legendFormat": "Cache Misses/sec",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Connected Clients",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+        "targets": [
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Clients",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 100 },
+                { "color": "red", "value": 500 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes",
+            "legendFormat": "Used Memory",
+            "refId": "A"
+          },
+          {
+            "expr": "redis_memory_max_bytes",
+            "legendFormat": "Max Memory",
+            "refId": "B"
+          },
+          {
+            "expr": "redis_memory_used_rss_bytes",
+            "legendFormat": "RSS Memory",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 214748364 },
+                { "color": "red", "value": 241172480 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Memory Fragmentation Ratio",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 6, "x": 12, "y": 6 },
+        "targets": [
+          {
+            "expr": "redis_mem_fragmentation_ratio",
+            "legendFormat": "Fragmentation",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1.5 },
+                { "color": "red", "value": 3 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Eviction Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 6, "x": 18, "y": 6 },
+        "targets": [
+          {
+            "expr": "rate(redis_evicted_keys_total[5m])",
+            "legendFormat": "Evictions/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 10 },
+                { "color": "red", "value": 100 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Keys in Database",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+        "targets": [
+          {
+            "expr": "redis_db0_keys",
+            "legendFormat": "Keys",
+            "refId": "A"
+          },
+          {
+            "expr": "redis_db0_expires",
+            "legendFormat": "Keys with TTL",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Redis Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+        "targets": [
+          {
+            "expr": "rate(redis_command_call_duration_seconds_sum[1m]) / rate(redis_command_call_duration_seconds_count[1m])",
+            "legendFormat": "Avg Command Latency",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.001 },
+                { "color": "red", "value": 0.01 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Application Cache Hit Rate (Custom Metrics)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total[5m])",
+            "legendFormat": "Cache Hits",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(cache_misses_total[5m])",
+            "legendFormat": "Cache Misses",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(cache_stale_hits_total[5m])",
+            "legendFormat": "Stale Hits (SWR)",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Cache Hit Ratio (Application Level)",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 6, "x": 12, "y": 22 },
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))",
+            "legendFormat": "Hit Ratio",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 0.5 },
+                { "color": "green", "value": 0.85 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Stampede Count",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 6, "x": 18, "y": 22 },
+        "targets": [
+          {
+            "expr": "rate(cache_stampedes_total[5m])",
+            "legendFormat": "Stampedes/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1 },
+                { "color": "red", "value": 10 }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(redis_up, instance)"
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

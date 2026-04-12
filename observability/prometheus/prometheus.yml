@@ -1,0 +1,99 @@
+# ============================================================
+# Prometheus Configuration — PilingTrack Observability
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    cluster: 'pilingtrack'
+    environment: '${ENVIRONMENT:-development}'
+    region: '${REGION:-eu-west-1}'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+scrape_configs:
+  # ============================================================
+  # Next.js Application
+  # ============================================================
+  - job_name: 'pilingtrack-app'
+    metrics_path: '/api/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['app:3000']
+        labels:
+          service: 'pilingtrack-app'
+          tier: 'frontend'
+
+  # ============================================================
+  # WebSocket Server
+  # ============================================================
+  - job_name: 'pilingtrack-ws'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['ws:3001']
+        labels:
+          service: 'pilingtrack-ws'
+          tier: 'realtime'
+
+  # ============================================================
+  # PostgreSQL
+  # ============================================================
+  - job_name: 'postgresql'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+          tier: 'database'
+
+  # ============================================================
+  # Redis
+  # ============================================================
+  - job_name: 'redis'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          tier: 'cache'
+
+  # ============================================================
+  # Node.js Process Metrics
+  # ============================================================
+  - job_name: 'nodejs-processes'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['app:3000', 'ws:3001']
+        labels:
+          service: 'nodejs'
+
+  # ============================================================
+  # k6 Load Test Results (push gateway)
+  # ============================================================
+  - job_name: 'k6-results'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['pushgateway:9091']
+        labels:
+          service: 'k6'
+          tier: 'testing'
+
+  # ============================================================
+  # Prometheus Self-Monitoring
+  # ============================================================
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'

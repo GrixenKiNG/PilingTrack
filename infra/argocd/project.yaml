@@ -1,0 +1,81 @@
+# ============================================================
+# ArgoCD Project — PilingTrack
+# ============================================================
+# Defines the project with access control and resource allowlist.
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: pilingtrack
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: pilingtrack
+spec:
+  description: PilingTrack — Industrial SaaS Platform
+
+  # Allow deployments to staging and production namespaces
+  destinations:
+    - namespace: pilingtrack-staging
+      server: https://kubernetes.default.svc
+    - namespace: pilingtrack-prod
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  # Only allow deployment from the official repo
+  sourceRepos:
+    - https://github.com/pilingtrack/pilingtrack.git
+
+  # Only allow specific resource kinds
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+
+  # RBAC — only specific groups can sync
+  roles:
+    - name: staging-deployer
+      description: Can deploy to staging
+      policies:
+        - p, proj:pilingtrack:staging-deployer, applications, sync, pilingtrack/pilingtrack-staging, allow
+        - p, proj:pilingtrack:staging-deployer, applications, get, pilingtrack/*, allow
+      groups:
+        - pilingtrack-staging-team
+    - name: prod-deployer
+      description: Can deploy to production (requires approval)
+      policies:
+        - p, proj:pilingtrack:prod-deployer, applications, sync, pilingtrack/pilingtrack-prod, allow
+        - p, proj:pilingtrack:prod-deployer, applications, get, pilingtrack/*, allow
+      groups:
+        - pilingtrack-prod-team
+    - name: admin
+      description: Full access to all environments
+      policies:
+        - p, proj:pilingtrack:admin, applications, *, pilingtrack/*, allow
+      groups:
+        - pilingtrack-admins

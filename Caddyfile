@@ -1,0 +1,75 @@
+# ============================================================
+# Caddyfile — Production Reverse Proxy
+#
+# Development: listens on :81, proxies to Next.js on :3000
+# Production: use TLS with automatic Let's Encrypt certificates
+# ============================================================
+
+# Development — HTTP only
+:81 {
+	@transform_port_query {
+		query XTransformPort=*
+	}
+
+	handle @transform_port_query {
+		reverse_proxy localhost:{query.XTransformPort} {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy localhost:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+}
+
+# Production — HTTPS with automatic TLS (Let's Encrypt)
+# Uncomment and configure for production:
+#
+# pilingtrack.ru www.pilingtrack.ru {
+# 	encode gzip zstd
+#
+# 	@transform_port_query {
+# 		query XTransformPort=*
+# 	}
+#
+# 	handle @transform_port_query {
+# 		reverse_proxy localhost:{query.XTransformPort} {
+# 			header_up Host {host}
+# 			header_up X-Forwarded-For {remote_host}
+# 			header_up X-Forwarded-Proto https
+# 			header_up X-Real-IP {remote_host}
+# 		}
+# 	}
+#
+# 	handle {
+# 		reverse_proxy localhost:3000 {
+# 			header_up Host {host}
+# 			header_up X-Forwarded-For {remote_host}
+# 			header_up X-Forwarded-Proto https
+# 			header_up X-Real-IP {remote_host}
+# 			header_up X-Forwarded-Host {host}
+# 		}
+# 	}
+#
+# 	# Security headers
+# 	header {
+# 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+# 		X-Content-Type-Options "nosniff"
+# 		X-Frame-Options "DENY"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+# 	}
+#
+# 	# Automatic TLS via Let's Encrypt
+# 	tls {
+# 		protocols tls1.2 tls1.3
+# 	}
+# }

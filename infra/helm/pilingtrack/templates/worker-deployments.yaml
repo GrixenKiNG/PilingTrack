@@ -1,0 +1,65 @@
+{{- range $name, $worker := .Values.workers }}
+{{- if $worker.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pilingtrack.fullname" $ }}-worker-{{ $name }}
+  labels:
+    {{- include "pilingtrack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: worker
+    worker-type: {{ $name }}
+spec:
+  replicas: {{ $worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pilingtrack.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: worker
+      worker-type: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "pilingtrack.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: worker
+        worker-type: {{ $name }}
+    spec:
+      {{- with $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "pilingtrack.serviceAccountName" $ }}
+      {{- if $.Values.podSecurity.enabled }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: {{ $.Values.podSecurity.seccompProfile }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: "{{ $worker.image.repository }}:{{ $worker.image.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.api.image.pullPolicy }}
+          {{- with $worker.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "pilingtrack.fullname" $ }}-config
+            {{- if or $.Values.secrets.databaseUrl $.Values.secrets.redisUrl $.Values.secrets.sessionSecret }}
+            - secretRef:
+                name: {{ include "pilingtrack.fullname" $ }}-secrets
+            {{- end }}
+          {{- if $.Values.podSecurity.enabled }}
+          securityContext:
+            readOnlyRootFilesystem: {{ $.Values.podSecurity.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ $.Values.podSecurity.allowPrivilegeEscalation }}
+            capabilities:
+              {{- toYaml $.Values.podSecurity.capabilities | nindent 14 }}
+          {{- end }}
+      terminationGracePeriodSeconds: 60
+{{- end }}
+{{- end }}

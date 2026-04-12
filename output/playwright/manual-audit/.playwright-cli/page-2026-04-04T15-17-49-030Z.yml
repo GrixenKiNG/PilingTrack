@@ -1,0 +1,158 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button [expanded]:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Объекты
+              - generic: "3"
+            - button:
+              - img
+              - text: Новый объект
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - generic:
+                          - paragraph: М-11, Переезд через реку
+                        - generic:
+                          - generic:
+                            - img
+                            - generic: "150"
+                            - text: свай
+                          - generic:
+                            - img
+                            - generic: "120"
+                            - text: м
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - generic:
+                          - paragraph: МКАД-Юг, Участок 3
+                          - generic:
+                            - generic: 2 плана бурения
+                        - generic:
+                          - generic:
+                            - img
+                            - generic: "240"
+                            - text: свай
+                          - generic:
+                            - img
+                            - generic: "180.5"
+                            - text: м
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - generic:
+                        - generic:
+                          - paragraph: ВСМЖ
+                        - generic:
+                          - generic:
+                            - img
+                            - generic: "0"
+                            - text: свай
+                          - generic:
+                            - img
+                            - generic: "0"
+                            - text: м
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+                  - generic:
+                    - generic:
+                      - paragraph: Нет свайных полей. Нажмите + чтобы добавить.
+                      - button:
+                        - img
+                        - text: Добавить свайное поле
+  - list
+  - alert
+  - dialog "Меню навигации" [ref=e502]:
+    - heading "Меню навигации" [level=2] [ref=e503]
+    - generic [ref=e504]:
+      - generic [ref=e505]:
+        - img [ref=e507]
+        - generic [ref=e512]:
+          - heading "PilingTrack" [level=1] [ref=e513]
+          - paragraph [ref=e514]: Панель администратора
+      - navigation [ref=e515]:
+        - button "Дашборд" [active] [ref=e516]:
+          - img [ref=e517]
+          - text: Дашборд
+        - button "Объекты" [ref=e522]:
+          - img [ref=e523]
+          - text: Объекты
+        - button "Установки" [ref=e526]:
+          - img [ref=e527]
+          - text: Установки
+        - button "Бригады" [ref=e529]:
+          - img [ref=e530]
+          - text: Бригады
+        - button "Отчёты" [ref=e534]:
+          - img [ref=e535]
+          - text: Отчёты
+        - button "Справочники" [ref=e538]:
+          - img [ref=e539]
+          - text: Справочники
+        - button "Пользователи" [ref=e542]:
+          - img [ref=e543]
+          - text: Пользователи
+        - button "Telegram" [ref=e548]:
+          - img [ref=e549]
+          - text: Telegram
+      - generic [ref=e552]:
+        - generic [ref=e553]:
+          - generic [ref=e555]: C
+          - generic [ref=e556]:
+            - paragraph [ref=e557]: Codex Admin
+            - paragraph [ref=e558]: codex-admin@piling.ru
+        - button "Выйти" [ref=e559]:
+          - img
+          - text: Выйти
+    - button "Close" [ref=e560]:
+      - img [ref=e561]
+      - generic [ref=e564]: Close

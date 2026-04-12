@@ -1,0 +1,91 @@
+{
+  "auth": {
+    "login": {
+      "title": "PilingTrack",
+      "subtitle": "Управление свайными работами",
+      "email": "Email",
+      "password": "Пароль",
+      "loginButton": "Войти",
+      "fillFields": "Заполните email и пароль",
+      "invalidCredentials": "Неверный email или пароль",
+      "loginError": "Ошибка входа",
+      "welcome": "Добро пожаловать, {name}!",
+      "emailPlaceholder": "operator@piling.ru",
+      "passwordPlaceholder": "••••••••",
+      "copyright": "© 2025 PilingTrack - Система управления свайными работами"
+    }
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "create": "Создать",
+    "close": "Закрыть",
+    "search": "Поиск",
+    "noData": "Нет данных",
+    "confirm": "Подтвердить",
+    "back": "Назад",
+    "next": "Далее"
+  },
+  "navigation": {
+    "dashboard": "Дашборд",
+    "reports": "Отчёты",
+    "sites": "Объекты",
+    "equipment": "Установки",
+    "crews": "Бригады",
+    "users": "Пользователи",
+    "dictionaries": "Справочники",
+    "telegram": "Telegram",
+    "reportForm": "Новый отчёт",
+    "reportHistory": "История"
+  },
+  "roles": {
+    "ADMIN": "Администратор",
+    "DISPATCHER": "Диспетчер",
+    "OPERATOR": "Оператор",
+    "ASSISTANT": "Монтёр"
+  },
+  "reports": {
+    "title": "Отчёты",
+    "newReport": "Новый отчёт",
+    "editReport": "Редактировать отчёт",
+    "submitSuccess": "Отчёт успешно отправлен!",
+    "submitError": "Ошибка при отправке отчёта",
+    "date": "Дата",
+    "shift": "Смена",
+    "dayShift": "Дневная",
+    "nightShift": "Ночная",
+    "piles": "Сваи",
+    "drilling": "Бурение",
+    "downtimes": "Простои",
+    "totalPiles": "Всего свай",
+    "totalDrilling": "Всего бурение",
+    "totalDowntime": "Всего простои",
+    "addPile": "Добавить сваю",
+    "addDrilling": "Добавить бурение",
+    "addDowntime": "Добавить простой",
+    "site": "Объект",
+    "crew": "Бригада",
+    "equipment": "Установка",
+    "status": {
+      "draft": "Черновик",
+      "submitted": "Отправлен"
+    }
+  },
+  "sites": {
+    "title": "Объекты",
+    "newSite": "Новый объект",
+    "editSite": "Редактировать объект",
+    "name": "Название",
+    "plannedPiles": "План по сваям",
+    "plannedDrilling": "План по бурению",
+    "status": {
+      "ACTIVE": "Активный",
+      "PAUSED": "Приостановлен",
+      "COMPLETED": "Завершён"
+    }
+  }
+}

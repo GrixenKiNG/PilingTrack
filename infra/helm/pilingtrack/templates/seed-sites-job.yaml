@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-sites
+  namespace: pilingtrack-prod
+  labels:
+    app.kubernetes.io/component: seed
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: seed
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: postgres:16-alpine
+          command: ["sh", "-c"]
+          args:
+            - |
+              export PGPASSWORD=pilingtrack
+              psql -h postgresql.pilingtrack-prod.svc.cluster.local -U postgres -d pilingtrack -f /sql/seed-sites.sql
+              echo "✅ Sites seeding completed!"
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+      volumes:
+        - name: sql
+          configMap:
+            name: seed-sites-cm

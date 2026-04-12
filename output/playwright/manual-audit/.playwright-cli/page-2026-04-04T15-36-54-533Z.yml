@@ -1,0 +1,127 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e36]:
+    - generic [ref=e38]:
+      - button [ref=e39]:
+        - img [ref=e40]
+      - generic [ref=e41]:
+        - img [ref=e43]
+        - generic [ref=e48]: PilingTrack
+    - main [ref=e49]:
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - heading "Панель управления" [level=1] [ref=e53]:
+            - img [ref=e54]
+            - text: Панель управления
+          - paragraph [ref=e59]: Обзор по всем объектам
+        - generic [ref=e60]:
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - img [ref=e65]
+              - generic [ref=e70]: Свай забито
+            - paragraph [ref=e71]: "41"
+            - paragraph [ref=e72]: из 390 (11%)
+          - generic [ref=e75]:
+            - generic [ref=e76]:
+              - img [ref=e77]
+              - generic [ref=e83]: М. бурения
+            - paragraph [ref=e84]: "451"
+            - paragraph [ref=e85]: из 300.5 (150%)
+          - generic [ref=e88]:
+            - generic [ref=e89]:
+              - img [ref=e90]
+              - generic [ref=e93]: Отчётов
+            - paragraph [ref=e94]: "1"
+            - paragraph [ref=e95]: всего
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - img [ref=e100]
+              - generic [ref=e103]: Простои
+            - paragraph [ref=e104]: "3.5"
+            - paragraph [ref=e105]: часов
+        - generic [ref=e107]:
+          - generic [ref=e109]:
+            - img [ref=e110]
+            - text: Общий прогресс
+          - generic [ref=e113]:
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - generic [ref=e116]: Забивка свай
+                - generic [ref=e117]: 41 / 390
+              - progressbar [ref=e118]
+            - generic [ref=e120]:
+              - generic [ref=e121]:
+                - generic [ref=e122]: Лидерное бурение
+                - generic [ref=e123]: 451 / 300.5 м
+              - progressbar [ref=e124]
+        - generic [ref=e126]:
+          - generic [ref=e127]:
+            - heading "Прогресс по объектам" [level=2] [ref=e128]:
+              - img [ref=e129]
+              - text: Прогресс по объектам
+            - button "Управление" [ref=e131]:
+              - text: Управление
+              - img [ref=e132]
+          - generic [ref=e134]:
+            - generic [ref=e138] [cursor=pointer]:
+              - generic [ref=e139]:
+                - paragraph [ref=e140]: ВСМЖ
+                - paragraph [ref=e141]: 0 отчётов · 0 ч простоев
+              - generic [ref=e142]: 0%
+            - generic [ref=e145] [cursor=pointer]:
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - paragraph [ref=e148]: М-11, Переезд через реку
+                  - paragraph [ref=e149]: 0 отчётов · 0 ч простоев
+                - generic [ref=e150]: 0%
+              - generic [ref=e151]:
+                - generic [ref=e152]:
+                  - generic [ref=e153]: Сваи
+                  - generic [ref=e154]: 0/150
+                - progressbar [ref=e155]
+              - generic [ref=e157]:
+                - generic [ref=e158]:
+                  - generic [ref=e159]: Бурение
+                  - generic [ref=e160]: 0/120 м
+                - progressbar [ref=e161]
+            - generic [ref=e165] [cursor=pointer]:
+              - generic [ref=e166]:
+                - generic [ref=e167]:
+                  - paragraph [ref=e168]: МКАД-Юг, Участок 3
+                  - paragraph [ref=e169]: 1 отчётов · 3.5 ч простоев
+                - generic [ref=e170]: 17.083333333333332%
+              - generic [ref=e171]:
+                - generic [ref=e172]:
+                  - generic [ref=e173]: Сваи
+                  - generic [ref=e174]: 41/240
+                - progressbar [ref=e175]
+              - generic [ref=e177]:
+                - generic [ref=e178]:
+                  - generic [ref=e179]: Бурение
+                  - generic [ref=e180]: 451/180.5 м
+                - progressbar [ref=e181]
+        - generic [ref=e183]:
+          - heading "Управление" [level=2] [ref=e184]
+          - generic [ref=e185]:
+            - generic [ref=e187] [cursor=pointer]:
+              - img [ref=e189]
+              - generic [ref=e192]: Объекты
+              - img [ref=e193]
+            - generic [ref=e196] [cursor=pointer]:
+              - img [ref=e198]
+              - generic [ref=e201]: Отчёты
+              - img [ref=e202]
+            - generic [ref=e205] [cursor=pointer]:
+              - img [ref=e207]
+              - generic [ref=e210]: Справочники
+              - img [ref=e211]
+            - generic [ref=e214] [cursor=pointer]:
+              - img [ref=e216]
+              - generic [ref=e221]: Пользователи
+              - img [ref=e222]
+            - generic [ref=e225] [cursor=pointer]:
+              - img [ref=e227]
+              - generic [ref=e230]: Telegram
+              - img [ref=e231]
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e35]

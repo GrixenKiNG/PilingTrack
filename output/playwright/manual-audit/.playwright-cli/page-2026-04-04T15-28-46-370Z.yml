@@ -1,0 +1,39 @@
+- generic [ref=e1]:
+  - generic [ref=e36]:
+    - generic [ref=e268]:
+      - generic [ref=e269]:
+        - img [ref=e271]
+        - heading "PilingTrack" [level=1] [ref=e277]
+      - generic [ref=e278]:
+        - generic [ref=e279]: "???????? ????????"
+        - button [ref=e280]:
+          - img
+    - generic [ref=e355]:
+      - generic [ref=e356]:
+        - heading "История отчётов" [level=1] [ref=e357]:
+          - img [ref=e358]
+          - text: История отчётов
+        - generic [ref=e362]: 0 записей
+      - generic [ref=e363]:
+        - img [ref=e364]
+        - combobox [ref=e366]:
+          - generic: Все объекты
+          - img
+      - generic [ref=e367]:
+        - img [ref=e368]
+        - paragraph [ref=e371]: Нет отчётов
+        - paragraph [ref=e372]: Создайте первый отчёт в разделе «Новый отчёт»
+    - navigation [ref=e333]:
+      - generic [ref=e334]:
+        - button "Главная" [ref=e335]:
+          - img [ref=e337]
+          - generic [ref=e342]: Главная
+        - button "Отчёт" [ref=e343]:
+          - img [ref=e345]
+          - generic [ref=e346]: Отчёт
+        - button "История" [active] [ref=e347]:
+          - img [ref=e349]
+          - generic [ref=e353]: История
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e35]

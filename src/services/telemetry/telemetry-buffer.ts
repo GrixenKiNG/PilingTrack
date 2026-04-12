@@ -1,0 +1,245 @@
+/**
+ * Telemetry Buffer — Batch, Sample, Protect
+ *
+ * Buffers telemetry records before writing to DB to:
+ * - Reduce DB write amplification (batch INSERT)
+ * - Protect against DB overload (circuit breaker + drop oldest)
+ * - Ensure graceful shutdown (flush on exit)
+ *
+ * Configuration:
+ *   maxBufferSize:   Max records before forced flush (default 500)
+ *   flushIntervalMs: Automatic flush interval (default 5000ms)
+ *   maxBatchSize:    Max records per single INSERT (default 200)
+ */
+
+import { db } from '@/lib/db';
+import { Prisma } from '@/generated/postgres-client/client';
+import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
+import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
+
+export interface TelemetryBufferConfig {
+  maxBufferSize?: number;
+  flushIntervalMs?: number;
+  maxBatchSize?: number;
+  circuitBreaker?: CircuitBreaker;
+}
+
+interface TelemetryBufferRecord extends TelemetryRecord {
+  _ingestedAt: number;
+}
+
+export class TelemetryBuffer {
+  private buffer: TelemetryBufferRecord[] = [];
+  private flushTimer: ReturnType<typeof setInterval>;
+  private circuitBreaker: CircuitBreaker;
+  private maxBufferSize: number;
+  private flushIntervalMs: number;
+  private maxBatchSize: number;
+
+  // Stats
+  private totalBuffered = 0;
+  private totalFlushed = 0;
+  private totalDropped = 0;
+
+  constructor(config: TelemetryBufferConfig = {}) {
+    this.maxBufferSize = config.maxBufferSize ?? 500;
+    this.flushIntervalMs = config.flushIntervalMs ?? 5_000;
+    this.maxBatchSize = config.maxBatchSize ?? 200;
+    this.circuitBreaker = config.circuitBreaker ?? new CircuitBreaker('telemetry-db', {
+      failureThreshold: 5,
+      resetTimeoutMs: 30_000,
+    });
+
+    // Periodic flush
+    this.flushTimer = setInterval(() => {
+      this.flush().catch((err) => {
+        console.error('[TelemetryBuffer] Periodic flush error:', err);
+      });
+    }, this.flushIntervalMs);
+
+    // Unref timer so it doesn't block process exit
+    if (typeof this.flushTimer.unref === 'function') {
+      this.flushTimer.unref();
+    }
+
+    // Graceful shutdown
+    this.registerShutdownHook();
+  }
+
+  /**
+   * Ingest a single telemetry record into the buffer.
+   * If buffer is full, flush immediately.
+   * If DB is overloaded (circuit OPEN), drop oldest records.
+   */
+  async ingest(record: TelemetryRecord): Promise<void> {
+    const bufferRecord: TelemetryBufferRecord = {
+      ...record,
+      _ingestedAt: Date.now(),
+    };
+
+    this.buffer.push(bufferRecord);
+    this.totalBuffered++;
+
+    // Check if buffer is at capacity
+    if (this.buffer.length >= this.maxBufferSize) {
+      // If circuit is OPEN, drop oldest to make room
+      if (this.circuitBreaker.getState() === 'OPEN') {
+        this.dropOldest(Math.ceil(this.maxBufferSize * 0.25)); // drop 25%
+        console.warn(
+          '[TelemetryBuffer] Circuit breaker OPEN — dropped oldest records, buffer size:',
+          this.buffer.length
+        );
+      } else {
+        await this.flush();
+      }
+    }
+  }
+
+  /**
+   * Flush all buffered records to the database.
+   * Processes in batches respecting maxBatchSize.
+   */
+  async flush(): Promise<void> {
+    if (this.buffer.length === 0) return;
+
+    const recordsToFlush = [...this.buffer];
+    this.buffer = [];
+
+    let flushedCount = 0;
+    let droppedCount = 0;
+
+    for (let i = 0; i < recordsToFlush.length; i += this.maxBatchSize) {
+      const batch = recordsToFlush.slice(i, i + this.maxBatchSize);
+
+      try {
+        await this.circuitBreaker.execute(async () => {
+          await db.$transaction(
+            batch.map((record) =>
+              db.telemetryRecord.create({
+                data: {
+                  type: record.type,
+                  equipmentId: record.equipmentId,
+                  siteId: record.siteId || null,
+                  value: record.value,
+                  unit: record.unit || null,
+                  latitude: record.latitude || null,
+                  longitude: record.longitude || null,
+                  metadata: record.metadata
+                    ? (record.metadata as Prisma.InputJsonValue)
+                    : Prisma.DbNull,
+                  timestamp: record.timestamp || new Date(),
+                },
+              })
+            )
+          );
+        });
+        flushedCount += batch.length;
+      } catch (error) {
+        // Circuit is OPEN or DB failed — re-queue remaining batches
+        if (error instanceof CircuitOpenError) {
+          // Put remaining records back into buffer
+          const remaining = recordsToFlush.slice(i + this.maxBatchSize);
+          this.buffer = [...remaining, ...this.buffer];
+          droppedCount += batch.length;
+          this.totalDropped += batch.length;
+          console.warn(
+            '[TelemetryBuffer] Circuit breaker OPEN — dropping batch of',
+            batch.length,
+            'records'
+          );
+          break;
+        }
+
+        // Other DB error — re-queue and log
+        const remaining = recordsToFlush.slice(i + this.maxBatchSize);
+        this.buffer = [...remaining, ...this.buffer];
+        console.error('[TelemetryBuffer] Flush error:', error);
+        break;
+      }
+    }
+
+    this.totalFlushed += flushedCount;
+
+    if (flushedCount > 0) {
+      console.debug(
+        '[TelemetryBuffer] Flushed',
+        flushedCount,
+        'records, dropped:',
+        droppedCount
+      );
+    }
+  }
+
+  /**
+   * Get current buffer stats.
+   */
+  getStats(): { buffered: number; flushed: number; dropped: number } {
+    return {
+      buffered: this.buffer.length,
+      flushed: this.totalFlushed,
+      dropped: this.totalDropped,
+    };
+  }
+
+  /**
+   * Get detailed stats including circuit breaker state.
+   */
+  getDetailedStats(): {
+    buffered: number;
+    flushed: number;
+    dropped: number;
+    totalBuffered: number;
+    circuitBreakerState: string;
+  } {
+    return {
+      buffered: this.buffer.length,
+      flushed: this.totalFlushed,
+      dropped: this.totalDropped,
+      totalBuffered: this.totalBuffered,
+      circuitBreakerState: this.circuitBreaker.getState(),
+    };
+  }
+
+  /**
+   * Get circuit breaker instance for external checks.
+   */
+  getCircuitBreaker(): CircuitBreaker {
+    return this.circuitBreaker;
+  }
+
+  /**
+   * Graceful shutdown — flush remaining records.
+   */
+  async shutdown(): Promise<void> {
+    clearInterval(this.flushTimer);
+    console.log('[TelemetryBuffer] Shutting down, flushing', this.buffer.length, 'records...');
+    await this.flush();
+    console.log('[TelemetryBuffer] Shutdown complete. Stats:', this.getStats());
+  }
+
+  /**
+   * Drop the oldest N records from the buffer.
+   */
+  private dropOldest(count: number): void {
+    const dropped = this.buffer.splice(0, Math.min(count, this.buffer.length));
+    this.totalDropped += dropped.length;
+  }
+
+  /**
+   * Register process shutdown handlers for graceful flush.
+   */
+  private registerShutdownHook(): void {
+    const shutdown = async () => {
+      await this.shutdown();
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
+    // For Node.js 14+ beforeExit
+    process.on('beforeExit', shutdown);
+  }
+}
+
+// Singleton instance
+export const telemetryBuffer = new TelemetryBuffer();

@@ -1,0 +1,55 @@
+# ============================================================
+# ArgoCD Application — PilingTrack Staging
+# ============================================================
+# Deploys PilingTrack to staging namespace.
+# Auto-sync on every git push to main branch.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pilingtrack-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: pilingtrack
+    environment: staging
+spec:
+  project: pilingtrack
+
+  source:
+    repoURL: https://github.com/pilingtrack/pilingtrack.git
+    targetRevision: main
+    path: infra/helm/pilingtrack
+    helm:
+      valueFiles:
+        - values-staging.yaml
+      parameters:
+        - name: image.tag
+          value: "latest"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pilingtrack-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+  revisionHistoryLimit: 10

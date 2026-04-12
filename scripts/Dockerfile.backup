@@ -1,0 +1,30 @@
+FROM postgres:16-alpine
+
+# Install backup tools
+RUN apk add --no-cache \
+    aws-cli \
+    minio-client \
+    coreutils \
+    findutils \
+    bash
+
+# Copy backup scripts
+COPY scripts/backup.sh /usr/local/bin/backup.sh
+COPY scripts/restore.sh /usr/local/bin/restore.sh
+
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh
+
+# Create backup directory
+RUN mkdir -p /backups/pilingtrack/{daily,weekly,monthly}
+
+ENV BACKUP_DIR=/backups/pilingtrack
+ENV DB_HOST=postgres
+ENV DB_PORT=5432
+ENV DB_NAME=pilingtrack
+ENV DB_USER=postgres
+ENV RETENTION_DAYS=7
+ENV RETENTION_WEEKS=4
+ENV RETENTION_MONTHS=12
+
+# Default command: run backup
+CMD ["/usr/local/bin/backup.sh"]

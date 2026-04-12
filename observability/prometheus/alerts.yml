@@ -1,0 +1,203 @@
+# ============================================================
+# Prometheus Alert Rules — PilingTrack
+# ============================================================
+
+groups:
+  # ============================================================
+  # API Performance Alerts
+  # ============================================================
+  - name: api-performance
+    rules:
+      - alert: HighAPILatencyP95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="pilingtrack-app"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "p95 API latency > 500ms for 5m"
+          description: "API p95 latency is {{ $value | humanizeDuration }} for the last 5 minutes on {{ $labels.instance }}"
+          runbook_url: "https://wiki.pilingtrack.com/runbooks/high-api-latency"
+
+      - alert: CriticalAPILatencyP95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="pilingtrack-app"}[5m])) > 2
+        for: 2m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "CRITICAL: p95 API latency > 2s for 2m"
+          description: "API is severely degraded. p95 = {{ $value | humanizeDuration }}"
+          runbook_url: "https://wiki.pilingtrack.com/runbooks/critical-api-latency"
+
+      - alert: HighAPIErrorRate
+        expr: sum(rate(http_requests_total{job="pilingtrack-app",status=~"5.."}[5m])) / sum(rate(http_requests_total{job="pilingtrack-app"}[5m])) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "API error rate > 1% for 2m"
+          description: "{{ $value | humanizePercentage }} of API requests are failing with 5xx errors"
+          runbook_url: "https://wiki.pilingtrack.com/runbooks/high-api-error-rate"
+
+      - alert: APIEndpointDown
+        expr: up{job="pilingtrack-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "API endpoint is DOWN"
+          description: "{{ $labels.instance }} has been unreachable for 1 minute"
+
+  # ============================================================
+  # Database Alerts
+  # ============================================================
+  - name: database
+    rules:
+      - alert: PostgresHighConnectionCount
+        expr: pg_stat_activity_count{datname="pilingtrack"} > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL connections > 80"
+          description: "{{ $value }} active connections out of 100 max"
+          runbook_url: "https://wiki.pilingtrack.com/runbooks/postgres-connections"
+
+      - alert: PostgresConnectionPoolExhausted
+        expr: pg_stat_activity_count{datname="pilingtrack"} > 95
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "CRITICAL: PostgreSQL pool nearly exhausted"
+          description: "{{ $value }} connections — risk of request queuing"
+
+      - alert: PostgresSlowQueries
+        expr: rate(pg_stat_statatments_mean_time_seconds{datname="pilingtrack"}[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL average query time > 300ms"
+          description: "Average query time: {{ $value | humanizeDuration }}"
+
+      - alert: PostgresDeadlocks
+        expr: increase(pg_stat_database_deadlocks{datname="pilingtrack"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "{{ $value }} deadlocks in the last 5 minutes"
+
+  # ============================================================
+  # Node.js / Application Alerts
+  # ============================================================
+  - name: application
+    rules:
+      - alert: HighMemoryUsage
+        expr: nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: nodejs
+        annotations:
+          summary: "Node.js heap usage > 90% for 5m"
+          description: "Heap usage on {{ $labels.instance }} is {{ $value | humanizePercentage }}"
+          runbook_url: "https://wiki.pilingtrack.com/runbooks/high-memory"
+
+      - alert: EventLoopLagHigh
+        expr: nodejs_eventloop_lag_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: nodejs
+        annotations:
+          summary: "Node.js event loop lag > 100ms"
+          description: "Event loop lag on {{ $labels.instance }} is {{ $value | humanizeDuration }}"
+
+      - alert: HighGarbageCollectionTime
+        expr: rate(nodejs_gc_duration_seconds_sum[5m]) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: nodejs
+        annotations:
+          summary: "Excessive GC activity"
+          description: "GC is consuming {{ $value | humanizePercentage }} of CPU time"
+
+  # ============================================================
+  # Business Logic Alerts
+  # ============================================================
+  - name: business-logic
+    rules:
+      - alert: NoReportsCreated
+        expr: rate(reports_created_total[1h]) == 0
+        for: 1h
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "No reports created in the last hour"
+          description: "Zero report creation activity — possible system issue"
+
+      - alert: HighSyncFailureRate
+        expr: rate(sync_errors_total[5m]) / rate(sync_updates_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "Sync failure rate > 10%"
+          description: "{{ $value | humanizePercentage }} of sync operations are failing"
+
+      - alert: OutboxBacklog
+        expr: outbox_events_pending_total > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "Outbox event backlog > 1000"
+          description: "{{ $value }} events pending processing"
+
+  # ============================================================
+  # Infrastructure Alerts
+  # ============================================================
+  - name: infrastructure
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Monitoring target {{ $labels.job }} is DOWN"
+          description: "{{ $labels.instance }} has been unreachable for 2 minutes"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis memory usage > 80%"
+          description: "Redis is using {{ $value | humanizePercentage }} of max memory"
+
+      - alert: WebSocketConnectionsDropping
+        expr: rate(ws_connections_closed_total{job="pilingtrack-ws"}[5m]) > rate(ws_connections_opened_total{job="pilingtrack-ws"}[5m]) * 1.2
+        for: 5m
+        labels:
+          severity: warning
+          service: pilingtrack-ws
+        annotations:
+          summary: "WebSocket connections being dropped"
+          description: "More connections closing than opening — possible issue"

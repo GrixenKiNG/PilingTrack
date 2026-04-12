@@ -1,0 +1,131 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "pilingtrack-business",
+    "title": "PilingTrack — Business Metrics",
+    "tags": ["pilingtrack", "business", "operations"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Reports Created (Rate)",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(reports_created_total[5m])",
+            "legendFormat": "Reports/min",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "rpm",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "blue", "value": null },
+                { "color": "green", "value": 1 },
+                { "color": "yellow", "value": 10 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Operators",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "expr": "count(count by (userId) (http_requests_total{path=\"/api/reports/my\"}))",
+            "legendFormat": "Active users",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Sync Operations",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(sync_updates_total[5m])",
+            "legendFormat": "Sync requests/sec",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Reports by Site",
+        "type": "bargauge",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+        "targets": [
+          {
+            "expr": "sum by (siteId) (rate(reports_created_total[1h]))",
+            "legendFormat": "{{siteId}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Alert Events Triggered",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+        "targets": [
+          {
+            "expr": "rate(alert_events_total[5m])",
+            "legendFormat": "{{severity}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Downtime Summary",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+        "targets": [
+          {
+            "expr": "sum by (reasonId) (rate(downtime_duration_total[1h]))",
+            "legendFormat": "{{reasonId}}",
+            "refId": "A",
+            "instant": true
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Shift Distribution",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+        "targets": [
+          {
+            "expr": "sum by (shiftType) (rate(reports_created_total[24h]))",
+            "legendFormat": "{{shiftType}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Equipment Utilization",
+        "type": "bargauge",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+        "targets": [
+          {
+            "expr": "sum by (equipmentId) (rate(reports_created_total[24h]))",
+            "legendFormat": "{{equipmentId}}",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

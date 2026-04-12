@@ -1,0 +1,190 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button [expanded]:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Пользователи
+            - button:
+              - img
+              - text: Новый пользователь
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Codex Admin(вы)
+                        - paragraph: codex-admin@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Админ
+                      - generic: Активен
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Администратор
+                        - paragraph: admin@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Админ
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Герасимов Сергей
+                        - paragraph: sas02@rambler.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Оператор
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Иванов И.П.
+                        - paragraph: operator@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Оператор
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Петрова Д.В.
+                        - paragraph: dispatch@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Диспетчер
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Сидоров К.А.
+                        - paragraph: helper@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Помощник
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+  - list
+  - alert
+  - dialog "Меню навигации" [ref=e1261]:
+    - heading "Меню навигации" [level=2] [ref=e1262]
+    - generic [ref=e1263]:
+      - generic [ref=e1264]:
+        - img [ref=e1266]
+        - generic [ref=e1271]:
+          - heading "PilingTrack" [level=1] [ref=e1272]
+          - paragraph [ref=e1273]: Панель администратора
+      - navigation [ref=e1274]:
+        - button "Дашборд" [active] [ref=e1275]:
+          - img [ref=e1276]
+          - text: Дашборд
+        - button "Объекты" [ref=e1281]:
+          - img [ref=e1282]
+          - text: Объекты
+        - button "Установки" [ref=e1285]:
+          - img [ref=e1286]
+          - text: Установки
+        - button "Бригады" [ref=e1288]:
+          - img [ref=e1289]
+          - text: Бригады
+        - button "Отчёты" [ref=e1293]:
+          - img [ref=e1294]
+          - text: Отчёты
+        - button "Справочники" [ref=e1297]:
+          - img [ref=e1298]
+          - text: Справочники
+        - button "Пользователи" [ref=e1301]:
+          - img [ref=e1302]
+          - text: Пользователи
+        - button "Telegram" [ref=e1307]:
+          - img [ref=e1308]
+          - text: Telegram
+      - generic [ref=e1311]:
+        - generic [ref=e1312]:
+          - generic [ref=e1314]: C
+          - generic [ref=e1315]:
+            - paragraph [ref=e1316]: Codex Admin
+            - paragraph [ref=e1317]: codex-admin@piling.ru
+        - button "Выйти" [ref=e1318]:
+          - img
+          - text: Выйти
+    - button "Close" [ref=e1319]:
+      - img [ref=e1320]
+      - generic [ref=e1323]: Close

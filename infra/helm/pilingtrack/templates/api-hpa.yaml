@@ -1,0 +1,45 @@
+{{- if and .Values.api.enabled .Values.api.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "pilingtrack.fullname" . }}-api
+  labels:
+    {{- include "pilingtrack.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "pilingtrack.fullname" . }}-api
+  minReplicas: {{ .Values.api.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.api.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.api.autoscaling.targetMemoryUtilizationPercentage }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.api.autoscaling.scaleUpStabilizationSeconds | default 60 }}
+      policies:
+        {{- range .Values.api.autoscaling.scaleUpPodPolicy | default (list (dict "type" "Pods" "value" 2 "periodSeconds" 60) (dict "type" "Percent" "value" 50 "periodSeconds" 60)) }}
+        - type: {{ .type }}
+          value: {{ .value }}
+          periodSeconds: {{ .periodSeconds }}
+        {{- end }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.api.autoscaling.scaleDownStabilizationSeconds | default 300 }}
+      policies:
+        {{- range .Values.api.autoscaling.scaleDownPodPolicy | default (list (dict "type" "Pods" "value" 1 "periodSeconds" 120)) }}
+        - type: {{ .type }}
+          value: {{ .value }}
+          periodSeconds: {{ .periodSeconds }}
+        {{- end }}
+{{- end }}

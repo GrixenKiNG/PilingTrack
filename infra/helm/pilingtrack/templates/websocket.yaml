@@ -1,0 +1,72 @@
+{{- if .Values.websocket.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pilingtrack.fullname" . }}-websocket
+  labels:
+    {{- include "pilingtrack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: websocket
+spec:
+  replicas: {{ .Values.websocket.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pilingtrack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: websocket
+  template:
+    metadata:
+      labels:
+        {{- include "pilingtrack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: websocket
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "pilingtrack.serviceAccountName" . }}
+      containers:
+        - name: websocket
+          image: "{{ .Values.websocket.image.repository }}:{{ .Values.websocket.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.websocket.image.pullPolicy }}
+          ports:
+            - name: ws
+              containerPort: 4000
+              protocol: TCP
+          {{- with .Values.websocket.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.websocket.probes.liveness }}
+          livenessProbe:
+            httpGet:
+              path: {{ .path }}
+              port: {{ .port }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "pilingtrack.fullname" . }}-config
+            {{- if or .Values.secrets.databaseUrl .Values.secrets.redisUrl .Values.secrets.sessionSecret }}
+            - secretRef:
+                name: {{ include "pilingtrack.fullname" . }}-secrets
+            {{- end }}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pilingtrack.fullname" . }}-websocket
+  labels:
+    {{- include "pilingtrack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: websocket
+spec:
+  type: {{ .Values.websocket.service.type }}
+  ports:
+    - port: {{ .Values.websocket.service.port }}
+      targetPort: ws
+      protocol: TCP
+      name: ws
+  selector:
+    {{- include "pilingtrack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: websocket
+{{- end }}

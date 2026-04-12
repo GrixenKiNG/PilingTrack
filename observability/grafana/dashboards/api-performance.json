@@ -1,0 +1,168 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "pilingtrack-api",
+    "title": "PilingTrack — API Performance",
+    "tags": ["pilingtrack", "api", "performance"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "time": { "from": "now-1h", "to": "now" },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Requests Per Second",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"pilingtrack-app\"}[1m])",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 50 },
+                { "color": "red", "value": 100 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "API Latency Heatmap",
+        "type": "heatmap",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_request_duration_seconds_bucket{job=\"pilingtrack-app\"}[5m])",
+            "format": "heatmap",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "p50 / p95 / p99 Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"pilingtrack-app\"}[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"pilingtrack-app\"}[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"pilingtrack-app\"}[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.2 },
+                { "color": "red", "value": 0.5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"pilingtrack-app\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"pilingtrack-app\"}[5m]))",
+            "legendFormat": "5xx error rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.01 },
+                { "color": "red", "value": 0.05 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Status Code Distribution",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(http_requests_total{job=\"pilingtrack-app\"}[5m]))",
+            "legendFormat": "HTTP {{status}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Endpoint Performance",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"pilingtrack-app\"}[5m]))",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          { "id": "organize", "options": { "renameByName": { "Value": "p95 (s)" } } }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "endpoint",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(http_request_duration_seconds_bucket{job=\"pilingtrack-app\"}, path)"
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

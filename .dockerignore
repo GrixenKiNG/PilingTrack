@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+npm-debug.log
+tmp-report.json
+tmp-report.pdf
+tmp-prisma-provider.prisma
+tmp-standalone.out.log
+tmp-standalone.err.log
+db
+coverage

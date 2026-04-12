@@ -1,0 +1,303 @@
+# PilingTrack — Default Values
+
+global:
+  environment: "production"
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# ============================================================
+# API Deployment (Next.js BFF)
+# ============================================================
+api:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: ghcr.io/pilingtrack/pilingtrack
+    pullPolicy: IfNotPresent
+    tag: ""  # defaults to .Chart.AppVersion
+
+  service:
+    type: ClusterIP
+    port: 3000
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    # Scale-up behavior: aggressive (respond quickly to load spikes)
+    scaleUpStabilizationSeconds: 30
+    scaleUpPodPolicy:
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    # Scale-down behavior: conservative (avoid flapping)
+    scaleDownStabilizationSeconds: 300
+    scaleDownPodPolicy:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+
+  probes:
+    liveness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      path: /api/ready
+      port: 3000
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+  env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "3000"
+    - name: NEXT_TELEMETRY_DISABLED
+      value: "1"
+
+# ============================================================
+# Workers
+# ============================================================
+workers:
+  outbox:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: ghcr.io/pilingtrack/worker
+      tag: ""
+    command: ["node", "src/workers/outbox-worker.ts"]
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  projection:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: ghcr.io/pilingtrack/worker
+      tag: ""
+    command: ["node", "src/workers/projection-worker.ts"]
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  pdf:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: ghcr.io/pilingtrack/worker
+      tag: ""
+    command: ["node", "src/workers/pdf-worker.ts"]
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+
+# ============================================================
+# WebSocket Gateway
+# ============================================================
+websocket:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/pilingtrack/ws
+    pullPolicy: IfNotPresent
+    tag: ""
+
+  service:
+    type: ClusterIP
+    port: 4000
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  probes:
+    liveness:
+      path: /health
+      port: 4000
+      initialDelaySeconds: 10
+      periodSeconds: 15
+
+# ============================================================
+# Ingress
+# ============================================================
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: app.pilingtrack.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: api
+          servicePort: 3000
+    - host: ws.pilingtrack.local
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: websocket
+          servicePort: 4000
+  tls: []
+  #  - secretName: pilingtrack-tls
+  #    hosts:
+  #      - app.pilingtrack.local
+
+# ============================================================
+# Secrets (external)
+# ============================================================
+secrets:
+  databaseUrl: ""
+  redisUrl: ""
+  sessionSecret: ""
+  encryptionKey: ""
+  s3AccessKey: ""
+  s3SecretKey: ""
+  sentryAuthToken: ""
+
+# ============================================================
+# Service Account
+# ============================================================
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# ============================================================
+# Network Policies
+# ============================================================
+networkPolicy:
+  enabled: true
+
+# ============================================================
+# Pod Security
+# ============================================================
+podSecurity:
+  enabled: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  seccompProfile: RuntimeDefault
+  capabilities:
+    drop:
+      - ALL
+
+# ============================================================
+# Observability
+# ============================================================
+observability:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+  openTelemetry:
+    enabled: false
+    endpoint: ""
+    samplerArg: "0.1"
+
+# ============================================================
+# Backup — PostgreSQL CronJob
+# ============================================================
+backup:
+  enabled: true
+  schedule: "0 2 * * *"       # Daily at 2 AM UTC
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  activeDeadlineSeconds: 3600  # 1 hour max
+
+  image:
+    repository: ghcr.io/pilingtrack/backup
+    pullPolicy: IfNotPresent
+    tag: ""  # defaults to .Chart.AppVersion
+
+  # Database connection
+  dbHost: ""           # defaults to <release>-postgresql
+  dbPort: "5432"
+  dbName: "pilingtrack"
+  dbUser: "postgres"
+  dbPasswordSecret: ""  # defaults to pilingtrack-postgresql
+  dbPasswordKey: ""     # defaults to postgres-password
+
+  # Local storage
+  backupDir: "/backups/pilingtrack"
+  retentionDays: 7
+  retentionWeeks: 4
+  retentionMonths: 12
+
+  # Off-site storage (S3-compatible)
+  s3Bucket: ""         # e.g., s3://pilingtrack-backups
+  s3Endpoint: ""       # e.g., https://storage.yandexcloud.net
+  s3SecretName: ""     # defaults to pilingtrack-s3
+
+  # Persistent storage for backups
+  persistence:
+    enabled: true
+    size: "20Gi"
+    storageClassName: "standard"
+    accessMode: "ReadWriteOnce"
+    emptyDirSize: "10Gi"  # fallback if persistence disabled
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  annotations: {}
+  nodeSelector: {}
+  tolerations: []
+  imagePullSecrets: []

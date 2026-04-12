@@ -1,0 +1,99 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - button:
+            - img
+          - generic:
+            - heading [level=1]: Отчёт за смену
+            - paragraph: ВСМЖ
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Дата
+                    - textbox: 2026-04-04
+                - generic:
+                  - generic:
+                    - generic: Начало смены
+                    - textbox: 08:00
+                  - generic:
+                    - generic: Конец смены
+                    - textbox: 20:00
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                    - text: Объект
+                  - combobox:
+                    - generic: ВСМЖ
+                    - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                    - text: Установка
+                  - combobox:
+                    - generic: Kopernik-SD-20
+                    - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - text: Забитые сваи
+                - generic:
+                  - generic:
+                    - combobox:
+                      - generic: Марка сваи...
+                      - img
+                    - generic:
+                      - spinbutton
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - text: Лидерное бурение
+                - generic:
+                  - generic:
+                    - combobox [expanded]:
+                      - generic: Тип скважины...
+                      - img
+                    - generic:
+                      - spinbutton
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                      - text: Простой техники
+                    - button: + Добавить
+        - generic:
+          - generic:
+            - img
+            - paragraph: Добавьте хотя бы одну сваю или бурение
+          - button:
+            - img
+            - text: Отправить отчёт
+  - list
+  - alert
+  - listbox [ref=e233]:
+    - option "Лидерное бурение d=150мм" [active] [ref=e234]:
+      - generic [ref=e236]: Лидерное бурение d=150мм
+    - option "Лидерное бурение d=200мм" [ref=e237]:
+      - generic [ref=e239]: Лидерное бурение d=200мм
+    - option "Расширение скважины" [ref=e240]:
+      - generic [ref=e242]: Расширение скважины

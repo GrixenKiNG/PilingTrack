@@ -1,0 +1,69 @@
+# ============================================================
+# Dockerfile — WebSocket Real-Time Server (Compiled)
+# ============================================================
+
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY package.json package-lock.json ./
+RUN npm ci --prefer-offline --no-audit
+
+# Stage 2: Build — Bundle TypeScript to JavaScript with esbuild
+FROM node:22-alpine AS builder
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate || true
+
+# Build Next.js (needed for shared modules)
+RUN npm run build
+
+# Bundle WebSocket server with esbuild (fast, single-file output)
+RUN npx esbuild src/realtime/server/index.ts \
+    --bundle \
+    --platform=node \
+    --target=node22 \
+    --outdir=dist/ws \
+    --external:@prisma/client \
+    --external:ws \
+    --external:ioredis \
+    --external:bullmq \
+    --external:pino \
+    --external:next \
+    --external:@sentry/nextjs \
+    --format=cjs \
+    --minify
+
+# Stage 3: Production — Minimal image with compiled JS
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apk add --no-cache curl
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+ENV NODE_ENV=production
+ENV WS_PORT=3001
+
+# Copy only compiled output and dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/dist/ws ./dist/ws
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/.next/standalone ./
+
+USER nextjs
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+
+# Run compiled JavaScript
+CMD ["node", "dist/ws/realtime/server/index.js"]

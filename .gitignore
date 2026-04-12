@@ -1,0 +1,95 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+.next-env.d.ts
+out/
+dist/
+
+# Production
+build/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment files (NEVER commit secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.docker
+
+# Database
+db/*.db
+db/*.db-journal
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+dev_detailed.log
+dev_new.log
+dev_stdout.log
+dev_stderr.log
+start3001.*.log
+devserver.*.log
+tmp-*.log
+
+# Temp files
+cookies.txt
+cookies2.txt
+cookies3.txt
+tmp-*.json
+tmp-*.pdf
+tmp-*.txt
+tmp-*.log
+
+# Test/coverage
+coverage/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
+# k6
+k6-report/
+
+# Prisma
+prisma/migrations/
+prisma/dev.db
+prisma/dev.db-journal
+
+# Bun
+bun.lock
+
+# Docker
+docker-compose.override.yml
+
+# OS
+Thumbs.db
+
+# Tool artifacts
+.playwright-cli/
+.kilo/
+.claude/
+
+# Binaries
+.bin/
+'$null'

@@ -1,0 +1,53 @@
+src/app/api/sync/batch/route.ts(65,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
+    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
+  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
+    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
+      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
+        Types of property 'isolationLevel' are incompatible.
+          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
+src/app/api/sync/batch/route.ts(65,34): error TS7006: Parameter 'tx' implicitly has an 'any' type.
+src/app/api/sync/batch/route.ts(111,7): error TS2304: Cannot find name 'SyncOperation'.
+src/app/api/sync/route.ts(165,7): error TS2304: Cannot find name 'SyncOperation'.
+src/app/api/sync/route.ts(191,8): error TS2304: Cannot find name 'SyncOperation'.
+src/app/api/telemetry/route.ts(44,48): error TS2345: Argument of type '{ type: any; equipmentId: string; value: number; siteId?: string | null | undefined; unit?: string | null | undefined; latitude?: number | null | undefined; longitude?: number | null | undefined; metadata?: Record<...> | ... 1 more ... | undefined; timestamp?: string | undefined; }[]' is not assignable to parameter of type 'TelemetryRecord[]'.
+  Type '{ type: any; equipmentId: string; value: number; siteId?: string | null | undefined; unit?: string | null | undefined; latitude?: number | null | undefined; longitude?: number | null | undefined; metadata?: Record<...> | ... 1 more ... | undefined; timestamp?: string | undefined; }' is not assignable to type 'TelemetryRecord'.
+    Types of property 'siteId' are incompatible.
+      Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+        Type 'null' is not assignable to type 'string | undefined'.
+src/app/api/telemetry/route.ts(56,38): error TS2345: Argument of type '{ type: any; unit: string | undefined; latitude: number | undefined; longitude: number | undefined; metadata: Record<string, unknown> | undefined; equipmentId: string; value: number; siteId?: string | ... 1 more ... | undefined; timestamp?: string | undefined; }' is not assignable to parameter of type 'TelemetryRecord'.
+  Types of property 'siteId' are incompatible.
+    Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+      Type 'null' is not assignable to type 'string | undefined'.
+src/lib/tenant-middleware.ts(71,33): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/lib/tenant-middleware.ts(72,55): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/lib/tenant-middleware.ts(83,33): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/lib/tenant-middleware.ts(104,31): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/lib/tenant-middleware.ts(105,43): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/lib/tenant-middleware.ts(114,32): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/lib/tenant-middleware.ts(115,44): error TS2339: Property 'siteId' does not exist on type '{}'.
+src/modules/crews/application/commands/crew-command.service.ts(105,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
+    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
+  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
+    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
+      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
+        Types of property 'isolationLevel' are incompatible.
+          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
+src/modules/crews/infrastructure/crew.repository.ts(22,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
+    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
+  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
+    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
+      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
+        Types of property 'isolationLevel' are incompatible.
+          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
+src/modules/reports/infrastructure/report.repository.ts(36,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
+    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
+  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
+    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
+      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
+        Types of property 'isolationLevel' are incompatible.
+          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
+src/services/telemetry/mqtt-ingestion-service.ts(126,25): error TS2307: Cannot find module 'mqtt' or its corresponding type declarations.

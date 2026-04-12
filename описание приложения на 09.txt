@@ -1,0 +1,1102 @@
+📘 PilingTrack — Полное техническое описание
+
+    Версия: 1.1.0 (после Staff/Principal Engineer Action Plan)
+    Дата: 09 апреля 2026
+    Аудитор: Staff/Principal Engineer Deep Architecture Review
+    Стек: Next.js 16 · React 19 · Prisma 6 · TypeScript 5 · SQLite/PostgreSQL 16 · Redis · WebSocket · BullMQ
+
+    ---
+
+    1. Обзор системы
+
+    1.1 Назначение
+
+    PilingTrack — промышленная SaaS-платформа для учёта свайных работ на строительных объектах. Система покрывает 4
+    контура:
+
+
+    ┌──────────────────┬─────────────────────────────────────────────────────────────────────────────────┐
+    │ Контур           │ Что покрывает                                                                   │
+    ├──────────────────┼─────────────────────────────────────────────────────────────────────────────────┤
+    │ Производственный │ Объекты, установки, бригады, отчёты, простои, фото-документация, IoT телеметрия │
+    │ Диспетчерский    │ Сводки, контроль объектов, аналитика, CQRS projections, realtime WebSocket      │
+    │ Административный │ Пользователи, справочники, доступы, Telegram-конфиги, multi-tenant billing      │
+    │ Эксплуатационный │ Audit, readiness, diagnostics, feedback center, event bus, outbox, workers      │
+    └──────────────────┴─────────────────────────────────────────────────────────────────────────────────┘
+
+
+    1.2 Пользователи и роли
+
+
+    ┌────────────┬─────────────────────────────────────────┬─────────────────────────────────────────┐
+    │ Роль       │ Ability set                             │ Access pattern                          │
+    ├────────────┼─────────────────────────────────────────┼─────────────────────────────────────────┤
+    │ ADMIN      │ Все 16 abilities                        │ Полный доступ + billing                 │
+    │ DISPATCHER │ 10 abilities (read_all, manage, assign) │ Все объекты, управление бригадами       │
+    │ OPERATOR   │ Базовый доступ                          │ Только свои отчёты, назначенные объекты │
+    │ ASSISTANT  │ Минимальный доступ                      │ Помощь оператору                        │
+    └────────────┴─────────────────────────────────────────┴─────────────────────────────────────────┘
+
+
+    1.3 Метрики системы
+
+
+    ┌───────────────────┬──────────────────────────────────────┐
+    │ Метрика           │ Значение                             │
+    ├───────────────────┼──────────────────────────────────────┤
+    │ API endpoints     │ 58+ (22 домена)                      │
+    │ React компонентов │ 61 (13 piling + 48 shadcn/ui)        │
+    │ Prisma моделей    │ 32                                   │
+    │ Сервисов          │ 15                                   │
+    │ Модулей DDD       │ 4 (reports, crews, sites, equipment) │
+    │ Строк кода        │ ~22,000                              │
+    │ Unit tests        │ 393                                  │
+    │ E2E tests         │ 5 spec файлов                        │
+    │ Workers           │ 3 (outbox, projection, pdf)          │
+    │ Event types       │ 18 (versioned schemas)               │
+    │ Пройденных тестов │ 98.5% (393/399)                      │
+    └───────────────────┴──────────────────────────────────────┘
+
+    ---
+
+    2. Архитектура системы
+
+    2.1 Общая диаграмма
+
+      1 ┌─────────────────────────────────────────────────────────────────────────┐
+      2 │                        КЛИЕНТ (Browser / PWA)                           │
+      3 │  ┌────────────┐  ┌─────────────┐  ┌──────────────────────────────────┐  │
+      4 │  │ Zustand    │  │ Dexie       │  │ Service Worker                   │  │
+      5 │  │ Store      │  │ (IndexedDB) │  │ (cache-first + offline queue)    │  │
+      6 │  └─────┬──────┘  └──────┬──────┘  └────────────┬─────────────────────┘  │
+      7 │        │                │                       │                        │
+      8 │  ┌─────▼────────────────▼───────────────────────▼────────────────────┐  │
+      9 │  │         SPA Router (Next.js App Router + client-side routing)      │  │
+     10 │  │  ┌──────────┐ ┌──────────┐ ┌───────┐ ┌────────────────────────┐  │  │
+     11 │  │  │ Operator │ │  Admin   │ │ Login │ │  Feedback Center (SSE) │  │  │
+     12 │  │  │ Dashboard│ │ Dashboard│ │ Page  │ │  + Quick Mode Reports  │  │  │
+     13 │  │  └──────────┘ └──────────┘ └───────┘ └────────────────────────┘  │  │
+     14 │  └────────────────────────────────┬──────────────────────────────────┘  │
+     15 └───────────────────────────────────┼─────────────────────────────────────┘
+     16                            HTTPS + WS │
+     17 ┌───────────────────────────────────▼─────────────────────────────────────┐
+     18 │                         NEXT.JS SERVER (Node.js 22)                      │
+     19 │                                                                          │
+     20 │  ┌────────────────────────────────────────────────────────────────────┐  │
+     21 │  │  Middleware (Edge Runtime) — CORS + Security Headers + Tenant      │  │
+     22 │  └───────────────────────────┬────────────────────────────────────────┘  │
+     23 │                              │                                           │
+     24 │  ┌───────────────────────────▼────────────────────────────────────────┐  │
+     25 │  │  API Routes (58+ endpoints, Node.js runtime)                       │  │
+     26 │  │  auth · reports · sites · crews · equipment · users · photos      │  │
+     27 │  │  sync · telemetry/ingest · feedback · notifications · analytics   │  │
+     28 │  │  dictionary · health · metrics · tenancy/billing · openapi        │  │
+     29 │  └───────────────────────────┬────────────────────────────────────────┘  │
+     30 │                              │                                           │
+     31 │  ┌───────────────────────────▼────────────────────────────────────────┐  │
+     32 │  │  Modules (Bounded Context — DDD)                                   │  │
+     33 │  │  ┌──────────────────────────────────────────────────────────────┐  │  │
+     34 │  │  │  reports/  ← полный DDD: domain + application + infrastructure│ │  │
+     35 │  │  │    domain/       — Aggregate Root, Domain Events, VOs         │  │  │
+     36 │  │  │    application/  — Commands, Queries, Projections, Validation │  │  │
+     37 │  │  │    infrastructure/ — PrismaRepository, Mapper, Transactional  │  │  │
+     38 │  │  │    api/          — Route handlers (delegate to application)   │  │  │
+     39 │  │  │  crews/    ← partial DDD (domain + application)              │  │  │
+     40 │  │  │  sites/    ← partial DDD                                     │  │  │
+     41 │  │  │  equipment/← partial DDD                                     │  │  │
+     42 │  │  └──────────────────────────────────────────────────────────────┘  │  │
+     43 │  └───────────────────────────┬────────────────────────────────────────┘  │
+     44 │                              │                                           │
+     45 │  ┌───────────────────────────▼────────────────────────────────────────┐  │
+     46 │  │  Core (Cross-Cutting Concerns)                                     │  │
+     47 │  │  ┌────────────┐ ┌──────────┐ ┌────────────┐ ┌──────────────────┐  │  │
+     48 │  │  │ event-bus  │ │ outbox   │ │observability│ │ security         │  │  │
+     49 │  │  │ InMemory + │ │ async +  │ │ health, SLO,│ │ tenant enforce,  │  │  │
+     50 │  │  │ Redis      │ │ DLQ      │ │ circuit brk │ │ encryption       │  │  │
+     51 │  │  └────────────┘ └──────────┘ └────────────┘ └──────────────────┘  │  │
+     52 │  └───────────────────────────┬────────────────────────────────────────┘  │
+     53 │                              │                                           │
+     54 │  ┌───────────────────────────▼────────────────────────────────────────┐  │
+     55 │  │  Services Layer (15 сервисов, legacy + delegation to modules)      │  │
+     56 │  │  auth · audit · feedback · telegram · tenancy/billing             │  │
+     57 │  └───────────────────────────┬────────────────────────────────────────┘  │
+     58 │                              │                                           │
+     59 │  ┌───────────────────────────▼────────────────────────────────────────┐  │
+     60 │  │  Workers (3 independent processes)                                 │  │
+     61 │  │  outbox-worker (10s poll) · projection-worker (5s poll) · pdf     │  │
+     62 │  └───────────────────────────┬────────────────────────────────────────┘  │
+     63 │                              │                                           │
+     64 │  ┌───────────────────────────▼────────────────────────────────────────┐  │
+     65 │  │  Realtime (Separate Process, Port 3001)                            │  │
+     66 │  │  WebSocket Server + Client Manager + Channel Router + Alert Engine │  │
+     67 │  │  Redis Pub/Sub bridge (horizontal scaling)                         │  │
+     68 │  └────────────────────────────────────────────────────────────────────┘  │
+     69 └──────────────────────────────────┬───────────────────────────────────────┘
+     70                                    │
+     71               ┌─────────────────────▼─────────────────────┐
+     72               │  PostgreSQL 16         │  Redis 7         │
+     73               │  (Prisma ORM)          │  (rate limit,    │
+     74               │  + RLS ready           │   pub/sub,       │
+     75               │  + 9 enums, 32 models  │   BullMQ, cache) │
+     76               │  + partitioned         │                  │
+     77               │    telemetry           │                  │
+     78               └────────────────────────┴──────────────────┘
+
+    2.2 Паттерн исполнения запроса
+
+      1 Client Request
+      2     │
+      3     ▼
+      4 ┌─────────────────────────────────────────┐
+      5 │ Middleware (Edge Runtime)               │
+      6 │ 1. CORS preflight handling              │
+      7 │ 2. Security headers injection           │
+      8 │ 3. Tenant enforcement (if enabled)      │
+      9 │    - X-Tenant-ID header                 │
+     10 │    - Subdomain extraction               │
+     11 │    - Public path whitelist              │
+     12 └──────────────┬──────────────────────────┘
+     13                │
+     14                ▼
+     15 ┌─────────────────────────────────────────┐
+     16 │ API Route Handler (Node.js Runtime)     │
+     17 │ 1. CSRF validation (Origin/Referer)     │
+     18 │ 2. Rate limit check (Redis + Lua)       │
+     19 │ 3. Authentication (requireAuth)         │
+     20 │ 4. Zod validation (if present)          │
+     21 │ 5. Delegate to service/module           │
+     22 │ 6. Return JSON + X-Request-ID           │
+     23 └──────────────┬──────────────────────────┘
+     24                │
+     25                ▼
+     26 ┌─────────────────────────────────────────┐
+     27 │ Module/Service Layer                    │
+     28 │ 1. Authorization check (RBAC)           │
+     29 │ 2. Resource access check                │
+     30 │ 3. Business logic execution             │
+     31 │ 4. Domain event generation              │
+     32 │ 5. Persistence ($transaction)           │
+     33 │ 6. Outbox event write (atomic)          │
+     34 │ 7. Audit diff recording                 │
+     35 └──────────────┬──────────────────────────┘
+     36                │
+     37                ▼
+     38 ┌─────────────────────────────────────────┐
+     39 │ Prisma Repository (Infrastructure)      │
+     40 │ 1. $transaction (ACID)                  │
+     41 │ 2. Upsert report + children             │
+     42 │ 3. OutboxEvent.createMany (atomic)      │
+     43 │ 4. Clear pending events                 │
+     44 └──────────────┬──────────────────────────┘
+     45                │
+     46                ▼
+     47          PostgreSQL / SQLite
+
+    2.3 Event-Driven Pipeline
+
+      1 Domain Event Generated (ReportSubmitted, PileWorkAdded, etc.)
+      2     │
+      3     ▼
+      4 ┌─────────────────────────────────────────────┐
+      5 │ emitDomainEvent() → Core EventBus           │
+      6 │ 1. Schema validation (Ajv, versioned)       │
+      7 │ 2. Sequence tracking (ordering enforcement) │
+      8 │ 3. Parallel handler dispatch                │
+      9 │    (Promise.allSettled — one fail ≠ all)    │
+     10 └──────────┬──────────────────────────────────┘
+     11            │
+     12      ┌─────┴──────────────────┐
+     13      │                        │
+     14      ▼                        ▼
+     15 ┌──────────────┐      ┌──────────────────┐
+     16 │ Outbox       │      │ WebSocket        │
+     17 │ Worker       │      │ Publisher        │
+     18 │ (10s poll)   │      │ (real-time)      │
+     19 │              │      │                  │
+     20 │ 1. Fetch     │      │ 1. Broadcast     │
+     21 │    unpub     │      │    to channel   │
+     22 │ 2. Idempotent│      │ 2. Redis Pub/Sub│
+     23 │    check     │      │    (multi-node)  │
+     24 │ 3. Process   │      │ 3. ACL check    │
+     25 │ 4. Mark pub  │      │                  │
+     26 │ 5. DLQ on    │      │                  │
+     27 │    fail      │      │                  │
+     28 └──────┬───────┘      └──────────────────┘
+     29        │
+     30        ▼
+     31 ┌─────────────────────────────────────────────┐
+     32 │ Projection Worker (5s poll)                 │
+     33 │ 1. projectReportStats (upsert per report)   │
+     34 │ 2. projectOperatorPerformance (full agg)    │
+     35 │ 3. projectDowntimeSummary (per reason)      │
+     36 │ 4. projectWeeklyTrend (hourly recompute)    │
+     37 │                                             │
+     38 │ IDEMPOTENT: full re-aggregation, no increment│
+     39 │ ATOMIC: where: { published: false } guard   │
+     40 └─────────────────────────────────────────────┘
+
+    ---
+
+    3. Domain-Driven Design
+
+    3.1 Reports Module (полный DDD)
+
+    Aggregate Root: ReportAggregate
+
+      1 State (private):
+      2   - id, reportId, userId, siteId, tenantId
+      3   - date, shiftType, shiftStart, shiftEnd, equipmentId
+      4   - status: 'draft' | 'submitted'
+      5   - piles: PileWorkEntry[]
+      6   - drillings: DrillingEntry[]
+      7   - downtimes: DowntimeEntry[]
+      8   - version: number (optimistic locking)
+      9   - createdAt, updatedAt
+     10
+     11 Business Rules (enforced by aggregate):
+     12   - MAX_DOWNTIME_PER_SHIFT = 1440 min (24h)
+     13   - MAX_PILE_COUNT = 9999
+     14   - MAX_DRILLING_METERS = 99999
+     15   - Downtime total ≤ shift duration (overnight: +24h)
+     16   - Submitted report is immutable (assertDraft)
+     17   - Report must have at least 1 pile or drilling entry
+     18
+     19 State Transitions:
+     20   create() → draft
+     21   draft → submitted (one-way, via submit())
+     22   reconstitute(state) → from DB (draft mode for editing)
+     23
+     24 Pending Events Queue:
+     25   - ReportCreated
+     26   - PileWorkAdded (×N)
+     27   - DrillingAdded (×N)
+     28   - DowntimeAdded (×N)
+     29   - ReportSubmitted
+     30   → Cleared after repo.save()
+
+    Trade-off: При update отчёта aggregate reconstitutes в draft mode, очищает все child entries и пересоздаёт их
+    заново. Это упрощает логику (не нужно tracking changes), но неэффективно для частичных обновлений. Для industrial
+    use case (полная замена смены) — приемлемо.
+
+    Value Objects
+
+      1 interface PileWorkEntry {
+      2   pileGradeId: string;  // FK to PileGrade
+      3   count: number;         // 1..9999
+      4   picketId?: string;     // Optional location
+      5 }
+      6
+      7 interface DrillingEntry {
+      8   typeId: string;        // FK to DrillingType
+      9   count: number;         // ≥ 1
+     10   metersPerUnit: number; // ≥ 0
+     11   meters: number;        // 0..99999 (count × metersPerUnit)
+     12   picketId?: string;
+     13 }
+     14
+     15 interface DowntimeEntry {
+     16   reasonId: string;      // FK to DowntimeReason
+     17   duration: number;      // minutes, 0..1440
+     18   comment?: string;
+     19 }
+
+    Domain Events
+
+    10 типов событий, все past tense, auto-generated UUID + timestamp:
+     - ReportCreated, ReportUpdated, ReportSubmitted, ReportDeleted
+     - PileWorkAdded, DrillingAdded, DowntimeAdded
+     - ReportExported, ReportPlanExceeded, ReportPhotoAttached
+
+    Command: upsertReport
+
+    Фазированный pipeline (single responsibility per phase):
+
+      1 Phase 1:  Validation (fast, no DB)
+      2           - Required fields, date not future
+      3           - Pile/drilling/downtime entry validation
+      4           - Downtime within shift duration
+      5
+      6 Phase 1.5: Site Plan Validation (DB query)
+      7           - Load SitePilePlan for site
+      8           - Sum actual piles from existing reports
+      9           - Check: actual + new ≤ plan.count
+     10           - Throw ServiceError(400) on exceed
+     11
+     12 Phase 2:  Authorization
+     13           - assertUserAssignedToSite(userId, siteId)
+     14           - resolveAccessibleUserId(session, requestedUserId)
+     15
+     16 Phase 3:  Load Aggregate
+     17           - repo.findById(reportId)
+     18           - If exists: reconstitute(state, draft mode)
+     19           - If new: create(params)
+     20           - Edit window check: updatedAt ≤ 24h
+     21
+     22 Phase 4:  Apply Commands
+     23           - aggregate.updateShiftInfo()
+     24           - aggregate.addPileWork() × N
+     25           - aggregate.addDrilling() × N
+     26           - aggregate.addDowntime() × N
+     27
+     28 Phase 5:  Submit
+     29           - aggregate.submit(actorId, actorName, actorRole)
+     30
+     31 Phase 6:  Persist (single $transaction)
+     32           - repo.save(aggregate)
+     33             - Upsert report
+     34             - Delete + recreate children
+     35             - OutboxEvent.createMany (atomic)
+     36           - Clear pending events
+     37
+     38 Phase 7:  Audit Diff
+     39           - computeDiff(oldState, newState)
+     40           - recordAudit(action, userId, diff)
+     41
+     42 Phase 8:  Return
+     43           - Fetch report with relations
+     44           - Return { report, events, _action }
+
+    3.2 Остальные модули
+
+
+    ┌───────────┬──────────────────────┬────────────────────┬────────────┐
+    │ Модуль    │ DDD уровень          │ Domain             │ Repository │
+    ├───────────┼──────────────────────┼────────────────────┼────────────┤
+    │ crews     │ domain + application │ CrewAggregate      │ Partial    │
+    │ sites     │ domain + application │ SiteAggregate      │ Partial    │
+    │ equipment │ domain + application │ EquipmentAggregate │ Partial    │
+    │ analytics │ application only     │ —                  │ —          │
+    │ users     │ application only     │ —                  │ —          │
+    │ telemetry │ application only     │ —                  │ —          │
+    │ system    │ application only     │ —                  │ —          │
+    └───────────┴──────────────────────┴────────────────────┴────────────┘
+
+
+    Trade-off: Только reports модуль имеет полный DDD. Остальные — partial или procedural. Это осознанное решение:
+    reports — самый сложный домен (10+ entities, complex validation, audit trail), остальные — CRUD.
+
+    ---
+
+    4. CQRS Read Models
+
+    4.1 Projection Architecture
+
+      1 OutboxEvent (published: false)
+      2     │
+      3     ▼ (poll every 5s)
+      4 ┌───────────────────────────────────────────┐
+      5 │ publishOutboxEvents(handler)              │
+      6 │ 1. Fetch unpublished (ORDER BY createdAt)│
+      7 │ 2. For each event:                       │
+      8 │    a. Idempotency check:                 │
+      9 │       findUnique(where: {id, published})  │
+     10 │       → skip if already published        │
+     11 │    b. Call handler(event)                │
+     12 │    c. Atomic update:                     │
+     13 │       update(where: {id, published:false})│
+     14 │       data: {published: true}            │
+     15 │    d. On fail: moveToDlq()              │
+     16 └──────────┬───────────────────────────────┘
+     17            │
+     18            ▼ (passed to all projection handlers)
+     19 ┌───────────────────────────────────────────┐
+     20 │ projectReportStats(event)                 │
+     21 │ - Fetch full report (include children)   │
+     22 │ - Compute: totalPiles, totalDrilling,    │
+     23 │   totalDowntime, topReason, perHour      │
+     24 │ - Upsert ReportStats                     │
+     25 └───────────────────────────────────────────┘
+     26 ┌───────────────────────────────────────────┐
+     27 │ projectOperatorPerformance(event)         │
+     28 │ - Full re-aggregation (NOT increment)    │
+     29 │ - Query all reports for user+site+date   │
+     30 │ - Compute: totals, avg, downtimeRatio    │
+     31 │ - Upsert OperatorPerformance             │
+     32 │ IDEMPOTENT: safe against double-process  │
+     33 └───────────────────────────────────────────┘
+     34 ┌───────────────────────────────────────────┐
+     35 │ projectDowntimeSummary(event)             │
+     36 │ - Filter: DowntimeAdded events only      │
+     37 │ - Aggregate by site+date+reason          │
+     38 │ - Compute percentage of total            │
+     39 │ - Upsert DowntimeSummary                 │
+     40 └───────────────────────────────────────────┘
+     41 ┌───────────────────────────────────────────┐
+     42 │ projectWeeklyTrend(siteId)                │
+     43 │ - Run every hour for ALL sites           │
+     44 │ - Compute Mon-Sun metrics from daily     │
+     45 │ - Trend: UP/DOWN/STABLE (last 2 days)    │
+     46 │ - Upsert SiteWeeklyTrend                 │
+     47 └───────────────────────────────────────────┘
+
+    4.2 Read Models
+
+
+    ┌────────────────────┬─────────────────────────────┬───────────────────────────┬───────────────────────────────┐
+    │ Модель             │ Granularity                 │ Update Strategy           │ Use Case                      │
+    ├────────────────────┼─────────────────────────────┼───────────────────────────┼───────────────────────────────┤
+    │ ReportStats        │ Per report                  │ Upsert on any report e... │ Dashboard cards, quick que... │
+    │ SiteDailySummary   │ Per site per day            │ Upsert daily              │ Site progress charts          │
+    │ **OperatorPerform... │ Per user per site per day   │ Full re-aggregation       │ Operator leaderboards         │
+    │ DowntimeSummary    │ Per site per date per re... │ Upsert on downtime event  │ Downtime Pareto analysis      │
+    │ SiteWeeklyTrend    │ Per site per week           │ Hourly recompute          │ Trend charts, forecasting     │
+    └────────────────────┴─────────────────────────────┴───────────────────────────┴───────────────────────────────┘
+
+
+    Trade-off: projectOperatorPerformance использует full re-aggregation вместо increment. Это на 3-5x медленнее
+    (дополнительный read), но гарантирует идемпотентность. При retry события не будет double-counting. Для industrial
+    use case (несколько событий в минуту) — приемлемо.
+
+    ---
+
+    5. Security Architecture
+
+    5.1 Layered Defense
+
+      1 Layer 1: Network/Edge (Middleware)
+      2   ├── CORS: allowed origins + wildcard subdomain
+      3   ├── Security Headers: CSP, HSTS, X-Frame, Permissions-Policy
+      4   └── Tenant Enforcement: X-Tenant-ID header or subdomain
+      5
+      6 Layer 2: Transport (API Route)
+      7   ├── CSRF: Origin → Referer → Sec-Fetch-Site → Host chain
+      8   ├── Rate Limiting: Redis + Lua (atomic), in-memory fallback
+      9   └── Input Validation: Zod schemas (30%+ endpoints)
+     10
+     11 Layer 3: Application (Service/Module)
+     12   ├── Authentication: jose JWT, HttpOnly cookie, 12h TTL
+     13   ├── Authorization (Role-based): 16 abilities × 4 roles
+     14   ├── Authorization (Resource-level): site assignment check
+     15   └── Idempotency: IdempotencyKey table (scope + key unique)
+     16
+     17 Layer 4: Data (Prisma/DB)
+     18   ├── Parameterized queries (SQL injection protection)
+     19   ├── Unique constraints (anti-duplicate)
+     20   ├── Cascade/Restrict deletes (referential integrity)
+     21   └── Row-Level Security (optional, PostgreSQL)
+
+    5.2 Authentication Flow
+
+      1 POST /api/auth/login
+      2   1. Rate limit check (Redis Lua: 5 attempts / 15min)
+      3   2. Find user by email
+      4   3. bcrypt.compare(inputPassword, storedHash) — 12 rounds
+      5   4. Create JWT payload: { id, name, role, tenantId }
+      6   5. Sign with jose (HS256, SESSION_SECRET)
+      7   6. Set HttpOnly cookie:
+      8      - name: pt-session
+      9      - httpOnly: true
+     10      - secure: true (production)
+     11      - sameSite: strict
+     12      - maxAge: 43200s (12h)
+     13   7. Create RefreshToken (hashed, family-based rotation)
+     14   8. Reset rate limit counter
+     15   9. Return { user, token }
+     16
+     17 Subsequent requests:
+     18   1. Read cookie from request
+     19   2. Verify JWT signature + exp claim
+     20   3. Return { user } or { error: 401 }
+
+    Trade-off: JWT хранится в HttpOnly cookie (не в localStorage). Это защищает от XSS theft, но делает logout сложнее
+     (нужно invalidate на сервере). Refresh token rotation с family tracking — если токен украден и использован, вся
+    семья токенов инвалидируется.
+
+    5.3 RBAC Matrix
+
+
+    ┌────────────────────────┬───────┬────────────┬──────────┬───────────┐
+    │ Ability                │ ADMIN │ DISPATCHER │ OPERATOR │ ASSISTANT │
+    ├────────────────────────┼───────┼────────────┼──────────┼───────────┤
+    │ analytics.read         │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ reports.read_all       │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ reports.read_cross_user  │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ reports.export         │ ✅    │ ❌         │ ❌       │ ❌        │
+    │ reports.manage_all     │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ sites.read_all         │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ sites.manage           │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ sites.assign_users     │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ sites.manage_hierarchy │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ users.manage           │ ✅    │ ❌         │ ❌       │ ❌        │
+    │ equipment.manage       │ ✅    │ ❌         │ ❌       │ ❌        │
+    │ crews.read             │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ crews.manage           │ ✅    │ ✅         │ ❌       │ ❌        │
+    │ crews.legacy_manage    │ ✅    │ ❌         │ ❌       │ ❌        │
+    │ dictionary.manage      │ ✅    │ ❌         │ ❌       │ ❌        │
+    │ telegram.manage        │ ✅    │ ❌         │ ❌       │ ❌        │
+    └────────────────────────┴───────┴────────────┴──────────┴───────────┘
+
+
+    5.4 Rate Limiting
+
+      1 Redis Lua Script (atomic):
+      2   Input: counter_key, block_key, max_attempts, window_ms, block_ms, now
+      3   Logic:
+      4     1. Check if blocked → return blocked
+      5     2. Increment counter (or create with TTL)
+      6     3. If counter > max_attempts → set block with TTL
+      7     4. Return {allowed, remaining, blocked_until}
+      8
+      9 Configs:
+     10   AUTH:       5 attempts / 15min window / 30min block
+     11   PIN:        3 attempts / 10min window / 1h block
+     12   MUTATION:   100 attempts / 1min window / 1min block
+     13   TELEMETRY:  500 attempts / 1min window / 5min block
+     14
+     15 Fallback: In-memory Map (if Redis unavailable)
+     16   - Cleanup: every 5 minutes
+     17   - Expiry: 1 hour
+
+    Trade-off: Lua script обеспечивает атомарность на уровне Redis (single-threaded). In-memory fallback graceful
+    degraded — не блокирует работу при Redis outage, но не distributed-safe.
+
+    ---
+
+    6. Realtime System
+
+    6.1 WebSocket Architecture
+
+      1 ┌─────────────────────────────────────────────────────┐
+      2 │  WebSocket Server (Port 3001, separate process)      │
+      3 │                                                      │
+      4 │  Protocol: pilingtrack-realtime-v1                   │
+      5 │  Message Types: subscribe, unsubscribe,              │
+      6 │                 ping/pong, ack/nack/replay           │
+      7 │                                                      │
+      8 │  ┌─────────────┐  ┌──────────────┐  ┌────────────┐  │
+      9 │  │ Client      │  │ Channel      │  │ Message    │  │
+     10 │  │ Manager     │  │ Router       │  │ Tracker    │  │
+     11 │  │             │  │              │  │            │  │
+     12 │  │ id→WS map   │  │ ACL check    │  │ ack/nack   │  │
+     13 │  │ WS→id map   │  │ Wildcard     │  │ Replay     │  │
+     14 │  │ Auto-sub    │  │ site:*,      │  │ Buffer     │  │
+     15 │  │ to tenant   │  │ tenant:*,    │  │ (100 msgs) │  │
+     16 │  │             │  │ feedback:*   │  │            │  │
+     17 │  └──────┬──────┘  └──────┬───────┘  └─────┬──────┘  │
+     18 │         │                │                │          │
+     19 │  ┌──────▼────────────────▼────────────────▼──────┐  │
+     20 │  │  Redis Pub/Sub (horizontal scaling bridge)    │  │
+     21 │  │  - Separate publisher/subscriber connections  │  │
+     22 │  │  - onChannel() auto-subscribes                │  │
+     23 │  │  - Broadcast: WS → Redis → all WS instances   │  │
+     24 │  └───────────────────────────────────────────────┘  │
+     25 │                                                      │
+     26 │  ┌───────────────────────────────────────────────┐  │
+     27 │  │  Alert Engine                                  │  │
+     28 │  │  - Rules-based evaluation                     │  │
+     29 │  │  - Cooldown per rule (in-memory)              │  │
+     30 │  │  - Channels: WS (via Redis), Telegram, Email  │  │
+     31 │  └───────────────────────────────────────────────┘  │
+     32 └──────────────────────────────────────────────────────┘
+
+    6.2 Reliability Protocol
+
+      1 Message Flow:
+      2   1. Server sends message with messageId
+      3   2. Client sends ack within 5s
+      4   3. If no ack → nack → replay from buffer (max 3 retries)
+      5   4. If still failed → dead letter (log + alert)
+      6
+      7 Reconnection:
+      8   1. Client reconnects with lastAckedMessageId
+      9   2. Server replays missed messages from buffer
+     10   3. Buffer: 100 messages per channel, LRU eviction
+     11   4. If missed > buffer → full resync request
+     12
+     13 Heartbeat:
+     14   - Server ping every 30s
+     15   - Client pong response
+     16   - Dead connection: 60s timeout → cleanup
+
+    Trade-off: Custom reliability protocol вместо стандартного (STOMP, MQTT). Это даёт полный контроль над поведением,
+     но требует поддержки собственного кода. Для industrial use case (нестабильная связь на стройплощадке) —
+    оправдано.
+
+    ---
+
+    7. Offline & Sync Architecture
+
+    7.1 Offline-First PWA
+
+      1 ┌──────────────────────────────────────────────┐
+      2 │  Service Worker (public/sw.js)               │
+      3 │                                               │
+      4 │  Caching Strategies:                          │
+      5 │  - App shell: cache-first (static)           │
+      6 │  - Static assets: cache-first (immutable)    │
+      7 │  - API GET: network-first → cache fallback   │
+      8 │  - API POST/PUT: network → 202 if offline    │
+      9 │                                                │
+     10 │  Background Sync:                             │
+     11 │  - Tag: sync-reports                         │
+     12 │  - Retry: max 5, exponential backoff         │
+     13 │  - Queue: IndexedDB (pending operations)     │
+     14 └──────────────────────────────────────────────┘
+     15
+     16 ┌──────────────────────────────────────────────┐
+     17 │  Dexie (IndexedDB) — Local Database          │
+     18 │                                               │
+     19 │  Tables:                                     │
+     20 │  - reports: local report copies              │
+     21 │  - pileWork: child entries                   │
+     22 │  - drillings: child entries                  │
+     23 │  - downtimes: child entries                  │
+     24 │  - outbox: pending operations                │
+     25 │  - syncMeta: cursors, timestamps             │
+     26 │                                                │
+     27 │  Sync Status per report:                     │
+     28 │  - pending: local changes, not synced        │
+     29 │  - synced: matches server                    │
+     30 │  - conflict: server version newer            │
+     31 │  - error: sync failed                        │
+     32 └──────────────────────────────────────────────┘
+
+    7.2 Sync Engine v3
+
+      1 Sync Cycle (runSyncCycle):
+      2   ┌─────────────────────────────────────────┐
+      3   │ 1. Lock: prevent concurrent syncs      │
+      4   │                                         │
+      5   │ 2. PUSH: Send pending outbox           │
+      6   │    - POST /api/sync                     │
+      7   │    - Batch: 1 operation per request     │
+      8   │    - On success: mark synced            │
+      9   │    - On fail: retry with backoff       │
+     10   │    - Max retries: 5 → mark failed      │
+     11   │                                         │
+     12   │ 3. PULL: Fetch server updates          │
+     13   │    - GET /api/sync/updates?since=cursor │
+     14   │    - Server returns delta since cursor  │
+     15   │    - Apply to local DB (upsert)         │
+     16   │    - Conflict: local pending wins      │
+     17   │    - Update cursor                      │
+     18   │                                         │
+     19   │ 4. Unlock                                │
+     20   └─────────────────────────────────────────┘
+     21
+     22 Auto-Sync Triggers:
+     23   - Network restored: 2s delay → sync
+     24   - App resume: immediate sync
+     25   - Periodic: every 60s
+     26   - Manual: user-triggered
+     27
+     28 Conflict Resolution:
+     29   Strategy: last-write-wins (by updatedAt)
+     30   Exception: local pending > server (local priority)
+
+    Trade-off: Два sync механизма (v2 и v3) сосуществуют. v3 — основной, используется в production. v2 — более
+    продвинутый (batch changes, field_merge conflicts), но ещё не полностью интегрирован. Это technical debt,
+    требующий консолидации.
+
+    ---
+
+    8. Multi-Tenant Architecture
+
+    8.1 Tenant Enforcement
+
+      1 ┌──────────────────────────────────────────────────┐
+      2 │  Middleware (Edge Runtime)                        │
+      3 │                                                    │
+      4 │  Tenant Resolution:                               │
+      5 │  1. X-Tenant-ID header (from reverse proxy)      │
+      6 │  2. Subdomain extraction:                         │
+      7 │     acme.pilingtrack.ru → tenant = "acme"         │
+      8 │  3. Skip for public paths:                        │
+      9 │     /api/health, /api/ready, /api/liveness        │
+     10 │                                                    │
+     11 │  If MULTI_TENANT_MODE=true and no tenant → 403    │
+     12 │  If MULTI_TENANT_MODE=false → pass through        │
+     13 │                                                    │
+     14 │  Set x-tenant-id header on response → downstream  │
+     15 └──────────────────────────────────────────────────┘
+     16
+     17 ┌──────────────────────────────────────────────────┐
+     18 │  Application Layer (Node.js Runtime)              │
+     19 │                                                    │
+     20 │  Tenant Context (AsyncLocalStorage):              │
+     21 │  - tenantId, userId, requestId                    │
+     22 │  - Propagated through all async calls            │
+     23 │                                                    │
+     24 │  tenantWhere(where, tenantId):                    │
+     25 │  - If multi-tenant: adds { tenantId } to where   │
+     26 │  - If single-tenant: returns where unchanged     │
+     27 │                                                    │
+     28 │  assertTenantOwnership(resourceTenantId):         │
+     29 │  - Throws 403 if cross-tenant access              │
+     30 └──────────────────────────────────────────────────┘
+
+    8.2 Billing & Subscription
+
+      1 Plans:
+      2   ┌──────────┬───────┬────────┬────────┬───────┐
+      3   │ Plan     │ Price │ Users  │ Sites  │ Store │
+      4   ├──────────┼───────┼────────┼────────┼───────┤
+      5   │ Free     │ 0 ₽   │ 3      │ 1      │ 100MB │
+      6   │ Starter  │ 5K ₽  │ 10     │ 5      │ 1GB   │
+      7   │ Pro      │ 15K ₽ │ 50     │ 20     │ 5GB   │
+      8   │ Enterp.  │ 50K ₽ │ ∞      │ ∞      │ 50GB  │
+      9   └──────────┴───────┴────────┴────────┴───────┘
+     10
+     11 Subscription States:
+     12   inactive → trial → active → past_due → canceled
+     13
+     14 Enforcement:
+     15   - assertTenantCanAddUser(): count users vs plan max
+     16   - assertTenantCanAddSite(): count sites vs plan max
+     17   - assertTenantSubscriptionActive(): check status + expiry
+     18
+     19 Invoicing:
+     20   - Auto-generated on subscription activation
+     21   - Number: INV-{SLUG}-{YYYYMM}-{RANDOM}
+     22   - Status: pending → paid / overdue / canceled
+
+    Trade-off: Plan enforcement — check-then-act race condition possible (между проверкой лимита и созданием ресурса
+    другой запрос может превысить лимит). Для industrial use case (несколько запросов в минуту) — риск минимален.
+
+    ---
+
+    9. IoT Telemetry Pipeline
+
+    9.1 HTTP Ingestion Gateway
+
+      1 POST /api/telemetry/ingest (single record)
+      2 PATCH /api/telemetry/ingest (batch array)
+      3
+      4 Device Authentication:
+      5   - X-Device-Key header → equipment ID lookup
+      6   - Future: JWT token from device identity provider
+      7
+      8 Rate Limiting:
+      9   - 500 requests/minute per device
+     10   - Block: 5 minutes on exceed
+     11
+     12 Validation:
+     13   - Required: type (string), value (number)
+     14   - 10 valid types: pile_strike, drilling_depth, equipment_gps,
+     15     cycle_time, pressure, vibration, temperature,
+     16     fuel_level, engine_hours, impact_force
+     17   - GPS: latitude -90..90, longitude -180..180
+     18
+     19 Storage:
+     20   - Bulk insert into TelemetryRecord
+     21   - Indexed: (equipmentId, timestamp), (siteId, timestamp), (type, timestamp)
+     22   - Partitioned by month (PostgreSQL) — future
+
+    Trade-off: Device auth через equipment ID — нет отдельной таблицы device credentials. Это упрощает деплой (не
+    нужно управлять device keys), но снижает безопасность (кто угодно с equipment ID может слать данные).
+
+    9.2 Future MQTT Integration
+
+      1 Current:   Device → HTTP POST → Ingest Route → Store
+      2 Future:    Device → MQTT Publish → Broker (Mosquitto/EMQX)
+      3                                       ↓ Webhook
+      4                                → HTTP Ingest Route → Store
+      5
+      6 Benefits:
+      7   - Persistent connection (lower overhead)
+      8   - QoS levels (at-least-once, exactly-once)
+      9   - Topic-based routing (equipment/{id}/telemetry)
+     10   - Broker-side retention
+     11   - Native IIoT protocol support
+
+    ---
+
+    10. Workers
+
+    10.1 Outbox Worker
+
+      1 Poll Interval: 10 seconds
+      2 Batch Size: 100 events
+      3 Max Retries: 5 → Dead Letter Queue
+      4
+      5 Flow:
+      6   1. Fetch unpublished events (ORDER BY createdAt ASC)
+      7   2. For each event:
+      8      a. Idempotency check (findUnique where published)
+      9      b. emitDomainEvent(event)
+     10      c. Atomic update (where: {id, published: false})
+     11      d. On fail: increment attempts, moveToDlq if max
+     12   3. Log stats every 60s
+     13   4. Heartbeat every 30s
+     14
+     15 Graceful Shutdown:
+     16   - SIGTERM/SIGINT → stop polling → final flush → exit
+
+    10.2 Projection Worker
+
+      1 Poll Interval: 5 seconds
+      2 Event Handler: publishOutboxEvents(projectEvent)
+      3
+      4 Projections:
+      5   - projectReportStats: upsert per report
+      6   - projectOperatorPerformance: full re-aggregation (idempotent)
+      7   - projectDowntimeSummary: per reason aggregation
+      8   - projectWeeklyTrend: hourly recompute (all sites)
+      9
+     10 Graceful Shutdown:
+     11   - SIGTERM/SIGINT → clear intervals → exit
+
+    10.3 PDF Worker (BullMQ)
+
+      1 Queue: Redis (pilingtrack: queue prefix)
+      2 Concurrency: 2 (configurable via PDF_WORKER_CONCURRENCY)
+      3 Job Types: period (date range), single (one report)
+      4
+      5 Flow:
+      6   1. Worker picks up job
+      7   2. Fetch reports from DB
+      8   3. Generate PDF (PDFKit)
+      9   4. Upload to S3 / save locally
+     10   5. Complete job with PDF URL
+     11
+     12 Retry: BullMQ automatic (configurable attempts)
+
+    Trade-off: PDF генерация синхронная в API route, а не через worker. BullMQ worker существует, но используется
+    только для фоновой генерации (future). Для industrial use case (PDF за смену — раз в день) — синхронная генерация
+    приемлема.
+
+    ---
+
+    11. Data Model
+
+    11.1 Core Entities
+
+      1 Tenant (multi-tenant root)
+      2   ├── User (4 roles, tenant-scoped)
+      3   │   └── Crew (operator → equipment → site)
+      4   │       └── CrewAssistant (named helpers)
+      5   │
+      6   ├── Site (object)
+      7   │   ├── PileField → Cluster → Picket (hierarchy)
+      8   │   ├── SitePilePlan (grade → count × meters)
+      9   │   ├── SiteDrillingPlan (diameter → count × meters)
+     10   │   └── UserSiteAssignment (access control)
+     11   │
+     12   ├── Equipment (installations)
+     13   ├── Report (shift report)
+     14   │   ├── PileWork (pile entries)
+     15   │   ├── LeaderDrilling (drilling entries)
+     16   │   ├── ReportDowntime (downtime entries)
+     17   │   ├── ReportVersion (immutable snapshots)
+     18   │   ├── ReportAudit (diff tracking)
+     19   │   └── ReportPhoto (photo evidence)
+     20   │
+     21   └── TenantInvoice (billing history)
+
+    11.2 Infrastructure Entities
+
+     1 OutboxEvent (transactional outbox)
+     2 AuditLog (immutable, append-only)
+     3 IdempotencyKey (duplicate prevention)
+     4 RefreshToken (session rotation)
+     5 ProjectionState (event deduplication)
+     6 DeadLetterQueue (failed events)
+     7 TelemetryRecord (IoT sensor data)
+     8 FeedbackEvent (industrial event loop)
+     9 FeedbackEventRead (read tracking)
+
+    11.3 Enum Types (9)
+
+     1 UserRole:          ADMIN, DISPATCHER, OPERATOR, ASSISTANT
+     2 ReportStatus:      draft, submitted
+     3 SiteStatus:        ACTIVE, COMPLETED, ARCHIVED
+     4 ShiftType:         day, night
+     5 FeedbackLevel:     info, success, warn, error, audit
+     6 FeedbackPriority:  LOW, MEDIUM, HIGH, CRITICAL
+     7 FeedbackAudience:  ALL, OPERATIONS, USER
+     8 OutboxStatus:      pending, processing, completed, failed
+     9 IdempotencyStatus: processing, completed, failed
+
+    11.4 Indexes Strategy
+
+
+    ┌──────────────────────────┬────────────────────────┬──────────────────────────┐
+    │ Index                    │ Purpose                │ Query Pattern            │
+    ├──────────────────────────┼────────────────────────┼──────────────────────────┤
+    │ unique_user_site_date      │ Anti-duplicate reports │ Upsert by user+site+date │
+    │ [tenantId]               │ Multi-tenant queries   │ Filter by tenant         │
+    │ [status]                 │ Report filtering       │ List by status           │
+    │ [equipmentId, timestamp] │ Telemetry time-series  │ Equipment timeline       │
+    │ [siteId, timestamp]      │ Telemetry by site      │ Site telemetry           │
+    │ [type, timestamp]        │ Telemetry by type      │ Type filtering           │
+    │ [userId, date]           │ Operator reports       │ Operator daily           │
+    │ [siteId, date]           │ Site reports           │ Site daily               │
+    └──────────────────────────┴────────────────────────┴──────────────────────────┘
+
+    ---
+
+    12. Infrastructure
+
+    12.1 Docker (Production)
+
+      1 3-Stage Build:
+      2   Stage 1 (deps):    npm ci, libc6-compat
+      3   Stage 2 (builder): Prisma generate, Next.js build
+      4   Stage 3 (runner):  Node 22 Alpine, non-root user (1001)
+      5
+      6 Services (docker-compose):
+      7   ├── app (Next.js standalone, 1GB RAM, 1 CPU)
+      8   ├── postgres (PostgreSQL 16, 2GB RAM, 2 CPU, healthcheck)
+      9   ├── redis (Redis 7, 256MB RAM, unix socket)
+     10   └── caddy (Reverse proxy, HTTPS, auto-renew)
+     11
+     12 Health Checks:
+     13   ├── app: wget /api/health (30s interval, 3 retries)
+     14   ├── postgres: pg_isready (10s interval)
+     15   ├── redis: redis-cli ping (10s interval)
+     16   └── caddy: wget / (30s interval)
+     17
+     18 Resource Limits:
+     19   ├── app: mem 1G, cpu 1.0
+     20   ├── postgres: mem 2G, cpu 2.0
+     21   └── redis: mem 256M, cpu 0.5
+
+    12.2 Kubernetes (Helm)
+
+      1 Deployments:
+      2   ├── API: 3 replicas, HPA (3-20, CPU 70%, Mem 80%)
+      3   ├── Outbox Worker: 2 replicas
+      4   ├── Projection Worker: 2 replicas
+      5   ├── PDF Worker: 1 replica
+      6   └── WebSocket: 2 replicas
+      7
+      8 Resources per Pod:
+      9   ├── Requests: CPU 250m, Memory 256Mi
+     10   ├── Limits:   CPU 500m, Memory 512Mi
+     11
+     12 Pod Management:
+     13   ├── PDB: minAvailable: 1
+     14   ├── RollingUpdate: maxUnavailable 1, maxSurge 1
+     15   ├── Anti-affinity: spread across nodes
+     16   ├── Security: runAsNonRoot, drop ALL capabilities
+     17   └── NetworkPolicy: restrict ingress/egress
+
+    12.3 CI/CD Pipeline
+
+      1 Pull Request:
+      2   → ci.yml: lint → typecheck → test → build
+      3   → codeql.yml: SAST analysis (weekly + on push)
+      4   → security.yml: trivy + npm audit + gitleaks
+      5
+      6 Merge to main:
+      7   → ci.yml: full test suite (28 files, 399 tests)
+      8   → deploy.yml: deploy VPS + backup + health check
+      9
+     10 Release (tag):
+     11   → release.yml: semver (conventional commits)
+     12   → changelog generation
+     13   → Docker image push (GHCR)
+     14   → GitHub Release
+     15
+     16 Deploy to Kubernetes:
+     17   → deploy-k8s.yml: Helm lint → staging (auto) → prod (manual)
+     18   → Rollback on failure
+     19   → Post-deploy: rollout status + health checks + HPA verify
+
+    12.4 Observability Stack
+
+      1 OpenTelemetry:
+      2   ├── SDK init (instrumentation.ts)
+      3   ├── Auto-instrumentation (Next.js, Express, HTTP)
+      4   ├── OTLP exporter (Jaeger/Tempo)
+      5   └── RUM (Real User Monitoring)
+      6
+      7 Sentry:
+      8   ├── Client config (error tracking, performance)
+      9   ├── Server config (backend errors, transactions)
+     10   └── Source maps upload (build time)
+     11
+     12 Prometheus:
+     13   ├── ServiceMonitor (Kubernetes scraping)
+     14   ├── Alert rules (CPU, memory, disk, HTTP errors)
+     15   └── Custom metrics (business KPIs)
+     16
+     17 Grafana:
+     18   ├── Dashboard 1: App Performance (latency, throughput, errors)
+     19   ├── Dashboard 2: Business Metrics (reports, users, sites)
+     20   └── Dashboard 3: Infrastructure (CPU, memory, disk, network)
+     21
+     22 Loki: Log aggregation
+     23 Jaeger/Tempo: Distributed tracing
+
+    ---
+
+    13. Trade-offs и архитектурные решения
+
+    13.1 Сознательные компромиссы
+
+
+    ┌────────────────────────────────┬───────────────────────────┬─────────────────────────────────────────────────┐
+    │ Решение                        │ Компромисс                │ Обоснование                                     │
+    ├────────────────────────────────┼───────────────────────────┼─────────────────────────────────────────────────┤
+    │ SQLite dev → PostgreSQL prod   │ Dual-database maintenance │ Быстрая локальная разработка, production мас... │
+    │ In-memory event ordering       │ Не переживает рестарт     │ Sequence tracking — bonus feature, не critic... │
+    │ **Schema validation logging (... │ Может пропустить inval... │ Graceful degradation > hard failure в produc... │
+    │ **Reconstitute + recreate chi... │ Неэффективно для parti... │ Простота кода > оптимизация для industrial u... │
+    │ Custom WS reliability protocol │ Не стандарт (STOMP/MQTT)  │ Полный контроль над поведением для unstable ... │
+    │ **Full re-aggregation в проек... │ 3-5x медленнее чем inc... │ Идемпотентность > производительность            │
+    │ CSRF via headers (не tokens)   │ Зависит от browser sup... │ Simpler implementation, covers 95% случаев      │
+    │ Device auth via equipment ID   │ Нет separate credentia... │ Simplicity > security для IIoT                  │
+    └────────────────────────────────┴───────────────────────────┴─────────────────────────────────────────────────┘
+
+
+    13.2 Known Issues (не исправлены)
+
+
+    ┌────┬──────────────────────────────────────────────┬──────────────────────────────┬───────────┐
+    │ #  │ Проблема                                     │ Влияние                      │ Приоритет │
+    ├────┼──────────────────────────────────────────────┼──────────────────────────────┼───────────┤
+    │ 1  │ Raw SQL $executeRawUnsafe без параметризации │ Potential SQL injection      │ 🟡 Medium │
+    │ 2  │ Два sync механизма (v2 + v3)                 │ Confusion, maintenance       │ 🟡 Medium │
+    │ 3  │ Hardcoded constants (24h edit window)        │ Не конфигурируемо            │ 🟢 Low    │
+    │ 4  │ Invoice number через Math.random()           │ Коллизии возможны            │ 🟡 Medium │
+    │ 5  │ Alert cooldown in-memory                     │ Теряется при рестарте        │ 🟢 Low    │
+    │ 6  │ PDF генерация синхронная                     │ Blocking для больших отчётов │ 🟢 Low    │
+    │ 7  │ Нет cursor-based pagination                  │ Данные обрезаются >100       │ 🟡 Medium │
+    │ 8  │ Гигантские компоненты (1443, 1266 строк)     │ Неподдерживаемо              │ 🟡 Medium │
+    │ 9  │ Нет Redis caching                            │ Нагрузка на БД               │ 🟡 Medium │
+    │ 10 │ Zustand монолитный store                     │ Unnecessary re-renders       │ 🟢 Low    │
+    └────┴──────────────────────────────────────────────┴──────────────────────────────┴───────────┘
+
+    ---
+
+    14. Оценка зрелости
+
+
+    ┌───────────────────┬───────┬──────────────────────────────────────────────────────────────────────────────────┐
+    │ Категория         │ Оц... │ Обоснование                                                                      │
+    ├───────────────────┼───────┼──────────────────────────────────────────────────────────────────────────────────┤
+    │ Архитектура       │ 8.... │ DDD/CQRS, event-driven, transactional outbox. Минус: dual service layer, part... │
+    │ Безопасность      │ 8.... │ bcrypt, rate limit, CSRF, CSP, tenant isolation. Минус: raw SQL, no token CSRF   │
+    │ Качество кода     │ 8.... │ Strict TS, 98.5% test pass, clean patterns. Минус: giant components              │
+    │ **Производительн... │ 8.... │ Quick mode, autosave, CQRS, idempotent projections. Минус: no Redis cache        │
+    │ Тестирование      │ 8.... │ 393 unit tests, k6 load, Redis stress. Минус: no API integration tests           │
+    │ DevOps            │ 8.... │ Docker, Helm, CI/CD, monitoring, DR plan. Минус: no staging env                  │
+    │ UX                │ 9.... │ Quick mode, photo, haptic, offline, PWA. Минус: giant forms                      │
+    │ Итого             │ **8.... │ Production-Ready SaaS Platform                                                   │
+    └───────────────────┴───────┴──────────────────────────────────────────────────────────────────────────────────┘
+
+
+    ---
+
+    15. Потенциал масштабирования
+
+
+    ┌─────────────────┬─────────────────────────────┬────────────────────────────────────────────────────┐
+    │ Уровень         │ Готовность                  │ Что нужно                                          │
+    ├─────────────────┼─────────────────────────────┼────────────────────────────────────────────────────┤
+    │ 5-10 клиентов   │ ✅ Готово сейчас            │ —                                                  │
+    │ 20-50 клиентов  │ ✅ После tenant enforcement │ Multi-tenant API enforcement                       │
+    │ 50-100 клиентов │ ⚠️ Нужно                    │ Stripe integration, MQTT, Redis caching            │
+    │ 100+ клиентов   │ ⚠️ Нужно                    │ Microservices (reports, auth), Kafka               │
+    │ Enterprise      │ ❌ Не готово                │ SSO/LDAP, SLA, custom integrations, geo-redundancy │
+    └─────────────────┴─────────────────────────────┴────────────────────────────────────────────────────┘
+
+
+    MRR Прогноз
+
+     1 20 клиентов × Starter (5K ₽) = 100K ₽/мес
+     2 10 клиентов × Pro (15K ₽)     = 150K ₽/мес
+     3 5 клиентов × Enterprise (50K) = 250K ₽/мес
+     4 ──────────────────────────────────────────
+     5 Total: 500K ₽/мес ≈ $5,500 MRR

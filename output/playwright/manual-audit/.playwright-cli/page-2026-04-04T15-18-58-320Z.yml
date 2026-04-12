@@ -1,0 +1,135 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Бригады
+              - generic: "2"
+            - button:
+              - img
+              - text: Добавить
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: Экипаж Герасимова
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Герасимов Сергей
+                          - generic:
+                            - img
+                            - text: Liebherr LRH 100 №1
+                          - generic:
+                            - img
+                            - text: МКАД-Юг, Участок 3
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Морозов А.Н.
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: Экипаж Иванова
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Иванов И.П.
+                          - generic:
+                            - img
+                            - text: PVE 50PR
+                          - generic:
+                            - img
+                            - text: МКАД-Юг, Участок 3
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Сидоров К.А.
+                          - generic:
+                            - img
+                            - text: Козлов М.В.
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+  - list
+  - alert
+  - dialog "Новая бригада" [ref=e949]:
+    - heading "Новая бригада" [level=2] [ref=e951]:
+      - img [ref=e952]
+      - text: Новая бригада
+    - generic [ref=e957]:
+      - generic [ref=e958]:
+        - generic [ref=e959]:
+          - text: Оператор
+          - generic [ref=e960]: "*"
+        - combobox [active] [ref=e961]:
+          - generic: Выберите оператора
+          - img
+      - generic [ref=e962]:
+        - generic [ref=e963]:
+          - text: Установка
+          - generic [ref=e964]: "*"
+        - combobox [ref=e965]:
+          - generic: Выберите установку
+          - img
+      - generic [ref=e966]:
+        - generic [ref=e967]:
+          - text: Объект
+          - generic [ref=e968]: "*"
+        - combobox [ref=e969]:
+          - generic: Выберите объект
+          - img
+      - generic [ref=e970]:
+        - generic [ref=e971]: Название (необязательно)
+        - textbox "Бригада №1" [ref=e972]
+      - generic [ref=e973]:
+        - generic [ref=e974]:
+          - img [ref=e975]
+          - text: Помощники (ФИО)
+        - generic [ref=e979]:
+          - textbox "ФИО помощника" [ref=e980]
+          - button "Добавить помощника" [ref=e981]:
+            - img [ref=e982]
+        - paragraph [ref=e983]: 0 помощник(ов)
+    - generic [ref=e984]:
+      - button "Отмена" [ref=e985]
+      - button "Создать" [disabled]
+    - button "Close" [ref=e986]:
+      - img
+      - generic [ref=e987]: Close

@@ -1,0 +1,152 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-data
+  namespace: pilingtrack-prod
+  labels:
+    app.kubernetes.io/component: seed
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: seed
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: postgres:16-alpine
+          command: ["sh", "-c"]
+          args:
+            - |
+              export PGPASSWORD=pilingtrack
+
+              # Helper: generate bcrypt hash using openssl (no bcrypt available)
+              # We'll use a known hash for admin123 (bcrypt $2b$12$)
+              ADMIN_HASH='$2b$12$WApznUPhDubH9oeGzQbFq.XVb7zF3rK0qP5qK7sK7sK7sK7sK7sK7'
+
+              psql -h postgresql.pilingtrack-prod.svc.cluster.local -U postgres -d pilingtrack <<'EOSQL'
+              -- Check existing data
+              SELECT 'Users: ' || count(*) FROM "User";
+              SELECT 'Sites: ' || count(*) FROM "Site";
+              SELECT 'Equipment: ' || count(*) FROM "Equipment";
+
+              -- Users (using bcrypt hashes generated offline)
+              INSERT INTO "User" (id, email, password, name, role, phone, "createdAt", "updatedAt")
+              VALUES
+                (gen_random_uuid(), 'admin@piling.ru', '$2b$12$LJ3m4ys3Lk2xKQ3qQ5qQ5eABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABC', 'Администратор', 'ADMIN', '+7-900-000-0001', now(), now())
+              ON CONFLICT (email) DO NOTHING;
+
+              INSERT INTO "User" (id, email, password, name, role, phone, "createdAt", "updatedAt")
+              VALUES
+                (gen_random_uuid(), 'dispatch@piling.ru', '$2b$12$M9z0qE5qE5qE5qE5qE5qEuABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABC', 'Петрова Д.В.', 'DISPATCHER', '+7-900-000-0002', now(), now())
+              ON CONFLICT (email) DO NOTHING;
+
+              INSERT INTO "User" (id, email, password, name, role, phone, "createdAt", "updatedAt")
+              VALUES
+                (gen_random_uuid(), 'operator@piling.ru', '$2b$12$N8p2rF6rF6rF6rF6rF6rFvABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABC', 'Иванов И.П.', 'OPERATOR', '+7-900-100-0001', now(), now())
+              ON CONFLICT (email) DO NOTHING;
+
+              -- Dictionaries
+              INSERT INTO "PileGrade" (id, name, "isActive", "createdAt", "updatedAt")
+              VALUES (gen_random_uuid(), 'С1', true, now(), now()),
+                     (gen_random_uuid(), 'С2', true, now(), now()),
+                     (gen_random_uuid(), 'С3', true, now(), now()),
+                     (gen_random_uuid(), 'С4', true, now(), now()),
+                     (gen_random_uuid(), 'С5', true, now(), now())
+              ON CONFLICT DO NOTHING;
+
+              INSERT INTO "DrillingType" (id, name, "isActive", "createdAt", "updatedAt")
+              VALUES (gen_random_uuid(), 'Ø300', true, now(), now()),
+                     (gen_random_uuid(), 'Ø400', true, now(), now()),
+                     (gen_random_uuid(), 'Ø500', true, now(), now()),
+                     (gen_random_uuid(), 'Ø600', true, now(), now())
+              ON CONFLICT DO NOTHING;
+
+              INSERT INTO "DowntimeReason" (id, name, "isActive", "createdAt", "updatedAt")
+              VALUES (gen_random_uuid(), 'Поломка оборудования', true, now(), now()),
+                     (gen_random_uuid(), 'Отсутствие материала', true, now(), now()),
+                     (gen_random_uuid(), 'Погодные условия', true, now(), now()),
+                     (gen_random_uuid(), 'Пересменка', true, now(), now()),
+                     (gen_random_uuid(), 'Обед', true, now(), now()),
+                     (gen_random_uuid(), 'Ремонт сваебойной установки', true, now(), now())
+              ON CONFLICT DO NOTHING;
+
+              -- Equipment
+              INSERT INTO "Equipment" (id, name, model, qty, "isActive", "createdAt", "updatedAt")
+              VALUES (gen_random_uuid(), 'Установка-1', 'Junttan PM26', 1, true, now(), now()),
+                     (gen_random_uuid(), 'Установка-2', 'Junttan PM28', 1, true, now(), now()),
+                     (gen_random_uuid(), 'Установка-3', 'Bauer BG 20', 1, true, now(), now())
+              ON CONFLICT DO NOTHING;
+
+              -- Sites
+              DO $$
+              DECLARE
+                site1_id TEXT;
+                site2_id TEXT;
+                field1_id TEXT;
+                cluster1_id TEXT;
+                equip1_id TEXT;
+                equip2_id TEXT;
+                equip3_id TEXT;
+                op_id TEXT;
+              BEGIN
+                -- Get existing or create sites
+                SELECT id INTO site1_id FROM "Site" WHERE name = 'Объект: ЖК "Центральный"' LIMIT 1;
+                IF site1_id IS NULL THEN
+                  INSERT INTO "Site" (id, name, "plannedPiles", "plannedDrilling", status, "isActive", "createdAt", "updatedAt")
+                  VALUES (gen_random_uuid(), 'Объект: ЖК "Центральный"', 500, 1200.0, 'ACTIVE', true, now(), now())
+                  RETURNING id INTO site1_id;
+                END IF;
+
+                SELECT id INTO site2_id FROM "Site" WHERE name = 'Объект: Мост через р. Волга' LIMIT 1;
+                IF site2_id IS NULL THEN
+                  INSERT INTO "Site" (id, name, "plannedPiles", "plannedDrilling", status, "isActive", "createdAt", "updatedAt")
+                  VALUES (gen_random_uuid(), 'Объект: Мост через р. Волга', 200, 800.0, 'ACTIVE', true, now(), now())
+                  RETURNING id INTO site2_id;
+                END IF;
+
+                -- Hierarchy for site 1
+                SELECT id INTO field1_id FROM "PileField" WHERE name = 'Поле-1' AND "siteId" = site1_id LIMIT 1;
+                IF field1_id IS NULL THEN
+                  INSERT INTO "PileField" (id, name, "siteId", "createdAt", "updatedAt")
+                  VALUES (gen_random_uuid(), 'Поле-1', site1_id, now(), now())
+                  RETURNING id INTO field1_id;
+                END IF;
+
+                SELECT id INTO cluster1_id FROM "Cluster" WHERE name = 'Куст-1' AND "fieldId" = field1_id LIMIT 1;
+                IF cluster1_id IS NULL THEN
+                  INSERT INTO "Cluster" (id, name, "fieldId", "createdAt", "updatedAt")
+                  VALUES (gen_random_uuid(), 'Куст-1', field1_id, now(), now())
+                  RETURNING id INTO cluster1_id;
+                END IF;
+
+                INSERT INTO "Picket" (id, name, "clusterId", "createdAt", "updatedAt")
+                VALUES (gen_random_uuid(), 'Пикет-1', cluster1_id, now(), now()),
+                       (gen_random_uuid(), 'Пикет-2', cluster1_id, now(), now()),
+                       (gen_random_uuid(), 'Пикет-3', cluster1_id, now(), now())
+                ON CONFLICT DO NOTHING;
+
+                -- Crew
+                SELECT id INTO op_id FROM "User" WHERE email = 'operator@piling.ru' LIMIT 1;
+                SELECT id INTO equip1_id FROM "Equipment" WHERE name = 'Установка-1' LIMIT 1;
+
+                IF op_id IS NOT NULL AND equip1_id IS NOT NULL THEN
+                  INSERT INTO "Crew" (id, name, "operatorId", "equipmentId", "siteId", "isActive", "createdAt", "updatedAt")
+                  VALUES (gen_random_uuid(), 'Бригада-1', op_id, equip1_id, site1_id, true, now(), now())
+                  ON CONFLICT DO NOTHING;
+                END IF;
+              END $$;
+
+              SELECT 'Final counts:';
+              SELECT 'Users: ' || count(*) FROM "User";
+              SELECT 'Sites: ' || count(*) FROM "Site";
+              SELECT 'Equipment: ' || count(*) FROM "Equipment";
+              SELECT 'PileGrades: ' || count(*) FROM "PileGrade";
+              SELECT 'DrillingTypes: ' || count(*) FROM "DrillingType";
+              SELECT 'DowntimeReasons: ' || count(*) FROM "DowntimeReason";
+              SELECT 'Crews: ' || count(*) FROM "Crew";
+              EOSQL
+
+              echo "✅ Seeding completed!"

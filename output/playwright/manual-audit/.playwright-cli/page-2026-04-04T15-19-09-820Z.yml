@@ -1,0 +1,152 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Бригады
+              - generic: "2"
+            - button:
+              - img
+              - text: Добавить
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: Экипаж Герасимова
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Герасимов Сергей
+                          - generic:
+                            - img
+                            - text: Liebherr LRH 100 №1
+                          - generic:
+                            - img
+                            - text: МКАД-Юг, Участок 3
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Морозов А.Н.
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - generic:
+                          - paragraph: Экипаж Иванова
+                          - generic: Активна
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Иванов И.П.
+                          - generic:
+                            - img
+                            - text: PVE 50PR
+                          - generic:
+                            - img
+                            - text: МКАД-Юг, Участок 3
+                        - generic:
+                          - generic:
+                            - img
+                            - text: Сидоров К.А.
+                          - generic:
+                            - img
+                            - text: Козлов М.В.
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+  - list
+  - alert
+  - dialog:
+    - generic:
+      - heading [level=2]:
+        - img
+        - text: Новая бригада
+    - generic:
+      - generic:
+        - generic:
+          - text: Оператор
+          - generic: "*"
+        - combobox [expanded]:
+          - generic: Выберите оператора
+          - img
+      - generic:
+        - generic:
+          - text: Установка
+          - generic: "*"
+        - combobox:
+          - generic: Выберите установку
+          - img
+      - generic:
+        - generic:
+          - text: Объект
+          - generic: "*"
+        - combobox:
+          - generic: Выберите объект
+          - img
+      - generic:
+        - generic: Название (необязательно)
+        - textbox:
+          - /placeholder: Бригада №1
+      - generic:
+        - generic:
+          - img
+          - text: Помощники (ФИО)
+        - generic:
+          - generic:
+            - textbox:
+              - /placeholder: ФИО помощника
+            - button:
+              - img
+        - paragraph: 0 помощник(ов)
+    - generic:
+      - button: Отмена
+      - button [disabled]: Создать
+    - button:
+      - img
+      - generic: Close
+  - listbox [active] [ref=e988]:
+    - option "Герасимов Сергей (уже в бригаде)" [disabled]:
+      - generic:
+        - generic:
+          - img
+          - text: Герасимов Сергей
+          - generic: (уже в бригаде)
+    - option "Иванов И.П. (уже в бригаде)" [disabled]:
+      - generic:
+        - generic:
+          - img
+          - text: Иванов И.П.
+          - generic: (уже в бригаде)

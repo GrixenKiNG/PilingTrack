@@ -1,0 +1,73 @@
+- generic [ref=e1]:
+  - generic [ref=e125]:
+    - generic [ref=e126]:
+      - button [ref=e127]:
+        - img [ref=e128]
+      - generic [ref=e130]:
+        - heading "Отчёт за смену" [level=1] [ref=e131]
+        - paragraph [ref=e132]: ВСМЖ
+    - generic [ref=e134]:
+      - generic [ref=e136]:
+        - generic [ref=e138]:
+          - generic [ref=e139]: Дата
+          - textbox [ref=e140]: 2026-04-04
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - generic [ref=e143]: Начало смены
+            - textbox [ref=e144]: 08:00
+          - generic [ref=e145]:
+            - generic [ref=e146]: Конец смены
+            - textbox [ref=e147]: 20:00
+      - generic [ref=e150]:
+        - generic [ref=e151]:
+          - img [ref=e152]
+          - text: Объект
+        - combobox [ref=e155]:
+          - generic: ВСМЖ
+          - img
+      - generic [ref=e158]:
+        - generic [ref=e159]:
+          - img [ref=e160]
+          - text: Установка
+        - combobox [ref=e162]:
+          - generic: Kopernik-SD-20
+          - img
+      - generic [ref=e164]:
+        - generic [ref=e167]:
+          - img [ref=e168]
+          - text: Забитые сваи
+        - generic [ref=e174]:
+          - combobox [ref=e175]:
+            - generic: Марка сваи...
+            - img
+          - generic [ref=e176]:
+            - spinbutton [ref=e177]
+            - button [ref=e178]:
+              - img
+      - generic [ref=e180]:
+        - generic [ref=e183]:
+          - img [ref=e184]
+          - text: Лидерное бурение
+        - generic [ref=e191]:
+          - combobox [active] [ref=e192]:
+            - generic: Лидерное бурение d=150мм
+            - img
+          - generic [ref=e193]:
+            - spinbutton [ref=e194]
+            - button [ref=e195]:
+              - img
+      - generic [ref=e199]:
+        - generic [ref=e200]:
+          - img [ref=e201]
+          - text: Простой техники
+        - button "+ Добавить" [ref=e204]
+    - generic [ref=e205]:
+      - generic [ref=e206]:
+        - img [ref=e207]
+        - paragraph [ref=e209]: Добавьте хотя бы одну сваю или бурение
+      - button "Отправить отчёт" [ref=e210] [cursor=pointer]:
+        - img [ref=e211]
+        - text: Отправить отчёт
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e35]

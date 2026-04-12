@@ -1,0 +1,232 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - button [expanded]:
+          - img
+        - generic:
+          - generic:
+            - img
+          - generic: PilingTrack
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - heading [level=1]:
+              - img
+              - text: Пользователи
+            - button:
+              - img
+              - text: Новый пользователь
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: "???????? ????????"
+                        - paragraph: test-operator-vsmzh@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Оператор
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Codex Admin
+                        - paragraph: codex-admin@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Админ
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Администратор(вы)
+                        - paragraph: admin@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Админ
+                      - generic: Активен
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Герасимов Сергей
+                        - paragraph: sas02@rambler.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Оператор
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Иванов И.П.
+                        - paragraph: operator@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Оператор
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Петрова Д.В.
+                        - paragraph: dispatch@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Диспетчер
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Сидоров К.А.
+                        - paragraph: helper@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Помощник
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - paragraph: Полевой Тестер
+                        - paragraph: field-tester-2@piling.ru
+                    - generic:
+                      - generic:
+                        - img
+                        - text: Оператор
+                      - generic: Активен
+                      - button:
+                        - img
+                      - button:
+                        - img
+                      - button:
+                        - img
+  - list
+  - alert
+  - dialog "Меню навигации" [ref=e501]:
+    - heading "Меню навигации" [level=2] [ref=e502]
+    - generic [ref=e503]:
+      - generic [ref=e504]:
+        - img [ref=e506]
+        - generic [ref=e511]:
+          - heading "PilingTrack" [level=1] [ref=e512]
+          - paragraph [ref=e513]: Панель администратора
+      - navigation [ref=e514]:
+        - button "Дашборд" [active] [ref=e515]:
+          - img [ref=e516]
+          - text: Дашборд
+        - button "Объекты" [ref=e521]:
+          - img [ref=e522]
+          - text: Объекты
+        - button "Установки" [ref=e525]:
+          - img [ref=e526]
+          - text: Установки
+        - button "Бригады" [ref=e528]:
+          - img [ref=e529]
+          - text: Бригады
+        - button "Отчёты" [ref=e533]:
+          - img [ref=e534]
+          - text: Отчёты
+        - button "Справочники" [ref=e537]:
+          - img [ref=e538]
+          - text: Справочники
+        - button "Пользователи" [ref=e541]:
+          - img [ref=e542]
+          - text: Пользователи
+        - button "Telegram" [ref=e547]:
+          - img [ref=e548]
+          - text: Telegram
+      - generic [ref=e551]:
+        - generic [ref=e552]:
+          - generic [ref=e554]: А
+          - generic [ref=e555]:
+            - paragraph [ref=e556]: Администратор
+            - paragraph [ref=e557]: admin@piling.ru
+        - button "Выйти" [ref=e558]:
+          - img
+          - text: Выйти
+    - button "Close" [ref=e559]:
+      - img [ref=e560]
+      - generic [ref=e563]: Close

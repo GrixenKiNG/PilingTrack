@@ -1,0 +1,75 @@
+# ============================================================
+# OWASP ZAP — Security Scan Configuration
+# ============================================================
+# Scans PilingTrack for common web vulnerabilities.
+#
+# Usage:
+#   docker run -t owasp/zap2docker-stable zap-baseline.py \
+#     -t http://host.docker.internal:3000 \
+#     -c zap-config.yaml \
+#     -r zap-report.html
+
+context:
+  name: pilingtrack
+  urls:
+    - http://localhost:3000
+  includePaths:
+    - http://localhost:3000.*
+  excludePaths:
+    - http://localhost:3000/.*\.(js|css|png|jpg|svg|ico)$
+    - http://localhost:3000/_next/.*
+    - http://localhost:3000/api/metrics
+
+authentication:
+  method: form
+  loginUrl: http://localhost:3000/api/auth/login
+  loginRequestData:
+    email: 'admin@piling.ru'
+    password: '1234'
+
+scan:
+  policy: Default Policy
+  maxDuration: 30
+  maxAlertsPerRule: 10
+
+rules:
+  # SQL Injection
+  - id: 40018
+    threshold: HIGH
+    risk: HIGH
+
+  # XSS
+  - id: 40012
+    threshold: HIGH
+    risk: HIGH
+
+  # CSRF
+  - id: 10202
+    threshold: MEDIUM
+    risk: MEDIUM
+
+  # Missing Security Headers
+  - id: 10038
+    threshold: LOW
+    risk: LOW
+
+  # Content Security Policy
+  - id: 10038
+    threshold: LOW
+    risk: LOW
+
+  # Session Cookie without HttpOnly
+  - id: 10010
+    threshold: MEDIUM
+    risk: MEDIUM
+
+  # Password Autocomplete
+  - id: 10058
+    threshold: LOW
+    risk: LOW
+
+alertFilters:
+  - ruleId: 10035
+    reason: 'Strict-Transport-Security not applicable in dev'
+  - ruleId: 10098
+    reason: 'Cross-Domain misannotation — false positive for local dev'

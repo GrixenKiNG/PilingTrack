@@ -1,0 +1,91 @@
+{
+  "auth": {
+    "login": {
+      "title": "PilingTrack",
+      "subtitle": "Pile Driving Management",
+      "email": "Email",
+      "password": "Password",
+      "loginButton": "Sign In",
+      "fillFields": "Fill in email and password",
+      "invalidCredentials": "Invalid email or password",
+      "loginError": "Login error",
+      "welcome": "Welcome, {name}!",
+      "emailPlaceholder": "operator@piling.ru",
+      "passwordPlaceholder": "••••••••",
+      "copyright": "© 2025 PilingTrack - Pile Work Management System"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close",
+    "search": "Search",
+    "noData": "No data",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "reports": "Reports",
+    "sites": "Sites",
+    "equipment": "Equipment",
+    "crews": "Crews",
+    "users": "Users",
+    "dictionaries": "Dictionaries",
+    "telegram": "Telegram",
+    "reportForm": "New Report",
+    "reportHistory": "History"
+  },
+  "roles": {
+    "ADMIN": "Administrator",
+    "DISPATCHER": "Dispatcher",
+    "OPERATOR": "Operator",
+    "ASSISTANT": "Assistant"
+  },
+  "reports": {
+    "title": "Reports",
+    "newReport": "New Report",
+    "editReport": "Edit Report",
+    "submitSuccess": "Report submitted successfully!",
+    "submitError": "Error submitting report",
+    "date": "Date",
+    "shift": "Shift",
+    "dayShift": "Day",
+    "nightShift": "Night",
+    "piles": "Piles",
+    "drilling": "Drilling",
+    "downtimes": "Downtimes",
+    "totalPiles": "Total piles",
+    "totalDrilling": "Total drilling",
+    "totalDowntime": "Total downtime",
+    "addPile": "Add pile",
+    "addDrilling": "Add drilling",
+    "addDowntime": "Add downtime",
+    "site": "Site",
+    "crew": "Crew",
+    "equipment": "Equipment",
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted"
+    }
+  },
+  "sites": {
+    "title": "Sites",
+    "newSite": "New Site",
+    "editSite": "Edit Site",
+    "name": "Name",
+    "plannedPiles": "Planned piles",
+    "plannedDrilling": "Planned drilling",
+    "status": {
+      "ACTIVE": "Active",
+      "PAUSED": "Paused",
+      "COMPLETED": "Completed"
+    }
+  }
+}

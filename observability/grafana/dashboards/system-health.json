@@ -1,0 +1,147 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "pilingtrack-system",
+    "title": "PilingTrack — System Health",
+    "tags": ["pilingtrack", "system", "infrastructure"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=~\"pilingtrack.*\"}[1m]) * 100",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 70 },
+                { "color": "red", "value": 90 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage (Heap)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "nodejs_heap_size_used_bytes{job=~\"pilingtrack.*\"}",
+            "legendFormat": "{{service}} — Used",
+            "refId": "A"
+          },
+          {
+            "expr": "nodejs_heap_size_total_bytes{job=~\"pilingtrack.*\"}",
+            "legendFormat": "{{service}} — Total",
+            "refId": "B"
+          },
+          {
+            "expr": "nodejs_external_memory_bytes{job=~\"pilingtrack.*\"}",
+            "legendFormat": "{{service}} — External",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "bytes" }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Event Loop Lag",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "nodejs_eventloop_lag_seconds{job=~\"pilingtrack.*\"}",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.1 },
+                { "color": "red", "value": 0.5 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "GC Activity",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(nodejs_gc_duration_seconds_sum{job=~\"pilingtrack.*\"}[1m])",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "PostgreSQL Connections",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{datname=\"pilingtrack\"}",
+            "legendFormat": "Active connections",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 50 },
+                { "color": "red", "value": 80 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Redis Memory & Keys",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes",
+            "legendFormat": "Memory Used",
+            "refId": "A"
+          },
+          {
+            "expr": "redis_db0_keys",
+            "legendFormat": "Keys in DB0",
+            "refId": "B"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

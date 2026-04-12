@@ -1,0 +1,65 @@
+# ============================================================
+# Prometheus Configuration
+# ============================================================
+# Scrapes metrics from Next.js app, WebSocket server, PostgreSQL, and Redis.
+#
+# Usage:
+#   docker run -d --name prometheus -p 9090:9090 \
+#     -v ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
+#     prom/prometheus
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    cluster: 'pilingtrack'
+    environment: 'production'
+
+# Alerting
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Rule files
+rule_files:
+  - 'alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Next.js Application
+  - job_name: 'pilingtrack-app'
+    metrics_path: '/api/metrics'
+    static_configs:
+      - targets: ['app:3000']
+        labels:
+          service: 'pilingtrack-app'
+
+  # WebSocket Server
+  - job_name: 'pilingtrack-ws'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ws:3001']
+        labels:
+          service: 'pilingtrack-ws'
+
+  # PostgreSQL
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+
+  # Node.js Process Metrics
+  - job_name: 'nodejs'
+    static_configs:
+      - targets: ['app:3000', 'ws:3001']

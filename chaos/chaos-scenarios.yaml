@@ -1,0 +1,200 @@
+# ============================================================
+# Chaos Engineering Scenarios — PilingTrack
+# ============================================================
+# Tests system resilience under failure conditions.
+#
+# Usage (with toxiproxy or custom chaos controller):
+#   chaos run chaos-scenarios.yaml --scenario <name>
+
+scenarios:
+  # ============================================================
+  # 1. Database Disconnection
+  # ============================================================
+  - name: database-disconnect
+    description: "Sever PostgreSQL connection — test reconnection and queueing"
+    target: postgres
+    action: kill
+    duration: 30s
+    recovery:
+      action: restore
+      wait: 5s
+    assertions:
+      - "API returns 503 during outage"
+      - "System recovers within 10s after restore"
+      - "No data loss — queued requests processed"
+      - "Outbox events processed after recovery"
+
+  # ============================================================
+  # 2. Redis Failure
+  # ============================================================
+  - name: redis-down
+    description: "Kill Redis — test fallback to in-memory cache"
+    target: redis
+    action: kill
+    duration: 60s
+    recovery:
+      action: restore
+    assertions:
+      - "API degrades gracefully (no crash)"
+      - "WebSocket connections maintained or reconnected"
+      - "Pub/Sub messages queued and replayed"
+
+  # ============================================================
+  # 3. Network Latency Injection
+  # ============================================================
+  - name: network-latency
+    description: "Add 3000ms latency to all API responses"
+    target: api
+    action: delay
+    value: 3000
+    duration: 5m
+    recovery:
+      action: restore
+    assertions:
+      - "Client timeouts handled gracefully"
+      - "Retry logic activates"
+      - "No cascading failures"
+      - "WebSocket heartbeat maintains connection"
+
+  # ============================================================
+  # 4. Packet Loss Simulation
+  # ============================================================
+  - name: packet-loss
+    description: "Simulate 10% packet loss (mobile network conditions)"
+    target: api
+    action: packet_loss
+    value: 0.1
+    duration: 5m
+    recovery:
+      action: restore
+    assertions:
+      - "Idempotency prevents duplicate operations"
+      - "Offline queue stores unsent reports"
+      - "Backfill sync recovers missed data"
+
+  # ============================================================
+  # 5. API Rate Limit Trigger
+  # ============================================================
+  - name: rate-limit-burst
+    description: "Flood login endpoint to trigger rate limiting"
+    target: api
+    action: flood
+    endpoint: /api/auth/login
+    requestsPerSecond: 100
+    duration: 30s
+    assertions:
+      - "Rate limiter activates after threshold"
+      - "429 responses returned correctly"
+      - "Legitimate requests not affected"
+      - "Rate limit resets after window"
+
+  # ============================================================
+  # 6. WebSocket Server Crash
+  # ============================================================
+  - name: ws-crash
+    description: "Kill WebSocket server — test client reconnection"
+    target: ws-server
+    action: kill
+    duration: 15s
+    recovery:
+      action: restore
+    assertions:
+      - "Clients detect disconnect within 5s"
+      - "Reconnection with exponential backoff"
+      - "Subscriptions restored after reconnect"
+      - "No message loss during downtime"
+
+  # ============================================================
+  # 7. Memory Pressure
+  # ============================================================
+  - name: memory-pressure
+    description: "Consume 80% of available memory"
+    target: app
+    action: memory_fill
+    value: 0.8
+    duration: 10m
+    recovery:
+      action: release
+    assertions:
+      - "GC activates before OOM"
+      - "Health endpoint reports memory warning"
+      - "No request failures due to memory"
+      - "System self-recovers after release"
+
+  # ============================================================
+  # 8. Disk Full
+  # ============================================================
+  - name: disk-full
+    description: "Simulate disk full condition"
+    target: postgres
+    action: disk_fill
+    value: 0.95
+    duration: 5m
+    recovery:
+      action: release
+    assertions:
+      - "Database handles disk full gracefully"
+      - "No data corruption"
+      - "Write operations queued or rejected cleanly"
+      - "Recovery possible after disk space freed"
+
+  # ============================================================
+  # 9. Cascading Failure
+  # ============================================================
+  - name: cascade-failure
+    description: "Kill DB + Redis simultaneously — test total degradation"
+    targets:
+      - postgres
+      - redis
+    action: kill
+    duration: 60s
+    recovery:
+      action: restore
+      stagger: 10s  # Restore DB first, then Redis
+    assertions:
+      - "System enters maintenance mode"
+      - "Static content still served"
+      - "Health checks report accurate degradation"
+      - "Full recovery after staggered restore"
+
+  # ============================================================
+  # 10. Clock Skew
+  # ============================================================
+  - name: clock-skew
+    description: "Shift server clock by 5 minutes — test time-sensitive logic"
+    target: app
+    action: clock_shift
+    value: 300s
+    duration: 10m
+    recovery:
+      action: restore
+    assertions:
+      - "JWT validation not broken by skew"
+      - "Report date handling uses server time"
+      - "Scheduled tasks adjust correctly"
+      - "No duplicate reports from time confusion"
+
+# ============================================================
+# Execution Configuration
+# ============================================================
+
+execution:
+  # Run one scenario at a time
+  parallel: false
+
+  # Wait between scenarios
+  interScenarioDelay: 30s
+
+  # Global timeout per scenario
+  timeout: 15m
+
+  # Notifications
+  notify:
+    onPass: slack
+    onFail: slack + email
+
+  # Results
+  output:
+    format: json
+    path: chaos/results/
+    retention: 30d

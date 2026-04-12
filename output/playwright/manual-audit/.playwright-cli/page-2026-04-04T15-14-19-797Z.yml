@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e6]
+      - heading "PilingTrack" [level=1] [ref=e11]
+      - paragraph [ref=e12]: Управление свайными работами
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: Email
+        - generic [ref=e17]:
+          - img [ref=e18]
+          - textbox "Email" [ref=e21]:
+            - /placeholder: operator@piling.ru
+            - text: admin@piling.ru
+      - generic [ref=e22]:
+        - generic [ref=e23]: Пароль
+        - generic [ref=e24]:
+          - img [ref=e25]
+          - textbox "Пароль" [ref=e28]:
+            - /placeholder: ••••••••
+            - text: "1234"
+          - button [ref=e29]:
+            - img [ref=e30]
+      - button "Войти" [ref=e33]
+    - paragraph [ref=e34]: © 2025 PilingTrack — Система управления свайными работами
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e35]

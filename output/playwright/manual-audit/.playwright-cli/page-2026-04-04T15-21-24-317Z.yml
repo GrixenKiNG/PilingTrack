@@ -1,0 +1,119 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e36]:
+    - generic [ref=e38]:
+      - button [ref=e39]:
+        - img [ref=e40]
+      - generic [ref=e41]:
+        - img [ref=e43]
+        - generic [ref=e48]: PilingTrack
+    - main [ref=e49]:
+      - generic [ref=e1054]:
+        - generic [ref=e1055]:
+          - heading "Пользователи" [level=1] [ref=e1056]:
+            - img [ref=e1057]
+            - text: Пользователи
+          - button "Новый пользователь" [ref=e1062]:
+            - img
+            - text: Новый пользователь
+        - generic [ref=e1063]:
+          - generic [ref=e1067]:
+            - generic [ref=e1068]:
+              - img [ref=e1070]
+              - generic [ref=e1072]:
+                - paragraph [ref=e1073]: Codex Admin(вы)
+                - paragraph [ref=e1074]: codex-admin@piling.ru
+            - generic [ref=e1075]:
+              - generic [ref=e1076]:
+                - img
+                - text: Админ
+              - generic [ref=e1077]: Активен
+              - button "Редактировать" [ref=e1078]:
+                - img [ref=e1079]
+          - generic [ref=e1085]:
+            - generic [ref=e1086]:
+              - img [ref=e1088]
+              - generic [ref=e1090]:
+                - paragraph [ref=e1091]: Администратор
+                - paragraph [ref=e1092]: admin@piling.ru
+            - generic [ref=e1093]:
+              - generic [ref=e1094]:
+                - img
+                - text: Админ
+              - generic [ref=e1095]: Активен
+              - button "Редактировать" [ref=e1096]:
+                - img [ref=e1097]
+              - button "Деактивировать" [ref=e1100]:
+                - img [ref=e1101]
+              - button "Удалить" [ref=e1105]:
+                - img [ref=e1106]
+          - generic [ref=e1112]:
+            - generic [ref=e1113]:
+              - img [ref=e1115]
+              - generic [ref=e1120]:
+                - paragraph [ref=e1121]: Герасимов Сергей
+                - paragraph [ref=e1122]: sas02@rambler.ru
+            - generic [ref=e1123]:
+              - generic [ref=e1124]:
+                - img
+                - text: Оператор
+              - generic [ref=e1125]: Активен
+              - button "Редактировать" [ref=e1126]:
+                - img [ref=e1127]
+              - button "Деактивировать" [ref=e1130]:
+                - img [ref=e1131]
+              - button "Удалить" [ref=e1135]:
+                - img [ref=e1136]
+          - generic [ref=e1142]:
+            - generic [ref=e1143]:
+              - img [ref=e1145]
+              - generic [ref=e1150]:
+                - paragraph [ref=e1151]: Иванов И.П.
+                - paragraph [ref=e1152]: operator@piling.ru
+            - generic [ref=e1153]:
+              - generic [ref=e1154]:
+                - img
+                - text: Оператор
+              - generic [ref=e1155]: Активен
+              - button "Редактировать" [ref=e1156]:
+                - img [ref=e1157]
+              - button "Деактивировать" [ref=e1160]:
+                - img [ref=e1161]
+              - button "Удалить" [ref=e1165]:
+                - img [ref=e1166]
+          - generic [ref=e1172]:
+            - generic [ref=e1173]:
+              - img [ref=e1175]
+              - generic [ref=e1178]:
+                - paragraph [ref=e1179]: Петрова Д.В.
+                - paragraph [ref=e1180]: dispatch@piling.ru
+            - generic [ref=e1181]:
+              - generic [ref=e1182]:
+                - img
+                - text: Диспетчер
+              - generic [ref=e1183]: Активен
+              - button "Редактировать" [ref=e1184]:
+                - img [ref=e1185]
+              - button "Деактивировать" [ref=e1188]:
+                - img [ref=e1189]
+              - button "Удалить" [ref=e1193]:
+                - img [ref=e1194]
+          - generic [ref=e1200]:
+            - generic [ref=e1201]:
+              - img [ref=e1203]
+              - generic [ref=e1207]:
+                - paragraph [ref=e1208]: Сидоров К.А.
+                - paragraph [ref=e1209]: helper@piling.ru
+            - generic [ref=e1210]:
+              - generic [ref=e1211]:
+                - img
+                - text: Помощник
+              - generic [ref=e1212]: Активен
+              - button "Редактировать" [ref=e1213]:
+                - img [ref=e1214]
+              - button "Деактивировать" [ref=e1217]:
+                - img [ref=e1218]
+              - button "Удалить" [ref=e1222]:
+                - img [ref=e1223]
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e35]

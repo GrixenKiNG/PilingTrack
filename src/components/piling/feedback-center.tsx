@@ -1,0 +1,354 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  Bell,
+  CheckCircle2,
+  CheckCheck,
+  Info,
+  RefreshCw,
+  ShieldCheck,
+  Siren,
+  X,
+  XCircle,
+} from 'lucide-react';
+import { authFetch } from '@/lib/api';
+import { usePilingStore } from '@/lib/store';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import type { FeedbackEventDTO, FeedbackEventPriority } from '@/lib/types';
+
+interface ReadyPayload {
+  ready: boolean;
+  database?: { provider?: string; ok?: boolean };
+  session?: { configured?: boolean };
+}
+
+interface FeedbackSummary {
+  total: number;
+  unread: number;
+  error: number;
+  warn: number;
+  success: number;
+  critical: number;
+  ackPending: number;
+}
+
+function getLevelIcon(level: FeedbackEventDTO['level']) {
+  switch (level) {
+    case 'success':
+      return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+    case 'warn':
+      return <AlertTriangle className="h-4 w-4 text-amber-600" />;
+    case 'error':
+      return <XCircle className="h-4 w-4 text-red-600" />;
+    case 'audit':
+      return <ShieldCheck className="h-4 w-4 text-slate-500" />;
+    default:
+      return <Info className="h-4 w-4 text-blue-600" />;
+  }
+}
+
+function getPriorityBadge(priority: FeedbackEventPriority) {
+  switch (priority) {
+    case 'CRITICAL':
+      return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Критично</Badge>;
+    case 'HIGH':
+      return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Высокий</Badge>;
+    case 'LOW':
+      return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">Низкий</Badge>;
+    default:
+      return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Средний</Badge>;
+  }
+}
+
+function formatEventDate(value: string) {
+  return new Date(value).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function FeedbackCenter() {
+  const user = usePilingStore((state) => state.currentUser);
+  const localFeedbackEvents = usePilingStore((state) => state.localFeedbackEvents);
+  const dismissLocalFeedbackEvent = usePilingStore((state) => state.dismissLocalFeedbackEvent);
+  const clearLocalFeedbackEvents = usePilingStore((state) => state.clearLocalFeedbackEvents);
+
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverEvents, setServerEvents] = useState<FeedbackEventDTO[]>([]);
+  const [summary, setSummary] = useState<FeedbackSummary | null>(null);
+  const [health, setHealth] = useState<ReadyPayload | null>(null);
+
+  const loadFeedback = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const [eventsRes, readyRes] = await Promise.all([
+        authFetch('/api/feedback/events?limit=25'),
+        fetch('/api/ready', { credentials: 'same-origin' }),
+      ]);
+
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        setServerEvents(eventsData.events || []);
+        setSummary(eventsData.summary || null);
+      }
+
+      if (readyRes.ok) {
+        const readyData = (await readyRes.json()) as ReadyPayload;
+        setHealth(readyData);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  const updateEventState = useCallback(
+    async (eventId: string, operation: 'read' | 'acknowledge') => {
+      const response = await authFetch('/api/feedback/events', {
+        method: 'POST',
+        body: JSON.stringify({ eventId, operation }),
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = await response.json();
+      setServerEvents((current) =>
+        current.map((event) => (event.id === eventId ? payload.event : event))
+      );
+      await loadFeedback();
+    },
+    [loadFeedback]
+  );
+
+  const markAllRead = useCallback(async () => {
+    const response = await authFetch('/api/feedback/events', {
+      method: 'POST',
+      body: JSON.stringify({ operation: 'read_all' }),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json();
+    setServerEvents(payload.events || []);
+    setSummary(payload.summary || null);
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    void loadFeedback();
+    const intervalId = window.setInterval(() => {
+      void loadFeedback();
+    }, open ? 15000 : 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadFeedback, open, user]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    void loadFeedback();
+
+    const eventSource = new EventSource('/api/feedback/stream', { withCredentials: true });
+    eventSource.addEventListener('sync', () => {
+      void loadFeedback();
+    });
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [loadFeedback, open]);
+
+  const mergedEvents = useMemo(() => {
+    const combined = [...localFeedbackEvents, ...serverEvents];
+    return combined
+      .sort((left, right) => +new Date(right.createdAt) - +new Date(left.createdAt))
+      .slice(0, 30);
+  }, [localFeedbackEvents, serverEvents]);
+
+  const localUnread = localFeedbackEvents.length;
+  const serverUnread = summary?.unread || 0;
+  const unreadCount = localUnread + serverUnread;
+  const warningCount = mergedEvents.filter((event) => event.level === 'warn' || event.level === 'error').length;
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100">
+          <Bell className="h-4.5 w-4.5 text-slate-600" />
+          {unreadCount > 0 && (
+            <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-[440px] overflow-y-auto p-0">
+        <SheetHeader className="border-b px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <SheetTitle className="text-left">Контур обратной связи</SheetTitle>
+              <p className="mt-1 text-xs text-slate-500">
+                События, ошибки, подтверждения операций и эксплуатационные сигналы.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => void loadFeedback()} size="sm" variant="outline" className="h-8 text-xs">
+                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Обновить
+              </Button>
+            </div>
+          </div>
+        </SheetHeader>
+
+        <div className="space-y-4 p-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border bg-slate-50 p-3">
+              <p className="text-xs text-slate-500">Состояние платформы</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                {health?.ready ? 'Система готова' : 'Проверка состояния'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                База: {health?.database?.ok ? 'ok' : 'unknown'} / Сессии: {health?.session?.configured ? 'ok' : 'not set'}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-slate-50 p-3">
+              <p className="text-xs text-slate-500">Активные сигналы</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{warningCount}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Непрочитанные: {unreadCount} / Критичные: {summary?.critical || 0}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">Всего: {summary?.total ?? mergedEvents.length}</Badge>
+            <Badge variant="outline">Непрочитанные: {unreadCount}</Badge>
+            <Badge variant="outline">Ожидают подтверждения: {summary?.ackPending || 0}</Badge>
+            {localFeedbackEvents.length > 0 && (
+              <Badge variant="outline">Локальные: {localFeedbackEvents.length}</Badge>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => void markAllRead()} size="sm" variant="outline" className="h-8 text-xs">
+              <CheckCheck className="mr-1.5 h-3.5 w-3.5" />
+              Отметить всё как прочитанное
+            </Button>
+            {localFeedbackEvents.length > 0 && (
+              <Button onClick={clearLocalFeedbackEvents} size="sm" variant="outline" className="h-8 text-xs">
+                Очистить локальные
+              </Button>
+            )}
+          </div>
+
+          {mergedEvents.length === 0 ? (
+            <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500">
+              Событий пока нет. Когда появятся ошибки, подтверждения операций или аудиторские записи, они будут видны здесь.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {mergedEvents.map((event) => {
+                const canAcknowledge =
+                  event.source === 'server' &&
+                  (user?.role === 'ADMIN' || user?.role === 'DISPATCHER') &&
+                  (event.level === 'warn' || event.level === 'error') &&
+                  !event.acknowledgedAt;
+
+                return (
+                  <div
+                    key={`${event.source}-${event.id}`}
+                    className={`rounded-xl border bg-white p-3 shadow-sm transition-opacity ${
+                      event.unread ? 'border-orange-200' : 'opacity-90'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2">
+                        {getLevelIcon(event.level)}
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                            {getPriorityBadge(event.priority)}
+                            <Badge variant="secondary" className="text-[10px]">
+                              {event.source === 'client' ? 'локально' : event.scope}
+                            </Badge>
+                            {event.unread && (
+                              <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Новое</Badge>
+                            )}
+                            {event.acknowledgedAt && (
+                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                                Подтверждено
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{event.message}</p>
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                            <span>{formatEventDate(event.createdAt)}</span>
+                            {event.requestId && <span>requestId: {event.requestId}</span>}
+                            {event.actorName && <span>Инициатор: {event.actorName}</span>}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {event.source === 'server' && event.unread && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                                onClick={() => void updateEventState(event.id, 'read')}
+                              >
+                                Отметить как прочитанное
+                              </Button>
+                            )}
+                            {canAcknowledge && (
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs bg-slate-900 hover:bg-slate-800"
+                                onClick={() => void updateEventState(event.id, 'acknowledge')}
+                              >
+                                <Siren className="mr-1.5 h-3.5 w-3.5" />
+                                Подтвердить обработку
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {event.source === 'client' && (
+                        <button
+                          onClick={() => dismissLocalFeedbackEvent(event.id)}
+                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

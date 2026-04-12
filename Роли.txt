@@ -1,0 +1,41 @@
+📧 Учетные данные для входа:                                                                                  
+  │                                                                                                                  
+  │      🔑 АДМИНИСТРАТОР:                                                                                           
+  │         Email:    admin@piling.ru                                                                                
+  │         Пароль:   1234                                                                                           
+  │                                                                                                                  
+  │      👷 ОПЕРАТОР:                                                                                                
+  │         Email:    operator@piling.ru                                                                             
+  │         Пароль:   0000                                                                                           
+  │                                                                                                                  
+  │      📡 ДИСПЕТЧЕР:                                                                                               
+  │         Email:    dispatch@piling.ru                                                                             
+  │         Пароль:   2222                                                                                           
+  │                                                                                                                  
+  │      ️  МОНТЁР:                                                                                                  
+  │         Email:    helper@piling.ru                                                                               
+  │         Пароль:   3333                                                                                           
+  │                                                                                                                  
+  │    📋 Дополнительные аккаунты:                                                                                   
+  │         Email:    sas02@rambler.ru                                                                              
+  │         Пароль:   1111       
+
+    ┌───── ───┬─────── ───────┬─────────┐
+    │ Роль       │ Email              │ Пароль      │
+    ├─ ───────┼─────────── ───┼─────────┤
+    │ ADMIN      │ admin@piling.ru    │ admin123    │
+    │ DISPATCHER │ dispatch@piling.ru │ 2222        │
+    │ OPERATOR   │ operator@piling.ru │ operator123 │
+    │ OPERATOR   │ loadtest@piling.ru │ loadtest123 │
+    │ ASSISTANT  │ helper@piling.ru   │ 3333        │
+            
+
+ 
+    │ Роль             │ Email              │ Пароль │
+    ├
+    │ 🔑 Администратор │ admin@piling.ru    │ 1234   │
+    │ 👷 Оператор      │ operator@piling.ru │ 0000   │
+    │ 📡 Диспетчер     │ dispatch@piling.ru │ 2222   │
+    │ 🔧 Монтёр        │ helper@piling.ru   │ 3333   │
+    │ 📋 Доп.          │ sas02@rambler.ru   │ 1111   │
+    

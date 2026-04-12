@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist/ws",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "declaration": false,
+    "sourceMap": true,
+    "paths": {}
+  },
+  "include": [
+    "src/realtime/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "src/app",
+    "src/components",
+    "src/mobile",
+    "tests"
+  ]
+}

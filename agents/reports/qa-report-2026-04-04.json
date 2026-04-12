@@ -1,0 +1,1121 @@
+{
+  "timestamp": "2026-04-04T20:00:51.938Z",
+  "projectName": "PilingTrack",
+  "version": "1.0.0",
+  "totalAgents": 24,
+  "agentsExecuted": 24,
+  "agentsPassed": 7,
+  "agentsFailed": 17,
+  "agentsWarning": 0,
+  "agentsSkipped": 0,
+  "findings": {
+    "critical": [
+      {
+        "agent": "software-architect",
+        "category": "architecture",
+        "severity": "critical",
+        "title": "Агент software-architect не смог完成 работу",
+        "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+        "recommendation": "Проверить агент и запустить повторно"
+      },
+      {
+        "agent": "distributed-systems-architect",
+        "category": "architecture",
+        "severity": "critical",
+        "title": "Агент distributed-systems-architect не смог完成 работу",
+        "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+        "recommendation": "Проверить агент и запустить повторно"
+      },
+      {
+        "agent": "database-architect",
+        "category": "architecture",
+        "severity": "critical",
+        "title": "Агент database-architect не смог完成 работу",
+        "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+        "recommendation": "Проверить агент и запустить повторно"
+      },
+      {
+        "agent": "backend-lead-engineer",
+        "category": "backend",
+        "severity": "critical",
+        "title": "Агент backend-lead-engineer не смог完成 работу",
+        "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+        "recommendation": "Проверить агент и запустить повторно"
+      },
+      {
+        "agent": "api-testing-engineer",
+        "category": "backend",
+        "severity": "critical",
+        "title": "Отсутствует обработка ошибок в API",
+        "description": "API routes не используют try-catch блоки. Необработанные ошибки приведут к 500 ошибкам без информативного сообщения.",
+        "recommendation": "Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов"
+      },
+      {
+        "agent": "concurrency-engineer",
+        "category": "backend",
+        "severity": "critical",
+        "title": "Отсутствует обработка ошибок в API",
+        "description": "API routes не используют try-catch блоки. Необработанные ошибки приведут к 500 ошибкам без информативного сообщения.",
+        "recommendation": "Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов"
+      },
+      {
+        "agent": "performance-engineer",
+        "category": "backend",
+        "severity": "critical",
+        "title": "Отсутствует обработка ошибок в API",
+        "description": "API routes не используют try-catch блоки. Необработанные ошибки приведут к 500 ошибкам без информативного сообщения.",
+        "recommendation": "Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов"
+      }
+    ],
+    "high": [
+      {
+        "agent": "api-testing-engineer",
+        "category": "backend",
+        "severity": "high",
+        "title": "Отсутствует валидация входных данных",
+        "description": "API endpoints не валидируют входные данные. Это риск безопасности и целостности данных.",
+        "recommendation": "Использовать Zod для валидации всех request body и query parameters"
+      },
+      {
+        "agent": "api-testing-engineer",
+        "category": "backend",
+        "severity": "high",
+        "title": "Отсутствует rate limiting",
+        "description": "API endpoints не защищены rate limiting. Это позволяет brute-force атаки и DoS.",
+        "recommendation": "Внедрить rate limiting на login, API endpoints"
+      },
+      {
+        "agent": "concurrency-engineer",
+        "category": "backend",
+        "severity": "high",
+        "title": "Отсутствует валидация входных данных",
+        "description": "API endpoints не валидируют входные данные. Это риск безопасности и целостности данных.",
+        "recommendation": "Использовать Zod для валидации всех request body и query parameters"
+      },
+      {
+        "agent": "concurrency-engineer",
+        "category": "backend",
+        "severity": "high",
+        "title": "Отсутствует rate limiting",
+        "description": "API endpoints не защищены rate limiting. Это позволяет brute-force атаки и DoS.",
+        "recommendation": "Внедрить rate limiting на login, API endpoints"
+      },
+      {
+        "agent": "performance-engineer",
+        "category": "backend",
+        "severity": "high",
+        "title": "Отсутствует валидация входных данных",
+        "description": "API endpoints не валидируют входные данные. Это риск безопасности и целостности данных.",
+        "recommendation": "Использовать Zod для валидации всех request body и query parameters"
+      },
+      {
+        "agent": "performance-engineer",
+        "category": "backend",
+        "severity": "high",
+        "title": "Отсутствует rate limiting",
+        "description": "API endpoints не защищены rate limiting. Это позволяет brute-force атаки и DoS.",
+        "recommendation": "Внедрить rate limiting на login, API endpoints"
+      },
+      {
+        "agent": "mobile-web-engineer",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Проблемы с responsive дизайном",
+        "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+        "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+      },
+      {
+        "agent": "mobile-web-engineer",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Отсутствует offline режим",
+        "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+        "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+      },
+      {
+        "agent": "browser-compatibility-engineer",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Проблемы с responsive дизайном",
+        "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+        "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+      },
+      {
+        "agent": "browser-compatibility-engineer",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Отсутствует offline режим",
+        "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+        "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+      },
+      {
+        "agent": "offline-mode-specialist",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Проблемы с responsive дизайном",
+        "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+        "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+      },
+      {
+        "agent": "offline-mode-specialist",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Отсутствует offline режим",
+        "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+        "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+      },
+      {
+        "agent": "frontend-performance-engineer",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Проблемы с responsive дизайном",
+        "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+        "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+      },
+      {
+        "agent": "frontend-performance-engineer",
+        "category": "frontend",
+        "severity": "high",
+        "title": "Отсутствует offline режим",
+        "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+        "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+      },
+      {
+        "agent": "cybersecurity-specialist",
+        "category": "security",
+        "severity": "high",
+        "title": "Отсутствует CSRF защита",
+        "description": "POST/PUT/DELETE endpoints не защищены от CSRF атак.",
+        "recommendation": "Внедрить CSRF tokens для state-changing операций"
+      },
+      {
+        "agent": "saas-security-architect",
+        "category": "security",
+        "severity": "high",
+        "title": "Отсутствует CSRF защита",
+        "description": "POST/PUT/DELETE endpoints не защищены от CSRF атак.",
+        "recommendation": "Внедрить CSRF tokens для state-changing операций"
+      },
+      {
+        "agent": "authentication-specialist",
+        "category": "security",
+        "severity": "high",
+        "title": "Отсутствует CSRF защита",
+        "description": "POST/PUT/DELETE endpoints не защищены от CSRF атак.",
+        "recommendation": "Внедрить CSRF tokens для state-changing операций"
+      },
+      {
+        "agent": "industry-4-engineer",
+        "category": "industrial",
+        "severity": "high",
+        "title": "Отсутствует IoT интеграция",
+        "description": "Для Industry 4.0 платформы нет интеграции с датчиками техники (GPS, нагрузка, время работы).",
+        "recommendation": "Реализовать MQTT/CoAP для получения данных с датчиков буровых установок"
+      },
+      {
+        "agent": "construction-process-engineer",
+        "category": "industrial",
+        "severity": "high",
+        "title": "Отсутствует IoT интеграция",
+        "description": "Для Industry 4.0 платформы нет интеграции с датчиками техники (GPS, нагрузка, время работы).",
+        "recommendation": "Реализовать MQTT/CoAP для получения данных с датчиков буровых установок"
+      },
+      {
+        "agent": "ux-specialist-industrial",
+        "category": "industrial",
+        "severity": "high",
+        "title": "Отсутствует IoT интеграция",
+        "description": "Для Industry 4.0 платформы нет интеграции с датчиками техники (GPS, нагрузка, время работы).",
+        "recommendation": "Реализовать MQTT/CoAP для получения данных с датчиков буровых установок"
+      }
+    ],
+    "medium": [
+      {
+        "agent": "api-testing-engineer",
+        "category": "backend",
+        "severity": "medium",
+        "title": "Отсутствует пагинация в API",
+        "description": "API endpoints возвращают все записи без пагинации. При росте данных это приведёт к проблемам производительности.",
+        "recommendation": "Реализовать cursor-based или offset пагинацию для всех list endpoints"
+      },
+      {
+        "agent": "concurrency-engineer",
+        "category": "backend",
+        "severity": "medium",
+        "title": "Отсутствует пагинация в API",
+        "description": "API endpoints возвращают все записи без пагинации. При росте данных это приведёт к проблемам производительности.",
+        "recommendation": "Реализовать cursor-based или offset пагинацию для всех list endpoints"
+      },
+      {
+        "agent": "performance-engineer",
+        "category": "backend",
+        "severity": "medium",
+        "title": "Отсутствует пагинация в API",
+        "description": "API endpoints возвращают все записи без пагинации. При росте данных это приведёт к проблемам производительности.",
+        "recommendation": "Реализовать cursor-based или offset пагинацию для всех list endpoints"
+      },
+      {
+        "agent": "mobile-web-engineer",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Большое количество зависимостей",
+        "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+        "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+      },
+      {
+        "agent": "mobile-web-engineer",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Проблемы доступности (a11y)",
+        "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+        "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+      },
+      {
+        "agent": "browser-compatibility-engineer",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Большое количество зависимостей",
+        "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+        "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+      },
+      {
+        "agent": "browser-compatibility-engineer",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Проблемы доступности (a11y)",
+        "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+        "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+      },
+      {
+        "agent": "offline-mode-specialist",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Большое количество зависимостей",
+        "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+        "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+      },
+      {
+        "agent": "offline-mode-specialist",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Проблемы доступности (a11y)",
+        "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+        "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+      },
+      {
+        "agent": "frontend-performance-engineer",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Большое количество зависимостей",
+        "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+        "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+      },
+      {
+        "agent": "frontend-performance-engineer",
+        "category": "frontend",
+        "severity": "medium",
+        "title": "Проблемы доступности (a11y)",
+        "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+        "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+      },
+      {
+        "agent": "cybersecurity-specialist",
+        "category": "security",
+        "severity": "medium",
+        "title": "Отсутствуют security headers",
+        "description": "Не установлены HTTP security headers (CSP, X-Frame-Options, etc).",
+        "recommendation": "Добавить middleware с security headers"
+      },
+      {
+        "agent": "saas-security-architect",
+        "category": "security",
+        "severity": "medium",
+        "title": "Отсутствуют security headers",
+        "description": "Не установлены HTTP security headers (CSP, X-Frame-Options, etc).",
+        "recommendation": "Добавить middleware с security headers"
+      },
+      {
+        "agent": "authentication-specialist",
+        "category": "security",
+        "severity": "medium",
+        "title": "Отсутствуют security headers",
+        "description": "Не установлены HTTP security headers (CSP, X-Frame-Options, etc).",
+        "recommendation": "Добавить middleware с security headers"
+      },
+      {
+        "agent": "industry-4-engineer",
+        "category": "industrial",
+        "severity": "medium",
+        "title": "Нет валидации строительных процессов",
+        "description": "Отчёты не проверяют логику (количество свай <= плана, бурение соответствует проекту).",
+        "recommendation": "Добавить валидацию: отчёт не может превышать план, проверка последовательности операций"
+      },
+      {
+        "agent": "industry-4-engineer",
+        "category": "industrial",
+        "severity": "medium",
+        "title": "UI не адаптирован для операторов техники",
+        "description": "Операторы работают в перчатках, на ярком солнце, в пыли. UI должен учитывать это.",
+        "recommendation": "Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+      },
+      {
+        "agent": "construction-process-engineer",
+        "category": "industrial",
+        "severity": "medium",
+        "title": "Нет валидации строительных процессов",
+        "description": "Отчёты не проверяют логику (количество свай <= плана, бурение соответствует проекту).",
+        "recommendation": "Добавить валидацию: отчёт не может превышать план, проверка последовательности операций"
+      },
+      {
+        "agent": "construction-process-engineer",
+        "category": "industrial",
+        "severity": "medium",
+        "title": "UI не адаптирован для операторов техники",
+        "description": "Операторы работают в перчатках, на ярком солнце, в пыли. UI должен учитывать это.",
+        "recommendation": "Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+      },
+      {
+        "agent": "ux-specialist-industrial",
+        "category": "industrial",
+        "severity": "medium",
+        "title": "Нет валидации строительных процессов",
+        "description": "Отчёты не проверяют логику (количество свай <= плана, бурение соответствует проекту).",
+        "recommendation": "Добавить валидацию: отчёт не может превышать план, проверка последовательности операций"
+      },
+      {
+        "agent": "ux-specialist-industrial",
+        "category": "industrial",
+        "severity": "medium",
+        "title": "UI не адаптирован для операторов техники",
+        "description": "Операторы работают в перчатках, на ярком солнце, в пыли. UI должен учитывать это.",
+        "recommendation": "Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+      }
+    ],
+    "low": [
+      {
+        "agent": "industry-4-engineer",
+        "category": "industrial",
+        "severity": "low",
+        "title": "Отсутствует логика смен",
+        "description": "В строительстве используются смены (день/ночь). Логика может быть неполной.",
+        "recommendation": "Реализовать корректную обработку смен и учёт работы across midnight"
+      },
+      {
+        "agent": "construction-process-engineer",
+        "category": "industrial",
+        "severity": "low",
+        "title": "Отсутствует логика смен",
+        "description": "В строительстве используются смены (день/ночь). Логика может быть неполной.",
+        "recommendation": "Реализовать корректную обработку смен и учёт работы across midnight"
+      },
+      {
+        "agent": "ux-specialist-industrial",
+        "category": "industrial",
+        "severity": "low",
+        "title": "Отсутствует логика смен",
+        "description": "В строительстве используются смены (день/ночь). Логика может быть неполной.",
+        "recommendation": "Реализовать корректную обработку смен и учёт работы across midnight"
+      }
+    ],
+    "info": []
+  },
+  "categories": {
+    "architecture": [
+      {
+        "agentName": "software-architect",
+        "category": "architecture",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "software-architect",
+            "category": "architecture",
+            "severity": "critical",
+            "title": "Агент software-architect не смог完成 работу",
+            "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+            "recommendation": "Проверить агент и запустить повторно"
+          }
+        ],
+        "summary": "Агент завершился с ошибкой",
+        "executedAt": "2026-04-04T19:58:56.894Z",
+        "duration": 0
+      },
+      {
+        "agentName": "distributed-systems-architect",
+        "category": "architecture",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "distributed-systems-architect",
+            "category": "architecture",
+            "severity": "critical",
+            "title": "Агент distributed-systems-architect не смог完成 работу",
+            "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+            "recommendation": "Проверить агент и запустить повторно"
+          }
+        ],
+        "summary": "Агент завершился с ошибкой",
+        "executedAt": "2026-04-04T19:58:56.896Z",
+        "duration": 0
+      },
+      {
+        "agentName": "database-architect",
+        "category": "architecture",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "database-architect",
+            "category": "architecture",
+            "severity": "critical",
+            "title": "Агент database-architect не смог完成 работу",
+            "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+            "recommendation": "Проверить агент и запустить повторно"
+          }
+        ],
+        "summary": "Агент завершился с ошибкой",
+        "executedAt": "2026-04-04T19:58:56.897Z",
+        "duration": 0
+      }
+    ],
+    "backend": [
+      {
+        "agentName": "backend-lead-engineer",
+        "category": "backend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "backend-lead-engineer",
+            "category": "backend",
+            "severity": "critical",
+            "title": "Агент backend-lead-engineer не смог完成 работу",
+            "description": "Ошибка выполнения: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'",
+            "recommendation": "Проверить агент и запустить повторно"
+          }
+        ],
+        "summary": "Агент завершился с ошибкой",
+        "executedAt": "2026-04-04T19:58:56.898Z",
+        "duration": 0
+      },
+      {
+        "agentName": "api-testing-engineer",
+        "category": "backend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "api-testing-engineer",
+            "category": "backend",
+            "severity": "critical",
+            "title": "Отсутствует обработка ошибок в API",
+            "description": "API routes не используют try-catch блоки. Необработанные ошибки приведут к 500 ошибкам без информативного сообщения.",
+            "recommendation": "Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов"
+          },
+          {
+            "agent": "api-testing-engineer",
+            "category": "backend",
+            "severity": "high",
+            "title": "Отсутствует валидация входных данных",
+            "description": "API endpoints не валидируют входные данные. Это риск безопасности и целостности данных.",
+            "recommendation": "Использовать Zod для валидации всех request body и query parameters"
+          },
+          {
+            "agent": "api-testing-engineer",
+            "category": "backend",
+            "severity": "high",
+            "title": "Отсутствует rate limiting",
+            "description": "API endpoints не защищены rate limiting. Это позволяет brute-force атаки и DoS.",
+            "recommendation": "Внедрить rate limiting на login, API endpoints"
+          },
+          {
+            "agent": "api-testing-engineer",
+            "category": "backend",
+            "severity": "medium",
+            "title": "Отсутствует пагинация в API",
+            "description": "API endpoints возвращают все записи без пагинации. При росте данных это приведёт к проблемам производительности.",
+            "recommendation": "Реализовать cursor-based или offset пагинацию для всех list endpoints"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:57.751Z",
+        "duration": 852
+      },
+      {
+        "agentName": "concurrency-engineer",
+        "category": "backend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "concurrency-engineer",
+            "category": "backend",
+            "severity": "critical",
+            "title": "Отсутствует обработка ошибок в API",
+            "description": "API routes не используют try-catch блоки. Необработанные ошибки приведут к 500 ошибкам без информативного сообщения.",
+            "recommendation": "Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов"
+          },
+          {
+            "agent": "concurrency-engineer",
+            "category": "backend",
+            "severity": "high",
+            "title": "Отсутствует валидация входных данных",
+            "description": "API endpoints не валидируют входные данные. Это риск безопасности и целостности данных.",
+            "recommendation": "Использовать Zod для валидации всех request body и query parameters"
+          },
+          {
+            "agent": "concurrency-engineer",
+            "category": "backend",
+            "severity": "high",
+            "title": "Отсутствует rate limiting",
+            "description": "API endpoints не защищены rate limiting. Это позволяет brute-force атаки и DoS.",
+            "recommendation": "Внедрить rate limiting на login, API endpoints"
+          },
+          {
+            "agent": "concurrency-engineer",
+            "category": "backend",
+            "severity": "medium",
+            "title": "Отсутствует пагинация в API",
+            "description": "API endpoints возвращают все записи без пагинации. При росте данных это приведёт к проблемам производительности.",
+            "recommendation": "Реализовать cursor-based или offset пагинацию для всех list endpoints"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:57.855Z",
+        "duration": 104
+      },
+      {
+        "agentName": "performance-engineer",
+        "category": "backend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "performance-engineer",
+            "category": "backend",
+            "severity": "critical",
+            "title": "Отсутствует обработка ошибок в API",
+            "description": "API routes не используют try-catch блоки. Необработанные ошибки приведут к 500 ошибкам без информативного сообщения.",
+            "recommendation": "Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов"
+          },
+          {
+            "agent": "performance-engineer",
+            "category": "backend",
+            "severity": "high",
+            "title": "Отсутствует валидация входных данных",
+            "description": "API endpoints не валидируют входные данные. Это риск безопасности и целостности данных.",
+            "recommendation": "Использовать Zod для валидации всех request body и query parameters"
+          },
+          {
+            "agent": "performance-engineer",
+            "category": "backend",
+            "severity": "high",
+            "title": "Отсутствует rate limiting",
+            "description": "API endpoints не защищены rate limiting. Это позволяет brute-force атаки и DoS.",
+            "recommendation": "Внедрить rate limiting на login, API endpoints"
+          },
+          {
+            "agent": "performance-engineer",
+            "category": "backend",
+            "severity": "medium",
+            "title": "Отсутствует пагинация в API",
+            "description": "API endpoints возвращают все записи без пагинации. При росте данных это приведёт к проблемам производительности.",
+            "recommendation": "Реализовать cursor-based или offset пагинацию для всех list endpoints"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:57.957Z",
+        "duration": 102
+      }
+    ],
+    "frontend": [
+      {
+        "agentName": "mobile-web-engineer",
+        "category": "frontend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "mobile-web-engineer",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Проблемы с responsive дизайном",
+            "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+            "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+          },
+          {
+            "agent": "mobile-web-engineer",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Отсутствует offline режим",
+            "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+            "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+          },
+          {
+            "agent": "mobile-web-engineer",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Большое количество зависимостей",
+            "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+            "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+          },
+          {
+            "agent": "mobile-web-engineer",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Проблемы доступности (a11y)",
+            "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+            "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:58.604Z",
+        "duration": 647
+      },
+      {
+        "agentName": "browser-compatibility-engineer",
+        "category": "frontend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "browser-compatibility-engineer",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Проблемы с responsive дизайном",
+            "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+            "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+          },
+          {
+            "agent": "browser-compatibility-engineer",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Отсутствует offline режим",
+            "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+            "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+          },
+          {
+            "agent": "browser-compatibility-engineer",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Большое количество зависимостей",
+            "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+            "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+          },
+          {
+            "agent": "browser-compatibility-engineer",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Проблемы доступности (a11y)",
+            "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+            "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:58.673Z",
+        "duration": 69
+      },
+      {
+        "agentName": "offline-mode-specialist",
+        "category": "frontend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "offline-mode-specialist",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Проблемы с responsive дизайном",
+            "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+            "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+          },
+          {
+            "agent": "offline-mode-specialist",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Отсутствует offline режим",
+            "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+            "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+          },
+          {
+            "agent": "offline-mode-specialist",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Большое количество зависимостей",
+            "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+            "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+          },
+          {
+            "agent": "offline-mode-specialist",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Проблемы доступности (a11y)",
+            "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+            "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:58.744Z",
+        "duration": 71
+      },
+      {
+        "agentName": "frontend-performance-engineer",
+        "category": "frontend",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "frontend-performance-engineer",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Проблемы с responsive дизайном",
+            "description": "Компоненты могут не иметь адаптивности для мобильных устройств операторов техники.",
+            "recommendation": "Проверить все компоненты на мобильных viewports (320px, 375px, 414px)"
+          },
+          {
+            "agent": "frontend-performance-engineer",
+            "category": "frontend",
+            "severity": "high",
+            "title": "Отсутствует offline режим",
+            "description": "Для операторов на стройплощадке с плохим интернетом offline режим критичен.",
+            "recommendation": "Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов"
+          },
+          {
+            "agent": "frontend-performance-engineer",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Большое количество зависимостей",
+            "description": "В проекте 69 зависимостей. Это может привести к большому bundle size и медленной загрузке на мобильных.",
+            "recommendation": "Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости"
+          },
+          {
+            "agent": "frontend-performance-engineer",
+            "category": "frontend",
+            "severity": "medium",
+            "title": "Проблемы доступности (a11y)",
+            "description": "Компоненты могут не иметь ARIA атрибутов, что критично для industrial приложений.",
+            "recommendation": "Добавить ARIA labels, role атрибуты и keyboard navigation"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T19:58:58.815Z",
+        "duration": 71
+      }
+    ],
+    "devops": [
+      {
+        "agentName": "devops-architect",
+        "category": "devops",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:42.366Z",
+        "duration": 103551
+      },
+      {
+        "agentName": "cloud-infrastructure-engineer",
+        "category": "devops",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:43.516Z",
+        "duration": 1150
+      },
+      {
+        "agentName": "monitoring-engineer",
+        "category": "devops",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:44.653Z",
+        "duration": 1136
+      },
+      {
+        "agentName": "disaster-recovery-engineer",
+        "category": "devops",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:45.808Z",
+        "duration": 1155
+      }
+    ],
+    "data": [
+      {
+        "agentName": "data-engineer",
+        "category": "data",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:47.566Z",
+        "duration": 1758
+      },
+      {
+        "agentName": "data-quality-engineer",
+        "category": "data",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:49.312Z",
+        "duration": 1746
+      },
+      {
+        "agentName": "analytics-engineer",
+        "category": "data",
+        "status": "passed",
+        "findings": [],
+        "summary": "Найдено 0 замечаний",
+        "executedAt": "2026-04-04T20:00:51.060Z",
+        "duration": 1748
+      }
+    ],
+    "security": [
+      {
+        "agentName": "cybersecurity-specialist",
+        "category": "security",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "cybersecurity-specialist",
+            "category": "security",
+            "severity": "high",
+            "title": "Отсутствует CSRF защита",
+            "description": "POST/PUT/DELETE endpoints не защищены от CSRF атак.",
+            "recommendation": "Внедрить CSRF tokens для state-changing операций"
+          },
+          {
+            "agent": "cybersecurity-specialist",
+            "category": "security",
+            "severity": "medium",
+            "title": "Отсутствуют security headers",
+            "description": "Не установлены HTTP security headers (CSP, X-Frame-Options, etc).",
+            "recommendation": "Добавить middleware с security headers"
+          }
+        ],
+        "summary": "Найдено 2 замечаний",
+        "executedAt": "2026-04-04T20:00:51.202Z",
+        "duration": 141
+      },
+      {
+        "agentName": "saas-security-architect",
+        "category": "security",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "saas-security-architect",
+            "category": "security",
+            "severity": "high",
+            "title": "Отсутствует CSRF защита",
+            "description": "POST/PUT/DELETE endpoints не защищены от CSRF атак.",
+            "recommendation": "Внедрить CSRF tokens для state-changing операций"
+          },
+          {
+            "agent": "saas-security-architect",
+            "category": "security",
+            "severity": "medium",
+            "title": "Отсутствуют security headers",
+            "description": "Не установлены HTTP security headers (CSP, X-Frame-Options, etc).",
+            "recommendation": "Добавить middleware с security headers"
+          }
+        ],
+        "summary": "Найдено 2 замечаний",
+        "executedAt": "2026-04-04T20:00:51.338Z",
+        "duration": 136
+      },
+      {
+        "agentName": "authentication-specialist",
+        "category": "security",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "authentication-specialist",
+            "category": "security",
+            "severity": "high",
+            "title": "Отсутствует CSRF защита",
+            "description": "POST/PUT/DELETE endpoints не защищены от CSRF атак.",
+            "recommendation": "Внедрить CSRF tokens для state-changing операций"
+          },
+          {
+            "agent": "authentication-specialist",
+            "category": "security",
+            "severity": "medium",
+            "title": "Отсутствуют security headers",
+            "description": "Не установлены HTTP security headers (CSP, X-Frame-Options, etc).",
+            "recommendation": "Добавить middleware с security headers"
+          }
+        ],
+        "summary": "Найдено 2 замечаний",
+        "executedAt": "2026-04-04T20:00:51.469Z",
+        "duration": 131
+      }
+    ],
+    "industrial": [
+      {
+        "agentName": "industry-4-engineer",
+        "category": "industrial",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "industry-4-engineer",
+            "category": "industrial",
+            "severity": "high",
+            "title": "Отсутствует IoT интеграция",
+            "description": "Для Industry 4.0 платформы нет интеграции с датчиками техники (GPS, нагрузка, время работы).",
+            "recommendation": "Реализовать MQTT/CoAP для получения данных с датчиков буровых установок"
+          },
+          {
+            "agent": "industry-4-engineer",
+            "category": "industrial",
+            "severity": "medium",
+            "title": "Нет валидации строительных процессов",
+            "description": "Отчёты не проверяют логику (количество свай <= плана, бурение соответствует проекту).",
+            "recommendation": "Добавить валидацию: отчёт не может превышать план, проверка последовательности операций"
+          },
+          {
+            "agent": "industry-4-engineer",
+            "category": "industrial",
+            "severity": "medium",
+            "title": "UI не адаптирован для операторов техники",
+            "description": "Операторы работают в перчатках, на ярком солнце, в пыли. UI должен учитывать это.",
+            "recommendation": "Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+          },
+          {
+            "agent": "industry-4-engineer",
+            "category": "industrial",
+            "severity": "low",
+            "title": "Отсутствует логика смен",
+            "description": "В строительстве используются смены (день/ночь). Логика может быть неполной.",
+            "recommendation": "Реализовать корректную обработку смен и учёт работы across midnight"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T20:00:51.634Z",
+        "duration": 164
+      },
+      {
+        "agentName": "construction-process-engineer",
+        "category": "industrial",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "construction-process-engineer",
+            "category": "industrial",
+            "severity": "high",
+            "title": "Отсутствует IoT интеграция",
+            "description": "Для Industry 4.0 платформы нет интеграции с датчиками техники (GPS, нагрузка, время работы).",
+            "recommendation": "Реализовать MQTT/CoAP для получения данных с датчиков буровых установок"
+          },
+          {
+            "agent": "construction-process-engineer",
+            "category": "industrial",
+            "severity": "medium",
+            "title": "Нет валидации строительных процессов",
+            "description": "Отчёты не проверяют логику (количество свай <= плана, бурение соответствует проекту).",
+            "recommendation": "Добавить валидацию: отчёт не может превышать план, проверка последовательности операций"
+          },
+          {
+            "agent": "construction-process-engineer",
+            "category": "industrial",
+            "severity": "medium",
+            "title": "UI не адаптирован для операторов техники",
+            "description": "Операторы работают в перчатках, на ярком солнце, в пыли. UI должен учитывать это.",
+            "recommendation": "Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+          },
+          {
+            "agent": "construction-process-engineer",
+            "category": "industrial",
+            "severity": "low",
+            "title": "Отсутствует логика смен",
+            "description": "В строительстве используются смены (день/ночь). Логика может быть неполной.",
+            "recommendation": "Реализовать корректную обработку смен и учёт работы across midnight"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T20:00:51.790Z",
+        "duration": 156
+      },
+      {
+        "agentName": "ux-specialist-industrial",
+        "category": "industrial",
+        "status": "failed",
+        "findings": [
+          {
+            "agent": "ux-specialist-industrial",
+            "category": "industrial",
+            "severity": "high",
+            "title": "Отсутствует IoT интеграция",
+            "description": "Для Industry 4.0 платформы нет интеграции с датчиками техники (GPS, нагрузка, время работы).",
+            "recommendation": "Реализовать MQTT/CoAP для получения данных с датчиков буровых установок"
+          },
+          {
+            "agent": "ux-specialist-industrial",
+            "category": "industrial",
+            "severity": "medium",
+            "title": "Нет валидации строительных процессов",
+            "description": "Отчёты не проверяют логику (количество свай <= плана, бурение соответствует проекту).",
+            "recommendation": "Добавить валидацию: отчёт не может превышать план, проверка последовательности операций"
+          },
+          {
+            "agent": "ux-specialist-industrial",
+            "category": "industrial",
+            "severity": "medium",
+            "title": "UI не адаптирован для операторов техники",
+            "description": "Операторы работают в перчатках, на ярком солнце, в пыли. UI должен учитывать это.",
+            "recommendation": "Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+          },
+          {
+            "agent": "ux-specialist-industrial",
+            "category": "industrial",
+            "severity": "low",
+            "title": "Отсутствует логика смен",
+            "description": "В строительстве используются смены (день/ночь). Логика может быть неполной.",
+            "recommendation": "Реализовать корректную обработку смен и учёт работы across midnight"
+          }
+        ],
+        "summary": "Найдено 4 замечаний",
+        "executedAt": "2026-04-04T20:00:51.938Z",
+        "duration": 148
+      }
+    ]
+  },
+  "executiveSummary": "Проведено тестирование PilingTrack SaaS платформы.\nВсего агентов: 24\nНайдено проблем: 50\n  🔴 Критических: 7\n  🟠 Высоких: 20\n  🟡 Средних: 20\n  🟢 Низких: 3\n  ℹ️ Информационных: 0\n\nРекомендуется приоритетное исправление критических проблем.",
+  "recommendations": [
+    "🔴 КРИТИЧНО: Агент software-architect не смог完成 работу — Проверить агент и запустить повторно",
+    "🔴 КРИТИЧНО: Агент distributed-systems-architect не смог完成 работу — Проверить агент и запустить повторно",
+    "🔴 КРИТИЧНО: Агент database-architect не смог完成 работу — Проверить агент и запустить повторно",
+    "🔴 КРИТИЧНО: Агент backend-lead-engineer не смог完成 работу — Проверить агент и запустить повторно",
+    "🔴 КРИТИЧНО: Отсутствует обработка ошибок в API — Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов",
+    "🔴 КРИТИЧНО: Отсутствует обработка ошибок в API — Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов",
+    "🔴 КРИТИЧНО: Отсутствует обработка ошибок в API — Обернуть все API handlers в try-catch с возвратом корректных HTTP статусов",
+    "🟠 ВАЖНО: Отсутствует валидация входных данных — Использовать Zod для валидации всех request body и query parameters",
+    "🟠 ВАЖНО: Отсутствует rate limiting — Внедрить rate limiting на login, API endpoints",
+    "🟠 ВАЖНО: Отсутствует валидация входных данных — Использовать Zod для валидации всех request body и query parameters",
+    "🟠 ВАЖНО: Отсутствует rate limiting — Внедрить rate limiting на login, API endpoints",
+    "🟠 ВАЖНО: Отсутствует валидация входных данных — Использовать Zod для валидации всех request body и query parameters",
+    "🟠 ВАЖНО: Отсутствует rate limiting — Внедрить rate limiting на login, API endpoints",
+    "🟠 ВАЖНО: Проблемы с responsive дизайном — Проверить все компоненты на мобильных viewports (320px, 375px, 414px)",
+    "🟠 ВАЖНО: Отсутствует offline режим — Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов",
+    "🟠 ВАЖНО: Проблемы с responsive дизайном — Проверить все компоненты на мобильных viewports (320px, 375px, 414px)",
+    "🟠 ВАЖНО: Отсутствует offline режим — Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов",
+    "🟠 ВАЖНО: Проблемы с responsive дизайном — Проверить все компоненты на мобильных viewports (320px, 375px, 414px)",
+    "🟠 ВАЖНО: Отсутствует offline режим — Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов",
+    "🟠 ВАЖНО: Проблемы с responsive дизайном — Проверить все компоненты на мобильных viewports (320px, 375px, 414px)",
+    "🟠 ВАЖНО: Отсутствует offline режим — Реализовать Service Worker с кэшированием и IndexedDB для offline отчётов",
+    "🟠 ВАЖНО: Отсутствует CSRF защита — Внедрить CSRF tokens для state-changing операций",
+    "🟠 ВАЖНО: Отсутствует CSRF защита — Внедрить CSRF tokens для state-changing операций",
+    "🟠 ВАЖНО: Отсутствует CSRF защита — Внедрить CSRF tokens для state-changing операций",
+    "🟠 ВАЖНО: Отсутствует IoT интеграция — Реализовать MQTT/CoAP для получения данных с датчиков буровых установок",
+    "🟠 ВАЖНО: Отсутствует IoT интеграция — Реализовать MQTT/CoAP для получения данных с датчиков буровых установок",
+    "🟠 ВАЖНО: Отсутствует IoT интеграция — Реализовать MQTT/CoAP для получения данных с датчиков буровых установок",
+    "🟡 СРЕДНЕ: Отсутствует пагинация в API — Реализовать cursor-based или offset пагинацию для всех list endpoints",
+    "🟡 СРЕДНЕ: Отсутствует пагинация в API — Реализовать cursor-based или offset пагинацию для всех list endpoints",
+    "🟡 СРЕДНЕ: Отсутствует пагинация в API — Реализовать cursor-based или offset пагинацию для всех list endpoints",
+    "🟡 СРЕДНЕ: Большое количество зависимостей — Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости",
+    "🟡 СРЕДНЕ: Проблемы доступности (a11y) — Добавить ARIA labels, role атрибуты и keyboard navigation",
+    "🟡 СРЕДНЕ: Большое количество зависимостей — Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости",
+    "🟡 СРЕДНЕ: Проблемы доступности (a11y) — Добавить ARIA labels, role атрибуты и keyboard navigation",
+    "🟡 СРЕДНЕ: Большое количество зависимостей — Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости",
+    "🟡 СРЕДНЕ: Проблемы доступности (a11y) — Добавить ARIA labels, role атрибуты и keyboard navigation",
+    "🟡 СРЕДНЕ: Большое количество зависимостей — Провести анализ bundle с webpack-bundle-analyzer и удалить неиспользуемые зависимости",
+    "🟡 СРЕДНЕ: Проблемы доступности (a11y) — Добавить ARIA labels, role атрибуты и keyboard navigation",
+    "🟡 СРЕДНЕ: Отсутствуют security headers — Добавить middleware с security headers",
+    "🟡 СРЕДНЕ: Отсутствуют security headers — Добавить middleware с security headers",
+    "🟡 СРЕДНЕ: Отсутствуют security headers — Добавить middleware с security headers",
+    "🟡 СРЕДНЕ: Нет валидации строительных процессов — Добавить валидацию: отчёт не может превышать план, проверка последовательности операций",
+    "🟡 СРЕДНЕ: UI не адаптирован для операторов техники — Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках",
+    "🟡 СРЕДНЕ: Нет валидации строительных процессов — Добавить валидацию: отчёт не может превышать план, проверка последовательности операций",
+    "🟡 СРЕДНЕ: UI не адаптирован для операторов техники — Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках",
+    "🟡 СРЕДНЕ: Нет валидации строительных процессов — Добавить валидацию: отчёт не может превышать план, проверка последовательности операций",
+    "🟡 СРЕДНЕ: UI не адаптирован для операторов техники — Увеличить touch targets (мин 48x48px), высокий контраст, режим работы в перчатках"
+  ]
+}

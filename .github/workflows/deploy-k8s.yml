@@ -1,0 +1,131 @@
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  HELM_VERSION: '3.14.0'
+  KUBECTL_VERSION: '1.29.0'
+
+jobs:
+  lint:
+    name: Lint Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Lint staging values
+        run: helm lint infra/helm/pilingtrack -f infra/helm/pilingtrack/values-staging.yaml
+
+      - name: Lint production values
+        run: helm lint infra/helm/pilingtrack -f infra/helm/pilingtrack/values-prod.yaml
+
+      - name: Template staging
+        run: helm template pilingtrack-staging infra/helm/pilingtrack -f infra/helm/pilingtrack/values-staging.yaml
+
+      - name: Template production
+        run: helm template pilingtrack-prod infra/helm/pilingtrack -f infra/helm/pilingtrack/values-prod.yaml
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+
+      - name: Deploy
+        run: |
+          helm upgrade --install pilingtrack-staging ./infra/helm/pilingtrack \
+            --namespace pilingtrack-staging --create-namespace \
+            --set api.image.tag=${{ github.sha }} \
+            -f infra/helm/pilingtrack/values-staging.yaml \
+            --wait --timeout 10m
+
+      - name: Smoke test
+        run: |
+          kubectl rollout status deployment/pilingtrack-staging-api --namespace pilingtrack-staging --timeout=300s
+          kubectl exec -it deployment/pilingtrack-staging-api -- curl -sf http://localhost:3000/api/health
+
+  deploy-production:
+    name: Deploy to Production
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'production'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+      - name: Pre-deploy checks
+        run: |
+          # Verify cluster connectivity
+          kubectl get nodes
+          # Verify current deployment status
+          kubectl get deployment -l app.kubernetes.io/instance=pilingtrack-prod --namespace pilingtrack-prod
+
+      - name: Deploy
+        run: |
+          helm upgrade --install pilingtrack-prod ./infra/helm/pilingtrack \
+            --namespace pilingtrack-prod --create-namespace \
+            --set api.image.tag=${{ github.sha }} \
+            -f infra/helm/pilingtrack/values-prod.yaml \
+            --wait --timeout 15m
+
+      - name: Post-deploy verification
+        run: |
+          # Wait for rollout
+          kubectl rollout status deployment/pilingtrack-prod-api --namespace pilingtrack-prod --timeout=600s
+          kubectl rollout status statefulset/pilingtrack-prod-postgresql --namespace pilingtrack-prod --timeout=600s
+
+          # Health checks
+          kubectl exec -it deployment/pilingtrack-prod-api -- curl -sf http://localhost:3000/api/health
+          kubectl exec -it deployment/pilingtrack-prod-api -- curl -sf http://localhost:3000/api/ready
+
+          # Verify HPA
+          kubectl get hpa --namespace pilingtrack-prod
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed, rolling back..."
+          helm rollback pilingtrack-prod --namespace pilingtrack-prod
+          kubectl rollout status deployment/pilingtrack-prod-api --namespace pilingtrack-prod --timeout=300s

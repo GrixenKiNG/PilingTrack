@@ -1,0 +1,231 @@
+ Структура приложения PilingTrack
+
+    ---
+
+    🏗️ 1. Архитектура
+
+    Диаграмма
+
+      1 ┌─────────────────────────────────────────────────────────────────┐
+      2 │                    КЛИЕНТ (Browser / PWA)                       │
+      3 │  ┌────────────┐  ┌─────────────┐  ┌──────────────────────────┐  │
+      4 │  │ Zustand    │  │ Dexie       │  │ Service Worker           │  │
+      5 │  │ Store      │  │ (IndexedDB) │  │ (offline cache + sync)   │  │
+      6 │  └─────┬──────┘  └──────┬──────┘  └────────────┬─────────────┘  │
+      7 │        │                │                       │                │
+      8 │  ┌─────▼────────────────▼───────────────────────▼────────────┐  │
+      9 │  │         SPA Router (page.tsx — client-side routing)        │  │
+     10 │  │  ┌──────────┐ ┌──────────┐ ┌───────┐ ┌────────────────┐  │  │
+     11 │  │  │ Operator │ │  Admin   │ │ Login │ │  Feedback      │  │  │
+     12 │  │  │ Dashboard│ │ Dashboard│ │ Page  │ │  Center        │  │  │
+     13 │  │  └──────────┘ └──────────┘ └───────┘ └────────────────┘  │  │
+     14 │  └────────────────────────────────┬──────────────────────────┘  │
+     15 └───────────────────────────────────┼─────────────────────────────┘
+     16                           HTTP + WS │
+     17 ┌───────────────────────────────────▼─────────────────────────────┐
+     18 │                     NEXT.JS SERVER                               │
+     19 │                                                                  │
+     20 │  ┌────────────────────────────────────────────────────────────┐ │
+     21 │  │  API Routes (22 домена)                                    │ │
+     22 │  │  auth · reports · sites · crews · equipment · users       │ │
+     23 │  │  sync · telemetry · feedback · notifications · analytics  │ │
+     24 │  │  dictionary · health · metrics · openapi · system         │ │
+     25 │  └───────────────────────────┬────────────────────────────────┘ │
+     26 │                              │                                  │
+     27 │  ┌───────────────────────────▼────────────────────────────────┐ │
+     28 │  │  Modules (Bounded Context — DDD)                           │ │
+     29 │  │  ┌──────────────────────────────────────────────────────┐  │ │
+     30 │  │  │  reports  ← полный DDD (domain/app/infra/api)        │  │ │
+     31 │  │  │  crews    ← partial DDD                              │  │ │
+     32 │  │  │  sites    ← partial DDD                              │  │ │
+     33 │  │  │  equipment← partial DDD                              │  │ │
+     34 │  │  │  analytics, users, telemetry, system ← заготовки     │  │ │
+     35 │  │  └──────────────────────────────────────────────────────┘  │ │
+     36 │  └───────────────────────────┬────────────────────────────────┘ │
+     37 │                              │                                  │
+     38 │  ┌───────────────────────────▼────────────────────────────────┐ │
+     39 │  │  Core (Cross-Cutting Concerns)                             │ │
+     40 │  │  event-bus · outbox · security · observability · storage   │ │
+     41 │  └───────────────────────────┬────────────────────────────────┘ │
+     42 │                              │                                  │
+     43 │  ┌───────────────────────────▼────────────────────────────────┐ │
+     44 │  │  Services (auth, audit, feedback, telegram, tenancy)       │ │
+     45 │  └───────────────────────────┬────────────────────────────────┘ │
+     46 │                              │                                  │
+     47 │  ┌───────────────────────────▼────────────────────────────────┐ │
+     48 │  │  Workers (outbox-worker, projection-worker)                │ │
+     49 │  └───────────────────────────┬────────────────────────────────┘ │
+     50 │                              │                                  │
+     51 │  ┌───────────────────────────▼────────────────────────────────┐ │
+     52 │  │  Realtime (WebSocket + Redis Pub/Sub + Alert Engine)       │ │
+     53 │  └───────────────────────────┬────────────────────────────────┘ │
+     54 └──────────────────────────────┼──────────────────────────────────┘
+     55                                │
+     56               ┌────────────────▼────────────────┐
+     57               │  PostgreSQL 16  │  Redis        │
+     58               │  (Prisma ORM)   │  (cache,      │
+     59               │  + 9 enum       │   pub/sub,    │
+     60               │  + RLS индексы  │   rate limit) │
+     61               └─────────────────┘  └────────────┘
+
+    Потоки данных
+
+    Авторизация:
+
+     1 POST /api/auth/login → rateLimiter.check() → bcrypt verify
+     2   → jose JWT sign → HttpOnly cookie → Zustand login(user)
+     3   ← При перезагрузке: GET /api/auth/me → restore session
+
+    Создание отчёта:
+
+     1 Online:  POST /api/reports/upsert → validate → PrismaRepository.save()
+     2   → domain events → outbox enqueue → WS broadcast → alerts
+     3 Offline: Dexie (IndexedDB) → outbox.enqueue() → sync при online
+
+    Offline Sync:
+
+     1 runSyncCycle():
+     2   1. Push: POST /api/sync/batch → отправка pending outbox
+     3   2. Pull: GET /api/sync/updates → delta с сервера
+     4   3. Conflict: last-write-wins с updated_at
+     5   4. Apply: Dexie bulkPut серверных записей
+
+    ---
+
+    🔒 2. Безопасность
+
+
+    ┌─────────────┬─────────────────────┬────────────────────────┬─────────────────────────────────────────────────┐
+    │ Область     │ До                  │ После                  │ Детали                                          │
+    ├─────────────┼─────────────────────┼────────────────────────┼─────────────────────────────────────────────────┤
+    │ PIN коды    │ Plain text          │ bcrypt (12 rounds)     │ + миграционный скрипт, legacy upgrade on-the... │
+    │ CSRF        │ 15 endpoints без... │ Все mutation endpoi... │ withCsrf() — Origin/Referer/Sec-Fetch-Site в... │
+    │ JWT         │ Ручной HMAC-SHA256  │ Библиотека jose        │ Стандартный JWT, proper exp claim               │
+    │ Rate Limit  │ In-memory Map       │ Redis + Lua script     │ Атомарно, distributed, graceful fallback        │
+    │ CSP         │ unsafe-inline + ... │ wasm-unsafe-eval то... │ XSS защита восстановлена                        │
+    │ **Tenant I... │ Отсутствовала       │ Для reports, crews     │ ADMIN/DISPATCHER bypass, остальные — строго ... │
+    │ ESLint      │ Все правила off     │ 12 правил включены     │ no-explicit-any: warn, exhaustive-deps: warn... │
+    └─────────────┴─────────────────────┴────────────────────────┴─────────────────────────────────────────────────┘
+
+    ---
+
+    💻 3. Качество кода
+
+
+    ┌─────────────────┬─────────────────────────┬─────────────────────┬─────────────────────────────────────────────┐
+    │ Метрика         │ До                      │ После               │ Детали                                      │
+    ├─────────────────┼─────────────────────────┼─────────────────────┼─────────────────────────────────────────────┤
+    │ `any` типы        │ 6+ в продуктивном коде  │ 0                   │ FallbackProps, Record<string, unknown>
+    │
+    │ Non-null `!`      │ 10+ мест                │ 0                   │ Runtime проверки, sessionUser pattern
+    │
+    │ Пустые catch    │ 12 мест без логов       │ 0                   │ console.error везде                         │
+    │ Дублирование    │ 8 компонентов × load... │ Хук useApiQuery     │ Один хук для всех запросов                  │
+    │ Файлы-гиганты   │ admin-sites 1352 строк  │ 6 файлов (37–644... │ index + site-list + editor + hierarchy +... │
+    │ **Deprecated с... │ report-service, crew... │ Удалены             │ Прямые импорты из modules
+    │
+    │ Мёртвый код     │ 4 файла + next-auth     │ Удалено             │ helpers.ts, proxy.ts, telegram.ts, outbo... │
+    └─────────────────┴─────────────────────────┴─────────────────────┴─────────────────────────────────────────────┘
+
+
+    ---
+
+    🗄️ 4. База данных
+
+    Модели (28 таблиц)
+
+      1 Multi-tenant:    Tenant → User (tenantId)
+      2 Core:            Site, Equipment, Crew, CrewAssistant
+      3 Hierarchy:       PileField → Cluster → Picket
+      4 Reports:         Report, ReportVersion, ReportAudit
+      5 Report data:     PileWork, LeaderDrilling, ReportDowntime
+      6 CQRS Projections:ReportAnalytics, SiteDailySummary, ReportStats,
+      7                  OperatorPerformance, DowntimeSummary, SiteWeeklyTrend
+      8 Infrastructure:  OutboxEvent, AuditLog, IdempotencyKey, RefreshToken
+      9 Telemetry:       TelemetryRecord
+     10 Feedback:        FeedbackEvent, FeedbackEventRead
+     11 Config:          TelegramConfig
+
+    Enum (добавлено 9 штук)
+
+
+    ┌───────────────────┬────────────────────────┬────────────────────────────────────────┐
+    │ Enum              │ Поля                   │ Значения                               │
+    ├───────────────────┼────────────────────────┼────────────────────────────────────────┤
+    │ UserRole          │ User.role              │ ADMIN, DISPATCHER, OPERATOR, ASSISTANT │
+    │ ReportStatus      │ Report.status          │ draft, submitted                       │
+    │ SiteStatus        │ Site.status            │ ACTIVE, COMPLETED, ARCHIVED            │
+    │ ShiftType         │ Report.shiftType       │ day, night                             │
+    │ FeedbackLevel     │ FeedbackEvent.level    │ info, success, warn, error, audit      │
+    │ FeedbackPriority  │ FeedbackEvent.priority │ LOW, MEDIUM, HIGH, CRITICAL            │
+    │ FeedbackAudience  │ FeedbackEvent.audience │ ALL, OPERATIONS, USER                  │
+    │ OutboxStatus      │ OutboxEvent.status     │ pending, processing, completed, failed │
+    │ IdempotencyStatus │ IdempotencyKey.status  │ processing, completed, failed          │
+    └───────────────────┴────────────────────────┴────────────────────────────────────────┘
+
+
+    Исправления: Raw SQL параметризирован ($executeRawUnsafe → createMany), каскадные связи, индексы.
+
+    ---
+
+    🧪 5. Тестирование
+
+
+    ┌─────┬──────────────────────┬─────────────────────────────────────────────────────────────────────────────────┐
+    │ Тип │ Файлы                │ Покрытие                                                                        │
+    ├─────┼──────────────────────┼─────────────────────────────────────────────────────────────────────────────────┤
+    │ **U   │ 17 файлов            │ pagination, conflict-resolution, rate-limiter, validation, crew/report aggre... │
+    │ E2E │ 6 файлов             │ login, shift flow, app smoke, operator report, report creation                  │
+    │ **S   │ scripts/smote-aut... │ Доступность после билда                                                         │
+    └─────┴──────────────────────┴─────────────────────────────────────────────────────────────────────────────────┘
+
+
+    Пробелы:
+     - ❌ Нет тестов для CRUD операций (sites, crews, equipment)
+     - ❌ Нет интеграционных тестов API routes
+     - ❌ Нет тестов админских страниц
+     - ❌ Нет тестов offline sync логики
+     - ❌ Нет тестов WebSocket realtime
+
+    ---
+
+    📈 6. Масштабируемость
+
+
+    ┌──────────────────┬─────────────────────┬──────────────────────────────────────────────────────────┐
+    │ Компонент        │ Текущее             │ Масштабирование                                          │
+    ├──────────────────┼─────────────────────┼──────────────────────────────────────────────────────────┤
+    │ Next.js          │ Standalone output   │ Docker + K8s (Helm chart + ArgoCD готовы)                │
+    │ Rate Limit       │ Redis (distributed) │ ✅ Горизонтально масштабируется                          │
+    │ WebSocket        │ Redis Pub/Sub       │ ✅ Множество инстансов                                   │
+    │ PostgreSQL       │ Одна инстанция      │ PgBouncer (connection pooling), партицирование telemetry │
+    │ CQRS Projections │ Projection worker   │ Можно распараллелить по типу проекций                    │
+    │ Outbox           │ Outbox worker       │ Можно запустить несколько воркеров (partition by ID)     │
+    │ PDF генерация    │ Синхронная в API    │ ⚠️ Нужно вынести в фоновую задачу                        │
+    │ Кэширование      │ Redis доступен      │ ⚠️ Используется только для rate limit + pub/sub          │
+    └──────────────────┴─────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+    Готовая инфраструктура:
+     - ✅ Docker Compose (production)
+     - ✅ Helm chart (staging + prod values)
+     - ✅ ArgoCD manifests
+     - ✅ GitHub Actions CI/CD
+     - ✅ Prometheus + Grafana + Loki + Tempo
+     - ✅ OpenTelemetry tracing + Sentry
+
+    ---
+
+    📊 Итоговые оценки
+
+
+    ┌──────────────────┬────────┬────────┬──────┐
+    │ Категория        │ До     │ После  │ Δ    │
+    ├──────────────────┼────────┼────────┼──────┤
+    │ Архитектура      │ 6.5/10 │ 8/10   │ +1.5 │
+    │ Безопасность     │ 4/10   │ 8/10   │ +4.0 │
+    │ Качество кода    │ 5.5/10 │ 7.5/10 │ +2.0 │
+    │ База данных      │ 8/10   │ 8.5/10 │ +0.5 │
+    │ Тестирование     │ 4/10   │ 4/10   │ —    │
+    │ Масштабируемость │ 5/10   │ 7/10   │ +2.0 │
+    └──────────────────┴────────┴────────┴──────┘
