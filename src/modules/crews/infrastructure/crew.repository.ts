@@ -3,7 +3,6 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
-import { asyncOutbox } from '@/core/outbox/async-outbox';
 import { CrewAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.mapper';
 
@@ -18,7 +17,7 @@ export class PrismaCrewRepository implements CrewRepository {
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
 
-    // Atomic transaction: only crew data (no outbox)
+    // Transactional outbox: crew data + outbox events in one transaction
     await db.$transaction(async (tx: any) => {
       await tx.crew.upsert({
         where: { id: state.id },
@@ -31,14 +30,20 @@ export class PrismaCrewRepository implements CrewRepository {
           isActive: persistenceData.isActive,
         },
       });
-    }, DEFAULT_TX_OPTIONS);
 
-    // Outbox events — async, outside transaction (eventual consistency)
-    if (pendingEvents.length > 0) {
-      for (const event of pendingEvents) {
-        asyncOutbox.enqueue(toOutboxData(event));
+      if (pendingEvents.length > 0) {
+        const outboxRecords = pendingEvents.map((event) => {
+          const data = toOutboxData(event);
+          return {
+            type: data.type,
+            aggregateId: data.aggregateId,
+            aggregateType: data.aggregateType,
+            payload: data.payload as any,
+          };
+        });
+        await tx.outboxEvent.createMany({ data: outboxRecords });
       }
-    }
+    }, DEFAULT_TX_OPTIONS);
 
     aggregate.clearPendingEvents();
   }
