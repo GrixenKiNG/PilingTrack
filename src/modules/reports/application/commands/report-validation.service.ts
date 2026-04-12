@@ -76,7 +76,7 @@ export function validateDrillingEntries(
     if (d.meters > 99999) {
       throw new ServiceError(`Метраж бурения не может превышать 99999м (тип: ${d.typeId})`, 400);
     }
-    if ((d.count || 1) < 1) {
+    if ((d.count ?? 1) < 1) {
       throw new ServiceError(`Количество бурений должно быть ≥ 1 (тип: ${d.typeId})`, 400);
     }
   }
