@@ -663,7 +663,7 @@ export function AdminReports() {
                 key={report.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.02 }}
+                transition={{ delay: index < 20 ? index * 0.02 : 0 }}
               >
                 <Card className="card-hover">
                   <CardContent className="p-4">

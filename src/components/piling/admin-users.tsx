@@ -403,7 +403,7 @@ export function AdminUsers() {
                 key={user.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
+                transition={{ delay: index < 20 ? index * 0.03 : 0 }}
               >
                 <Card className={cn('card-hover', !user.isActive && 'opacity-60')}>
                   <CardContent className="p-4">

@@ -445,7 +445,7 @@ export function AdminCrews() {
               key={crew.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.03 }}
+              transition={{ delay: index < 20 ? index * 0.03 : 0 }}
             >
               <Card className={cn('transition-all', !crew.isActive && 'border-dashed border-slate-300 opacity-60')}>
                 <CardContent className="p-4">
