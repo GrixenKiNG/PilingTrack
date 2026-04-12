@@ -47,7 +47,7 @@ jobs:
         run: npm ci
 
       - name: Prisma generate
-        run: npx prisma generate --schema prisma/schema.postgres.prisma
+        run: npx prisma generate
 
       - name: Run unit tests
         run: npx vitest run --coverage

@@ -111,7 +111,7 @@ async function setupPartitioning() {
   console.log('\nTo apply:');
   console.log(`  psql -U piling -d pilingtrack -f ${outputPath}`);
   console.log('\nOr via Prisma:');
-  console.log('  npx prisma db execute --schema prisma/schema.postgres.prisma');
+  console.log('  npx prisma db execute');
 }
 
 setupPartitioning().catch(e => {

@@ -26,4 +26,4 @@ spec:
               cd /app
               # Use prisma from the builder stage - it's available via npx with version pin
               npm install --no-save prisma@6.19.3 @prisma/client@6.19.3 2>/dev/null
-              ./node_modules/.bin/prisma db push --schema prisma/schema.postgres.prisma --accept-data-loss
+              ./node_modules/.bin/prisma migrate deploy

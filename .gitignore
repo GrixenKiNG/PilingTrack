@@ -93,3 +93,13 @@ Thumbs.db
 # Binaries
 .bin/
 '$null'
+
+# Other tool artifacts
+.openclaw/
+SOUL.md
+IDENTITY.md
+USER.md
+TOOLS.md
+HEARTBEAT.md
+BOOTSTRAP.md
+*.dll.node.tmp*

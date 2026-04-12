@@ -743,7 +743,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\PillingR\\my-project\\prisma\\schema.postgres.prisma",
+    "sourceFilePath": "C:\\PillingR\\my-project\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

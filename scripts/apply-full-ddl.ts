@@ -35,7 +35,7 @@ async function main() {
   // Step 1: Prisma generate
   console.log('📦 Step 1: Prisma generate...');
   try {
-    execSync('npx prisma generate --schema prisma/schema.postgres.prisma', {
+    execSync('npx prisma generate --schema prisma/schema.prisma', {
       stdio: 'inherit',
       cwd: join(__dirname, '..'),
     });
@@ -48,7 +48,7 @@ async function main() {
   // Step 2: Prisma db push
   console.log('📦 Step 2: Prisma db push (schema sync)...');
   try {
-    execSync('npx prisma db push --schema prisma/schema.postgres.prisma --accept-data-loss', {
+    execSync('npx prisma db push --schema prisma/schema.prisma --accept-data-loss', {
       stdio: 'inherit',
       cwd: join(__dirname, '..'),
     });
