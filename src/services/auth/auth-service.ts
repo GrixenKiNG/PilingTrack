@@ -43,6 +43,15 @@ export async function hashPin(pin: string): Promise<string> {
   return bcryptHash(pin, BCRYPT_ROUNDS);
 }
 
+/**
+ * Constant-time string comparison to prevent timing side-channel attacks
+ * on legacy plaintext PIN values.
+ */
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 export async function hashPassword(value: string): Promise<string> {
   return bcryptHash(value, BCRYPT_ROUNDS);
 }
@@ -206,7 +215,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     const isBcrypt = indexedCandidate.pin.startsWith(PIN_HASH_PREFIX);
     const matches = isBcrypt
       ? await bcryptCompare(pin, indexedCandidate.pin)
-      : pin === indexedCandidate.pin;
+      : constantTimeEquals(pin, indexedCandidate.pin);
     if (matches) matchedUser = indexedCandidate;
   }
 
@@ -237,7 +246,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
       const isBcrypt = u.pin.startsWith(PIN_HASH_PREFIX);
       const matches = isBcrypt
         ? await bcryptCompare(pin, u.pin)
-        : pin === u.pin;
+        : constantTimeEquals(pin, u.pin);
       if (matches) {
         matchedUser = u;
         break;

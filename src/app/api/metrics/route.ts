@@ -7,14 +7,19 @@
  * Scraped by Prometheus every 15s.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { assertCan } from '@/services/auth/authorization-service';
 import { generatePrometheusMetrics } from '@/lib/cache-metrics';
 import { exportPrometheusMetrics, getLagMetrics } from '@/core/observability/lag-monitor';
 import { getCurrentStatus } from '@/core/observability/health-tracker';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { user, error } = await requireAuth(request);
+  if (error) return error;
+  assertCan(user!, 'system.read');
   let output = '';
 
   // Application cache metrics

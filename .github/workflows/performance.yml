@@ -210,7 +210,7 @@ jobs:
   soak-test:
     name: Soak Test
     runs-on: ubuntu-latest
-    timeout-minutes: 480  # 8 hours
+    timeout-minutes: 120  # 2 hours (GHA limit is 360 min)
     if: >-
       github.event_name == 'workflow_dispatch' && github.event.inputs.test_type == 'soak' ||
       github.event_name == 'schedule' && github.ref == 'refs/heads/main'

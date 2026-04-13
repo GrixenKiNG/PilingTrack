@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ServiceError } from '@/services/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
+import { withCsrf } from '@/lib/csrf-protection';
+import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 
 export interface ApiWrapperOptions {
   domain?: string;
@@ -70,10 +72,30 @@ export function withApi<T extends any[]>(
   };
 }
 
+const MUTATION_RATE_LIMIT = { maxAttempts: 100, windowMs: 60_000 };
+
+/**
+ * Wrap a mutation handler with CSRF check + rate limiting + error boundary.
+ * Eliminates the need for per-route CSRF/rate-limit boilerplate.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withMutation<T extends any[]>(
   handler: (request: NextRequest, ...args: T) => Promise<NextResponse>,
   _opts?: ApiWrapperOptions
 ) {
-  return withApi(handler, _opts);
+  return withApi(async (request: NextRequest, ...args: T) => {
+    const csrfCheck = withCsrf(request);
+    if (csrfCheck) return csrfCheck;
+
+    const identifier = getRateLimitIdentifier(request);
+    const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+      );
+    }
+
+    return handler(request, ...args);
+  }, _opts);
 }

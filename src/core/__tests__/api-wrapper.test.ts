@@ -30,8 +30,21 @@ vi.mock('@/core/infrastructure/circuit-breakers', () => ({
   },
 }));
 
+// Mock CSRF — pass by default
+vi.mock('@/lib/csrf-protection', () => ({
+  withCsrf: vi.fn(() => null),
+}));
+
+// Mock rate limiter — allow by default
+vi.mock('@/lib/rate-limiter', () => ({
+  rateLimiter: { check: vi.fn(() => Promise.resolve({ allowed: true, remaining: 99 })) },
+  getRateLimitIdentifier: vi.fn(() => 'test-ip'),
+}));
+
 import { ServiceError } from '@/services/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
+import { withCsrf } from '@/lib/csrf-protection';
+import { rateLimiter } from '@/lib/rate-limiter';
 
 function mockRequest(): NextRequest {
   return new NextRequest('http://localhost/api/test');
@@ -152,7 +165,41 @@ describe('withApi', () => {
 });
 
 describe('withMutation', () => {
-  it('should behave identically to withApi', async () => {
+  it('should pass through when CSRF and rate limit pass', async () => {
+    const handler = withMutation(async () => NextResponse.json({ ok: true }));
+    const res = await handler(mockRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+  });
+
+  it('should return 403 when CSRF check fails', async () => {
+    vi.mocked(withCsrf).mockReturnValueOnce(
+      NextResponse.json({ error: 'CSRF validation failed' }, { status: 403 })
+    );
+    const handler = withMutation(async () => NextResponse.json({ ok: true }));
+    const res = await handler(mockRequest());
+
+    expect(res.status).toBe(403);
+  });
+
+  it('should return 429 when rate limit exceeded', async () => {
+    vi.mocked(rateLimiter.check).mockResolvedValueOnce({
+      allowed: false,
+      remaining: 0,
+      retryAfter: 30,
+    } as any);
+    const handler = withMutation(async () => NextResponse.json({ ok: true }));
+    const res = await handler(mockRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(429);
+    expect(body.error).toBe('Too many requests');
+    expect(res.headers.get('Retry-After')).toBe('30');
+  });
+
+  it('should still catch ServiceError from handler', async () => {
     const handler = withMutation(async () => {
       throw new ServiceError('Forbidden', 403);
     });

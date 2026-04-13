@@ -73,7 +73,7 @@ function checkDisk(): HealthCheck {
 }
 
 function checkEnv(): HealthCheck {
-  const required = ['DATABASE_URL_POSTGRES', 'NEXTAUTH_SECRET'];
+  const required = ['DATABASE_URL_POSTGRES', 'SESSION_SECRET'];
   const missing = required.filter(key => !process.env[key]);
 
   return {

@@ -19,7 +19,7 @@ describe('Health Checks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.DATABASE_URL_POSTGRES = 'postgresql://test';
-    process.env.NEXTAUTH_SECRET = 'test-secret';
+    process.env.SESSION_SECRET = 'test-secret';
   });
 
   describe('getLiveness', () => {
@@ -65,14 +65,14 @@ describe('Health Checks', () => {
 
     it('should return degraded when env vars are missing', async () => {
       vi.mocked(db.$queryRaw).mockResolvedValue([{ '?column?': 1 }]);
-      delete process.env.NEXTAUTH_SECRET;
+      delete process.env.SESSION_SECRET;
 
       const result = await getHealth();
 
       expect(result.status).toBe('degraded');
       expect(result.checks.environment.status).toBe('warn');
       expect(result.checks.environment.details).toEqual({
-        missing: ['NEXTAUTH_SECRET'],
+        missing: ['SESSION_SECRET'],
       });
     });
 

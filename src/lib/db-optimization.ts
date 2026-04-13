@@ -173,8 +173,8 @@ export async function getCrewPerformance(crewId: string, from: string, to: strin
  * Get site daily summary with single aggregated query.
  */
 export async function getSiteDailySummary(siteId: string, date: string) {
-  return db.$queryRawUnsafe(
-    `SELECT
+  return db.$queryRaw`
+    SELECT
       COUNT(DISTINCT r.id) as report_count,
       COALESCE(SUM(p.count), 0) as total_piles,
       COALESCE(SUM(d.meters), 0) as total_drilling,
@@ -183,10 +183,7 @@ export async function getSiteDailySummary(siteId: string, date: string) {
     LEFT JOIN "PileWork" p ON p."reportId" = r.id
     LEFT JOIN "LeaderDrilling" d ON d."reportId" = r.id
     LEFT JOIN "ReportDowntime" dt ON dt."reportId" = r.id
-    WHERE r."siteId" = $1 AND r."date" = $2`,
-    siteId,
-    date
-  );
+    WHERE r."siteId" = ${siteId} AND r."date" = ${date}`;
 }
 
 /**
