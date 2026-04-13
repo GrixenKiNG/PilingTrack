@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createUser, deleteUser, listUsers, updateUser } from '@/modules/users';
 import { createUserSchema, deleteIdSchema, updateUserSchema } from '@/lib/validation-schemas';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, withMutation } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
@@ -24,29 +23,29 @@ export const GET = withApi(
   { domain: 'users', cache: true, cacheTTL: 30_000 }
 );
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
+export const POST = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
 
-  const MUTATION_RATE_LIMIT = {
-    maxAttempts: 100,
-    windowMs: 60_000,
-    blockDurationMs: 60_000,
-  };
+    const MUTATION_RATE_LIMIT = {
+      maxAttempts: 100,
+      windowMs: 60_000,
+      blockDurationMs: 60_000,
+    };
 
-  const identifier = getRateLimitIdentifier(request);
-  const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
-    );
-  }
+    const identifier = getRateLimitIdentifier(request);
+    const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+      );
+    }
 
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  try {
     assertCan(user!, 'users.manage');
     const body = await request.json();
 
@@ -72,38 +71,33 @@ export async function POST(request: NextRequest) {
       role: rest.role || 'OPERATOR',
     }, user!.id);
     return NextResponse.json({ user: createdUser }, { status: 201 });
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
+  },
+  { domain: 'users' }
+);
+
+export const PUT = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
+
+    const MUTATION_RATE_LIMIT = {
+      maxAttempts: 100,
+      windowMs: 60_000,
+      blockDurationMs: 60_000,
+    };
+
+    const identifier = getRateLimitIdentifier(request);
+    const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+      );
     }
 
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-export async function PUT(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
-
-  const MUTATION_RATE_LIMIT = {
-    maxAttempts: 100,
-    windowMs: 60_000,
-    blockDurationMs: 60_000,
-  };
-
-  const identifier = getRateLimitIdentifier(request);
-  const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
-    );
-  }
-
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
-
-  try {
     assertCan(user!, 'users.manage');
     const body = await request.json();
 
@@ -117,38 +111,33 @@ export async function PUT(request: NextRequest) {
 
     const updatedUser = await updateUser(validation.data, user!.id);
     return NextResponse.json({ user: updatedUser });
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
+  },
+  { domain: 'users' }
+);
+
+export const DELETE = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
+
+    const MUTATION_RATE_LIMIT = {
+      maxAttempts: 100,
+      windowMs: 60_000,
+      blockDurationMs: 60_000,
+    };
+
+    const identifier = getRateLimitIdentifier(request);
+    const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+      );
     }
 
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-export async function DELETE(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
-
-  const MUTATION_RATE_LIMIT = {
-    maxAttempts: 100,
-    windowMs: 60_000,
-    blockDurationMs: 60_000,
-  };
-
-  const identifier = getRateLimitIdentifier(request);
-  const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
-    );
-  }
-
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
-
-  try {
     assertCan(user!, 'users.manage');
     const body = await request.json();
 
@@ -162,11 +151,6 @@ export async function DELETE(request: NextRequest) {
 
     const result = await deleteUser(user!.id, validation.data.id);
     return NextResponse.json(result);
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
-
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+  },
+  { domain: 'users' }
+);

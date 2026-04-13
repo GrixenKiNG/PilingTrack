@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { listCrewSummaries } from '@/modules/crews';
-import { ServiceError } from '@/services/service-error';
 import { getCachedCrewsAll } from '@/lib/cached-queries';
 import { withApi } from '@/core/api-wrapper';
 
