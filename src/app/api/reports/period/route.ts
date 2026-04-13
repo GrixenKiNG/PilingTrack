@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { getReportsByPeriod } from '@/modules/reports/application/queries/report-query.service';
-import { ServiceError } from '@/services/service-error';
+import { withApi } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
+export const GET = withApi(
+  async (request: NextRequest) => {
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  try {
     assertCan(user!, 'reports.read_all');
     const dateFrom = request.nextUrl.searchParams.get('dateFrom');
     const dateTo = request.nextUrl.searchParams.get('dateTo');
@@ -19,11 +19,6 @@ export async function GET(request: NextRequest) {
 
     const result = await getReportsByPeriod(dateFrom, dateTo, siteId);
     return NextResponse.json(result);
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
-
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+  },
+  { domain: 'reports' }
+);

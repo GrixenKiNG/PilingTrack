@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import { exportReportsCsv } from '@/modules/reports';
+import { withApi } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
 
 const MAX_EXPORT_WINDOW_DAYS = 92; // ~1 quarter
 
-export async function GET(request: NextRequest) {
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
+export const GET = withApi(
+  async (request: NextRequest) => {
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  try {
     assertCan(user!, 'reports.export');
 
     const dateFrom = request.nextUrl.searchParams.get('dateFrom');
     const dateTo = request.nextUrl.searchParams.get('dateTo');
     const siteId = request.nextUrl.searchParams.get('siteId');
 
-    // Force a bounded query. Without this, the endpoint streams every report
-    // in the system into a CSV held entirely in memory — a single call can
-    // OOM the Node.js process.
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
         { error: 'dateFrom and dateTo are required (max 92 days)' },
@@ -59,11 +56,6 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="pilingtrack-reports-${new Date().toISOString().split('T')[0]}.csv"`,
       },
     });
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
-
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+  },
+  { domain: 'reports' }
+);
