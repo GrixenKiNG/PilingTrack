@@ -72,7 +72,7 @@ export function withApi<T extends any[]>(
   };
 }
 
-const MUTATION_RATE_LIMIT = { maxAttempts: 100, windowMs: 60_000 };
+const MUTATION_RATE_LIMIT = { maxAttempts: 100, windowMs: 60_000, blockDurationMs: 60_000 };
 
 /**
  * Wrap a mutation handler with CSRF check + rate limiting + error boundary.
