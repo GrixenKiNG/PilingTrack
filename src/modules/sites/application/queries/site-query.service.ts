@@ -81,3 +81,22 @@ export async function listAllSites() {
     orderBy: { name: 'asc' },
   });
 }
+
+export async function listAllSitesForAdmin() {
+  return db.site.findMany({
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      plannedPiles: true,
+      plannedDrilling: true,
+      _count: {
+        select: {
+          pilePlans: true,
+          drillingPlans: true,
+        },
+      },
+    },
+    orderBy: { name: 'asc' },
+  });
+}

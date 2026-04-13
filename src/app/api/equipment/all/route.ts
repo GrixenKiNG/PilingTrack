@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { listEquipmentCatalog } from '@/services/equipment/equipment-service';
 import { getCachedEquipmentAll } from '@/lib/cached-queries';
 import { withApi } from '@/core/api-wrapper';
 

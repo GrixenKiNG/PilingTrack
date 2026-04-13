@@ -18,7 +18,20 @@ vi.mock('@/services/service-error', () => ({
   },
 }));
 
+// Mock CircuitOpenError
+vi.mock('@/core/infrastructure/circuit-breakers', () => ({
+  CircuitOpenError: class CircuitOpenError extends Error {
+    retryAfterMs: number;
+    constructor(serviceName: string, retryAfterMs: number) {
+      super(`Circuit breaker OPEN for ${serviceName}`);
+      this.retryAfterMs = retryAfterMs;
+      this.name = 'CircuitOpenError';
+    }
+  },
+}));
+
 import { ServiceError } from '@/services/service-error';
+import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 
 function mockRequest(): NextRequest {
   return new NextRequest('http://localhost/api/test');
@@ -97,6 +110,19 @@ describe('withApi', () => {
     consoleSpy.mockRestore();
   });
 
+  it('should map CircuitOpenError to 503', async () => {
+    const handler = withApi(async () => {
+      throw new CircuitOpenError('database', 15000);
+    });
+    const res = await handler(mockRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(body.error).toBe('Service temporarily unavailable');
+    expect(body.retryAfter).toBe(15);
+    expect(res.headers.get('Retry-After')).toBe('15');
+  });
+
   it('should log errors with domain context', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = withApi(
@@ -110,6 +136,18 @@ describe('withApi', () => {
       expect.any(Error)
     );
     consoleSpy.mockRestore();
+  });
+
+  it('should pass through extra arguments (dynamic route params)', async () => {
+    const handler = withApi(async (_req: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
+      const { id } = await ctx.params;
+      return NextResponse.json({ id });
+    });
+    const res = await handler(mockRequest(), { params: Promise.resolve({ id: 'eq-123' }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.id).toBe('eq-123');
   });
 });
 

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
-import { listAllSitesForAdmin } from '@/services/sites/site-admin-service';
 import { getCachedSitesAll } from '@/lib/cached-queries';
 import { withApi } from '@/core/api-wrapper';
 

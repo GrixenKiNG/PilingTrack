@@ -1,1 +1,1 @@
-export { getAccessibleSites, getSiteWithHierarchy, listAllSites } from './site-query.service';
+export { getAccessibleSites, getSiteWithHierarchy, listAllSites, listAllSitesForAdmin } from './site-query.service';

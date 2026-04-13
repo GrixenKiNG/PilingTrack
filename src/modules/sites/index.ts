@@ -14,6 +14,11 @@ export {
   updateSite,
   activateSite,
   deactivateSite,
+  createSiteWithPlans,
+  assignUserToSite,
+  unassignUserFromSite,
+  createSiteHierarchyItem,
+  deleteSiteHierarchyItem,
 } from './application/commands';
 export type { CreateSiteCommand, UpdateSiteCommand } from './application/commands/site.command';
 
@@ -21,6 +26,7 @@ export {
   getAccessibleSites,
   getSiteWithHierarchy,
   listAllSites,
+  listAllSitesForAdmin,
 } from './application/queries';
 
 // Infrastructure
