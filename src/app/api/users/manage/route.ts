@@ -1,38 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import { updateUser } from '@/modules/users';
 import { updateUserSchema } from '@/lib/validation-schemas';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
+import { withMutation } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
 
-export async function PUT(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
+export const PUT = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
 
-  const MUTATION_RATE_LIMIT = {
-    maxAttempts: 100,
-    windowMs: 60_000,
-    blockDurationMs: 60_000,
-  };
+    const MUTATION_RATE_LIMIT = {
+      maxAttempts: 100,
+      windowMs: 60_000,
+      blockDurationMs: 60_000,
+    };
 
-  const identifier = getRateLimitIdentifier(request);
-  const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
-    );
-  }
+    const identifier = getRateLimitIdentifier(request);
+    const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+      );
+    }
 
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  try {
     assertCan(user!, 'users.manage');
     let body;
     try {
@@ -42,9 +42,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Zod validation — do NOT call .partial() here; updateUserSchema already
-    // makes optional fields optional and keeps `id` REQUIRED. Calling
-    // .partial() would strip the id requirement and force an unvalidated
-    // `body.id` fallback.
+    // makes optional fields optional and keeps `id` REQUIRED.
     const validation = updateUserSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -75,11 +73,6 @@ export async function PUT(request: NextRequest) {
         phone: updated.phone,
       },
     });
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
-
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+  },
+  { domain: 'users' }
+);

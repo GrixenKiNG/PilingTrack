@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
-import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import {
   createTelegramConfig,
@@ -11,7 +10,7 @@ import {
   updateTelegramConfig,
 } from '@/services/telegram/telegram-config-service';
 import { telegramConfigSchema } from '@/lib/validation-schemas';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, withMutation } from '@/core/api-wrapper';
 
 const telegramConfigIdSchema = telegramConfigSchema.extend({ id: z.string().uuid() });
 const deleteIdSchema = z.object({ id: z.string().uuid('Invalid ID') });
@@ -31,17 +30,17 @@ export const GET = withApi(
   { domain: 'telegram', cache: true, cacheTTL: 60_000 }
 );
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
+export const POST = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
 
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  try {
     assertCan(user!, 'telegram.manage');
     const body = await request.json();
-    
+
     const validation = telegramConfigSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -52,26 +51,21 @@ export async function POST(request: NextRequest) {
 
     const config = await createTelegramConfig(validation.data);
     return NextResponse.json({ config }, { status: 201 });
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
+  },
+  { domain: 'telegram' }
+);
 
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+export const PUT = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
 
-export async function PUT(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
-
-  try {
     assertCan(user!, 'telegram.manage');
     const body = await request.json();
-    
+
     const validation = telegramConfigIdSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -83,26 +77,21 @@ export async function PUT(request: NextRequest) {
     const { id, ...data } = validation.data;
     const config = await updateTelegramConfig(id, data);
     return NextResponse.json({ config });
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
+  },
+  { domain: 'telegram' }
+);
 
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+export const DELETE = withMutation(
+  async (request: NextRequest) => {
+    const csrfResponse = withCsrf(request);
+    if (csrfResponse) return csrfResponse;
 
-export async function DELETE(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
-
-  try {
     assertCan(user!, 'telegram.manage');
     const body = await request.json();
-    
+
     const validation = deleteIdSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -113,11 +102,6 @@ export async function DELETE(request: NextRequest) {
 
     const result = await deleteTelegramConfig(validation.data.id);
     return NextResponse.json(result);
-  } catch (caughtError) {
-    if (caughtError instanceof ServiceError) {
-      return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
-    }
-
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
-}
+  },
+  { domain: 'telegram' }
+);
