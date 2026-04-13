@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { ServiceError } from '@/services/service-error';
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
 import { withApi } from '@/core/api-wrapper';
 

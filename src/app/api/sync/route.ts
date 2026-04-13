@@ -20,7 +20,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { assertCan } from '@/services/auth/authorization-service';
-import { ServiceError } from '@/services/service-error';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { getRequestId } from '@/lib/request-context';
 import { upsertReport } from '@/modules/reports';

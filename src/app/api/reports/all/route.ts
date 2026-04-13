@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import { listReportsForReview } from '@/modules/reports';
 import { withApi } from '@/core/api-wrapper';

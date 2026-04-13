@@ -20,7 +20,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
-import { ServiceError } from '@/services/service-error';
 import { getRequestId } from '@/lib/request-context';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { z } from 'zod';
