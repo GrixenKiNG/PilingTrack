@@ -14,7 +14,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rotateRefreshToken } from '@/core/security/refresh-tokens';
 import { attachSessionCookie } from '@/services/auth/session-service';
-import { withCsrf } from '@/lib/csrf-protection';
 import { z } from 'zod';
 import { withMutation } from '@/core/api-wrapper';
 
@@ -26,9 +25,6 @@ export const runtime = 'nodejs';
 
 export const POST = withMutation(
   async (request: NextRequest) => {
-    const csrfResponse = withCsrf(request);
-    if (csrfResponse) return csrfResponse;
-
     const body = await request.json();
     const validated = refreshSchema.safeParse(body);
     if (!validated.success) {
@@ -75,9 +71,6 @@ export const POST = withMutation(
  */
 export const DELETE = withMutation(
   async (request: NextRequest) => {
-    const csrfResponse = withCsrf(request);
-    if (csrfResponse) return csrfResponse;
-
     const refreshToken = request.cookies.get('pt-refresh')?.value;
 
     if (refreshToken) {

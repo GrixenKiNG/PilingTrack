@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
 import { assertCan } from '@/services/auth/authorization-service';
 import {
   createTelegramConfig,
@@ -32,9 +31,6 @@ export const GET = withApi(
 
 export const POST = withMutation(
   async (request: NextRequest) => {
-    const csrfResponse = withCsrf(request);
-    if (csrfResponse) return csrfResponse;
-
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
@@ -57,9 +53,6 @@ export const POST = withMutation(
 
 export const PUT = withMutation(
   async (request: NextRequest) => {
-    const csrfResponse = withCsrf(request);
-    if (csrfResponse) return csrfResponse;
-
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
@@ -83,9 +76,6 @@ export const PUT = withMutation(
 
 export const DELETE = withMutation(
   async (request: NextRequest) => {
-    const csrfResponse = withCsrf(request);
-    if (csrfResponse) return csrfResponse;
-
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
