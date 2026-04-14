@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/postgres-client';
 import { hashSync } from 'bcryptjs';
 
 const db = new PrismaClient();

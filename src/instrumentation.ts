@@ -19,6 +19,14 @@ export async function register() {
     return;
   }
 
+  // C3: SESSION_SECRET is required in production — without it all sessions
+  // are signed with a known dev-only fallback key.
+  if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+    throw new Error(
+      'SESSION_SECRET is required in production. Set it to a random 64+ char string.'
+    );
+  }
+
   try {
     // Start the background health tracker — polls all subsystems
     // every 15s and caches the result for fast /api/system/status responses.
