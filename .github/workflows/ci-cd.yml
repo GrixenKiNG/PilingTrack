@@ -214,14 +214,18 @@ jobs:
         run: npm audit --audit-level=moderate
 
   # ============================================================
-  # 7. Docker Build (main only)
+  # 7. Docker Build & Push (main/master only)
   # ============================================================
   docker:
-    name: Docker Build
+    name: Docker Build & Push
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [e2e, security]
-    if: github.event_name == "push" && (github.ref == "refs/heads/main" || github.ref == "refs/heads/master" || github.ref == "refs/heads/develop")
+    if: github.event_name == "push" && (github.ref == "refs/heads/main" || github.ref == "refs/heads/master")
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
@@ -230,22 +234,72 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build app image
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta-app
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/pilingtrack-app
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build & push app image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
-          push: false
-          tags: pilingtrack-app:${{ github.sha }}
+          push: true
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build WS image
+      - name: Extract metadata (WS)
+        id: meta-ws
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/pilingtrack-ws
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build & push WS image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile.ws
-          push: false
-          tags: pilingtrack-ws:${{ github.sha }}
+          push: true
+          tags: ${{ steps.meta-ws.outputs.tags }}
+          labels: ${{ steps.meta-ws.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata (Workers)
+        id: meta-workers
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/pilingtrack-workers
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build & push workers image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.workers
+          push: true
+          tags: ${{ steps.meta-workers.outputs.tags }}
+          labels: ${{ steps.meta-workers.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

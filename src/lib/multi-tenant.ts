@@ -8,8 +8,6 @@
  * combined with connection-level tenant context.
  */
 
-import { Prisma } from '@prisma/client';
-
 // Tables that have tenantId field
 const TENANT_ISOLATED_MODELS = [
   'User',

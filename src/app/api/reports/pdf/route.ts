@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId);
+    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
     const fallbackCrews = await db.crew.findMany({
       where: {
         isActive: true,
@@ -150,9 +150,16 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   const searchParams = request.nextUrl.searchParams;
+  const dateFrom = searchParams.get('dateFrom');
+  const dateTo = searchParams.get('dateTo');
   const sync = searchParams.get('sync');
 
-  // --- Sync fallback ---
+  // --- Auto-sync if dateFrom/dateTo are provided ---
+  if (dateFrom && dateTo) {
+    return handleSyncGeneration(request, user!);
+  }
+
+  // --- Explicit sync mode ---
   if (sync === '1') {
     return handleSyncGeneration(request, user!);
   }
@@ -163,7 +170,7 @@ export async function GET(request: NextRequest) {
 
   if (!jobId) {
     return NextResponse.json(
-      { error: 'jobId required for async mode. Use POST to enqueue.' },
+      { error: 'Provide dateFrom+dateTo for PDF generation or jobId for async status' },
       { status: 400 }
     );
   }
@@ -183,7 +190,7 @@ export async function GET(request: NextRequest) {
 // Sync generation (fallback)
 // ============================================================
 
-async function handleSyncGeneration(request: NextRequest, user: { id: string; name: string; role: string }) {
+async function handleSyncGeneration(request: NextRequest, user: { id: string; name: string; role: string; email: string; phone: string; tenantId: string | null }) {
   const requestId = getRequestId(request);
 
   try {
@@ -199,7 +206,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       );
     }
 
-    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId);
+    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
     const fallbackCrews = await db.crew.findMany({
       where: {
         isActive: true,

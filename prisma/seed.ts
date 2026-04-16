@@ -33,14 +33,14 @@ async function seed() {
   assertNotProduction();
   console.log('Seeding database...');
 
-  // Generate random passwords for seed users
-  const adminPassword = generatePassword();
-  const dispatcherPassword = generatePassword();
-  const operator1Password = generatePassword();
-  const operator2Password = generatePassword();
-  const assistantPassword = generatePassword();
+  // Use fixed passwords for testing
+  const adminPassword = 'admin123';
+  const dispatcherPassword = 'dispatch123';
+  const operator1Password = 'operator123';
+  const operator2Password = 'sas02password';
+  const assistantPassword = 'helper123';
 
-  console.log('⚠️  Generated passwords (save these for testing):');
+  console.log('🔑 Fixed passwords for testing:');
   console.log(`   admin@piling.ru: ${adminPassword}`);
   console.log(`   dispatch@piling.ru: ${dispatcherPassword}`);
   console.log(`   operator@piling.ru: ${operator1Password}`);
@@ -53,6 +53,7 @@ async function seed() {
       name: 'Администратор',
       role: 'ADMIN',
       phone: '+7-900-000-0001',
+      password: hashPassword(adminPassword),
     },
     create: {
       email: 'admin@piling.ru',

@@ -1,11 +1,55 @@
+# Git
 .git
+.gitignore
+.gitattributes
+
+# Build outputs
 .next
 node_modules
-npm-debug.log
-tmp-report.json
-tmp-report.pdf
-tmp-prisma-provider.prisma
-tmp-standalone.out.log
-tmp-standalone.err.log
-db
+dist
+build
+out
+.turbo
+.next/cache
+
+# Environment & secrets
+.env*
+.env.local
+.env.*.local
+
+# IDE & Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+.eslintcache
+
+# Tests & coverage
+test-results
+test-screenshots
 coverage
+e2e
+playwright.config.ts
+vitest.config.ts
+
+# Temporary files
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+tmp-*
+db
+
+# Dev scripts & docs
+scripts
+docs
+examples
+README*
+LICENSE
+*.md
+
+# Logs
+*.log
+lerna-debug.log*
+pnpm-debug.log*

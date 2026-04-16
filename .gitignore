@@ -1,3 +1,31 @@
+# Node artifacts
+node_modules/
+dist/
+build/
+.next/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env
+.env
+.env.local
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+
+# Coverage
+coverage/
 # Dependencies
 node_modules/
 

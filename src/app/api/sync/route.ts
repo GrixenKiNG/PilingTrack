@@ -203,4 +203,10 @@ async function handleReportDelete(
   // Report deletion — soft delete or hard delete based on role
   // For now, just acknowledge (reports are typically not deleted in production)
   // TODO: Implement proper soft delete with audit trail
+  // Implementation should:
+  // 1. Mark report as deleted (isActive = false) for soft delete
+  // 2. Create audit trail entry via recordAuditLog() with before/after state
+  // 3. Cascade soft delete to related ReportVersion and ReportAudit records
+  // 4. Validate user permissions (ADMIN required for deletion)
+  // 5. Return deleted report in response for sync confirmation
 }

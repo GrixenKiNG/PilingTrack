@@ -8,12 +8,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
       DATABASE_PROVIDER: postgres
       DATABASE_URL_POSTGRES: ${DATABASE_URL_POSTGRES:?DATABASE_URL_POSTGRES is required}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
       DATABASE_LOG_QUERIES: ${DATABASE_LOG_QUERIES:-false}
     ports:
       - "3000:3000"
@@ -23,7 +26,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    # Resource limits (works with docker compose v2+)
     deploy:
       resources:
         limits:
@@ -37,10 +39,8 @@ services:
         delay: 5s
         max_attempts: 3
         window: 120s
-    # For Docker Compose non-Swarm mode (v2 syntax)
     mem_limit: 1g
     cpus: 1.0
-    # Logging configuration
     logging:
       driver: "json-file"
       options:
@@ -54,8 +54,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    # Do NOT expose port 5432 externally in production
-    # App can reach it via Docker network
     expose:
       - "5432"
     volumes:
@@ -65,7 +63,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    # Resource limits
     deploy:
       resources:
         limits:
@@ -76,7 +73,34 @@ services:
           memory: 512M
     mem_limit: 2g
     cpus: 2.0
-    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
     logging:
       driver: "json-file"
       options:
@@ -85,4 +109,6 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  redis-data:
     driver: local

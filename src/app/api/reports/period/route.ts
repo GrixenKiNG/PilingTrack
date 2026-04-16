@@ -17,7 +17,7 @@ export const GET = withApi(
     const dateTo = request.nextUrl.searchParams.get('dateTo');
     const siteId = request.nextUrl.searchParams.get('siteId');
 
-    const result = await getReportsByPeriod(dateFrom, dateTo, siteId);
+    const result = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
     return NextResponse.json(result);
   },
   { domain: 'reports' }

@@ -86,6 +86,24 @@ export class CrewAggregate {
     );
   }
 
+  assignOperator(operatorId: string, userId?: string): void {
+    this.state.operatorId = operatorId;
+    this.state.updatedAt = new Date().toISOString();
+
+    this.pendingEvents.push(
+      createCrewEvent('CrewOperatorAssigned', this.state.id, { operatorId }, { userId })
+    );
+  }
+
+  assignEquipment(equipmentId: string, userId?: string): void {
+    this.state.equipmentId = equipmentId;
+    this.state.updatedAt = new Date().toISOString();
+
+    this.pendingEvents.push(
+      createCrewEvent('CrewEquipmentAssigned', this.state.id, { equipmentId }, { userId })
+    );
+  }
+
   deactivate(userId?: string): void {
     if (!this.state.isActive) throw new Error('Crew is already deactivated');
     this.state.isActive = false;

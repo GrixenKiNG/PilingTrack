@@ -71,7 +71,7 @@ export async function getReportsByPeriodRaw(
       (SELECT json_agg(json_build_object(
         'id', rd.id,
         'duration', rd.duration,
-        "reasonId", rd."reasonId",
+        'reasonId', rd."reasonId",
         'comment', rd.comment
       ))
       FROM "ReportDowntime" rd

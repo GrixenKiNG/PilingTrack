@@ -65,7 +65,15 @@ export async function getCachedSite(id: string) {
     () => db.site.findUnique({
       where: { id },
       include: {
-        fields: { include: { clusters: { include: { pickets: true } } } },
+        fields: {
+          take: 50,
+          include: {
+            clusters: {
+              take: 20,
+              include: { pickets: { take: 50 } },
+            },
+          },
+        },
       },
     }),
     { ttl: TTL.sites, mutex: true }
@@ -163,12 +171,12 @@ export async function getCachedReport(reportId: string) {
           select: {
             name: true,
             equipment: { select: { name: true } },
-            assistants: { select: { name: true } },
+            assistants: { select: { name: true }, take: 10 },
           },
         },
-        piles: { include: { pileGrade: true } },
-        drillings: { include: { type: true } },
-        downtimes: { include: { reason: true } },
+        piles: { include: { pileGrade: true }, take: 100 },
+        drillings: { include: { type: true }, take: 100 },
+        downtimes: { include: { reason: true }, take: 50 },
       },
     }),
     { ttl: TTL.report }

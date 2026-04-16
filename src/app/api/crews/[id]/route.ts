@@ -41,8 +41,12 @@ export const PUT = withMutation(
     const crew = await updateCrew({
       crewId: id,
       name: validated.data.name,
-      isActive: (validated.data as any).isActive,
-      userId: validated.data.operatorId,
+      operatorId: validated.data.operatorId,
+      equipmentId: validated.data.equipmentId,
+      siteId: validated.data.siteId,
+      assistantNames: validated.data.assistantNames || [],
+      isActive: validated.data.isActive,
+      userId: user!.id,
     });
     return NextResponse.json({ crew });
   },

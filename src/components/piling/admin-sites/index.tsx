@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   MapPin,
   Plus,
@@ -58,36 +58,52 @@ export function AdminSites() {
   // Data loading
   // ============================================================
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [usersRes, sitesRes, dictRes] = await Promise.all([
-        authFetch('/api/users'),
-        authFetch('/api/sites/all'),
-        authFetch('/api/dictionary/all'),
-      ]);
-      if (usersRes.ok) {
-        const data = await usersRes.json();
-        setUsers(data.users || []);
-      }
-      if (sitesRes.ok) {
-        const data = await sitesRes.json();
-        setSites(data.sites || []);
-      }
-      if (dictRes.ok) {
-        const data = await dictRes.json();
-        setPileGrades(data.pileGrades || []);
-      }
-    } catch {
-      toast.error('Ошибка загрузки данных');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    const abortController = new AbortController();
+    let isMounted = true;
+
+    const loadData = async () => {
+      if (!isMounted) return;
+      setLoading(true);
+      try {
+        const [usersRes, sitesRes, dictRes] = await Promise.all([
+          authFetch('/api/users', { signal: abortController.signal }),
+          authFetch('/api/sites/all', { signal: abortController.signal }),
+          authFetch('/api/dictionary/all', { signal: abortController.signal }),
+        ]);
+        
+        if (!isMounted) return;
+
+        if (usersRes.ok) {
+          const data = await usersRes.json();
+          setUsers(data.data || data.users || []);
+        }
+        if (sitesRes.ok) {
+          const data = await sitesRes.json();
+          setSites(data.sites || []);
+        }
+        if (dictRes.ok) {
+          const data = await dictRes.json();
+          setPileGrades(data.pileGrades || []);
+        }
+      } catch (error: unknown) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          toast.error('Ошибка загрузки данных');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, []);
 
   // ============================================================
   // Expand / collapse site tree

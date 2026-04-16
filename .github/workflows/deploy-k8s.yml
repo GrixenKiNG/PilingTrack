@@ -1,8 +1,10 @@
 name: Deploy to Kubernetes
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       environment:
@@ -46,7 +48,9 @@ jobs:
     name: Deploy to Staging
     needs: lint
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event.inputs.environment == 'staging'
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +70,8 @@ jobs:
         run: |
           helm upgrade --install pilingtrack-staging ./infra/helm/pilingtrack \
             --namespace pilingtrack-staging --create-namespace \
-            --set api.image.tag=${{ github.sha }} \
+            --set api.image.tag=${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }} \
+            --set global.imageRegistry=ghcr.io/${{ github.repository }} \
             -f infra/helm/pilingtrack/values-staging.yaml \
             --wait --timeout 10m
 
@@ -106,7 +111,8 @@ jobs:
         run: |
           helm upgrade --install pilingtrack-prod ./infra/helm/pilingtrack \
             --namespace pilingtrack-prod --create-namespace \
-            --set api.image.tag=${{ github.sha }} \
+            --set api.image.tag=${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }} \
+            --set global.imageRegistry=ghcr.io/${{ github.repository }} \
             -f infra/helm/pilingtrack/values-prod.yaml \
             --wait --timeout 15m
 

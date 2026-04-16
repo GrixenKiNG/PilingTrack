@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import { getSiteWithHierarchy, updateSite, deactivateSite } from '@/modules/sites';
+import { updateSiteWithPlans } from '@/modules/sites/application/commands';
 import { updateSiteSchema } from '@/lib/validation-schemas';
 import { invalidateSites } from '@/lib/cached-queries';
 import { withApi, withMutation } from '@/core/api-wrapper';
@@ -38,14 +39,33 @@ export const PUT = withMutation(
         { status: 400 }
       );
     }
-    const site = await updateSite({
-      siteId: id,
-      name: validated.data.name,
-      plannedPiles: validated.data.plannedPiles,
-      plannedDrilling: validated.data.plannedDrilling,
-      completionDate: (validated.data as any).completionDate,
-      userId: user!.id,
-    });
+
+    // Check if plans are included
+    const hasPlans = validated.data.pilePlans || validated.data.drillingPlans;
+    
+    let site;
+    if (hasPlans) {
+      // Use new function that handles plans
+      site = await updateSiteWithPlans(id, {
+        name: validated.data.name,
+        plannedPiles: validated.data.plannedPiles,
+        plannedDrilling: validated.data.plannedDrilling,
+        completionDate: validated.data.completionDate,
+        pilePlans: validated.data.pilePlans,
+        drillingPlans: validated.data.drillingPlans,
+      });
+    } else {
+      // Use existing function for simple updates
+      site = await updateSite({
+        siteId: id,
+        name: validated.data.name,
+        plannedPiles: validated.data.plannedPiles,
+        plannedDrilling: validated.data.plannedDrilling,
+        completionDate: validated.data.completionDate,
+        userId: user!.id,
+      });
+    }
+    
     await invalidateSites();
     return NextResponse.json({ site });
   },

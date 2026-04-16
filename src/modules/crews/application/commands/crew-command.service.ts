@@ -46,6 +46,20 @@ export async function createCrew(command: CreateCrewCommand) {
 
   try {
     await getCrewRepository().save(aggregate);
+
+    // Create crew assistants after crew is created
+    if (command.assistantNames && command.assistantNames.length > 0) {
+      const assistantData = command.assistantNames
+        .filter((name) => name.trim().length > 0)
+        .map((name) => ({
+          crewId: aggregate.getState().id,
+          name: name.trim(),
+        }));
+      
+      if (assistantData.length > 0) {
+        await db.crewAssistant.createMany({ data: assistantData });
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     if (message.includes('UNIQUE') || message.includes('unique')) {
@@ -71,7 +85,47 @@ export async function updateCrew(command: UpdateCrewCommand) {
     throw new ServiceError('Crew not found', 404);
   }
 
-  aggregate.update({ name: command.name }, command.userId);
+  // Validate dependencies if operator/equipment/site are being changed
+  if (command.operatorId || command.equipmentId || command.siteId) {
+    const [operator, equipment, site] = await Promise.all([
+      command.operatorId ? db.user.findUnique({ where: { id: command.operatorId } }) : null,
+      command.equipmentId ? db.equipment.findUnique({ where: { id: command.equipmentId } }) : null,
+      command.siteId ? db.site.findUnique({ where: { id: command.siteId } }) : null,
+    ]);
+
+    if (command.operatorId && !operator) throw new ServiceError('Operator not found', 404);
+    if (command.operatorId && operator!.role !== 'OPERATOR') throw new ServiceError('User must have OPERATOR role', 400);
+    
+    // Check if new operator is already assigned to another crew
+    if (command.operatorId && command.operatorId !== aggregate.getState().operatorId) {
+      const existingOperatorCrew = await db.crew.findUnique({ 
+        where: { operatorId: command.operatorId } 
+      });
+      if (existingOperatorCrew && existingOperatorCrew.id !== command.crewId) {
+        throw new ServiceError('Operator already has a crew', 409);
+      }
+    }
+
+    if (command.equipmentId && !equipment) throw new ServiceError('Equipment not found', 404);
+    if (command.siteId && !site) throw new ServiceError('Site not found', 404);
+  }
+
+  // Update crew fields
+  if (command.operatorId) {
+    aggregate.assignOperator(command.operatorId, command.userId);
+  }
+  
+  if (command.equipmentId) {
+    aggregate.assignEquipment(command.equipmentId, command.userId);
+  }
+  
+  if (command.siteId) {
+    aggregate.assignToSite(command.siteId, command.userId);
+  }
+
+  if (command.name !== undefined) {
+    aggregate.update({ name: command.name }, command.userId);
+  }
 
   if (command.isActive !== undefined) {
     if (command.isActive) {
@@ -82,6 +136,26 @@ export async function updateCrew(command: UpdateCrewCommand) {
   }
 
   await repo.save(aggregate);
+
+  // Update crew assistants if provided
+  if (command.assistantNames !== undefined) {
+    // Delete existing assistants
+    await db.crewAssistant.deleteMany({ where: { crewId: command.crewId } });
+    
+    // Create new assistants
+    if (command.assistantNames.length > 0) {
+      const assistantData = command.assistantNames
+        .filter((name) => name.trim().length > 0)
+        .map((name) => ({
+          crewId: command.crewId,
+          name: name.trim(),
+        }));
+      
+      if (assistantData.length > 0) {
+        await db.crewAssistant.createMany({ data: assistantData });
+      }
+    }
+  }
 
   return db.crew.findUnique({
     where: { id: command.crewId },

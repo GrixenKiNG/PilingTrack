@@ -2,6 +2,7 @@ export { createSite, updateSite, activateSite, deactivateSite } from './site-com
 export type { CreateSiteCommand, UpdateSiteCommand } from './site.command';
 export {
   createSiteWithPlans,
+  updateSiteWithPlans,
   assignUserToSite,
   unassignUserFromSite,
   createSiteHierarchyItem,

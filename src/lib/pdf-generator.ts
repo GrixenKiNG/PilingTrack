@@ -61,7 +61,7 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
  * Generate a single-report PDF. Returns a Buffer with the PDF content.
  */
 export async function generateSinglePdf(data: SingleReportData): Promise<Buffer> {
-  return generatePdfViaScript('generate-single-pdf.js', data);
+  return generatePdfViaScript('generate-single-pdf.js', { report: data });
 }
 
 /**

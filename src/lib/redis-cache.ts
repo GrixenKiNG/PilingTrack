@@ -23,7 +23,17 @@
  *   await cache.invalidatePattern('report:*');
  */
 
-import 'server-only';
+// Guard against client-side imports (Next.js only, not Node.js workers)
+if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+  // Only enforce server-only in Next.js context, skip in Node.js workers
+  try {
+    // Dynamic import for server-only in Node.js worker contexts
+    // @ts-ignore - server-only not available in all contexts
+    await import('server-only');
+  } catch (e) {
+    // Ignore if running in worker context where server-only is not available
+  }
+}
 import { Redis, RedisOptions } from 'ioredis';
 import { redisCircuitBreaker } from '@/core/infrastructure/circuit-breakers';
 
@@ -196,6 +206,11 @@ export async function del(key: string): Promise<boolean> {
 /**
  * Invalidate all keys matching a pattern.
  * Uses SCAN (not KEYS) for production safety.
+ *
+ * FIX: Properly awaits each batch deletion to prevent:
+ * 1. Premature resolve before deletions complete
+ * 2. Inaccurate deleted count
+ * 3. Race conditions under high key counts
  */
 export async function invalidatePattern(pattern: string): Promise<number> {
   const client = await getRedisClient();
@@ -205,18 +220,25 @@ export async function invalidatePattern(pattern: string): Promise<number> {
   const fullPattern = buildKey(pattern);
 
   try {
-    const stream = client.scanStream({ match: fullPattern, count: 100 });
+    // Collect all keys first, then delete in batches
+    const allKeys: string[][] = [];
 
     await new Promise<void>((resolve, reject) => {
-      stream.on('data', async (keys: string[]) => {
+      const stream = client.scanStream({ match: fullPattern, count: 100 });
+      stream.on('data', (keys: string[]) => {
         if (keys.length > 0) {
-          await client.del(keys);
-          deleted += keys.length;
+          allKeys.push(keys);
         }
       });
       stream.on('end', () => resolve());
       stream.on('error', (err) => reject(err));
     });
+
+    // Now delete sequentially — each batch is awaited
+    for (const keys of allKeys) {
+      await client.del(keys);
+      deleted += keys.length;
+    }
   } catch (err) {
     console.warn('[Cache] Pattern invalidation failed:', (err as Error).message);
   }

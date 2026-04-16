@@ -4,6 +4,7 @@ import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { ingestTelemetryBatch, telemetryBuffer } from '@/services/telemetry/telemetry-ingestion-service';
 import { dbHealthCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 const telemetryRecordSchema = z.object({
@@ -134,6 +135,9 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     if (err instanceof CircuitOpenError) {
       const retryAfter = Math.ceil(err.retryAfterMs / 1000);
+      logger.warn('Telemetry batch: database circuit breaker open', {
+        retryAfterMs: err.retryAfterMs,
+      });
       return NextResponse.json(
         {
           error: 'Database unavailable — circuit breaker is OPEN',
@@ -147,8 +151,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    logger.error('Telemetry batch ingestion failed', {
+      error: errorMessage,
+      errorType: err instanceof Error ? err.constructor.name : typeof err,
+    });
+
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

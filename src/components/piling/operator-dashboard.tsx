@@ -62,7 +62,7 @@ export function OperatorDashboard() {
         const sitesData = await sitesRes.json();
         setSites(sitesData.sites || []);
 
-        if (!selectedSiteId && sitesData.sites?.length > 0) {
+        if (!selectedSiteId && sitesData.sites?.[0]?.id) {
           setSelectedSite(sitesData.sites[0].id);
         }
       }

@@ -112,6 +112,7 @@ export async function cacheAside<T>(
   }
 
   // Cache miss — check for mutex (stampede prevention)
+  let mutexAcquired = false;
   if (options?.mutex) {
     const mutexKey = `mutex:${key}`;
     const mutexTtl = options?.mutexTtl ?? 10;
@@ -127,23 +128,27 @@ export async function cacheAside<T>(
         const retry = await get<T>(key);
         if (retry !== null) return retry;
         // Still miss — proceed without mutex
+      } else {
+        mutexAcquired = true;
       }
     }
   }
 
   // Compute value (DB call)
   cacheStats.misses++;
-  const value = await compute();
+  try {
+    const value = await compute();
 
-  // Store in cache
-  await set(key, value, { ttl });
+    // Store in cache
+    await set(key, value, { ttl });
 
-  // Release mutex if acquired
-  if (options?.mutex) {
-    await del(`mutex:${key}`);
+    return value;
+  } finally {
+    // Release mutex on success OR failure — prevents deadlocks
+    if (options?.mutex && mutexAcquired) {
+      await del(`mutex:${key}`);
+    }
   }
-
-  return value;
 }
 
 /**

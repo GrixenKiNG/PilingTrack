@@ -45,6 +45,7 @@ export const POST = withMutation(
       operatorId: validation.data.operatorId,
       equipmentId: validation.data.equipmentId,
       siteId: validation.data.siteId,
+      assistantNames: validation.data.assistantNames || [],
       userId: user!.id,
     });
 

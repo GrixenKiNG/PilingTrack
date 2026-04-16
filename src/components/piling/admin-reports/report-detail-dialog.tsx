@@ -49,6 +49,10 @@ export function ReportDetailDialog({
               <div><p className="text-xs text-slate-500">Объект</p><p className="font-medium">{report.site?.name || '—'}</p></div>
               <div><p className="text-xs text-slate-500">Смена</p><p className="font-mono">{report.shiftStart || '—'} – {report.shiftEnd || '—'}</p></div>
               <div>
+                <p className="text-xs text-slate-500">Установка</p>
+                <p className="font-medium">{report.equipment?.name || '—'}</p>
+              </div>
+              <div>
                 <p className="text-xs text-slate-500">Статус</p>
                 <Badge variant="secondary" className={
                   report.status === 'submitted' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'

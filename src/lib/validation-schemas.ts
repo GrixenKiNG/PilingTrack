@@ -76,6 +76,16 @@ export const createSiteSchema = z.object({
   plannedDrilling: z.number().int().min(0).max(999999).optional(),
   description: z.string().max(2000).optional(),
   status: z.enum(['active', 'paused', 'completed']).default('active'),
+  pilePlans: z.array(z.object({
+    pileGradeId: z.string().min(1).max(64),
+    count: z.number().int().min(1),
+    metersPerUnit: z.number().min(0).optional(),
+  })).max(100).default([]).optional(),
+  drillingPlans: z.array(z.object({
+    diameter: z.number().min(0).max(999),
+    count: z.number().int().min(1),
+    metersPerUnit: z.number().min(0).optional(),
+  })).max(100).default([]).optional(),
 });
 
 export const updateSiteSchema = createSiteSchema.partial();
@@ -111,6 +121,7 @@ export const createCrewSchema = z.object({
   siteId: internalIdSchema,
   assistantNames: z.array(z.string().max(200)).max(20).default([]),
   assistantsCount: z.number().int().min(0).max(20).default(0),
+  isActive: z.boolean().optional().default(true),
 });
 
 export const updateCrewSchema = createCrewSchema.partial();

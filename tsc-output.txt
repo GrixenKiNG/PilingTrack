@@ -1,53 +1,92 @@
-src/app/api/sync/batch/route.ts(65,14): error TS2769: No overload matches this call.
-  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
-    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
-  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
-    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
-      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
-        Types of property 'isolationLevel' are incompatible.
-          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
-src/app/api/sync/batch/route.ts(65,34): error TS7006: Parameter 'tx' implicitly has an 'any' type.
-src/app/api/sync/batch/route.ts(111,7): error TS2304: Cannot find name 'SyncOperation'.
-src/app/api/sync/route.ts(165,7): error TS2304: Cannot find name 'SyncOperation'.
-src/app/api/sync/route.ts(191,8): error TS2304: Cannot find name 'SyncOperation'.
-src/app/api/telemetry/route.ts(44,48): error TS2345: Argument of type '{ type: any; equipmentId: string; value: number; siteId?: string | null | undefined; unit?: string | null | undefined; latitude?: number | null | undefined; longitude?: number | null | undefined; metadata?: Record<...> | ... 1 more ... | undefined; timestamp?: string | undefined; }[]' is not assignable to parameter of type 'TelemetryRecord[]'.
-  Type '{ type: any; equipmentId: string; value: number; siteId?: string | null | undefined; unit?: string | null | undefined; latitude?: number | null | undefined; longitude?: number | null | undefined; metadata?: Record<...> | ... 1 more ... | undefined; timestamp?: string | undefined; }' is not assignable to type 'TelemetryRecord'.
-    Types of property 'siteId' are incompatible.
-      Type 'string | null | undefined' is not assignable to type 'string | undefined'.
-        Type 'null' is not assignable to type 'string | undefined'.
-src/app/api/telemetry/route.ts(56,38): error TS2345: Argument of type '{ type: any; unit: string | undefined; latitude: number | undefined; longitude: number | undefined; metadata: Record<string, unknown> | undefined; equipmentId: string; value: number; siteId?: string | ... 1 more ... | undefined; timestamp?: string | undefined; }' is not assignable to parameter of type 'TelemetryRecord'.
-  Types of property 'siteId' are incompatible.
-    Type 'string | null | undefined' is not assignable to type 'string | undefined'.
-      Type 'null' is not assignable to type 'string | undefined'.
-src/lib/tenant-middleware.ts(71,33): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/lib/tenant-middleware.ts(72,55): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/lib/tenant-middleware.ts(83,33): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/lib/tenant-middleware.ts(104,31): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/lib/tenant-middleware.ts(105,43): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/lib/tenant-middleware.ts(114,32): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/lib/tenant-middleware.ts(115,44): error TS2339: Property 'siteId' does not exist on type '{}'.
-src/modules/crews/application/commands/crew-command.service.ts(105,14): error TS2769: No overload matches this call.
-  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
-    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
-  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
-    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
-      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
-        Types of property 'isolationLevel' are incompatible.
-          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
-src/modules/crews/infrastructure/crew.repository.ts(22,14): error TS2769: No overload matches this call.
-  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
-    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
-  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
-    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
-      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
-        Types of property 'isolationLevel' are incompatible.
-          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
-src/modules/reports/infrastructure/report.repository.ts(36,14): error TS2769: No overload matches this call.
-  Overload 1 of 2, '(arg: PrismaPromise<any>[], options?: { isolationLevel?: "Serializable" | undefined; } | undefined): Promise<any[]>', gave the following error.
-    Argument of type '(tx: any) => Promise<void>' is not assignable to parameter of type 'PrismaPromise<any>[]'.
-  Overload 2 of 2, '(fn: (prisma: Omit<PrismaClient<PrismaClientOptions, never, DefaultArgs>, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">) => Promise<...>, options?: { ...; } | undefined): Promise<...>', gave the following error.
-    Argument of type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; } | { timeout: number; maxWait: number; isolationLevel?: undefined; }' is not assignable to parameter of type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; } | undefined'.
-      Type '{ isolationLevel: "ReadCommitted"; timeout: number; maxWait: number; }' is not assignable to type '{ maxWait?: number | undefined; timeout?: number | undefined; isolationLevel?: "Serializable" | undefined; }'.
-        Types of property 'isolationLevel' are incompatible.
-          Type '"ReadCommitted"' is not assignable to type '"Serializable"'.
-src/services/telemetry/mqtt-ingestion-service.ts(126,25): error TS2307: Cannot find module 'mqtt' or its corresponding type declarations.
+[96mcheck-users.ts[0m:[93m4[0m:[93m8[0m - [91merror[0m[90m TS2451: [0mCannot redeclare block-scoped variable 'PrismaClient'.
+
+[7m4[0m const {PrismaClient} = require('@prisma/client');
+[7m [0m [91m       ~~~~~~~~~~~~[0m
+
+  [96mfix-admin.ts[0m:[93m4[0m:[93m8[0m
+    [7m4[0m const {PrismaClient} = require('@prisma/client');
+    [7m [0m [96m       ~~~~~~~~~~~~[0m
+    'PrismaClient' was also declared here.
+
+[96mcheck-users.ts[0m:[93m5[0m:[93m7[0m - [91merror[0m[90m TS2451: [0mCannot redeclare block-scoped variable 'p'.
+
+[7m5[0m const p = new PrismaClient();
+[7m [0m [91m      ~[0m
+
+  [96mfix-admin.ts[0m:[93m5[0m:[93m7[0m
+    [7m5[0m const p = new PrismaClient();
+    [7m [0m [96m      ~[0m
+    'p' was also declared here.
+
+[96mcheck-users.ts[0m:[93m10[0m:[93m17[0m - [91merror[0m[90m TS7006: [0mParameter 'u' implicitly has an 'any' type.
+
+[7m10[0m   users.forEach(u => console.log(u.email, u.password?.substring(0,15), '...'));
+[7m  [0m [91m                ~[0m
+
+[96mfix-admin.ts[0m:[93m4[0m:[93m8[0m - [91merror[0m[90m TS2451: [0mCannot redeclare block-scoped variable 'PrismaClient'.
+
+[7m4[0m const {PrismaClient} = require('@prisma/client');
+[7m [0m [91m       ~~~~~~~~~~~~[0m
+
+  [96mcheck-users.ts[0m:[93m4[0m:[93m8[0m
+    [7m4[0m const {PrismaClient} = require('@prisma/client');
+    [7m [0m [96m       ~~~~~~~~~~~~[0m
+    'PrismaClient' was also declared here.
+
+[96mfix-admin.ts[0m:[93m5[0m:[93m7[0m - [91merror[0m[90m TS2451: [0mCannot redeclare block-scoped variable 'p'.
+
+[7m5[0m const p = new PrismaClient();
+[7m [0m [91m      ~[0m
+
+  [96mcheck-users.ts[0m:[93m5[0m:[93m7[0m
+    [7m5[0m const p = new PrismaClient();
+    [7m [0m [96m      ~[0m
+    'p' was also declared here.
+
+[96mfix-admin.ts[0m:[93m18[0m:[93m17[0m - [91merror[0m[90m TS7006: [0mParameter 'u' implicitly has an 'any' type.
+
+[7m18[0m   users.forEach(u => console.log(u.email, u.role, u.isActive));
+[7m  [0m [91m                ~[0m
+
+[96mprisma/seed-test-data.ts[0m:[93m6[0m:[93m10[0m - [91merror[0m[90m TS2305: [0mModule '"@prisma/client"' has no exported member 'PrismaClient'.
+
+[7m6[0m import { PrismaClient } from '@prisma/client';
+[7m [0m [91m         ~~~~~~~~~~~~[0m
+
+[96msrc/app/api/reports/pdf/route.ts[0m:[93m209[0m:[93m78[0m - [91merror[0m[90m TS2339: [0mProperty 'tenantId' does not exist on type '{ id: string; name: string; role: string; }'.
+
+[7m209[0m     const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
+[7m   [0m [91m                                                                             ~~~~~~~~[0m
+
+[96msrc/components/piling/admin-crews/use-crews-data.ts[0m:[93m74[0m:[93m34[0m - [91merror[0m[90m TS2304: [0mCannot find name 'useCallback'.
+
+[7m74[0m   const getAssignedOperatorIds = useCallback((excludeCrewId?: string) => {
+[7m  [0m [91m                                 ~~~~~~~~~~~[0m
+
+[96msrc/core/infrastructure/audit-log-service.ts[0m:[93m15[0m:[93m10[0m - [91merror[0m[90m TS2305: [0mModule '"@prisma/client"' has no exported member 'Prisma'.
+
+[7m15[0m import { Prisma } from '@prisma/client';
+[7m  [0m [91m         ~~~~~~[0m
+
+[96msrc/lib/multi-tenant.ts[0m:[93m11[0m:[93m10[0m - [91merror[0m[90m TS2305: [0mModule '"@prisma/client"' has no exported member 'Prisma'.
+
+[7m11[0m import { Prisma } from '@prisma/client';
+[7m  [0m [91m         ~~~~~~[0m
+
+[96msrc/services/feedback/feedback-event-service.ts[0m:[93m1[0m:[93m15[0m - [91merror[0m[90m TS2305: [0mModule '"@prisma/client"' has no exported member 'Prisma'.
+
+[7m1[0m import type { Prisma } from '@prisma/client';
+[7m [0m [91m              ~~~~~~[0m
+
+
+Found 12 errors in 8 files.
+
+Errors  Files
+     3  check-users.ts[90m:4[0m
+     3  fix-admin.ts[90m:4[0m
+     1  prisma/seed-test-data.ts[90m:6[0m
+     1  src/app/api/reports/pdf/route.ts[90m:209[0m
+     1  src/components/piling/admin-crews/use-crews-data.ts[90m:74[0m
+     1  src/core/infrastructure/audit-log-service.ts[90m:15[0m
+     1  src/lib/multi-tenant.ts[90m:11[0m
+     1  src/services/feedback/feedback-event-service.ts[90m:1[0m

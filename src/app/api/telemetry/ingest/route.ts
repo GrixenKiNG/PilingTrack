@@ -87,12 +87,24 @@ async function authenticateDevice(request: NextRequest): Promise<{ identity: Dev
     };
   }
 
-  // JWT token authentication (future)
+  // JWT token authentication (future feature)
   // TODO: Implement JWT verification for device tokens
-
+  // This would support JWT tokens issued for IoT devices.
+  // Implementation steps:
+  // 1. Extract JWT from Authorization header
+  // 2. Verify JWT signature using device's public key
+  // 3. Extract deviceId, siteId from JWT claims
+  // 4. Validate token expiration and not-before times
+  // 5. Optionally rotate device keys for enhanced security
+  
+  // For now, JWT auth is not supported
   return {
     identity: { deviceId: '', siteId: '' },
-    error: createJsonResponse({ error: 'Authentication failed' }, { status: 401 }, getRequestId(request)),
+    error: createJsonResponse(
+      { error: 'JWT authentication not yet implemented. Use X-Device-Key header.' },
+      { status: 501 },
+      getRequestId(request)
+    ),
   };
 }
 

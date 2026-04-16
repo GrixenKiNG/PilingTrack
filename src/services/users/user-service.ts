@@ -3,21 +3,31 @@ import { ServiceError } from '@/services/service-error';
 import { assertNotSelfAction } from '@/services/auth/authorization-service';
 import { hashPassword } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
+import { parseCursorPagination, type CursorPaginationResult } from '@/lib/pagination-cursor';
 
 function isUniqueConstraintError(message: string) {
   return message.includes('Unique') || message.includes('unique constraint');
 }
 
-export async function listUsers(role?: string | null) {
+export async function listUsers(
+  role?: string | null,
+  pagination?: CursorPaginationResult
+) {
   const where: Record<string, unknown> = {};
   if (role) {
     where.role = role;
   }
 
+  const take = pagination?.take ?? 50;
+  const cursor = pagination?.cursor ?? undefined;
+
   return db.user.findMany({
     where,
     select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
     orderBy: { name: 'asc' },
+    cursor: cursor ? { id: cursor } : undefined,
+    take: take + 1,
+    skip: cursor ? 1 : 0,
   });
 }
 

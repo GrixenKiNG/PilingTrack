@@ -46,6 +46,16 @@
     "zai-provider-extension",
     "scripts",
     "tests",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "check-users.ts",
+    "fix-admin.ts",
+    "test-comprehensive.ts",
+    "test-comprehensive-v2.ts",
+    "api-test-suite.ts",
+    "extended-api-test.ts",
+    "setup-test-users.ts",
+    "check-test-users.ts",
+    "comprehensive-test-suite.ts",
+    "prisma/seed-test-data.ts"
   ]
 }

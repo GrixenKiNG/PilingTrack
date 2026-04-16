@@ -105,6 +105,84 @@ export async function createSiteWithPlans(input: {
 }
 
 // ────────────────────────────────────────────
+// Update site with plans (transactional)
+// ────────────────────────────────────────────
+
+export async function updateSiteWithPlans(siteId: string, input: {
+  name?: string;
+  plannedPiles?: number;
+  plannedDrilling?: number;
+  completionDate?: Date | string;
+  pilePlans?: IncomingPilePlan[];
+  drillingPlans?: IncomingDrillingPlan[];
+}) {
+  const existing = await db.site.findUnique({ where: { id: siteId } });
+  if (!existing) {
+    throw new ServiceError('Site not found', 404);
+  }
+
+  const normalized = normalizeSitePlans({
+    pilePlans: input.pilePlans,
+    drillingPlans: input.drillingPlans,
+  });
+
+  const completionDate = input.completionDate
+    ? input.completionDate instanceof Date
+      ? input.completionDate
+      : new Date(input.completionDate)
+    : undefined;
+
+  return db.$transaction(async (tx) => {
+    // Update site fields
+    await tx.site.update({
+      where: { id: siteId },
+      data: {
+        name: input.name !== undefined ? input.name.trim() : undefined,
+        plannedPiles: input.plannedPiles !== undefined ? input.plannedPiles : normalized.plannedPiles,
+        plannedDrilling: input.plannedDrilling !== undefined ? input.plannedDrilling : normalized.plannedDrilling,
+        ...(completionDate && { completionDate }),
+      },
+    });
+
+    // Delete old plans
+    await tx.sitePilePlan.deleteMany({ where: { siteId } });
+    await tx.siteDrillingPlan.deleteMany({ where: { siteId } });
+
+    // Create new pile plans
+    for (const plan of normalized.pilePlans) {
+      await tx.sitePilePlan.create({
+        data: {
+          siteId,
+          pileGradeId: plan.pileGradeId,
+          count: Number(plan.count) || 0,
+          metersPerUnit: Number(plan.metersPerUnit) || 0,
+        },
+      });
+    }
+
+    // Create new drilling plans
+    for (const plan of normalized.drillingPlans) {
+      await tx.siteDrillingPlan.create({
+        data: {
+          siteId,
+          diameter: Number(plan.diameter) || 0,
+          count: Number(plan.count) || 0,
+          metersPerUnit: Number(plan.metersPerUnit) || 0,
+        },
+      });
+    }
+
+    return tx.site.findUnique({
+      where: { id: siteId },
+      include: {
+        pilePlans: { include: { pileGrade: true } },
+        drillingPlans: true,
+      },
+    });
+  });
+}
+
+// ────────────────────────────────────────────
 // User–Site assignments
 // ────────────────────────────────────────────
 

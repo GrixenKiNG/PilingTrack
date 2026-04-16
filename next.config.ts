@@ -17,6 +17,17 @@ const nextConfig: NextConfig = {
   // Security + cache headers
   async headers() {
     return [
+      // PDF endpoint — allow framing for inline preview
+      {
+        source: "/api/reports/single-pdf/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self'",
+          },
+        ],
+      },
       // Global security headers for all routes
       {
         source: "/(.*)",
@@ -43,7 +54,7 @@ const nextConfig: NextConfig = {
               "connect-src 'self' https: ws: wss:",
               "media-src 'self'",
               "object-src 'none'",
-              "frame-ancestors 'none'",
+              "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",
               "frame-src 'self' blob:",

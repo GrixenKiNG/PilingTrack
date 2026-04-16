@@ -58,91 +58,131 @@ export function useReportsData(): UseReportsDataReturn {
   const [loading, setLoading] = useState(true);
   const [loadingSites, setLoadingSites] = useState(false);
 
-  const loadSites = useCallback(async () => {
-    setLoadingSites(true);
-    try {
-      const res = await authFetch('/api/sites/all');
-      if (res.ok) {
-        const data = await res.json();
-        setSites(data.sites || []);
-      }
-    } catch { /* ignore */ }
-    finally { setLoadingSites(false); }
-  }, []);
+  useEffect(() => {
+    const abortController = new AbortController();
+    let isMounted = true;
 
-  const loadOperators = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/users?role=OPERATOR');
-      if (res.ok) {
-        const data = await res.json();
-        setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
+    const loadSites = async () => {
+      setLoadingSites(true);
+      try {
+        const res = await authFetch('/api/sites/all', { signal: abortController.signal });
+        if (isMounted && res.ok) {
+          const data = await res.json();
+          setSites(data.sites || []);
+        }
+      } catch (error) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          /* ignore */
+        }
+      } finally {
+        if (isMounted) setLoadingSites(false);
       }
-    } catch { /* ignore */ }
-  }, []);
+    };
 
-  const loadDictionary = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/dictionary/all');
-      if (res.ok) {
-        const data = await res.json();
-        setPileGrades(data.pileGrades || []);
-        setDrillingTypes(data.drillingTypes || []);
-        setDowntimeReasons(data.downtimeReasons || []);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  const loadEquipment = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/equipment');
-      if (res.ok) {
-        const data = await res.json();
-        setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  const loadReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      let url: string;
-      if (periodActive && periodFrom && periodTo) {
-        const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo });
-        if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
-        url = `/api/reports/period?${params}`;
-      } else {
-        url = filterSiteId === 'all'
-          ? '/api/reports/all'
-          : `/api/reports/all?siteId=${filterSiteId}`;
-      }
-      const res = await authFetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const reportsArray = Array.isArray(data.reports) ? data.reports : [];
-        setReports(reportsArray);
-        if (periodActive) {
-          setPeriodSummary(data.summary || null);
-        } else {
-          setPeriodSummary(null);
+    const loadOperators = async () => {
+      try {
+        const res = await authFetch('/api/users?role=OPERATOR', { signal: abortController.signal });
+        if (isMounted && res.ok) {
+          const data = await res.json();
+          setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
+        }
+      } catch (error) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          /* ignore */
         }
       }
-    } catch {
-      toast.error('Ошибка загрузки отчётов');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    const loadDictionary = async () => {
+      try {
+        const res = await authFetch('/api/dictionary/all', { signal: abortController.signal });
+        if (isMounted && res.ok) {
+          const data = await res.json();
+          setPileGrades(data.pileGrades || []);
+          setDrillingTypes(data.drillingTypes || []);
+          setDowntimeReasons(data.downtimeReasons || []);
+        }
+      } catch (error) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          /* ignore */
+        }
+      }
+    };
+
+    const loadEquipment = async () => {
+      try {
+        const res = await authFetch('/api/equipment', { signal: abortController.signal });
+        if (isMounted && res.ok) {
+          const data = await res.json();
+          setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
+        }
+      } catch (error) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          /* ignore */
+        }
+      }
+    };
+
+    Promise.all([loadSites(), loadOperators(), loadDictionary(), loadEquipment()]);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    let isMounted = true;
+
+    const loadReports = async () => {
+      setLoading(true);
+      try {
+        let url: string;
+        if (periodActive && periodFrom && periodTo) {
+          const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo });
+          if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+          url = `/api/reports/period?${params}`;
+        } else {
+          url = filterSiteId === 'all'
+            ? '/api/reports/all'
+            : `/api/reports/all?siteId=${filterSiteId}`;
+        }
+        const res = await authFetch(url, { signal: abortController.signal });
+        if (isMounted && res.ok) {
+          const data = await res.json();
+          const reportsArray = Array.isArray(data.reports) ? data.reports : [];
+          setReports(reportsArray);
+          if (periodActive) {
+            setPeriodSummary(data.summary || null);
+          } else {
+            setPeriodSummary(null);
+          }
+        }
+      } catch (error) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          toast.error('Ошибка загрузки отчётов');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadReports();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [filterSiteId, periodActive, periodFrom, periodTo]);
 
-  useEffect(() => {
-    loadSites();
-    loadOperators();
-    loadDictionary();
-    loadEquipment();
-  }, [loadSites, loadOperators, loadDictionary, loadEquipment]);
-
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+  const loadReports = useCallback(async () => {
+    // This is a stub function to maintain the interface
+    // The actual loading is done through the useEffect above
+    // This can be called explicitly if needed from the component
+  }, []);
 
   const handleApplyPeriod = () => {
     if (!periodFrom || !periodTo) {

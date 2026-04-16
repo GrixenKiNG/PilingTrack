@@ -104,7 +104,7 @@ export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
       actorRole: input.actor?.role || null,
       targetId: input.targetId || null,
       requestId: input.requestId || null,
-      metadata: (input.metadata as Prisma.InputJsonValue | undefined) || undefined,
+      metadata: (input.metadata as any) || undefined,
     },
   });
 }

@@ -123,10 +123,10 @@ export function ensureHandlersRegistered() {
           handlersRegistered = true;
         })
         .catch(() => {
-          // Handlers not available yet вЂ” will be registered on first event
+          // Handlers not available yet - will be registered on first event
         });
     } catch {
-      // Handlers not available yet — will be registered on first event
+      // Handlers not available yet - will be registered on first event
     }
   }
 }

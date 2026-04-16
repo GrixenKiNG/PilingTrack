@@ -41,9 +41,10 @@ export async function listAllEquipment(pagination?: CursorPaginationResult, site
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
   const where: Record<string, unknown> = {};
-  if (siteId) {
-    where.crews = { some: { siteId } };
-  }
+  
+  // Always include all equipment, but optionally filter by associated sites via crews
+  // Don't filter if siteId is provided - return all equipment as it can be assigned to any site
+  
   return db.equipment.findMany({
     where,
     select: { id: true, name: true, model: true, qty: true, isActive: true },

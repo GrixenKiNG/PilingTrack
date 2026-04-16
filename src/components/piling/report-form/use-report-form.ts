@@ -173,7 +173,7 @@ export function useReportForm(): UseReportFormReturn {
     authFetch(`/api/sites/${siteId}`)
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data?.site) setSiteTree(data.site); })
-      .catch((err) => console.error('[ReportForm] Failed to load site tree:', err));
+      .catch(() => toast.error('Не удалось загрузить план объекта'));
   }, []);
 
   useEffect(() => { loadSiteTree(selectedSiteId); }, [selectedSiteId, loadSiteTree]);

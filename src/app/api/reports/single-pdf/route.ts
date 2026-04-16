@@ -154,9 +154,16 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   const searchParams = request.nextUrl.searchParams;
+  const reportId = searchParams.get('reportId');
   const sync = searchParams.get('sync');
+  const inline = searchParams.get('inline');
 
-  // --- Sync fallback ---
+  // --- If reportId is provided, generate synchronously for preview/download ---
+  if (reportId) {
+    return handleSyncGeneration(request, user!);
+  }
+
+  // --- Explicit sync fallback ---
   if (sync === '1') {
     return handleSyncGeneration(request, user!);
   }
@@ -268,6 +275,8 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
         'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="pilingtrack-report-${safeDate}.pdf"`,
         'Content-Length': String(pdfBuffer.length),
         'x-request-id': requestId,
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Content-Security-Policy': "frame-ancestors 'self'",
       },
     });
   } catch (caughtError) {

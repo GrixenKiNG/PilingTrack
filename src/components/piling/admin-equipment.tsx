@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Wrench,
@@ -65,38 +65,54 @@ export function AdminEquipment() {
   // Toggle
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [equipRes, crewsRes] = await Promise.all([
-        authFetch('/api/equipment'),
-        authFetch('/api/crews'),
-      ]);
-      if (equipRes.ok) {
-        const data = await equipRes.json();
-        setEquipment(data.data || data.equipment || []);
-      }
-      if (crewsRes.ok) {
-        const data = await crewsRes.json();
-        const crews = data.data || data.crews || [];
-        const counts: Record<string, number> = {};
-        crews.forEach((c: { equipmentId: string; isActive: boolean }) => {
-          if (c.isActive) {
-            counts[c.equipmentId] = (counts[c.equipmentId] || 0) + 1;
-          }
-        });
-        setCrewsByEquipment(counts);
-      }
-    } catch {
-      toast.error('Ошибка загрузки данных');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    const abortController = new AbortController();
+    let isMounted = true;
+
+    const loadData = async () => {
+      if (!isMounted) return;
+      setLoading(true);
+      try {
+        const [equipRes, crewsRes] = await Promise.all([
+          authFetch('/api/equipment', { signal: abortController.signal }),
+          authFetch('/api/crews', { signal: abortController.signal }),
+        ]);
+        
+        if (!isMounted) return;
+
+        if (equipRes.ok) {
+          const data = await equipRes.json();
+          setEquipment(data.data || data.equipment || []);
+        }
+        if (crewsRes.ok) {
+          const data = await crewsRes.json();
+          const crews = data.data || data.crews || [];
+          const counts: Record<string, number> = {};
+          crews.forEach((c: { equipmentId: string; isActive: boolean }) => {
+            if (c.isActive) {
+              counts[c.equipmentId] = (counts[c.equipmentId] || 0) + 1;
+            }
+          });
+          setCrewsByEquipment(counts);
+        }
+      } catch (error: unknown) {
+        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          toast.error('Ошибка загрузки данных');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, []);
 
   // === CREATE ===
   const openCreateDialog = () => {

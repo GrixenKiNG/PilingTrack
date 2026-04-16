@@ -7,6 +7,8 @@ export type CrewDomainEventType =
   | 'CrewUpdated'
   | 'CrewAssigned'
   | 'CrewUnassigned'
+  | 'CrewOperatorAssigned'
+  | 'CrewEquipmentAssigned'
   | 'CrewDeactivated'
   | 'CrewReactivated';
 

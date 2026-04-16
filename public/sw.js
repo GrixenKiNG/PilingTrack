@@ -64,6 +64,9 @@ self.addEventListener('fetch', (event) => {
   // Skip non-http(s) requests
   if (!request.url.startsWith('http')) return;
 
+  // Only handle same-origin requests — ignore all external domains
+  if (url.origin !== self.location.origin) return;
+
   // Mutation requests (POST/PUT/DELETE/PATCH)
   if (request.method !== 'GET') {
     if (request.url.includes('/api/')) {
@@ -314,29 +317,52 @@ async function runBackgroundSync() {
  */
 async function getQueuedChanges() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('pilingtrack-sync');
+    const request = indexedDB.open('pilingtrack-sync', 2);
 
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction('syncQueue', 'readonly');
-      const store = tx.objectStore('syncQueue');
-      const getAll = store.getAll();
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('syncQueue')) {
+        db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
+      }
+    };
 
-      getAll.onsuccess = () => {
-        const entries = getAll.result.filter(e => e.status === 'pending');
-        resolve(JSON.stringify({
-          deviceId: '', // Will be read from syncState
-          changes: entries.map(e => ({
-            entity: e.entity,
-            op: e.op,
-            data: e.data,
-            baseVersion: e.baseVersion,
-            opId: e.opId,
-          })),
-        }));
-      };
-      getAll.onerror = () => reject(getAll.error);
+    request.onsuccess = () => {
+      try {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('syncQueue')) {
+          // Fallback: if object store still doesn't exist, close and reject
+          db.close();
+          reject(new Error('syncQueue object store not found'));
+          return;
+        }
+        
+        const tx = db.transaction('syncQueue', 'readonly');
+        const store = tx.objectStore('syncQueue');
+        const getAll = store.getAll();
+
+        getAll.onsuccess = () => {
+          const entries = getAll.result.filter(e => e.status === 'pending');
+          db.close();
+          resolve(JSON.stringify({
+            deviceId: '', // Will be read from syncState
+            changes: entries.map(e => ({
+              entity: e.entity,
+              op: e.op,
+              data: e.data,
+              baseVersion: e.baseVersion,
+              opId: e.opId,
+            })),
+          }));
+        };
+        getAll.onerror = () => {
+          db.close();
+          reject(getAll.error);
+        };
+      } catch (error) {
+        reject(error);
+      }
     };
   });
 }

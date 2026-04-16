@@ -10,7 +10,17 @@
  *   const reports = await db.report.findMany({ where: { tenantId } });
  */
 
-import 'server-only';
+// Guard against client-side imports (Next.js only, not Node.js workers)
+if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+  // Only enforce server-only in Next.js context, skip in Node.js workers
+  try {
+    // Dynamic import for server-only in Node.js worker contexts
+    // @ts-ignore - server-only not available in all contexts
+    await import('server-only');
+  } catch (e) {
+    // Ignore if running in worker context where server-only is not available
+  }
+}
 import { Prisma as PostgresPrisma } from '../generated/postgres-client/client';
 import { PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
 

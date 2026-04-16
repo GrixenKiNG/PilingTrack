@@ -139,10 +139,23 @@ export function AdminUsers() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      // Load first page (50 users by default)
       const res = await authFetch('/api/users');
       if (res.ok) {
         const data = await res.json();
-        setUsers(data.users || []);
+        let allUsers = data.users || [];
+        // If there's a nextCursor, load remaining pages
+        if (data.nextCursor) {
+          let cursor = data.nextCursor;
+          while (cursor) {
+            const nextRes = await authFetch(`/api/users?cursor=${cursor}`);
+            if (!nextRes.ok) break;
+            const nextData = await nextRes.json();
+            allUsers = allUsers.concat(nextData.users || []);
+            cursor = nextData.nextCursor || null;
+          }
+        }
+        setUsers(allUsers);
       }
     } catch {
       toast.error('Ошибка загрузки пользователей');

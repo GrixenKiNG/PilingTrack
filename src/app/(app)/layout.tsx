@@ -264,8 +264,25 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const currentUser = usePilingStore((s) => s.currentUser);
+  
+  if (currentUser?.role === 'ADMIN' || currentUser?.role === 'DISPATCHER') {
+    return (
+      <AppErrorBoundary>
+        <AdminLayout>{children}</AdminLayout>
+      </AppErrorBoundary>
+    );
+  }
+
+  return (
+    <AppErrorBoundary>
+      <OperatorLayout>{children}</OperatorLayout>
+    </AppErrorBoundary>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [bootstrapping, setBootstrapping] = useState(true);
 
@@ -304,6 +321,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
+  // Get current user for redirect check
+  const currentUser = usePilingStore((s) => s.currentUser);
+
+  // Redirect to login if session check finished but no user found
+  useEffect(() => {
+    if (!bootstrapping && !currentUser) {
+      router.replace('/login');
+    }
+  }, [bootstrapping, currentUser, router]);
+
   if (bootstrapping) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -317,27 +344,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  useEffect(() => {
-    if (!bootstrapping && !currentUser) {
-      router.replace('/login');
-    }
-  }, [bootstrapping, currentUser, router]);
-
   if (!currentUser) {
     return null;
   }
 
-  if (currentUser.role === 'ADMIN' || currentUser.role === 'DISPATCHER') {
-    return (
-      <AppErrorBoundary>
-        <AdminLayout>{children}</AdminLayout>
-      </AppErrorBoundary>
-    );
-  }
-
-  return (
-    <AppErrorBoundary>
-      <OperatorLayout>{children}</OperatorLayout>
-    </AppErrorBoundary>
-  );
+  return <AppLayoutContent>{children}</AppLayoutContent>;
 }
