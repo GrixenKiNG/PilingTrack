@@ -7,17 +7,18 @@ import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { loginSchema } from '@/lib/validation-schemas';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
+import { withApi } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const requestId = getRequestId(request);
+export const POST = withApi(
+  async (request: NextRequest) => {
+    const requestId = getRequestId(request);
 
-  try {
     const body = await request.json();
     const tenantContext = resolveTenantContext(request);
-    
+
     // Zod validation
     const validation = loginSchema.safeParse(body);
     if (!validation.success) {
@@ -75,8 +76,6 @@ export async function POST(request: NextRequest) {
     });
 
     return await createAuthenticatedResponse(result.user, requestId);
-  } catch (error) {
-    console.error('Login error:', error);
-    return createJsonResponse({ error: 'Internal error', requestId }, { status: 500 }, requestId);
-  }
-}
+  },
+  { domain: 'auth' }
+);

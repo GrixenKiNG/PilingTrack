@@ -17,14 +17,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { schemaRegistry, registerAllEventSchemas } from '@/core/event-bus/schema-registry';
+import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
+export const GET = withApi(
+  async (request: NextRequest) => {
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  try {
     assertCan(user!, 'system.read');
 
     // Ensure schemas are registered
@@ -33,8 +34,6 @@ export async function GET(request: NextRequest) {
     const schemas = schemaRegistry.getAllSchemas();
 
     return NextResponse.json({ schemas });
-  } catch (caughtError) {
-    const message = caughtError instanceof Error ? caughtError.message : 'Internal error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+  },
+  { domain: 'system' }
+);

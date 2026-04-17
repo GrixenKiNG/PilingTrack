@@ -50,7 +50,6 @@ export const PUT = withMutation(
         name: validated.data.name,
         plannedPiles: validated.data.plannedPiles,
         plannedDrilling: validated.data.plannedDrilling,
-        completionDate: validated.data.completionDate,
         pilePlans: validated.data.pilePlans,
         drillingPlans: validated.data.drillingPlans,
       });
@@ -61,7 +60,6 @@ export const PUT = withMutation(
         name: validated.data.name,
         plannedPiles: validated.data.plannedPiles,
         plannedDrilling: validated.data.plannedDrilling,
-        completionDate: validated.data.completionDate,
         userId: user!.id,
       });
     }

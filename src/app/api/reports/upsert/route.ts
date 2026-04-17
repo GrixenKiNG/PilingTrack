@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
-import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import {
   assertCanActForUser,
@@ -11,151 +9,88 @@ import {
 import { ServiceError } from '@/services/service-error';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
-import { withDbProtection, databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
+import { withMutation } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
+export const POST = withMutation(
+  async (request: NextRequest) => {
+    const requestId = getRequestId(request);
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
 
-  const MUTATION_RATE_LIMIT = {
-    maxAttempts: 100,
-    windowMs: 60_000,
-    blockDurationMs: 60_000,
-  };
+    const dto = await request.json();
 
-  const identifier = getRateLimitIdentifier(request);
-  const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
-    );
-  }
-
-  const requestId = getRequestId(request);
-  const { user, error } = await requireAuth(request);
-  if (error) return error;
-
-  try {
-    return await withDbProtection(async () => {
-      const dto = await request.json();
-
-      // Zod validation
-      const validation = reportUpsertSchema.safeParse(dto);
-      if (!validation.success) {
-        await recordFeedbackEvent({
-          level: 'warn',
-          scope: 'reports',
-          action: 'report.validation_failed',
-          title: 'Отчёт не сохранён',
-          message: 'Проверка данных отчёта завершилась ошибкой валидации.',
-          audience: 'OPERATIONS',
-          actor: { id: user!.id, name: user!.name, role: user!.role },
-          requestId,
-          metadata: {
-            issues: validation.error.issues.map((issue) => ({
-              field: issue.path.join('.'),
-              message: issue.message,
-            })),
-          },
-        });
-
-        return createJsonResponse(
-          { error: 'Validation failed', requestId, details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
-          { status: 400 },
-          requestId
-        );
-      }
-
-      const validatedDto = validation.data;
-      const requestedUserId = validatedDto.userId ?? user!.id;
-
-      assertCanActForUser(user!, requestedUserId);
-
-      const result = await upsertReport(
-        {
-          reportId: validatedDto.reportId || validatedDto.id || crypto.randomUUID(),
-          siteId: validatedDto.siteId,
-          userId: resolveReportUserId(user!, requestedUserId),
-          date: validatedDto.date,
-          shiftType: validatedDto.shiftType,
-          shiftStart: validatedDto.shiftStart,
-          shiftEnd: validatedDto.shiftEnd,
-          equipmentId: validatedDto.equipmentId,
-          piles: validatedDto.piles,
-          drillings: validatedDto.drillings,
-          downtimes: validatedDto.downtimes,
-        },
-        { enforceEditWindow: true, actor: user! }
-      );
-
+    // Zod validation
+    const validation = reportUpsertSchema.safeParse(dto);
+    if (!validation.success) {
       await recordFeedbackEvent({
-        level: 'success',
+        level: 'warn',
         scope: 'reports',
-        action: result._action === 'updated' ? 'report.submit.updated' : 'report.submit.created',
-        title: result._action === 'updated' ? 'Отчёт обновлён' : 'Отчёт отправлен',
-        message:
-          result._action === 'updated'
-            ? 'Производственный отчёт был успешно обновлён.'
-            : 'Новый производственный отчёт был успешно сохранён.',
+        action: 'report.validation_failed',
+        title: 'Отчёт не сохранён',
+        message: 'Проверка данных отчёта завершилась ошибкой валидации.',
         audience: 'OPERATIONS',
         actor: { id: user!.id, name: user!.name, role: user!.role },
-        targetId: result.report.reportId,
         requestId,
         metadata: {
-          siteId: result.report.siteId,
-          reportDate: result.report.date,
+          issues: validation.error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
         },
       });
 
-      return createJsonResponse({ report: result, requestId }, { status: 200 }, requestId);
-    });
-  } catch (caughtError) {
-    if (caughtError instanceof CircuitOpenError) {
-      const retryAfterSec = Math.ceil(caughtError.retryAfterMs / 1000);
-      return NextResponse.json(
-        {
-          error: 'Database temporarily unavailable',
-          requestId,
-          retryAfter: retryAfterSec,
-        },
-        {
-          status: 503,
-          headers: {
-            'Retry-After': String(retryAfterSec),
-          },
-        }
+      return createJsonResponse(
+        { error: 'Validation failed', requestId, details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
+        { status: 400 },
+        requestId
       );
     }
 
-    if (caughtError instanceof ServiceError) {
-      await recordFeedbackEvent({
-        level: caughtError.status >= 500 ? 'error' : 'warn',
-        scope: 'reports',
-        action: 'report.submit.failed',
-        title: 'Ошибка сохранения отчёта',
-        message: caughtError.message,
-        audience: 'OPERATIONS',
-        actor: { id: user!.id, name: user!.name, role: user!.role },
-        requestId,
-      });
-      return createJsonResponse({ error: caughtError.message, requestId }, { status: caughtError.status }, requestId);
-    }
+    const validatedDto = validation.data;
+    const requestedUserId = validatedDto.userId ?? user!.id;
 
-    const message = caughtError instanceof Error ? caughtError.message : 'Internal error';
+    assertCanActForUser(user!, requestedUserId);
+
+    const result = await upsertReport(
+      {
+        reportId: validatedDto.reportId || validatedDto.id || crypto.randomUUID(),
+        siteId: validatedDto.siteId,
+        userId: resolveReportUserId(user!, requestedUserId),
+        date: validatedDto.date,
+        shiftType: validatedDto.shiftType,
+        shiftStart: validatedDto.shiftStart,
+        shiftEnd: validatedDto.shiftEnd,
+        equipmentId: validatedDto.equipmentId,
+        piles: validatedDto.piles,
+        drillings: validatedDto.drillings,
+        downtimes: validatedDto.downtimes,
+      },
+      { enforceEditWindow: true, actor: user! }
+    );
+
     await recordFeedbackEvent({
-      level: 'error',
+      level: 'success',
       scope: 'reports',
-      action: 'report.submit.failed',
-      title: 'Внутренняя ошибка сохранения отчёта',
-      message,
+      action: result._action === 'updated' ? 'report.submit.updated' : 'report.submit.created',
+      title: result._action === 'updated' ? 'Отчёт обновлён' : 'Отчёт отправлен',
+      message:
+        result._action === 'updated'
+          ? 'Производственный отчёт был успешно обновлён.'
+          : 'Новый производственный отчёт был успешно сохранён.',
       audience: 'OPERATIONS',
       actor: { id: user!.id, name: user!.name, role: user!.role },
+      targetId: result.report.reportId,
       requestId,
+      metadata: {
+        siteId: result.report.siteId,
+        reportDate: result.report.date,
+      },
     });
-    return createJsonResponse({ error: message, requestId }, { status: 500 }, requestId);
-  }
-}
+
+    return createJsonResponse({ report: result, requestId }, { status: 200 }, requestId);
+  },
+  { domain: 'reports' }
+);
