@@ -44,15 +44,25 @@ export function AdminReports() {
       const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
       const res = await authFetch(`/api/reports/pdf?${params}`);
-      if (!res.ok) throw new Error('Ошибка генерации PDF');
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(`Ошибка генерации PDF (${res.status}): ${msg.slice(0, 200)}`);
+      }
       const blob = await res.blob();
+      if (blob.size === 0 || blob.type.indexOf('pdf') === -1) {
+        throw new Error('Сервер вернул пустой или неверный PDF');
+      }
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `pilingtrack-report-${periodFrom}-${periodTo}.pdf`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch { /* toast handled elsewhere */ }
-    finally { setGeneratingPdf(false); }
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        const a = document.createElement('a');
+        a.href = url; a.download = `pilingtrack-report-${periodFrom}-${periodTo}.pdf`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось сформировать PDF');
+    } finally { setGeneratingPdf(false); }
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
