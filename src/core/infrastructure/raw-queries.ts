@@ -12,6 +12,7 @@
 
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // DTOs for raw SQL results (not Prisma models — SQL returns different shape)
@@ -87,7 +88,7 @@ export async function getReportsByPeriodRaw(
 
   const elapsed = Date.now() - start;
   if (elapsed > 100) {
-    console.warn(`[RawQuery] getReportsByPeriod slow: ${elapsed}ms`);
+    logger.warn('RawQuery: getReportsByPeriod slow', { elapsedMs: elapsed });
   }
 
   return reports;
@@ -143,7 +144,7 @@ export async function getSiteDailySummaryRaw(
 
   const elapsed = Date.now() - start;
   if (elapsed > 50) {
-    console.warn(`[RawQuery] getSiteDailySummary slow: ${elapsed}ms`);
+    logger.warn('RawQuery: getSiteDailySummary slow', { elapsedMs: elapsed });
   }
 
   return summary;
@@ -191,7 +192,7 @@ export async function getCrewsWithDetailsRaw(
 
   const elapsed = Date.now() - start;
   if (elapsed > 50) {
-    console.warn(`[RawQuery] getCrewsWithDetails slow: ${elapsed}ms`);
+    logger.warn('RawQuery: getCrewsWithDetails slow', { elapsedMs: elapsed });
   }
 
   return crews;
@@ -241,7 +242,7 @@ export async function upsertReportRaw(params: {
 
   const elapsed = Date.now() - start;
   if (elapsed > 20) {
-    console.warn(`[RawQuery] upsertReport slow: ${elapsed}ms`);
+    logger.warn('RawQuery: upsertReport slow', { elapsedMs: elapsed });
   }
 
   return report[0];
@@ -270,7 +271,7 @@ export async function incrementReportCountersRaw(
 
   const elapsed = Date.now() - start;
   if (elapsed > 10) {
-    console.warn(`[RawQuery] incrementCounters slow: ${elapsed}ms`);
+    logger.warn('RawQuery: incrementCounters slow', { elapsedMs: elapsed });
   }
 }
 
@@ -300,7 +301,7 @@ export async function bulkDeleteReportsRaw(reportIds: string[]): Promise<number>
 
   const elapsed = Date.now() - start;
   if (elapsed > 100) {
-    console.warn(`[RawQuery] bulkDeleteReports slow: ${elapsed}ms, count: ${reportIds.length}`);
+    logger.warn('RawQuery: bulkDeleteReports slow', { elapsedMs: elapsed, count: reportIds.length });
   }
 
   return result as number;

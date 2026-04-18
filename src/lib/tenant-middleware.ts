@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 /**
  * Extract tenant ID from user session or request.
@@ -45,7 +46,7 @@ export async function setTenantContext(tenantId: string): Promise<void> {
     await db.$executeRaw`SET app.tenant_id = ${tenantId}::uuid`;
   } catch (error) {
     // If RLS is not configured, log warning but don't fail
-    console.warn('[Tenant Context] Failed to set tenant context:', error);
+    logger.warn('Tenant context: failed to set tenant context', { error: error instanceof Error ? error.message : String(error) });
   }
 }
 

@@ -10,6 +10,7 @@ import {
   type SessionUser,
 } from '@/services/auth/session-service';
 import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT } from '@/lib/rate-limiter';
+import { logger } from '@/lib/logger';
 
 const BCRYPT_ROUNDS = 12;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
@@ -160,7 +161,7 @@ export async function authenticateUserByEmailPassword(email: string, password: s
     await rateLimiter.reset(email.toLowerCase());
     return { user: toSessionUser(user), rateLimited: false };
   } catch (err) {
-    console.error('[authenticateUserByEmailPassword] Error:', err);
+    logger.error('authenticateUserByEmailPassword failed', err);
     throw err;
   }
 }
@@ -197,7 +198,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     isActive: boolean;
   } | null = null;
 
-  const indexedCandidate = await (db.user as any).findUnique({
+  const indexedCandidate = await db.user.findUnique({
     where: { pinLookup },
     select: {
       id: true,
@@ -223,7 +224,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
   // Scans only users whose pinLookup is null (backfilled users are excluded
   // from the scan path so repeated PIN logins never re-hit it).
   if (!matchedUser) {
-    const unindexedUsers = await (db.user as any).findMany({
+    const unindexedUsers = await db.user.findMany({
       where: {
         isActive: true,
         pinLookup: null,
@@ -266,7 +267,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     const updateData: Record<string, unknown> = {};
     if (needsBcryptUpgrade) updateData.pin = await hashPin(pin);
     if (needsLookupBackfill) updateData.pinLookup = pinLookup;
-    await (db.user as any).update({
+    await db.user.update({
       where: { id: matchedUser.id },
       data: updateData,
     }).catch(() => {

@@ -36,6 +36,7 @@
  */
 
 import { get, set, del, getRedisClient } from './redis-cache';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // Types
@@ -292,7 +293,7 @@ async function revalidateInBackground<T>(
         set(staleKey, value, { ttl: staleTtl }),
       ]);
     } catch (err) {
-      console.warn('[SWR] Background revalidation failed:', (err as Error).message);
+      logger.warn('SWR: background revalidation failed', { error: (err as Error).message });
       // Keep stale data — don't delete it
     }
   });

@@ -11,6 +11,7 @@ import { join } from 'path';
 import { writeFileSync, unlinkSync, readFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { resolveRuntimeScript } from '@/lib/runtime-scripts';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // Types
@@ -118,14 +119,14 @@ function generatePdfViaScript(scriptName: string, data: unknown): Promise<Buffer
         try {
           unlinkSync(inputTmp);
         } catch (cleanupErr) {
-          console.error('[PDF] cleanup inputTmp error:', cleanupErr);
+          logger.error('PDF: cleanup inputTmp error', cleanupErr);
         }
 
         if (error) {
           try {
             unlinkSync(outputTmp);
           } catch (cleanupErr) {
-            console.error('[PDF] cleanup outputTmp on error:', cleanupErr);
+            logger.error('PDF: cleanup outputTmp on error', cleanupErr);
           }
           const errMsg = stderr ? `: ${stderr}` : `: ${error.message}`;
           reject(new Error(`PDF script error${errMsg}`));
@@ -137,14 +138,14 @@ function generatePdfViaScript(scriptName: string, data: unknown): Promise<Buffer
           try {
             unlinkSync(outputTmp);
           } catch (cleanupErr) {
-            console.error('[PDF] cleanup outputTmp on success:', cleanupErr);
+            logger.error('PDF: cleanup outputTmp on success', cleanupErr);
           }
           resolve(pdfBuffer);
         } catch (readErr) {
           try {
             unlinkSync(outputTmp);
           } catch (cleanupErr) {
-            console.error('[PDF] cleanup outputTmp on read error:', cleanupErr);
+            logger.error('PDF: cleanup outputTmp on read error', cleanupErr);
           }
           reject(new Error(`PDF read error: ${(readErr as Error).message}`));
         }

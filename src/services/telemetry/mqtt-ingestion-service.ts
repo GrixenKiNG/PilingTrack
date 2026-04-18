@@ -18,6 +18,7 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { ingestTelemetry } from '@/services/telemetry/telemetry-ingestion-service';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // Message Schema
@@ -70,7 +71,7 @@ async function handleTelemetryMessage(topic: string, payload: Buffer): Promise<v
   const equipmentId = parts[parts.length - 1];
 
   if (!equipmentId) {
-    console.warn('[MQTT] No equipmentId in topic:', topic);
+    logger.warn('MQTT: no equipmentId in topic', { topic });
     return;
   }
 
@@ -78,13 +79,13 @@ async function handleTelemetryMessage(topic: string, payload: Buffer): Promise<v
   try {
     json = JSON.parse(payload.toString());
   } catch {
-    console.warn('[MQTT] Invalid JSON payload for topic:', topic);
+    logger.warn('MQTT: invalid JSON payload', { topic });
     return;
   }
 
   const validated = telemetryMessageSchema.safeParse(json);
   if (!validated.success) {
-    console.warn('[MQTT] Invalid message schema:', validated.error.flatten());
+    logger.warn('MQTT: invalid message schema', { issues: validated.error.flatten() });
     return;
   }
 
@@ -103,7 +104,7 @@ async function handleTelemetryMessage(topic: string, payload: Buffer): Promise<v
       timestamp: message.timestamp ? new Date(message.timestamp) : undefined,
     });
   } catch (error) {
-    console.error('[MQTT] Failed to ingest telemetry:', error);
+    logger.error('MQTT: failed to ingest telemetry', error);
   }
 }
 
@@ -116,7 +117,7 @@ let mqttClient: unknown = null;
 export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> }> {
   const config = getConfig();
   if (!config) {
-    console.log('[MQTT] No MQTT_BROKER_URL configured, skipping ingestion');
+    logger.info('MQTT: no MQTT_BROKER_URL configured, skipping ingestion');
     return { stop: async () => {} };
   }
 
@@ -127,7 +128,7 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
     // @ts-expect-error mqtt is optional — install with: npm install mqtt
     mqtt = await import('mqtt');
   } catch {
-    console.error('[MQTT] mqtt package not installed. Run: npm install mqtt');
+    logger.error('MQTT: mqtt package not installed. Run: npm install mqtt');
     return { stop: async () => {} };
   }
 
@@ -141,15 +142,15 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
   });
 
   client.on('connect', () => {
-    console.log(`[MQTT] Connected to broker: ${config.brokerUrl}`);
+    logger.info('MQTT: connected to broker', { brokerUrl: config.brokerUrl });
     
     // Subscribe to telemetry topic with wildcard
     const topic = `${config.topicPrefix}/#`;
     client.subscribe(topic, { qos: config.qos }, (err: Error | null) => {
       if (err) {
-        console.error('[MQTT] Failed to subscribe:', err);
+        logger.error('MQTT: failed to subscribe', err);
       } else {
-        console.log(`[MQTT] Subscribed to: ${topic}`);
+        logger.info('MQTT: subscribed', { topic });
       }
     });
   });
@@ -157,22 +158,22 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
   client.on('message', handleTelemetryMessage);
 
   client.on('error', (error: Error) => {
-    console.error('[MQTT] Client error:', error);
+    logger.error('MQTT: client error', error);
   });
 
   client.on('reconnect', () => {
-    console.log('[MQTT] Reconnecting...');
+    logger.info('MQTT: reconnecting');
   });
 
   client.on('close', () => {
-    console.log('[MQTT] Connection closed');
+    logger.info('MQTT: connection closed');
   });
 
   mqttClient = client;
 
   return {
     stop: async () => {
-      console.log('[MQTT] Stopping ingestion...');
+      logger.info('MQTT: stopping ingestion');
       await new Promise<void>((resolve) => {
         client.end(() => resolve());
       });

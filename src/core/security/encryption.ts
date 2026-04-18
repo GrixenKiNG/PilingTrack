@@ -14,6 +14,7 @@
  */
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { logger } from '@/lib/logger';
 
 const CIPHER_ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // 128 bits
@@ -42,9 +43,7 @@ function getEncryptionKey(): Buffer {
 
   // Development fallback — generate and warn
   if (process.env.NODE_ENV !== 'production') {
-    console.warn(
-      '⚠️  ENCRYPTION_KEY not set. Generating random key — encrypted data will not survive restart!'
-    );
+    logger.warn('ENCRYPTION_KEY not set. Generating random key — encrypted data will not survive restart');
     cachedKey = randomBytes(KEY_LENGTH);
     return cachedKey;
   }

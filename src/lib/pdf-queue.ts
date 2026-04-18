@@ -17,6 +17,7 @@
 import { Queue, Job, QueueEvents } from 'bullmq';
 import { Redis } from 'ioredis';
 import { readPdfResult } from '@/lib/pdf-generator';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // Configuration
@@ -161,7 +162,7 @@ export interface PdfJobResult {
 export async function enqueuePdfGeneration(jobData: PdfJobData): Promise<string | null> {
   const available = await checkRedisAvailability();
   if (!available) {
-    console.warn('[PDF Queue] Redis unavailable, enqueuePdfGeneration returns null — use sync fallback');
+    logger.warn('PDF Queue: Redis unavailable, enqueuePdfGeneration returns null — use sync fallback');
     return null;
   }
 
@@ -172,7 +173,7 @@ export async function enqueuePdfGeneration(jobData: PdfJobData): Promise<string 
     });
     return job.id as string;
   } catch (err) {
-    console.error('[PDF Queue] Failed to enqueue job:', err);
+    logger.error('PDF Queue: failed to enqueue job', err);
     return null;
   }
 }

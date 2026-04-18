@@ -36,6 +36,7 @@ if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
 }
 import { Redis, RedisOptions } from 'ioredis';
 import { redisCircuitBreaker } from '@/core/infrastructure/circuit-breakers';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // Configuration
@@ -69,15 +70,15 @@ export async function getRedisClient(): Promise<Redis | null> {
     redisClient = new Redis(REDIS_URL, getRedisOptions());
 
     redisClient.on('error', (err) => {
-      console.error('[Redis] Connection error:', err.message);
+      logger.error('Redis: connection error', err);
     });
 
     redisClient.on('connect', () => {
-      console.log('[Redis] Connected');
+      logger.info('Redis: connected');
     });
 
     redisClient.on('ready', () => {
-      console.log('[Redis] Ready');
+      logger.info('Redis: ready');
     });
 
     await redisClient.connect();
@@ -240,7 +241,7 @@ export async function invalidatePattern(pattern: string): Promise<number> {
       deleted += keys.length;
     }
   } catch (err) {
-    console.warn('[Cache] Pattern invalidation failed:', (err as Error).message);
+    logger.warn('Cache: pattern invalidation failed', { error: (err as Error).message });
   }
 
   return deleted;

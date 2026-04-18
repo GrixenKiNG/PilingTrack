@@ -7,6 +7,7 @@ import { ServiceError } from '@/services/service-error';
 import { CrewAggregate } from '../../domain';
 import { getCrewRepository } from '../../infrastructure';
 import { CreateCrewCommand, UpdateCrewCommand, DeleteCrewCommand } from './crew.command';
+import { logger } from '@/lib/logger';
 
 export async function createCrew(command: CreateCrewCommand) {
   // Validate required fields before creating aggregate
@@ -68,7 +69,7 @@ export async function createCrew(command: CreateCrewCommand) {
     if (message.includes('FOREIGN KEY')) {
       throw new ServiceError('Invalid crew dependencies', 400);
     }
-    console.error('[CrewCommand] Failed to save crew:', error);
+    logger.error('CrewCommand: failed to save crew', error);
     throw new ServiceError('Failed to create crew', 500);
   }
 

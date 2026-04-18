@@ -16,6 +16,7 @@ import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client/client';
 import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
 import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
+import { logger } from '@/lib/logger';
 
 export interface TelemetryBufferConfig {
   maxBufferSize?: number;
@@ -53,7 +54,7 @@ export class TelemetryBuffer {
     // Periodic flush
     this.flushTimer = setInterval(() => {
       this.flush().catch((err) => {
-        console.error('[TelemetryBuffer] Periodic flush error:', err);
+        logger.error('TelemetryBuffer: periodic flush error', err);
       });
     }, this.flushIntervalMs);
 
@@ -85,10 +86,7 @@ export class TelemetryBuffer {
       // If circuit is OPEN, drop oldest to make room
       if (this.circuitBreaker.getState() === 'OPEN') {
         this.dropOldest(Math.ceil(this.maxBufferSize * 0.25)); // drop 25%
-        console.warn(
-          '[TelemetryBuffer] Circuit breaker OPEN — dropped oldest records, buffer size:',
-          this.buffer.length
-        );
+        logger.warn('TelemetryBuffer: circuit breaker OPEN, dropped oldest records', { bufferSize: this.buffer.length });
       } else {
         await this.flush();
       }
@@ -142,18 +140,14 @@ export class TelemetryBuffer {
           this.buffer = [...remaining, ...this.buffer];
           droppedCount += batch.length;
           this.totalDropped += batch.length;
-          console.warn(
-            '[TelemetryBuffer] Circuit breaker OPEN — dropping batch of',
-            batch.length,
-            'records'
-          );
+          logger.warn('TelemetryBuffer: circuit breaker OPEN, dropping batch', { batchSize: batch.length });
           break;
         }
 
         // Other DB error — re-queue and log
         const remaining = recordsToFlush.slice(i + this.maxBatchSize);
         this.buffer = [...remaining, ...this.buffer];
-        console.error('[TelemetryBuffer] Flush error:', error);
+        logger.error('TelemetryBuffer: flush error', error);
         break;
       }
     }
@@ -161,12 +155,7 @@ export class TelemetryBuffer {
     this.totalFlushed += flushedCount;
 
     if (flushedCount > 0) {
-      console.debug(
-        '[TelemetryBuffer] Flushed',
-        flushedCount,
-        'records, dropped:',
-        droppedCount
-      );
+      logger.debug('TelemetryBuffer: flushed records', { flushedCount, droppedCount });
     }
   }
 
@@ -212,9 +201,9 @@ export class TelemetryBuffer {
    */
   async shutdown(): Promise<void> {
     clearInterval(this.flushTimer);
-    console.log('[TelemetryBuffer] Shutting down, flushing', this.buffer.length, 'records...');
+    logger.info('TelemetryBuffer: shutting down, flushing', { pending: this.buffer.length });
     await this.flush();
-    console.log('[TelemetryBuffer] Shutdown complete. Stats:', this.getStats());
+    logger.info('TelemetryBuffer: shutdown complete', this.getStats());
   }
 
   /**

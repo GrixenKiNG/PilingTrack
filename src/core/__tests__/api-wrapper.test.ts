@@ -144,10 +144,9 @@ describe('withApi', () => {
     );
     await handler(mockRequest());
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      '[API reports]',
-      expect.any(Error)
-    );
+    const logged = consoleSpy.mock.calls.map(c => String(c[0])).join('');
+    expect(logged).toContain('"domain":"reports"');
+    expect(logged).toContain('"error":"fail"');
     consoleSpy.mockRestore();
   });
 

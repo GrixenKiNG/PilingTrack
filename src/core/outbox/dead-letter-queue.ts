@@ -68,7 +68,7 @@ export async function moveToDlq(
     });
   } catch (dlqError) {
     // Last resort — log to console
-    console.error('[DLQ] Failed to move event to DLQ:', dlqError);
+    logger.error('DLQ: failed to move event to DLQ', dlqError);
   }
 }
 

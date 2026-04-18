@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client/client';
+import { logger } from '@/lib/logger';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -115,7 +116,7 @@ export async function cacheIdempotentResponse(
       },
     });
   } catch (error) {
-    console.error('[Idempotency] Failed to cache response:', error);
+    logger.error('Idempotency: failed to cache response', error);
   }
 
   return response;

@@ -24,6 +24,7 @@
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/services/service-error';
+import { logger } from '@/lib/logger';
 
 // ============================================================
 // Idempotency Store (Prisma-backed)
@@ -204,7 +205,7 @@ export async function cleanupExpiredKeys(): Promise<number> {
   });
 
   if (result.count > 0) {
-    console.log(`Cleaned up ${result.count} expired idempotency keys`);
+    logger.info('Cleaned up expired idempotency keys', { count: result.count });
   }
 
   return result.count;

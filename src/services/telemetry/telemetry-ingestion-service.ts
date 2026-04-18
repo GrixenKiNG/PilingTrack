@@ -28,6 +28,7 @@
 
 import { db } from '@/lib/db';
 import { telemetryBuffer } from './telemetry-buffer';
+import { logger } from '@/lib/logger';
 
 // Re-export buffer for API layer access
 export { telemetryBuffer };
@@ -119,14 +120,11 @@ function adaptSamplingRate(): void {
     );
 
     if (newRate < currentSamplingConfig.rate) {
-      console.warn(
-        '[TelemetryIngestion] High load detected (',
-        currentRate.toFixed(0),
-        'rec/s), reducing sampling rate:',
-        currentSamplingConfig.rate.toFixed(2),
-        '->',
-        newRate.toFixed(2)
-      );
+      logger.warn('TelemetryIngestion: high load detected, reducing sampling rate', {
+        currentRate: Number(currentRate.toFixed(0)),
+        prevRate: Number(currentSamplingConfig.rate.toFixed(2)),
+        newRate: Number(newRate.toFixed(2)),
+      });
       currentSamplingConfig.rate = newRate;
     }
   } else if (currentRate < currentSamplingConfig.loadThreshold * 0.5 &&

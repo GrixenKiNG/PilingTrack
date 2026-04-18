@@ -7,6 +7,7 @@
  */
 
 import Redis from 'ioredis';
+import { logger } from '@/lib/logger';
 
 export interface RateLimitConfig {
   maxAttempts: number;
@@ -114,12 +115,12 @@ class RateLimiter {
       });
 
       this.redis.on('error', (err) => {
-        console.warn('[RateLimiter] Redis error:', err.message);
+        logger.warn('RateLimiter: Redis error', { error: err.message });
         this.redisReady = false;
       });
 
       this.redis.on('ready', () => {
-        console.log('[RateLimiter] Redis ready');
+        logger.info('RateLimiter: Redis ready');
         this.redisReady = true;
       });
 
@@ -131,7 +132,7 @@ class RateLimiter {
       this.luaSha = String(sha);
       this.redisReady = true;
     } catch (err) {
-      console.warn('[RateLimiter] Redis initialization failed, using in-memory fallback:', (err as Error).message);
+      logger.warn('RateLimiter: Redis initialization failed, using in-memory fallback', { error: (err as Error).message });
       this.redisReady = false;
       this.redis = null;
     }
@@ -158,7 +159,7 @@ class RateLimiter {
       try {
         return await this.checkRedis(identifier, config);
       } catch (err) {
-        console.warn('[RateLimiter] Redis check failed, falling back to in-memory:', (err as Error).message);
+        logger.warn('RateLimiter: Redis check failed, falling back to in-memory', { error: (err as Error).message });
         this.redisReady = false;
       }
     }

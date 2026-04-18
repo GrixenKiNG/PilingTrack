@@ -3,6 +3,7 @@ import { ServiceError } from '@/services/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
+import { logger } from '@/lib/logger';
 
 export interface ApiWrapperOptions {
   domain?: string;
@@ -17,13 +18,9 @@ const PRISMA_STATUS: Record<string, number> = {
 };
 
 function isPrismaKnownError(err: unknown): err is { code: string; message: string } {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    typeof (err as any).code === 'string' &&
-    (err as any).code.startsWith('P')
-  );
+  if (typeof err !== 'object' || err === null || !('code' in err)) return false;
+  const code = (err as { code: unknown }).code;
+  return typeof code === 'string' && code.startsWith('P');
 }
 
 /**
@@ -63,7 +60,7 @@ export function withApi<T extends any[]>(
         }
       }
 
-      console.error(`[API ${_opts?.domain || 'unknown'}]`, error);
+      logger.error('API handler failed', error, { domain: _opts?.domain || 'unknown' });
       return NextResponse.json(
         { error: 'Internal server error' },
         { status: 500 }

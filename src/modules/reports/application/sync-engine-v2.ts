@@ -12,6 +12,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
+import { logger } from '@/lib/logger';
 import {
   resolveConflict,
 } from '@/shared/sync/conflict-resolver';
@@ -450,10 +451,7 @@ export async function handleSync(request: SyncRequest): Promise<SyncResponse> {
         }
       } catch (err) {
         // Log error but continue processing other changes
-        console.error(
-          `[Sync] Error processing change ${change.opId}:`,
-          err instanceof Error ? err.message : err
-        );
+        logger.error('Sync: error processing change', err, { opId: change.opId });
       }
     }
 
