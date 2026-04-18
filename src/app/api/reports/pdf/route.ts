@@ -9,6 +9,7 @@ import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-qu
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { getRequestId } from '@/lib/request-context';
 import { normalizeCrewData } from '@/lib/normalize-crew';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: caughtError.message, requestId }, { status: caughtError.status });
     }
 
-    console.error('PDF enqueue error:', caughtError);
+    logger.error('pdf: enqueue failed', caughtError, { requestId });
     await recordFeedbackEvent({
       level: 'error',
       scope: 'pdf',
@@ -267,7 +268,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       return NextResponse.json({ error: caughtError.message }, { status: caughtError.status });
     }
 
-    console.error('PDF generation error:', caughtError);
+    logger.error('pdf: generation failed', caughtError);
     await recordFeedbackEvent({
       level: 'error',
       scope: 'pdf',

@@ -14,6 +14,7 @@ import { generatePrometheusMetrics } from '@/lib/cache-metrics';
 import { exportPrometheusMetrics, getLagMetrics } from '@/core/observability/lag-monitor';
 import { getCurrentStatus } from '@/core/observability/health-tracker';
 import { withApi } from '@/core/api-wrapper';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -29,7 +30,7 @@ export const GET = withApi(
       output = generatePrometheusMetrics();
     } catch (caughtError) {
       // Cache metrics not available yet
-      console.error('[API] GET /api/metrics generatePrometheusMetrics error:', caughtError);
+      logger.error('metrics: cache metrics unavailable', caughtError);
       output = '# No cache metrics available yet\n';
     }
 
@@ -70,7 +71,7 @@ export const GET = withApi(
         output += exportPrometheusMetrics(lagMetrics);
       }
     } catch (err) {
-      console.error('[API] GET /api/metrics lag metrics error:', err);
+      logger.error('metrics: lag metrics failed', err);
     }
 
     // Backup health metrics
@@ -90,7 +91,7 @@ export const GET = withApi(
         output += `backup_s3_synced ${s3Synced}\n\n`;
       }
     } catch (err) {
-      console.error('[API] GET /api/metrics backup metrics error:', err);
+      logger.error('metrics: backup metrics failed', err);
     }
 
     return new NextResponse(output, {

@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import type { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 export const SESSION_COOKIE_NAME = 'pt-session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
@@ -34,10 +35,7 @@ function getSecretKey() {
   if (process.env.NODE_ENV !== 'production') {
     if (!devFallbackWarned) {
       devFallbackWarned = true;
-      // eslint-disable-next-line no-console
-      console.warn(
-        '[session-service] SESSION_SECRET is not set — using dev-only fallback. Set SESSION_SECRET in .env before deploying.',
-      );
+      logger.warn('session-service: SESSION_SECRET not set — using dev-only fallback');
     }
     return new TextEncoder().encode('dev-only-session-secret-change-me');
   }

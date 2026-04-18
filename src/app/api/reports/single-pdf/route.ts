@@ -7,6 +7,7 @@ import { generateSinglePdf } from '@/lib/pdf-generator';
 import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-queue';
 import { getRequestId } from '@/lib/request-context';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: caughtError.message, requestId }, { status: caughtError.status });
     }
 
-    console.error('Single PDF enqueue error:', caughtError);
+    logger.error('single-pdf: enqueue failed', caughtError, { requestId });
     await recordFeedbackEvent({
       level: 'error',
       scope: 'pdf',
@@ -294,7 +295,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       return NextResponse.json({ error: caughtError.message, requestId }, { status: caughtError.status });
     }
 
-    console.error('Single PDF generation error:', caughtError);
+    logger.error('single-pdf: generation failed', caughtError, { requestId });
     await recordFeedbackEvent({
       level: 'error',
       scope: 'pdf',

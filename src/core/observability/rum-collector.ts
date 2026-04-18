@@ -201,7 +201,7 @@ class RUMCollector {
       });
     } catch (error) {
       // Failed to send — metrics lost (acceptable for RUM)
-      console.warn('[RUM] Failed to flush metrics');
+      logger.warn('rum: failed to flush metrics');
     }
   }
 

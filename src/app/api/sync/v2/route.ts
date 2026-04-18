@@ -40,6 +40,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { ServiceError } from '@/services/service-error';
 import { handleSync, type SyncRequest } from '@/modules/reports/application/sync-engine-v2';
 import { getRequestId } from '@/lib/request-context';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('[Sync v2] Internal error:', caughtError);
+    logger.error('sync v2: internal error', caughtError, { requestId });
     return NextResponse.json(
       { error: 'Internal sync error' },
       { status: 500, headers: { 'X-Request-Id': requestId || '' } }
