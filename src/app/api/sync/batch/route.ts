@@ -92,7 +92,10 @@ export const POST = withMutation(async (request: NextRequest) => {
       details: results,
       cursor: Date.now(),
     });
-}, { domain: 'sync' });
+}, {
+  domain: 'sync',
+  rateLimit: { maxAttempts: 600, windowMs: 60_000, blockDurationMs: 60_000 },
+});
 
 /**
  * Handle a single report operation within a transaction.

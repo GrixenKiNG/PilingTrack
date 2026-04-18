@@ -161,7 +161,10 @@ export const POST = withMutation(async (request: NextRequest) => {
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}, { domain: 'sync' });
+}, {
+  domain: 'sync',
+  rateLimit: { maxAttempts: 600, windowMs: 60_000, blockDurationMs: 60_000 },
+});
 
 // ============================================================
 // Operation Handlers

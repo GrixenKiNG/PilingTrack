@@ -146,4 +146,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   });
 
   return NextResponse.json(state, { status: 201 });
-}, { domain: 'sync' })
+}, {
+  domain: 'sync',
+  rateLimit: { maxAttempts: 600, windowMs: 60_000, blockDurationMs: 60_000 },
+});

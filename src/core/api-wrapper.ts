@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { ServiceError } from '@/services/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
@@ -9,6 +10,8 @@ export interface ApiWrapperOptions {
   domain?: string;
   cache?: boolean;
   cacheTTL?: number;
+  /** Override the default 100/min mutation rate limit (e.g. for high-throughput sync). */
+  rateLimit?: { maxAttempts: number; windowMs: number; blockDurationMs: number };
 }
 
 /** Map Prisma error codes to HTTP status. Only well-known codes listed. */
@@ -60,7 +63,9 @@ export function withApi<T extends any[]>(
         }
       }
 
-      logger.error('API handler failed', error, { domain: _opts?.domain || 'unknown' });
+      const domain = _opts?.domain || 'unknown';
+      logger.error('API handler failed', error, { domain });
+      Sentry.captureException(error, { tags: { domain, route: request.nextUrl.pathname } });
       return NextResponse.json(
         { error: 'Internal server error' },
         { status: 500 }
@@ -85,7 +90,7 @@ export function withMutation<T extends any[]>(
     if (csrfCheck) return csrfCheck;
 
     const identifier = getRateLimitIdentifier(request);
-    const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
+    const rl = await rateLimiter.check(identifier, _opts?.rateLimit ?? MUTATION_RATE_LIMIT);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: 'Too many requests' },
