@@ -16,8 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
 import { postgresDb } from '@/lib/db';
+import { withApi, withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -26,7 +26,7 @@ export const runtime = 'nodejs';
 // GET /api/sync/conflicts
 // ============================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     })),
     total: conflicts.length,
   });
-}
+}, { domain: 'sync' });
 
 // ============================================================
 // POST /api/sync/conflicts/:id/resolve
@@ -82,16 +82,12 @@ const resolveConflictSchema = z.object({
   customData: z.record(z.string(), z.unknown()).optional(),
 });
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
-
+export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
   const sessionUser = user!;
 
-  // Admin only
   if (sessionUser.role !== 'ADMIN') {
     return NextResponse.json(
       { error: 'Admin access required' },
@@ -99,9 +95,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  try {
-    const body = await request.json();
-    const validated = resolveConflictSchema.safeParse(body);
+  const body = await request.json();
+  const validated = resolveConflictSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
         { error: 'Validation error', details: validated.error.flatten() },
@@ -205,8 +200,4 @@ export async function POST(request: NextRequest) {
       strategy,
       resolvedAt: new Date().toISOString(),
     });
-  } catch (caughtError) {
-    const message = caughtError instanceof Error ? caughtError.message : 'Internal error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+}, { domain: 'sync' });

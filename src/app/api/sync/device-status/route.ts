@@ -35,9 +35,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
 import { postgresDb } from '@/lib/db';
 import { getDeviceSyncStatus } from '@/modules/reports/application/sync-engine-v2';
+import { withApi, withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -46,7 +46,7 @@ export const runtime = 'nodejs';
 // GET /api/sync/device-status
 // ============================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(status);
-}
+}, { domain: 'sync' });
 
 // ============================================================
 // POST /api/sync/device-status
@@ -97,63 +97,53 @@ const deviceStatusSchema = z.object({
   userId: z.string().optional(),
 });
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
-
+export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
   const sessionUser = user!;
 
-  try {
-    const body = await request.json();
-    const validated = deviceStatusSchema.safeParse(body);
-    if (!validated.success) {
-      return NextResponse.json(
-        { error: 'Validation error', details: validated.error.flatten() },
-        { status: 400 }
-      );
-    }
+  const body = await request.json();
+  const validated = deviceStatusSchema.safeParse(body);
+  if (!validated.success) {
+    return NextResponse.json(
+      { error: 'Validation error', details: validated.error.flatten() },
+      { status: 400 }
+    );
+  }
 
-    const { deviceId, tenantId: inputTenantId, userId: inputUserId } = validated.data;
-    const tenantId = inputTenantId || sessionUser.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
-    const userId = inputUserId || sessionUser.id;
+  const { deviceId, tenantId: inputTenantId, userId: inputUserId } = validated.data;
+  const tenantId = inputTenantId || sessionUser.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
+  const userId = inputUserId || sessionUser.id;
 
-    // Non-admin users can only register/update their own devices
-    if (sessionUser.role !== 'ADMIN') {
-      // Verify the device belongs to the user's tenant
-      const existing = await postgresDb.deviceSyncState.findUnique({
-        where: { deviceId },
-        select: { tenantId: true, userId: true },
-      });
-
-      if (existing && existing.tenantId !== tenantId) {
-        return NextResponse.json(
-          { error: 'Access denied: device belongs to different tenant' },
-          { status: 403 }
-        );
-      }
-    }
-
-    const state = await postgresDb.deviceSyncState.upsert({
+  if (sessionUser.role !== 'ADMIN') {
+    const existing = await postgresDb.deviceSyncState.findUnique({
       where: { deviceId },
-      update: {
-        tenantId,
-        userId: userId || null,
-        lastSyncAt: new Date(),
-      },
-      create: {
-        deviceId,
-        tenantId,
-        userId: userId || null,
-        syncStatus: 'idle',
-      },
+      select: { tenantId: true, userId: true },
     });
 
-    return NextResponse.json(state, { status: 201 });
-  } catch (caughtError) {
-    const message = caughtError instanceof Error ? caughtError.message : 'Internal error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (existing && existing.tenantId !== tenantId) {
+      return NextResponse.json(
+        { error: 'Access denied: device belongs to different tenant' },
+        { status: 403 }
+      );
+    }
   }
-}
+
+  const state = await postgresDb.deviceSyncState.upsert({
+    where: { deviceId },
+    update: {
+      tenantId,
+      userId: userId || null,
+      lastSyncAt: new Date(),
+    },
+    create: {
+      deviceId,
+      tenantId,
+      userId: userId || null,
+      syncStatus: 'idle',
+    },
+  });
+
+  return NextResponse.json(state, { status: 201 });
+}, { domain: 'sync' })

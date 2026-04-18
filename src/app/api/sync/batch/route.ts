@@ -19,9 +19,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
-import { getRequestId } from '@/lib/request-context';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import { withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -42,18 +41,12 @@ const batchRequestSchema = z.object({
   operations: z.array(batchOperationSchema).max(MAX_BATCH_SIZE),
 });
 
-export async function POST(request: NextRequest) {
-  const csrfCheck = withCsrf(request);
-  if (csrfCheck) return csrfCheck;
-
+export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
-  const requestId = getRequestId(request);
-
-  try {
-    const body = await request.json();
-    const validated = batchRequestSchema.safeParse(body);
+  const body = await request.json();
+  const validated = batchRequestSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
         { error: 'Validation error', details: validated.error.flatten() },
@@ -99,11 +92,7 @@ export async function POST(request: NextRequest) {
       details: results,
       cursor: Date.now(),
     });
-  } catch (caughtError) {
-    const message = caughtError instanceof Error ? caughtError.message : 'Internal error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+}, { domain: 'sync' });
 
 /**
  * Handle a single report operation within a transaction.

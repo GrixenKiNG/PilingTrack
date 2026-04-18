@@ -18,11 +18,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
 import { assertCan } from '@/services/auth/authorization-service';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { getRequestId } from '@/lib/request-context';
 import { upsertReport } from '@/modules/reports';
+import { withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -77,10 +77,7 @@ interface SyncResult {
   errors: Array<{ operationId: string; error: string }>;
 }
 
-export async function POST(request: NextRequest) {
-  const csrfCheck = withCsrf(request);
-  if (csrfCheck) return csrfCheck;
-
+export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -164,7 +161,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+}, { domain: 'sync' });
 
 // ============================================================
 // Operation Handlers

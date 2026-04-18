@@ -15,10 +15,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -94,4 +95,4 @@ export async function GET(request: NextRequest) {
     eventsNextCursor: eventsResult.nextCursor,
     hasMore: reportsResult.hasMore,
   });
-}
+}, { domain: 'sync' });
