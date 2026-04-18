@@ -1,37 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createJsonResponse, getRequestId } from '@/lib/request-context';
+import { getRequestId } from '@/lib/request-context';
 import { createLogoutResponse } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
-import { withCsrf } from '@/lib/csrf-protection';
-
+import { withMutation } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
-
+export const POST = withMutation(async (request: NextRequest) => {
   const requestId = getRequestId(request);
+  const tenantContext = resolveTenantContext(request);
+  const { user } = await requireAuth(request);
 
-  try {
-    const tenantContext = resolveTenantContext(request);
-    const { user } = await requireAuth(request);
-
-    if (user) {
-      await recordAuditEvent({
-        action: 'auth.logout',
-        scope: 'auth',
-        actorId: user.id,
-        tenantId: tenantContext.tenantId,
-        requestId,
-        metadata: { role: user.role },
-      });
-    }
-
-    return createLogoutResponse(requestId);
-  } catch {
-    return createJsonResponse({ error: 'Logout failed', requestId }, { status: 500 }, requestId);
+  if (user) {
+    await recordAuditEvent({
+      action: 'auth.logout',
+      scope: 'auth',
+      actorId: user.id,
+      tenantId: tenantContext.tenantId,
+      requestId,
+      metadata: { role: user.role },
+    });
   }
-}
+
+  return createLogoutResponse(requestId);
+}, { domain: 'auth.logout' });

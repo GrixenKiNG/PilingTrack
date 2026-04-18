@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import {
   authenticateUserByPin,
   createAuthenticatedResponse,
@@ -8,80 +8,73 @@ import { pinAuthSchema } from '@/lib/validation-schemas';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 import { getRateLimitIdentifier } from '@/lib/rate-limiter';
-
+import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
+export const POST = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
+  const body = await request.json();
+  const tenantContext = resolveTenantContext(request);
 
-  try {
-    const body = await request.json();
-    const tenantContext = resolveTenantContext(request);
-    
-    // Zod validation
-    const validation = pinAuthSchema.safeParse(body);
-    if (!validation.success) {
-      return createJsonResponse(
-        {
-          error: 'Validation failed',
-          requestId,
-          details: validation.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
-        },
-        { status: 400 },
-        requestId
-      );
-    }
-
-    const { pin } = validation.data;
-
-    // Rate-limit by client identifier (IP, or tenant+IP if tenant header present).
-    // Prevents a brute-force of "try all PINs from one IP" that rate-limiting
-    // by PIN value would miss.
-    const clientIdentifier = getRateLimitIdentifier(request, 'unknown', {
-      includeTenant: true,
-    });
-    const result = await authenticateUserByPin(pin, clientIdentifier);
-
-    // Rate limited
-    if (result.rateLimited) {
-      await recordAuditEvent({
-        action: 'auth.pin.rate_limited',
-        scope: 'auth',
-        tenantId: tenantContext.tenantId,
+  const validation = pinAuthSchema.safeParse(body);
+  if (!validation.success) {
+    return createJsonResponse(
+      {
+        error: 'Validation failed',
         requestId,
-        metadata: { retryAfter: result.retryAfter },
-      });
+        details: validation.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
+      },
+      { status: 400 },
+      requestId
+    );
+  }
 
-      return createJsonResponse(
-        { error: result.error || 'Too many PIN attempts', requestId, retryAfter: result.retryAfter },
-        { status: 429 },
-        requestId
-      );
-    }
+  const { pin } = validation.data;
 
-    if (!result.user) {
-      await recordAuditEvent({
-        action: 'auth.pin.failed',
-        scope: 'auth',
-        tenantId: tenantContext.tenantId,
-        requestId,
-      });
+  // Rate-limit by client identifier (IP, or tenant+IP if tenant header present).
+  // Prevents a brute-force of "try all PINs from one IP" that rate-limiting
+  // by PIN value would miss.
+  const clientIdentifier = getRateLimitIdentifier(request, 'unknown', {
+    includeTenant: true,
+  });
+  const result = await authenticateUserByPin(pin, clientIdentifier);
 
-      return createJsonResponse({ error: 'Invalid PIN', requestId }, { status: 401 }, requestId);
-    }
-
+  if (result.rateLimited) {
     await recordAuditEvent({
-      action: 'auth.pin.succeeded',
+      action: 'auth.pin.rate_limited',
       scope: 'auth',
-      actorId: result.user.id,
       tenantId: tenantContext.tenantId,
       requestId,
-      metadata: { email: result.user.email, role: result.user.role },
+      metadata: { retryAfter: result.retryAfter },
     });
 
-    return await createAuthenticatedResponse(result.user, requestId);
-  } catch {
-    return createJsonResponse({ error: 'Internal error', requestId }, { status: 500 }, requestId);
+    return createJsonResponse(
+      { error: result.error || 'Too many PIN attempts', requestId, retryAfter: result.retryAfter },
+      { status: 429 },
+      requestId
+    );
   }
-}
+
+  if (!result.user) {
+    await recordAuditEvent({
+      action: 'auth.pin.failed',
+      scope: 'auth',
+      tenantId: tenantContext.tenantId,
+      requestId,
+    });
+
+    return createJsonResponse({ error: 'Invalid PIN', requestId }, { status: 401 }, requestId);
+  }
+
+  await recordAuditEvent({
+    action: 'auth.pin.succeeded',
+    scope: 'auth',
+    actorId: result.user.id,
+    tenantId: tenantContext.tenantId,
+    requestId,
+    metadata: { email: result.user.email, role: result.user.role },
+  });
+
+  return await createAuthenticatedResponse(result.user, requestId);
+}, { domain: 'auth.pin' });
