@@ -53,38 +53,24 @@ export async function getReportsByPeriodRaw(
 ) {
   const start = Date.now();
 
-  const reports = await db.$queryRaw<RawReportRow[]>`
-    SELECT r.*,
-      (SELECT json_agg(json_build_object(
-        'id', pw.id,
-        'count', pw.count,
-        'pileGradeId', pw."pileGradeId"
-      ))
-      FROM "PileWork" pw
-      WHERE pw."reportId" = r.id) as piles,
-      (SELECT json_agg(json_build_object(
-        'id', ld.id,
-        'meters', ld.meters,
-        'typeId', ld."typeId"
-      ))
-      FROM "LeaderDrilling" ld
-      WHERE ld."reportId" = r.id) as drillings,
-      (SELECT json_agg(json_build_object(
-        'id', rd.id,
-        'duration', rd.duration,
-        'reasonId', rd."reasonId",
-        'comment', rd.comment
-      ))
-      FROM "ReportDowntime" rd
-      WHERE rd."reportId" = r.id) as downtimes
-    FROM "Report" r
-    WHERE r."tenantId" = ${tenantId}
-      AND r."date" >= ${dateFrom}
-      AND r."date" <= ${dateTo}
-      ${siteId ? Prisma.sql`AND r."siteId" = ${siteId}` : Prisma.sql``}
-    ORDER BY r."date" DESC
-    LIMIT 500
-  `;
+  const where: Record<string, unknown> = {
+    tenantId: tenantId || null,
+    date: { gte: dateFrom, lte: dateTo },
+  };
+  if (siteId) where.siteId = siteId;
+
+  const rows = await db.report.findMany({
+    where,
+    orderBy: { date: 'desc' },
+    take: 500,
+    include: {
+      piles: { select: { id: true, count: true, pileGradeId: true } },
+      drillings: { select: { id: true, meters: true, typeId: true } },
+      downtimes: { select: { id: true, duration: true, reasonId: true, comment: true } },
+    },
+  });
+
+  const reports = rows as unknown as RawReportRow[];
 
   const elapsed = Date.now() - start;
   if (elapsed > 100) {
