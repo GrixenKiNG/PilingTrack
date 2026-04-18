@@ -18,6 +18,7 @@ import {
   getIngestStats,
 } from '@/services/telemetry/telemetry-ingestion-service';
 import { dbHealthCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
+import { withApi } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 const telemetryRecordSchema = z.object({
@@ -78,7 +79,7 @@ function checkCircuitBreaker(): NextResponse | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withApi(async (request: NextRequest) => {
   const csrfCheck = withCsrf(request);
   if (csrfCheck) return csrfCheck;
 
@@ -102,7 +103,6 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   try {
-    // Only ADMIN, DISPATCHER, and OPERATOR can submit telemetry
     assertAnyRole(user!, ['ADMIN', 'DISPATCHER', 'OPERATOR']);
 
     // Check circuit breaker before accepting data
@@ -197,18 +197,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal error' },
-      { status: 500 }
-    );
+    throw err;
   }
-}
+}, { domain: 'telemetry' });
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
-  try {
     assertCan(user!, 'analytics.read');
 
     const { searchParams } = request.nextUrl;
@@ -256,13 +252,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ records });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal error' },
-      { status: 500 }
-    );
-  }
-}
+}, { domain: 'telemetry' });
 
 function assertAnyRole(user: { role: string }, roles: string[]) {
   if (!roles.includes(user.role)) {

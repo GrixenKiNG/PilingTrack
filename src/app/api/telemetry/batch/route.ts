@@ -5,6 +5,7 @@ import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { ingestTelemetryBatch, telemetryBuffer } from '@/services/telemetry/telemetry-ingestion-service';
 import { dbHealthCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
 import { logger } from '@/lib/logger';
+import { withApi } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 const telemetryRecordSchema = z.object({
@@ -60,7 +61,7 @@ function checkCircuitBreaker(): NextResponse | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withApi(async (request: NextRequest) => {
   const csrfCheck = withCsrf(request);
   if (csrfCheck) return csrfCheck;
 
@@ -151,15 +152,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    logger.error('Telemetry batch ingestion failed', {
-      error: errorMessage,
-      errorType: err instanceof Error ? err.constructor.name : typeof err,
-    });
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+    throw err;
   }
-}
+}, { domain: 'telemetry' });

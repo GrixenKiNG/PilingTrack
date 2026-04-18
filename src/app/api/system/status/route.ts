@@ -18,10 +18,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { checkSystemStatus, getFreshStatus, getCurrentStatus } from '@/core/observability/health-tracker';
+import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -38,4 +39,4 @@ export async function GET(request: NextRequest) {
   const httpStatus = status.status === 'unhealthy' ? 503 : 200;
 
   return NextResponse.json(status, { status: httpStatus });
-}
+}, { domain: 'system' });

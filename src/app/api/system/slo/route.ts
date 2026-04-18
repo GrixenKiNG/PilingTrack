@@ -16,10 +16,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { getSLOHealth, checkAllBurnRateAlerts } from '@/core/observability/slo-enforcement';
+import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -29,4 +30,4 @@ export async function GET(request: NextRequest) {
   const alerts = checkAllBurnRateAlerts();
 
   return NextResponse.json({ slo: sloHealth, alerts });
-}
+}, { domain: 'system' });
