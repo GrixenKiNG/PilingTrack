@@ -130,7 +130,8 @@ export function AdminReports() {
       <PdfPreviewDialog open={!!previewReportId} onOpenChange={(o) => { if (!o) setPreviewReportId(null); }}
         reportId={previewReportId} downloadName={previewReportName} />
 
-      <ReportFormDialog open={showCreateDialog} onClose={() => { setShowCreateDialog(false); setEditReport(null); }}
+      <ReportFormDialog key={editReport?.reportId || 'new'}
+        open={showCreateDialog} onClose={() => { setShowCreateDialog(false); setEditReport(null); }}
         editReport={editReport}
         operators={operators} sites={sites} pileGrades={pileGrades}
         drillingTypes={drillingTypes} downtimeReasons={downtimeReasons} equipment={equipment}

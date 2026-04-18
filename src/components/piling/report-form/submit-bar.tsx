@@ -51,7 +51,7 @@ export function SubmitBar({
         </Card>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-sm border-t px-4 py-3 pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t px-4 py-3 pb-safe">
         {showHint && (
           <div className="flex items-center gap-1.5 mb-2 justify-center">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
