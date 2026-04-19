@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
-import { assertCanAccessReportOwner } from '@/services/auth/resource-access-service';
+import { assertCanAccessReportOwner, ensureTenantAccess } from '@/services/auth/resource-access-service';
 import { generateSinglePdf } from '@/lib/pdf-generator';
 import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-queue';
 import { getRequestId } from '@/lib/request-context';
@@ -52,6 +52,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
+    await ensureTenantAccess(user!, report.tenantId, 'report');
     assertCanAccessReportOwner(user!, report.userId, 'reports.read_cross_user');
 
     const fallbackCrew = report.crew
@@ -229,6 +230,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
+    await ensureTenantAccess(user!, report.tenantId, 'report');
     assertCanAccessReportOwner(user!, report.userId, 'reports.read_cross_user');
 
     const fallbackCrew = report.crew

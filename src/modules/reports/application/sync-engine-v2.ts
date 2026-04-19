@@ -106,35 +106,35 @@ async function processReportChange(
     // Initialize vector clock for new report
     const vc = clientVC || { [reportData.deviceId as string || 'server']: 1 };
 
-    await prisma.report.create({
-      data: {
-        id: reportId,
-        reportId: reportData.reportId as string || reportId,
-        tenantId,
-        version: 1,
-        status: (reportData.status as string) || 'draft',
-        userId: reportData.userId as string,
-        siteId: reportData.siteId as string,
-        date: reportData.date as string,
-        shiftType: (reportData.shiftType as string) || 'day',
-        shiftStart: (reportData.shiftStart as string) || null,
-        shiftEnd: (reportData.shiftEnd as string) || null,
-        equipmentId: (reportData.equipmentId as string) || null,
-        vectorClock: vc,
-        updatedAt: new Date(),
-        createdAt: new Date(),
-      },
-    });
-
-    // Create initial ReportVersion snapshot
-    await prisma.reportVersion.create({
-      data: {
-        reportId,
-        version: 1,
-        data: reportData as any,
-        actorId: reportData.userId as string || 'sync',
-      },
-    });
+    await prisma.$transaction([
+      prisma.report.create({
+        data: {
+          id: reportId,
+          reportId: reportData.reportId as string || reportId,
+          tenantId,
+          version: 1,
+          status: (reportData.status as string) || 'draft',
+          userId: reportData.userId as string,
+          siteId: reportData.siteId as string,
+          date: reportData.date as string,
+          shiftType: (reportData.shiftType as string) || 'day',
+          shiftStart: (reportData.shiftStart as string) || null,
+          shiftEnd: (reportData.shiftEnd as string) || null,
+          equipmentId: (reportData.equipmentId as string) || null,
+          vectorClock: vc,
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        },
+      }),
+      prisma.reportVersion.create({
+        data: {
+          reportId,
+          version: 1,
+          data: reportData as any,
+          actorId: reportData.userId as string || 'sync',
+        },
+      }),
+    ]);
 
     await recordIdempotency(opId, 'report.create');
     return { applied: true };
@@ -256,28 +256,28 @@ async function processReportChange(
       mergedVC = serverVC;
     }
 
-    await prisma.report.update({
-      where: { id: reportId },
-      data: {
-        version: newVersion,
-        status: (reportData.status as string) || existing.status,
-        vectorClock: mergedVC,
-        updatedAt: new Date(),
-      },
-    });
-
-    // Create ReportVersion snapshot for normal updates too
-    await prisma.reportVersion.create({
-      data: {
-        reportId,
-        version: newVersion,
+    await prisma.$transaction([
+      prisma.report.update({
+        where: { id: reportId },
         data: {
-          ...reportData,
+          version: newVersion,
+          status: (reportData.status as string) || existing.status,
           vectorClock: mergedVC,
-        } as any,
-        actorId: reportData.userId as string || 'sync',
-      },
-    });
+          updatedAt: new Date(),
+        },
+      }),
+      prisma.reportVersion.create({
+        data: {
+          reportId,
+          version: newVersion,
+          data: {
+            ...reportData,
+            vectorClock: mergedVC,
+          } as any,
+          actorId: reportData.userId as string || 'sync',
+        },
+      }),
+    ]);
   }
 
   // DELETE
