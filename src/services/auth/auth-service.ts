@@ -30,13 +30,36 @@ const PIN_HASH_PREFIX = '$2';
  * an attacker with read access to the DB cannot brute-force PINs offline
  * without also compromising the secret.
  */
+let pinLookupSecretFallbackWarned = false;
+
 export function computePinLookup(pin: string): string {
-  const secret = process.env.PIN_LOOKUP_SECRET || process.env.SESSION_SECRET || '';
+  const explicitSecret = process.env.PIN_LOOKUP_SECRET;
+  const sessionSecret = process.env.SESSION_SECRET;
+  const secret = explicitSecret || sessionSecret || '';
+
   if (!secret) {
-    // No secret configured — fall back to a plain SHA256 so the column is
-    // still populated and PIN login still works in dev/test.
+    // Hard-fail in production: a plain SHA256 over a 4-6 digit PIN is trivial
+    // to rainbow-table for anyone with DB read access.
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'PIN_LOOKUP_SECRET is required in production (or SESSION_SECRET as a fallback)'
+      );
+    }
+    // Dev/test only — keeps PIN login functional locally.
     return createHash('sha256').update(`pinlookup:${pin}`).digest('hex');
   }
+
+  if (!explicitSecret && sessionSecret && !pinLookupSecretFallbackWarned) {
+    pinLookupSecretFallbackWarned = true;
+    // Coupling warning: rotating SESSION_SECRET will invalidate every stored
+    // pinLookup, locking out all PIN users until they reset.
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[auth] PIN_LOOKUP_SECRET not set — falling back to SESSION_SECRET. ' +
+      'Rotating SESSION_SECRET will invalidate all stored PIN lookups.'
+    );
+  }
+
   return createHmac('sha256', secret).update(pin).digest('hex');
 }
 

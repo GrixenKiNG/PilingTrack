@@ -1,47 +1,81 @@
 import { db } from '@/lib/db';
 
-export async function getSiteAnalytics() {
-  const sites = await db.site.findMany({
-    where: { isActive: true },
-    include: {
-      _count: { select: { reports: true } },
-      reports: {
-        select: {
-          piles: { select: { count: true } },
-          drillings: { select: { meters: true } },
-          downtimes: { select: { duration: true } },
-        },
-      },
-    },
-    orderBy: { name: 'asc' },
-  });
-
-  return sites.map((site) => {
-    const actualPiles = site.reports.reduce(
-      (sum, report) => sum + report.piles.reduce((acc, pile) => acc + pile.count, 0),
-      0
-    );
-    const actualDrilling = site.reports.reduce(
-      (sum, report) => sum + report.drillings.reduce((acc, drilling) => acc + drilling.meters, 0),
-      0
-    );
-    const totalDowntime = site.reports.reduce(
-      (sum, report) => sum + report.downtimes.reduce((acc, downtime) => acc + downtime.duration, 0),
-      0
-    );
-
-    return {
-      siteId: site.id,
-      siteName: site.name,
-      plannedPiles: site.plannedPiles,
-      actualPiles,
-      plannedDrilling: site.plannedDrilling,
-      actualDrilling: parseFloat(actualDrilling.toFixed(1)),
-      pileProgress: site.plannedPiles > 0 ? Math.min(100, (actualPiles / site.plannedPiles) * 100) : 0,
-      drillingProgress:
-        site.plannedDrilling > 0 ? Math.min(100, (actualDrilling / site.plannedDrilling) * 100) : 0,
-      totalReports: site._count.reports,
-      totalDowntime: parseFloat(totalDowntime.toFixed(1)),
-    };
-  });
+interface SiteAnalyticsRow {
+  siteId: string;
+  siteName: string;
+  plannedPiles: number;
+  plannedDrilling: number;
+  actualPiles: number;
+  actualDrilling: number;
+  totalDowntime: number;
+  totalReports: number;
 }
+
+/**
+ * Aggregates per-site progress in a single SQL round-trip.
+ *
+ * The previous implementation used Prisma `findMany` with deeply nested
+ * `include` (reports → piles/drillings/downtimes) and summed every row in
+ * Node — which materialized thousands of child rows just to compute integer
+ * sums, and was a real OOM risk on large tenants.
+ *
+ * Each child sum is computed in its own subquery (joined LEFT) to avoid the
+ * Cartesian explosion that a flat multi-LEFT-JOIN would produce.
+ */
+export async function getSiteAnalytics() {
+  const rows = await db.$queryRaw<SiteAnalyticsRow[]>`
+    SELECT
+      s.id                                  AS "siteId",
+      s.name                                AS "siteName",
+      s."plannedPiles"                      AS "plannedPiles",
+      s."plannedDrilling"                   AS "plannedDrilling",
+      COALESCE(p.total_piles, 0)::int       AS "actualPiles",
+      COALESCE(d.total_meters, 0)::float    AS "actualDrilling",
+      COALESCE(dt.total_duration, 0)::float AS "totalDowntime",
+      COALESCE(rc.report_count, 0)::int     AS "totalReports"
+    FROM "Site" s
+    LEFT JOIN (
+      SELECT r."siteId", COUNT(*)::int AS report_count
+      FROM "Report" r
+      GROUP BY r."siteId"
+    ) rc ON rc."siteId" = s.id
+    LEFT JOIN (
+      SELECT r."siteId", SUM(pw.count)::int AS total_piles
+      FROM "Report" r
+      JOIN "PileWork" pw ON pw."reportId" = r.id
+      GROUP BY r."siteId"
+    ) p ON p."siteId" = s.id
+    LEFT JOIN (
+      SELECT r."siteId", SUM(ld.meters)::float AS total_meters
+      FROM "Report" r
+      JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
+      GROUP BY r."siteId"
+    ) d ON d."siteId" = s.id
+    LEFT JOIN (
+      SELECT r."siteId", SUM(rd.duration)::float AS total_duration
+      FROM "Report" r
+      JOIN "ReportDowntime" rd ON rd."reportId" = r.id
+      GROUP BY r."siteId"
+    ) dt ON dt."siteId" = s.id
+    WHERE s."isActive" = true
+    ORDER BY s.name ASC
+  `;
+
+  return rows.map((row) => ({
+    siteId: row.siteId,
+    siteName: row.siteName,
+    plannedPiles: row.plannedPiles,
+    actualPiles: row.actualPiles,
+    plannedDrilling: row.plannedDrilling,
+    actualDrilling: parseFloat(row.actualDrilling.toFixed(1)),
+    pileProgress:
+      row.plannedPiles > 0 ? Math.min(100, (row.actualPiles / row.plannedPiles) * 100) : 0,
+    drillingProgress:
+      row.plannedDrilling > 0
+        ? Math.min(100, (row.actualDrilling / row.plannedDrilling) * 100)
+        : 0,
+    totalReports: row.totalReports,
+    totalDowntime: parseFloat(row.totalDowntime.toFixed(1)),
+  }));
+}
+

@@ -151,6 +151,7 @@ model Site {
 
   @@index([tenantId])
   @@index([isActive])
+  @@index([tenantId, isActive])
 }
 
 // Site pile plan: grade → count × meters per unit → auto total meters
@@ -322,6 +323,7 @@ model Report {
   drillings    LeaderDrilling[]
 
   @@index([tenantId])
+  @@index([tenantId, updatedAt])
   @@index([userId, date])
   @@index([siteId, date])
   @@index([status])
