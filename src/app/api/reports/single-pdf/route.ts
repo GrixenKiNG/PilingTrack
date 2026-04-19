@@ -103,7 +103,12 @@ export const POST = withMutation(async (request: NextRequest) => {
 
     // Fallback to sync if Redis unavailable
     if (!jobId) {
-      const pdfBuffer = await generateSinglePdf(pdfData);
+      const pdfBuffer = await Promise.race([
+        generateSinglePdf(pdfData),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new ServiceError('PDF generation timeout (30s)', 504)), 30_000),
+        ),
+      ]);
       return new NextResponse(new Uint8Array(pdfBuffer), {
         status: 200,
         headers: {

@@ -168,16 +168,33 @@ export function FeedbackCenter() {
 
     void loadFeedback();
 
-    const eventSource = new EventSource('/api/feedback/stream', { withCredentials: true });
-    eventSource.addEventListener('sync', () => {
-      void loadFeedback();
-    });
-    eventSource.onerror = () => {
-      eventSource.close();
+    let cancelled = false;
+    let source: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+
+    const connect = () => {
+      if (cancelled) return;
+      source = new EventSource('/api/feedback/stream', { withCredentials: true });
+      source.addEventListener('sync', () => {
+        attempt = 0;
+        void loadFeedback();
+      });
+      source.onerror = () => {
+        source?.close();
+        source = null;
+        if (cancelled) return;
+        const delay = Math.min(30_000, 1_000 * 2 ** attempt);
+        attempt += 1;
+        retryTimer = setTimeout(connect, delay);
+      };
     };
+    connect();
 
     return () => {
-      eventSource.close();
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      source?.close();
     };
   }, [loadFeedback, open]);
 
