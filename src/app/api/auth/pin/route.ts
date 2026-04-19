@@ -67,6 +67,8 @@ export const POST = withApi(async (request: NextRequest) => {
     return createJsonResponse({ error: 'Invalid PIN', requestId }, { status: 401 }, requestId);
   }
 
+  // TODO(security): same caveat as login — tenantContext.tenantId comes from
+  // header, not session. Proper fix requires SessionUser.tenantId plumbing.
   await recordAuditEvent({
     action: 'auth.pin.succeeded',
     scope: 'auth',

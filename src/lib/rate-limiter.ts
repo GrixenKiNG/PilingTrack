@@ -444,20 +444,41 @@ export function createRateLimitMiddleware(config: RateLimitConfig) {
 }
 
 /**
+ * Resolve client IP. Only honors `x-forwarded-for`/`x-real-ip` when
+ * `TRUST_PROXY=true` — otherwise an attacker rotates the header to mint
+ * unlimited rate-limit buckets and bypasses brute-force protection.
+ */
+function resolveClientIp(request: Request, fallback: string): string {
+  if (process.env.TRUST_PROXY === 'true') {
+    const forwarded = request.headers.get('x-forwarded-for');
+    if (forwarded) return forwarded.split(',')[0].trim();
+    const realIp = request.headers.get('x-real-ip');
+    if (realIp) return realIp;
+  }
+  // Direct connection or untrusted proxy — IP not derivable here
+  // (Next.js doesn't expose remoteAddress). Fall through to caller fallback.
+  return fallback;
+}
+
+/**
  * Helper to extract identifier from request.
  * Supports tenant-aware rate limiting.
+ *
+ * NOTE: when `includeTenant` is set, tenant ID MUST be resolved server-side
+ * after auth and passed via the second positional arg in the future. The
+ * `x-tenant-id` header is client-controlled and should never partition
+ * rate-limit buckets on its own.
  */
 export function getRateLimitIdentifier(
   request: Request,
   fallback: string = 'unknown',
   options?: { includeTenant?: boolean }
 ): string {
-  // Try to get from X-Forwarded-For (behind proxy/load balancer)
-  const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || fallback;
+  const ip = resolveClientIp(request, fallback);
 
-  // Add tenant ID for tenant-aware rate limiting
   if (options?.includeTenant) {
+    // Header is untrusted; treat as opaque suffix only — never as a security
+    // boundary. Real tenant isolation comes from session-bound checks elsewhere.
     const tenantId = request.headers.get('x-tenant-id');
     return tenantId ? `tenant:${tenantId}:ip:${ip}` : `ip:${ip}`;
   }
@@ -471,8 +492,6 @@ export function getRateLimitIdentifier(
  */
 export function getTenantRateLimitIdentifier(request: Request): string {
   const tenantId = request.headers.get('x-tenant-id');
-  const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown';
-
+  const ip = resolveClientIp(request, 'unknown');
   return tenantId ? `tenant:${tenantId}:${ip}` : `global:${ip}`;
 }

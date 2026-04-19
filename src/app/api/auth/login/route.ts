@@ -66,6 +66,10 @@ export const POST = withApi(
       return createJsonResponse({ error: 'Invalid credentials', requestId }, { status: 401 }, requestId);
     }
 
+    // TODO(security): tenantContext.tenantId comes from the X-Tenant-ID
+    // header — a logged-in user from tenant A who sends X-Tenant-ID: B will
+    // record this success audit under tenant B. Proper fix requires plumbing
+    // tenantId through SessionUser/JWT payload (out of scope here).
     await recordAuditEvent({
       action: 'auth.login.succeeded',
       scope: 'auth',
