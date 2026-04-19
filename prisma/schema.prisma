@@ -120,8 +120,34 @@ model Equipment {
 
   crews       Crew[]
   reports     Report[] @relation("ReportEquipment")
+  deviceKeys  DeviceKey[]
 
   @@index([isActive])
+}
+
+// ============================================================
+// DEVICE KEYS — IoT telemetry authentication
+// Plaintext key is shown to the operator exactly once at provisioning
+// and never stored; only `keyHash` (HMAC-SHA256 with DEVICE_KEY_LOOKUP_SECRET)
+// is persisted, so DB read access alone cannot impersonate a device.
+// ============================================================
+model DeviceKey {
+  id           String   @id @default(cuid())
+  keyHash      String   @unique
+  name         String   // operator-facing label (e.g. "Rig 4 — North site MQTT")
+  tenantId     String?
+  equipmentId  String
+  siteId       String?
+  revoked      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  createdById  String?
+  lastUsedAt   DateTime?
+
+  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([equipmentId])
+  @@index([tenantId])
+  @@index([revoked])
 }
 
 // ============================================================

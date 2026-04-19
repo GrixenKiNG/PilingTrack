@@ -27,6 +27,7 @@ import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { db } from '@/lib/db';
 import { withApi } from '@/core/api-wrapper';
+import { authenticateDeviceByKey } from '@/services/telemetry/device-key-service';
 
 export const runtime = 'nodejs';
 
@@ -45,68 +46,41 @@ const TELEMETRY_RATE_LIMIT = {
 // ============================================================
 
 interface DeviceIdentity {
-  deviceId: string;
-  siteId: string;
-  equipmentId?: string;
+  deviceKeyId: string;
+  equipmentId: string;
+  siteId: string | null;
+  tenantId: string | null;
 }
 
-async function authenticateDevice(request: NextRequest): Promise<{ identity: DeviceIdentity; error?: Response }> {
+async function authenticateDevice(
+  request: NextRequest
+): Promise<{ identity: DeviceIdentity | null; error?: Response }> {
   const deviceKey = request.headers.get('x-device-key');
-  const authToken = request.headers.get('authorization');
 
-  if (!deviceKey && !authToken) {
+  if (!deviceKey) {
     return {
-      identity: { deviceId: '', siteId: '' },
-      error: createJsonResponse({ error: 'Device authentication required' }, { status: 401 }, getRequestId(request)),
+      identity: null,
+      error: createJsonResponse(
+        { error: 'Device authentication required (X-Device-Key header)' },
+        { status: 401 },
+        getRequestId(request)
+      ),
     };
   }
 
-  // Device API key authentication
-  if (deviceKey) {
-    const device = await db.equipment.findFirst({
-      where: {
-        isActive: true,
-        // In production, store device keys in a separate table
-        // For now, use equipment ID as device key
-        id: deviceKey,
-      },
-    });
-
-    if (!device) {
-      return {
-        identity: { deviceId: '', siteId: '' },
-        error: createJsonResponse({ error: 'Invalid device key' }, { status: 403 }, getRequestId(request)),
-      };
-    }
-
+  const authed = await authenticateDeviceByKey(deviceKey);
+  if (!authed) {
     return {
-      identity: {
-        deviceId: device.id,
-        siteId: '', // Would be resolved from equipment assignment
-        equipmentId: device.id,
-      },
+      identity: null,
+      error: createJsonResponse(
+        { error: 'Invalid or revoked device key' },
+        { status: 403 },
+        getRequestId(request)
+      ),
     };
   }
 
-  // JWT token authentication (future feature)
-  // TODO: Implement JWT verification for device tokens
-  // This would support JWT tokens issued for IoT devices.
-  // Implementation steps:
-  // 1. Extract JWT from Authorization header
-  // 2. Verify JWT signature using device's public key
-  // 3. Extract deviceId, siteId from JWT claims
-  // 4. Validate token expiration and not-before times
-  // 5. Optionally rotate device keys for enhanced security
-  
-  // For now, JWT auth is not supported
-  return {
-    identity: { deviceId: '', siteId: '' },
-    error: createJsonResponse(
-      { error: 'JWT authentication not yet implemented. Use X-Device-Key header.' },
-      { status: 501 },
-      getRequestId(request)
-    ),
-  };
+  return { identity: authed };
 }
 
 // ============================================================
@@ -128,7 +102,7 @@ export const POST = withApi(async (request: NextRequest) => {
 
   // Device authentication
   const { identity, error } = await authenticateDevice(request);
-  if (error) return error as NextResponse;
+  if (!identity) return error as NextResponse;
 
   const body = await request.json();
 
@@ -169,7 +143,7 @@ export const PATCH = withApi(async (request: NextRequest) => {
   }
 
   const { identity, error } = await authenticateDevice(request);
-  if (error) return error as NextResponse;
+  if (!identity) return error as NextResponse;
 
   const body = await request.json();
 
@@ -296,8 +270,8 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
     const r = record as Record<string, unknown>;
     return {
       type: r.type as string,
-      equipmentId: identity.equipmentId || 'unknown',
-      siteId: identity.siteId || null,
+      equipmentId: identity.equipmentId,
+      siteId: identity.siteId,
       value: Number(r.value),
       unit: (r.unit as string) || null,
       latitude: r.latitude ? Number(r.latitude) : null,
