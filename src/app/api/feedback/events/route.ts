@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
-import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import {
   listFeedbackEventsForUser,
@@ -11,7 +9,7 @@ import {
 } from '@/services/feedback/feedback-event-service';
 import type { FeedbackEventAudience, FeedbackEventLevel, FeedbackEventPriority } from '@/lib/types';
 import { z } from 'zod';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, withMutation } from '@/core/api-wrapper';
 
 const ALLOWED_LEVELS: FeedbackEventLevel[] = ['info', 'success', 'warn', 'error', 'audit'];
 const ALLOWED_PRIORITIES: FeedbackEventPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -58,25 +56,7 @@ export const GET = withApi(
   { domain: 'feedback', cache: true, cacheTTL: 10_000 }
 );
 
-export async function POST(request: NextRequest) {
-  const csrfCheck = withCsrf(request);
-  if (csrfCheck) return csrfCheck;
-
-  const MUTATION_RATE_LIMIT = {
-    maxAttempts: 100,
-    windowMs: 60_000,
-    blockDurationMs: 60_000,
-  };
-
-  const identifier = getRateLimitIdentifier(request);
-  const rl = await rateLimiter.check(identifier, MUTATION_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
-    );
-  }
-
+export const POST = withMutation(async (request: NextRequest) => {
   const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -84,7 +64,7 @@ export async function POST(request: NextRequest) {
   // user is guaranteed after error check above
   const sessionUser = user;
   if (!sessionUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return createJsonResponse({ error: 'Unauthorized', requestId }, { status: 401 }, requestId);
   }
 
   try {
@@ -189,8 +169,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return createJsonResponse({ error: 'Internal error', requestId }, { status: 500 }, requestId);
   }
-}
+}, { domain: 'feedback' });
 
-export async function PATCH(request: NextRequest) {
-  return POST(request);
-}
+export const PATCH = POST;

@@ -35,19 +35,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { withCsrf } from '@/lib/csrf-protection';
 import { assertCan } from '@/services/auth/authorization-service';
 import { ServiceError } from '@/services/service-error';
 import { handleSync, type SyncRequest } from '@/modules/reports/application/sync-engine-v2';
 import { getRequestId } from '@/lib/request-context';
 import { logger } from '@/lib/logger';
+import { withMutation } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const csrfResponse = withCsrf(request);
-  if (csrfResponse) return csrfResponse;
-
+export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
@@ -101,4 +98,4 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: { 'X-Request-Id': requestId || '' } }
     );
   }
-}
+}, { domain: 'sync', rateLimit: { maxAttempts: 600, windowMs: 60_000, blockDurationMs: 60_000 } });
