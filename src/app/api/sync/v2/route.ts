@@ -55,9 +55,20 @@ export const POST = withMutation(async (request: NextRequest) => {
 
   try {
     const body = await request.json();
+    // Refuse the request if no tenant context can be resolved — silently
+    // collapsing every tenant to the literal `'default'` string is how
+    // cross-tenant data merging happens.
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: 'Tenant context required' },
+        { status: 400, headers: { 'X-Request-Id': requestId || '' } }
+      );
+    }
+
     const syncRequest: SyncRequest = {
       deviceId: body.deviceId,
-      tenantId: user!.tenantId || process.env.DEFAULT_TENANT_ID || 'default',
+      tenantId,
       userId: user!.id,
       lastSyncAt: body.lastSyncAt || '1970-01-01T00:00:00Z',
       changes: body.changes || [],
