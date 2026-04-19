@@ -188,6 +188,14 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    if (body.length > 1000) {
+      return createJsonResponse(
+        { error: 'Batch too large: max 1000 records per request', count: body.length },
+        { status: 413 },
+        requestId
+      );
+    }
+
     // Validate each record
     const errors: Array<{ index: number; errors: string[] }> = [];
     for (let i = 0; i < body.length; i++) {
