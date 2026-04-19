@@ -115,8 +115,12 @@ Thumbs.db
 
 # Tool artifacts
 .playwright-cli/
+.playwright-mcp/
 .kilo/
 .claude/
+tsconfig.tsbuildinfo
+tsc-output.txt
+andrej-karpathy-skills-main/
 
 # Binaries
 .bin/
