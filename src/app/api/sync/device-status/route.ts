@@ -69,18 +69,11 @@ export const GET = withApi(async (request: NextRequest) => {
 
   const status = await getDeviceSyncStatus(deviceId);
 
-  if (!status) {
+  // For non-admins, do not leak device existence across tenants — return 404 in both cases.
+  if (!status || (sessionUser.role !== 'ADMIN' && status.tenantId !== sessionUser.tenantId)) {
     return NextResponse.json(
       { error: 'Device not found', deviceId },
       { status: 404 }
-    );
-  }
-
-  // Non-admin users can only see devices in their tenant
-  if (sessionUser.role !== 'ADMIN' && status.tenantId !== sessionUser.tenantId) {
-    return NextResponse.json(
-      { error: 'Access denied' },
-      { status: 403 }
     );
   }
 
@@ -113,19 +106,32 @@ export const POST = withMutation(async (request: NextRequest) => {
   }
 
   const { deviceId, tenantId: inputTenantId, userId: inputUserId } = validated.data;
-  const tenantId = inputTenantId || sessionUser.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
-  const userId = inputUserId || sessionUser.id;
 
-  if (sessionUser.role !== 'ADMIN') {
+  // Non-admins cannot set tenantId/userId — always derived from session.
+  // Admins may target a specific tenant; if neither provided, fall back to session.
+  const isAdmin = sessionUser.role === 'ADMIN';
+  const tenantId = isAdmin
+    ? (inputTenantId || sessionUser.tenantId)
+    : sessionUser.tenantId;
+  const userId = isAdmin ? (inputUserId || sessionUser.id) : sessionUser.id;
+
+  if (!tenantId) {
+    return NextResponse.json(
+      { error: 'Tenant context required' },
+      { status: 400 }
+    );
+  }
+
+  if (!isAdmin) {
     const existing = await postgresDb.deviceSyncState.findUnique({
       where: { deviceId },
-      select: { tenantId: true, userId: true },
+      select: { tenantId: true },
     });
-
+    // Block hijacking an existing device row that belongs to a different tenant.
     if (existing && existing.tenantId !== tenantId) {
       return NextResponse.json(
-        { error: 'Access denied: device belongs to different tenant' },
-        { status: 403 }
+        { error: 'Device not found', deviceId },
+        { status: 404 }
       );
     }
   }

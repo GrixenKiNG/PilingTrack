@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { db } from '@/lib/db';
+import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -112,10 +113,10 @@ async function authenticateDevice(request: NextRequest): Promise<{ identity: Dev
 // Telemetry Ingestion
 // ============================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
 
-  // Rate limiting
+  // Rate limiting (device-specific, higher than default)
   const identifier = getRateLimitIdentifier(request);
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
@@ -127,43 +128,37 @@ export async function POST(request: NextRequest) {
 
   // Device authentication
   const { identity, error } = await authenticateDevice(request);
-  if (error) return error;
+  if (error) return error as NextResponse;
 
-  try {
-    const body = await request.json();
+  const body = await request.json();
 
-    // Validate telemetry payload
-    const validation = validateTelemetry(body);
-    if (!validation.valid) {
-      return createJsonResponse(
-        { error: 'Invalid telemetry data', details: validation.errors, requestId },
-        { status: 400 },
-        requestId
-      );
-    }
-
-    // Store telemetry records
-    const records = await ingestTelemetry(identity, body);
-
+  // Validate telemetry payload
+  const validation = validateTelemetry(body);
+  if (!validation.valid) {
     return createJsonResponse(
-      { accepted: records.length, requestId },
-      { status: 202 },
+      { error: 'Invalid telemetry data', details: validation.errors, requestId },
+      { status: 400 },
       requestId
     );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal error';
-    return createJsonResponse({ error: message, requestId }, { status: 500 }, requestId);
   }
-}
+
+  // Store telemetry records
+  const records = await ingestTelemetry(identity, body);
+
+  return createJsonResponse(
+    { accepted: records.length, requestId },
+    { status: 202 },
+    requestId
+  );
+}, { domain: 'telemetry' });
 
 // ============================================================
 // Batch Ingestion
 // ============================================================
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
 
-  // Rate limiting (same as POST)
   const identifier = getRateLimitIdentifier(request);
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
@@ -173,59 +168,51 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  // Device authentication
   const { identity, error } = await authenticateDevice(request);
-  if (error) return error;
+  if (error) return error as NextResponse;
 
-  try {
-    const body = await request.json();
+  const body = await request.json();
 
-    if (!Array.isArray(body)) {
-      return createJsonResponse(
-        { error: 'Expected array of telemetry records' },
-        { status: 400 },
-        requestId
-      );
-    }
-
-    if (body.length > 1000) {
-      return createJsonResponse(
-        { error: 'Batch too large: max 1000 records per request', count: body.length },
-        { status: 413 },
-        requestId
-      );
-    }
-
-    // Validate each record
-    const errors: Array<{ index: number; errors: string[] }> = [];
-    for (let i = 0; i < body.length; i++) {
-      const validation = validateTelemetry(body[i]);
-      if (!validation.valid) {
-        errors.push({ index: i, errors: validation.errors });
-      }
-    }
-
-    if (errors.length > 0) {
-      return createJsonResponse(
-        { error: `${errors.length} invalid records`, details: errors.slice(0, 5), requestId },
-        { status: 400 },
-        requestId
-      );
-    }
-
-    // Bulk ingest
-    const records = await ingestTelemetry(identity, body);
-
+  if (!Array.isArray(body)) {
     return createJsonResponse(
-      { accepted: records.length, total: body.length, requestId },
-      { status: 202 },
+      { error: 'Expected array of telemetry records' },
+      { status: 400 },
       requestId
     );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal error';
-    return createJsonResponse({ error: message, requestId }, { status: 500 }, requestId);
   }
-}
+
+  if (body.length > 1000) {
+    return createJsonResponse(
+      { error: 'Batch too large: max 1000 records per request', count: body.length },
+      { status: 413 },
+      requestId
+    );
+  }
+
+  const errors: Array<{ index: number; errors: string[] }> = [];
+  for (let i = 0; i < body.length; i++) {
+    const validation = validateTelemetry(body[i]);
+    if (!validation.valid) {
+      errors.push({ index: i, errors: validation.errors });
+    }
+  }
+
+  if (errors.length > 0) {
+    return createJsonResponse(
+      { error: `${errors.length} invalid records`, details: errors.slice(0, 5), requestId },
+      { status: 400 },
+      requestId
+    );
+  }
+
+  const records = await ingestTelemetry(identity, body);
+
+  return createJsonResponse(
+    { accepted: records.length, total: body.length, requestId },
+    { status: 202 },
+    requestId
+  );
+}, { domain: 'telemetry' });
 
 // ============================================================
 // Telemetry Validation
@@ -302,25 +289,28 @@ function validateTelemetry(data: unknown): ValidationResult {
 async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown[]) {
   const records = Array.isArray(data) ? data : [data];
 
+  // equipmentId and siteId are derived from authenticated device identity,
+  // never from the request body — otherwise an attacker holding a single
+  // device key could write telemetry against any equipment/site.
   const telemetryRecords = records.map((record: unknown) => {
     const r = record as Record<string, unknown>;
     return {
       type: r.type as string,
-      equipmentId: identity.equipmentId || r.equipmentId as string || 'unknown',
-      siteId: identity.siteId || r.siteId as string || null,
+      equipmentId: identity.equipmentId || 'unknown',
+      siteId: identity.siteId || null,
       value: Number(r.value),
       unit: (r.unit as string) || null,
       latitude: r.latitude ? Number(r.latitude) : null,
       longitude: r.longitude ? Number(r.longitude) : null,
-      metadata: r.metadata || null,
+      metadata: r.metadata ?? null,
       timestamp: r.timestamp ? new Date(r.timestamp as string) : undefined,
     };
   });
 
-  // Bulk insert
-  await db.telemetryRecord.createMany({
-    data: telemetryRecords as any,
-  });
+  // Prisma's InputJsonValue/NullableJsonNullValueInput typing is too strict for
+  // dynamic JSON metadata; values are already validated at the route boundary.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await db.telemetryRecord.createMany({ data: telemetryRecords as any });
 
   return telemetryRecords;
 }
@@ -329,7 +319,7 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
 // Health Check for IoT Devices
 // ============================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
 
   return createJsonResponse({
@@ -342,4 +332,4 @@ export async function GET(request: NextRequest) {
     },
     requestId,
   }, { status: 200 }, requestId);
-}
+}, { domain: 'telemetry' });

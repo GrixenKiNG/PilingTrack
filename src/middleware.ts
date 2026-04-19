@@ -41,10 +41,20 @@ function getAllowedOrigins(): string[] {
 }
 
 function isOriginAllowed(origin: string, allowed: string[]): boolean {
+  let originHost: string;
+  try {
+    originHost = new URL(origin).hostname;
+  } catch {
+    return false;
+  }
+
   return allowed.some(a => {
     if (a === origin) return true;
     if (a.startsWith('*.')) {
-      return origin.endsWith(a.slice(1));
+      const suffix = a.slice(2); // strip "*."
+      // Match subdomains (foo.example.com) but NOT the apex (example.com)
+      // and NOT lookalikes (evilexample.com).
+      return originHost.endsWith(`.${suffix}`);
     }
     return false;
   });
@@ -127,7 +137,7 @@ function enforceTenant(request: NextRequest, response: NextResponse): NextRespon
 // Middleware
 // ============================================================
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const origin = request.headers.get('origin');
   const allowedOrigins = getAllowedOrigins();
 
