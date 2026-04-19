@@ -8,6 +8,7 @@ import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-qu
 import { getRequestId } from '@/lib/request-context';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { logger } from '@/lib/logger';
+import { withApi, withMutation } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +16,7 @@ export const runtime = 'nodejs';
 // POST — Enqueue async single PDF generation (default)
 // ============================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withMutation(async (request: NextRequest) => {
   const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -143,13 +144,13 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ error: 'PDF enqueue failed', requestId }, { status: 500 });
   }
-}
+}, { domain: 'reports' });
 
 // ============================================================
 // GET — Sync fallback (?sync=1) or status/download by jobId
 // ============================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) return error;
@@ -189,7 +190,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ error: 'Invalid action. Use action=status or action=download' }, { status: 400 });
-}
+}, { domain: 'reports' });
 
 // ============================================================
 // Sync generation (fallback)
