@@ -12,7 +12,7 @@ async function main() {
   // Find first active user
   const user = await db.user.findFirst({
     where: { isActive: true },
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, name: true, role: true, tenantId: true },
   });
 
   if (!user) {
@@ -28,6 +28,7 @@ async function main() {
     email: user.email,
     name: user.name,
     role: user.role,
+    tenantId: user.tenantId,
   });
 
   console.log('\n🔑 Session token generated:');

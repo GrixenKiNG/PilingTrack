@@ -14,6 +14,7 @@ const mockUser = {
   email: 'test@piling.ru',
   name: 'Test User',
   role: 'OPERATOR',
+  tenantId: null,
 };
 
 describe('session-service', () => {

@@ -10,6 +10,7 @@ export interface SessionUser {
   email: string;
   name: string;
   role: string;
+  tenantId: string | null;
 }
 
 interface SessionPayload extends JWTPayload {

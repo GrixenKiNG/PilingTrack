@@ -52,9 +52,7 @@ export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => 
     name: parsed.data.name,
     equipmentId,
     siteId: parsed.data.siteId ?? null,
-    // user.tenantId is not on SessionUser today (see TODO in login route);
-    // tenant binding lives at the equipment/site layer for now.
-    tenantId: null,
+    tenantId: user!.tenantId,
     createdById: user!.id,
   });
 

@@ -141,12 +141,14 @@ function toSessionUser(user: {
   email: string;
   name: string;
   role: string;
+  tenantId: string | null;
 }): SessionUser {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
+    tenantId: user.tenantId,
   };
 }
 
@@ -166,6 +168,7 @@ export async function authenticateUserByEmailPassword(email: string, password: s
       name: true,
       role: true,
       isActive: true,
+      tenantId: true,
     },
   });
 
@@ -219,6 +222,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     name: string;
     role: string;
     isActive: boolean;
+    tenantId: string | null;
   } | null = null;
 
   const indexedCandidate = await db.user.findUnique({
@@ -232,6 +236,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
       name: true,
       role: true,
       isActive: true,
+      tenantId: true,
     },
   }).catch(() => null);
 
@@ -262,6 +267,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
         name: true,
         role: true,
         isActive: true,
+        tenantId: true,
       },
     });
 
