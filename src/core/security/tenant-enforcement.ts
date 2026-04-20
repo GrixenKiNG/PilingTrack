@@ -74,7 +74,8 @@ export function resolveTenantId(user: UserWithTenant, headerTenantId?: string | 
 }
 
 export function isMultiTenantMode(): boolean {
-  return process.env.MULTI_TENANT_MODE === 'true';
+  const mtm = process.env.MULTI_TENANT_MODE;
+  return mtm === 'multi' || mtm === 'true';
 }
 
 // ============================================================
