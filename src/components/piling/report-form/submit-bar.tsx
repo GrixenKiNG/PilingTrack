@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 interface SubmitBarProps {
   totalPiles: number;
   totalPileMeters: number;
+  totalDrillingCount: number;
   totalMeters: number;
   totalDowntime: number;
   hasDowntime: boolean;
@@ -19,7 +20,7 @@ interface SubmitBarProps {
 }
 
 export function SubmitBar({
-  totalPiles, totalPileMeters, totalMeters, totalDowntime, hasDowntime,
+  totalPiles, totalPileMeters, totalDrillingCount, totalMeters, totalDowntime, hasDowntime,
   selectedSiteId, hasEntries, submitting, onSubmit,
 }: SubmitBarProps) {
   const router = useRouter();
@@ -37,8 +38,8 @@ export function SubmitBar({
                 <p className="text-[10px] text-slate-400">Сваи, шт. / м.п.</p>
               </div>
               <div>
-                <p className="text-lg font-bold font-mono tabular-nums">{formatNumber(totalMeters)} м</p>
-                <p className="text-[10px] text-slate-400">Лидерное бурение</p>
+                <p className="text-lg font-bold font-mono tabular-nums">{totalDrillingCount} шт. / {formatNumber(totalMeters)} м.п.</p>
+                <p className="text-[10px] text-slate-400">Бурение, шт. / м.п.</p>
               </div>
               {hasDowntime && (
                 <div>

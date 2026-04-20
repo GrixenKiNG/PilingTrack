@@ -76,6 +76,7 @@ export function ReportForm() {
   const totalPiles = piles.reduce((s, p) => s + p.count, 0);
   const totalPileMeters = piles.reduce((s, p) => s + p.count * getPileMetersPerUnit(p.pileGradeId), 0);
   const totalMeters = drillings.reduce((s, d) => s + d.meters, 0);
+  const totalDrillingCount = drillings.reduce((s, d) => s + d.count, 0);
   const totalDowntime = downtimes.reduce((s, d) => s + d.duration, 0);
   const hasEntries = piles.length > 0 || drillings.length > 0 || downtimes.length > 0;
 
@@ -144,7 +145,8 @@ export function ReportForm() {
             onTempCommentChange={temp.setTempDowntimeComment} onAdd={() => temp.addDowntime(addDowntime)}
             onRemove={removeDowntime} getDowntimeReasonName={getDowntimeReasonName} totalDowntime={totalDowntime} />
 
-          <SubmitBar totalPiles={totalPiles} totalPileMeters={totalPileMeters} totalMeters={totalMeters}
+          <SubmitBar totalPiles={totalPiles} totalPileMeters={totalPileMeters}
+            totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
             totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
             selectedSiteId={selectedSiteId} hasEntries={hasEntries} submitting={submitting} onSubmit={handleSubmit} />
         </div>
