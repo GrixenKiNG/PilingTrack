@@ -10,16 +10,14 @@
  *   const reports = await db.report.findMany({ where: { tenantId } });
  */
 
-// Guard against client-side imports (Next.js only, not Node.js workers)
+// Guard against client-side imports (Next.js only, not Node.js workers).
+// Fire-and-forget so this file can be compiled to CJS (workers via tsx)
+// where top-level await is not supported.
 if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
-  // Only enforce server-only in Next.js context, skip in Node.js workers
-  try {
-    // Dynamic import for server-only in Node.js worker contexts
-    // @ts-ignore - server-only not available in all contexts
-    await import('server-only');
-  } catch (e) {
-    // Ignore if running in worker context where server-only is not available
-  }
+  // @ts-ignore - server-only not available in all contexts
+  import('server-only').catch(() => {
+    // Ignore: running in worker context where server-only isn't installed
+  });
 }
 import { Prisma as PostgresPrisma } from '../generated/postgres-client/client';
 import { PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
