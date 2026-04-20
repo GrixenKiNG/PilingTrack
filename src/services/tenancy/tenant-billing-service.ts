@@ -9,6 +9,7 @@
  * - Usage tracking
  */
 
+import { randomBytes } from 'crypto';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 
@@ -175,7 +176,8 @@ async function generateInvoice(tenantId: string, amount: number): Promise<any> {
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const invoiceNumber = `INV-${tenant.slug.toUpperCase()}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+  const invoiceSuffix = randomBytes(4).toString('hex').toUpperCase();
+  const invoiceNumber = `INV-${tenant.slug.toUpperCase()}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${invoiceSuffix}`;
 
   return await db.tenantInvoice.create({
     data: {

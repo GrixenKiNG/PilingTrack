@@ -17,13 +17,16 @@ function hashDeviceKey(plaintext: string): string {
   const secret = explicitSecret || fallbackSecret;
 
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
+    // Fail-closed: anything other than an explicit dev/test env must
+    // refuse to hash. This catches mis-set NODE_ENV (e.g. "Production"
+    // with a capital P) that would otherwise silently drop to the
+    // weak dev fallback.
+    if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
       throw new ServiceError(
-        'DEVICE_KEY_LOOKUP_SECRET is required in production',
+        'DEVICE_KEY_LOOKUP_SECRET is required outside development',
         500
       );
     }
-    // Dev/test fallback — keys still work but are weaker.
     return createHmac('sha256', 'dev-only-device-key-fallback').update(plaintext).digest('hex');
   }
 
@@ -102,7 +105,9 @@ export interface AuthenticatedDevice {
 export async function authenticateDeviceByKey(
   plaintextKey: string
 ): Promise<AuthenticatedDevice | null> {
-  if (!plaintextKey || plaintextKey.length < 16) return null;
+  // Minted keys are `${KEY_PREFIX}_${base64url(32)}` ≈ 48 chars.
+  // Reject anything clearly too short before spending a hash.
+  if (!plaintextKey || plaintextKey.length < 40) return null;
 
   const keyHash = hashDeviceKey(plaintextKey);
   const device = await db.deviceKey.findUnique({
