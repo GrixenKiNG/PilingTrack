@@ -11,7 +11,10 @@ interface HeaderCarrier {
 }
 
 export function isMultiTenantMode() {
-  return process.env.MULTI_TENANT_MODE === 'true';
+  // Accept 'multi' (canonical, per validate-env) and 'true' (legacy).
+  // Anything else — including 'single', 'false', or unset — disables it.
+  const v = process.env.MULTI_TENANT_MODE;
+  return v === 'multi' || v === 'true';
 }
 
 export function resolveTenantContext(request?: HeaderCarrier): TenantContext {

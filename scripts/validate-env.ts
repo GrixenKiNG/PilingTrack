@@ -86,10 +86,10 @@ const ENV_CONFIG: Record<string, EnvVarConfig> = {
   // Multi-tenant — optional
   MULTI_TENANT_MODE: {
     required: false,
-    description: 'Multi-tenant mode (false | single | multi)',
+    description: 'Multi-tenant mode (false | single | multi). Only "multi" (or legacy "true") enables multi-tenant enforcement.',
     validate: (v) => {
-      if (!['false', 'single', 'multi'].includes(v)) {
-        return `Must be "false", "single", or "multi", got "${v}"`;
+      if (!['false', 'single', 'multi', 'true'].includes(v)) {
+        return `Must be "false", "single", "multi" (or legacy "true"), got "${v}"`;
       }
       return null;
     },

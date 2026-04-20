@@ -45,8 +45,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
+              // Next.js emits inline bootstrap/hydration scripts; without
+              // 'unsafe-inline' (or a per-request nonce), the app white-screens
+              // in production. 'unsafe-eval' stays disabled in prod — that's
+              // the bigger risk. A nonce-based CSP is the proper long-term fix.
               process.env.NODE_ENV === "production"
-                ? "script-src 'self' 'wasm-unsafe-eval'"
+                ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
                 : "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",

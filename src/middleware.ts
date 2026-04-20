@@ -84,7 +84,8 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
  * - Pass tenant context to downstream handlers via X-Tenant-ID header
  */
 function enforceTenant(request: NextRequest, response: NextResponse): NextResponse {
-  const isMultiTenant = process.env.MULTI_TENANT_MODE === 'true';
+  const mtm = process.env.MULTI_TENANT_MODE;
+  const isMultiTenant = mtm === 'multi' || mtm === 'true';
 
   if (!isMultiTenant) {
     // Single-tenant mode — no enforcement needed
