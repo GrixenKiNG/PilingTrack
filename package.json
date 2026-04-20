@@ -33,6 +33,7 @@
     "worker:projection": "npx tsx src/workers/projection-worker.ts",
     "worker:pdf": "npx tsx src/workers/pdf-worker.ts",
     "worker:all": "npx tsx src/workers/unified-worker.ts",
+    "postinstall": "npm run db:generate",
     "db:push": "prisma db push",
     "db:generate": "prisma generate && node scripts/patch-postgres-client.js",
     "db:migrate": "prisma migrate dev",

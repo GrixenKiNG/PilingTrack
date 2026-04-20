@@ -124,7 +124,19 @@ andrej-karpathy-skills-main/
 
 # Binaries
 .bin/
-'$null'
+$null
+*.zip
+
+# Playwright screenshots
+output/playwright/
+
+# External tool artifacts
+.codex/
+zai-provider-extension/
+Текстовый документ.txt
+
+# Prisma generated client
+src/generated/postgres-client/
 
 # Other tool artifacts
 .openclaw/
