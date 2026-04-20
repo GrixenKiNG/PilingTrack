@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   History,
@@ -66,6 +67,19 @@ export function ReportHistory() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const searchParams = useSearchParams();
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current || loading) return;
+    const reportId = searchParams.get('reportId');
+    if (!reportId) return;
+    const match = reports.find((r) => r.id === reportId);
+    if (match) {
+      autoOpenedRef.current = true;
+      void handleOpenDetail(match);
+    }
+  }, [loading, reports, searchParams]);
 
   const filteredReports =
     filterSiteId === 'all' ? reports : reports.filter((report) => report.siteId === filterSiteId);
