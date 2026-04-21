@@ -68,23 +68,7 @@ export function ReportHistory() {
     void loadData();
   }, [loadData]);
 
-  const searchParams = useSearchParams();
-  const autoOpenedRef = useRef(false);
-  useEffect(() => {
-    if (autoOpenedRef.current || loading) return;
-    const reportId = searchParams.get('reportId');
-    if (!reportId) return;
-    const match = reports.find((r) => r.id === reportId);
-    if (match) {
-      autoOpenedRef.current = true;
-      void handleOpenDetail(match);
-    }
-  }, [loading, reports, searchParams]);
-
-  const filteredReports =
-    filterSiteId === 'all' ? reports : reports.filter((report) => report.siteId === filterSiteId);
-
-  const handleOpenDetail = async (report: ReportListItemDTO) => {
+  const handleOpenDetail = useCallback(async (report: ReportListItemDTO) => {
     setSelectedReport(null);
     setDetailLoading(true);
 
@@ -106,7 +90,23 @@ export function ReportHistory() {
     } finally {
       setDetailLoading(false);
     }
-  };
+  }, [user]);
+
+  const searchParams = useSearchParams();
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current || loading) return;
+    const reportId = searchParams.get('reportId');
+    if (!reportId) return;
+    const match = reports.find((r) => r.id === reportId);
+    if (match) {
+      autoOpenedRef.current = true;
+      void handleOpenDetail(match);
+    }
+  }, [loading, reports, searchParams, handleOpenDetail]);
+
+  const filteredReports =
+    filterSiteId === 'all' ? reports : reports.filter((report) => report.siteId === filterSiteId);
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('ru-RU', {

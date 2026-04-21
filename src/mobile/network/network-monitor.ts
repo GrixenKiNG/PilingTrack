@@ -67,6 +67,7 @@ export class NetworkMonitor {
 
   private handleOnline = () => {
     this._isOnline = true;
+    // eslint-disable-next-line no-console
     console.log('[Network] Online');
     for (const cb of this.onlineCallbacks) {
       cb();
@@ -75,6 +76,7 @@ export class NetworkMonitor {
 
   private handleOffline = () => {
     this._isOnline = false;
+    // eslint-disable-next-line no-console
     console.log('[Network] Offline');
     for (const cb of this.offlineCallbacks) {
       cb();

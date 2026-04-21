@@ -53,7 +53,6 @@ export function computePinLookup(pin: string): string {
     pinLookupSecretFallbackWarned = true;
     // Coupling warning: rotating SESSION_SECRET will invalidate every stored
     // pinLookup, locking out all PIN users until they reset.
-    // eslint-disable-next-line no-console
     console.warn(
       '[auth] PIN_LOOKUP_SECRET not set — falling back to SESSION_SECRET. ' +
       'Rotating SESSION_SECRET will invalidate all stored PIN lookups.'

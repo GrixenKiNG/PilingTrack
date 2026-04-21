@@ -74,6 +74,7 @@ function log(level: LogLevel, message: string, data?: Record<string, unknown>) {
       console.warn(line);
       break;
     default:
+      // eslint-disable-next-line no-console
       console.log(line);
   }
 }

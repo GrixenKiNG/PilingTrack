@@ -64,6 +64,7 @@ export function ServiceWorkerRegistration() {
             const newWorker = registration.installing;
             newWorker?.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // eslint-disable-next-line no-console
                 console.info('[SW] New version available');
               }
             });

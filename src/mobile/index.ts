@@ -68,5 +68,6 @@ export function initOffline() {
     outboxService.cleanupOldData(14);
   }, 24 * 60 * 60 * 1000);
 
+  // eslint-disable-next-line no-console
   console.log('[PilingTrack] Offline-first initialized');
 }

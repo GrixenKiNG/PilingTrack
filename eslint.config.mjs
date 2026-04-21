@@ -19,6 +19,8 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     // React rules
     "react-hooks/exhaustive-deps": "warn",
     "react-hooks/purity": "off",
+    "react-hooks/set-state-in-effect": "warn",
+    "react-hooks/refs": "warn",
     "react/no-unescaped-entities": "off",
     "react/display-name": "off",
     "react/prop-types": "off",
@@ -44,6 +46,24 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "warn",
   },
 }, {
+  files: [
+    "scripts/**",
+    "load-tests/**",
+    "performance/**",
+    "e2e/**",
+    "tests/**",
+    "prisma/**",
+    "src/workers/**",
+    "src/lib/seed/**",
+    "src/**/__tests__/**",
+    "*.ts",
+    "*.js",
+    "public/**",
+  ],
+  rules: {
+    "no-console": "off",
+  },
+}, {
   ignores: [
     "node_modules/**",
     ".next/**",
@@ -54,7 +74,13 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "skills",
     "scripts/**",
     "src/generated/**",
-    "agents/**"
+    "agents/**",
+    ".kilo/**",
+    "zai-provider-extension/**",
+    "coverage/**",
+    ".codex/**",
+    "output/**",
+    "andrej-karpathy-skills-main/**"
   ]
 }];
 
