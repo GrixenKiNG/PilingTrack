@@ -41,8 +41,11 @@ yarn-error.log
 tmp-*
 db
 
-# Dev scripts & docs
+# Dev scripts & docs — build-time скрипты должны остаться
 scripts
+!scripts/validate-env.ts
+!scripts/copy-standalone-assets.js
+!scripts/patch-postgres-client.js
 docs
 examples
 README*

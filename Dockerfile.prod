@@ -34,7 +34,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
-RUN npx prisma generate --schema prisma/schema.postgres.prisma
+RUN npx prisma generate --schema prisma/schema.prisma
 
 # Build Next.js standalone
 RUN npm run build

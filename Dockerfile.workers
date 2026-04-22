@@ -28,12 +28,17 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATABASE_PROVIDER=postgres
+ENV SESSION_SECRET=build-time-secret-for-validation-32chars-min
+ENV DEVICE_KEY_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars
+ENV PIN_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars-xxx
+ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client for PostgreSQL
-RUN npx prisma generate --schema prisma/schema.postgres.prisma
+RUN npx prisma generate --schema prisma/schema.prisma
 
 # Build Next.js standalone (needed for path resolution)
 RUN npm run build
@@ -60,10 +65,12 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 
+# Workers need full node_modules (standalone only traces Next.js code)
+COPY --from=builder /app/node_modules ./node_modules
+
 # Copy worker source (tsx will resolve @/ paths via tsconfig)
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/tsconfig.paths.json ./tsconfig.paths.json 2>/dev/null || true
 
 # Install tsx for running TypeScript directly
 RUN npm install -g tsx
@@ -81,7 +88,7 @@ ENV WORKER_HEALTH_PORT=3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  curl -f http://localhost:3002/health || exit 1
+  CMD curl -f http://localhost:3002/health || exit 1
 
 EXPOSE 3002
 

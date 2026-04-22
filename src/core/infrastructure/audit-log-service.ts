@@ -12,7 +12,7 @@
  */
 
 import { db } from '@/lib/db';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/postgres-client/client';
 
 export interface AuditLogEntry {
   entity: string;

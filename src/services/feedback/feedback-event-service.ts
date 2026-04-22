@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import type {
   FeedbackEventAudience,

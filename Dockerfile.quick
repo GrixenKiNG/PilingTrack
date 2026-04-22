@@ -10,7 +10,7 @@ COPY . .
 
 # Быстрая сборка без production оптимизаций
 ENV NODE_ENV=production
-RUN npx prisma generate --schema prisma/schema.postgres.prisma || true
+RUN npx prisma generate --schema prisma/schema.prisma || true
 RUN npm run build || echo "Build skipped — using dev server"
 
 FROM node:22-alpine AS runner

@@ -18,13 +18,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV DATABASE_PROVIDER=postgres
 ENV SESSION_SECRET=build-time-secret-for-validation-32chars-min
+ENV DEVICE_KEY_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars
+ENV PIN_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars-xxx
 ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
-RUN npx prisma generate --schema prisma/schema.postgres.prisma
+RUN npx prisma generate --schema prisma/schema.prisma
 
 # Build Next.js standalone
 RUN npm run build

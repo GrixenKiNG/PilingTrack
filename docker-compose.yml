@@ -32,9 +32,13 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://redis:6379
       - WS_URL=ws://ws:3001
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
+      - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
+      - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
       - NEXT_PUBLIC_WS_URL=ws://localhost:3001
     depends_on:
       postgres:
@@ -69,6 +73,8 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://redis:6379
       - WORKER_HEALTH_PORT=3002
       - OUTBOX_INTERVAL_MS=10000
@@ -114,9 +120,13 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://redis:6379
       - WS_PORT=3001
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
+      - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
+      - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
     depends_on:
       postgres:
         condition: service_healthy
@@ -135,7 +145,7 @@ services:
   # PgBouncer — Connection Pooling (правило #19)
   # ============================================================
   pgbouncer:
-    image: edoburu/pgbouncer:1.22.1
+    image: edoburu/pgbouncer:latest
     container_name: pilingtrack-pgbouncer
     restart: unless-stopped
     ports:

@@ -66,7 +66,7 @@ function createPrismaClient(): PostgresPrismaClient {
   // Append pool settings to connection URL if not already present
   let url = process.env.DATABASE_URL_POSTGRES;
   if (!url.includes('pool_timeout=')) {
-    url += `?pool_timeout=${poolTimeout}`;
+    url += `${url.includes('?') ? '&' : '?'}pool_timeout=${poolTimeout}`;
   }
   if (!url.includes('connection_limit=')) {
     // connection_limit is set via Prisma client options, not URL
