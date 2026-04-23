@@ -21,10 +21,11 @@ import type { AssignedUser, SiteFullData } from './types';
 interface UserAssignmentDialogProps {
   siteId: string;
   onOpenChange: (open: boolean) => void;
+  loadingUsers: boolean;
   users: { id: string; email: string; name: string; role: string; isActive: boolean }[];
 }
 
-export function UserAssignmentDialog({ siteId, onOpenChange, users }: UserAssignmentDialogProps) {
+export function UserAssignmentDialog({ siteId, onOpenChange, loadingUsers, users }: UserAssignmentDialogProps) {
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
   const [loadingAssign, setLoadingAssign] = useState(false);
 
@@ -89,7 +90,7 @@ export function UserAssignmentDialog({ siteId, onOpenChange, users }: UserAssign
       <DialogHeader>
         <DialogTitle>Операторы на объекте</DialogTitle>
       </DialogHeader>
-      {loadingAssign ? (
+      {loadingAssign || loadingUsers ? (
         <div className="py-8 flex justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
         </div>

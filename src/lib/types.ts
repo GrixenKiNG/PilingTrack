@@ -259,6 +259,10 @@ export interface SiteAnalyticsDTO {
   siteName: string;
   plannedPiles: number;
   actualPiles: number;
+  plannedPileMeters: number;
+  actualPileMeters: number;
+  plannedDrillingCount: number;
+  actualDrillingCount: number;
   plannedDrilling: number;
   actualDrilling: number;
   pileProgress: number;

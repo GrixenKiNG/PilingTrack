@@ -27,13 +27,14 @@ import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeRea
 interface OperatorUser { id: string; name: string; }
 
 interface PileEntry { id: string; pileGradeId: string; count: number; }
-interface DrillingEntry { id: string; typeId: string; meters: number; }
+interface DrillingEntry { id: string; typeId: string; count: number; metersPerUnit: number; meters: number; }
 interface DowntimeEntry { id: string; reasonId: string; duration: number; comment: string; }
 
 interface ReportFormDialogProps {
   open: boolean;
   onClose: () => void;
   editReport: ReportDTO | null;
+  loadingReferenceData: boolean;
   operators: OperatorUser[];
   sites: SiteFlatDTO[];
   pileGrades: PileGradeDTO[];
@@ -45,6 +46,7 @@ interface ReportFormDialogProps {
 
 export function ReportFormDialog({
   open, onClose, editReport,
+  loadingReferenceData,
   operators, sites, pileGrades, drillingTypes, downtimeReasons, equipment,
   onSuccess,
 }: ReportFormDialogProps) {
@@ -59,7 +61,13 @@ export function ReportFormDialog({
     (editReport?.piles || []).map((p) => ({ id: p.id, pileGradeId: p.pileGradeId, count: p.count }))
   );
   const [formDrillings, setFormDrillings] = useState<DrillingEntry[]>(
-    (editReport?.drillings || []).map((d) => ({ id: d.id, typeId: d.typeId, meters: d.meters }))
+    (editReport?.drillings || []).map((d) => ({
+      id: d.id,
+      typeId: d.typeId,
+      count: d.count || 1,
+      metersPerUnit: d.metersPerUnit || d.meters || 0,
+      meters: d.meters,
+    }))
   );
   const [formDowntimes, setFormDowntimes] = useState<DowntimeEntry[]>(
     (editReport?.downtimes || []).map((dt) => ({ id: dt.id, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' }))
@@ -69,19 +77,37 @@ export function ReportFormDialog({
   const [tempPileGrade, setTempPileGrade] = useState('');
   const [tempPileCount, setTempPileCount] = useState('');
   const [tempDrillType, setTempDrillType] = useState('');
-  const [tempDrillMeters, setTempDrillMeters] = useState('');
+  const [tempDrillCount, setTempDrillCount] = useState('');
+  const [tempDrillMetersPerUnit, setTempDrillMetersPerUnit] = useState('');
   const [tempDtReason, setTempDtReason] = useState('');
   const [tempDtDuration, setTempDtDuration] = useState('');
   const [tempDtComment, setTempDtComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const getPileGradeName = (id: string) => pileGrades.find((g) => g.id === id)?.name || id;
+  const getDrillTypeName = (id: string) => drillingTypes.find((t) => t.id === id)?.name || id;
+  const getDtReasonName = (id: string) => downtimeReasons.find((r) => r.id === id)?.name || id;
+
+  const getPileLengthMeters = (pileGradeId: string) => {
+    const match = getPileGradeName(pileGradeId).match(/\d{3}/);
+    return match ? Number(match[0]) / 10 : 0;
+  };
+
+  const getPileMeters = (pileGradeId: string, count: number) =>
+    Number((getPileLengthMeters(pileGradeId) * count).toFixed(1));
+
   const formTotalPiles = formPiles.reduce((s, p) => s + p.count, 0);
+  const formTotalPileMeters = formPiles.reduce((s, p) => s + getPileMeters(p.pileGradeId, p.count), 0);
+  const formTotalDrillingCount = formDrillings.reduce((s, d) => s + d.count, 0);
   const formTotalMeters = formDrillings.reduce((s, d) => s + d.meters, 0);
   const formTotalDowntime = formDowntimes.reduce((s, d) => s + d.duration, 0);
+  const tempPileMeters = tempPileGrade && Number(tempPileCount) > 0
+    ? getPileMeters(tempPileGrade, Number(tempPileCount))
+    : 0;
 
   const resetTempFields = () => {
     setTempPileGrade(''); setTempPileCount('');
-    setTempDrillType(''); setTempDrillMeters('');
+    setTempDrillType(''); setTempDrillCount(''); setTempDrillMetersPerUnit('');
     setTempDtReason(''); setTempDtDuration(''); setTempDtComment('');
   };
 
@@ -97,11 +123,19 @@ export function ReportFormDialog({
   };
 
   const addDrilling = () => {
-    if (!tempDrillType || !tempDrillMeters || Number(tempDrillMeters) <= 0) {
-      toast.error('Заполните тип и метры'); return;
+    const count = Number(tempDrillCount);
+    const metersPerUnit = Number(tempDrillMetersPerUnit);
+    if (!tempDrillType || !count || count <= 0 || !metersPerUnit || metersPerUnit <= 0) {
+      toast.error('Заполните тип, количество и метры на 1 шт.'); return;
     }
-    setFormDrillings((prev) => [...prev, { id: crypto.randomUUID(), typeId: tempDrillType, meters: Number(tempDrillMeters) }]);
-    setTempDrillType(''); setTempDrillMeters('');
+    setFormDrillings((prev) => [...prev, {
+      id: crypto.randomUUID(),
+      typeId: tempDrillType,
+      count,
+      metersPerUnit,
+      meters: count * metersPerUnit,
+    }]);
+    setTempDrillType(''); setTempDrillCount(''); setTempDrillMetersPerUnit('');
     toast.success('Бурение добавлено');
   };
 
@@ -132,7 +166,12 @@ export function ReportFormDialog({
           shiftStart: formShiftStart, shiftEnd: formShiftEnd,
           equipmentId: formEquipmentId || undefined,
           piles: formPiles.map((p) => ({ pileGradeId: p.pileGradeId, count: p.count })),
-          drillings: formDrillings.map((d) => ({ typeId: d.typeId, meters: d.meters })),
+          drillings: formDrillings.map((d) => ({
+            typeId: d.typeId,
+            count: d.count,
+            metersPerUnit: d.metersPerUnit,
+            meters: d.meters,
+          })),
           downtimes: formDowntimes.map((d) => ({ reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
         }),
       });
@@ -144,16 +183,20 @@ export function ReportFormDialog({
     } finally { setSubmitting(false); }
   };
 
-  const getPileGradeName = (id: string) => pileGrades.find((g) => g.id === id)?.name || id;
-  const getDrillTypeName = (id: string) => drillingTypes.find((t) => t.id === id)?.name || id;
-  const getDtReasonName = (id: string) => downtimeReasons.find((r) => r.id === id)?.name || id;
-
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
         <DialogHeader>
           <DialogTitle className="text-base">{editReport ? 'Редактировать отчёт' : 'Сформировать отчёт'}</DialogTitle>
         </DialogHeader>
+        {loadingReferenceData ? (
+          <div className="flex min-h-[280px] items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+              Загрузка справочников формы...
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4 mt-2">
           {/* Operator, Site, Date, Shift, Equipment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -202,7 +245,11 @@ export function ReportFormDialog({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" />Забитые сваи</h4>
-              {formTotalPiles > 0 && <span className="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{formTotalPiles} шт.</span>}
+              {formTotalPiles > 0 && (
+                <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">
+                  {formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п.
+                </span>
+              )}
             </div>
             <div className="flex gap-2 mb-2">
               <Select value={tempPileGrade} onValueChange={setTempPileGrade}>
@@ -213,13 +260,26 @@ export function ReportFormDialog({
                 min="1" className="w-20 h-9 font-mono text-sm" />
               <Button onClick={addPile} size="sm" className="h-9 bg-orange-500 hover:bg-orange-600 text-white px-3"><Plus className="w-4 h-4" /></Button>
             </div>
+            {tempPileGrade && Number(tempPileCount) > 0 && (
+              <p className="mb-2 rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+                Автоподсчёт: {getPileGradeName(tempPileGrade)} → {getPileLengthMeters(tempPileGrade).toFixed(1)} м × {Number(tempPileCount)} шт. = {tempPileMeters.toFixed(1)} м.п.
+              </p>
+            )}
             {formPiles.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
                 {formPiles.map((pile) => (
                   <div key={pile.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
-                    <span className="font-medium">{getPileGradeName(pile.pileGradeId)}</span>
+                    <div className="min-w-0">
+                      <span className="font-medium">{getPileGradeName(pile.pileGradeId)}</span>
+                      <p className="text-[10px] text-slate-500">
+                        {getPileLengthMeters(pile.pileGradeId).toFixed(1)} м × {pile.count} шт. = {getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.
+                      </p>
+                    </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold">{pile.count} шт.</span>
+                      <span className="text-right font-mono font-semibold">
+                        <span className="block">{pile.count} шт.</span>
+                        <span className="block text-xs text-slate-500">{getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.</span>
+                      </span>
                       <button onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
                         className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
@@ -235,15 +295,17 @@ export function ReportFormDialog({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2"><Drill className="w-4 h-4 text-blue-500" />Лидерное бурение</h4>
-              {formTotalMeters > 0 && <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formTotalMeters.toFixed(1)} м</span>}
+              {formTotalMeters > 0 && <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м</span>}
             </div>
             <div className="flex gap-2 mb-2">
               <Select value={tempDrillType} onValueChange={setTempDrillType}>
                 <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Тип скважины..." /></SelectTrigger>
                 <SelectContent>{drillingTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Input type="number" step="0.1" placeholder="Метры" value={tempDrillMeters} onChange={(e) => setTempDrillMeters(e.target.value)}
-                min="0.1" className="w-24 h-9 font-mono text-sm" />
+              <Input type="number" placeholder="Кол-во" value={tempDrillCount} onChange={(e) => setTempDrillCount(e.target.value)}
+                min="1" className="w-20 h-9 font-mono text-sm" />
+              <Input type="number" step="0.1" placeholder="м/шт" value={tempDrillMetersPerUnit} onChange={(e) => setTempDrillMetersPerUnit(e.target.value)}
+                min="0.1" className="w-20 h-9 font-mono text-sm" />
               <Button onClick={addDrilling} size="sm" className="h-9 bg-blue-500 hover:bg-blue-600 text-white px-3"><Plus className="w-4 h-4" /></Button>
             </div>
             {formDrillings.length > 0 && (
@@ -252,7 +314,10 @@ export function ReportFormDialog({
                   <div key={d.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
                     <span className="font-medium">{getDrillTypeName(d.typeId)}</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold">{d.meters} м</span>
+                      <span className="text-right font-mono font-semibold">
+                        <span className="block">{d.count} шт. x {d.metersPerUnit} м</span>
+                        <span className="block text-xs text-slate-500">{d.meters} м</span>
+                      </span>
                       <button onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
                         className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
@@ -310,16 +375,17 @@ export function ReportFormDialog({
             <div className="bg-slate-900 rounded-lg p-3 text-white">
               <p className="text-[10px] font-medium text-slate-400 mb-2">Итого</p>
               <div className="flex items-center gap-4 text-sm">
-                <span className="font-mono font-bold">{formTotalPiles} св.</span>
-                <span className="font-mono font-bold">{formTotalMeters.toFixed(1)} м</span>
+                <span className="font-mono font-bold">{formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п. сваи</span>
+                <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м.п. бурение</span>
                 {formDowntimes.length > 0 && <span className="font-mono font-bold text-amber-400">{formTotalDowntime} ч</span>}
               </div>
             </div>
           )}
         </div>
+        )}
         <DialogFooter className="pt-2">
           <Button variant="outline" onClick={handleClose} className="h-10">Отмена</Button>
-          <Button onClick={handleSubmit} disabled={submitting} className="h-10 bg-orange-500 hover:bg-orange-600 text-white">
+          <Button onClick={handleSubmit} disabled={submitting || loadingReferenceData} className="h-10 bg-orange-500 hover:bg-orange-600 text-white">
             {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохранение...</>
               : <>{editReport ? <Pencil className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}{editReport ? 'Сохранить' : 'Создать'}</>}
           </Button>

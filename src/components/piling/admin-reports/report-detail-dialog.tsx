@@ -25,6 +25,11 @@ function formatRecordCount(count: number) {
   return `${count} ${pluralizeRu(count, ['запись', 'записи', 'записей'])}`;
 }
 
+function getPileLengthMeters(pileGradeName: string) {
+  const match = pileGradeName.match(/\d{3}/);
+  return match ? Number(match[0]) / 10 : 0;
+}
+
 export function ReportDetailDialog({
   report, onClose, onPreviewPdf, formatDate, formatLastEditor,
 }: ReportDetailDialogProps) {
@@ -75,8 +80,20 @@ export function ReportDetailDialog({
                   <div className="space-y-1">
                     {report.piles.map((p) => (
                       <div key={p.id} className="flex justify-between text-sm p-2 bg-slate-50 rounded">
-                        <span>{p.pileGrade?.name || '—'}</span>
-                        <span className="font-mono font-semibold">{p.count} шт.</span>
+                        <div>
+                          <span>{p.pileGrade?.name || '—'}</span>
+                          {p.pileGrade?.name && (
+                            <p className="text-[10px] text-slate-500">
+                              {getPileLengthMeters(p.pileGrade.name).toFixed(1)} м × {p.count} шт. = {(getPileLengthMeters(p.pileGrade.name) * p.count).toFixed(1)} м.п.
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-right font-mono font-semibold">
+                          <span className="block">{p.count} шт.</span>
+                          <span className="block text-xs text-slate-500">
+                            {p.pileGrade?.name ? (getPileLengthMeters(p.pileGrade.name) * p.count).toFixed(1) : '0.0'} м.п.
+                          </span>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -96,7 +113,10 @@ export function ReportDetailDialog({
                     {report.drillings.map((d) => (
                       <div key={d.id} className="flex justify-between text-sm p-2 bg-slate-50 rounded">
                         <span>{d.type?.name || '—'}</span>
-                        <span className="font-mono font-semibold">{d.meters} м</span>
+                        <span className="text-right font-mono font-semibold">
+                          <span className="block">{d.count || 1} шт.</span>
+                          <span className="block text-xs text-slate-500">{d.meters} м.п.</span>
+                        </span>
                       </div>
                     ))}
                   </div>

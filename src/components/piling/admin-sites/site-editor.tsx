@@ -313,11 +313,12 @@ function PlanSummary({
 interface CreateSiteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  loadingPileGrades: boolean;
   pileGrades: PileGradeDTO[];
   onCreate: (name: string, pilePlans: PilePlanRow[], drillingPlans: DrillingPlanRow[]) => Promise<void>;
 }
 
-export function CreateSiteDialog({ open, onOpenChange, pileGrades, onCreate }: CreateSiteDialogProps) {
+export function CreateSiteDialog({ open, onOpenChange, loadingPileGrades, pileGrades, onCreate }: CreateSiteDialogProps) {
   const [newSiteName, setNewSiteName] = useState('');
   const [newPilePlans, setNewPilePlans] = useState<PilePlanRow[]>([]);
   const [newDrillingPlans, setNewDrillingPlans] = useState<DrillingPlanRow[]>([]);
@@ -346,6 +347,13 @@ export function CreateSiteDialog({ open, onOpenChange, pileGrades, onCreate }: C
           <DialogTitle>Новый объект</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] pr-2">
+          {loadingPileGrades ? (
+            <div className="space-y-3 pb-2">
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : (
           <div className="space-y-4 pb-2">
             <div className="space-y-1.5">
               <Label>Название объекта</Label>
@@ -368,12 +376,13 @@ export function CreateSiteDialog({ open, onOpenChange, pileGrades, onCreate }: C
 
             <PlanSummary pilePlans={newPilePlans} drillingPlans={newDrillingPlans} />
           </div>
+          )}
         </ScrollArea>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={handleCreate}
-            disabled={creating || !newSiteName.trim()}
+            disabled={creating || loadingPileGrades || !newSiteName.trim()}
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Создать'}
@@ -392,11 +401,12 @@ interface EditSiteDialogProps {
   site: SiteListItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  loadingPileGrades: boolean;
   pileGrades: PileGradeDTO[];
   onSave: (siteId: string, name: string, isActive: boolean, pilePlans: PilePlanRow[], drillingPlans: DrillingPlanRow[]) => Promise<void>;
 }
 
-export function EditSiteDialog({ site, open, onOpenChange, pileGrades, onSave }: EditSiteDialogProps) {
+export function EditSiteDialog({ site, open, onOpenChange, loadingPileGrades, pileGrades, onSave }: EditSiteDialogProps) {
   const [editName, setEditName] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [editPilePlans, setEditPilePlans] = useState<PilePlanRow[]>([]);
@@ -462,6 +472,14 @@ export function EditSiteDialog({ site, open, onOpenChange, pileGrades, onSave }:
           <DialogTitle>Редактировать объект</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] pr-2">
+          {loadingPileGrades ? (
+            <div className="space-y-3 pb-2">
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : (
           <div className="space-y-4 pb-2">
             <div className="space-y-1.5">
               <Label>Название объекта</Label>
@@ -501,12 +519,13 @@ export function EditSiteDialog({ site, open, onOpenChange, pileGrades, onSave }:
 
             <PlanSummary pilePlans={editPilePlans} drillingPlans={editDrillingPlans} />
           </div>
+          )}
         </ScrollArea>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={handleSave}
-            disabled={saving || !editName.trim()}
+            disabled={saving || loadingPileGrades || !editName.trim()}
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Сохранить'}

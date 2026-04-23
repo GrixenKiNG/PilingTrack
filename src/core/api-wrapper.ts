@@ -5,6 +5,8 @@ import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
+import { getResponseCache } from '@/core/cache';
+import { readSessionToken } from '@/services/auth/session-service';
 
 export interface ApiWrapperOptions {
   domain?: string;
@@ -36,6 +38,26 @@ export function withApi<T extends any[]>(
 ) {
   return async (request: NextRequest, ...args: T) => {
     try {
+      if (
+        _opts?.cache &&
+        request.method === 'GET' &&
+        !request.nextUrl.searchParams.has('_ts')
+      ) {
+        const domain = _opts.domain || 'unknown';
+        const responseCache = getResponseCache(domain);
+        const sessionToken = readSessionToken(request);
+
+        return await responseCache.getOrFetch(
+          {
+            endpoint: `${request.method}:${request.nextUrl.pathname}`,
+            params: Object.fromEntries(request.nextUrl.searchParams.entries()),
+            userId: sessionToken || undefined,
+          },
+          () => handler(request, ...args),
+          { ttl: _opts.cacheTTL }
+        );
+      }
+
       return await handler(request, ...args);
     } catch (error: unknown) {
       if (error instanceof ServiceError) {

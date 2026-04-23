@@ -60,6 +60,21 @@ describe('withApi', () => {
     expect(body.ok).toBe(true);
   });
 
+  it('should cache GET responses when cache is enabled', async () => {
+    const calls = vi.fn(async () => NextResponse.json({ ok: true, nonce: Date.now() }));
+    const handler = withApi(calls, { domain: 'api-wrapper-cache-test', cache: true, cacheTTL: 60_000 });
+
+    const res1 = await handler(mockRequest());
+    const body1 = await res1.json();
+    const res2 = await handler(mockRequest());
+    const body2 = await res2.json();
+
+    expect(calls).toHaveBeenCalledTimes(1);
+    expect(body1.ok).toBe(true);
+    expect(body2.ok).toBe(true);
+    expect(body2.nonce).toBe(body1.nonce);
+  });
+
   it('should catch ServiceError and return its status', async () => {
     const handler = withApi(async () => {
       throw new ServiceError('Not authorized', 403);

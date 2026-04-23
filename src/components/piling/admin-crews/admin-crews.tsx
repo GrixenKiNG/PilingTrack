@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { DeleteDialog } from './delete-dialog';
 export function AdminCrews() {
   const {
     crews, setCrews, users, equipmentList, sites, loading,
+    loadingReferenceData, loadReferenceData,
     availableOperators, assistantUsers, activeEquipment, activeSites,
     getAssignedOperatorIds, toggleActive, createCrew, updateCrew, deleteCrew,
   } = useCrewsData();
@@ -26,6 +27,12 @@ export function AdminCrews() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteItem, setDeleteItem] = useState<typeof crews[0] | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (showCreateDialog || showEditDialog) {
+      void loadReferenceData();
+    }
+  }, [showCreateDialog, showEditDialog, loadReferenceData]);
 
   const formatCrewCount = (count: number) => `${count} ${pluralizeRu(count, ['бригада', 'бригады', 'бригад'])}`;
 
@@ -117,11 +124,13 @@ export function AdminCrews() {
       <CrewFormDialog open={showCreateDialog} onClose={() => setShowCreateDialog(false)} mode="create"
         editItem={null} operators={availableOperators} equipment={activeEquipment} sites={activeSites}
         assistants={assistantUsers} assignedOperatorIds={getAssignedOperatorIds()}
+        loadingReferenceData={loadingReferenceData}
         onSubmit={handleCreate} submitting={submitting} />
 
       <CrewFormDialog open={showEditDialog} onClose={() => { setShowEditDialog(false); setEditItem(null); }} mode="edit"
         editItem={editItem} operators={availableOperators} equipment={equipmentList} sites={sites}
         assistants={assistantUsers} assignedOperatorIds={getAssignedOperatorIds(editItem?.id)} excludeCrewId={editItem?.id}
+        loadingReferenceData={loadingReferenceData}
         onSubmit={handleEdit} submitting={submitting} />
 
       <DeleteDialog open={showDeleteDialog} onClose={() => { setShowDeleteDialog(false); setDeleteItem(null); }}

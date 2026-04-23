@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,8 @@ export function AdminReports() {
   const {
     reports, sites, operators, pileGrades, drillingTypes, downtimeReasons, equipment,
     filterSiteId, setFilterSiteId, periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites,
-    handleApplyPeriod, handleResetPeriod, loadReports,
+    periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
+    handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   } = useReportsData();
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -28,12 +28,16 @@ export function AdminReports() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editReport, setEditReport] = useState<ReportDTO | null>(null);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
-  const [previewReportName, setPreviewReportName] = useState('');
+
+  useEffect(() => {
+    if (showCreateDialog) {
+      void loadReferenceData();
+    }
+  }, [showCreateDialog, loadReferenceData]);
 
   const handlePreviewPdf = (report: ReportDTO) => {
     if (!report.reportId) return;
     setPreviewReportId(report.reportId);
-    setPreviewReportName(`otchet-${report.date}-${report.user?.name || ''}.pdf`);
   };
 
   const handleExportPdf = async () => {
@@ -41,7 +45,7 @@ export function AdminReports() {
     setGeneratingPdf(true);
     try {
       const { authFetch } = await import('@/lib/api');
-      const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo });
+      const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo, inline: '1' });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
       const res = await authFetch(`/api/reports/pdf?${params}`);
       if (!res.ok) {
@@ -55,9 +59,7 @@ export function AdminReports() {
       const url = URL.createObjectURL(blob);
       const win = window.open(url, '_blank', 'noopener,noreferrer');
       if (!win) {
-        const a = document.createElement('a');
-        a.href = url; a.download = `pilingtrack-report-${periodFrom}-${periodTo}.pdf`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        alert('Разрешите всплывающие окна, чтобы открыть PDF для печати.');
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
@@ -138,11 +140,12 @@ export function AdminReports() {
         onPreviewPdf={handlePreviewPdf} formatDate={formatDate} formatLastEditor={formatLastEditor} />
 
       <PdfPreviewDialog open={!!previewReportId} onOpenChange={(o) => { if (!o) setPreviewReportId(null); }}
-        reportId={previewReportId} downloadName={previewReportName} />
+        reportId={previewReportId} />
 
       <ReportFormDialog key={editReport?.reportId || 'new'}
         open={showCreateDialog} onClose={() => { setShowCreateDialog(false); setEditReport(null); }}
         editReport={editReport}
+        loadingReferenceData={loadingReferenceData}
         operators={operators} sites={sites} pileGrades={pileGrades}
         drillingTypes={drillingTypes} downtimeReasons={downtimeReasons} equipment={equipment}
         onSuccess={loadReports} />

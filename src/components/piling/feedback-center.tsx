@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
@@ -35,6 +35,11 @@ interface FeedbackSummary {
   critical: number;
   ackPending: number;
 }
+
+const OPEN_POLL_INTERVAL_MS = 30_000;
+const CLOSED_POLL_INTERVAL_MS = 180_000;
+const HIDDEN_POLL_INTERVAL_MS = 300_000;
+const HEALTH_REFRESH_INTERVAL_MS = 300_000;
 
 function getLevelIcon(level: FeedbackEventDTO['level']) {
   switch (level) {
@@ -86,30 +91,58 @@ export function FeedbackCenter() {
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
   const [health, setHealth] = useState<ReadyPayload | null>(null);
 
-  const loadFeedback = useCallback(async () => {
+  const isMountedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const healthFetchedAtRef = useRef(0);
+
+  const loadFeedback = useCallback(async (options?: { includeHealth?: boolean; silent?: boolean }) => {
     if (!user) {
       return;
     }
 
-    setLoading(true);
+    if (inFlightRef.current) {
+      return;
+    }
+
+    const includeHealth = options?.includeHealth ?? false;
+    const silent = options?.silent ?? false;
+    const shouldLoadHealth =
+      includeHealth &&
+      (healthFetchedAtRef.current === 0 || Date.now() - healthFetchedAtRef.current >= HEALTH_REFRESH_INTERVAL_MS);
+
+    inFlightRef.current = true;
+    if (!silent) {
+      setLoading(true);
+    }
+
     try {
-      const [eventsRes, readyRes] = await Promise.all([
-        authFetch('/api/feedback/events?limit=25'),
-        fetch('/api/ready', { credentials: 'same-origin' }),
-      ]);
+      const requests: Promise<Response>[] = [authFetch('/api/feedback/events?limit=25')];
+      if (shouldLoadHealth) {
+        requests.push(fetch('/api/ready', { credentials: 'same-origin' }));
+      }
+
+      const [eventsRes, readyRes] = await Promise.all(requests);
 
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json();
-        setServerEvents(eventsData.events || []);
-        setSummary(eventsData.summary || null);
+        if (isMountedRef.current) {
+          setServerEvents(eventsData.events || []);
+          setSummary(eventsData.summary || null);
+        }
       }
 
-      if (readyRes.ok) {
+      if (readyRes?.ok) {
         const readyData = (await readyRes.json()) as ReadyPayload;
-        setHealth(readyData);
+        healthFetchedAtRef.current = Date.now();
+        if (isMountedRef.current) {
+          setHealth(readyData);
+        }
       }
     } finally {
-      setLoading(false);
+      inFlightRef.current = false;
+      if (!silent && isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [user]);
 
@@ -153,12 +186,39 @@ export function FeedbackCenter() {
       return;
     }
 
-    void loadFeedback();
-    const intervalId = window.setInterval(() => {
-      void loadFeedback();
-    }, open ? 15000 : 60000);
+    isMountedRef.current = true;
+    void loadFeedback({ includeHealth: true });
 
-    return () => window.clearInterval(intervalId);
+    const getIntervalMs = () => {
+      if (document.hidden) return HIDDEN_POLL_INTERVAL_MS;
+      return open ? OPEN_POLL_INTERVAL_MS : CLOSED_POLL_INTERVAL_MS;
+    };
+
+    let intervalId = window.setInterval(() => {
+      void loadFeedback({ includeHealth: open, silent: true });
+    }, getIntervalMs());
+
+    const restartInterval = () => {
+      window.clearInterval(intervalId);
+      intervalId = window.setInterval(() => {
+        void loadFeedback({ includeHealth: open, silent: true });
+      }, getIntervalMs());
+    };
+
+    const handleVisibilityChange = () => {
+      restartInterval();
+      if (!document.hidden) {
+        void loadFeedback({ includeHealth: true, silent: true });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMountedRef.current = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.clearInterval(intervalId);
+    };
   }, [loadFeedback, open, user]);
 
   useEffect(() => {
@@ -166,7 +226,7 @@ export function FeedbackCenter() {
       return;
     }
 
-    void loadFeedback();
+    void loadFeedback({ includeHealth: true, silent: true });
 
     let cancelled = false;
     let source: EventSource | null = null;
@@ -232,7 +292,7 @@ export function FeedbackCenter() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={() => void loadFeedback()} size="sm" variant="outline" className="h-8 text-xs">
+              <Button onClick={() => void loadFeedback({ includeHealth: true })} size="sm" variant="outline" className="h-8 text-xs">
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
               </Button>

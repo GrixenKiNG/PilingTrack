@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { authFetch } from '@/lib/api';
 import { toast } from 'sonner';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
@@ -12,9 +12,12 @@ interface OperatorUser {
 
 interface PeriodSummary {
   totalPiles: number;
+  totalDrillingCount?: number;
   totalDrilling: number;
   totalDowntime: number;
   reportCount: number;
+  uniqueSites?: number;
+  uniqueOperators?: number;
 }
 
 export interface UseReportsDataReturn {
@@ -35,9 +38,11 @@ export interface UseReportsDataReturn {
   periodSummary: PeriodSummary | null;
   loading: boolean;
   loadingSites: boolean;
+  loadingReferenceData: boolean;
   handleApplyPeriod: () => void;
   handleResetPeriod: () => void;
   loadReports: () => Promise<void>;
+  loadReferenceData: () => Promise<void>;
 }
 
 export function useReportsData(): UseReportsDataReturn {
@@ -57,6 +62,10 @@ export function useReportsData(): UseReportsDataReturn {
 
   const [loading, setLoading] = useState(true);
   const [loadingSites, setLoadingSites] = useState(false);
+  const [loadingReferenceData, setLoadingReferenceData] = useState(false);
+
+  const referenceDataLoadedRef = useRef(false);
+  const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -79,56 +88,60 @@ export function useReportsData(): UseReportsDataReturn {
       }
     };
 
-    const loadOperators = async () => {
-      try {
-        const res = await authFetch('/api/users?role=OPERATOR', { signal: abortController.signal });
-        if (isMounted && res.ok) {
-          const data = await res.json();
-          setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
-        }
-      } catch (error) {
-        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
-          /* ignore */
-        }
-      }
-    };
-
-    const loadDictionary = async () => {
-      try {
-        const res = await authFetch('/api/dictionary/all', { signal: abortController.signal });
-        if (isMounted && res.ok) {
-          const data = await res.json();
-          setPileGrades(data.pileGrades || []);
-          setDrillingTypes(data.drillingTypes || []);
-          setDowntimeReasons(data.downtimeReasons || []);
-        }
-      } catch (error) {
-        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
-          /* ignore */
-        }
-      }
-    };
-
-    const loadEquipment = async () => {
-      try {
-        const res = await authFetch('/api/equipment', { signal: abortController.signal });
-        if (isMounted && res.ok) {
-          const data = await res.json();
-          setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
-        }
-      } catch (error) {
-        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
-          /* ignore */
-        }
-      }
-    };
-
-    Promise.all([loadSites(), loadOperators(), loadDictionary(), loadEquipment()]);
+    void loadSites();
 
     return () => {
       isMounted = false;
       abortController.abort();
     };
+  }, []);
+
+  const loadReferenceData = useCallback(async () => {
+    if (referenceDataLoadedRef.current) {
+      return;
+    }
+
+    if (referenceDataPromiseRef.current) {
+      return referenceDataPromiseRef.current;
+    }
+
+    setLoadingReferenceData(true);
+
+    const promise = Promise.all([
+      authFetch('/api/users?role=OPERATOR'),
+      authFetch('/api/dictionary/all'),
+      authFetch('/api/equipment'),
+    ])
+      .then(async ([operatorsRes, dictionaryRes, equipmentRes]) => {
+        if (operatorsRes.ok) {
+          const data = await operatorsRes.json();
+          setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
+        }
+
+        if (dictionaryRes.ok) {
+          const data = await dictionaryRes.json();
+          setPileGrades(data.pileGrades || []);
+          setDrillingTypes(data.drillingTypes || []);
+          setDowntimeReasons(data.downtimeReasons || []);
+        }
+
+        if (equipmentRes.ok) {
+          const data = await equipmentRes.json();
+          setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
+        }
+
+        referenceDataLoadedRef.current = true;
+      })
+      .catch(() => {
+        toast.error('Ошибка загрузки справочников для формы отчёта');
+      })
+      .finally(() => {
+        setLoadingReferenceData(false);
+        referenceDataPromiseRef.current = null;
+      });
+
+    referenceDataPromiseRef.current = promise;
+    return promise;
   }, []);
 
   useEffect(() => {
@@ -206,7 +219,7 @@ export function useReportsData(): UseReportsDataReturn {
   return {
     reports, sites, operators, pileGrades, drillingTypes, downtimeReasons, equipment,
     filterSiteId, setFilterSiteId, periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites,
-    handleApplyPeriod, handleResetPeriod, loadReports,
+    periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
+    handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   };
 }

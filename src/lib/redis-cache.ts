@@ -71,11 +71,15 @@ export async function getRedisClient(): Promise<Redis | null> {
     });
 
     redisClient.on('connect', () => {
-      logger.info('Redis: connected');
+      if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
+        logger.info('Redis: connected');
+      }
     });
 
     redisClient.on('ready', () => {
-      logger.info('Redis: ready');
+      if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
+        logger.info('Redis: ready');
+      }
     });
 
     await redisClient.connect();

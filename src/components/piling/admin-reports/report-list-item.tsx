@@ -19,11 +19,18 @@ interface ReportListItemProps {
   onPreviewPdf: (r: ReportDTO) => void;
 }
 
+function getPileLengthMeters(pileGradeName: string) {
+  const match = pileGradeName.match(/\d{3}/);
+  return match ? Number(match[0]) / 10 : 0;
+}
+
 export function ReportListItem({
   report, index, pileGradeNames, drillTypeNames, dtReasonNames,
   formatDate, formatLastEditor, onView, onEdit, onPreviewPdf,
 }: ReportListItemProps) {
   const totalPiles = report.piles?.reduce((s, p) => s + p.count, 0) || 0;
+  const totalPileMeters = report.piles?.reduce((s, p) => s + getPileLengthMeters(p.pileGrade?.name || '') * p.count, 0) || 0;
+  const totalDrillingCount = report.drillings?.reduce((s, d) => s + (d.count || 1), 0) || 0;
   const totalDrilling = report.drillings?.reduce((s, d) => s + d.meters, 0) || 0;
   const totalDowntime = report.downtimes?.reduce((s, d) => s + d.duration, 0) || 0;
 
@@ -71,13 +78,13 @@ export function ReportListItem({
           <div className="flex items-center gap-4 mt-2">
             <span className="flex items-center gap-1 text-xs">
               <HardHat className="w-3 h-3 text-orange-500" />
-              <span className="font-mono font-semibold">{totalPiles}</span>
-              <span className="text-slate-500">св.</span>
+              <span className="font-mono font-semibold">{totalPiles}/{totalPileMeters.toFixed(1)}</span>
+              <span className="text-slate-500">шт/м.п.</span>
             </span>
             <span className="flex items-center gap-1 text-xs">
               <Drill className="w-3 h-3 text-blue-500" />
-              <span className="font-mono font-semibold">{totalDrilling}</span>
-              <span className="text-slate-500">м</span>
+              <span className="font-mono font-semibold">{totalDrillingCount}/{totalDrilling}</span>
+              <span className="text-slate-500">шт/м</span>
             </span>
             {totalDowntime > 0 && (
               <span className="flex items-center gap-1 text-xs">

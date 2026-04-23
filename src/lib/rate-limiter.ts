@@ -120,7 +120,9 @@ class RateLimiter {
       });
 
       this.redis.on('ready', () => {
-        logger.info('RateLimiter: Redis ready');
+        if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
+          logger.info('RateLimiter: Redis ready');
+        }
         this.redisReady = true;
       });
 

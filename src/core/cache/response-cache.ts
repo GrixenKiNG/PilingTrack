@@ -86,6 +86,10 @@ export function cacheKeyToString(key: CacheKey): string {
   return parts.join('|');
 }
 
+function cloneResponse<T>(response: NextResponse<T>): NextResponse<T> {
+  return response.clone() as NextResponse<T>;
+}
+
 // ============================================================
 // Response Cache
 // ============================================================
@@ -129,14 +133,14 @@ export class ResponseCache {
 
       if (age < ttl) {
         // Fresh — return immediately
-        return entry.value as NextResponse<T>;
+        return cloneResponse(entry.value as NextResponse<T>);
       }
 
       if (age < ttl + this.config.staleWhileRevalidate) {
         // Stale but revalidatable — serve stale + refresh in background
         entry.isStale = true;
         this.refreshInBackground(cacheKey, key, fetchFn, ttl);
-        return entry.value as NextResponse<T>;
+        return cloneResponse(entry.value as NextResponse<T>);
       }
 
       // Expired — remove and re-fetch
@@ -149,7 +153,7 @@ export class ResponseCache {
       // Wait for the existing request to complete
       try {
         const value = await inFlight.promise as NextResponse<T>;
-        return value;
+        return cloneResponse(value);
       } catch {
         // In-flight failed — retry
         this.inFlight.delete(cacheKey);
@@ -184,14 +188,14 @@ export class ResponseCache {
     }
 
     this.cache.set(cacheKey, {
-      value: value as any,
+      value: cloneResponse(value) as any,
       createdAt: Date.now(),
       lastAccessedAt: Date.now(),
       hitCount: 0,
       isStale: false,
     });
 
-    return value;
+    return cloneResponse(value);
   }
 
   /**
@@ -343,6 +347,10 @@ export function getCacheHealth(): Record<string, ReturnType<ResponseCache['getSt
 
 // Auto-log stats
 setInterval(() => {
+  if (process.env.LOG_CACHE_STATS !== 'true') {
+    return;
+  }
+
   const stats = getCacheHealth();
   const activeCaches = Object.entries(stats).filter(([, s]) => s.entries > 0);
 

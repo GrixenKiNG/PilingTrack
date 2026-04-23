@@ -10,6 +10,8 @@ import {
 import type { FeedbackEventAudience, FeedbackEventLevel, FeedbackEventPriority } from '@/lib/types';
 import { z } from 'zod';
 import { withApi, withMutation } from '@/core/api-wrapper';
+import { getResponseCache } from '@/core/cache';
+import { readSessionToken } from '@/services/auth/session-service';
 
 const ALLOWED_LEVELS: FeedbackEventLevel[] = ['info', 'success', 'warn', 'error', 'audit'];
 const ALLOWED_PRIORITIES: FeedbackEventPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -35,6 +37,23 @@ const feedbackCreateSchema = z.object({
 
 
 export const runtime = 'nodejs';
+
+function invalidateFeedbackCache(request: NextRequest, scope: 'all' | 'user') {
+  const cache = getResponseCache('feedback');
+
+  if (scope === 'all') {
+    cache.invalidate('GET:/api/feedback/events');
+    return;
+  }
+
+  const sessionToken = readSessionToken(request);
+  if (!sessionToken) {
+    cache.invalidate('GET:/api/feedback/events');
+    return;
+  }
+
+  cache.invalidate('GET:/api/feedback/events', { userId: sessionToken });
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -73,6 +92,7 @@ export const POST = withMutation(async (request: NextRequest) => {
 
     if (operation === 'read_all') {
       const result = await markAllFeedbackEventsRead(sessionUser);
+      invalidateFeedbackCache(request, 'user');
       return createJsonResponse({ requestId, ...result }, { status: 200 }, requestId);
     }
 
@@ -111,6 +131,7 @@ export const POST = withMutation(async (request: NextRequest) => {
         );
       }
 
+      invalidateFeedbackCache(request, 'user');
       return createJsonResponse({ requestId, event }, { status: 200 }, requestId);
     }
 
@@ -137,6 +158,8 @@ export const POST = withMutation(async (request: NextRequest) => {
       targetId: validated.data.targetId || null,
       metadata: validated.data.metadata || null,
     });
+
+    invalidateFeedbackCache(request, 'all');
 
     return createJsonResponse(
       {

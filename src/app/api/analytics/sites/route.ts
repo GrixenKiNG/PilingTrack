@@ -16,7 +16,7 @@ export const GET = withApi(
     assertCan(user!, 'analytics.read');
 
     // Redis cache with 5 min TTL
-    const cacheKey = `analytics:sites:${user!.id}`;
+    const cacheKey = `analytics:sites:v2:${user!.id}`;
     const analytics = await cache.getOrSet(
       cacheKey,
       () => getSiteAnalytics(),

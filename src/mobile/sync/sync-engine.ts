@@ -10,7 +10,7 @@
  * - Network restored (online event)
  * - App resume
  * - Manual sync button
- * - Timer (every 60s when online)
+ * - Timer (every 90s when online and visible)
  */
 
 import { outboxService } from '../outbox/outbox-service';
@@ -31,7 +31,7 @@ const SYNC_CONFIG = {
   maxRetries: 5,
   baseDelayMs: 1000,
   maxDelayMs: 30000,
-  pullIntervalMs: 60000, // 60s when online
+  pullIntervalMs: 90000, // 90s when online
   autoSyncDelayMs: 2000, // Delay after network restored
 };
 
@@ -350,7 +350,7 @@ export function startAutoSync() {
 
   // Periodic pull sync
   syncTimer = setInterval(() => {
-    if (navigator.onLine && !syncInProgress) {
+    if (document.visibilityState === 'visible' && navigator.onLine && !syncInProgress) {
       runSyncCycle();
     }
   }, SYNC_CONFIG.pullIntervalMs);

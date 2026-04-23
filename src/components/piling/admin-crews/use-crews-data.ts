@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
@@ -12,14 +12,29 @@ export interface UseCrewsDataReturn {
   equipmentList: EquipmentDTO[];
   sites: SiteDTO[];
   loading: boolean;
+  loadingReferenceData: boolean;
   availableOperators: UserDTO[];
   assistantUsers: UserDTO[];
   activeEquipment: EquipmentDTO[];
   activeSites: SiteDTO[];
+  loadReferenceData: () => Promise<void>;
   getAssignedOperatorIds: (excludeCrewId?: string) => Set<string>;
   toggleActive: (crew: CrewDTO) => Promise<void>;
-  createCrew: (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantNames?: string[] }) => Promise<CrewDTO>;
-  updateCrew: (id: string, data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantNames?: string[]; isActive: boolean }) => Promise<CrewDTO>;
+  createCrew: (data: {
+    operatorId: string;
+    equipmentId: string;
+    siteId: string;
+    name?: string;
+    assistantNames?: string[];
+  }) => Promise<CrewDTO>;
+  updateCrew: (id: string, data: {
+    operatorId: string;
+    equipmentId: string;
+    siteId: string;
+    name?: string;
+    assistantNames?: string[];
+    isActive: boolean;
+  }) => Promise<CrewDTO>;
   deleteCrew: (id: string) => Promise<void>;
 }
 
@@ -29,29 +44,81 @@ export function useCrewsData(): UseCrewsDataReturn {
   const [equipmentList, setEquipmentList] = useState<EquipmentDTO[]>([]);
   const [sites, setSites] = useState<SiteDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [loadingReferenceData, setLoadingReferenceData] = useState(false);
+  const referenceDataLoadedRef = useRef(false);
+  const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
+
+  const loadReferenceData = useCallback(async () => {
+    if (referenceDataLoadedRef.current) {
+      return;
+    }
+
+    if (referenceDataPromiseRef.current) {
+      return referenceDataPromiseRef.current;
+    }
+
+    const promise = (async () => {
+      setLoadingReferenceData(true);
+
+      try {
+        const [usersRes, equipmentRes, sitesRes] = await Promise.all([
+          authFetch('/api/users'),
+          authFetch('/api/equipment'),
+          authFetch('/api/sites/all'),
+        ]);
+
+        if (usersRes.ok) {
+          const data = await usersRes.json();
+          setUsers(data.data || data.users || []);
+        }
+
+        if (equipmentRes.ok) {
+          const data = await equipmentRes.json();
+          setEquipmentList(data.data || data.equipment || []);
+        }
+
+        if (sitesRes.ok) {
+          const data = await sitesRes.json();
+          setSites(data.sites || []);
+        }
+
+        referenceDataLoadedRef.current = true;
+      } catch {
+        toast.error('Ошибка загрузки справочников для формы бригады');
+      } finally {
+        setLoadingReferenceData(false);
+        referenceDataPromiseRef.current = null;
+      }
+    })();
+
+    referenceDataPromiseRef.current = promise;
+    return promise;
+  }, []);
 
   useEffect(() => {
     const abortController = new AbortController();
     let isMounted = true;
 
-    const loadData = async () => {
-      if (!isMounted) return;
-      setLoading(true);
-      try {
-        const [crewsRes, usersRes, equipmentRes, sitesRes] = await Promise.all([
-          authFetch('/api/crews', { signal: abortController.signal }),
-          authFetch('/api/users', { signal: abortController.signal }),
-          authFetch('/api/equipment', { signal: abortController.signal }),
-          authFetch('/api/sites/all', { signal: abortController.signal }),
-        ]);
-        
-        if (!isMounted) return;
+    const loadCrews = async () => {
+      if (!isMounted) {
+        return;
+      }
 
-        if (crewsRes.ok) { const d = await crewsRes.json(); setCrews(d.data || d.crews || []); }
-        if (usersRes.ok) { const d = await usersRes.json(); setUsers(d.data || d.users || []); }
-        if (equipmentRes.ok) { const d = await equipmentRes.json(); setEquipmentList(d.data || d.equipment || []); }
-        if (sitesRes.ok) { const d = await sitesRes.json(); setSites(d.sites || []); }
+      setLoading(true);
+
+      try {
+        const crewsRes = await authFetch('/api/crews', {
+          signal: abortController.signal,
+        });
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (crewsRes.ok) {
+          const data = await crewsRes.json();
+          setCrews(data.data || data.crews || []);
+        }
       } catch (error: unknown) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
           toast.error('Ошибка загрузки данных');
@@ -63,7 +130,7 @@ export function useCrewsData(): UseCrewsDataReturn {
       }
     };
 
-    loadData();
+    void loadCrews();
 
     return () => {
       isMounted = false;
@@ -73,45 +140,127 @@ export function useCrewsData(): UseCrewsDataReturn {
 
   const getAssignedOperatorIds = useCallback((excludeCrewId?: string) => {
     const ids = new Set<string>();
-    crews.filter(c => c.isActive && (!excludeCrewId || c.id !== excludeCrewId))
-      .forEach(c => { if (c.operatorId) ids.add(c.operatorId); });
+
+    crews
+      .filter(crew => crew.isActive && (!excludeCrewId || crew.id !== excludeCrewId))
+      .forEach(crew => {
+        if (crew.operatorId) {
+          ids.add(crew.operatorId);
+        }
+      });
+
     return ids;
   }, [crews]);
 
-  const availableOperators = useMemo(() => users.filter(u => u.role === 'OPERATOR' && u.isActive), [users]);
-  const assistantUsers = useMemo(() => users.filter(u => u.role === 'ASSISTANT' && u.isActive).sort((a, b) => a.name.localeCompare(b.name, 'ru')), [users]);
-  const activeEquipment = useMemo(() => equipmentList.filter(e => e.isActive), [equipmentList]);
-  const activeSites = useMemo(() => sites.filter(s => s.isActive), [sites]);
+  const availableOperators = useMemo(
+    () => users.filter(user => user.role === 'OPERATOR' && user.isActive),
+    [users],
+  );
+  const assistantUsers = useMemo(
+    () => users
+      .filter(user => user.role === 'ASSISTANT' && user.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    [users],
+  );
+  const activeEquipment = useMemo(
+    () => equipmentList.filter(item => item.isActive),
+    [equipmentList],
+  );
+  const activeSites = useMemo(
+    () => sites.filter(site => site.isActive),
+    [sites],
+  );
 
   const toggleActive = async (crew: CrewDTO) => {
-    setTogglingId(crew.id);
     try {
-      const res = await authFetch(`/api/crews/${crew.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: !crew.isActive }) });
-      if (!res.ok) throw new Error();
+      const res = await authFetch(`/api/crews/${crew.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !crew.isActive }),
+      });
+
+      if (!res.ok) {
+        throw new Error();
+      }
+
       const data = await res.json();
-      setCrews(prev => prev.map(c => c.id === crew.id ? data.crew : c));
-    } catch { toast.error('Ошибка изменения статуса'); }
-    finally { setTogglingId(null); }
+      setCrews(prev => prev.map(item => item.id === crew.id ? data.crew : item));
+    } catch {
+      toast.error('Ошибка изменения статуса');
+    }
   };
 
-  const createCrew = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantNames?: string[] }) => {
-    const res = await authFetch('/api/crews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Ошибка создания'); }
+  const createCrew = async (data: {
+    operatorId: string;
+    equipmentId: string;
+    siteId: string;
+    name?: string;
+    assistantNames?: string[];
+  }) => {
+    const res = await authFetch('/api/crews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || 'Ошибка создания');
+    }
+
     const result = await res.json();
     return result.crew;
   };
 
-  const updateCrew = async (id: string, data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantNames?: string[]; isActive: boolean }) => {
-    const res = await authFetch(`/api/crews/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Ошибка сохранения'); }
+  const updateCrew = async (id: string, data: {
+    operatorId: string;
+    equipmentId: string;
+    siteId: string;
+    name?: string;
+    assistantNames?: string[];
+    isActive: boolean;
+  }) => {
+    const res = await authFetch(`/api/crews/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || 'Ошибка сохранения');
+    }
+
     const result = await res.json();
     return result.crew;
   };
 
   const deleteCrew = async (id: string) => {
     const res = await authFetch(`/api/crews/${id}`, { method: 'DELETE' });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Ошибка удаления'); }
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || 'Ошибка удаления');
+    }
   };
 
-  return { crews, setCrews, users, equipmentList, sites, loading, availableOperators, assistantUsers, activeEquipment, activeSites, getAssignedOperatorIds, toggleActive, createCrew, updateCrew, deleteCrew };
+  return {
+    crews,
+    setCrews,
+    users,
+    equipmentList,
+    sites,
+    loading,
+    loadingReferenceData,
+    availableOperators,
+    assistantUsers,
+    activeEquipment,
+    activeSites,
+    loadReferenceData,
+    getAssignedOperatorIds,
+    toggleActive,
+    createCrew,
+    updateCrew,
+    deleteCrew,
+  };
 }

@@ -24,6 +24,16 @@ interface HealthCheck {
   details?: Record<string, unknown>;
 }
 
+const READINESS_CACHE_TTL_MS = 5_000;
+
+let readinessCache:
+  | {
+      expiresAt: number;
+      value: Awaited<ReturnType<typeof buildReadiness>>;
+    }
+  | null = null;
+let readinessInFlight: Promise<Awaited<ReturnType<typeof buildReadiness>>> | null = null;
+
 async function checkDatabase(): Promise<HealthCheck> {
   const start = Date.now();
   try {
@@ -113,7 +123,7 @@ export async function getHealth() {
 // Readiness (Ready to serve traffic)
 // ============================================================
 
-export async function getReadiness() {
+async function buildReadiness() {
   const dbCheck = await checkDatabase();
   const envCheck = checkEnv();
 
@@ -126,6 +136,35 @@ export async function getReadiness() {
       environment: envCheck,
     },
   };
+}
+
+export async function getReadiness() {
+  if (process.env.NODE_ENV === 'test') {
+    return buildReadiness();
+  }
+
+  const now = Date.now();
+  if (readinessCache && readinessCache.expiresAt > now) {
+    return readinessCache.value;
+  }
+
+  if (readinessInFlight) {
+    return readinessInFlight;
+  }
+
+  readinessInFlight = buildReadiness()
+    .then((value) => {
+      readinessCache = {
+        value,
+        expiresAt: Date.now() + READINESS_CACHE_TTL_MS,
+      };
+      return value;
+    })
+    .finally(() => {
+      readinessInFlight = null;
+    });
+
+  return readinessInFlight;
 }
 
 // ============================================================

@@ -58,7 +58,9 @@ export class InMemoryEventBus implements EventBus {
 
     const eventHandlers = this.handlers.get(event.type);
     if (!eventHandlers || eventHandlers.size === 0) {
-      logger.debug('No handlers for event', { type: event.type });
+      if (process.env.LOG_UNHANDLED_EVENTS === 'true') {
+        logger.debug('No handlers for event', { type: event.type });
+      }
       return;
     }
 

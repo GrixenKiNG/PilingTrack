@@ -112,7 +112,22 @@ export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
 export async function listFeedbackEventsForUser(user: FeedbackUser, limit = 25) {
   const events = await db.feedbackEvent.findMany({
     where: getAccessWhere(user),
-    include: {
+    select: {
+      id: true,
+      level: true,
+      priority: true,
+      scope: true,
+      action: true,
+      title: true,
+      message: true,
+      audience: true,
+      actorId: true,
+      actorName: true,
+      actorRole: true,
+      targetId: true,
+      requestId: true,
+      metadata: true,
+      createdAt: true,
       reads: {
         where: { userId: user.id },
         select: { readAt: true, acknowledgedAt: true },
@@ -124,20 +139,32 @@ export async function listFeedbackEventsForUser(user: FeedbackUser, limit = 25) 
   });
 
   const mapped = events.map(mapEvent);
+  const isPrivileged = isPrivilegedRole(user.role);
   const summary = {
-    total: mapped.length,
-    unread: mapped.filter((event) => event.unread).length,
-    error: mapped.filter((event) => event.level === 'error').length,
-    warn: mapped.filter((event) => event.level === 'warn').length,
-    success: mapped.filter((event) => event.level === 'success').length,
-    critical: mapped.filter((event) => event.priority === 'CRITICAL').length,
-    ackPending: mapped.filter(
-      (event) =>
-        (event.level === 'warn' || event.level === 'error') &&
-        isPrivilegedRole(user.role) &&
-        !event.acknowledgedAt
-    ).length,
+    total: 0,
+    unread: 0,
+    error: 0,
+    warn: 0,
+    success: 0,
+    critical: 0,
+    ackPending: 0,
   };
+
+  for (const event of mapped) {
+    summary.total++;
+    if (event.unread) summary.unread++;
+    if (event.level === 'error') summary.error++;
+    if (event.level === 'warn') summary.warn++;
+    if (event.level === 'success') summary.success++;
+    if (event.priority === 'CRITICAL') summary.critical++;
+    if (
+      isPrivileged &&
+      (event.level === 'warn' || event.level === 'error') &&
+      !event.acknowledgedAt
+    ) {
+      summary.ackPending++;
+    }
+  }
 
   return { events: mapped, summary };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MapPin,
   Plus,
@@ -29,6 +29,13 @@ export function AdminSites() {
   const [users, setUsers] = useState<{ id: string; email: string; name: string; role: string; isActive: boolean }[]>([]);
   const [pileGrades, setPileGrades] = useState<PileGradeDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingPileGrades, setLoadingPileGrades] = useState(false);
+
+  const usersLoadedRef = useRef(false);
+  const usersPromiseRef = useRef<Promise<void> | null>(null);
+  const pileGradesLoadedRef = useRef(false);
+  const pileGradesPromiseRef = useRef<Promise<void> | null>(null);
 
   // Create site dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -66,25 +73,13 @@ export function AdminSites() {
       if (!isMounted) return;
       setLoading(true);
       try {
-        const [usersRes, sitesRes, dictRes] = await Promise.all([
-          authFetch('/api/users', { signal: abortController.signal }),
-          authFetch('/api/sites/all', { signal: abortController.signal }),
-          authFetch('/api/dictionary/all', { signal: abortController.signal }),
-        ]);
-        
+        const sitesRes = await authFetch('/api/sites/all', { signal: abortController.signal });
+
         if (!isMounted) return;
 
-        if (usersRes.ok) {
-          const data = await usersRes.json();
-          setUsers(data.data || data.users || []);
-        }
         if (sitesRes.ok) {
           const data = await sitesRes.json();
           setSites(data.sites || []);
-        }
-        if (dictRes.ok) {
-          const data = await dictRes.json();
-          setPileGrades(data.pileGrades || []);
         }
       } catch (error: unknown) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
@@ -104,6 +99,84 @@ export function AdminSites() {
       abortController.abort();
     };
   }, []);
+
+  const loadUsers = useCallback(async () => {
+    if (usersLoadedRef.current) {
+      return;
+    }
+
+    if (usersPromiseRef.current) {
+      return usersPromiseRef.current;
+    }
+
+    setLoadingUsers(true);
+
+    const promise = authFetch('/api/users')
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error('Failed to load users');
+        }
+
+        const data = await res.json();
+        setUsers(data.data || data.users || []);
+        usersLoadedRef.current = true;
+      })
+      .catch(() => {
+        toast.error('Ошибка загрузки пользователей');
+      })
+      .finally(() => {
+        setLoadingUsers(false);
+        usersPromiseRef.current = null;
+      });
+
+    usersPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  const loadPileGrades = useCallback(async () => {
+    if (pileGradesLoadedRef.current) {
+      return;
+    }
+
+    if (pileGradesPromiseRef.current) {
+      return pileGradesPromiseRef.current;
+    }
+
+    setLoadingPileGrades(true);
+
+    const promise = authFetch('/api/dictionary/all')
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error('Failed to load pile grades');
+        }
+
+        const data = await res.json();
+        setPileGrades(data.pileGrades || []);
+        pileGradesLoadedRef.current = true;
+      })
+      .catch(() => {
+        toast.error('Ошибка загрузки справочника свай');
+      })
+      .finally(() => {
+        setLoadingPileGrades(false);
+        pileGradesPromiseRef.current = null;
+      });
+
+    pileGradesPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  useEffect(() => {
+    if (showCreateDialog || showEditDialog) {
+      void loadPileGrades();
+    }
+  }, [showCreateDialog, showEditDialog, loadPileGrades]);
+
+  useEffect(() => {
+    if (showAssignDialog) {
+      void loadUsers();
+    }
+  }, [showAssignDialog, loadUsers]);
 
   // ============================================================
   // Expand / collapse site tree
@@ -413,6 +486,7 @@ export function AdminSites() {
       <CreateSiteDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
+        loadingPileGrades={loadingPileGrades}
         pileGrades={pileGrades}
         onCreate={handleCreateSite}
       />
@@ -422,6 +496,7 @@ export function AdminSites() {
         site={editSite}
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
+        loadingPileGrades={loadingPileGrades}
         pileGrades={pileGrades}
         onSave={handleSaveEdit}
       />
@@ -447,6 +522,7 @@ export function AdminSites() {
         <UserAssignmentDialog
           siteId={assignSiteId}
           onOpenChange={setShowAssignDialog}
+          loadingUsers={loadingUsers}
           users={users}
         />
       </Dialog>

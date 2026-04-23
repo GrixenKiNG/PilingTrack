@@ -46,7 +46,9 @@ export function on(eventType: string, handler: EventHandler) {
 export function emitDomainEvent(event: DomainEvent) {
   const eventHandlers = handlers.get(event.type);
   if (!eventHandlers) {
-    logger.debug('No handlers for event', { eventType: event.type });
+    if (process.env.LOG_UNHANDLED_EVENTS === 'true') {
+      logger.debug('No handlers for event', { eventType: event.type });
+    }
     return;
   }
 

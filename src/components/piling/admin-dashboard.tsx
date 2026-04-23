@@ -55,6 +55,10 @@ export function AdminDashboard() {
 
   const totalPlanned = analytics.reduce((sum, item) => sum + item.plannedPiles, 0);
   const totalActual = analytics.reduce((sum, item) => sum + item.actualPiles, 0);
+  const totalPlannedPileMeters = analytics.reduce((sum, item) => sum + (item.plannedPileMeters || 0), 0);
+  const totalActualPileMeters = analytics.reduce((sum, item) => sum + (item.actualPileMeters || 0), 0);
+  const totalPlannedDrillingCount = analytics.reduce((sum, item) => sum + (item.plannedDrillingCount || 0), 0);
+  const totalActualDrillingCount = analytics.reduce((sum, item) => sum + (item.actualDrillingCount || 0), 0);
   const totalPlannedDrilling = analytics.reduce((sum, item) => sum + item.plannedDrilling, 0);
   const totalActualDrilling = analytics.reduce((sum, item) => sum + item.actualDrilling, 0);
   const totalReports = analytics.reduce((sum, item) => sum + item.totalReports, 0);
@@ -76,6 +80,47 @@ export function AdminDashboard() {
     `${count} ${pluralizeRu(count, ['отчёт', 'отчёта', 'отчётов'])}`;
 
   const formatDowntimeLabel = (hours: number) => `${formatNumber(hours)} ч простоев`;
+  const formatCountMeters = (count: number, meters: number) =>
+    `${formatNumber(count)} шт. / ${formatNumber(meters)} м.п.`;
+
+  const summaryCards = [
+    {
+      label: 'Сваи забито',
+      icon: HardHat,
+      value: formatCountMeters(totalActual, totalActualPileMeters),
+      detail: `из ${formatCountMeters(totalPlanned, totalPlannedPileMeters)} (${formatPercent(overallPileProgress, 0)})`,
+      cardClass: 'border-amber-300 bg-gradient-to-br from-amber-100 via-orange-50 to-stone-50',
+      iconClass: 'bg-amber-500 text-white shadow-sm',
+      valueClass: 'text-amber-950',
+    },
+    {
+      label: 'Лидерное бурение',
+      icon: Drill,
+      value: formatCountMeters(totalActualDrillingCount, totalActualDrilling),
+      detail: `из ${formatCountMeters(totalPlannedDrillingCount, totalPlannedDrilling)} (${formatPercent(overallDrillingProgress, 0)})`,
+      cardClass: 'border-amber-300 bg-gradient-to-br from-amber-100 via-orange-50 to-stone-50',
+      iconClass: 'bg-amber-500 text-white shadow-sm',
+      valueClass: 'text-amber-950',
+    },
+    {
+      label: 'Отчёты',
+      icon: FileText,
+      value: formatNumber(totalReports),
+      detail: formatReportLabel(totalReports),
+      cardClass: 'border-amber-300 bg-gradient-to-br from-amber-100 via-orange-50 to-stone-50',
+      iconClass: 'bg-amber-500 text-white shadow-sm',
+      valueClass: 'text-amber-950',
+    },
+    {
+      label: 'Простои',
+      icon: Clock,
+      value: formatNumber(totalDowntime),
+      detail: formatDowntimeLabel(totalDowntime),
+      cardClass: 'border-amber-300 bg-gradient-to-br from-amber-100 via-orange-50 to-stone-50',
+      iconClass: 'bg-amber-500 text-white shadow-sm',
+      valueClass: 'text-amber-950',
+    },
+  ];
 
   if (loading) {
     return (
@@ -102,63 +147,33 @@ export function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <Card>
-            <CardContent className="p-4">
-              <div className="mb-1 flex items-center gap-2">
-                <HardHat className="h-4 w-4 text-orange-500" />
-                <span className="text-xs text-slate-500">Свай забито</span>
-              </div>
-              <p className="font-mono text-2xl font-bold tabular-nums text-slate-900">{totalActual}</p>
-              <p className="text-[10px] text-slate-400">из {totalPlanned} ({formatPercent(overallPileProgress, 0)})</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {summaryCards.map((card, index) => {
+          const Icon = card.icon;
 
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}>
-          <Card>
-            <CardContent className="p-4">
-              <div className="mb-1 flex items-center gap-2">
-                <Drill className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-slate-500">М бурения</span>
-              </div>
-              <p className="font-mono text-2xl font-bold tabular-nums text-slate-900">
-                {formatNumber(totalActualDrilling)}
-              </p>
-              <p className="text-[10px] text-slate-400">
-                из {formatNumber(totalPlannedDrilling)} ({formatPercent(overallDrillingProgress, 0)})
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}>
-          <Card>
-            <CardContent className="p-4">
-              <div className="mb-1 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-slate-500">Отчёты</span>
-              </div>
-              <p className="font-mono text-2xl font-bold tabular-nums text-slate-900">{totalReports}</p>
-              <p className="text-[10px] text-slate-400">{formatReportLabel(totalReports)}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }}>
-          <Card>
-            <CardContent className="p-4">
-              <div className="mb-1 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <span className="text-xs text-slate-500">Простои</span>
-              </div>
-              <p className="font-mono text-2xl font-bold tabular-nums text-amber-600">
-                {formatNumber(totalDowntime)}
-              </p>
-              <p className="text-[10px] text-slate-400">{formatDowntimeLabel(totalDowntime)}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+          return (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.03 }}
+            >
+              <Card className={cn('overflow-hidden border shadow-sm ring-1 ring-white/60', card.cardClass)}>
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-600">{card.label}</span>
+                    <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl', card.iconClass)}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                  </div>
+                  <p className={cn('font-mono text-xl font-bold leading-tight tabular-nums lg:text-2xl', card.valueClass)}>
+                    {card.value}
+                  </p>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">{card.detail}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
       </div>
 
       {(totalPlanned > 0 || totalPlannedDrilling > 0) && (
@@ -173,10 +188,11 @@ export function AdminDashboard() {
             <CardContent className="space-y-4">
               {totalPlanned > 0 && (
                 <div>
-                  <div className="mb-1.5 flex items-center justify-between">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-slate-600">Забивка свай</span>
-                    <span className="font-mono text-xs font-bold text-slate-900">
-                      {totalActual} / {totalPlanned}
+                    <span className="text-right font-mono text-[11px] font-bold text-slate-900">
+                      {formatCountMeters(totalActual, totalActualPileMeters)} /{' '}
+                      {formatCountMeters(totalPlanned, totalPlannedPileMeters)}
                     </span>
                   </div>
                   <Progress value={overallPileProgress} className="h-2.5" />
@@ -185,10 +201,11 @@ export function AdminDashboard() {
 
               {totalPlannedDrilling > 0 && (
                 <div>
-                  <div className="mb-1.5 flex items-center justify-between">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-slate-600">Лидерное бурение</span>
-                    <span className="font-mono text-xs font-bold text-slate-900">
-                      {formatNumber(totalActualDrilling)} / {formatNumber(totalPlannedDrilling)} м
+                    <span className="text-right font-mono text-[11px] font-bold text-slate-900">
+                      {formatCountMeters(totalActualDrillingCount, totalActualDrilling)} /{' '}
+                      {formatCountMeters(totalPlannedDrillingCount, totalPlannedDrilling)}
                     </span>
                   </div>
                   <Progress value={overallDrillingProgress} className="h-2.5" />
@@ -247,10 +264,11 @@ export function AdminDashboard() {
 
                     {site.plannedPiles > 0 && (
                       <div className="mb-2">
-                        <div className="mb-1 flex items-center justify-between">
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                           <span className="text-[10px] text-slate-500">Сваи</span>
-                          <span className="font-mono text-[10px] text-slate-600">
-                            {site.actualPiles}/{site.plannedPiles}
+                          <span className="text-right font-mono text-[10px] text-slate-600">
+                            {formatCountMeters(site.actualPiles, site.actualPileMeters)} /{' '}
+                            {formatCountMeters(site.plannedPiles, site.plannedPileMeters)}
                           </span>
                         </div>
                         <Progress value={site.pileProgress} className="h-1.5" />
@@ -259,10 +277,11 @@ export function AdminDashboard() {
 
                     {site.plannedDrilling > 0 && (
                       <div>
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-[10px] text-slate-500">Бурение</span>
-                          <span className="font-mono text-[10px] text-slate-600">
-                            {formatNumber(site.actualDrilling)}/{formatNumber(site.plannedDrilling)} м
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-500">Лидерное бурение</span>
+                          <span className="text-right font-mono text-[10px] text-slate-600">
+                            {formatCountMeters(site.actualDrillingCount, site.actualDrilling)} /{' '}
+                            {formatCountMeters(site.plannedDrillingCount, site.plannedDrilling)}
                           </span>
                         </div>
                         <Progress value={site.drillingProgress} className="h-1.5" />

@@ -20,14 +20,41 @@ import { projectOutboxEvents } from '@/services/reports/outbox-publisher';
 // Projection Handlers
 // ============================================================
 
+const PROJECTABLE_EVENT_PREFIXES = ['Report', 'Pile', 'Drilling', 'Downtime'];
+
+function isProjectableReportEvent(event: unknown): event is ReportDomainEvent {
+  if (!event || typeof event !== 'object') return false;
+
+  const maybeEvent = event as Partial<ReportDomainEvent>;
+  return (
+    typeof maybeEvent.type === 'string' &&
+    typeof maybeEvent.aggregateId === 'string' &&
+    PROJECTABLE_EVENT_PREFIXES.some((prefix) => maybeEvent.type!.startsWith(prefix))
+  );
+}
+
+function getProjectionDate(event: ReportDomainEvent, fallbackDate?: string | null): string | null {
+  if (event.occurredAt) {
+    const occurredAt = new Date(event.occurredAt);
+    if (!Number.isNaN(occurredAt.getTime())) {
+      return occurredAt.toISOString().split('T')[0];
+    }
+  }
+
+  const eventDate = typeof event.data?.date === 'string' ? event.data.date : null;
+  if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    return eventDate;
+  }
+
+  return fallbackDate || null;
+}
+
 /**
  * Update ReportStats on report events.
  */
 async function projectReportStats(event: ReportDomainEvent) {
   const { siteId, userId, tenantId, data } = event;
   if (!siteId || !userId) return;
-
-  const date = new Date(event.occurredAt).toISOString().split('T')[0];
 
   // We need the full report data — fetch it
   const report = await db.report.findUnique({
@@ -40,6 +67,9 @@ async function projectReportStats(event: ReportDomainEvent) {
   });
 
   if (!report) return;
+
+  const date = getProjectionDate(event, report.date);
+  if (!date) return;
 
   // Compute top downtime reason
   let topReasonId: string | null = null;
@@ -127,7 +157,10 @@ async function projectOperatorPerformance(event: ReportDomainEvent) {
   if (!siteId || !userId) return;
 
   // Always use full aggregation for idempotency — safe against double-processing
-  await projectOperatorPerformanceFull(userId, siteId, new Date(event.occurredAt).toISOString().split('T')[0]);
+  const date = getProjectionDate(event);
+  if (!date) return;
+
+  await projectOperatorPerformanceFull(userId, siteId, date);
 }
 
 /**
@@ -205,8 +238,11 @@ async function projectDowntimeSummary(event: ReportDomainEvent) {
   const { siteId, tenantId } = event;
   if (!siteId) return;
 
-  const date = new Date(event.occurredAt).toISOString().split('T')[0];
+  const date = getProjectionDate(event);
+  if (!date) return;
+
   const reasonId = event.data.reasonId as string;
+  if (!reasonId) return;
 
   // Fetch reason name
   const reason = await db.downtimeReason.findUnique({
@@ -343,6 +379,15 @@ async function projectWeeklyTrend(siteId: string) {
 // ============================================================
 
 async function projectEvent(event: ReportDomainEvent) {
+  if (!isProjectableReportEvent(event)) {
+    if (process.env.LOG_PROJECTION_SKIPS === 'true') {
+      logger.debug('Projection skipped non-report event', {
+        eventType: (event as { type?: string })?.type,
+      });
+    }
+    return;
+  }
+
   try {
     await Promise.all([
       projectReportStats(event),
@@ -371,7 +416,7 @@ async function projectEvent(event: ReportDomainEvent) {
 export function startProjectionWorker(intervalMs = 5000) {
   logger.info('Projection worker starting', { intervalMs });
 
-  const interval = setInterval(async () => {
+  const processOnce = async () => {
     try {
       // Uses the dedicated `projected` consumer — independent of the
       // outbox publisher so both workers see every event exactly once.
@@ -382,7 +427,10 @@ export function startProjectionWorker(intervalMs = 5000) {
     } catch (error) {
       logger.error('Projection worker error', error);
     }
-  }, intervalMs);
+  };
+
+  void processOnce();
+  const interval = setInterval(processOnce, intervalMs);
 
   // Weekly trend recomputation every hour
   const weeklyInterval = setInterval(async () => {
