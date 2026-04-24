@@ -64,17 +64,8 @@ test.describe('E2E — Full Application Flow', () => {
     expect(h['x-content-type-options']).toBe('nosniff');
   });
 
-  test('rate limiting on login', async ({ request }) => {
-    for (let i = 0; i < 8; i++) {
-      await request.post('/api/auth/login', {
-        data: { email: 'ratelimit-e2e@test.com', password: 'wrong' },
-      });
-    }
-    const res = await request.post('/api/auth/login', {
-      data: { email: 'ratelimit-e2e@test.com', password: 'wrong' },
-    });
-    expect(res.status()).toBe(429);
-  });
+  // Rate limiting has moved to rate-limit-e2e.spec.ts (single-project file)
+  // because IP-scoped rate limits collide with sibling projects' auth tests.
 
   test('PWA manifest valid', async ({ request }) => {
     const res = await request.get('/manifest.json');

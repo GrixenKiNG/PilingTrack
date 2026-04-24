@@ -203,7 +203,7 @@ async function testOperatorFlow(page: Page) {
   // 2. Login as Operator
   try {
     await page.fill('[name="email"]', 'operator@piling.ru');
-    await page.fill('[name="password"]', '0000');
+    await page.fill('[name="password"]', 'operator123');
     await page.click('button:has-text("Войти")');
 
     await page.waitForURL('**/operator', { timeout: 10000 });

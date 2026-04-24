@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('operator can authenticate and access reports', async ({ request }) => {
   // 1. Login as operator
   const loginRes = await request.post('/api/auth/login', {
-    data: { email: 'operator@piling.ru', password: '0000' },
+    data: { email: 'operator@piling.ru', password: 'operator123' },
   });
   expect(loginRes.ok()).toBe(true);
   const loginBody = await loginRes.json();

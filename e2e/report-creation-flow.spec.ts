@@ -21,7 +21,7 @@ test.describe('Real Report Creation Flow', () => {
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
     await emailInput.fill('operator@piling.ru');
-    await page.locator('#password').fill('0000');
+    await page.locator('#password').fill('operator123');
     await page.locator('button[type="submit"]').click();
 
     // Wait for navigation
@@ -93,7 +93,7 @@ test.describe('Real Report Creation Flow', () => {
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
     await emailInput.fill('operator@piling.ru');
-    await page.locator('#password').fill('0000');
+    await page.locator('#password').fill('operator123');
     await page.locator('button[type="submit"]').click();
     await page.waitForTimeout(3000);
 
@@ -131,7 +131,7 @@ test.describe('Real Report Creation Flow', () => {
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
     await emailInput.fill('dispatcher@piling.ru');
-    await page.locator('#password').fill('0000');
+    await page.locator('#password').fill('operator123');
     await page.locator('button[type="submit"]').click();
     await page.waitForTimeout(3000);
 

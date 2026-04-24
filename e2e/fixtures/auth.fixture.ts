@@ -9,22 +9,22 @@ import { DashboardPage } from '../page-objects/dashboard.page';
 export const TEST_USERS = {
   admin: {
     email: 'admin@piling.ru',
-    password: process.env.ADMIN_PASSWORD || '1234',
+    password: process.env.ADMIN_PASSWORD || 'admin123',
     role: 'ADMIN',
   },
   dispatcher: {
     email: 'dispatch@piling.ru',
-    password: process.env.DISPATCH_PASSWORD || '2222',
+    password: process.env.DISPATCH_PASSWORD || 'dispatch123',
     role: 'DISPATCHER',
   },
   operator: {
     email: 'operator@piling.ru',
-    password: process.env.OPERATOR_PASSWORD || '0000',
+    password: process.env.OPERATOR_PASSWORD || 'operator123',
     role: 'OPERATOR',
   },
   assistant: {
     email: 'helper@piling.ru',
-    password: process.env.ASSISTANT_PASSWORD || '3333',
+    password: process.env.ASSISTANT_PASSWORD || 'helper123',
     role: 'ASSISTANT',
   },
 };

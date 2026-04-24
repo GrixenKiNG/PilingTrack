@@ -26,7 +26,7 @@ async function globalSetup(config: FullConfig) {
   const operatorPage = await browser.newPage();
   await operatorPage.goto(`${BASE_URL}/login`);
   await operatorPage.getByRole('textbox', { name: /email/i }).fill('operator@piling.ru');
-  await operatorPage.getByRole('textbox', { name: /password/i }).fill('0000');
+  await operatorPage.getByRole('textbox', { name: /password/i }).fill('operator123');
   await operatorPage.getByRole('button', { name: /войти|login/i }).click();
   await operatorPage.waitForURL(/dashboard/, { timeout: 10000 });
   await operatorPage.context().storageState({ path: path.join(AUTH_DIR, 'user.json') });
@@ -36,7 +36,7 @@ async function globalSetup(config: FullConfig) {
   const adminPage = await browser.newPage();
   await adminPage.goto(`${BASE_URL}/login`);
   await adminPage.getByRole('textbox', { name: /email/i }).fill('admin@piling.ru');
-  await adminPage.getByRole('textbox', { name: /password/i }).fill('1234');
+  await adminPage.getByRole('textbox', { name: /password/i }).fill('admin123');
   await adminPage.getByRole('button', { name: /войти|login/i }).click();
   await adminPage.waitForURL(/dashboard/, { timeout: 10000 });
   await adminPage.context().storageState({ path: path.join(AUTH_DIR, 'admin.json') });
