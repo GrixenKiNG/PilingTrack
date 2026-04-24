@@ -4,6 +4,7 @@ import {
   createSiteSchema,
   createEquipmentSchema,
   createCrewSchema,
+  updateCrewSchema,
   reportUpsertSchema,
   createUserSchema,
   dictionaryItemSchema,
@@ -154,6 +155,21 @@ describe('validation-schemas', () => {
         equipmentId: 'eq-1',
         siteId: 'site-1',
       });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('updateCrewSchema', () => {
+    it('does not inject create defaults into partial updates', () => {
+      const result = updateCrewSchema.safeParse({ name: 'Updated Crew' });
+
+      expect(result.success).toBe(true);
+      expect((result as any).data).toEqual({ name: 'Updated Crew' });
+    });
+
+    it('rejects empty crew name updates before domain logic runs', () => {
+      const result = updateCrewSchema.safeParse({ name: '' });
+
       expect(result.success).toBe(false);
     });
   });

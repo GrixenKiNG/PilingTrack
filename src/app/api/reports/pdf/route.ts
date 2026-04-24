@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
-import { getReportsByPeriod } from '@/modules/reports/application/queries/report-query.service';
 import { generatePeriodPdf } from '@/lib/pdf-generator';
+import { buildPeriodPdfData } from '@/lib/pdf-data';
 import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-queue';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { getRequestId } from '@/lib/request-context';
-import { normalizeCrewData } from '@/lib/normalize-crew';
 import { logger } from '@/lib/logger';
 import { withApi, withMutation } from '@/core/api-wrapper';
 
@@ -36,44 +34,12 @@ export const POST = withMutation(async (request: NextRequest) => {
       );
     }
 
-    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
-    const fallbackCrews = await db.crew.findMany({
-      where: {
-        isActive: true,
-        operatorId: { in: reports.map((report: { userId: string }) => report.userId) },
-        siteId: { in: reports.map((report: { siteId: string }) => report.siteId) },
-      },
-      select: {
-        operatorId: true,
-        siteId: true,
-        assistants: { select: { name: true } },
-        equipment: { select: { name: true } },
-      },
+    const pdfData = await buildPeriodPdfData({
+      dateFrom,
+      dateTo,
+      siteId,
+      tenantId: user?.tenantId || null,
     });
-    const fallbackCrewByKey = new Map(
-      fallbackCrews.map((crew: { operatorId: string; siteId: string }) => [`${crew.operatorId}:${crew.siteId}`, crew])
-    );
-
-    const normalizedReports = reports.map((report) => {
-      const fallbackCrew = report.crew
-        ? null
-        : fallbackCrewByKey.get(`${report.userId}:${report.siteId}`) || null;
-      const effectiveCrew = report.crew || fallbackCrew;
-      const crewData = normalizeCrewData(effectiveCrew);
-
-      return {
-        ...report,
-        assistantName: crewData.assistantName,
-        equipmentName: report.equipment?.name || crewData.equipmentName,
-      };
-    });
-
-    // Compute summary from reports
-    const summary = {
-      totalPiles: reports.reduce((sum: number, r: any) => sum + (r.piles?.reduce((s: number, p: any) => s + (p.count || 0), 0) || 0), 0),
-      totalDrilling: reports.reduce((sum: number, r: any) => sum + (r.drillings?.reduce((s: number, d: any) => s + (d.meters || 0), 0) || 0), 0),
-      totalDowntime: reports.reduce((sum: number, r: any) => sum + (r.downtimes?.reduce((s: number, dt: any) => s + (dt.duration || 0), 0) || 0), 0),
-    };
 
     const jobId = await enqueuePdfGeneration({
       dateFrom,
@@ -81,29 +47,22 @@ export const POST = withMutation(async (request: NextRequest) => {
       siteId: siteId || '',
       type: 'period',
       userId: user!.id,
-      reports: normalizedReports,
-      totalPiles: summary.totalPiles,
-      totalDrilling: summary.totalDrilling,
-      totalDowntime: summary.totalDowntime,
+      reports: pdfData.reports,
+      totalPiles: pdfData.totalPiles,
+      totalDrilling: pdfData.totalDrilling,
+      totalDowntime: pdfData.totalDowntime,
     });
 
     // Fallback to sync if Redis unavailable
     if (!jobId) {
-      const pdfBuffer = await generatePeriodPdf({
-        reports: normalizedReports,
-        dateFrom,
-        dateTo,
-        siteId: siteId || '',
-        totalPiles: summary.totalPiles,
-        totalDrilling: summary.totalDrilling,
-        totalDowntime: summary.totalDowntime,
-      });
+      const inline = request.nextUrl.searchParams.get('inline') === '1';
+      const pdfBuffer = await generatePeriodPdf(pdfData);
 
       return new NextResponse(new Uint8Array(pdfBuffer), {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="pilingtrack-report-${dateFrom}-${dateTo}.pdf"`,
+          'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="pilingtrack-report-${dateFrom}-${dateTo}.pdf"`,
         },
       });
     }
@@ -200,6 +159,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
     const dateFrom = request.nextUrl.searchParams.get('dateFrom');
     const dateTo = request.nextUrl.searchParams.get('dateTo');
     const siteId = request.nextUrl.searchParams.get('siteId');
+    const inline = request.nextUrl.searchParams.get('inline') === '1';
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
@@ -208,59 +168,18 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       );
     }
 
-    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
-    const fallbackCrews = await db.crew.findMany({
-      where: {
-        isActive: true,
-        operatorId: { in: reports.map((report: { userId: string }) => report.userId) },
-        siteId: { in: reports.map((report: { siteId: string }) => report.siteId) },
-      },
-      select: {
-        operatorId: true,
-        siteId: true,
-        assistants: { select: { name: true } },
-        equipment: { select: { name: true } },
-      },
-    });
-    const fallbackCrewByKey = new Map(
-      fallbackCrews.map((crew: { operatorId: string; siteId: string }) => [`${crew.operatorId}:${crew.siteId}`, crew])
-    );
-
-    const normalizedReports = reports.map((report) => {
-      const fallbackCrew = report.crew
-        ? null
-        : fallbackCrewByKey.get(`${report.userId}:${report.siteId}`) || null;
-      const effectiveCrew = report.crew || fallbackCrew;
-      const crewData = normalizeCrewData(effectiveCrew);
-
-      return {
-        ...report,
-        assistantName: crewData.assistantName,
-        equipmentName: report.equipment?.name || crewData.equipmentName,
-      };
-    });
-
-    // Compute summary
-    const syncSummary = {
-      totalPiles: reports.reduce((sum: number, r: any) => sum + (r.piles?.reduce((s: number, p: any) => s + (p.count || 0), 0) || 0), 0),
-      totalDrilling: reports.reduce((sum: number, r: any) => sum + (r.drillings?.reduce((s: number, d: any) => s + (d.meters || 0), 0) || 0), 0),
-      totalDowntime: reports.reduce((sum: number, r: any) => sum + (r.downtimes?.reduce((s: number, dt: any) => s + (dt.duration || 0), 0) || 0), 0),
-    };
-
-    const pdfBuffer = await generatePeriodPdf({
+    const pdfData = await buildPeriodPdfData({
       dateFrom,
       dateTo,
-      siteId: siteId || '',
-      reports: normalizedReports,
-      totalPiles: syncSummary.totalPiles,
-      totalDrilling: syncSummary.totalDrilling,
-      totalDowntime: syncSummary.totalDowntime,
+      siteId,
+      tenantId: user?.tenantId || null,
     });
+    const pdfBuffer = await generatePeriodPdf(pdfData);
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="pilingtrack-report-${dateFrom}-${dateTo}.pdf"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="pilingtrack-report-${dateFrom}-${dateTo}.pdf"`,
         'Content-Length': String(pdfBuffer.length),
       },
     });
@@ -307,10 +226,11 @@ async function handleJobStatus(jobId: string) {
 async function handleJobDownload(jobId: string, request: NextRequest) {
   try {
     const pdfBuffer = await downloadPdf(jobId);
+    const inline = request.nextUrl.searchParams.get('inline') === '1';
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="pilingtrack-report-${jobId}.pdf"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="pilingtrack-report-${jobId}.pdf"`,
         'Content-Length': String(pdfBuffer.length),
       },
     });

@@ -35,12 +35,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { postgresDb } from '@/lib/db';
 import { getDeviceSyncStatus } from '@/modules/reports/application/sync-engine-v2';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
+
+async function getPostgresDb() {
+  const { postgresDb } = await import('@/lib/db');
+  return postgresDb;
+}
 
 // ============================================================
 // GET /api/sync/device-status
@@ -123,6 +127,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   }
 
   if (!isAdmin) {
+    const postgresDb = await getPostgresDb();
     const existing = await postgresDb.deviceSyncState.findUnique({
       where: { deviceId },
       select: { tenantId: true },
@@ -136,6 +141,7 @@ export const POST = withMutation(async (request: NextRequest) => {
     }
   }
 
+  const postgresDb = await getPostgresDb();
   const state = await postgresDb.deviceSyncState.upsert({
     where: { deviceId },
     update: {

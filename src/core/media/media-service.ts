@@ -35,7 +35,6 @@
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { ServiceError } from '@/services/service-error';
 import { s3CircuitBreaker } from '@/core/infrastructure/circuit-breakers';
@@ -111,6 +110,11 @@ const DEFAULT_CONFIG: Partial<MediaServiceConfig> = {
   urlExpiresIn: 3600, // 1 hour
 };
 
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
+
 // ============================================================
 // Media Service
 // ============================================================
@@ -158,6 +162,7 @@ export class MediaService {
     const extension = this.getExtension(request.fileName);
     const mediaId = crypto.randomUUID();
     const key = `media/${request.tenantId}/${mediaId}${extension}`;
+    const db = await getDbClient();
 
     // Create media record (pending upload)
     await db.media.create({
@@ -202,6 +207,7 @@ export class MediaService {
    * Generates thumbnail and CDN URL.
    */
   async confirmUpload(mediaId: string): Promise<MediaRecord> {
+    const db = await getDbClient();
     const media = await db.media.findUnique({
       where: { id: mediaId },
     });
@@ -251,6 +257,7 @@ export class MediaService {
    * Get download URL for a media file (presigned, time-limited).
    */
   async getDownloadUrl(mediaId: string, expiresIn?: number): Promise<{ url: string; media: MediaRecord }> {
+    const db = await getDbClient();
     const media = await db.media.findUnique({
       where: { id: mediaId },
     });
@@ -281,6 +288,7 @@ export class MediaService {
    * Actual S3 deletion happens after retention period.
    */
   async softDelete(mediaId: string, userId: string): Promise<void> {
+    const db = await getDbClient();
     const media = await db.media.findUnique({
       where: { id: mediaId },
     });
@@ -312,6 +320,7 @@ export class MediaService {
    * Called by retention policy worker.
    */
   async hardDelete(mediaId: string): Promise<void> {
+    const db = await getDbClient();
     const media = await db.media.findUnique({
       where: { id: mediaId },
     });
@@ -351,6 +360,7 @@ export class MediaService {
    * List media files for an entity.
    */
   async listByEntity(entityType: string, entityId: string, tenantId: string): Promise<MediaRecord[]> {
+    const db = await getDbClient();
     const media = await db.media.findMany({
       where: {
         entityType,
@@ -370,6 +380,7 @@ export class MediaService {
    */
   async runRetention(retentionDays: number = 90): Promise<number> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const db = await getDbClient();
 
     const toDelete = await db.media.findMany({
       where: {

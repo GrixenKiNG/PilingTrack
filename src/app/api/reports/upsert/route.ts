@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
-import {
-  assertCanActForUser,
-  resolveReportUserId,
-  upsertReport,
-} from '@/modules/reports/application/commands/report-command.service';
 import { ServiceError } from '@/services/service-error';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
@@ -13,6 +8,10 @@ import { withMutation } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
+
+async function getReportCommandService() {
+  return import('@/modules/reports/application/commands/report-command.service');
+}
 
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -52,6 +51,7 @@ export const POST = withMutation(
     const validatedDto = validation.data;
     const requestedUserId = validatedDto.userId ?? user!.id;
 
+    const { assertCanActForUser, resolveReportUserId, upsertReport } = await getReportCommandService();
     assertCanActForUser(user!, requestedUserId);
 
     const result = await upsertReport(

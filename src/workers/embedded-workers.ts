@@ -26,6 +26,10 @@ const DEFAULT_WORKERS: EmbeddedWorkerName[] = ['outbox', 'projection'];
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const OUTBOX_STATS_INTERVAL_MS = 60_000;
 
+function shouldLogWorkerLifecycle(): boolean {
+  return process.env.LOG_WORKER_LIFECYCLE === 'true';
+}
+
 let startupPromise: Promise<void> | null = null;
 let shutdownRegistered = false;
 const activeHandles: EmbeddedWorkerHandle[] = [];
@@ -77,7 +81,9 @@ function registerShutdownHook() {
   shutdownRegistered = true;
 
   const shutdown = async (signal: string) => {
-    logger.info('Embedded workers shutting down', { signal });
+    if (shouldLogWorkerLifecycle()) {
+      logger.info('Embedded workers shutting down', { signal });
+    }
 
     const handles = activeHandles.splice(0, activeHandles.length);
     await Promise.all(
@@ -120,7 +126,9 @@ async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
       return;
     }
 
-    logger.info('Embedded outbox: became leader');
+    if (shouldLogWorkerLifecycle()) {
+      logger.info('Embedded outbox: became leader');
+    }
     worker = startOutboxWorker(async (event) => emitDomainEvent(event), 10_000);
 
     void recordLeaderHeartbeat('outbox', election).catch((error) => {
@@ -131,7 +139,9 @@ async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
   };
 
   election.onLoseLeadership = () => {
-    logger.info('Embedded outbox: lost leadership');
+    if (shouldLogWorkerLifecycle()) {
+      logger.info('Embedded outbox: lost leadership');
+    }
 
     if (worker) {
       worker.stop();
@@ -178,10 +188,12 @@ async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
       });
   }, OUTBOX_STATS_INTERVAL_MS);
 
-  logger.info('Embedded outbox worker armed', {
-    isLeader: election.isLeader(),
-    nodeId: election.getStats().nodeId,
-  });
+  if (shouldLogWorkerLifecycle()) {
+    logger.info('Embedded outbox worker armed', {
+      isLeader: election.isLeader(),
+      nodeId: election.getStats().nodeId,
+    });
+  }
 
   return {
     stop: async () => {
@@ -217,7 +229,9 @@ async function startEmbeddedProjectionWorker(): Promise<EmbeddedWorkerHandle> {
       return;
     }
 
-    logger.info('Embedded projection: became leader');
+    if (shouldLogWorkerLifecycle()) {
+      logger.info('Embedded projection: became leader');
+    }
     worker = startProjectionWorker(5_000);
 
     void recordLeaderHeartbeat('projection', election).catch((error) => {
@@ -228,7 +242,9 @@ async function startEmbeddedProjectionWorker(): Promise<EmbeddedWorkerHandle> {
   };
 
   election.onLoseLeadership = () => {
-    logger.info('Embedded projection: lost leadership');
+    if (shouldLogWorkerLifecycle()) {
+      logger.info('Embedded projection: lost leadership');
+    }
 
     if (worker) {
       worker.stop();
@@ -247,10 +263,12 @@ async function startEmbeddedProjectionWorker(): Promise<EmbeddedWorkerHandle> {
     });
   }, HEARTBEAT_INTERVAL_MS);
 
-  logger.info('Embedded projection worker armed', {
-    isLeader: election.isLeader(),
-    nodeId: election.getStats().nodeId,
-  });
+  if (shouldLogWorkerLifecycle()) {
+    logger.info('Embedded projection worker armed', {
+      isLeader: election.isLeader(),
+      nodeId: election.getStats().nodeId,
+    });
+  }
 
   return {
     stop: async () => {
@@ -273,13 +291,17 @@ export async function startEmbeddedWorkers(): Promise<void> {
     const enabledWorkers = parseEnabledWorkers();
 
     if (enabledWorkers.length === 0) {
-      logger.info('Embedded workers disabled');
+      if (shouldLogWorkerLifecycle()) {
+        logger.info('Embedded workers disabled');
+      }
       return;
     }
 
     registerShutdownHook();
 
-    logger.info('Starting embedded workers', { enabledWorkers });
+    if (shouldLogWorkerLifecycle()) {
+      logger.info('Starting embedded workers', { enabledWorkers });
+    }
 
     if (enabledWorkers.includes('outbox')) {
       activeHandles.push(await startEmbeddedOutboxWorker());

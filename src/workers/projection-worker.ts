@@ -1,14 +1,5 @@
 /**
- * Projection Worker — Entry Point
- *
- * Processes unpublished outbox events and updates CQRS read projections.
- * Uses the modular projection worker from modules/reports.
- *
- * Leader Election: Only ONE instance processes events at a time.
- * Standby instances do nothing and wait for the leader to die.
- *
- * Usage:
- *   npx tsx src/workers/projection-worker.ts
+ * Projection Worker - CQRS projection entrypoint.
  */
 
 import { startProjectionWorker } from '@/modules/reports/application/projections/projection-worker';
@@ -20,36 +11,50 @@ import { getProjectionLeaderElection } from '@/core/infrastructure/leader-electi
 async function main() {
   logger.info('Projection worker starting');
 
-  // Register legacy event handlers for backward compatibility
   registerAllEventHandlers();
 
-  // Leader Election — only one active worker
   const election = getProjectionLeaderElection();
-
-  await election.start();
-
-  // Worker instance — started/stopped based on leadership
   let worker: ReturnType<typeof startProjectionWorker> | null = null;
 
   election.onBecomeLeader = () => {
-    logger.info('Projection worker: became leader — starting processing');
+    if (worker) return;
+
+    logger.info('Projection worker: became leader - starting processing');
     worker = startProjectionWorker(5000);
+
+    void recordWorkerHeartbeat('projection').catch((error) => {
+      logger.error(
+        'Failed to record immediate heartbeat',
+        error instanceof Error ? { message: error.message } : undefined
+      );
+    });
   };
 
   election.onLoseLeadership = () => {
-    logger.info('Projection worker: lost leadership — stopping processing');
+    logger.info('Projection worker: lost leadership - stopping processing');
     if (worker) {
       worker.stop();
       worker = null;
     }
   };
 
-  // Record heartbeat every 30 seconds
+  await election.start();
+  if (election.isLeader()) {
+    await recordWorkerHeartbeat('projection');
+  }
+
   const heartbeatInterval = setInterval(async () => {
+    if (!election.isLeader()) {
+      return;
+    }
+
     try {
       await recordWorkerHeartbeat('projection');
     } catch (error) {
-      logger.error('Failed to record heartbeat', error instanceof Error ? { message: error.message } : undefined);
+      logger.error(
+        'Failed to record heartbeat',
+        error instanceof Error ? { message: error.message } : undefined
+      );
     }
   }, 30000);
 
@@ -58,7 +63,6 @@ async function main() {
     isLeader: election.isLeader(),
   });
 
-  // Graceful shutdown
   process.on('SIGTERM', async () => {
     logger.info('Projection worker shutting down');
     clearInterval(heartbeatInterval);

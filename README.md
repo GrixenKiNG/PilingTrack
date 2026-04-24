@@ -1,171 +1,86 @@
 # PilingTrack
 
-Краткое описание: приватный репозиторий для проекта PilingTrack.
+PilingTrack — операционная платформа для свайных работ: управление объектами, экипажами и оборудованием, сменные отчеты, офлайн-синхронизация, PDF-экспорт, realtime и административный контур.
 
-Цель репозитория — хранение кода и документации приложения.
+## Что внутри
 
-Установка и запуск:
+- `src/app` — Next.js App Router: страницы и API routes
+- `src/components` — UI и прикладные экраны
+- `src/modules` — bounded contexts с доменной логикой
+- `src/services` — orchestration/service-layer, интеграции и cross-cutting logic
+- `src/core` — инфраструктурные механики: event bus, outbox, observability, reliability
+- `src/mobile` — офлайн-режим, local DB, sync engine
+- `src/workers` — фоновые worker entrypoints
+- `prisma` — схема БД и seed
+- `docs/adr` — архитектурные решения
 
-- См. `package.json` для скриптов проекта.
+## Роли
 
-Лицензия: MIT.
-# PilingTrack
+- `ADMIN` — администрирование справочников, пользователей, объектов и отчетов
+- `DISPATCHER` — диспетчерский контур и операционный контроль
+- `OPERATOR` — заполнение и отправка сменных отчетов
+- `ASSISTANT` — вспомогательная роль с ограниченным доступом
 
-Система управления свайными работами для строительных объектов.
+## Основные возможности
 
-## 🏗️ Описание
+- управление объектами, оборудованием и бригадами
+- сменные отчеты по сваям, лидерному бурению и простоям
+- offline-first сценарии с синхронизацией
+- CQRS/read models для аналитики и агрегатов
+- PDF-экспорт сводных и одиночных отчетов
+- feedback/alerts/observability контур
+- Telegram-уведомления и realtime-каналы
 
-PilingTrack — это веб-приложение для отслеживания и управления свайными работами на строительных объектах. Поддерживает роли: **Администратор**, **Диспетчер**, **Оператор**, **Помощник**.
+## Технологии
 
-### Возможности
+- Next.js 16, React 19, TypeScript 5
+- Prisma 6, PostgreSQL, Redis
+- BullMQ, ws, Dexie, Zod
+- Vitest, Playwright, k6
+- OpenTelemetry, Sentry, Prometheus, Grafana
 
-- Управление объектами строительства, оборудованием и бригадами
-- Формирование сменных отчётов (забитые сваи, лидерное бурение, простои)
-- Ролевая модель доступа с multi-tenant поддержкой
-- Оффлайн-режим с синхронизацией данных
-- WebSocket для real-time обновлений
-- Экспорт отчётов в PDF
-- Telegram-интеграция для уведомлений
-
-## 🚀 Быстрый старт
-
-### Предварительные требования
-
-- Node.js 22+
-- PostgreSQL 16
-- Redis 7
-- Bun (рекомендуется) или npm
-
-### Установка
+## Быстрый старт
 
 ```bash
-# Клонировать репозиторий
-git clone https://github.com/pilingtrack/pilingtrack.git
-cd pilingtrack
-
-# Установить зависимости
 npm install
-
-# Создать .env файл
 cp .env.example .env
-# Отредактируйте .env и укажите реальные значения для:
-# - DATABASE_URL_POSTGRES
-# - SESSION_SECRET
-# - REDIS_URL (опционально для dev)
-
-# Подготовить БД
-npm run db:generate:postgres
-npm run db:push:postgres
-
-# Запустить seed-данные
-npx prisma db seed --schema prisma/schema.postgres.prisma
-
-# Запустить dev-сервер
+npm run db:generate
+npm run db:push
+npm run db:seed
 npm run dev
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000) в браузере.
+Приложение поднимется на [http://localhost:3000](http://localhost:3000).
 
-### Тестовые учётные данные
-
-| Роль | Email | Пароль |
-|------|-------|--------|
-| Admin | admin@piling.ru | admin123 |
-| Dispatcher | dispatch@piling.ru | dispatch123 |
-| Operator | operator@piling.ru | operator123 |
-| Assistant | helper@piling.ru | helper123 |
-
-## 📁 Структура проекта
-
-```
-my-project/
-├── src/
-│   ├── app/              # Next.js App Router (pages + API routes)
-│   ├── components/       # React components (UI + piling)
-│   ├── core/             # Domain core (event-bus, outbox, security)
-│   ├── modules/          # DDD modules (reports, crews, sites, equipment)
-│   ├── services/         # Business logic services
-│   ├── lib/              # Shared utilities (auth, cache, validation)
-│   ├── mobile/           # Offline sync & PWA logic
-│   ├── realtime/         # WebSocket server
-│   └── workers/          # Background workers (outbox, projection, PDF)
-├── prisma/               # Prisma schemas
-├── scripts/              # Utility scripts
-├── monitoring/           # Prometheus + Grafana configs
-├── infra/                # Helm charts, ArgoCD
-├── e2e/                  # Playwright E2E tests
-├── tests/                # Vitest unit tests
-└── docs/                 # Architecture decision records
-```
-
-## 🧪 Тестирование
+## Ключевые команды
 
 ```bash
-# Unit тесты
+npm run dev
+npm run build
+npm run start
 npm run test:unit
-
-# E2E тесты
+npm run test:contract
+npm run test:integration
 npm run test:e2e
-
-# Все тесты
-npm run test
-
-# Smoke-тест
-npm run test:smoke:auth-access
-
-# Нагрузочные тесты (требует k6)
-npm run test:load
 ```
 
-## 🐳 Docker
+## Архитектурное правило
 
-### Development
+В проекте используется смешанная модель, но с явными границами:
 
-```bash
-docker compose up -d
-```
+- `modules/*` — доменные bounded contexts, где живут aggregate/command/query правила
+- `services/*` — service-layer и интеграции, не притворяющиеся доменом
+- `core/*` — платформенные механизмы, общие для нескольких контекстов
 
-### Production
+Подробности зафиксированы в [docs/adr/0007-bounded-context-vs-service-layer.md](docs/adr/0007-bounded-context-vs-service-layer.md).
 
-```bash
-docker compose -f docker-compose.production.yml up -d
-```
+## Документация
 
-## 📖 Документация
-
-- [Architecture Decision Records](docs/adr/)
+- [ADR index](docs/adr/README.md)
 - [Disaster Recovery Plan](docs/DISASTER-RECOVERY-PLAN.md)
 - [Kubernetes Deployment](docs/KUBERNETES-DEPLOYMENT.md)
 - [Test Architecture](docs/TEST-ARCHITECTURE.md)
 
-## 🔧 Скрипты
+## Состояние репозитория
 
-| Команда | Описание |
-|---------|----------|
-| `npm run dev` | Запуск dev-сервера |
-| `npm run build` | Продакшн-билд |
-| `npm run start` | Запуск продакшн-сервера |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | Проверка типов TypeScript |
-| `npm run db:generate:postgres` | Генерация Prisma-клиента |
-| `npm run db:push:postgres` | Применить схему к БД |
-| `npm run db:seed` | Заполнить тестовыми данными |
-| `npm run test:unit` | Unit-тесты |
-| `npm run test:e2e` | E2E-тесты |
-
-## 🛠️ Технологический стек
-
-| Категория | Технологии |
-|-----------|-----------|
-| **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, shadcn/ui |
-| **Backend** | Next.js API Routes, Prisma 6, PostgreSQL 16 |
-| **Кэширование** | Redis 7, ioredis |
-| **Реальное время** | WebSocket (ws), SSE |
-| **Мониторинг** | OpenTelemetry, Sentry, Prometheus, Grafana |
-| **Тестирование** | Vitest, Playwright, k6 |
-| **CI/CD** | GitHub Actions, Helm, ArgoCD |
-| **Контейнеризация** | Docker, Docker Compose |
-
-## 📝 Лицензия
-
-© 2025-2026 PilingTrack. Все права защищены.
+Репозиторий хранит исходники и документацию. Временные логи, PDF-артефакты, dev-сборки и локальные результаты тестов должны оставаться вне git и удаляться после локальной диагностики.

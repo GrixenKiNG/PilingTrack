@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { createCrew, getAccessibleCrews } from '@/modules/crews';
 import { createCrewSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
+import { invalidateCrewsCache } from './cache';
 
 
 export const runtime = 'nodejs';
+
+async function getCrewsModule() {
+  return import('@/modules/crews');
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -17,6 +21,7 @@ export const GET = withApi(
     assertCan(user!, 'crews.read');
     const siteId = request.nextUrl.searchParams.get('siteId');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
+    const { getAccessibleCrews } = await getCrewsModule();
     const crews = await getAccessibleCrews(siteId || undefined, pagination);
     const nextCursor = pagination.getNextCursor(crews);
     return NextResponse.json({ data: crews, nextCursor });
@@ -40,6 +45,7 @@ export const POST = withMutation(
       );
     }
 
+    const { createCrew } = await getCrewsModule();
     const crew = await createCrew({
       name: validation.data.name?.trim() || 'Unnamed Crew',
       operatorId: validation.data.operatorId,
@@ -48,6 +54,8 @@ export const POST = withMutation(
       assistantNames: validation.data.assistantNames || [],
       userId: user!.id,
     });
+
+    invalidateCrewsCache();
 
     return NextResponse.json({ crew });
   },

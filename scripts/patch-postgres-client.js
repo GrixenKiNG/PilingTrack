@@ -34,6 +34,16 @@ source = source.replace(
   ''
 );
 
+source = source.replace(
+  /"relativeEnvPaths":\s*\{\s*"rootEnvPath":\s*null,\s*"schemaEnvPath":\s*"[^"]+"\s*\}/m,
+  `"relativeEnvPaths": {\n    "rootEnvPath": null,\n    "schemaEnvPath": null\n  }`
+);
+
+source = source.replace(
+  /\nconst \{ warnEnvConflicts \} = require\('\.\/runtime\/library\.js'\)\s*\n\s*\nwarnEnvConflicts\(\{\s*rootEnvPath:[\s\S]*?schemaEnvPath:[\s\S]*?\}\)\s*/m,
+  '\n'
+);
+
 fs.writeFileSync(clientIndexPath, source, 'utf8');
 
 if (fs.existsSync(runtimeLibraryPath)) {

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { createCrew, deleteCrew, updateCrew } from '@/modules/crews';
 import { createCrewSchema, crewManageSchema, crewIdSchema } from '@/lib/validation-schemas';
 import { withDbProtection } from '@/core/infrastructure/circuit-breakers';
 import { withMutation } from '@/core/api-wrapper';
+import { invalidateCrewsCache } from '../cache';
 
 
 export const runtime = 'nodejs';
+
+async function getCrewsModule() {
+  return import('@/modules/crews');
+}
 
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -30,6 +34,7 @@ export const POST = withMutation(
       );
     }
 
+    const { createCrew } = await getCrewsModule();
     const crew = await withDbProtection(async () =>
       createCrew({
         operatorId: validated.data.operatorId,
@@ -38,6 +43,8 @@ export const POST = withMutation(
         name: validated.data.name || 'Unnamed Crew',
       })
     );
+
+    invalidateCrewsCache();
 
     return NextResponse.json({ crew });
   },
@@ -65,6 +72,7 @@ export const PUT = withMutation(
       );
     }
 
+    const { updateCrew } = await getCrewsModule();
     const crew = await withDbProtection(async () =>
       updateCrew({
         crewId: validated.data.id!,
@@ -72,6 +80,8 @@ export const PUT = withMutation(
         isActive: (validated.data as any).isActive,
       })
     );
+
+    invalidateCrewsCache();
 
     return NextResponse.json({ crew });
   },
@@ -99,9 +109,13 @@ export const DELETE = withMutation(
       );
     }
 
+    const { deleteCrew } = await getCrewsModule();
     const result = await withDbProtection(async () =>
       deleteCrew({ crewId: validated.data.id, force: true })
     );
+
+    invalidateCrewsCache();
+
     return NextResponse.json(result);
   },
   { domain: 'crews' }

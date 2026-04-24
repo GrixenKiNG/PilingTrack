@@ -255,6 +255,26 @@ describe('Crew Command Service', () => {
       expect(aggregate.getState().isActive).toBe(false);
     });
 
+    it('should ignore unchanged active status on update', async () => {
+      const aggregate = CrewAggregate.create({
+        name: 'Test Crew',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+      }, 'user-1');
+      aggregate.clearPendingEvents();
+      mockRepoFindById.mockResolvedValue(aggregate);
+
+      await updateCrew({
+        crewId: 'crew-1',
+        isActive: true,
+        userId: 'user-1',
+      });
+
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
+      expect(aggregate.getState().isActive).toBe(true);
+    });
+
     it('should reject update if crew not found', async () => {
       mockRepoFindById.mockResolvedValue(null);
 

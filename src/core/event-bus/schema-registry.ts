@@ -12,6 +12,10 @@ import Ajv, { type ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
 import { logger } from '@/lib/logger';
 
+function shouldLogSchemaRegistration(): boolean {
+  return process.env.LOG_SCHEMA_REGISTRATION === 'true';
+}
+
 // ============================================================
 // Types
 // ============================================================
@@ -80,7 +84,9 @@ export class SchemaRegistry {
     this.schemas.set(key, def);
     this.registeredAt.set(key, new Date().toISOString());
 
-    logger.info('Schema registered', { eventType: def.id, version: def.version });
+    if (shouldLogSchemaRegistration()) {
+      logger.debug('Schema registered', { eventType: def.id, version: def.version });
+    }
   }
 
   /**
@@ -235,7 +241,9 @@ export function registerAllEventSchemas(): void {
   }
 
   _schemasRegistered = true;
-  logger.info('All event schemas registered', { count: schemas.length });
+  if (shouldLogSchemaRegistration()) {
+    logger.info('All event schemas registered', { count: schemas.length });
+  }
 }
 
 function getEventSchemas(): SchemaDef[] {

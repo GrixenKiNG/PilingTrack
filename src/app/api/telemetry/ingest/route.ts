@@ -25,11 +25,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { db } from '@/lib/db';
 import { withApi } from '@/core/api-wrapper';
 import { authenticateDeviceByKey } from '@/services/telemetry/device-key-service';
 
 export const runtime = 'nodejs';
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 
 // ============================================================
 // Rate Limiting — High throughput for IoT devices
@@ -284,6 +288,7 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
   // Prisma's InputJsonValue/NullableJsonNullValueInput typing is too strict for
   // dynamic JSON metadata; values are already validated at the route boundary.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = await getDbClient();
   await db.telemetryRecord.createMany({ data: telemetryRecords as any });
 
   return telemetryRecords;

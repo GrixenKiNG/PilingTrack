@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { createUser, deleteUser, listUsers, updateUser } from '@/modules/users';
 import { createUserSchema, deleteIdSchema, updateUserSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 
 
 export const runtime = 'nodejs';
+
+async function getUsersModule() {
+  return import('@/modules/users');
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -17,6 +20,7 @@ export const GET = withApi(
     assertCan(user!, 'users.manage');
     const role = request.nextUrl.searchParams.get('role');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
+    const { listUsers } = await getUsersModule();
     const users = await listUsers(role, pagination);
     const nextCursor = pagination.getNextCursor(users);
     return NextResponse.json({ users, nextCursor });
@@ -48,6 +52,7 @@ export const POST = withMutation(
       );
     }
 
+    const { createUser } = await getUsersModule();
     const createdUser = await createUser({
       ...rest,
       password: password?.trim() || pin?.trim() || '',
@@ -74,6 +79,7 @@ export const PUT = withMutation(
       );
     }
 
+    const { updateUser } = await getUsersModule();
     const updatedUser = await updateUser(validation.data, user!.id);
     return NextResponse.json({ user: updatedUser });
   },
@@ -96,6 +102,7 @@ export const DELETE = withMutation(
       );
     }
 
+    const { deleteUser } = await getUsersModule();
     const result = await deleteUser(user!.id, validation.data.id);
     return NextResponse.json(result);
   },

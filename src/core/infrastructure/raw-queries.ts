@@ -36,8 +36,8 @@ export interface RawReportRow {
   updatedAt: Date;
   crew: { name?: string } | null;
   equipment: { name?: string } | null;
-  piles: Array<{ id: string; count: number; pileGradeId: string }> | null;
-  drillings: Array<{ id: string; meters: number; typeId: string }> | null;
+  piles: Array<{ id: string; count: number; pileGradeId: string; pileGrade?: { name: string } }> | null;
+  drillings: Array<{ id: string; count: number; metersPerUnit: number; meters: number; typeId: string; type?: { name: string } }> | null;
   downtimes: Array<{ id: string; duration: number; reasonId: string; comment: string | null }> | null;
 }
 
@@ -46,7 +46,7 @@ export interface RawReportRow {
 // ============================================================
 
 export async function getReportsByPeriodRaw(
-  tenantId: string,
+  tenantId: string | null,
   dateFrom: string,
   dateTo: string,
   siteId?: string | null
@@ -54,9 +54,9 @@ export async function getReportsByPeriodRaw(
   const start = Date.now();
 
   const where: Record<string, unknown> = {
-    tenantId: tenantId || null,
     date: { gte: dateFrom, lte: dateTo },
   };
+  where.tenantId = tenantId && tenantId.trim().length > 0 ? tenantId : null;
   if (siteId) where.siteId = siteId;
 
   const rows = await db.report.findMany({
@@ -64,9 +64,19 @@ export async function getReportsByPeriodRaw(
     orderBy: { date: 'desc' },
     take: 500,
     include: {
-      piles: { select: { id: true, count: true, pileGradeId: true } },
-      drillings: { select: { id: true, meters: true, typeId: true } },
-      downtimes: { select: { id: true, duration: true, reasonId: true, comment: true } },
+      user: { select: { id: true, name: true } },
+      site: { select: { id: true, name: true } },
+      equipment: { select: { id: true, name: true } },
+      crew: {
+        select: {
+          name: true,
+          equipment: { select: { name: true } },
+          assistants: { select: { name: true } },
+        },
+      },
+      piles: { select: { id: true, count: true, pileGradeId: true, pileGrade: { select: { name: true } } } },
+      drillings: { select: { id: true, count: true, metersPerUnit: true, meters: true, typeId: true, type: { select: { name: true } } } },
+      downtimes: { select: { id: true, duration: true, reasonId: true, comment: true, reason: { select: { name: true } } } },
     },
   });
 

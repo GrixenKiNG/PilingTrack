@@ -7,6 +7,7 @@ import { ChevronRight, MapPin, Plus, FileText, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
+import { getTodayInTimezone } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
@@ -24,7 +25,7 @@ export function OperatorDashboard() {
   const [today, setToday] = useState('');
 
   useEffect(() => {
-    setToday(new Date().toISOString().split('T')[0]);
+    setToday(getTodayInTimezone());
   }, []);
 
   const loadData = useCallback(async () => {
@@ -38,15 +39,18 @@ export function OperatorDashboard() {
 
       if (sitesRes.ok) {
         const sitesData = await sitesRes.json();
-        setSites(sitesData.sites || []);
-        if (!selectedSiteId && sitesData.sites?.[0]?.id) {
-          setSelectedSite(sitesData.sites[0].id);
+        const accessibleSites = sitesData.data || sitesData.sites || [];
+        setSites(accessibleSites);
+        if (accessibleSites.length === 0) {
+          setSelectedSite(null);
+        } else if (!selectedSiteId || !accessibleSites.some((site: SiteFlatDTO) => site.id === selectedSiteId)) {
+          setSelectedSite(accessibleSites[0].id);
         }
       }
 
       if (reportsRes.ok) {
         const reportsData = await reportsRes.json();
-        const items = reportsData.reports || [];
+        const items = reportsData.data || reportsData.reports || [];
         setReports(items);
         setTodayReport(items.find((r: ReportListItemDTO) => r.date === today) || null);
       }
@@ -77,14 +81,14 @@ export function OperatorDashboard() {
     );
   }
 
-  const firstName = user?.name?.split(' ')[0] || 'Оператор';
+  const displayName = user?.name?.trim() || 'Оператор';
 
   return (
     <div className="p-4 pb-24 space-y-6">
       <header className="flex items-center justify-between">
         <div>
           <p className="text-xs text-slate-500">Здравствуйте,</p>
-          <h1 className="text-lg font-semibold text-slate-900">{firstName}</h1>
+          <h1 className="text-lg font-semibold text-slate-900">{displayName}</h1>
         </div>
         {reports.length > 0 && (
           <button

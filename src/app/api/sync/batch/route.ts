@@ -19,11 +19,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
+
+async function getDbModule() {
+  return import('@/lib/db');
+}
 
 // Max operations per batch
 const MAX_BATCH_SIZE = 50;
@@ -56,6 +59,7 @@ export const POST = withMutation(async (request: NextRequest) => {
 
     const operations = validated.data.operations;
     const results: Array<{ operationId: string; success: boolean; error?: string }> = [];
+    const { db, DEFAULT_TX_OPTIONS } = await getDbModule();
 
     // Process all operations in a single atomic transaction
     await db.$transaction(async (tx) => {

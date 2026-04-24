@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { listReportsForReview } from '@/modules/reports';
 import { withApi } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
+
+async function getReportsModule() {
+  return import('@/modules/reports');
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -14,6 +17,7 @@ export const GET = withApi(
 
     assertCan(user!, 'reports.read_all');
     const siteId = request.nextUrl.searchParams.get('siteId');
+    const { listReportsForReview } = await getReportsModule();
     const paginated = await listReportsForReview(user!, siteId);
     return NextResponse.json({ reports: paginated.data, hasMore: paginated.hasMore, nextCursor: paginated.nextCursor });
   },

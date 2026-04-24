@@ -23,9 +23,12 @@
  *   startLagMonitor();
  */
 
-import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getOutboxLeaderElection, getProjectionLeaderElection } from '@/core/infrastructure/leader-election';
+
+function shouldLogLagMonitorLifecycle(): boolean {
+  return process.env.LOG_WORKER_LIFECYCLE === 'true';
+}
 
 // ============================================================
 // Types
@@ -82,6 +85,11 @@ let lastPublishedCount = 0;
 let lastPublishedAt = Date.now();
 let config: LagMonitorConfig;
 
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
+
 // ============================================================
 // Lag Calculation
 // ============================================================
@@ -90,6 +98,7 @@ let config: LagMonitorConfig;
  * Get current outbox lag: age of oldest unpublished event.
  */
 async function getOutboxLag(): Promise<{ lagSeconds: number; pendingCount: number; oldestPending?: Date }> {
+  const db = await getDbClient();
   const result = await db.outboxEvent.findFirst({
     where: { published: false },
     orderBy: { createdAt: 'asc' },
@@ -114,6 +123,7 @@ async function getOutboxLag(): Promise<{ lagSeconds: number; pendingCount: numbe
  * Get exact pending count.
  */
 async function getPendingCount(): Promise<number> {
+  const db = await getDbClient();
   return db.outboxEvent.count({ where: { published: false } });
 }
 
@@ -134,6 +144,7 @@ async function getDlqPendingCount(): Promise<number> {
  * Estimate publish rate (events/sec) based on published events in last 5 minutes.
  */
 async function getPublishRate(): Promise<number> {
+  const db = await getDbClient();
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   const count = await db.outboxEvent.count({
     where: {
@@ -297,11 +308,13 @@ export function startLagMonitor(userConfig?: Partial<LagMonitorConfig>): void {
   config = { ...DEFAULT_CONFIG, ...userConfig };
   monitorStarted = true;
 
-  logger.info('Lag monitor started', {
-    pollIntervalMs: config.pollIntervalMs,
-    lagWarnThresholdSec: config.lagWarnThresholdSec,
-    lagCriticalThresholdSec: config.lagCriticalThresholdSec,
-  });
+  if (shouldLogLagMonitorLifecycle()) {
+    logger.info('Lag monitor started', {
+      pollIntervalMs: config.pollIntervalMs,
+      lagWarnThresholdSec: config.lagWarnThresholdSec,
+      lagCriticalThresholdSec: config.lagCriticalThresholdSec,
+    });
+  }
 
   async function tick() {
     try {

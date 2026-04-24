@@ -14,7 +14,6 @@
  */
 
 import { logger } from '@/lib/logger';
-import { db } from '@/lib/db';
 
 // ============================================================
 // Configuration
@@ -26,8 +25,14 @@ interface TelegramBotConfig {
   enabled: boolean;
 }
 
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
+
 async function getConfig(): Promise<TelegramBotConfig | null> {
   try {
+    const db = await getDbClient();
     const configs = await db.telegramConfig.findMany({
       where: { enabled: true },
       orderBy: { createdAt: 'asc' },

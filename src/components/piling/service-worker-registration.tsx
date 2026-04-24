@@ -38,6 +38,29 @@ export function ServiceWorkerRegistration() {
       return undefined;
     }
 
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    const cleanupServiceWorkers = async () => {
+      if (!('serviceWorker' in navigator)) {
+        return;
+      }
+
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames
+            .filter((name) => name.startsWith('pilingtrack-'))
+            .map((name) => caches.delete(name))
+        );
+      }
+
+      setSwRegistered(false);
+      setQueueCount(0);
+    };
+
     const registerBackgroundSync = () => {
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         void navigator.serviceWorker.ready.then((registration) => {
@@ -53,11 +76,19 @@ export function ServiceWorkerRegistration() {
       }
     };
 
+    if (!isProduction) {
+      void cleanupServiceWorkers();
+      return undefined;
+    }
+
     if ('serviceWorker' in navigator && window.isSecureContext) {
       void navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
         .then((registration) => {
           setSwRegistered(true);
+          void registration.update().catch(() => {
+            // Best-effort check for a newer service worker.
+          });
           registerBackgroundSync();
 
           registration.addEventListener('updatefound', () => {

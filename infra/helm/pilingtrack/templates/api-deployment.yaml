@@ -62,6 +62,10 @@ spec:
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+            - name: BACKUP_ENABLED
+              value: {{ ternary "true" "false" .Values.backup.enabled | quote }}
+            - name: BACKUP_DIR
+              value: {{ .Values.backup.backupDir | default "/backups/pilingtrack" | quote }}
           {{- with .Values.api.probes.liveness }}
           livenessProbe:
             httpGet:

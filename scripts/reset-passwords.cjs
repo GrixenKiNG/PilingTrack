@@ -1,19 +1,13 @@
 /**
  * Reset user passwords to known defaults.
+ *
+ * CommonJS variant for environments where tsx/npx is unavailable.
  */
-import { PrismaClient } from '../src/generated/postgres-client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { hashSync } from 'bcryptjs';
+require('dotenv/config');
 
-const connectionString = process.env.DATABASE_URL_POSTGRES;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL_POSTGRES is required to reset passwords.');
-}
-
-const db = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+const { PrismaClient } = require('../src/generated/postgres-client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { hashSync } = require('bcryptjs');
 
 const users = [
   { email: 'admin@piling.ru', password: 'admin123' },
@@ -29,6 +23,14 @@ const users = [
   { email: 'loadtest@piling.ru', password: 'loadtest123' },
   { email: 'apj@piling.ru', password: 'apj123' },
 ];
+
+if (!process.env.DATABASE_URL_POSTGRES) {
+  throw new Error('DATABASE_URL_POSTGRES is required to reset passwords.');
+}
+
+const db = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL_POSTGRES }),
+});
 
 async function main() {
   console.log('Resetting user passwords...');
@@ -54,7 +56,8 @@ async function main() {
 
 main()
   .then(() => db.$disconnect())
-  .catch((error) => {
+  .catch(async (error) => {
     console.error(error);
+    await db.$disconnect().catch(() => {});
     process.exit(1);
   });

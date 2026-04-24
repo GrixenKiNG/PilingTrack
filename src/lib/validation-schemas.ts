@@ -114,17 +114,27 @@ export const updateEquipmentSchema = createEquipmentSchema.partial();
 // Crew schemas
 // ============================================================
 
+const crewAssistantNamesSchema = z.array(z.string().max(200)).max(20);
+
 export const createCrewSchema = z.object({
   name: z.string().max(200).optional().or(z.literal('')),
   operatorId: internalIdSchema,
   equipmentId: internalIdSchema,
   siteId: internalIdSchema,
-  assistantNames: z.array(z.string().max(200)).max(20).default([]),
+  assistantNames: crewAssistantNamesSchema.default([]),
   assistantsCount: z.number().int().min(0).max(20).default(0),
   isActive: z.boolean().optional().default(true),
 });
 
-export const updateCrewSchema = createCrewSchema.partial();
+export const updateCrewSchema = z.object({
+  name: z.string().min(1, 'Crew name is required').max(200).optional(),
+  operatorId: internalIdSchema.optional(),
+  equipmentId: internalIdSchema.optional(),
+  siteId: internalIdSchema.optional(),
+  assistantNames: crewAssistantNamesSchema.optional(),
+  assistantsCount: z.number().int().min(0).max(20).optional(),
+  isActive: z.boolean().optional(),
+});
 
 export const crewAssignSchema = z.object({
   crewId: internalIdSchema,

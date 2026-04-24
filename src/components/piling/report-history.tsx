@@ -35,7 +35,6 @@ export function ReportHistory() {
   const [selectedReport, setSelectedReport] = useState<ReportDTO | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
-  const [previewReportName, setPreviewReportName] = useState('');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -50,12 +49,12 @@ export function ReportHistory() {
 
       if (reportsRes.ok) {
         const data = await reportsRes.json();
-        setReports(data.reports || []);
+        setReports(data.data || data.reports || []);
       }
 
       if (sitesRes.ok) {
         const data = await sitesRes.json();
-        setSites(data.sites || []);
+        setSites(data.data || data.sites || []);
       }
     } catch {
       toast.error('Ошибка загрузки отчётов');
@@ -154,7 +153,6 @@ export function ReportHistory() {
       }
 
       setPreviewReportId(reportId);
-      setPreviewReportName(`otchet-${report.date}.pdf`);
     } catch {
       toast.error('Ошибка загрузки отчёта');
     }
@@ -163,7 +161,6 @@ export function ReportHistory() {
   const handlePreviewFromDetail = (reportId: string, reportDate: string) => {
     if (!reportId) return;
     setPreviewReportId(reportId);
-    setPreviewReportName(`otchet-${reportDate}.pdf`);
   };
 
   if (loading) {
@@ -389,7 +386,10 @@ export function ReportHistory() {
                             className="flex justify-between text-sm p-2 bg-slate-50 rounded"
                           >
                             <span>{drilling.type?.name || '-'}</span>
-                            <span className="font-mono font-semibold">{drilling.meters} м</span>
+                            <span className="text-right font-mono font-semibold">
+                              <span className="block">{drilling.count || 1} шт.</span>
+                              <span className="block text-xs text-slate-500">{drilling.meters} м.п.</span>
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -438,11 +438,9 @@ export function ReportHistory() {
           onOpenChange={(open) => {
             if (!open) {
               setPreviewReportId(null);
-              setPreviewReportName('');
             }
           }}
           reportId={previewReportId}
-          downloadName={previewReportName}
         />
       )}
     </div>

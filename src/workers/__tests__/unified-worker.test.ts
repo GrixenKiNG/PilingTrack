@@ -30,6 +30,24 @@ const mocks = vi.hoisted(() => ({
   // Health
   mockRecordWorkerHeartbeat: vi.fn().mockResolvedValue(undefined),
 
+  // Leader election
+  mockOutboxElection: {
+    onBecomeLeader: undefined as undefined | (() => void),
+    onLoseLeadership: undefined as undefined | (() => void),
+    start: vi.fn(),
+    stop: vi.fn().mockResolvedValue(undefined),
+    isLeader: vi.fn(() => true),
+    getStats: vi.fn(() => ({ nodeId: 'test-node' })),
+  },
+  mockProjectionElection: {
+    onBecomeLeader: undefined as undefined | (() => void),
+    onLoseLeadership: undefined as undefined | (() => void),
+    start: vi.fn(),
+    stop: vi.fn().mockResolvedValue(undefined),
+    isLeader: vi.fn(() => true),
+    getStats: vi.fn(() => ({ nodeId: 'test-node' })),
+  },
+
   // Logger
   mockLogger: {
     info: vi.fn(),
@@ -42,6 +60,14 @@ const mocks = vi.hoisted(() => ({
   mockHttpListen: vi.fn(),
   mockHttpClose: vi.fn(),
 }));
+
+mocks.mockOutboxElection.start.mockImplementation(async () => {
+  mocks.mockOutboxElection.onBecomeLeader?.();
+});
+
+mocks.mockProjectionElection.start.mockImplementation(async () => {
+  mocks.mockProjectionElection.onBecomeLeader?.();
+});
 
 vi.mock('@/services/reports/outbox-publisher', () => ({
   startOutboxWorker: mocks.mockStartOutboxWorker.mockReturnValue({
@@ -70,6 +96,11 @@ vi.mock('@/services/reports/event-handlers', () => ({
 
 vi.mock('@/core/observability/health-tracker', () => ({
   recordWorkerHeartbeat: mocks.mockRecordWorkerHeartbeat,
+}));
+
+vi.mock('@/core/infrastructure/leader-election', () => ({
+  getOutboxLeaderElection: vi.fn(() => mocks.mockOutboxElection),
+  getProjectionLeaderElection: vi.fn(() => mocks.mockProjectionElection),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -107,6 +138,10 @@ describe('Unified Worker Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mocks.mockOutboxElection.onBecomeLeader = undefined;
+    mocks.mockOutboxElection.onLoseLeadership = undefined;
+    mocks.mockProjectionElection.onBecomeLeader = undefined;
+    mocks.mockProjectionElection.onLoseLeadership = undefined;
 
     // Set env vars for testing
     process.env.ENABLED_WORKERS = 'outbox,projection';

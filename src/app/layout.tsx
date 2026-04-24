@@ -1,22 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
 import { ServiceWorkerRegistration } from '@/components/piling/service-worker-registration';
 import { OfflineInitializer } from '@/mobile/ui-adapters/offline-initializer';
 import './globals.css';
 
-const inter = Inter({
-  variable: '--font-sans',
-  subsets: ['latin'],
-  display: 'swap',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: '--font-mono',
-  subsets: ['latin'],
-  display: 'swap',
-});
+const APP_TITLE = 'PilingTrack';
+const APP_DESCRIPTION =
+  'Платформа учёта и управления свайными работами: объекты, бригады, установки, отчёты и аналитика.';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -25,18 +16,17 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'PilingTrack - Управление свайными работами',
-  description:
-    'Платформа учёта и управления свайными работами: объекты, бригады, установки, отчёты и аналитика.',
+  title: `${APP_TITLE} - Управление свайными работами`,
+  description: APP_DESCRIPTION,
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'PilingTrack',
+    title: APP_TITLE,
   },
   icons: {
-    icon: 'https://z-cdn.chatglm.cn/z-ai/static/logo.svg',
-    apple: 'https://z-cdn.chatglm.cn/z-ai/static/logo.svg',
+    icon: '/icon-192.svg',
+    apple: '/icon-192.svg',
   },
 };
 
@@ -47,13 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}
-        style={{
-          fontFamily:
-            'var(--font-sans), system-ui, -apple-system, PingFang SC, Microsoft YaHei, sans-serif',
-        }}
-      >
+      <body className="font-sans antialiased bg-background text-foreground">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

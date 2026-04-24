@@ -37,18 +37,5 @@ copyRecursive(
   path.join(projectRoot, 'public'),
   path.join(projectRoot, '.next', 'standalone', 'public')
 );
-copyRecursive(
-  path.join(projectRoot, 'scripts', 'generate-pdf.js'),
-  path.join(projectRoot, '.next', 'standalone', 'scripts', 'generate-pdf.js')
-);
-copyRecursive(
-  path.join(projectRoot, 'scripts', 'generate-single-pdf.js'),
-  path.join(projectRoot, '.next', 'standalone', 'scripts', 'generate-single-pdf.js')
-);
-copyRecursive(
-  path.join(projectRoot, 'scripts', 'pdf-fonts.js'),
-  path.join(projectRoot, '.next', 'standalone', 'scripts', 'pdf-fonts.js')
-);
-
 ensureJsStubForTypeFile(path.join(projectRoot, '.next', 'types'), 'routes');
 ensureJsStubForTypeFile(path.join(projectRoot, '.next', 'dev', 'types'), 'routes');

@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { exportReportsCsv } from '@/modules/reports';
 import { withApi } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
 
 const MAX_EXPORT_WINDOW_DAYS = 92; // ~1 quarter
+
+async function getReportsModule() {
+  return import('@/modules/reports');
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -44,6 +47,7 @@ export const GET = withApi(
       );
     }
 
+    const { exportReportsCsv } = await getReportsModule();
     const csv = await exportReportsCsv({
       siteId,
       dateFrom,

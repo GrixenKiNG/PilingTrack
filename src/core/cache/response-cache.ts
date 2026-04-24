@@ -90,6 +90,15 @@ function cloneResponse<T>(response: NextResponse<T>): NextResponse<T> {
   return response.clone() as NextResponse<T>;
 }
 
+function scopeToLog(scope?: { tenantId?: string; userId?: string }) {
+  if (!scope) return undefined;
+
+  return {
+    tenantScoped: Boolean(scope.tenantId),
+    userScoped: Boolean(scope.userId),
+  };
+}
+
 // ============================================================
 // Response Cache
 // ============================================================
@@ -251,7 +260,7 @@ export class ResponseCache {
       }
     }
 
-    logger.debug('Cache invalidated', { prefix, scope });
+    logger.debug('Cache invalidated', { prefix, scope: scopeToLog(scope) });
   }
 
   /**

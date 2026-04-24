@@ -1,64 +1,63 @@
 /**
- * Unified Worker Service — Standalone Runtime
+ * Unified worker service standalone runtime.
  *
- * Runs all background workers as a separate process from the Next.js app:
- * - Outbox Worker: publishes domain events from transactional outbox
- * - Projection Worker: updates CQRS read models from events
- * - PDF Worker: generates PDFs from BullMQ queue
+ * Runs background workers in a dedicated process:
+ * - outbox worker
+ * - projection worker
+ * - PDF queue worker
  *
- * Architecture:
- * ┌─────────────────┐    ┌──────────────────┐    ┌─────────────┐
- * │  Next.js App    │    │  Worker Service  │    │  PDF Queue  │
- * │  (API + Web)    │───>│  (outbox +       │<──>│  (BullMQ +  │
- * │  port 3000      │    │   projections)   │    │   Redis)    │
- * └─────────────────┘    └──────────────────┘    └─────────────┘
- *
- * Health Check: HTTP server on WORKER_HEALTH_PORT (default 3002)
- *   GET /health → { status: "ok", workers: {...} }
- *
- * Usage:
- *   npx tsx src/workers/unified-worker.ts
- *   # or: npm run worker:all
+ * Outbox and projection are leader-elected so a dedicated worker process can
+ * coexist with embedded workers running inside the app server.
  */
 
 import http from 'http';
-import { startOutboxWorker, getOutboxStats } from '@/services/reports/outbox-publisher';
+import { Worker, Job } from 'bullmq';
+import Redis from 'ioredis';
 import { emitDomainEvent } from '@/services/reports/domain-events';
+import { getOutboxStats, startOutboxWorker } from '@/services/reports/outbox-publisher';
 import { startProjectionWorker } from '@/modules/reports/application/projections/projection-worker';
 import { registerAllEventHandlers } from '@/services/reports/event-handlers';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';
-import { logger } from '@/lib/logger';
+import {
+  getOutboxLeaderElection,
+  getProjectionLeaderElection,
+  LeaderElection,
+} from '@/core/infrastructure/leader-election';
 import { recordWorkerHeartbeat } from '@/core/observability/health-tracker';
+import { logger } from '@/lib/logger';
+import { generatePeriodPdf, generateSinglePdf, savePdfBuffer } from '@/lib/pdf-generator';
 
-// ============================================================
-// Configuration
-// ============================================================
+type WorkerName = 'outbox' | 'projection' | 'pdf';
+type WorkerStatus = 'starting' | 'running' | 'error' | 'stopped';
+
+interface WorkerState {
+  name: WorkerName;
+  status: WorkerStatus;
+  lastHeartbeat: Date | null;
+  error: string | null;
+  startedAt: Date | null;
+  isLeader: boolean;
+  stop: (() => Promise<void>) | null;
+}
 
 const HEALTH_PORT = parseInt(process.env.WORKER_HEALTH_PORT || '3002', 10);
 const OUTBOX_INTERVAL = parseInt(process.env.OUTBOX_INTERVAL_MS || '10000', 10);
 const PROJECTION_INTERVAL = parseInt(process.env.PROJECTION_INTERVAL_MS || '5000', 10);
-const ENABLED_WORKERS = (process.env.ENABLED_WORKERS || 'outbox,projection,pdf').split(',');
+const PDF_CONCURRENCY = parseInt(process.env.PDF_WORKER_CONCURRENCY || '2', 10);
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const ENABLED_WORKERS = (process.env.ENABLED_WORKERS || 'outbox,projection,pdf')
+  .split(',')
+  .map((name) => name.trim().toLowerCase())
+  .filter(Boolean) as WorkerName[];
 
-// ============================================================
-// Worker State Tracking
-// ============================================================
-
-interface WorkerState {
-  name: string;
-  status: 'starting' | 'running' | 'error' | 'stopped';
-  lastHeartbeat: Date | null;
-  error: string | null;
-  startedAt: Date | null;
-  stop: (() => void) | null;
-}
-
-const workerStates: Record<string, WorkerState> = {
+const workerStates: Record<WorkerName, WorkerState> = {
   outbox: {
     name: 'outbox',
     status: 'starting',
     lastHeartbeat: null,
     error: null,
     startedAt: null,
+    isLeader: false,
     stop: null,
   },
   projection: {
@@ -67,6 +66,7 @@ const workerStates: Record<string, WorkerState> = {
     lastHeartbeat: null,
     error: null,
     startedAt: null,
+    isLeader: false,
     stop: null,
   },
   pdf: {
@@ -75,25 +75,56 @@ const workerStates: Record<string, WorkerState> = {
     lastHeartbeat: null,
     error: null,
     startedAt: null,
+    isLeader: false,
     stop: null,
   },
 };
 
-// ============================================================
-// Health Check HTTP Server
-// ============================================================
+function markHeartbeat(state: WorkerState) {
+  state.lastHeartbeat = new Date();
+}
+
+async function recordClusterHeartbeat(
+  workerName: Extract<WorkerName, 'outbox' | 'projection' | 'pdf'>
+): Promise<void> {
+  await recordWorkerHeartbeat(workerName);
+  markHeartbeat(workerStates[workerName]);
+}
+
+async function recordLeaderHeartbeat(
+  workerName: Extract<WorkerName, 'outbox' | 'projection'>,
+  election: LeaderElection
+): Promise<void> {
+  if (!election.isLeader()) {
+    return;
+  }
+
+  await recordClusterHeartbeat(workerName);
+}
+
+function setRunning(state: WorkerState) {
+  state.status = 'running';
+  state.error = null;
+  if (!state.startedAt) {
+    state.startedAt = new Date();
+  }
+}
+
+function setError(state: WorkerState, error: unknown) {
+  state.status = 'error';
+  state.error = error instanceof Error ? error.message : String(error);
+}
 
 function startHealthServer(): http.Server {
   const server = http.createServer((req, res) => {
     if (req.url === '/health' || req.url === '/api/health') {
       const allWorkers = Object.values(workerStates);
-      const runningWorkers = allWorkers.filter((w) => w.status === 'running');
-      const errorWorkers = allWorkers.filter((w) => w.status === 'error');
+      const runningWorkers = allWorkers.filter((worker) => worker.status === 'running');
+      const errorWorkers = allWorkers.filter((worker) => worker.status === 'error');
 
-      const statusCode =
-        errorWorkers.length > 0 ? 503 : runningWorkers.length > 0 ? 200 : 503;
-
-      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.writeHead(errorWorkers.length > 0 ? 503 : runningWorkers.length > 0 ? 200 : 503, {
+        'Content-Type': 'application/json',
+      });
       res.end(
         JSON.stringify({
           status: errorWorkers.length > 0 ? 'degraded' : 'ok',
@@ -101,13 +132,16 @@ function startHealthServer(): http.Server {
           pid: process.pid,
           memory: process.memoryUsage(),
           workers: Object.fromEntries(
-            allWorkers.map((w) => [
-              w.name,
+            allWorkers.map((worker) => [
+              worker.name,
               {
-                status: w.status,
-                lastHeartbeat: w.lastHeartbeat?.toISOString(),
-                error: w.error,
-                uptime: w.startedAt ? (Date.now() - w.startedAt.getTime()) / 1000 : 0,
+                status: worker.status,
+                leader: worker.isLeader,
+                lastHeartbeat: worker.lastHeartbeat?.toISOString(),
+                error: worker.error,
+                uptime: worker.startedAt
+                  ? Math.round((Date.now() - worker.startedAt.getTime()) / 1000)
+                  : 0,
               },
             ])
           ),
@@ -118,18 +152,14 @@ function startHealthServer(): http.Server {
 
     if (req.url === '/metrics') {
       res.writeHead(200, { 'Content-Type': 'text/plain' });
-      const lines: string[] = [];
 
-      for (const [name, state] of Object.entries(workerStates)) {
-        lines.push(
-          `worker_status{name="${name}"} ${state.status === 'running' ? 1 : 0}`
-        );
-        lines.push(
-          `worker_uptime_seconds{name="${name}"} ${
-            state.startedAt ? (Date.now() - state.startedAt.getTime()) / 1000 : 0
-          }`
-        );
-      }
+      const lines = Object.values(workerStates).flatMap((worker) => [
+        `worker_status{name="${worker.name}"} ${worker.status === 'running' ? 1 : 0}`,
+        `worker_is_leader{name="${worker.name}"} ${worker.isLeader ? 1 : 0}`,
+        `worker_uptime_seconds{name="${worker.name}"} ${
+          worker.startedAt ? Math.round((Date.now() - worker.startedAt.getTime()) / 1000) : 0
+        }`,
+      ]);
 
       res.end(lines.join('\n') + '\n');
       return;
@@ -146,109 +176,171 @@ function startHealthServer(): http.Server {
   return server;
 }
 
-// ============================================================
-// Worker Start/Stop Functions
-// ============================================================
-
 async function startOutbox(): Promise<void> {
   const state = workerStates.outbox;
-  logger.info('Starting outbox worker');
+  const election = getOutboxLeaderElection();
+  let worker: ReturnType<typeof startOutboxWorker> | null = null;
+
+  logger.info('Arming outbox worker', { intervalMs: OUTBOX_INTERVAL });
 
   try {
     registerAllEventSchemas();
   } catch (error) {
-    logger.warn('Failed to register event schemas', { error: error instanceof Error ? error.message : String(error) });
+    logger.warn('Failed to register event schemas', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  const worker = startOutboxWorker(async (event) => {
-    try {
+  election.onBecomeLeader = () => {
+    if (worker) {
+      return;
+    }
+
+    state.isLeader = true;
+    setRunning(state);
+    logger.info('Outbox worker became leader');
+
+    worker = startOutboxWorker(async (event) => {
       await emitDomainEvent(event);
-      state.lastHeartbeat = new Date();
-    } catch (error) {
-      state.error = error instanceof Error ? error.message : String(error);
-      state.status = 'error';
-      throw error;
+      await recordLeaderHeartbeat('outbox', election);
+    }, OUTBOX_INTERVAL);
+
+    void recordLeaderHeartbeat('outbox', election).catch((error) => {
+      logger.error('Outbox worker immediate heartbeat failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  };
+
+  election.onLoseLeadership = () => {
+    logger.info('Outbox worker lost leadership');
+    state.isLeader = false;
+
+    if (worker) {
+      worker.stop();
+      worker = null;
     }
-  }, OUTBOX_INTERVAL);
+  };
 
-  state.status = 'running';
-  state.startedAt = new Date();
-  state.stop = () => worker.stop();
+  await election.start();
+  setRunning(state);
+  state.isLeader = election.isLeader();
+  await recordLeaderHeartbeat('outbox', election);
 
-  // Heartbeat every 30s
-  setInterval(async () => {
-    if (state.status === 'running') {
-      try {
-        await recordWorkerHeartbeat('outbox');
-        state.lastHeartbeat = new Date();
-      } catch {
-        // Non-fatal
-      }
+  const heartbeatInterval = setInterval(() => {
+    void recordLeaderHeartbeat('outbox', election).catch((error) => {
+      logger.error('Outbox worker heartbeat failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, 30_000);
+
+  const statsInterval = setInterval(() => {
+    if (!election.isLeader()) {
+      return;
     }
-  }, 30000);
 
-  // Stats logging every 60s
-  setInterval(async () => {
-    if (state.status === 'running') {
-      try {
-        const stats = await getOutboxStats();
+    void getOutboxStats()
+      .then((stats) => {
         logger.info('Outbox stats', stats);
-      } catch {
-        // Non-fatal
-      }
-    }
-  }, 60000);
+      })
+      .catch((error) => {
+        logger.error('Failed to get outbox stats', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }, 60_000);
 
-  logger.info('Outbox worker started');
+  state.stop = async () => {
+    clearInterval(heartbeatInterval);
+    clearInterval(statsInterval);
+    if (worker) {
+      worker.stop();
+      worker = null;
+    }
+    state.isLeader = false;
+    state.status = 'stopped';
+    await election.stop();
+  };
 }
 
 async function startProjection(): Promise<void> {
   const state = workerStates.projection;
-  logger.info('Starting projection worker');
+  const election = getProjectionLeaderElection();
+  let worker: ReturnType<typeof startProjectionWorker> | null = null;
+
+  logger.info('Arming projection worker', { intervalMs: PROJECTION_INTERVAL });
 
   try {
     registerAllEventHandlers();
   } catch (error) {
-    logger.warn('Failed to register event handlers', { error: error instanceof Error ? error.message : String(error) });
+    logger.warn('Failed to register event handlers', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  const worker = startProjectionWorker(PROJECTION_INTERVAL);
-
-  state.status = 'running';
-  state.startedAt = new Date();
-  state.stop = () => worker.stop();
-
-  // Heartbeat
-  setInterval(async () => {
-    if (state.status === 'running') {
-      try {
-        await recordWorkerHeartbeat('projection');
-        state.lastHeartbeat = new Date();
-      } catch {
-        // Non-fatal
-      }
+  election.onBecomeLeader = () => {
+    if (worker) {
+      return;
     }
-  }, 30000);
 
-  logger.info('Projection worker started');
+    state.isLeader = true;
+    setRunning(state);
+    logger.info('Projection worker became leader');
+
+    worker = startProjectionWorker(PROJECTION_INTERVAL);
+
+    void recordLeaderHeartbeat('projection', election).catch((error) => {
+      logger.error('Projection worker immediate heartbeat failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  };
+
+  election.onLoseLeadership = () => {
+    logger.info('Projection worker lost leadership');
+    state.isLeader = false;
+
+    if (worker) {
+      worker.stop();
+      worker = null;
+    }
+  };
+
+  await election.start();
+  setRunning(state);
+  state.isLeader = election.isLeader();
+  await recordLeaderHeartbeat('projection', election);
+
+  const heartbeatInterval = setInterval(() => {
+    void recordLeaderHeartbeat('projection', election).catch((error) => {
+      logger.error('Projection worker heartbeat failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, 30_000);
+
+  state.stop = async () => {
+    clearInterval(heartbeatInterval);
+    if (worker) {
+      worker.stop();
+      worker = null;
+    }
+    state.isLeader = false;
+    state.status = 'stopped';
+    await election.stop();
+  };
 }
 
 async function startPdf(): Promise<void> {
   const state = workerStates.pdf;
-  logger.info('Starting PDF worker');
+
+  logger.info('Starting PDF worker', { concurrency: PDF_CONCURRENCY });
 
   try {
-    // Dynamic import to avoid Redis issues if not needed
-    const { Worker, Job } = await import('bullmq');
-    const { default: Redis } = await import('ioredis');
-    const { generatePeriodPdf, generateSinglePdf, savePdfBuffer } = await import('@/lib/pdf-generator');
-
-    const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-    const CONCURRENCY = parseInt(process.env.PDF_WORKER_CONCURRENCY || '2', 10);
-
     const redisConnection = new Redis(REDIS_URL, {
       maxRetriesPerRequest: null,
-      connectTimeout: 10000,
+      connectTimeout: 10_000,
       keyPrefix: 'pilingtrack:',
       lazyConnect: true,
     });
@@ -257,34 +349,36 @@ async function startPdf(): Promise<void> {
       'pdf-generation',
       async (job: InstanceType<typeof Job>) => {
         const data = job.data as Record<string, any>;
-        const { type, dateFrom, dateTo, siteId, reportId, userId, reports, report } = data;
-        const jobId = job.id as string;
+        const jobId = String(job.id);
 
-        logger.info(`[PDF Worker] Processing job ${jobId}: type=${type}`);
+        logger.info('PDF worker processing job', {
+          jobId,
+          type: data.type,
+        });
 
         let pdfBuffer: Buffer;
 
-        if (type === 'period') {
+        if (data.type === 'period') {
           pdfBuffer = await generatePeriodPdf({
-            dateFrom,
-            dateTo,
-            siteId,
-            reports: reports || [],
+            dateFrom: data.dateFrom,
+            dateTo: data.dateTo,
+            siteId: data.siteId,
+            reports: data.reports || [],
             totalPiles: data.totalPiles || 0,
             totalDrilling: data.totalDrilling || 0,
             totalDowntime: data.totalDowntime || 0,
           });
-        } else if (type === 'single') {
-          if (!report) {
+        } else if (data.type === 'single') {
+          if (!data.report) {
             throw new Error('Single PDF requires report data in job');
           }
-          pdfBuffer = await generateSinglePdf(report);
+          pdfBuffer = await generateSinglePdf(data.report);
         } else {
-          throw new Error(`Unknown PDF type: ${type}`);
+          throw new Error(`Unknown PDF type: ${String(data.type)}`);
         }
 
         const filePath = savePdfBuffer(jobId, pdfBuffer);
-        logger.info(`[PDF Worker] Job ${jobId} completed: ${pdfBuffer.length} bytes`);
+        await recordClusterHeartbeat('pdf');
 
         return {
           jobId,
@@ -295,153 +389,159 @@ async function startPdf(): Promise<void> {
       },
       {
         connection: redisConnection,
-        concurrency: CONCURRENCY,
+        concurrency: PDF_CONCURRENCY,
         autorun: true,
       }
     );
 
     pdfWorker.on('completed', (job) => {
-      logger.info(`[PDF] Job ${job.id} completed`);
-      state.lastHeartbeat = new Date();
+      logger.info('PDF job completed', { jobId: job.id });
+      markHeartbeat(state);
+      // A single failed job must not leave the worker permanently marked unhealthy.
+      if (state.status === 'error') {
+        setRunning(state);
+      }
     });
 
-    pdfWorker.on('failed', (job, err) => {
-      const jobId = job?.id || 'unknown';
-      logger.error(`[PDF] Job ${jobId} failed`, err);
-      state.error = err.message;
-      state.status = 'error';
+    pdfWorker.on('failed', (job, error) => {
+      logger.error('PDF job failed', {
+        jobId: job?.id ?? 'unknown',
+        error: error.message,
+      });
+      // Per-job failure is expected; only record the last error, do not flip worker health.
+      state.error = error.message;
     });
 
-    pdfWorker.on('error', (err) => {
-      logger.error('[PDF] Worker error', err);
-      state.error = err.message;
+    pdfWorker.on('error', (error) => {
+      logger.error('PDF worker error', {
+        error: error.message,
+      });
+      setError(state, error);
     });
 
-    state.status = 'running';
-    state.startedAt = new Date();
+    setRunning(state);
+    await recordClusterHeartbeat('pdf');
+
+    const heartbeatInterval = setInterval(() => {
+      if (state.status !== 'running') {
+        return;
+      }
+
+      void recordClusterHeartbeat('pdf').catch((error) => {
+        logger.error('PDF worker heartbeat failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }, 30_000);
+
     state.stop = async () => {
+      clearInterval(heartbeatInterval);
+      state.status = 'stopped';
       await pdfWorker.close();
       await redisConnection.quit();
     };
-
-    // Heartbeat
-    setInterval(async () => {
-      if (state.status === 'running') {
-        try {
-          await recordWorkerHeartbeat('pdf');
-          state.lastHeartbeat = new Date();
-        } catch {
-          // Non-fatal
-        }
-      }
-    }, 30000);
-
-    logger.info('PDF worker started', { concurrency: CONCURRENCY });
   } catch (error) {
-    state.status = 'error';
-    state.error = error instanceof Error ? error.message : String(error);
-    logger.error('Failed to start PDF worker', error);
+    setError(state, error);
+    logger.error('Failed to start PDF worker', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
-// ============================================================
-// Graceful Shutdown
-// ============================================================
-
 let isShuttingDown = false;
+let healthServer: http.Server | null = null;
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
-    logger.warn('Shutdown already in progress, forcing exit');
+    logger.warn('Shutdown already in progress', { signal });
     process.exit(1);
   }
 
   isShuttingDown = true;
-  logger.info(`Received ${signal}, shutting down gracefully`);
+  logger.info('Received shutdown signal', { signal });
 
-  // Stop all workers in parallel
-  const stopPromises = Object.entries(workerStates)
-    .filter(([, state]) => state.stop && state.status !== 'stopped')
-    .map(async ([name, state]) => {
+  const stops = Object.values(workerStates)
+    .filter((worker) => worker.stop && worker.status !== 'stopped')
+    .map(async (worker) => {
       try {
-        logger.info(`Stopping ${name} worker`);
-        state.status = 'stopped';
-        if (typeof state.stop === 'function') {
-          await state.stop();
-        }
-        logger.info(`${name} worker stopped`);
+        logger.info('Stopping worker', { worker: worker.name });
+        await worker.stop?.();
       } catch (error) {
-        logger.error(`Error stopping ${name} worker`, error);
+        logger.error('Worker shutdown failed', {
+          worker: worker.name,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     });
 
-  await Promise.all(stopPromises);
+  await Promise.all(stops);
 
-  // Close health server
   if (healthServer) {
-    healthServer.close(() => {
-      logger.info('Health server closed');
+    await new Promise<void>((resolve) => {
+      healthServer?.close(() => resolve());
     });
   }
 
-  logger.info('All workers stopped, exiting');
+  logger.info('Unified worker shutdown complete');
   process.exit(0);
 }
 
-// ============================================================
-// Main
-// ============================================================
-
-let healthServer: http.Server | null = null;
-
 async function main(): Promise<void> {
-  logger.info('Unified Worker Service starting');
-  logger.info('Enabled workers', { enabled: ENABLED_WORKERS });
-  logger.info('Health port', { port: HEALTH_PORT });
+  logger.info('Unified Worker Service starting', {
+    enabledWorkers: ENABLED_WORKERS,
+    healthPort: HEALTH_PORT,
+  });
 
-  // Start health check server
   healthServer = startHealthServer();
 
-  // Start enabled workers
-  const startPromises: Promise<void>[] = [];
+  const startups: Promise<void>[] = [];
 
   if (ENABLED_WORKERS.includes('outbox')) {
-    startPromises.push(startOutbox());
+    startups.push(startOutbox());
   } else {
     workerStates.outbox.status = 'stopped';
   }
 
   if (ENABLED_WORKERS.includes('projection')) {
-    startPromises.push(startProjection());
+    startups.push(startProjection());
   } else {
     workerStates.projection.status = 'stopped';
   }
 
   if (ENABLED_WORKERS.includes('pdf')) {
-    startPromises.push(startPdf());
+    startups.push(startPdf());
   } else {
     workerStates.pdf.status = 'stopped';
   }
 
-  await Promise.all(startPromises);
+  await Promise.all(startups);
 
-  logger.info('All workers started successfully');
+  logger.info('Unified Worker Service ready');
 
-  // Signal handling
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => {
+    void gracefulShutdown('SIGTERM');
+  });
 
-  // Handle uncaught exceptions
+  process.on('SIGINT', () => {
+    void gracefulShutdown('SIGINT');
+  });
+
   process.on('uncaughtException', (error) => {
-    logger.error('Uncaught exception', error);
+    logger.error('Uncaught exception in unified worker', {
+      error: error.message,
+    });
   });
 
   process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled rejection', reason);
+    logger.error('Unhandled rejection in unified worker', {
+      reason: reason instanceof Error ? reason.message : String(reason),
+    });
   });
 }
 
 main().catch((error) => {
-  logger.error('Worker service failed to start', error);
+  logger.error('Unified worker service failed to start', {
+    error: error instanceof Error ? error.message : String(error),
+  });
   process.exit(1);
 });

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { upsertReport } from '@/modules/reports/application/commands/report-command.service';
 import { reportAdminUpsertSchema } from '@/lib/validation-schemas';
 import { withMutation } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
+
+async function getReportCommandService() {
+  return import('@/modules/reports/application/commands/report-command.service');
+}
 
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -22,6 +25,7 @@ export const POST = withMutation(
         { status: 400 }
       );
     }
+    const { upsertReport } = await getReportCommandService();
     const result = await upsertReport(
       {
         reportId: dto.reportId,

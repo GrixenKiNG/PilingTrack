@@ -1,5 +1,5 @@
 /**
- * Data Integrity Tests — PilingTrack
+ * Data Integrity Tests - PilingTrack
  *
  * Verifies:
  * - No data loss during sync
@@ -10,7 +10,8 @@
  * Run: npx vitest run tests/integration/data-integrity.spec.ts
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { resolveConflict } from '@/shared/sync/conflict-resolver';
 
 // Mock DB for testing
 const mockDB = {
@@ -19,7 +20,7 @@ const mockDB = {
   idempotencyKeys: new Map<string, boolean>(),
 };
 
-describe('Data Integrity — No Data Loss', () => {
+describe('Data Integrity - No Data Loss', () => {
   beforeEach(() => {
     mockDB.reports.clear();
     mockDB.syncQueue = [];
@@ -88,10 +89,8 @@ describe('Data Integrity — No Data Loss', () => {
 
         // Simulate partial failure on attempt 1-2, success on 3
         if (attempt < 3) {
-          // Failed — keep in queue
           mockDB.syncQueue.push({ opId, data: report, status: 'pending' });
         } else {
-          // Success
           mockDB.reports.set(report.id, { ...report, version: report.version + 1 });
           mockDB.syncQueue = mockDB.syncQueue.filter((q) => q.opId !== opId);
         }
@@ -101,53 +100,46 @@ describe('Data Integrity — No Data Loss', () => {
     // Verify data is preserved and not duplicated
     expect(mockDB.reports.size).toBe(1);
     expect(mockDB.reports.get('report-2').version).toBe(2);
-    expect(mockDB.syncQueue.length).toBe(2); // Failed attempts still tracked
+    expect(mockDB.syncQueue.length).toBe(2);
   });
 
   it('preserves data through conflict resolution', async () => {
     const serverReport = {
       id: 'report-3',
-      piles: [{ pileGradeId: 'grade-1', count: 5 }],
-      drillings: [{ typeId: 'type-1', meters: 20 }],
-      downtimes: [{ reasonId: 'reason-1', duration: 15 }],
+      status: 'submitted',
+      date: '2026-04-08',
+      siteId: 'site-1',
+      userId: 'user-1',
+      piles: [{ id: 'pile-1', pileGradeId: 'grade-1', count: 5 }],
+      drillings: [{ id: 'drill-1', typeId: 'type-1', meters: 20 }],
+      downtimes: [{ id: 'down-1', reasonId: 'reason-1', duration: 15 }],
       version: 5,
     };
 
     const clientReport = {
       id: 'report-3',
-      piles: [{ pileGradeId: 'grade-2', count: 8 }],
+      status: 'draft',
+      date: '2026-04-07',
+      siteId: 'site-2',
+      userId: 'user-2',
+      piles: [{ id: 'pile-2', pileGradeId: 'grade-2', count: 8 }],
       drillings: [],
-      downtimes: [{ reasonId: 'reason-2', duration: 30 }],
-      version: 3, // Stale version
+      downtimes: [{ id: 'down-2', reasonId: 'reason-2', duration: 30 }],
+      version: 3,
     };
 
-    // Conflict detected — server wins on critical fields, merge on others
-    const criticalFields = new Set(['status', 'date', 'siteId', 'userId']);
-    const resolvedReport = { ...serverReport };
+    const resolvedReport = resolveConflict(clientReport, serverReport, 'field_merge') as
+      typeof serverReport & typeof clientReport;
 
-    // Merge non-critical fields from client
-    for (const [key, value] of Object.entries(clientReport)) {
-      if (!criticalFields.has(key) && serverReport[key] !== value) {
-        if (key === 'piles' || key === 'drillings' || key === 'downtimes') {
-          // Deep merge for arrays
-          resolvedReport[key] = [
-            ...(serverReport[key] || []),
-            ...(clientReport[key] || []),
-          ];
-        } else {
-          resolvedReport[key] = value;
-        }
-      }
-    }
-
-    // Verify merge preserved all data
-    expect(resolvedReport.piles).toHaveLength(2); // Both versions
-    expect(resolvedReport.downtimes).toHaveLength(2); // Both versions
-    expect(resolvedReport.version).toBe(serverReport.version); // Server version maintained
+    expect(resolvedReport.piles).toHaveLength(2);
+    expect(resolvedReport.downtimes).toHaveLength(2);
+    expect(resolvedReport.version).toBe(serverReport.version);
+    expect(resolvedReport.status).toBe(serverReport.status);
+    expect(resolvedReport.siteId).toBe(serverReport.siteId);
   });
 });
 
-describe('Data Integrity — No Duplication', () => {
+describe('Data Integrity - No Duplication', () => {
   beforeEach(() => {
     mockDB.reports.clear();
     mockDB.syncQueue = [];
@@ -158,13 +150,11 @@ describe('Data Integrity — No Duplication', () => {
     const report = { id: 'report-1', piles: [{ count: 5 }], version: 1 };
     const opId = 'op-unique-1';
 
-    // First sync — creates report
     if (!mockDB.idempotencyKeys.has(opId)) {
       mockDB.idempotencyKeys.set(opId, true);
       mockDB.reports.set(report.id, { ...report });
     }
 
-    // Simulate duplicate sync (same opId)
     let duplicateCreated = false;
     if (!mockDB.idempotencyKeys.has(opId)) {
       mockDB.idempotencyKeys.set(opId, true);
@@ -180,10 +170,8 @@ describe('Data Integrity — No Duplication', () => {
     const opId = 'op-queue-1';
     const change = { opId, entity: 'report', op: 'upsert', data: { id: 'report-1' } };
 
-    // Add to queue
     mockDB.syncQueue.push(change);
 
-    // Try to add duplicate
     const existingOpIds = new Set(mockDB.syncQueue.map((q) => q.opId));
     if (!existingOpIds.has(opId)) {
       mockDB.syncQueue.push(change);
@@ -194,12 +182,11 @@ describe('Data Integrity — No Duplication', () => {
 
   it('handles concurrent sync requests without duplication', async () => {
     const report = { id: 'report-concurrent', piles: [{ count: 3 }], version: 1 };
-    const opIds = ['op-concurrent-1', 'op-concurrent-2', 'op-concurrent-3'];
+    const opId = 'op-concurrent-1';
 
-    // Simulate 3 concurrent sync requests
+    // Simulate duplicate delivery of the same operation across concurrent requests.
     const results = await Promise.all(
-      opIds.map(async (opId) => {
-        // Simulate network delay
+      Array.from({ length: 3 }, async () => {
         await new Promise((r) => setTimeout(r, Math.random() * 100));
 
         if (!mockDB.idempotencyKeys.has(opId)) {
@@ -212,16 +199,13 @@ describe('Data Integrity — No Duplication', () => {
       })
     );
 
-    // Only first request should succeed
     const successCount = results.filter((r) => r.success).length;
     expect(successCount).toBe(1);
-
-    // Only one report should exist
     expect(mockDB.reports.size).toBe(1);
   });
 });
 
-describe('Data Integrity — Correct Aggregates', () => {
+describe('Data Integrity - Correct Aggregates', () => {
   it('calculates correct pile counts', async () => {
     const reports = [
       { id: 'r1', piles: [{ count: 5 }, { count: 3 }] },
@@ -234,7 +218,7 @@ describe('Data Integrity — Correct Aggregates', () => {
       0
     );
 
-    expect(totalPiles).toBe(27); // 5+3+2+10+7
+    expect(totalPiles).toBe(27);
   });
 
   it('calculates correct drilling meters', async () => {
@@ -248,7 +232,7 @@ describe('Data Integrity — Correct Aggregates', () => {
       0
     );
 
-    expect(totalMeters).toBe(70); // 25+30+15
+    expect(totalMeters).toBe(70);
   });
 
   it('calculates correct downtime duration', async () => {
@@ -262,6 +246,6 @@ describe('Data Integrity — Correct Aggregates', () => {
       0
     );
 
-    expect(totalDowntime).toBe(135); // 30+45+60
+    expect(totalDowntime).toBe(135);
   });
 });

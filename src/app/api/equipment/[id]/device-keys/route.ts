@@ -11,13 +11,17 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi, withMutation } from '@/core/api-wrapper';
-import { db } from '@/lib/db';
 import {
   provisionDeviceKey,
   revokeDeviceKey,
 } from '@/services/telemetry/device-key-service';
 
 export const runtime = 'nodejs';
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 
 const provisionSchema = z.object({
   name: z.string().min(1).max(120),
@@ -66,6 +70,7 @@ export const GET = withApi(async (request: NextRequest, ctx: RouteCtx) => {
   assertCan(user!, 'equipment.manage');
 
   const { id: equipmentId } = await ctx.params;
+  const db = await getDbClient();
 
   const keys = await db.deviceKey.findMany({
     where: { equipmentId },
@@ -103,6 +108,7 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: RouteCtx) =
 
   // Confirm the key actually belongs to this equipment before revoking,
   // so the URL `equipmentId` acts as a tenant-scoping check.
+  const db = await getDbClient();
   const key = await db.deviceKey.findUnique({
     where: { id: parsed.data.keyId },
     select: { equipmentId: true },

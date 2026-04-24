@@ -16,11 +16,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { postgresDb } from '@/lib/db';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
+
+async function getPostgresDb() {
+  const { postgresDb } = await import('@/lib/db');
+  return postgresDb;
+}
 
 // ============================================================
 // GET /api/sync/conflicts
@@ -43,6 +47,7 @@ export const GET = withApi(async (request: NextRequest) => {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get('tenantId') || undefined;
   const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+  const postgresDb = await getPostgresDb();
 
   // Query conflicts from audit log / feedback events
   // Conflicts are tracked as feedback events with action 'sync.conflict'
@@ -105,6 +110,7 @@ export const POST = withMutation(async (request: NextRequest) => {
     }
 
     const { conflictId, strategy, customData } = validated.data;
+    const postgresDb = await getPostgresDb();
 
     // Find the conflict in feedback events
     const conflict = await postgresDb.feedbackEvent.findUnique({

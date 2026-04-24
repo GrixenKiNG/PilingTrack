@@ -1,36 +1,57 @@
 /**
- * Projection Worker — CQRS Read Model Updater
+ * Projection Worker - CQRS Read Model Updater
  *
- * Listens to domain events and updates denormalized read models:
- * - ReportStats: per-report aggregated stats
- * - OperatorPerformance: daily per-user metrics
- * - DowntimeSummary: per-site per-date downtime breakdown
- * - SiteDailySummary: existing daily aggregates
- * - SiteWeeklyTrend: weekly trend data
- *
- * Runs as a separate process for fault isolation.
+ * Listens to report-domain events and updates denormalized read models.
+ * The canonical event model is PascalCase (`ReportCreated`, `DowntimeAdded`),
+ * while dotted aliases are normalized at the boundaries for compatibility.
  */
 
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { ReportDomainEvent } from '@/modules/reports/domain';
+import {
+  ReportDomainEvent,
+  REPORT_DOMAIN_EVENT_TYPES,
+  normalizeReportDomainEventType,
+} from '@/modules/reports/domain';
 import { projectOutboxEvents } from '@/services/reports/outbox-publisher';
 
-// ============================================================
-// Projection Handlers
-// ============================================================
+function shouldLogProjectionLifecycle(): boolean {
+  return process.env.LOG_WORKER_LIFECYCLE === 'true';
+}
 
-const PROJECTABLE_EVENT_PREFIXES = ['Report', 'Pile', 'Drilling', 'Downtime'];
+const PROJECTABLE_EVENT_TYPES = new Set<string>([
+  REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED,
+  REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+  REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+  REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,
+  REPORT_DOMAIN_EVENT_TYPES.REPORT_VERSION_CREATED,
+  REPORT_DOMAIN_EVENT_TYPES.PILE_WORK_ADDED,
+  REPORT_DOMAIN_EVENT_TYPES.PILE_WORK_REMOVED,
+  REPORT_DOMAIN_EVENT_TYPES.DRILLING_ADDED,
+  REPORT_DOMAIN_EVENT_TYPES.DRILLING_REMOVED,
+  REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
+  REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_REMOVED,
+]);
 
-function isProjectableReportEvent(event: unknown): event is ReportDomainEvent {
-  if (!event || typeof event !== 'object') return false;
+function normalizeProjectionEvent(event: unknown): ReportDomainEvent | null {
+  if (!event || typeof event !== 'object') {
+    return null;
+  }
 
   const maybeEvent = event as Partial<ReportDomainEvent>;
-  return (
-    typeof maybeEvent.type === 'string' &&
-    typeof maybeEvent.aggregateId === 'string' &&
-    PROJECTABLE_EVENT_PREFIXES.some((prefix) => maybeEvent.type!.startsWith(prefix))
-  );
+  const normalizedType = normalizeReportDomainEventType(maybeEvent.type);
+  if (!normalizedType || typeof maybeEvent.aggregateId !== 'string') {
+    return null;
+  }
+
+  if (!PROJECTABLE_EVENT_TYPES.has(normalizedType)) {
+    return null;
+  }
+
+  return {
+    ...(maybeEvent as ReportDomainEvent),
+    type: normalizedType,
+  };
 }
 
 function getProjectionDate(event: ReportDomainEvent, fallbackDate?: string | null): string | null {
@@ -49,14 +70,10 @@ function getProjectionDate(event: ReportDomainEvent, fallbackDate?: string | nul
   return fallbackDate || null;
 }
 
-/**
- * Update ReportStats on report events.
- */
 async function projectReportStats(event: ReportDomainEvent) {
-  const { siteId, userId, tenantId, data } = event;
+  const { siteId, userId, tenantId } = event;
   if (!siteId || !userId) return;
 
-  // We need the full report data — fetch it
   const report = await db.report.findUnique({
     where: { reportId: event.aggregateId },
     include: {
@@ -71,14 +88,14 @@ async function projectReportStats(event: ReportDomainEvent) {
   const date = getProjectionDate(event, report.date);
   if (!date) return;
 
-  // Compute top downtime reason
   let topReasonId: string | null = null;
   let topReasonDuration: number | null = null;
   if (report.downtimes.length > 0) {
     const byReason = new Map<string, number>();
-    for (const dt of report.downtimes) {
-      byReason.set(dt.reasonId, (byReason.get(dt.reasonId) || 0) + dt.duration);
+    for (const downtime of report.downtimes) {
+      byReason.set(downtime.reasonId, (byReason.get(downtime.reasonId) || 0) + downtime.duration);
     }
+
     let maxDuration = 0;
     for (const [reasonId, duration] of byReason) {
       if (duration > maxDuration) {
@@ -89,25 +106,26 @@ async function projectReportStats(event: ReportDomainEvent) {
     }
   }
 
-  // Compute piles/drilling per hour
   let pilesPerHour: number | null = null;
   let drillingPerHour: number | null = null;
   if (report.shiftStart && report.shiftEnd) {
-    const [sh, sm] = report.shiftStart.split(':').map(Number);
-    const [eh, em] = report.shiftEnd.split(':').map(Number);
-    let hours = (eh * 60 + em - sh * 60 - sm) / 60;
+    const [shiftStartHours, shiftStartMinutes] = report.shiftStart.split(':').map(Number);
+    const [shiftEndHours, shiftEndMinutes] = report.shiftEnd.split(':').map(Number);
+    let hours =
+      (shiftEndHours * 60 + shiftEndMinutes - shiftStartHours * 60 - shiftStartMinutes) / 60;
     if (hours < 0) hours += 24;
+
     if (hours > 0) {
-      const totalPiles = report.piles.reduce((s, p) => s + p.count, 0);
-      const totalDrilling = report.drillings.reduce((s, d) => s + d.meters, 0);
+      const totalPiles = report.piles.reduce((sum, pile) => sum + pile.count, 0);
+      const totalDrilling = report.drillings.reduce((sum, drilling) => sum + drilling.meters, 0);
       pilesPerHour = Math.round((totalPiles / hours) * 100) / 100;
       drillingPerHour = Math.round((totalDrilling / hours) * 100) / 100;
     }
   }
 
-  const totalPiles = report.piles.reduce((s, p) => s + p.count, 0);
-  const totalDrilling = report.drillings.reduce((s, d) => s + d.meters, 0);
-  const totalDowntime = report.downtimes.reduce((s, d) => s + d.duration, 0);
+  const totalPiles = report.piles.reduce((sum, pile) => sum + pile.count, 0);
+  const totalDrilling = report.drillings.reduce((sum, drilling) => sum + drilling.meters, 0);
+  const totalDowntime = report.downtimes.reduce((sum, downtime) => sum + downtime.duration, 0);
 
   await db.reportStats.upsert({
     where: { reportId: report.reportId },
@@ -122,7 +140,7 @@ async function projectReportStats(event: ReportDomainEvent) {
       totalDrilling,
       totalDowntime,
       downtimeCount: report.downtimes.length,
-      pileGradeCount: new Set(report.piles.map(p => p.pileGradeId)).size,
+      pileGradeCount: new Set(report.piles.map((pile) => pile.pileGradeId)).size,
       drillingCount: report.drillings.length,
       pilesPerHour,
       drillingPerHour,
@@ -134,7 +152,7 @@ async function projectReportStats(event: ReportDomainEvent) {
       totalDrilling,
       totalDowntime,
       downtimeCount: report.downtimes.length,
-      pileGradeCount: new Set(report.piles.map(p => p.pileGradeId)).size,
+      pileGradeCount: new Set(report.piles.map((pile) => pile.pileGradeId)).size,
       drillingCount: report.drillings.length,
       pilesPerHour,
       drillingPerHour,
@@ -144,28 +162,23 @@ async function projectReportStats(event: ReportDomainEvent) {
   });
 }
 
-/**
- * Update OperatorPerformance on report submission.
- *
- * IDEMPOTENT: Uses full aggregation instead of increment to prevent
- * double-counting when events are processed multiple times.
- */
 async function projectOperatorPerformance(event: ReportDomainEvent) {
-  if (event.type !== 'ReportSubmitted' && event.type !== 'ReportCreated') return;
+  if (
+    event.type !== REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED &&
+    event.type !== REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED
+  ) {
+    return;
+  }
 
-  const { siteId, userId, tenantId } = event;
+  const { siteId, userId } = event;
   if (!siteId || !userId) return;
 
-  // Always use full aggregation for idempotency — safe against double-processing
   const date = getProjectionDate(event);
   if (!date) return;
 
   await projectOperatorPerformanceFull(userId, siteId, date);
 }
 
-/**
- * Full aggregation fallback — used when event payload is not available.
- */
 async function projectOperatorPerformanceFull(userId: string, siteId: string, date: string) {
   const reports = await db.report.findMany({
     where: { userId, siteId, date },
@@ -180,19 +193,31 @@ async function projectOperatorPerformanceFull(userId: string, siteId: string, da
 
   if (reports.length === 0) return;
 
-  const totalPiles = reports.reduce((s, r) => s + r.piles.reduce((ps, p) => ps + p.count, 0), 0);
-  const totalDrilling = reports.reduce((s, r) => s + r.drillings.reduce((ds, d) => ds + d.meters, 0), 0);
-  const totalDowntime = reports.reduce((s, r) => s + r.downtimes.reduce((dt, d) => dt + d.duration, 0), 0);
+  const totalPiles = reports.reduce(
+    (sum, report) => sum + report.piles.reduce((pileSum, pile) => pileSum + pile.count, 0),
+    0
+  );
+  const totalDrilling = reports.reduce(
+    (sum, report) =>
+      sum + report.drillings.reduce((drillingSum, drilling) => drillingSum + drilling.meters, 0),
+    0
+  );
+  const totalDowntime = reports.reduce(
+    (sum, report) =>
+      sum + report.downtimes.reduce((downtimeSum, downtime) => downtimeSum + downtime.duration, 0),
+    0
+  );
   const reportCount = reports.length;
 
   let totalShiftMinutes = 0;
-  for (const r of reports) {
-    if (r.shiftStart && r.shiftEnd) {
-      const [sh, sm] = r.shiftStart.split(':').map(Number);
-      const [eh, em] = r.shiftEnd.split(':').map(Number);
-      let mins = eh * 60 + em - sh * 60 - sm;
-      if (mins < 0) mins += 24 * 60;
-      totalShiftMinutes += mins;
+  for (const report of reports) {
+    if (report.shiftStart && report.shiftEnd) {
+      const [shiftStartHours, shiftStartMinutes] = report.shiftStart.split(':').map(Number);
+      const [shiftEndHours, shiftEndMinutes] = report.shiftEnd.split(':').map(Number);
+      let minutes =
+        shiftEndHours * 60 + shiftEndMinutes - shiftStartHours * 60 - shiftStartMinutes;
+      if (minutes < 0) minutes += 24 * 60;
+      totalShiftMinutes += minutes;
     }
   }
 
@@ -229,11 +254,8 @@ async function projectOperatorPerformanceFull(userId: string, siteId: string, da
   });
 }
 
-/**
- * Update DowntimeSummary on downtime events.
- */
 async function projectDowntimeSummary(event: ReportDomainEvent) {
-  if (event.type !== 'DowntimeAdded') return;
+  if (event.type !== REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED) return;
 
   const { siteId, tenantId } = event;
   if (!siteId) return;
@@ -244,7 +266,6 @@ async function projectDowntimeSummary(event: ReportDomainEvent) {
   const reasonId = event.data.reasonId as string;
   if (!reasonId) return;
 
-  // Fetch reason name
   const reason = await db.downtimeReason.findUnique({
     where: { id: reasonId },
     select: { name: true },
@@ -252,7 +273,6 @@ async function projectDowntimeSummary(event: ReportDomainEvent) {
 
   if (!reason) return;
 
-  // Get all downtimes for this site + date
   const allDowntimes = await db.reportDowntime.findMany({
     where: {
       reasonId,
@@ -260,16 +280,15 @@ async function projectDowntimeSummary(event: ReportDomainEvent) {
     },
   });
 
-  const totalDuration = allDowntimes.reduce((s, d) => s + d.duration, 0);
-  const uniqueReports = new Set(allDowntimes.map(d => d.reportId)).size;
+  const totalDuration = allDowntimes.reduce((sum, downtime) => sum + downtime.duration, 0);
+  const uniqueReports = new Set(allDowntimes.map((downtime) => downtime.reportId)).size;
 
-  // Get total site downtime for percentage
   const siteDowntimes = await db.reportDowntime.findMany({
     where: {
       report: { siteId, date },
     },
   });
-  const siteTotal = siteDowntimes.reduce((s, d) => s + d.duration, 0);
+  const siteTotal = siteDowntimes.reduce((sum, downtime) => sum + downtime.duration, 0);
   const percentage = siteTotal > 0 ? (totalDuration / siteTotal) * 100 : 0;
 
   await db.downtimeSummary.upsert({
@@ -296,12 +315,9 @@ async function projectDowntimeSummary(event: ReportDomainEvent) {
   });
 }
 
-/**
- * Update SiteWeeklyTrend — recomputed weekly.
- */
 async function projectWeeklyTrend(siteId: string) {
   const now = new Date();
-  const dayOfWeek = now.getDay() || 7; // 1=Mon..7=Sun
+  const dayOfWeek = now.getDay() || 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - dayOfWeek + 1);
   const sunday = new Date(monday);
@@ -310,7 +326,6 @@ async function projectWeeklyTrend(siteId: string) {
   const weekStart = monday.toISOString().split('T')[0];
   const weekEnd = sunday.toISOString().split('T')[0];
 
-  // Get daily summaries for the week
   const dailySummaries = await db.siteDailySummary.findMany({
     where: {
       siteId,
@@ -319,31 +334,45 @@ async function projectWeeklyTrend(siteId: string) {
     orderBy: { date: 'asc' },
   });
 
-  const dailyMetrics = dailySummaries.map(ds => ({
-    date: ds.date,
-    piles: ds.totalPiles,
-    drilling: ds.totalDrilling,
-    downtime: ds.totalDowntime,
-    reports: ds.reportCount,
+  const dailyMetrics = dailySummaries.map((summary) => ({
+    date: summary.date,
+    piles: summary.totalPiles,
+    drilling: summary.totalDrilling,
+    downtime: summary.totalDowntime,
+    reports: summary.reportCount,
   }));
 
-  const totalPiles = dailySummaries.reduce((s, d) => s + d.totalPiles, 0);
-  const totalDrilling = dailySummaries.reduce((s, d) => s + d.totalDrilling, 0);
-  const totalDowntime = dailySummaries.reduce((s, d) => s + d.totalDowntime, 0);
-  const reportCount = dailySummaries.reduce((s, d) => s + d.reportCount, 0);
+  const totalPiles = dailySummaries.reduce((sum, summary) => sum + summary.totalPiles, 0);
+  const totalDrilling = dailySummaries.reduce((sum, summary) => sum + summary.totalDrilling, 0);
+  const totalDowntime = dailySummaries.reduce((sum, summary) => sum + summary.totalDowntime, 0);
+  const reportCount = dailySummaries.reduce((sum, summary) => sum + summary.reportCount, 0);
 
-  // Compute trends (compare last 2 days)
   let pilesTrend: string | null = null;
   let drillingTrend: string | null = null;
   let downtimeTrend: string | null = null;
 
   if (dailySummaries.length >= 2) {
     const last = dailySummaries[dailySummaries.length - 1];
-    const prev = dailySummaries[dailySummaries.length - 2];
+    const previous = dailySummaries[dailySummaries.length - 2];
 
-    pilesTrend = last.totalPiles > prev.totalPiles ? 'UP' : last.totalPiles < prev.totalPiles ? 'DOWN' : 'STABLE';
-    drillingTrend = last.totalDrilling > prev.totalDrilling ? 'UP' : last.totalDrilling < prev.totalDrilling ? 'DOWN' : 'STABLE';
-    downtimeTrend = last.totalDowntime < prev.totalDowntime ? 'UP' : last.totalDowntime > prev.totalDowntime ? 'DOWN' : 'STABLE'; // Less downtime = UP
+    pilesTrend =
+      last.totalPiles > previous.totalPiles
+        ? 'UP'
+        : last.totalPiles < previous.totalPiles
+          ? 'DOWN'
+          : 'STABLE';
+    drillingTrend =
+      last.totalDrilling > previous.totalDrilling
+        ? 'UP'
+        : last.totalDrilling < previous.totalDrilling
+          ? 'DOWN'
+          : 'STABLE';
+    downtimeTrend =
+      last.totalDowntime < previous.totalDowntime
+        ? 'UP'
+        : last.totalDowntime > previous.totalDowntime
+          ? 'DOWN'
+          : 'STABLE';
   }
 
   await db.siteWeeklyTrend.upsert({
@@ -352,7 +381,7 @@ async function projectWeeklyTrend(siteId: string) {
       siteId,
       weekStart,
       weekEnd,
-      dailyMetrics: dailyMetrics as any,
+      dailyMetrics: dailyMetrics as never,
       totalPiles,
       totalDrilling,
       totalDowntime,
@@ -362,7 +391,7 @@ async function projectWeeklyTrend(siteId: string) {
       downtimeTrend,
     },
     update: {
-      dailyMetrics: dailyMetrics as any,
+      dailyMetrics: dailyMetrics as never,
       totalPiles,
       totalDrilling,
       totalDowntime,
@@ -374,12 +403,9 @@ async function projectWeeklyTrend(siteId: string) {
   });
 }
 
-// ============================================================
-// Main Projection Router
-// ============================================================
-
 async function projectEvent(event: ReportDomainEvent) {
-  if (!isProjectableReportEvent(event)) {
+  const normalizedEvent = normalizeProjectionEvent(event);
+  if (!normalizedEvent) {
     if (process.env.LOG_PROJECTION_SKIPS === 'true') {
       logger.debug('Projection skipped non-report event', {
         eventType: (event as { type?: string })?.type,
@@ -390,36 +416,35 @@ async function projectEvent(event: ReportDomainEvent) {
 
   try {
     await Promise.all([
-      projectReportStats(event),
-      projectOperatorPerformance(event),
-      projectDowntimeSummary(event),
+      projectReportStats(normalizedEvent),
+      projectOperatorPerformance(normalizedEvent),
+      projectDowntimeSummary(normalizedEvent),
     ]);
 
-    // Weekly trend — update on any report event
-    if (event.type.startsWith('Report') || event.type.startsWith('Pile') || event.type.startsWith('Drilling')) {
-      if (event.siteId) {
-        await projectWeeklyTrend(event.siteId);
+    if (
+      normalizedEvent.type.startsWith('Report') ||
+      normalizedEvent.type.startsWith('Pile') ||
+      normalizedEvent.type.startsWith('Drilling')
+    ) {
+      if (normalizedEvent.siteId) {
+        await projectWeeklyTrend(normalizedEvent.siteId);
       }
     }
   } catch (error) {
     logger.error('Projection failed', error, {
-      eventType: event.type,
-      aggregateId: event.aggregateId,
+      eventType: normalizedEvent.type,
+      aggregateId: normalizedEvent.aggregateId,
     });
   }
 }
 
-// ============================================================
-// Worker Loop
-// ============================================================
-
 export function startProjectionWorker(intervalMs = 5000) {
-  logger.info('Projection worker starting', { intervalMs });
+  if (shouldLogProjectionLifecycle()) {
+    logger.info('Projection worker starting', { intervalMs });
+  }
 
   const processOnce = async () => {
     try {
-      // Uses the dedicated `projected` consumer — independent of the
-      // outbox publisher so both workers see every event exactly once.
       const count = await projectOutboxEvents(projectEvent);
       if (count > 0) {
         logger.info('Projection worker processed events', { count });
@@ -432,7 +457,6 @@ export function startProjectionWorker(intervalMs = 5000) {
   void processOnce();
   const interval = setInterval(processOnce, intervalMs);
 
-  // Weekly trend recomputation every hour
   const weeklyInterval = setInterval(async () => {
     try {
       const sites = await db.site.findMany({ select: { id: true } });
@@ -442,10 +466,12 @@ export function startProjectionWorker(intervalMs = 5000) {
     } catch (error) {
       logger.error('Weekly trend recomputation failed', error);
     }
-  }, 3600000); // 1 hour
+  }, 3600000);
 
   process.on('SIGTERM', () => {
-    logger.info('Projection worker shutting down');
+    if (shouldLogProjectionLifecycle()) {
+      logger.info('Projection worker shutting down');
+    }
     clearInterval(interval);
     clearInterval(weeklyInterval);
   });

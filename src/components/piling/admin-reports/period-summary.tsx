@@ -38,7 +38,7 @@ export function PeriodSummaryCard({ summary, loading }: PeriodSummaryCardProps) 
     },
     {
       label: 'Бурение',
-      value: `${formatNumber(summary.totalDrilling)} м.п.`,
+      value: `${summary.totalDrillingCount ?? 0} шт. / ${formatNumber(summary.totalDrilling)} м.п.`,
       icon: Drill,
       color: 'text-cyan-600',
       bg: 'bg-cyan-50',

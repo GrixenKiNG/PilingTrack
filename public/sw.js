@@ -17,8 +17,8 @@
  * - Retry with exponential backoff on failure
  */
 
-const SHELL_CACHE = 'pilingtrack-shell-v3';
-const API_CACHE = 'pilingtrack-api-v3';
+const SHELL_CACHE = 'pilingtrack-shell-v4';
+const API_CACHE = 'pilingtrack-api-v4';
 const MAX_SYNC_RETRIES = 5;
 const BASE_RETRY_DELAY = 1000; // 1 second
 
@@ -66,6 +66,16 @@ self.addEventListener('fetch', (event) => {
 
   // Only handle same-origin requests — ignore all external domains
   if (url.origin !== self.location.origin) return;
+
+  // Never intercept Next.js runtime/dev assets. Serving these from the SW cache
+  // causes stale chunk/HMR errors that only disappear after a hard refresh.
+  if (
+    url.pathname.startsWith('/_next/') ||
+    url.pathname === '/webpack-hmr' ||
+    request.cache === 'no-store'
+  ) {
+    return;
+  }
 
   // Mutation requests (POST/PUT/DELETE/PATCH)
   if (request.method !== 'GET') {

@@ -9,9 +9,8 @@ import {
 } from '@/services/feedback/feedback-event-service';
 import type { FeedbackEventAudience, FeedbackEventLevel, FeedbackEventPriority } from '@/lib/types';
 import { z } from 'zod';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { getSessionCacheScope, withApi, withMutation } from '@/core/api-wrapper';
 import { getResponseCache } from '@/core/cache';
-import { readSessionToken } from '@/services/auth/session-service';
 
 const ALLOWED_LEVELS: FeedbackEventLevel[] = ['info', 'success', 'warn', 'error', 'audit'];
 const ALLOWED_PRIORITIES: FeedbackEventPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -46,13 +45,13 @@ function invalidateFeedbackCache(request: NextRequest, scope: 'all' | 'user') {
     return;
   }
 
-  const sessionToken = readSessionToken(request);
-  if (!sessionToken) {
+  const userScope = getSessionCacheScope(request);
+  if (!userScope) {
     cache.invalidate('GET:/api/feedback/events');
     return;
   }
 
-  cache.invalidate('GET:/api/feedback/events', { userId: sessionToken });
+  cache.invalidate('GET:/api/feedback/events', { userId: userScope });
 }
 
 export const GET = withApi(

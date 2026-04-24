@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCanAccessReportOwner, ensureTenantAccess } from '@/services/auth/resource-access-service';
 import { generateSinglePdf } from '@/lib/pdf-generator';
+import { loadSingleReportPdfContext } from '@/lib/pdf-data';
 import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-queue';
 import { getRequestId } from '@/lib/request-context';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
@@ -29,82 +29,28 @@ export const POST = withMutation(async (request: NextRequest) => {
       return NextResponse.json({ error: 'reportId required' }, { status: 400 });
     }
 
-    const report = await db.report.findUnique({
-      where: { reportId },
-      include: {
-        user: { select: { name: true } },
-        site: { select: { name: true } },
-        equipment: { select: { name: true } },
-        crew: {
-          select: {
-            name: true,
-            assistants: { select: { name: true } },
-            equipment: { select: { name: true } },
-          },
-        },
-        piles: { include: { pileGrade: true } },
-        drillings: { include: { type: true } },
-        downtimes: { include: { reason: true } },
-      },
-    });
-
-    if (!report) {
+    const context = await loadSingleReportPdfContext(reportId);
+    if (!context) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
-    await ensureTenantAccess(user!, report.tenantId, 'report');
-    assertCanAccessReportOwner(user!, report.userId, 'reports.read_cross_user');
-
-    const fallbackCrew = report.crew
-      ? null
-      : await db.crew.findFirst({
-          where: {
-            operatorId: report.userId,
-            siteId: report.siteId,
-            isActive: true,
-          },
-          select: {
-            assistants: { select: { name: true } },
-            equipment: { select: { name: true } },
-          },
-        });
-
-    const effectiveCrew = report.crew || fallbackCrew;
-    const assistantName =
-      effectiveCrew?.assistants?.map((assistant) => assistant.name).filter(Boolean).join(', ') || '';
-
-    const pdfData = {
-      reportId: report.reportId,
-      date: report.date,
-      shiftStart: report.shiftStart,
-      shiftEnd: report.shiftEnd,
-      shiftType: report.shiftType,
-      status: report.status,
-      lastEditedByName: report.lastEditedByName,
-      lastEditedByRole: report.lastEditedByRole,
-      assistantName,
-      equipmentName: report.equipment?.name || effectiveCrew?.equipment?.name || '',
-      user: report.user,
-      site: report.site,
-      piles: report.piles,
-      drillings: report.drillings,
-      downtimes: report.downtimes,
-    };
+    await ensureTenantAccess(user!, context.report.tenantId, 'report');
+    assertCanAccessReportOwner(user!, context.report.userId, 'reports.read_cross_user');
 
     const jobId = await enqueuePdfGeneration({
-      dateFrom: report.date,
-      dateTo: report.date,
-      siteId: report.siteId || '',
+      dateFrom: context.report.date,
+      dateTo: context.report.date,
+      siteId: context.report.siteId || '',
       type: 'single',
       reportId,
       userId: user!.id,
-      report: pdfData,
+      report: context.pdfData,
     });
 
     // Fallback to sync if Redis unavailable
     if (!jobId) {
       const pdfBuffer = await Promise.race([
-        generateSinglePdf(pdfData),
+        generateSinglePdf(context.pdfData),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new ServiceError('PDF generation timeout (30s)', 504)), 30_000),
         ),
@@ -113,7 +59,7 @@ export const POST = withMutation(async (request: NextRequest) => {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="otchet-${report.date}-${report.user?.name || ''}.pdf"`,
+          'Content-Disposition': `attachment; filename="otchet-${context.report.date}-${context.report.user?.name || ''}.pdf"`,
         },
       });
     }
@@ -212,71 +158,17 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       return NextResponse.json({ error: 'reportId required' }, { status: 400 });
     }
 
-    const report = await db.report.findUnique({
-      where: { reportId },
-      include: {
-        user: { select: { name: true } },
-        site: { select: { name: true } },
-        equipment: { select: { name: true } },
-        crew: {
-          select: {
-            name: true,
-            assistants: { select: { name: true } },
-            equipment: { select: { name: true } },
-          },
-        },
-        piles: { include: { pileGrade: true } },
-        drillings: { include: { type: true } },
-        downtimes: { include: { reason: true } },
-      },
-    });
-
-    if (!report) {
+    const context = await loadSingleReportPdfContext(reportId);
+    if (!context) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
-    await ensureTenantAccess(user!, report.tenantId, 'report');
-    assertCanAccessReportOwner(user!, report.userId, 'reports.read_cross_user');
+    await ensureTenantAccess(user!, context.report.tenantId, 'report');
+    assertCanAccessReportOwner(user!, context.report.userId, 'reports.read_cross_user');
 
-    const fallbackCrew = report.crew
-      ? null
-      : await db.crew.findFirst({
-          where: {
-            operatorId: report.userId,
-            siteId: report.siteId,
-            isActive: true,
-          },
-          select: {
-            assistants: { select: { name: true } },
-            equipment: { select: { name: true } },
-          },
-        });
+    const pdfBuffer = await generateSinglePdf(context.pdfData);
 
-    const effectiveCrew = report.crew || fallbackCrew;
-    const assistantName =
-      effectiveCrew?.assistants?.map((assistant) => assistant.name).filter(Boolean).join(', ') || '';
-
-    const pdfData = {
-      reportId: report.reportId,
-      date: report.date,
-      shiftStart: report.shiftStart,
-      shiftEnd: report.shiftEnd,
-      shiftType: report.shiftType,
-      status: report.status,
-      lastEditedByName: report.lastEditedByName,
-      lastEditedByRole: report.lastEditedByRole,
-      assistantName,
-      equipmentName: report.equipment?.name || effectiveCrew?.equipment?.name || '',
-      user: report.user,
-      site: report.site,
-      piles: report.piles,
-      drillings: report.drillings,
-      downtimes: report.downtimes,
-    };
-
-    const pdfBuffer = await generateSinglePdf(pdfData);
-
-    const safeDate = report.date.replace(/[^0-9-]/g, '');
+    const safeDate = context.report.date.replace(/[^0-9-]/g, '');
     const inline = request.nextUrl.searchParams.get('inline') === '1';
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {

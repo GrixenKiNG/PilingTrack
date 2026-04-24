@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { listReportsForUserScope } from '@/modules/reports';
 import { withApi } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 
 
 export const runtime = 'nodejs';
+
+async function getReportsModule() {
+  return import('@/modules/reports');
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -14,9 +17,10 @@ export const GET = withApi(
 
     const requestedUserId = request.nextUrl.searchParams.get('userId');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
+    const { listReportsForUserScope } = await getReportsModule();
     const reports = await listReportsForUserScope(user!, requestedUserId, pagination);
     const nextCursor = pagination.getNextCursor(reports);
-    return NextResponse.json({ data: reports, nextCursor });
+    return NextResponse.json({ data: reports, reports, nextCursor });
   },
   { domain: 'reports', cache: true, cacheTTL: 10_000 }
 );

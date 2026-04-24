@@ -12,9 +12,8 @@
  *   maxBatchSize:    Max records per single INSERT (default 200)
  */
 
-import { db } from '@/lib/db';
-import { Prisma } from '@/generated/postgres-client/client';
 import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
+import type { Prisma } from '@/generated/postgres-client';
 import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
 
@@ -27,6 +26,17 @@ export interface TelemetryBufferConfig {
 
 interface TelemetryBufferRecord extends TelemetryRecord {
   _ingestedAt: number;
+}
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
+
+function toJsonMetadata(
+  metadata: TelemetryRecord['metadata']
+): Prisma.InputJsonValue | undefined {
+  return metadata as Prisma.InputJsonValue | undefined;
 }
 
 export class TelemetryBuffer {
@@ -102,6 +112,7 @@ export class TelemetryBuffer {
 
     const recordsToFlush = [...this.buffer];
     this.buffer = [];
+    const db = await getDbClient();
 
     let flushedCount = 0;
     let droppedCount = 0;
@@ -122,9 +133,9 @@ export class TelemetryBuffer {
                   unit: record.unit || null,
                   latitude: record.latitude || null,
                   longitude: record.longitude || null,
-                  metadata: record.metadata
-                    ? (record.metadata as Prisma.InputJsonValue)
-                    : Prisma.DbNull,
+                  ...(record.metadata !== undefined
+                    ? { metadata: toJsonMetadata(record.metadata) }
+                    : {}),
                   timestamp: record.timestamp || new Date(),
                 },
               })

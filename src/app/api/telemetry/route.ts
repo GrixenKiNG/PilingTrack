@@ -103,7 +103,8 @@ export const POST = withApi(async (request: NextRequest) => {
   if (error) return error;
 
   try {
-    assertAnyRole(user!, ['ADMIN', 'DISPATCHER', 'OPERATOR']);
+    const roleCheck = assertAnyRole(user!, ['ADMIN', 'DISPATCHER', 'OPERATOR']);
+    if (roleCheck) return roleCheck;
 
     // Check circuit breaker before accepting data
     const circuitResponse = checkCircuitBreaker();
@@ -258,4 +259,6 @@ function assertAnyRole(user: { role: string }, roles: string[]) {
   if (!roles.includes(user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  return null;
 }

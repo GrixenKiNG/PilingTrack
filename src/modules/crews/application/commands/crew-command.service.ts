@@ -128,7 +128,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
     aggregate.update({ name: command.name }, command.userId);
   }
 
-  if (command.isActive !== undefined) {
+  if (command.isActive !== undefined && command.isActive !== aggregate.getState().isActive) {
     if (command.isActive) {
       aggregate.reactivate(command.userId);
     } else {

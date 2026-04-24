@@ -1,22 +1,11 @@
 /**
  * Report Domain Events
  *
- * All events specific to the Reports bounded context.
- * Each event is an immutable fact — something that already happened (past tense).
+ * Canonical event names inside the reports bounded context use PascalCase.
+ * Older dotted aliases are normalized at the boundaries for backward compatibility.
  */
 
-export type ReportDomainEventType =
-  | 'ReportCreated'
-  | 'ReportUpdated'
-  | 'ReportSubmitted'
-  | 'ReportDeleted'
-  | 'ReportVersionCreated'
-  | 'PileWorkAdded'
-  | 'PileWorkRemoved'
-  | 'DrillingAdded'
-  | 'DrillingRemoved'
-  | 'DowntimeAdded'
-  | 'DowntimeRemoved';
+import type { ReportDomainEventType } from './report-event-types';
 
 export interface ReportDomainEvent {
   id: string;
@@ -58,3 +47,10 @@ export function createReportEvent(
     data,
   };
 }
+
+export type { ReportDomainEventType } from './report-event-types';
+export {
+  REPORT_DOMAIN_EVENT_TYPES,
+  normalizeReportDomainEventType,
+  isReportDomainEventType,
+} from './report-event-types';

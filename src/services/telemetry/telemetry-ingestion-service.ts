@@ -26,7 +26,6 @@
  *   await ingestTelemetryBatch(records);
  */
 
-import { db } from '@/lib/db';
 import { telemetryBuffer } from './telemetry-buffer';
 import { logger } from '@/lib/logger';
 
@@ -52,6 +51,11 @@ export interface TelemetryRecord {
   longitude?: number;
   metadata?: Record<string, unknown>;
   timestamp?: Date;
+}
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
 }
 
 // --- Sampling Configuration ---
@@ -242,6 +246,7 @@ export async function getLatestTelemetry(
   equipmentId: string,
   type?: TelemetryType
 ) {
+  const db = await getDbClient();
   return db.telemetryRecord.findFirst({
     where: {
       equipmentId,
@@ -262,6 +267,7 @@ export async function getTelemetryByRange(params: {
   to: Date;
   limit?: number;
 }) {
+  const db = await getDbClient();
   return db.telemetryRecord.findMany({
     where: {
       ...(params.equipmentId ? { equipmentId: params.equipmentId } : {}),
@@ -286,6 +292,7 @@ export async function getTelemetryStats(params: {
   from: Date;
   to: Date;
 }) {
+  const db = await getDbClient();
   const where: Record<string, unknown> = {
     timestamp: {
       gte: params.from,

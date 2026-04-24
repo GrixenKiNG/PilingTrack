@@ -192,7 +192,7 @@ export function startOutboxWorker(
   handler: (event: ReportDomainEvent) => Promise<void>,
   intervalMs: number = 10000 // 10 seconds
 ) {
-  const interval = setInterval(async () => {
+  const processOnce = async () => {
     try {
       const count = await publishOutboxEvents(handler);
       if (count > 0) {
@@ -201,7 +201,10 @@ export function startOutboxWorker(
     } catch (error) {
       logger.error('Outbox worker error', error);
     }
-  }, intervalMs);
+  };
+
+  void processOnce();
+  const interval = setInterval(processOnce, intervalMs);
 
   // Cleanup on process exit
   if (typeof process !== 'undefined') {

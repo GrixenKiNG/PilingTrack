@@ -21,13 +21,17 @@
  *   recordWorkerHeartbeat('outbox');
  */
 
-import { db } from '@/lib/db';
-import { getDatabaseProvider } from '@/lib/db';
 import { getRedisClient } from '@/lib/redis-cache';
 import { logger } from './logger';
 import { getOutboxStats } from '@/services/reports/outbox-publisher';
 import { getDlqStats } from '@/core/outbox/dead-letter-queue';
 import { getLagMetrics, startLagMonitor, LagAlert } from './lag-monitor';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+function shouldLogHealthTrackerLifecycle(): boolean {
+  return process.env.LOG_WORKER_LIFECYCLE === 'true';
+}
 
 // ============================================================
 // Types
@@ -75,6 +79,7 @@ export interface BackupHealth {
   lastBackupAgeHours?: number;
   lastBackupSize?: string;
   s3Synced?: boolean;
+  source?: 'disabled' | 'redis' | 'filesystem' | 'missing';
 }
 
 export interface SystemComponents {
@@ -117,6 +122,7 @@ const REDIS_CHECK_TIMEOUT_MS = 1000;
 const POLL_INTERVAL_MS = 15000; // check every 15s
 const BACKUP_STALE_HOURS = 26;   // Alert if no backup in 26h
 const BACKUP_CRITICAL_HOURS = 48; // Critical if no backup in 48h
+const DEFAULT_BACKUP_DIR = '/backups/pilingtrack';
 
 // ============================================================
 // Cached status (updated by background loop)
@@ -124,6 +130,11 @@ const BACKUP_CRITICAL_HOURS = 48; // Critical if no backup in 48h
 
 let cachedStatus: SystemStatus | null = null;
 let trackerStarted = false;
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 
 // ============================================================
 // Timeout wrapper — rejects if promise takes too long
@@ -154,6 +165,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 async function checkDatabase(): Promise<ComponentHealth> {
   const start = Date.now();
   try {
+    const db = await getDbClient();
     await withTimeout(
       db.$queryRaw`SELECT 1`,
       DB_CHECK_TIMEOUT_MS,
@@ -213,6 +225,7 @@ async function checkOutbox(): Promise<OutboxHealth> {
     // Get oldest pending event
     let oldestPending: string | undefined;
     if (pendingCount > 0) {
+      const db = await getDbClient();
       const oldest = await withTimeout(
         db.outboxEvent.findFirst({
           where: { published: false },
@@ -335,6 +348,70 @@ async function checkWebSocket(): Promise<WebSocketHealth> {
   }
 }
 
+function isBackupMonitoringEnabled(): boolean {
+  const raw = process.env.BACKUP_ENABLED?.trim().toLowerCase();
+
+  if (!raw) {
+    return false;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(raw);
+}
+
+function getBackupDir(): string {
+  return process.env.BACKUP_DIR || DEFAULT_BACKUP_DIR;
+}
+
+async function readBackupFromFilesystem(): Promise<BackupHealth | null> {
+  try {
+    const dailyDir = path.join(getBackupDir(), 'daily');
+    const files = await fs.readdir(dailyDir);
+    const dumpFiles = files.filter((file) => file.endsWith('.dump')).sort().reverse();
+
+    if (dumpFiles.length === 0) {
+      return null;
+    }
+
+    const latestPath = path.join(dailyDir, dumpFiles[0]);
+    const stats = await fs.stat(latestPath);
+    const ageMs = Date.now() - stats.mtime.getTime();
+    const ageHours = Math.round((ageMs / (1000 * 60 * 60)) * 10) / 10;
+    const lastBackupAt = stats.mtime.toISOString();
+    const sizeMb = Math.max(stats.size / (1024 * 1024), 0.01);
+    const lastBackupSize = `${sizeMb.toFixed(2)} MB`;
+
+    if (ageHours > BACKUP_CRITICAL_HOURS) {
+      return {
+        status: 'down',
+        lastBackupAt,
+        lastBackupAgeHours: ageHours,
+        lastBackupSize,
+        source: 'filesystem',
+      };
+    }
+
+    if (ageHours > BACKUP_STALE_HOURS) {
+      return {
+        status: 'slow',
+        lastBackupAt,
+        lastBackupAgeHours: ageHours,
+        lastBackupSize,
+        source: 'filesystem',
+      };
+    }
+
+    return {
+      status: 'up',
+      lastBackupAt,
+      lastBackupAgeHours: ageHours,
+      lastBackupSize,
+      source: 'filesystem',
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function checkBackup(): Promise<BackupHealth> {
   try {
     const client = await getRedisClient();
@@ -385,6 +462,71 @@ async function checkBackup(): Promise<BackupHealth> {
     };
   } catch {
     return { status: 'down' };
+  }
+}
+
+async function checkBackupStatus(): Promise<BackupHealth> {
+  if (!isBackupMonitoringEnabled()) {
+    return { status: 'up', source: 'disabled' };
+  }
+
+  try {
+    const client = await getRedisClient();
+    if (!client) {
+      const fallback = await readBackupFromFilesystem();
+      return fallback || { status: 'slow', source: 'missing' };
+    }
+
+    const lastBackupAt = await client.get('system:backup:last_timestamp');
+    const lastBackupSize = await client.get('system:backup:last_size');
+    const s3Synced = await client.get('system:backup:s3_synced');
+
+    if (!lastBackupAt) {
+      const fallback = await readBackupFromFilesystem();
+      if (fallback) {
+        return fallback;
+      }
+
+      return { status: 'slow', source: 'missing' };
+    }
+
+    const backupTime = new Date(lastBackupAt).getTime();
+    const ageMs = Date.now() - backupTime;
+    const ageHours = Math.round((ageMs / (1000 * 60 * 60)) * 10) / 10;
+
+    if (ageHours > BACKUP_CRITICAL_HOURS) {
+      return {
+        status: 'down',
+        lastBackupAt,
+        lastBackupAgeHours: ageHours,
+        lastBackupSize: lastBackupSize || undefined,
+        s3Synced: s3Synced === 'true',
+        source: 'redis',
+      };
+    }
+
+    if (ageHours > BACKUP_STALE_HOURS) {
+      return {
+        status: 'slow',
+        lastBackupAt,
+        lastBackupAgeHours: ageHours,
+        lastBackupSize: lastBackupSize || undefined,
+        s3Synced: s3Synced === 'true',
+        source: 'redis',
+      };
+    }
+
+    return {
+      status: 'up',
+      lastBackupAt,
+      lastBackupAgeHours: ageHours,
+      lastBackupSize: lastBackupSize || undefined,
+      s3Synced: s3Synced === 'true',
+      source: 'redis',
+    };
+  } catch {
+    const fallback = await readBackupFromFilesystem();
+    return fallback || { status: 'slow', source: 'missing' };
   }
 }
 
@@ -497,7 +639,7 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
       checkWorkers(),
       checkStorage(),
       checkWebSocket(),
-      checkBackup(),
+      checkBackupStatus(),
       collectMetrics(),
     ]);
 
@@ -575,7 +717,9 @@ function startBackgroundTracker(): void {
   // Run first check immediately
   tick();
 
-  logger.info('Health tracker started', { intervalMs: POLL_INTERVAL_MS });
+  if (shouldLogHealthTrackerLifecycle()) {
+    logger.info('Health tracker started', { intervalMs: POLL_INTERVAL_MS });
+  }
 }
 
 // ============================================================

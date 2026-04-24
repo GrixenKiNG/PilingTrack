@@ -14,10 +14,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
 import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 
 export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
@@ -53,6 +57,7 @@ export const GET = withApi(async (request: NextRequest) => {
   }
 
   const { paginateQuery } = await import('@/lib/pagination');
+  const db = await getDbClient();
   const reportsResult = await paginateQuery(
     (args) =>
       db.report.findMany({

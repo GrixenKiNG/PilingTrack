@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
+import { createHash } from 'crypto';
 import { ServiceError } from '@/services/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
@@ -21,6 +22,13 @@ const PRISMA_STATUS: Record<string, number> = {
   P2025: 404, // Record not found
   P2002: 409, // Unique constraint violation
 };
+
+export function getSessionCacheScope(request: NextRequest): string | undefined {
+  const sessionToken = readSessionToken(request);
+  if (!sessionToken) return undefined;
+
+  return createHash('sha256').update(sessionToken).digest('hex').slice(0, 24);
+}
 
 function isPrismaKnownError(err: unknown): err is { code: string; message: string } {
   if (typeof err !== 'object' || err === null || !('code' in err)) return false;
@@ -45,13 +53,13 @@ export function withApi<T extends any[]>(
       ) {
         const domain = _opts.domain || 'unknown';
         const responseCache = getResponseCache(domain);
-        const sessionToken = readSessionToken(request);
+        const userScope = getSessionCacheScope(request);
 
         return await responseCache.getOrFetch(
           {
             endpoint: `${request.method}:${request.nextUrl.pathname}`,
             params: Object.fromEntries(request.nextUrl.searchParams.entries()),
-            userId: sessionToken || undefined,
+            userId: userScope,
           },
           () => handler(request, ...args),
           { ttl: _opts.cacheTTL }

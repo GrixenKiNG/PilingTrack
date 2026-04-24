@@ -7,7 +7,7 @@
  * These are registered once on server startup.
  */
 
-import { ReportDomainEvent } from '@/modules/reports/domain';
+import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { emitDomainEvent, on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
 
@@ -16,11 +16,11 @@ import { logger } from '@/lib/logger';
 // ============================================================
 
 export function registerAnalyticsEventHandler() {
-  on('ReportCreated', handleReportForAnalytics);
-  on('ReportSubmitted', handleReportForAnalytics);
-  on('PileWorkAdded', handlePileWorkForAnalytics);
-  on('DrillingAdded', handleDrillingForAnalytics);
-  on('DowntimeAdded', handleDowntimeForAnalytics);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED, handleReportForAnalytics);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForAnalytics);
+  on(REPORT_DOMAIN_EVENT_TYPES.PILE_WORK_ADDED, handlePileWorkForAnalytics);
+  on(REPORT_DOMAIN_EVENT_TYPES.DRILLING_ADDED, handleDrillingForAnalytics);
+  on(REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED, handleDowntimeForAnalytics);
 }
 
 async function handleReportForAnalytics(event: ReportDomainEvent) {
@@ -34,14 +34,14 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
         siteId: event.siteId || '',
         userId: event.userId || '',
         tenantId: event.tenantId || null,
-        status: event.type === 'ReportSubmitted' ? 'submitted' : 'draft',
+        status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft',
         totalPiles: (event.data.totalPiles as number) || 0,
         totalDrilling: (event.data.totalDrilling as number) || 0,
         totalDowntime: (event.data.totalDowntime as number) || 0,
         lastEventAt: new Date(event.occurredAt),
       },
       update: {
-        status: event.type === 'ReportSubmitted' ? 'submitted' : undefined,
+        status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : undefined,
         totalPiles: (event.data.totalPiles as number) !== undefined
           ? event.data.totalPiles as number
           : undefined,
@@ -164,7 +164,7 @@ async function handleDowntimeForAnalytics(event: ReportDomainEvent) {
 // ============================================================
 
 export function registerAlertEventHandler() {
-  on('DowntimeAdded', handleDowntimeAlert);
+  on(REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED, handleDowntimeAlert);
 }
 
 async function handleDowntimeAlert(event: ReportDomainEvent) {
@@ -192,10 +192,10 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
 // ============================================================
 
 export function registerAuditEventHandler() {
-  on('ReportCreated', handleAuditEvent);
-  on('ReportUpdated', handleAuditEvent);
-  on('ReportSubmitted', handleAuditEvent);
-  on('ReportVersionCreated', handleAuditEvent);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED, handleAuditEvent);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED, handleAuditEvent);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleAuditEvent);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_VERSION_CREATED, handleAuditEvent);
 }
 
 async function handleAuditEvent(event: ReportDomainEvent) {

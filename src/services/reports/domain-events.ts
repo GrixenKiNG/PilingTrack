@@ -10,7 +10,12 @@ import type {
   ReportDomainEvent as DomainEvent,
   ReportDomainEventType as DomainEventType,
 } from '@/modules/reports/domain';
+import { normalizeReportDomainEventType } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
+
+function shouldLogHandlerRegistration(): boolean {
+  return process.env.LOG_HANDLER_REGISTRATION === 'true';
+}
 
 // Re-export for convenience — aliased from the report domain types so
 // existing call sites that import `DomainEvent` from this module keep
@@ -32,11 +37,17 @@ const handlers = new Map<string, Set<EventHandler>>();
  * Register an event handler for a specific event type.
  */
 export function on(eventType: string, handler: EventHandler) {
-  if (!handlers.has(eventType)) {
-    handlers.set(eventType, new Set());
+  const normalizedEventType = normalizeReportDomainEventType(eventType) || eventType;
+  if (!handlers.has(normalizedEventType)) {
+    handlers.set(normalizedEventType, new Set());
   }
-  handlers.get(eventType)!.add(handler);
-  logger.debug('Event handler registered', { eventType, totalHandlers: handlers.get(eventType)!.size });
+  handlers.get(normalizedEventType)!.add(handler);
+  if (shouldLogHandlerRegistration()) {
+    logger.debug('Event handler registered', {
+      eventType: normalizedEventType,
+      totalHandlers: handlers.get(normalizedEventType)!.size,
+    });
+  }
 }
 
 /**
@@ -44,34 +55,37 @@ export function on(eventType: string, handler: EventHandler) {
  * If a handler throws, the error is logged but doesn't stop other handlers.
  */
 export function emitDomainEvent(event: DomainEvent) {
-  const eventHandlers = handlers.get(event.type);
+  const normalizedType = normalizeReportDomainEventType(event.type) || event.type;
+  const normalizedEvent =
+    normalizedType === event.type ? event : { ...event, type: normalizedType };
+  const eventHandlers = handlers.get(normalizedType);
   if (!eventHandlers) {
     if (process.env.LOG_UNHANDLED_EVENTS === 'true') {
-      logger.debug('No handlers for event', { eventType: event.type });
+      logger.debug('No handlers for event', { eventType: normalizedType });
     }
     return;
   }
 
   logger.info('Domain event emitted', {
-    type: event.type,
-    aggregateId: event.aggregateId,
-    aggregateType: event.aggregateType,
+    type: normalizedType,
+    aggregateId: normalizedEvent.aggregateId,
+    aggregateType: normalizedEvent.aggregateType,
     handlerCount: eventHandlers.size,
   });
 
   for (const handler of eventHandlers) {
     try {
-      const result = handler(event);
+      const result = handler(normalizedEvent);
       if (result instanceof Promise) {
         result.catch((err) => {
-          logger.error(`Event handler error for ${event.type}`, err, {
-            aggregateId: event.aggregateId,
+          logger.error(`Event handler error for ${normalizedType}`, err, {
+            aggregateId: normalizedEvent.aggregateId,
           });
         });
       }
     } catch (err) {
-      logger.error(`Event handler error for ${event.type}`, err, {
-        aggregateId: event.aggregateId,
+      logger.error(`Event handler error for ${normalizedType}`, err, {
+        aggregateId: normalizedEvent.aggregateId,
       });
     }
   }
@@ -107,9 +121,11 @@ export function registerAllEventHandlers() {
   import('@/services/reports/event-handlers').then(({ registerAllEventHandlers }) => {
     registerAllEventHandlers();
     handlersRegistered = true;
-    logger.info('All event handlers registered', {
-      eventTypes: getRegisteredEventTypes(),
-    });
+    if (shouldLogHandlerRegistration()) {
+      logger.info('All event handlers registered', {
+        eventTypes: getRegisteredEventTypes(),
+      });
+    }
   });
 }
 

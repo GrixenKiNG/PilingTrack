@@ -17,7 +17,7 @@ export const GET = withApi(
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const sites = await getAccessibleSites(sessionUser, requestedUserId, pagination);
     const nextCursor = pagination.getNextCursor(sites);
-    return NextResponse.json({ data: sites, nextCursor });
+    return NextResponse.json({ data: sites, sites, nextCursor });
   },
   { domain: 'sites', cache: true, cacheTTL: 30_000 }
 );

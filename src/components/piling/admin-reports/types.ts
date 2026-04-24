@@ -11,6 +11,7 @@ export interface ReportFilters {
 
 export interface PeriodSummary {
   totalPiles: number;
+  totalDrillingCount?: number;
   totalDrilling: number;
   totalDowntime: number;
   reportCount: number;

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
 import { withApi } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
+
+async function getDbClient() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -14,6 +18,7 @@ export const GET = withApi(
 
     const requestedUserId = request.nextUrl.searchParams.get('userId');
     const userId = resolveAccessibleUserId(sessionUser!, requestedUserId, 'reports.read_cross_user');
+    const db = await getDbClient();
 
     const user = await db.user.findUnique({
       where: { id: userId },

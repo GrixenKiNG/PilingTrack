@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { ensureTenantAccess } from '@/services/auth/resource-access-service';
-import { deleteCrew, getCrewById, updateCrew } from '@/modules/crews';
 import { updateCrewSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
+import { invalidateCrewsCache } from '../cache';
 
 
 export const runtime = 'nodejs';
+
+async function getCrewsModule() {
+  return import('@/modules/crews');
+}
 
 export const GET = withApi(
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -16,6 +20,7 @@ export const GET = withApi(
 
     assertCan(user!, 'crews.read');
     const { id } = await params;
+    const { getCrewById } = await getCrewsModule();
     const crew = await getCrewById(id);
     await ensureTenantAccess(user!, crew.site?.tenantId ?? null, 'Crew');
     return NextResponse.json({ crew });
@@ -38,16 +43,20 @@ export const PUT = withMutation(
         { status: 400 }
       );
     }
+    const { updateCrew } = await getCrewsModule();
     const crew = await updateCrew({
       crewId: id,
       name: validated.data.name,
       operatorId: validated.data.operatorId,
       equipmentId: validated.data.equipmentId,
       siteId: validated.data.siteId,
-      assistantNames: validated.data.assistantNames || [],
+      assistantNames: validated.data.assistantNames,
       isActive: validated.data.isActive,
       userId: user!.id,
     });
+
+    invalidateCrewsCache();
+
     return NextResponse.json({ crew });
   },
   { domain: 'crews' }
@@ -60,7 +69,11 @@ export const DELETE = withMutation(
 
     assertCan(user!, 'crews.manage');
     const { id } = await params;
+    const { deleteCrew } = await getCrewsModule();
     const result = await deleteCrew({ crewId: id });
+
+    invalidateCrewsCache();
+
     return NextResponse.json(result);
   },
   { domain: 'crews' }

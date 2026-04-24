@@ -60,7 +60,7 @@ vi.mock('@/core/outbox/dead-letter-queue', () => ({
 
 function createEvent(overrides = {}) {
   return {
-    type: 'report.created',
+    type: 'ReportCreated',
     aggregateId: 'report-1',
     aggregateType: 'Report',
     siteId: 'site-1',
@@ -111,7 +111,7 @@ describe('Projection Worker', () => {
 
       const event = {
         id: 'outbox-1',
-        type: 'report.created',
+        type: 'ReportCreated',
         aggregateId: 'report-1',
         aggregateType: 'Report',
         payload: createEvent(),
@@ -173,10 +173,10 @@ describe('Projection Worker', () => {
 
       const event = {
         id: 'outbox-1',
-        type: 'report.created',
+        type: 'ReportCreated',
         aggregateId: 'report-1',
         aggregateType: 'Report',
-        payload: createEvent({ type: 'report.created' }),
+        payload: createEvent({ type: 'ReportCreated' }),
         published: false,
         attempts: 0,
         createdAt: new Date(),
@@ -215,7 +215,7 @@ describe('Projection Worker', () => {
 
       const event = {
         id: 'outbox-1',
-        type: 'report.created',
+        type: 'ReportCreated',
         aggregateId: 'report-missing',
         aggregateType: 'Report',
         payload: createEvent(),
@@ -247,10 +247,10 @@ describe('Projection Worker', () => {
 
       const event = {
         id: 'outbox-1',
-        type: 'report.updated',
+        type: 'ReportUpdated',
         aggregateId: 'report-1',
         aggregateType: 'Report',
-        payload: createEvent({ type: 'report.updated' }),
+        payload: createEvent({ type: 'ReportUpdated' }),
         published: false,
         attempts: 0,
         createdAt: new Date(),

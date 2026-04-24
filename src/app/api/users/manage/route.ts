@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { updateUser } from '@/modules/users';
 import { updateUserSchema } from '@/lib/validation-schemas';
 import { withMutation } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
+
+async function getUsersModule() {
+  return import('@/modules/users');
+}
 
 export const PUT = withMutation(
   async (request: NextRequest) => {
@@ -32,6 +35,7 @@ export const PUT = withMutation(
     }
 
     const validatedData = validation.data;
+    const { updateUser } = await getUsersModule();
 
     const updated = await updateUser({
       id: validatedData.id,
