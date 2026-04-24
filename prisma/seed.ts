@@ -70,6 +70,7 @@ async function seed() {
       name: 'Петрова Д.В.',
       role: 'DISPATCHER',
       phone: '+7-900-000-0002',
+      password: hashPassword(dispatcherPassword),
     },
     create: {
       email: 'dispatch@piling.ru',
@@ -86,6 +87,7 @@ async function seed() {
       name: 'Иванов И.П.',
       role: 'OPERATOR',
       phone: '+7-900-100-0001',
+      password: hashPassword(operator1Password),
     },
     create: {
       email: 'operator@piling.ru',
@@ -102,6 +104,7 @@ async function seed() {
       name: 'Герасимов Сергей',
       role: 'OPERATOR',
       phone: '+7-900-100-0002',
+      password: hashPassword(operator2Password),
     },
     create: {
       email: 'sas02@rambler.ru',
@@ -118,6 +121,7 @@ async function seed() {
       name: 'Сидоров К.А.',
       role: 'ASSISTANT',
       phone: '+7-900-200-0001',
+      password: hashPassword(assistantPassword),
     },
     create: {
       email: 'helper@piling.ru',
