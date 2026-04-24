@@ -37,5 +37,11 @@ copyRecursive(
   path.join(projectRoot, 'public'),
   path.join(projectRoot, '.next', 'standalone', 'public')
 );
+// Prisma client is imported via a concrete relative path at runtime; Next.js
+// does not trace the generated folder into standalone automatically.
+copyRecursive(
+  path.join(projectRoot, 'src', 'generated', 'postgres-client'),
+  path.join(projectRoot, '.next', 'standalone', 'src', 'generated', 'postgres-client')
+);
 ensureJsStubForTypeFile(path.join(projectRoot, '.next', 'types'), 'routes');
 ensureJsStubForTypeFile(path.join(projectRoot, '.next', 'dev', 'types'), 'routes');
