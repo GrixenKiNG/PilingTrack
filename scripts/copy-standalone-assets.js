@@ -43,5 +43,11 @@ copyRecursive(
   path.join(projectRoot, 'src', 'generated', 'postgres-client'),
   path.join(projectRoot, '.next', 'standalone', 'src', 'generated', 'postgres-client')
 );
+// Release launcher — shipped inside the zip so users can start the server
+// without remembering the `node server.js` invocation.
+copyRecursive(
+  path.join(projectRoot, 'scripts', 'release-start.bat'),
+  path.join(projectRoot, '.next', 'standalone', 'start.bat')
+);
 ensureJsStubForTypeFile(path.join(projectRoot, '.next', 'types'), 'routes');
 ensureJsStubForTypeFile(path.join(projectRoot, '.next', 'dev', 'types'), 'routes');
