@@ -1,13 +1,8 @@
 /**
- * Next.js Middleware — Global CORS, Security Headers, Tenant Enforcement
+ * Next.js Proxy — Global CORS, Security Headers, Tenant Enforcement
  *
- * Runs on Edge runtime for every request before the route handler.
- *
- * Features:
- * - CORS configuration with wildcard subdomain support
- * - Security headers reinforcement
- * - Tenant context propagation (X-Tenant-ID header → AsyncLocalStorage)
- * - Multi-tenant mode enforcement
+ * Runs before matched route handlers and replaces the deprecated
+ * `middleware` file convention in Next.js 16+.
  */
 
 import { NextResponse } from 'next/server';
@@ -65,7 +60,7 @@ function isOriginAllowed(origin: string, allowed: string[]): boolean {
 // ============================================================
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
-  // Already set in next.config.ts, but reinforce here for Edge runtime
+  // Already set in next.config.ts, but reinforce here for Proxy runtime
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -135,10 +130,10 @@ function enforceTenant(request: NextRequest, response: NextResponse): NextRespon
 }
 
 // ============================================================
-// Middleware
+// Proxy
 // ============================================================
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const origin = request.headers.get('origin');
   const allowedOrigins = getAllowedOrigins();
 

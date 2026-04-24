@@ -4,6 +4,32 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  outputFileTracingExcludes: {
+    "**/*": [
+      "next.config.ts",
+      "coverage/**",
+      "test-results/**",
+      "test-screenshots/**",
+      "test-screenshots-new/**",
+      "tests/**",
+      "chaos/**",
+      "agents/**",
+      "andrej-karpathy-skills-main/**",
+      "zai-provider-extension/**",
+      "infra/**",
+      "*.md",
+      "*.log",
+      "*.out",
+      "*.err",
+      "tmp-*",
+      "Dockerfile*",
+      "Caddyfile",
+      "components.json",
+      "vitest.config.ts",
+      "playwright.config.ts",
+      "tsconfig*.json",
+    ],
+  },
   typescript: {
     // C4: strict typecheck on build. Type-check run: 0 errors across src/.
     // scripts/ and tests/ are excluded via tsconfig (separate runners).
@@ -120,5 +146,4 @@ export default withSentryConfig(nextConfig, {
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
   telemetry: false,
-  disableLogger: true,
 });
