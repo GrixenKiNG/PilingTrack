@@ -16,7 +16,7 @@ if /I "%~1"=="development" set MODE=dev
 
 echo.
 echo ============================================================
-echo  PilingTrack v2.0.0  —  %MODE% mode
+echo  PilingTrack v2.1.0  —  %MODE% mode
 echo  URL: http://localhost:3000
 echo ============================================================
 

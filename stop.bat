@@ -1,13 +1,14 @@
 @echo off
-setlocal
+rem Stop PilingTrack-related processes started by start.bat / start-prod.bat.
+rem Targets the Next.js port (3000) and the unified worker health port (3002 —
+rem see WORKER_HEALTH_PORT in src/workers).
 
+setlocal
 cd /d "%~dp0"
 
-echo Stopping PilingTrack on port 3000...
+echo.
+echo Stopping PilingTrack...
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$connections = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; " ^
-  "if (-not $connections) { Write-Host 'No process is listening on port 3000.'; exit 0 }; " ^
-  "foreach ($procId in $connections) { if ($procId -and $procId -ne 0) { Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue; Write-Host ('Stopped process ' + $procId) } }"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\stop-piling.ps1"
 
 endlocal
