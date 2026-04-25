@@ -15,12 +15,12 @@ import { ServiceError } from '@/services/service-error';
 import { logger } from '@/lib/logger';
 import {
   resolveConflict,
-} from '@/shared/sync/conflict-resolver';
+} from '@/core/shared/sync/conflict-resolver';
 import {
   VectorClock,
   determineConflictType,
   mergeWithVectorClocks,
-} from '@/shared/sync/vector-clock';
+} from '@/core/shared/sync/vector-clock';
 import {
   createReportConflictEngine,
   type ConflictContext,
@@ -35,13 +35,13 @@ import type {
   SyncStatus,
   EntityType,
   OperationType,
-} from '@/shared/types/sync';
+} from '@/core/shared/types/sync';
 
 export type { LocalChange, SyncRequest, SyncResponse, ServerChange, Conflict, SyncStatus };
-export type { EntityType, OperationType, ConflictStrategy } from '@/shared/types/sync';
+export type { EntityType, OperationType, ConflictStrategy } from '@/core/shared/types/sync';
 export { resolveConflict };
-export { VectorClock, determineConflictType, mergeWithVectorClocks } from '@/shared/sync/vector-clock';
-export type { VectorClockData, VectorClockRelation } from '@/shared/sync/vector-clock';
+export { VectorClock, determineConflictType, mergeWithVectorClocks } from '@/core/shared/sync/vector-clock';
+export type { VectorClockData, VectorClockRelation } from '@/core/shared/sync/vector-clock';
 
 // Use typed db — no `as any` bypass
 const prisma = db;

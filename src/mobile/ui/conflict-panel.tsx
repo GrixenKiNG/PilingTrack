@@ -14,7 +14,7 @@
 
 import { useState } from 'react';
 import { useSyncConflict, type ConflictFieldDiff } from '@/mobile/ui/use-sync-conflict';
-import type { Conflict } from '@/shared/types/sync';
+import type { Conflict } from '@/core/shared/types/sync';
 
 interface ConflictPanelProps {
   conflicts: Conflict[];

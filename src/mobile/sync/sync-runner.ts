@@ -21,8 +21,8 @@ import type {
   Conflict,
   ServerChange,
   SyncStatus,
-} from '@/shared/types/sync';
-import { resolveConflict } from '@/shared/sync/conflict-resolver';
+} from '@/core/shared/types/sync';
+import { resolveConflict } from '@/core/shared/sync/conflict-resolver';
 import { getSyncQueue, getSyncState, getSyncDB, type SyncQueueEntry } from './sync-queue';
 
 // ============================================================

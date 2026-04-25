@@ -24,7 +24,7 @@ import type {
   SyncResponse,
   Conflict,
   SyncStatus,
-} from '@/shared/types/sync';
+} from '@/core/shared/types/sync';
 
 // ============================================================
 // Dexie Schema

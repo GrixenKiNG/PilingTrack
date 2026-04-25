@@ -5,7 +5,7 @@
  * Integrates with the offline-first architecture.
  */
 
-import { RealtimeEvent } from '@/realtime/types/events';
+import { RealtimeEvent } from '@/core/realtime/types/events';
 import { getDB } from '@/mobile/db/schema';
 import type { LocalReport } from '@/mobile/db/schema';
 

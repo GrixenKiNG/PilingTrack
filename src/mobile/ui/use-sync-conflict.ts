@@ -12,8 +12,8 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { Conflict, LocalChange } from '@/shared/types/sync';
-import type { VectorClockData } from '@/shared/sync/vector-clock';
+import type { Conflict, LocalChange } from '@/core/shared/types/sync';
+import type { VectorClockData } from '@/core/shared/sync/vector-clock';
 
 export interface ConflictFieldDiff {
   field: string;

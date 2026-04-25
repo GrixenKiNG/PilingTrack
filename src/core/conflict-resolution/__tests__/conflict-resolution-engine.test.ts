@@ -20,7 +20,7 @@ import {
   VectorClockMergeStrategy,
   type ConflictContext,
 } from '../conflict-resolution-engine';
-import { VectorClock } from '@/shared/sync/vector-clock';
+import { VectorClock } from '@/core/shared/sync/vector-clock';
 
 // ============================================================
 // Helpers

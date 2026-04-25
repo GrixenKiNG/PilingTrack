@@ -25,8 +25,8 @@
  *   // result: { merged, conflicts, auditLog, strategy }
  */
 
-import type { VectorClockData } from '@/shared/sync/vector-clock';
-import { VectorClock, determineConflictType, mergeWithVectorClocks } from '@/shared/sync/vector-clock';
+import type { VectorClockData } from '@/core/shared/sync/vector-clock';
+import { VectorClock, determineConflictType, mergeWithVectorClocks } from '@/core/shared/sync/vector-clock';
 
 // ============================================================
 // Types

@@ -11,7 +11,7 @@
 import { ReliabilityContext, OrderedEvent, SequenceCounter } from '../reliability';
 import { handleRealtimeEvent } from './event-handlers';
 import { backfill } from './backfill';
-import { RealtimeEvent } from '@/realtime/types/events';
+import { RealtimeEvent } from '@/core/realtime/types/events';
 import { logger } from '@/lib/logger';
 
 export class ReliableEventDispatcher {

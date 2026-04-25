@@ -10,7 +10,7 @@
  * - Event callbacks
  */
 
-import { WSClientMessage, WSServerMessage, RealtimeEvent } from '@/realtime/types/events';
+import { WSClientMessage, WSServerMessage, RealtimeEvent } from '@/core/realtime/types/events';
 import { logger } from '@/lib/logger';
 
 // ============================================================

@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Wifi, WifiOff, Loader2, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSyncStatusUI, runSyncCycle, retryFailedSync } from './sync-runner';
-import type { SyncStatus } from '@/shared/types/sync';
+import type { SyncStatus } from '@/core/shared/types/sync';
 
 interface SyncStatusData {
   isOnline: boolean;

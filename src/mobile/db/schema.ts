@@ -20,7 +20,7 @@ import Dexie, { type Table } from 'dexie';
 // Entity Types
 // ============================================================
 
-import type { VectorClockData } from '@/shared/sync/vector-clock';
+import type { VectorClockData } from '@/core/shared/sync/vector-clock';
 
 export interface LocalReport {
   id: string;           // reportId (from server)

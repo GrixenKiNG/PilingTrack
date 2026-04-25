@@ -18,7 +18,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { WSClient, WSConnectionState } from './ws-client';
 import { handleRealtimeEvent } from './event-handlers';
 import { getReliableDispatcher } from './reliable-dispatcher';
-import { RealtimeEvent } from '@/realtime/types/events';
+import { RealtimeEvent } from '@/core/realtime/types/events';
 import { logger } from '@/lib/logger';
 
 // ============================================================

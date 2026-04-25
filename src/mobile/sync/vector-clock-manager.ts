@@ -10,8 +10,8 @@
  *   await saveReport({ ...data, vectorClock: vc.snapshot() });
  */
 
-import { VectorClock } from '@/shared/sync/vector-clock';
-import type { VectorClockData } from '@/shared/sync/vector-clock';
+import { VectorClock } from '@/core/shared/sync/vector-clock';
+import type { VectorClockData } from '@/core/shared/sync/vector-clock';
 import { getDB } from '../db/schema';
 
 const DEVICE_ID_KEY = 'device-id';

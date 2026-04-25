@@ -20,7 +20,7 @@ import {
   applyServerVCToReport,
 } from './vector-clock-manager';
 import type { LocalReport, OutboxEntry } from '../db/schema';
-import type { VectorClockData } from '@/shared/sync/vector-clock';
+import type { VectorClockData } from '@/core/shared/sync/vector-clock';
 
 // ============================================================
 // Configuration

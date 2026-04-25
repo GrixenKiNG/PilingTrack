@@ -11,7 +11,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { resolveConflict } from '@/shared/sync/conflict-resolver';
+import { resolveConflict } from '@/core/shared/sync/conflict-resolver';
 
 // Mock DB for testing
 const mockDB = {
