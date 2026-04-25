@@ -395,7 +395,15 @@ async function startPdf(): Promise<void> {
     );
 
     pdfWorker.on('completed', (job) => {
-      logger.info('PDF job completed', { jobId: job.id });
+      // Surface memory pressure: large period reports can spike heap usage in
+      // the worker process. Logging RSS lets us correlate slowdowns with
+      // specific job types/sizes during incident review.
+      const mem = process.memoryUsage();
+      logger.info('PDF job completed', {
+        jobId: job.id,
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+      });
       markHeartbeat(state);
       // A single failed job must not leave the worker permanently marked unhealthy.
       if (state.status === 'error') {
