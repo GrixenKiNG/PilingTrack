@@ -12,7 +12,7 @@
  *   maxBatchSize:    Max records per single INSERT (default 200)
  */
 
-import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
+import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import type { Prisma } from '@/generated/postgres-client';
 import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
@@ -94,7 +94,7 @@ export class TelemetryBuffer {
     // Check if buffer is at capacity
     if (this.buffer.length >= this.maxBufferSize) {
       // If circuit is OPEN, drop oldest to make room
-      if (this.circuitBreaker.getState() === 'OPEN') {
+      if (this.circuitBreaker.getState().state === 'OPEN') {
         this.dropOldest(Math.ceil(this.maxBufferSize * 0.25)); // drop 25%
         logger.warn('TelemetryBuffer: circuit breaker OPEN, dropped oldest records', { bufferSize: this.buffer.length });
       } else {
@@ -196,7 +196,7 @@ export class TelemetryBuffer {
       flushed: this.totalFlushed,
       dropped: this.totalDropped,
       totalBuffered: this.totalBuffered,
-      circuitBreakerState: this.circuitBreaker.getState(),
+      circuitBreakerState: this.circuitBreaker.getState().state,
     };
   }
 

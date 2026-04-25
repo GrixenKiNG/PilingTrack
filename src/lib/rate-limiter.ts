@@ -157,6 +157,15 @@ class RateLimiter {
     retryAfter?: number;
     blockedUntil?: number;
   }> {
+    // Test-mode bypass — set RATE_LIMIT_BYPASS=true in CI/E2E so suites do not
+    // need to flush Redis between runs. Never honored in production.
+    if (
+      process.env.RATE_LIMIT_BYPASS === 'true' &&
+      process.env.NODE_ENV !== 'production'
+    ) {
+      return { allowed: true, remaining: config.maxAttempts };
+    }
+
     if (this.isRedisAvailable()) {
       try {
         return await this.checkRedis(identifier, config);

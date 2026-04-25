@@ -23,7 +23,7 @@ type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 export interface CircuitBreakerConfig {
   failureThreshold: number;    // Сколько ошибок до открытия
   resetTimeoutMs: number;      // Базовое время до попытки восстановления
-  maxResetTimeoutMs: number;   // Максимальное время (exponential backoff cap)
+  maxResetTimeoutMs?: number;  // Максимальное время (exponential backoff cap); defaults to 5 minutes
 }
 
 const DEFAULT_CONFIG: CircuitBreakerConfig = {
@@ -94,6 +94,34 @@ export class CircuitBreaker {
   }
 
   /**
+   * Verbose stats for diagnostic endpoints (telemetry health, /api/system).
+   */
+  getStats(): {
+    name: string;
+    state: CircuitState;
+    failures: number;
+    failureThreshold: number;
+    resetTimeoutMs: number;
+    timeUntilRetry: number | null;
+  } {
+    const view = this.getState();
+    let timeUntilRetry: number | null = null;
+    if (view.state === 'OPEN') {
+      const elapsed = Date.now() - this.lastFailureTime;
+      const remaining = this.getCurrentResetTimeout() - elapsed;
+      timeUntilRetry = remaining > 0 ? remaining : 0;
+    }
+    return {
+      name: this.name,
+      state: view.state,
+      failures: view.failures,
+      failureThreshold: this.config.failureThreshold,
+      resetTimeoutMs: this.config.resetTimeoutMs,
+      timeUntilRetry,
+    };
+  }
+
+  /**
    * Manually reset to CLOSED.
    */
   reset(): void {
@@ -140,7 +168,7 @@ export class CircuitBreaker {
     const multiplier = Math.pow(2, Math.min(this.failures - this.config.failureThreshold, 10));
     return Math.min(
       this.config.resetTimeoutMs * multiplier,
-      this.config.maxResetTimeoutMs
+      this.config.maxResetTimeoutMs ?? 300_000
     );
   }
 }

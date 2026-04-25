@@ -152,6 +152,19 @@ function validateEnv(): { valid: boolean; errors: string[]; warnings: string[] }
       continue;
     }
 
+    // PIN_LOOKUP_SECRET must be distinct from SESSION_SECRET in production —
+    // shared secret means rotating one breaks the other and JWT-key compromise
+    // also breaks PIN-lookup integrity.
+    if (
+      process.env.NODE_ENV === 'production' &&
+      key === 'PIN_LOOKUP_SECRET' &&
+      value &&
+      value === process.env.SESSION_SECRET
+    ) {
+      errors.push('PIN_LOOKUP_SECRET must be different from SESSION_SECRET in production.');
+      continue;
+    }
+
     // Skip if not set and not required
     if (!value || value.trim() === '') continue;
 

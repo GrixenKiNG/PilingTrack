@@ -35,27 +35,36 @@ let pinLookupSecretFallbackWarned = false;
 export function computePinLookup(pin: string): string {
   const explicitSecret = process.env.PIN_LOOKUP_SECRET;
   const sessionSecret = process.env.SESSION_SECRET;
-  const secret = explicitSecret || sessionSecret || '';
 
-  if (!secret) {
-    // Hard-fail in production: a plain SHA256 over a 4-6 digit PIN is trivial
-    // to rainbow-table for anyone with DB read access.
-    if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production') {
+    // Production must use a dedicated PIN_LOOKUP_SECRET. Sharing the secret
+    // with SESSION_SECRET means rotating one breaks the other, and a JWT-key
+    // compromise also breaks PIN-lookup integrity.
+    if (!explicitSecret) {
       throw new Error(
-        'PIN_LOOKUP_SECRET is required in production (or SESSION_SECRET as a fallback)'
+        'PIN_LOOKUP_SECRET is required in production (must be distinct from SESSION_SECRET).'
       );
     }
-    // Dev/test only — keeps PIN login functional locally.
+    if (explicitSecret === sessionSecret) {
+      throw new Error(
+        'PIN_LOOKUP_SECRET must be different from SESSION_SECRET in production.'
+      );
+    }
+    return createHmac('sha256', explicitSecret).update(pin).digest('hex');
+  }
+
+  // Dev/test: allow fallback chain so local PIN login keeps working without
+  // forcing every developer to manage a separate secret.
+  const secret = explicitSecret || sessionSecret || '';
+  if (!secret) {
     return createHash('sha256').update(`pinlookup:${pin}`).digest('hex');
   }
 
   if (!explicitSecret && sessionSecret && !pinLookupSecretFallbackWarned) {
     pinLookupSecretFallbackWarned = true;
-    // Coupling warning: rotating SESSION_SECRET will invalidate every stored
-    // pinLookup, locking out all PIN users until they reset.
-    console.warn(
-      '[auth] PIN_LOOKUP_SECRET not set — falling back to SESSION_SECRET. ' +
-      'Rotating SESSION_SECRET will invalidate all stored PIN lookups.'
+    logger.warn(
+      'PIN_LOOKUP_SECRET not set — falling back to SESSION_SECRET (dev-only). ' +
+        'Rotating SESSION_SECRET will invalidate all stored PIN lookups.'
     );
   }
 

@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { ingestTelemetryBatch, telemetryBuffer } from '@/services/telemetry/telemetry-ingestion-service';
-import { dbHealthCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breaker';
+import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { logger } from '@/lib/logger';
 import { withApi } from '@/core/api-wrapper';
 import { z } from 'zod';
@@ -33,10 +33,9 @@ const TELEMETRY_RATE_LIMIT = {
 const MAX_BATCH_SIZE = 100;
 
 function checkCircuitBreaker(): NextResponse | null {
-  const state = dbHealthCircuitBreaker.getState();
+  const stats = databaseCircuitBreaker.getStats();
 
-  if (state === 'OPEN') {
-    const stats = dbHealthCircuitBreaker.getStats();
+  if (stats.state === 'OPEN') {
     const retryAfter = stats.timeUntilRetry
       ? Math.ceil(stats.timeUntilRetry / 1000)
       : 30;
@@ -143,7 +142,7 @@ export const POST = withApi(async (request: NextRequest) => {
         {
           error: 'Database unavailable — circuit breaker is OPEN',
           retryAfter,
-          circuitBreaker: dbHealthCircuitBreaker.getStats(),
+          circuitBreaker: databaseCircuitBreaker.getStats(),
         },
         {
           status: 503,
