@@ -66,6 +66,10 @@ export function assertCanManageUserScope(
  * Проверяет, что пользователь имеет доступ к ресурсу указанного tenant.
  * ADMIN/DISPATCHER имеют доступ ко всем tenant.
  * OPERATOR/ASSISTANT — только к своему tenant.
+ *
+ * Single-tenant установки (MULTI_TENANT_MODE != 'true') пропускают проверку:
+ * у юзеров и ресурсов tenantId == null, и enforcement смысла не имеет.
+ * Multi-tenant установки fail-closed на отсутствии tenantId у юзера.
  */
 export async function ensureTenantAccess(
   user: { id: string; role: string; tenantId?: string | null },
@@ -75,9 +79,12 @@ export async function ensureTenantAccess(
   // ADMIN/DISPATCHER bypass tenant checks
   if (user.role === 'ADMIN' || user.role === 'DISPATCHER') return;
 
+  // Single-tenant deployment — no isolation to enforce.
+  if (process.env.MULTI_TENANT_MODE !== 'true') return;
+
+  // Multi-tenant deployment from here on.
   // Fail-closed: an OPERATOR/ASSISTANT without a tenant assignment must NOT
-  // be able to access tenant-owned resources. Previously this branch silently
-  // allowed access when user.tenantId was null/undefined.
+  // be able to access tenant-owned resources.
   if (!user.tenantId) {
     throw new ServiceError(`Access denied: user has no tenant assignment`, 403);
   }
