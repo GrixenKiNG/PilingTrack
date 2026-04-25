@@ -18,6 +18,37 @@ version: '3.8'
 
 services:
   # ============================================================
+  # Migrate — apply Prisma migrations and seed the database once.
+  # ------------------------------------------------------------
+  # Uses the builder stage which has the full node_modules + prisma CLI
+  # + tsx. Exits when done; app/workers/ws wait for it via service_completed_successfully.
+  # ============================================================
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: pilingtrack-migrate
+    command: >
+      sh -c "
+        echo '➤ Applying Prisma migrations...' &&
+        npx prisma migrate deploy &&
+        echo '➤ Seeding database (idempotent upserts)...' &&
+        NODE_ENV=development npx tsx prisma/seed.ts &&
+        echo '✓ Migration + seed complete.'
+      "
+    environment:
+      - DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://piling:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/pilingtrack?schema=public
+      - DATABASE_PROVIDER=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pilingtrack
+    restart: "no"
+
+  # ============================================================
   # Next.js Application
   # ============================================================
   app:
@@ -45,6 +76,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -87,6 +120,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
       interval: 30s
@@ -132,6 +167,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001"]
       interval: 30s
@@ -197,7 +234,9 @@ services:
       - POSTGRES_DB=pilingtrack
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-rls.sql:/docker-entrypoint-initdb.d/init-rls.sql:ro
+      # init-rls.sql cannot run on first boot (Postgres applies it before any
+      # migrations exist). RLS lives in Prisma migrations now —
+      # see prisma/migrations/20260425000000_enable_rls_foundation.
     command: >
       postgres
       -c max_connections=200

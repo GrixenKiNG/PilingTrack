@@ -2,6 +2,48 @@
 
 PilingTrack — операционная платформа для свайных работ: управление объектами, экипажами и оборудованием, сменные отчеты, офлайн-синхронизация, PDF-экспорт, realtime и административный контур.
 
+## ⚡ Установка одной командой
+
+Требуется только **Docker Desktop** (Windows/macOS) или Docker Engine с плагином `compose` (Linux). Postgres, Redis, приложение, воркеры и WebSocket-сервер поднимаются как контейнеры — устанавливать их на хост не нужно.
+
+**Windows:**
+```cmd
+git clone https://github.com/GrixenKiNG/PilingTrack.git
+cd PilingTrack
+setup.bat
+```
+
+**Linux / macOS:**
+```bash
+git clone https://github.com/GrixenKiNG/PilingTrack.git
+cd PilingTrack
+./setup.sh
+```
+
+Скрипт сам:
+1. Сгенерирует `.env.docker` со случайными секретами (32 байта на каждый);
+2. Соберёт образы и запустит стек (`docker compose up -d --build`);
+3. Применит миграции Prisma и засидит БД учётными данными по умолчанию;
+4. Распечатает URL и логины/пароли.
+
+После завершения откроется [http://localhost:3000](http://localhost:3000).
+
+| Логин | Пароль | Роль |
+|-------|--------|------|
+| `admin@piling.ru` | `admin123` | ADMIN |
+| `dispatch@piling.ru` | `dispatch123` | DISPATCHER |
+| `operator@piling.ru` | `operator123` | OPERATOR |
+| `helper@piling.ru` | `helper123` | ASSISTANT |
+
+> Поменяй пароли после первого входа. Всё остальное (схема БД, RLS-политики, сидинг справочников) уже применено автоматически.
+
+**Остановить стек:** `docker compose --env-file .env.docker down`
+**Сбросить всё (включая БД):** `docker compose --env-file .env.docker down -v && setup.bat`
+
+Установка на телефон/планшет (PWA) — см. [INSTALL-MOBILE.md](INSTALL-MOBILE.md).
+
+---
+
 ## Что внутри
 
 - `src/app` — Next.js App Router: страницы и API routes
