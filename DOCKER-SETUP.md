@@ -190,11 +190,15 @@ docker service update --secret-add db_password pilingtrack-app
 
 ---
 
-## 📈 Мониторинг с Prometheus + Grafana
+## 📈 Мониторинг с Prometheus + Grafana + Loki + Tempo
 
 ```bash
-# Дополнительно запустить мониторинг
-docker compose -f docker-compose.monitoring.yml up -d
+# Полный стек observability (метрики, логи, трейсы, алерты).
+# Подробности — observability/README.md.
+docker compose -f docker-compose.observability.yml up -d
+
+# Только observability без приложения (например, если app запущен нативно)
+docker compose -f docker-compose.monitoring-standalone.yml up -d
 
 # Grafana доступна на http://localhost:3010
 # Login: admin / admin
