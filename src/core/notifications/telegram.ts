@@ -174,6 +174,44 @@ export class TelegramNotifier {
   }
 
   /**
+   * Send a binary document (e.g. PDF) with optional HTML caption.
+   */
+  async sendDocument(
+    filename: string,
+    data: Buffer,
+    caption?: string,
+  ): Promise<boolean> {
+    const config = await getConfig();
+    if (!config) {
+      logger.warn('Telegram not configured — skipping document');
+      return false;
+    }
+
+    try {
+      const url = `https://api.telegram.org/bot${config.botToken}/sendDocument`;
+      const form = new FormData();
+      form.append('chat_id', config.chatId);
+      if (caption) {
+        form.append('caption', caption.slice(0, 1024));
+        form.append('parse_mode', 'HTML');
+      }
+      const arr = new Uint8Array(data);
+      form.append('document', new Blob([arr], { type: 'application/pdf' }), filename);
+
+      const response = await fetch(url, { method: 'POST', body: form });
+      if (!response.ok) {
+        const err = await response.text();
+        logger.error('Telegram sendDocument error', new Error(err), { status: response.status });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      logger.error('Failed to send Telegram document', error);
+      return false;
+    }
+  }
+
+  /**
    * Test connectivity with Telegram API.
    */
   async testConnection(): Promise<{ ok: boolean; chatTitle?: string; error?: string }> {

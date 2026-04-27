@@ -103,12 +103,21 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
         sum + (report.drillings || []).reduce((inner, drilling) => inner + (drilling.count || 1), 0),
       0
     );
+    const totalPileMeters = reports.reduce(
+      (sum, report) =>
+        sum + (report.piles || []).reduce(
+          (inner, pile) => inner + (pile.count || 0) * (pile.metersPerUnit || 0),
+          0,
+        ),
+      0,
+    );
 
     addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`);
     addMetricStrip(doc, [
       ['Отчётов', String(reports.length), 'шт'],
       ['Свай забито', formatNumber(data.totalPiles), 'шт'],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatNumber(data.totalDrilling)}`, 'шт / м.п.'],
+      ['Сваи всего', formatMeters(totalPileMeters), 'м.п.'],
+      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт / м.п.'],
       ['Простои', formatNumber(data.totalDowntime), 'ч'],
     ]);
 
@@ -152,8 +161,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
 
     addMetricStrip(doc, [
       ['Свай забито', formatNumber(totalPiles), 'шт'],
-      ['Сваи всего', formatNumber(totalPileMeters), 'м.п.'],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatNumber(totalDrilling)}`, 'шт / м.п.'],
+      ['Сваи всего', formatMeters(totalPileMeters), 'м.п.'],
+      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт / м.п.'],
       ['Простои', formatNumber(totalDowntime), 'ч'],
     ]);
 
@@ -165,8 +174,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
         data.piles.map((pile) => [
           pile.pileGrade?.name || '—',
           formatNumber(pile.count),
-          formatNumber(pile.metersPerUnit || 0),
-          formatNumber((pile.count || 0) * (pile.metersPerUnit || 0)),
+          formatMeters(pile.metersPerUnit || 0),
+          formatMeters((pile.count || 0) * (pile.metersPerUnit || 0)),
         ]),
         [0.46, 0.16, 0.18, 0.2]
       );
@@ -180,8 +189,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
         data.drillings.map((drilling) => [
           drilling.type?.name || '—',
           formatNumber(drilling.count || 1),
-          formatNumber(drilling.metersPerUnit || 0),
-          formatNumber(drilling.meters || 0),
+          formatMeters(drilling.metersPerUnit || 0),
+          formatMeters(drilling.meters || 0),
         ]),
         [0.46, 0.16, 0.18, 0.2]
       );
@@ -521,6 +530,10 @@ function safeText(value: unknown): string {
 function formatNumber(value: number | null | undefined): string {
   const numeric = Number(value || 0);
   return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
+}
+
+function formatMeters(value: number | null | undefined): string {
+  return Number(value || 0).toFixed(1);
 }
 
 function formatRuDate(value: string): string {

@@ -15,6 +15,11 @@ tsconfig.tsbuildinfo
 .env.production.local
 .env.docker
 
+# Database dumps — никогда не коммитим (могут содержать реальные данные).
+backups/
+*.sql.dump
+*.pgdump
+
 # Logs and temporary artifacts
 *.log
 *.out.log

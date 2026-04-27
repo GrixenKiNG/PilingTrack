@@ -11,7 +11,7 @@ import {
 import { telegramConfigSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 
-const telegramConfigIdSchema = telegramConfigSchema.extend({ id: z.string().uuid() });
+const telegramConfigIdSchema = telegramConfigSchema.partial().extend({ id: z.string().uuid() });
 const deleteIdSchema = z.object({ id: z.string().uuid('Invalid ID') });
 
 

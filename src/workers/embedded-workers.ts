@@ -118,6 +118,14 @@ async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
     });
   }
 
+  try {
+    registerAllEventHandlers();
+  } catch (error) {
+    logger.warn('Embedded outbox: failed to register handlers', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   const election = getOutboxLeaderElection();
   let worker: ReturnType<typeof startOutboxWorker> | null = null;
 
@@ -129,7 +137,7 @@ async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
     if (shouldLogWorkerLifecycle()) {
       logger.info('Embedded outbox: became leader');
     }
-    worker = startOutboxWorker(async (event) => emitDomainEvent(event), 10_000);
+    worker = startOutboxWorker(async (event) => emitDomainEvent(event), 2_000);
 
     void recordLeaderHeartbeat('outbox', election).catch((error) => {
       logger.error('Embedded outbox: immediate heartbeat failed', {
@@ -232,7 +240,7 @@ async function startEmbeddedProjectionWorker(): Promise<EmbeddedWorkerHandle> {
     if (shouldLogWorkerLifecycle()) {
       logger.info('Embedded projection: became leader');
     }
-    worker = startProjectionWorker(5_000);
+    worker = startProjectionWorker(1_000);
 
     void recordLeaderHeartbeat('projection', election).catch((error) => {
       logger.error('Embedded projection: immediate heartbeat failed', {

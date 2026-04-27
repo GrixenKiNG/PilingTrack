@@ -42,7 +42,7 @@ export function PdfPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[95vh] w-[95vw] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="flex aspect-[210/297] max-h-[95vh] w-[95vw] max-w-[820px] flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="flex flex-row items-center justify-between gap-2 border-b px-4 py-2 pr-12">
           <DialogTitle className="truncate text-sm font-medium text-slate-900">
             Просмотр отчёта

@@ -29,11 +29,11 @@ RUN npx prisma generate || true
 RUN npm run build
 
 # Bundle WebSocket server with esbuild (fast, single-file output)
-RUN npx esbuild src/realtime/server/index.ts \
+RUN npx esbuild src/core/realtime/server/index.ts \
     --bundle \
     --platform=node \
     --target=node22 \
-    --outdir=dist/ws \
+    --outfile=dist/ws/index.js \
     --external:@prisma/client \
     --external:ws \
     --external:ioredis \

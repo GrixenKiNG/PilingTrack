@@ -41,6 +41,28 @@ export function AdminTelegram() {
   const [newChatId, setNewChatId] = useState('');
   const [creating, setCreating] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const handleTest = async () => {
+    setTesting(true);
+    try {
+      const res = await authFetch('/api/notifications/telegram/test', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        toast.success(
+          data.chatTitle
+            ? `Соединение установлено: ${data.chatTitle}`
+            : 'Соединение установлено',
+        );
+      } else {
+        toast.error(`Ошибка: ${data.error || 'Не удалось подключиться'}`);
+      }
+    } catch {
+      toast.error('Ошибка тестирования');
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -223,6 +245,18 @@ export function AdminTelegram() {
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 mt-3">
+                    <button
+                      onClick={handleTest}
+                      disabled={testing || !config.enabled}
+                      className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-sky-50 disabled:opacity-50"
+                    >
+                      {testing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      Тест
+                    </button>
                     <button
                       onClick={() => handleToggle(config)}
                       disabled={togglingId === config.id}

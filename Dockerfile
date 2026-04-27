@@ -51,6 +51,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
+# Next.js standalone не трассирует кастомный Prisma client из src/generated/postgres-client.
+# Явно копируем @prisma и .prisma — иначе runtime падает с
+# "Cannot find module '@prisma/client-runtime-utils'".
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/src/generated ./src/generated
+
 # Install wget for health checks
 RUN apk add --no-cache wget
 

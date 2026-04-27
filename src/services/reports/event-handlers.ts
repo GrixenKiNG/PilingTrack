@@ -225,6 +225,64 @@ async function handleAuditEvent(event: ReportDomainEvent) {
 }
 
 // ============================================================
+// Telegram Notification Handler — submitted reports go to chat
+// ============================================================
+
+export function registerTelegramReportHandler() {
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportSubmittedTelegram);
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function fmtNum(n: number): string {
+  return new Intl.NumberFormat('ru-RU').format(n);
+}
+
+async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
+  try {
+    const { loadSingleReportPdfContext } = await import('@/lib/pdf-data');
+    const { generateSinglePdf } = await import('@/lib/pdf-generator');
+    const { telegramNotifier } = await import('@/core/notifications/telegram');
+
+    const ctx = await loadSingleReportPdfContext(event.aggregateId);
+    if (!ctx) {
+      logger.warn('Telegram: report not found for submitted event', { reportId: event.aggregateId });
+      return;
+    }
+
+    const d = ctx.pdfData;
+    const totalPiles = d.piles.reduce((s, p) => s + (p.count || 0), 0);
+    const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
+    const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
+
+    const lines = [
+      '📋 <b>Отчёт отправлен</b>',
+      '',
+      `📍 Объект: <b>${escapeHtml(d.site?.name || '—')}</b>`,
+      `📅 Дата: <b>${escapeHtml(d.date)}</b>`,
+      `👷 Оператор: <b>${escapeHtml(d.user?.name || '—')}</b>`,
+      `🛠 Оборудование: ${escapeHtml(d.equipmentName || '—')}`,
+      '',
+      `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
+      `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
+      `⏸ Простои: <b>${fmtNum(totalDowntime)}</b> ч`,
+    ];
+    const caption = lines.join('\n');
+
+    const pdfBuffer = await generateSinglePdf(d);
+    const filename = `report-${d.date}-${d.user?.name || 'unknown'}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
+
+    await telegramNotifier.sendDocument(filename, pdfBuffer, caption);
+  } catch (error) {
+    logger.error('Telegram report notification failed', error, {
+      reportId: event.aggregateId,
+    });
+  }
+}
+
+// ============================================================
 // Registration — call once on server startup
 // ============================================================
 
@@ -232,4 +290,5 @@ export function registerAllEventHandlers() {
   registerAnalyticsEventHandler();
   registerAlertEventHandler();
   registerAuditEventHandler();
+  registerTelegramReportHandler();
 }

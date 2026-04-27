@@ -105,7 +105,23 @@ async function consumeOutboxEvents(
     if (current?.[consumerColumn]) continue;
 
     try {
-      const event = outboxEvent.payload as unknown as ReportDomainEvent;
+      // Reconstruct the domain event from outbox columns. Some writers store
+      // the full event in `payload`, others store only `event.data`. We treat
+      // `payload` as a partial source and override the routing fields with
+      // the canonical column values so dispatch by `type` always works.
+      const payloadObj = (outboxEvent.payload && typeof outboxEvent.payload === 'object'
+        ? (outboxEvent.payload as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+      const looksLikeFullEvent = typeof payloadObj.type === 'string' && 'data' in payloadObj;
+      const event = {
+        ...(looksLikeFullEvent ? payloadObj : {}),
+        id: outboxEvent.id,
+        type: outboxEvent.type,
+        aggregateId: outboxEvent.aggregateId,
+        aggregateType: outboxEvent.aggregateType,
+        occurredAt: outboxEvent.occurredAt.toISOString(),
+        data: looksLikeFullEvent ? (payloadObj.data ?? {}) : payloadObj,
+      } as unknown as ReportDomainEvent;
 
       await handler(event);
 

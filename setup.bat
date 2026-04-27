@@ -1,15 +1,15 @@
 @echo off
 rem One-command bootstrap for PilingTrack on a fresh machine.
-rem Generates secrets if missing, brings the full stack up via Docker
-rem (Postgres + Redis + app + workers + WebSocket), and waits for
-rem migration + seed to finish before printing credentials.
+rem Generates secrets if missing, brings the full Docker stack up
+rem (Postgres 18 + Redis + app + workers + WebSocket + pgbouncer)
+rem and waits for migration to finish before printing credentials.
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 echo.
 echo ============================================================
-echo  PilingTrack — first-run setup
+echo  PilingTrack - first-run setup
 echo ============================================================
 
 rem 1. Verify Docker is available.
@@ -46,7 +46,7 @@ if errorlevel 1 goto fail
 
 rem 4. Wait for the migrate container to finish.
 echo.
-echo Waiting for database migrations + seed to complete...
+echo Waiting for database migrations to complete...
 docker compose --env-file .env.docker logs -f migrate
 docker compose --env-file .env.docker wait migrate >nul 2>&1
 
@@ -57,7 +57,7 @@ echo  PilingTrack is up.
 echo.
 echo  App:        http://localhost:3000
 echo  WebSocket:  ws://localhost:3001
-echo  Postgres:   localhost:5432   (user: piling)
+echo  Postgres:   localhost:5435   (user: postgres, db: pilingtrack_test)
 echo  PgBouncer:  localhost:6432
 echo  Redis:      localhost:6379
 echo.
@@ -67,7 +67,17 @@ echo    dispatcher: dispatch@piling.ru  / dispatch123
 echo    operator:   operator@piling.ru  / operator123
 echo    helper:     helper@piling.ru    / helper123
 echo.
-echo  Stop the stack:    docker compose --env-file .env.docker down
+echo  NOTE: If a backups\latest.sql dump exists and you want to
+echo  restore real data over the seed, run:
+echo    docker exec -i pilingtrack-postgres psql -U postgres -d pilingtrack_test ^< backups\latest.sql
+echo.
+echo  Telegram alerts (optional):
+echo    1. Create a bot via @BotFather, get the token.
+echo    2. Add the bot to a group, send any message there.
+echo    3. Open http://localhost:3000/admin/telegram and add a config.
+echo    4. Submitted reports are then auto-sent to the chat with PDF.
+echo.
+echo  Stop the stack:    stop.bat   (or: docker compose --env-file .env.docker down)
 echo  Reset everything:  docker compose --env-file .env.docker down -v
 echo ============================================================
 endlocal
