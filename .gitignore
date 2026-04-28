@@ -93,3 +93,4 @@ bun.lock
 bun.lockb
 pnpm-lock.yaml
 yarn.lock
+.gitnexus

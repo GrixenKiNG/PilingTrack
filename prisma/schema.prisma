@@ -23,10 +23,10 @@ model Tenant {
   billingEmail String?
   stripeCustomerId String?
   subscriptionStatus String @default("inactive") // inactive, trial, active, past_due, canceled
-  trialEndsAt DateTime?
-  subscriptionEndsAt DateTime?
-  lastBillingAt DateTime?
-  monthlyFee    Float    @default(0)
+  trialEndsAt DateTime? @db.Timestamptz(3)
+  subscriptionEndsAt DateTime? @db.Timestamptz(3)
+  lastBillingAt DateTime? @db.Timestamptz(3)
+  monthlyFee    Decimal  @default(0) @db.Decimal(12, 2)
   currency      String   @default("RUB")
 
   // Usage tracking
@@ -34,8 +34,8 @@ model Tenant {
   currentSites  Int      @default(0)
   storageUsedMB Float    @default(0)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   users       User[]
   sites       Site[]
@@ -53,16 +53,16 @@ model TenantInvoice {
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   invoiceNumber String @unique
-  periodStart DateTime
-  periodEnd   DateTime
-  amount      Float
+  periodStart DateTime @db.Timestamptz(3)
+  periodEnd   DateTime @db.Timestamptz(3)
+  amount      Decimal  @db.Decimal(15, 2)
   currency    String   @default("RUB")
   status      String   @default("pending") // pending, paid, overdue, canceled
-  paidAt      DateTime?
+  paidAt      DateTime? @db.Timestamptz(3)
   stripeInvoiceId String?
 
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([tenantId])
   @@index([status])
@@ -90,8 +90,8 @@ model User {
   isActive   Boolean  @default(true)
   timezone   String   @default("Europe/Moscow")
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
   tenant     Tenant?  @relation(fields: [tenantId], references: [id])
   reports    Report[]
@@ -100,6 +100,7 @@ model User {
   feedbackReads FeedbackEventRead[]
 
   @@index([email])
+  @@index([tenantId])
 }
 
 // ============================================================
@@ -114,8 +115,8 @@ model Equipment {
   isActive    Boolean  @default(true)
   description String   @default("")
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   crews       Crew[]
   reports     Report[] @relation("ReportEquipment")
@@ -138,9 +139,9 @@ model DeviceKey {
   equipmentId  String
   siteId       String?
   revoked      Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
   createdById  String?
-  lastUsedAt   DateTime?
+  lastUsedAt   DateTime? @db.Timestamptz(3)
 
   equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
 
@@ -161,10 +162,10 @@ model Site {
   plannedPiles     Int       @default(0)
   plannedDrilling  Float     @default(0)
   status           String    @default("ACTIVE")
-  completionDate   DateTime?
+  completionDate   DateTime? @db.Timestamptz(3)
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
 
   tenant           Tenant?   @relation(fields: [tenantId], references: [id])
   fields           PileField[]
@@ -189,8 +190,8 @@ model SitePilePlan {
   count         Int      @default(0)
   metersPerUnit Float    @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([siteId])
 }
@@ -204,8 +205,8 @@ model SiteDrillingPlan {
   count         Int      @default(0)
   metersPerUnit Float    @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([siteId])
 }
@@ -216,8 +217,8 @@ model PileField {
   siteId    String
   site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   clusters  Cluster[]
 
@@ -230,8 +231,8 @@ model Cluster {
   fieldId   String
   field     PileField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   pickets   Picket[]
 
@@ -244,8 +245,8 @@ model Picket {
   clusterId String
   cluster   Cluster  @relation(fields: [clusterId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   piles     PileWork[]
   drillings LeaderDrilling[]
@@ -265,8 +266,8 @@ model Crew {
   equipmentId     String
   siteId          String
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   operator        User       @relation("CrewOperator", fields: [operatorId], references: [id], onDelete: Cascade)
   equipment       Equipment @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
@@ -287,8 +288,8 @@ model CrewAssistant {
   crew      Crew     @relation(fields: [crewId], references: [id], onDelete: Cascade)
   name      String
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([crewId])
 }
@@ -304,8 +305,8 @@ model UserSiteAssignment {
   user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   site      Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([userId, siteId])
   @@index([userId])
@@ -335,8 +336,8 @@ model Report {
   lastEditedByName String?
   lastEditedByRole String?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   user         User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   site         Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -367,7 +368,7 @@ model ReportVersion {
   version   Int
   data      Json
   actorId   String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([reportId, version])
   @@index([reportId])
@@ -391,7 +392,7 @@ model ReportAudit {
   ipAddress   String?
   userAgent   String?
   requestId   String?  // Correlation ID from request
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([reportId])
   @@index([actorId, createdAt])
@@ -412,8 +413,8 @@ model TelemetryRecord {
   latitude    Float?
   longitude   Float?
   metadata    Json?
-  timestamp   DateTime @default(now())
-  createdAt   DateTime @default(now())
+  timestamp   DateTime @default(now()) @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([equipmentId, timestamp])
   @@index([siteId, timestamp])
@@ -437,12 +438,12 @@ model OutboxEvent {
   projected   Boolean  @default(false)
   attempts    Int      @default(0)
   lastError   String?
-  occurredAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  publishedAt DateTime?
+  occurredAt  DateTime @default(now()) @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  publishedAt DateTime? @db.Timestamptz(3)
   // Earliest time a retry should be attempted. Used by the outbox publisher
   // to implement exponential backoff with jitter.
-  nextRetryAt DateTime?
+  nextRetryAt DateTime? @db.Timestamptz(3)
 
   @@index([published, nextRetryAt])
   @@index([published, createdAt])
@@ -464,8 +465,8 @@ model ReportAnalytics {
   totalPiles    Int      @default(0)
   totalDrilling Float    @default(0)
   totalDowntime Float    @default(0)
-  lastEventAt   DateTime @default(now())
-  createdAt     DateTime @default(now())
+  lastEventAt   DateTime @default(now()) @db.Timestamptz(3)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([siteId])
   @@index([userId])
@@ -481,8 +482,8 @@ model SiteDailySummary {
   totalDrilling Float    @default(0)
   totalDowntime Float    @default(0)
   reportCount   Int      @default(0)
-  updatedAt     DateTime @updatedAt
-  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([siteId, date])
   @@index([siteId])
@@ -519,8 +520,8 @@ model ReportStats {
   topDowntimeReasonId   String?
   topDowntimeDuration   Float?
 
-  updatedAt         DateTime @updatedAt
-  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([siteId, date])
   @@index([userId, date])
@@ -552,8 +553,8 @@ model OperatorPerformance {
   // Downtime ratio
   downtimeRatio   Float    @default(0)  // downtime / shift duration
 
-  updatedAt       DateTime @updatedAt
-  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([userId, siteId, date])
   @@index([userId, date])
@@ -577,8 +578,8 @@ model DowntimeSummary {
   // Percentage of total site downtime for that day
   percentageOfTotal Float  @default(0)
 
-  updatedAt       DateTime @updatedAt
-  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([siteId, date, reasonId])
   @@index([siteId, date])
@@ -607,8 +608,8 @@ model SiteWeeklyTrend {
   drillingTrend   String?
   downtimeTrend   String?
 
-  updatedAt       DateTime @updatedAt
-  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([siteId, weekStart])
   @@index([siteId, weekStart])
@@ -626,7 +627,7 @@ model PileWork {
   pileGradeId  String
   count        Int
 
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
 
   report       Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
   picket       Picket?  @relation(fields: [picketId], references: [id])
@@ -650,7 +651,7 @@ model LeaderDrilling {
   metersPerUnit Float @default(0)
   meters    Float
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   report    Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
   picket    Picket?      @relation(fields: [picketId], references: [id])
@@ -672,7 +673,7 @@ model ReportDowntime {
   duration  Float
   comment   String?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   report    Report          @relation(fields: [reportId], references: [id], onDelete: Cascade)
   reason    DowntimeReason  @relation(fields: [reasonId], references: [id], onDelete: Restrict)
@@ -690,8 +691,8 @@ model PileGrade {
   name      String
   isActive  Boolean @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   piles     PileWork[]
   plans     SitePilePlan[]
@@ -702,8 +703,8 @@ model DrillingType {
   name      String
   isActive  Boolean @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   drillings LeaderDrilling[]
 }
@@ -713,8 +714,8 @@ model DowntimeReason {
   name      String
   isActive  Boolean @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   downtimes ReportDowntime[]
 }
@@ -730,8 +731,8 @@ model TelegramConfig {
   chatId    String
   enabled   Boolean @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 // ============================================================
@@ -754,7 +755,7 @@ model FeedbackEvent {
   requestId  String?
   metadata   Json?
 
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
   reads      FeedbackEventRead[]
 
   @@index([createdAt])
@@ -769,10 +770,10 @@ model FeedbackEventRead {
   id             String        @id @default(cuid())
   eventId         String
   userId          String
-  readAt          DateTime?
-  acknowledgedAt  DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  readAt          DateTime? @db.Timestamptz(3)
+  acknowledgedAt  DateTime? @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
 
   event           FeedbackEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -800,7 +801,7 @@ model AuditLog {
   requestId   String?  // Correlation ID
   ipAddress   String?  // Client IP
   userAgent   String?  // Client info
-  timestamp   DateTime @default(now())
+  timestamp   DateTime @default(now()) @db.Timestamptz(3)
 
   // Immutable guarantee: no UPDATE, only INSERT
   // Soft-delete protection via application layer
@@ -824,9 +825,9 @@ model IdempotencyKey {
   result      Json?    // Cached response
   error       String?  // Error message if failed
   statusCode  Int?     // HTTP status code for errors
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  completedAt DateTime?
+  expiresAt   DateTime @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
 
   @@unique([scope, key])
   @@index([scope, key])
@@ -843,14 +844,14 @@ model DeviceSyncState {
   deviceId      String   @unique
   tenantId      String?
   userId        String?
-  lastSyncAt    DateTime @default(now())
+  lastSyncAt    DateTime @default(now()) @db.Timestamptz(3)
   syncStatus    String   @default("idle") // idle, syncing, failed
   lastError     String?
   changesSent   Int      @default(0)
   changesRecv   Int      @default(0)
   lastVectorClock Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([tenantId])
   @@index([syncStatus])
@@ -877,11 +878,11 @@ model Media {
 
   uploadStatus  String   @default("pending") // pending, completed, failed
   isDeleted     Boolean  @default(false)
-  deletedAt     DateTime?
+  deletedAt     DateTime? @db.Timestamptz(3)
   deletedBy     String?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([tenantId])
   @@index([userId])
@@ -909,7 +910,7 @@ model ConflictAudit {
   serverVersion       Int?
   clientVectorClock   Json?
   serverVectorClock   Json?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([entityId, createdAt])
   @@index([tenantId, createdAt])
@@ -927,12 +928,12 @@ model RefreshToken {
   userId        String
   token         String   @unique // Hashed token
   family        String   // Token family for rotation detection
-  expiresAt     DateTime
+  expiresAt     DateTime @db.Timestamptz(3)
   revoked       Boolean  @default(false)
-  revokedAt     DateTime?
+  revokedAt     DateTime? @db.Timestamptz(3)
   revokedReason String?
-  createdAt     DateTime @default(now())
-  lastUsedAt    DateTime?
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  lastUsedAt    DateTime? @db.Timestamptz(3)
   ipAddress     String?
   userAgent     String?
 
@@ -971,7 +972,7 @@ model ReportPhoto {
   thumbnailPath String?  // Thumbnail path
   mediaId       String?  // Link to Media table (optional)
 
-  createdAt     DateTime @default(now())
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
   createdBy     String?  // User ID who uploaded
 
   @@index([reportId])
@@ -997,8 +998,8 @@ model DeadLetterQueue {
   attempts       Int      @default(0)
   sourceOutboxId String?
   status         String   @default("pending") // pending | resolved | discarded
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([status, createdAt])
   @@index([eventType])

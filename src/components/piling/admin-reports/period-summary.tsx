@@ -31,7 +31,7 @@ export function PeriodSummaryCard({ summary, loading }: PeriodSummaryCardProps) 
     },
     {
       label: 'Свай забито',
-      value: `${formatNumber(summary.totalPiles)} шт.`,
+      value: `${formatNumber(summary.totalPiles)} шт. / ${formatNumber(summary.totalPileMeters ?? 0)} м.п.`,
       icon: HardHat,
       color: 'text-orange-600',
       bg: 'bg-orange-50',

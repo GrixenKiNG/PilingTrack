@@ -255,15 +255,17 @@ export function ReportHistory() {
                   <div className="grid grid-cols-3 gap-3 mt-3">
                     <div className="flex items-center gap-1.5">
                       <HardHat className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-sm font-mono font-semibold text-slate-900">{report.totalPiles}</span>
-                      <span className="text-[10px] text-slate-500">св.</span>
+                      <span className="text-sm font-mono font-semibold text-slate-900">
+                        {report.totalPiles}/{(report.totalPileMeters ?? 0).toFixed(1)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">шт/м.п.</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Drill className="w-3.5 h-3.5 text-blue-500" />
                       <span className="text-sm font-mono font-semibold text-slate-900">
-                        {report.totalDrilling}
+                        {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-[10px] text-slate-500">м</span>
+                      <span className="text-[10px] text-slate-500">шт/м</span>
                     </div>
                     {report.totalDowntime > 0 && (
                       <div className="flex items-center gap-1.5">

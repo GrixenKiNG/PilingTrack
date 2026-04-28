@@ -222,6 +222,8 @@ export interface ReportListItemDTO {
   date: string;
   status: ReportStatus;
   totalPiles: number;
+  totalPileMeters?: number;
+  totalDrillingCount?: number;
   totalDrilling: number;
   totalDowntime: number;
   createdAt: string;

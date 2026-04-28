@@ -113,8 +113,8 @@ services:
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://redis:6379
       - WORKER_HEALTH_PORT=3002
-      - OUTBOX_INTERVAL_MS=10000
-      - PROJECTION_INTERVAL_MS=5000
+      - OUTBOX_INTERVAL_MS=${OUTBOX_INTERVAL_MS:-10000}
+      - PROJECTION_INTERVAL_MS=${PROJECTION_INTERVAL_MS:-5000}
       - PDF_WORKER_CONCURRENCY=2
       # Control which workers to enable: outbox,projection,pdf
       - ENABLED_WORKERS=outbox,projection,pdf

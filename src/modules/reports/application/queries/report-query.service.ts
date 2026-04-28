@@ -125,8 +125,8 @@ export async function listReportsForUserScope(
     where,
     include: {
       site: { select: { name: true } },
-      piles: { select: { count: true } },
-      drillings: { select: { meters: true } },
+      piles: { select: { count: true, pileGrade: { select: { name: true } } } },
+      drillings: { select: { count: true, meters: true } },
       downtimes: { select: { duration: true } },
     },
     orderBy: { date: 'desc' },
@@ -135,6 +135,11 @@ export async function listReportsForUserScope(
     skip: cursor ? 1 : 0,
   });
 
+  const pileLengthFromName = (name: string) => {
+    const m = name.match(/\d{3}/);
+    return m ? Number(m[0]) / 10 : 0;
+  };
+
   return reports.map((report) => ({
     id: report.id,
     siteId: report.siteId,
@@ -142,6 +147,15 @@ export async function listReportsForUserScope(
     date: report.date,
     status: report.status,
     totalPiles: report.piles.reduce((sum: number, pile: { count: number }) => sum + pile.count, 0),
+    totalPileMeters: report.piles.reduce(
+      (sum: number, pile: { count: number; pileGrade: { name: string } }) =>
+        sum + pile.count * pileLengthFromName(pile.pileGrade?.name || ''),
+      0,
+    ),
+    totalDrillingCount: report.drillings.reduce(
+      (sum: number, d: { count: number | null }) => sum + (d.count || 1),
+      0,
+    ),
     totalDrilling: report.drillings.reduce((sum: number, d: { meters: number }) => sum + d.meters, 0),
     totalDowntime: report.downtimes.reduce((sum: number, d: { duration: number }) => sum + d.duration, 0),
     createdAt: report.createdAt,

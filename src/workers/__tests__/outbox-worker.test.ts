@@ -61,6 +61,7 @@ function createOutboxEvent(overrides = {}) {
     published: false,
     attempts: 0,
     lastError: null,
+    occurredAt: new Date(),
     createdAt: new Date(),
     publishedAt: null,
     ...overrides,
@@ -93,7 +94,16 @@ describe('Outbox Publisher', () => {
 
       expect(count).toBe(1);
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(event.payload);
+      // The publisher reconstructs the event from outbox columns + payload,
+      // overriding routing fields with canonical column values.
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: event.id,
+          type: event.type,
+          aggregateId: event.aggregateId,
+          aggregateType: event.aggregateType,
+        })
+      );
     });
 
     it('returns 0 when no unpublished events', async () => {

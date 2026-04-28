@@ -23,7 +23,7 @@ interface ReportFiltersProps {
   periodTo: string;
   onPeriodToChange: (v: string) => void;
   periodActive: boolean;
-  periodSummary: { totalPiles: number; totalDrillingCount?: number; totalDrilling: number; totalDowntime: number; reportCount: number } | null;
+  periodSummary: { totalPiles: number; totalPileMeters?: number; totalDrillingCount?: number; totalDrilling: number; totalDowntime: number; reportCount: number } | null;
   onApplyPeriod: () => void;
   onResetPeriod: () => void;
   onExportPdf: () => void;
@@ -92,7 +92,7 @@ export function ReportFilters({
           {periodActive && periodSummary && (
             <div className="mt-3 flex items-center gap-4 flex-wrap">
               <span className="inline-flex items-center gap-1.5 text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full font-mono">
-                {periodSummary.totalPiles} св.
+                {periodSummary.totalPiles} шт. / {formatNumber(periodSummary.totalPileMeters ?? 0)} м.п.
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-mono">
                 {periodSummary.totalDrillingCount ?? 0} шт. / {formatNumber(periodSummary.totalDrilling)} м

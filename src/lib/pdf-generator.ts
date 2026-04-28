@@ -115,8 +115,7 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
     addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`);
     addMetricStrip(doc, [
       ['Отчётов', String(reports.length), 'шт'],
-      ['Свай забито', formatNumber(data.totalPiles), 'шт'],
-      ['Сваи всего', formatMeters(totalPileMeters), 'м.п.'],
+      ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт / м.п.'],
       ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт / м.п.'],
       ['Простои', formatNumber(data.totalDowntime), 'ч'],
     ]);
@@ -136,9 +135,17 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
 
 export async function generateSinglePdf(data: SingleReportData): Promise<Buffer> {
   return renderPdf((doc) => {
+    const pileLengthFromName = (name: string) => {
+      const m = name.match(/\d{3}/);
+      return m ? Number(m[0]) / 10 : 0;
+    };
+    const pileMetersOf = (pile: { pileGrade?: { name: string }; metersPerUnit?: number }) =>
+      pile.metersPerUnit && pile.metersPerUnit > 0
+        ? pile.metersPerUnit
+        : pileLengthFromName(pile.pileGrade?.name || '');
     const totalPiles = data.piles.reduce((sum, pile) => sum + (pile.count || 0), 0);
     const totalPileMeters = data.piles.reduce(
-      (sum, pile) => sum + (pile.count || 0) * (pile.metersPerUnit || 0),
+      (sum, pile) => sum + (pile.count || 0) * pileMetersOf(pile),
       0
     );
     const totalDrillingCount = data.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
@@ -160,8 +167,7 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     }
 
     addMetricStrip(doc, [
-      ['Свай забито', formatNumber(totalPiles), 'шт'],
-      ['Сваи всего', formatMeters(totalPileMeters), 'м.п.'],
+      ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт / м.п.'],
       ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт / м.п.'],
       ['Простои', formatNumber(totalDowntime), 'ч'],
     ]);
@@ -171,12 +177,15 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
       addTable(
         doc,
         ['Марка сваи', 'Кол-во', 'Метров на сваю', 'Всего м.п.'],
-        data.piles.map((pile) => [
-          pile.pileGrade?.name || '—',
-          formatNumber(pile.count),
-          formatMeters(pile.metersPerUnit || 0),
-          formatMeters((pile.count || 0) * (pile.metersPerUnit || 0)),
-        ]),
+        data.piles.map((pile) => {
+          const mpu = pileMetersOf(pile);
+          return [
+            pile.pileGrade?.name || '—',
+            formatNumber(pile.count),
+            formatMeters(mpu),
+            formatMeters((pile.count || 0) * mpu),
+          ];
+        }),
         [0.46, 0.16, 0.18, 0.2]
       );
     }

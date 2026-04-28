@@ -117,6 +117,7 @@ describe('Projection Worker', () => {
         payload: createEvent(),
         published: false,
         attempts: 0,
+        occurredAt: new Date(),
         createdAt: new Date(),
       };
 
@@ -179,6 +180,7 @@ describe('Projection Worker', () => {
         payload: createEvent({ type: 'ReportCreated' }),
         published: false,
         attempts: 0,
+        occurredAt: new Date(),
         createdAt: new Date(),
       };
 
@@ -221,6 +223,7 @@ describe('Projection Worker', () => {
         payload: createEvent(),
         published: false,
         attempts: 0,
+        occurredAt: new Date(),
         createdAt: new Date(),
       };
 
@@ -253,6 +256,7 @@ describe('Projection Worker', () => {
         payload: createEvent({ type: 'ReportUpdated' }),
         published: false,
         attempts: 0,
+        occurredAt: new Date(),
         createdAt: new Date(),
       };
 
