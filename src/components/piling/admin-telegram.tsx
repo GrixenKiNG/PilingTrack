@@ -11,6 +11,7 @@ import {
   MessageSquare,
   ToggleLeft,
   ToggleRight,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -34,14 +35,36 @@ export function AdminTelegram() {
   const [configs, setConfigs] = useState<TelegramConfigDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Create dialog
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  // Create / edit dialog (mode = 'create' | 'edit')
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [newBotToken, setNewBotToken] = useState('');
   const [newChatId, setNewChatId] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+
+  const openCreate = () => {
+    setDialogMode('create');
+    setEditingId(null);
+    setNewLabel('');
+    setNewBotToken('');
+    setNewChatId('');
+  };
+
+  const openEdit = (config: TelegramConfigDTO) => {
+    setDialogMode('edit');
+    setEditingId(config.id);
+    setNewLabel(config.label);
+    setNewBotToken(config.botToken);
+    setNewChatId(config.chatId);
+  };
+
+  const closeDialog = () => {
+    setDialogMode(null);
+    setEditingId(null);
+  };
 
   const handleTest = async () => {
     setTesting(true);
@@ -83,34 +106,38 @@ export function AdminTelegram() {
     loadData();
   }, [loadData]);
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!newLabel.trim() || !newBotToken.trim() || !newChatId.trim()) {
       toast.error('Заполните все поля');
       return;
     }
-    setCreating(true);
+    setSaving(true);
     try {
+      const isEdit = dialogMode === 'edit' && editingId;
       const res = await authFetch('/api/telegram/configs', {
-        method: 'POST',
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...(isEdit ? { id: editingId } : {}),
           label: newLabel.trim(),
           botToken: newBotToken.trim(),
           chatId: newChatId.trim(),
         }),
       });
-      if (!res.ok) throw new Error('Ошибка создания');
+      if (!res.ok) throw new Error('Ошибка сохранения');
       const data = await res.json();
-      setConfigs((prev) => [...prev, data.config]);
-      setShowCreateDialog(false);
-      setNewLabel('');
-      setNewBotToken('');
-      setNewChatId('');
-      toast.success('Конфигурация добавлена');
+      if (isEdit) {
+        setConfigs((prev) => prev.map((c) => (c.id === editingId ? data.config : c)));
+        toast.success('Конфигурация обновлена');
+      } else {
+        setConfigs((prev) => [...prev, data.config]);
+        toast.success('Конфигурация добавлена');
+      }
+      closeDialog();
     } catch {
-      toast.error('Ошибка создания');
+      toast.error('Ошибка сохранения');
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
@@ -179,7 +206,7 @@ export function AdminTelegram() {
           </p>
         </div>
         <Button
-          onClick={() => setShowCreateDialog(true)}
+          onClick={openCreate}
           className="bg-orange-500 hover:bg-orange-600 text-white"
         >
           <Plus className="w-4 h-4 mr-1" />
@@ -258,6 +285,13 @@ export function AdminTelegram() {
                       Тест
                     </button>
                     <button
+                      onClick={() => openEdit(config)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Редактировать
+                    </button>
+                    <button
                       onClick={() => handleToggle(config)}
                       disabled={togglingId === config.id}
                       className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-orange-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-50"
@@ -286,13 +320,13 @@ export function AdminTelegram() {
         </div>
       )}
 
-      {/* Create Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-4 h-4" />
-              Новая конфигурация Telegram
+              {dialogMode === 'edit' ? 'Редактировать конфигурацию' : 'Новая конфигурация Telegram'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -325,16 +359,18 @@ export function AdminTelegram() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+            <Button variant="outline" onClick={closeDialog}>
               Отмена
             </Button>
             <Button
-              onClick={handleCreate}
-              disabled={creating}
+              onClick={handleSave}
+              disabled={saving}
               className="bg-orange-500 hover:bg-orange-600 text-white"
             >
-              {creating ? (
+              {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
+              ) : dialogMode === 'edit' ? (
+                'Сохранить'
               ) : (
                 'Добавить'
               )}

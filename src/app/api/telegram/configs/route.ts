@@ -10,6 +10,7 @@ import {
 } from '@/services/telegram/telegram-config-service';
 import { telegramConfigSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
+import { getResponseCache } from '@/core/cache';
 
 const telegramConfigIdSchema = telegramConfigSchema.partial().extend({ id: z.string().uuid() });
 const deleteIdSchema = z.object({ id: z.string().uuid('Invalid ID') });
@@ -46,6 +47,7 @@ export const POST = withMutation(
     }
 
     const config = await createTelegramConfig(validation.data);
+    getResponseCache('telegram').invalidateAll();
     return NextResponse.json({ config }, { status: 201 });
   },
   { domain: 'telegram' }
@@ -69,6 +71,7 @@ export const PUT = withMutation(
 
     const { id, ...data } = validation.data;
     const config = await updateTelegramConfig(id, data);
+    getResponseCache('telegram').invalidateAll();
     return NextResponse.json({ config });
   },
   { domain: 'telegram' }
@@ -91,6 +94,7 @@ export const DELETE = withMutation(
     }
 
     const result = await deleteTelegramConfig(validation.data.id);
+    getResponseCache('telegram').invalidateAll();
     return NextResponse.json(result);
   },
   { domain: 'telegram' }
