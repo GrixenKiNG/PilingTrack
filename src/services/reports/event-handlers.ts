@@ -253,16 +253,26 @@ async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
     }
 
     const d = ctx.pdfData;
+    // Resubmit detection: every save bumps Report.version. version === 1 means
+    // first time the report transitions draft→submitted; > 1 means an admin
+    // (or anyone with edit-window access) changed an already-submitted report.
+    const reportVersion = (ctx.report as { version?: number } | null)?.version ?? 1;
+    const isCorrection = reportVersion > 1;
+    const operatorName = (ctx.report?.lastEditedByName) || d.user?.name || '—';
+
     const totalPiles = d.piles.reduce((s, p) => s + (p.count || 0), 0);
     const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
     const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
 
     const lines = [
-      '📋 <b>Отчёт отправлен</b>',
+      isCorrection
+        ? `✏️ <b>Корректировка отчёта</b> (ред. №${reportVersion})`
+        : '📋 <b>Отчёт отправлен</b>',
       '',
       `📍 Объект: <b>${escapeHtml(d.site?.name || '—')}</b>`,
       `📅 Дата: <b>${escapeHtml(d.date)}</b>`,
       `👷 Оператор: <b>${escapeHtml(d.user?.name || '—')}</b>`,
+      ...(isCorrection ? [`🖊 Изменил: <b>${escapeHtml(operatorName)}</b>`] : []),
       `🛠 Оборудование: ${escapeHtml(d.equipmentName || '—')}`,
       '',
       `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,

@@ -58,7 +58,6 @@ export type { DashboardData } from './application';
 
 // Event Bus
 export { on, emitDomainEvent, getRegisteredEventTypes } from './application/event-bus';
-export { registerAllReportEventHandlers } from './application/event-handlers';
 
 // Projections
 export { startProjectionWorker } from './application/projections/projection-worker';

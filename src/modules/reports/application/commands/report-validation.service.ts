@@ -132,6 +132,26 @@ export async function validateAgainstSitePlans(
 
   if (plans.length === 0) return; // No plans defined, skip validation
 
+  // Rule 1: every submitted pileGrade must exist in the site's plan.
+  // Operators must not be able to log piles of a grade that wasn't planned
+  // for this site — that bypasses the per-grade plan cap entirely.
+  const plannedGradeIds = new Set(plans.map(p => p.pileGradeId));
+  for (const pile of piles) {
+    if (!plannedGradeIds.has(pile.pileGradeId)) {
+      // Look up grade name for a useful error message.
+      const grade = await db.pileGrade.findUnique({
+        where: { id: pile.pileGradeId },
+        select: { name: true },
+      });
+      const gradeLabel = grade?.name || pile.pileGradeId;
+      throw new ServiceError(
+        `Марка "${gradeLabel}" не запланирована на этом объекте. Доступные марки: ${plans.map(p => p.pileGrade.name).join(', ')}`,
+        400
+      );
+    }
+  }
+
+  // Rule 2: total piles for each planned grade (existing + new) must not exceed plan.
   // Load all existing reports for this site (excluding current report if updating)
   const existingReports = await db.report.findMany({
     where: {
@@ -141,7 +161,6 @@ export async function validateAgainstSitePlans(
     include: { piles: true },
   });
 
-  // Sum actuals by pileGradeId
   const actualByGrade = new Map<string, number>();
   for (const report of existingReports) {
     for (const pile of report.piles) {
@@ -152,7 +171,6 @@ export async function validateAgainstSitePlans(
     }
   }
 
-  // Check against plans
   for (const plan of plans) {
     const actual = actualByGrade.get(plan.pileGradeId) || 0;
     const newPiles = piles.find(p => p.pileGradeId === plan.pileGradeId)?.count || 0;
