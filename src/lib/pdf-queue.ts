@@ -59,7 +59,6 @@ function createRedisConnection(): Redis {
     redisConnection = new Redis(REDIS_URL, {
       maxRetriesPerRequest: 3,
       connectTimeout: 10000,
-      keyPrefix: 'pilingtrack:',
       lazyConnect: true,
     });
 
@@ -86,6 +85,7 @@ function getQueue(): Queue {
     const connection = createRedisConnection();
     pdfQueueInstance = new Queue(QUEUE_NAME, {
       connection,
+      prefix: 'pilingtrack',
       defaultJobOptions: {
         attempts: MAX_RETRIES,
         backoff: {
@@ -103,7 +103,7 @@ function getQueue(): Queue {
 function getQueueEvents(): QueueEvents {
   if (!pdfQueueEventsInstance) {
     const connection = createRedisConnection();
-    pdfQueueEventsInstance = new QueueEvents(QUEUE_NAME, { connection });
+    pdfQueueEventsInstance = new QueueEvents(QUEUE_NAME, { connection, prefix: 'pilingtrack' });
   }
   return pdfQueueEventsInstance;
 }

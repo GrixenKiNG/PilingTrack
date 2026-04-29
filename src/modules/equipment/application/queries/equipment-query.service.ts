@@ -37,14 +37,27 @@ export async function listEquipmentCatalog() {
   return db.equipment.findMany({ orderBy: { name: 'asc' } });
 }
 
-export async function listAllEquipment(pagination?: CursorPaginationResult, siteId?: string | null) {
+export async function listAllEquipment(
+  pagination?: CursorPaginationResult,
+  siteId?: string | null,
+  operatorUserId?: string | null,
+) {
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
   const where: Record<string, unknown> = {};
-  
-  // Always include all equipment, but optionally filter by associated sites via crews
-  // Don't filter if siteId is provided - return all equipment as it can be assigned to any site
-  
+
+  // Operator scope: only equipment they are assigned to via an active crew.
+  // Optionally further narrowed to a specific site if siteId is provided.
+  if (operatorUserId) {
+    where.crews = {
+      some: {
+        isActive: true,
+        operatorId: operatorUserId,
+        ...(siteId ? { siteId } : {}),
+      },
+    };
+  }
+
   return db.equipment.findMany({
     where,
     select: { id: true, name: true, model: true, qty: true, isActive: true },

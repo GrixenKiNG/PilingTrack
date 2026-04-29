@@ -29,13 +29,16 @@ const CONCURRENCY = parseInt(process.env.PDF_WORKER_CONCURRENCY || '2', 10);
 // ============================================================
 
 function createRedisConnection(): Redis {
+  // BullMQ rejects ioredis `keyPrefix` (it manages keys itself). Use the
+  // BullMQ-level `prefix` option on Worker/Queue instead.
   return new Redis(REDIS_URL, {
-    maxRetriesPerRequest: null, // BullMQ workers need this set to null
+    maxRetriesPerRequest: null,
     connectTimeout: 10000,
-    keyPrefix: 'pilingtrack:',
     lazyConnect: true,
   });
 }
+
+const BULLMQ_PREFIX = 'pilingtrack';
 
 // ============================================================
 // Worker
@@ -99,6 +102,7 @@ const pdfWorker = new Worker<PdfJobData, PdfJobResult>(
     connection: workerConnection,
     concurrency: CONCURRENCY,
     autorun: true,
+    prefix: BULLMQ_PREFIX,
   }
 );
 

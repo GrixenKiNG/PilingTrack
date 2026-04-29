@@ -45,22 +45,26 @@ if not exist .env (
   exit /b 1
 )
 
-echo Stopping Docker app/workers/ws (so local npm owns ports 3000/3001)...
-docker compose --env-file .env.docker stop app workers ws >nul 2>&1
+echo Stopping Docker app/ws (so local npm owns ports 3000/3001)...
+echo (Keeping workers container running - it processes the PDF/BullMQ queue.)
+docker compose --env-file .env.docker stop app ws >nul 2>&1
 
-echo Starting Docker DB services (postgres, redis, pgbouncer, minio)...
-docker compose --env-file .env.docker up -d postgres redis pgbouncer minio minio-init
+echo Starting Docker DB + workers services...
+docker compose --env-file .env.docker up -d postgres redis pgbouncer minio minio-init workers
 if errorlevel 1 goto fail
 
 call :wait_port 5435 "Postgres"   || goto fail
-call :wait_port 6379 "Redis"      || goto fail
+call :wait_port 6380 "Redis"      || goto fail
 echo Dependencies: Postgres OK, Redis OK
 echo.
 
 if "%MODE%"=="prod" goto prod
 
+echo Starting PDF worker in a separate window (BullMQ queue consumer)...
+start "PilingTrack PDF Worker" cmd /k "npm run worker:pdf"
+
 echo Starting npm dev server (hot reload)...
-echo App connects to Postgres at localhost:5435, Redis at localhost:6379.
+echo App connects to Postgres at localhost:5435, Redis at localhost:6380.
 echo.
 call npm.cmd run dev
 goto end

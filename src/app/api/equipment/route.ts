@@ -11,12 +11,13 @@ export const runtime = 'nodejs';
 
 export const GET = withApi(
   async (request: NextRequest) => {
-    const { error } = await requireAuth(request);
+    const { user, error } = await requireAuth(request);
     if (error) return error;
 
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const siteId = request.nextUrl.searchParams.get('siteId');
-    const equipment = await listAllEquipment(pagination, siteId);
+    const operatorUserId = user!.role === 'OPERATOR' ? user!.id : null;
+    const equipment = await listAllEquipment(pagination, siteId, operatorUserId);
     const nextCursor = pagination.getNextCursor(equipment);
     return NextResponse.json({ data: equipment, nextCursor });
   },

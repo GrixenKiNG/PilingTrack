@@ -341,7 +341,6 @@ async function startPdf(): Promise<void> {
     const redisConnection = new Redis(REDIS_URL, {
       maxRetriesPerRequest: null,
       connectTimeout: 10_000,
-      keyPrefix: 'pilingtrack:',
       lazyConnect: true,
     });
 
@@ -391,6 +390,7 @@ async function startPdf(): Promise<void> {
         connection: redisConnection,
         concurrency: PDF_CONCURRENCY,
         autorun: true,
+        prefix: 'pilingtrack',
       }
     );
 
@@ -450,9 +450,7 @@ async function startPdf(): Promise<void> {
     };
   } catch (error) {
     setError(state, error);
-    logger.error('Failed to start PDF worker', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.error('Failed to start PDF worker', error);
   }
 }
 

@@ -76,7 +76,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:3001
 S3_ENDPOINT=http://minio:9000
 S3_ACCESS_KEY_ID=minioadmin
 S3_SECRET_ACCESS_KEY=minioadmin
-S3_BUCKET=pilingtrack-pdfs
+S3_BUCKET=pilingtrack-reports
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true
 
@@ -121,9 +121,10 @@ DATABASE_PROVIDER=postgres
 DATABASE_LOG_QUERIES=false
 
 # ------------------------------------------------------------
-# Redis (Docker port 6379)
+# Redis (Docker host port 6380 to avoid Windows-Redis conflict on 6379;
+# inside containers it's still redis:6379).
 # ------------------------------------------------------------
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://localhost:6380
 
 # ------------------------------------------------------------
 # Security secrets (must match .env.docker so encrypted data
@@ -153,7 +154,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:3001
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY_ID=minioadmin
 S3_SECRET_ACCESS_KEY=minioadmin
-S3_BUCKET=pilingtrack-pdfs
+S3_BUCKET=pilingtrack-reports
 S3_REGION=us-east-1
 S3_FORCE_PATH_STYLE=true
 

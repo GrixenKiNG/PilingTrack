@@ -94,3 +94,4 @@ bun.lockb
 pnpm-lock.yaml
 yarn.lock
 .gitnexus
+tmp-screenshots/

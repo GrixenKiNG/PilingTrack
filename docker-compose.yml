@@ -220,10 +220,12 @@ services:
     container_name: pilingtrack-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Host port 6380 to avoid conflict with a Windows-installed Redis on 6379.
+      # Containers still talk to the service via redis://redis:6379 (Docker network).
+      - "6380:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
