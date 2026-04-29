@@ -1,18 +1,19 @@
 @echo off
 rem PilingTrack launcher.
 rem
-rem Without args:        start the Docker stack (recommended).
-rem With "dev":          start npm dev server against the running Docker
-rem                      Postgres (5435) and Redis (6379).
-rem With "prod":         build + start npm in production mode against Docker.
+rem Default (no args / "dev"):  local `npm run dev` against Docker DB-only stack.
+rem                             This is the recommended workflow for development.
+rem With "docker":              full Docker stack (app + workers + ws + DB).
+rem With "prod":                local `npm run build` + `npm run start` against Docker DB.
 rem
 rem For first-time setup on a fresh machine, run setup.bat instead.
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-set MODE=docker
+set MODE=dev
 if /I "%~1"=="dev"         set MODE=dev
+if /I "%~1"==""            set MODE=dev
 if /I "%~1"=="development" set MODE=dev
 if /I "%~1"=="prod"        set MODE=prod
 if /I "%~1"=="production"  set MODE=prod
@@ -24,24 +25,42 @@ echo  PilingTrack v2.1.0  -  %MODE% mode
 echo  URL: http://localhost:3000
 echo ============================================================
 
+if not exist .env.docker (
+  echo ERROR: .env.docker not found. Run setup.bat first.
+  pause
+  exit /b 1
+)
+
 if "%MODE%"=="docker" goto docker_mode
 
-rem ------ dev / prod modes need Docker Postgres + Redis listening ------
-rem Local dev runs the app on port 3000 and starts embedded outbox/projection
-rem workers inside Next.js. Stop the Docker app/workers containers so they do
-rem not hold port 3000 and do not race for outbox leader-election.
-echo Stopping Docker app + workers (so local dev owns port 3000)...
-docker compose --env-file .env.docker stop app workers >nul 2>&1
-echo.
-call :check_port 5435 "Postgres (Docker, port 5435)" || goto missing_deps
-call :check_port 6379 "Redis (Docker, port 6379)"    || goto missing_deps
+rem ------------------------------------------------------------
+rem dev / prod modes:
+rem   - Bring up DB-only services (postgres, redis, pgbouncer, minio).
+rem   - Stop any Docker app/workers/ws containers (so port 3000/3001
+rem     is free and outbox/projection workers don't race the local ones).
+rem ------------------------------------------------------------
+if not exist .env (
+  echo ERROR: .env not found. Run setup.bat to generate it.
+  pause
+  exit /b 1
+)
+
+echo Stopping Docker app/workers/ws (so local npm owns ports 3000/3001)...
+docker compose --env-file .env.docker stop app workers ws >nul 2>&1
+
+echo Starting Docker DB services (postgres, redis, pgbouncer, minio)...
+docker compose --env-file .env.docker up -d postgres redis pgbouncer minio minio-init
+if errorlevel 1 goto fail
+
+call :wait_port 5435 "Postgres"   || goto fail
+call :wait_port 6379 "Redis"      || goto fail
 echo Dependencies: Postgres OK, Redis OK
 echo.
 
 if "%MODE%"=="prod" goto prod
 
 echo Starting npm dev server (hot reload)...
-echo App will use the Docker Postgres at localhost:5435.
+echo App connects to Postgres at localhost:5435, Redis at localhost:6379.
 echo.
 call npm.cmd run dev
 goto end
@@ -55,7 +74,7 @@ call npm.cmd run start
 goto end
 
 :docker_mode
-echo Starting Docker stack (Postgres + Redis + app + ws + workers)...
+echo Starting full Docker stack (postgres + redis + app + ws + workers + minio)...
 echo.
 docker compose --env-file .env.docker up -d
 if errorlevel 1 goto fail
@@ -68,22 +87,23 @@ echo  Logs: docker compose --env-file .env.docker logs -f app
 echo  Stop: stop.bat
 goto end
 
-:check_port
-netstat -ano | findstr /C:":%~1 " | findstr /C:"LISTENING" >nul
-if errorlevel 1 (
-  echo ERROR: %~2 is not listening.
+rem ============================================================
+rem Helper: poll a TCP port up to ~30 seconds for LISTEN.
+rem ============================================================
+:wait_port
+set PORT=%~1
+set NAME=%~2
+set TRIES=0
+:wait_port_loop
+netstat -ano | findstr /C:":%PORT% " | findstr /C:"LISTENING" >nul
+if not errorlevel 1 exit /b 0
+set /a TRIES+=1
+if !TRIES! GEQ 15 (
+  echo ERROR: %NAME% on port %PORT% did not become ready.
   exit /b 1
 )
-exit /b 0
-
-:missing_deps
-echo.
-echo Dev/prod mode needs the Docker stack running first.
-echo Start it with:    start.bat
-echo Or do a fresh setup:  setup.bat
-echo.
-pause
-exit /b 1
+timeout /t 2 /nobreak >nul
+goto wait_port_loop
 
 :build_failed
 echo.
@@ -92,7 +112,7 @@ exit /b 1
 
 :fail
 echo.
-echo Failed to start Docker stack. See output above.
+echo Failed to start. See output above.
 pause
 exit /b 1
 

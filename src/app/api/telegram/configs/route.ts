@@ -12,8 +12,8 @@ import { telegramConfigSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { getResponseCache } from '@/core/cache';
 
-const telegramConfigIdSchema = telegramConfigSchema.partial().extend({ id: z.string().uuid() });
-const deleteIdSchema = z.object({ id: z.string().uuid('Invalid ID') });
+const telegramConfigIdSchema = telegramConfigSchema.partial().extend({ id: z.string().min(1) });
+const deleteIdSchema = z.object({ id: z.string().min(1, 'Invalid ID') });
 
 
 export const runtime = 'nodejs';

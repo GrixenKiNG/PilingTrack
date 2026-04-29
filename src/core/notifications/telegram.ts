@@ -33,6 +33,7 @@ async function getDbClient() {
 async function getConfig(): Promise<TelegramBotConfig | null> {
   try {
     const db = await getDbClient();
+    const { decrypt, isEncrypted } = await import('@/core/security/encryption');
     const configs = await db.telegramConfig.findMany({
       where: { enabled: true },
       orderBy: { createdAt: 'asc' },
@@ -40,12 +41,18 @@ async function getConfig(): Promise<TelegramBotConfig | null> {
 
     if (configs.length === 0) return null;
 
+    const raw = configs[0];
+    const botToken = raw.botToken && isEncrypted(raw.botToken)
+      ? decrypt(raw.botToken)
+      : raw.botToken;
+
     return {
-      botToken: configs[0].botToken,
-      chatId: configs[0].chatId,
-      enabled: configs[0].enabled,
+      botToken,
+      chatId: raw.chatId,
+      enabled: raw.enabled,
     };
-  } catch {
+  } catch (err) {
+    logger.error('Failed to load Telegram config', err);
     return null;
   }
 }
