@@ -17,6 +17,8 @@ const PAGE_TO_ROUTE: Record<AppPage, string> = {
   'admin-reports': '/admin/reports',
   'admin-users': '/admin/users',
   'admin-telegram': '/admin/telegram',
+  'admin-dlq': '/admin/dlq',
+  'admin-analytics': '/admin/analytics',
 };
 
 export function appPageRoute(page: AppPage): string {

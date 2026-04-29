@@ -74,6 +74,11 @@ services:
       - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
       - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
       - NEXT_PUBLIC_WS_URL=ws://localhost:3001
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_REGION=${S3_REGION:-auto}
+      - S3_BUCKET=${S3_BUCKET:-pilingtrack-reports}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,6 +123,11 @@ services:
       - PDF_WORKER_CONCURRENCY=2
       # Control which workers to enable: outbox,projection,pdf
       - ENABLED_WORKERS=outbox,projection,pdf
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_REGION=${S3_REGION:-auto}
+      - S3_BUCKET=${S3_BUCKET:-pilingtrack-reports}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -280,6 +290,47 @@ services:
     networks:
       - pilingtrack
 
+  # MinIO — S3-compatible storage for PDFs and report photos
+  # Web console: http://localhost:9001 (login with MINIO_ROOT_USER / MINIO_ROOT_PASSWORD)
+  # S3 API:      http://localhost:9000 (used by app via S3_ENDPOINT)
+  # Optional. App falls back to local filesystem when S3 envs aren't set.
+  minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    container_name: pilingtrack-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - pilingtrack
+
+  # MinIO bootstrap — creates the default bucket once on startup, then exits.
+  minio-init:
+    image: minio/mc:RELEASE.2024-09-16T17-43-14Z
+    container_name: pilingtrack-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+      mc mb --ignore-existing local/${S3_BUCKET:-pilingtrack-reports} &&
+      echo 'Bucket ready: ${S3_BUCKET:-pilingtrack-reports}'
+      "
+    networks:
+      - pilingtrack
+
 # ============================================================
 # Volumes
 # ============================================================
@@ -287,6 +338,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local
 
 # ============================================================

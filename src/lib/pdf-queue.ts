@@ -227,7 +227,7 @@ export async function downloadPdf(jobId: string): Promise<Buffer> {
     throw new Error(`PDF not ready yet. Status: ${status}`);
   }
 
-  return readPdfResult(jobId);
+  return await readPdfResult(jobId);
 }
 
 /**

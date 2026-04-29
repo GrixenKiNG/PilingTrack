@@ -62,7 +62,7 @@ async function processPdfJob(job: Job<PdfJobData, PdfJobResult>): Promise<PdfJob
     throw new Error(`Unknown PDF type: ${type}`);
   }
 
-  const filePath = savePdfBuffer(jobId, pdfBuffer);
+  const filePath = await savePdfBuffer(jobId, pdfBuffer);
 
   logger.info(`[PDF Worker] Job ${jobId} completed: ${pdfBuffer.length} bytes -> ${filePath}`);
 

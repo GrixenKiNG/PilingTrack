@@ -377,7 +377,7 @@ async function startPdf(): Promise<void> {
           throw new Error(`Unknown PDF type: ${String(data.type)}`);
         }
 
-        const filePath = savePdfBuffer(jobId, pdfBuffer);
+        const filePath = await savePdfBuffer(jobId, pdfBuffer);
         await recordClusterHeartbeat('pdf');
 
         return {

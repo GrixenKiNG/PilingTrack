@@ -359,4 +359,6 @@ export type AppPage =
   | 'admin-dictionaries'
   | 'admin-reports'
   | 'admin-telegram'
+  | 'admin-dlq'
+  | 'admin-analytics'
   | 'admin-users';

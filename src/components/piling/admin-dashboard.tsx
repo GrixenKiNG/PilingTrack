@@ -17,6 +17,7 @@ import {
   Users,
   Send,
   Wrench,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -74,6 +75,8 @@ export function AdminDashboard() {
     { label: 'Справочники', icon: Settings, page: 'admin-dictionaries' as const, color: 'text-purple-600 bg-purple-100' },
     { label: 'Пользователи', icon: Users, page: 'admin-users' as const, color: 'text-green-600 bg-green-100' },
     { label: 'Telegram', icon: Send, page: 'admin-telegram' as const, color: 'text-sky-600 bg-sky-100' },
+    { label: 'Аналитика', icon: BarChart3, page: 'admin-analytics' as const, color: 'text-blue-600 bg-blue-100' },
+    { label: 'DLQ', icon: AlertTriangle, page: 'admin-dlq' as const, color: 'text-amber-600 bg-amber-100' },
   ];
 
   const formatReportLabel = (count: number) =>
