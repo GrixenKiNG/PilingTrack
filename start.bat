@@ -45,12 +45,12 @@ if not exist .env (
   exit /b 1
 )
 
-echo Stopping Docker app/ws (so local npm owns ports 3000/3001)...
-echo (Keeping workers container running - it processes the PDF/BullMQ queue.)
-docker compose --env-file .env.docker stop app ws >nul 2>&1
+echo Stopping Docker app/ws/workers (local npm owns dev process; ENCRYPTION_KEY
+echo  in .env.docker may differ from .env, so let local dev be the outbox leader).
+docker compose --env-file .env.docker stop app ws workers >nul 2>&1
 
-echo Starting Docker DB + workers services...
-docker compose --env-file .env.docker up -d postgres redis pgbouncer minio minio-init workers
+echo Starting Docker DB-only services...
+docker compose --env-file .env.docker up -d postgres redis pgbouncer minio minio-init
 if errorlevel 1 goto fail
 
 call :wait_port 5435 "Postgres"   || goto fail

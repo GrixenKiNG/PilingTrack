@@ -125,7 +125,13 @@ export function ReportForm() {
               onPicketChange={setSelectedPicketId} />
           )}
 
-          <PileSection piles={piles} pileGrades={pileGrades} quickMode={quickMode}
+          <PileSection piles={piles} pileGrades={
+            // Filter pile grades to those planned for the selected site so
+            // operators can't pick a grade the backend will then reject.
+            siteTree?.pilePlans && siteTree.pilePlans.length > 0
+              ? pileGrades.filter((g) => siteTree.pilePlans!.some((p) => p.pileGradeId === g.id))
+              : pileGrades
+          } quickMode={quickMode}
             tempGrade={temp.tempPileGrade} tempCount={temp.tempPileCount}
             onTempGradeChange={temp.setTempPileGrade} onTempCountChange={temp.setTempPileCount}
             onAdd={() => temp.addPile(addPile)} onRemove={removePile} onToggleMode={() => setQuickMode(!quickMode)}

@@ -21,31 +21,41 @@ export function PeriodSummaryCard({ summary, loading }: PeriodSummaryCardProps) 
     );
   }
 
-  const stats = [
+  const stats: Array<{
+    label: string;
+    primary: string;
+    secondary?: string;
+    icon: typeof FileText;
+    color: string;
+    bg: string;
+  }> = [
     {
       label: 'Отчётов',
-      value: summary.reportCount,
+      primary: `${summary.reportCount}`,
+      secondary: 'шт.',
       icon: FileText,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
     },
     {
       label: 'Свай забито',
-      value: `${formatNumber(summary.totalPiles)} шт. / ${formatNumber(summary.totalPileMeters ?? 0)} м.п.`,
+      primary: `${formatNumber(summary.totalPiles)} шт.`,
+      secondary: `${formatNumber(summary.totalPileMeters ?? 0)} м.п.`,
       icon: HardHat,
       color: 'text-orange-600',
       bg: 'bg-orange-50',
     },
     {
       label: 'Бурение',
-      value: `${summary.totalDrillingCount ?? 0} шт. / ${formatNumber(summary.totalDrilling)} м.п.`,
+      primary: `${summary.totalDrillingCount ?? 0} шт.`,
+      secondary: `${formatNumber(summary.totalDrilling)} м.п.`,
       icon: Drill,
       color: 'text-cyan-600',
       bg: 'bg-cyan-50',
     },
     {
       label: 'Простои',
-      value: `${formatNumber(summary.totalDowntime)} ч.`,
+      primary: `${formatNumber(summary.totalDowntime)} ч.`,
       icon: Clock,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
@@ -64,13 +74,16 @@ export function PeriodSummaryCard({ summary, loading }: PeriodSummaryCardProps) 
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {stats.map((stat) => (
-            <div key={stat.label} className="flex items-center gap-3">
+            <div key={stat.label} className="flex items-center gap-3 min-w-0">
               <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center flex-shrink-0`}>
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />
               </div>
-              <div>
-                <div className="text-lg font-bold font-mono">{stat.value}</div>
-                <div className="text-xs text-slate-500">{stat.label}</div>
+              <div className="min-w-0">
+                <div className="text-base font-bold font-mono whitespace-nowrap leading-tight">{stat.primary}</div>
+                {stat.secondary && (
+                  <div className="text-sm font-semibold font-mono text-slate-700 whitespace-nowrap leading-tight">{stat.secondary}</div>
+                )}
+                <div className="text-xs text-slate-500 truncate">{stat.label}</div>
               </div>
             </div>
           ))}

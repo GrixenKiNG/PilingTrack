@@ -103,10 +103,19 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
         sum + (report.drillings || []).reduce((inner, drilling) => inner + (drilling.count || 1), 0),
       0
     );
+    const pileLengthFromName = (name: string) => {
+      const m = name.match(/\d{3}/);
+      return m ? Number(m[0]) / 10 : 0;
+    };
     const totalPileMeters = reports.reduce(
       (sum, report) =>
         sum + (report.piles || []).reduce(
-          (inner, pile) => inner + (pile.count || 0) * (pile.metersPerUnit || 0),
+          (inner, pile) => {
+            const mpu = pile.metersPerUnit && pile.metersPerUnit > 0
+              ? pile.metersPerUnit
+              : pileLengthFromName(pile.pileGrade?.name || '');
+            return inner + (pile.count || 0) * mpu;
+          },
           0,
         ),
       0,
@@ -398,10 +407,26 @@ function addMetricStrip(doc: PdfDoc, metrics: Array<[string, string, string]>) {
 
     doc.font('Regular').fontSize(8).fillColor(COLORS.muted);
     doc.text(label, x + 12, y + 18, { width: columnWidth - 24 });
-    doc.font('Bold').fontSize(15).fillColor(COLORS.dark);
-    doc.text(value, x + 12, y + 34, { width: columnWidth - 24 });
-    doc.font('Regular').fontSize(8).fillColor(COLORS.muted);
-    doc.text(unit, x + 12, y + 54, { width: columnWidth - 24 });
+
+    const valueParts = value.split(' / ');
+    const unitParts = unit.split(' / ');
+    if (valueParts.length === 2 && unitParts.length === 2) {
+      doc.font('Bold').fontSize(12).fillColor(COLORS.dark);
+      doc.text(`${valueParts[0]} ${unitParts[0]}`, x + 12, y + 32, {
+        width: columnWidth - 24, lineBreak: false, ellipsis: true,
+      });
+      doc.font('Bold').fontSize(11).fillColor(COLORS.dark);
+      doc.text(`${valueParts[1]} ${unitParts[1]}`, x + 12, y + 50, {
+        width: columnWidth - 24, lineBreak: false, ellipsis: true,
+      });
+    } else {
+      doc.font('Bold').fontSize(15).fillColor(COLORS.dark);
+      doc.text(value, x + 12, y + 34, {
+        width: columnWidth - 24, lineBreak: false, ellipsis: true,
+      });
+      doc.font('Regular').fontSize(8).fillColor(COLORS.muted);
+      doc.text(unit, x + 12, y + 54, { width: columnWidth - 24 });
+    }
   });
 
   doc.y = y + height + 16;
