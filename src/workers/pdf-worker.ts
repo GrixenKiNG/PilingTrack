@@ -10,6 +10,7 @@
  * Or as a systemd service / Docker container in production.
  */
 
+import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { generatePeriodPdf, generateSinglePdf, savePdfBuffer, PeriodPdfData, SingleReportData } from '@/lib/pdf-generator';

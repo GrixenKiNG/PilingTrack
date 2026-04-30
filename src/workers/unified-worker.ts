@@ -10,6 +10,7 @@
  * coexist with embedded workers running inside the app server.
  */
 
+import 'dotenv/config';
 import http from 'http';
 import { Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
