@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Wrench, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HeroKpi } from '@/components/piling/hero-kpi';
 import type { EquipmentDTO } from '@/lib/types';
 import { useEquipmentList } from './use-equipment-list';
 import { EquipmentRow } from './equipment-row';
@@ -44,13 +44,7 @@ export function AdminEquipment() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-orange-500" />
-          Установки
-          <Badge variant="secondary" className="ml-2 font-mono text-xs">
-            {equipment.length}
-          </Badge>
-        </h1>
+        <h1 className="text-xl font-bold text-foreground">Установки</h1>
         <Button
           onClick={() => setShowCreate(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white"
@@ -59,6 +53,24 @@ export function AdminEquipment() {
           Добавить
         </Button>
       </div>
+
+      <HeroKpi
+        label="В работе"
+        value={equipment.filter((e) => e.isActive).length}
+        unit={`/ ${equipment.length}`}
+        icon={Wrench}
+        detail={(() => {
+          const assigned = equipment.filter((e) => (crewsByEquipment[e.id] || 0) > 0).length;
+          const idle = equipment.filter((e) => e.isActive && (crewsByEquipment[e.id] || 0) === 0).length;
+          return (
+            <span className="font-mono tabular-nums">
+              {assigned} с активной бригадой
+              <span className="mx-2 text-white/50">·</span>
+              {idle} без бригады
+            </span>
+          );
+        })()}
+      />
 
       {equipment.length === 0 ? (
         <div className="text-center py-16">

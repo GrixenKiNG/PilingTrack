@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Plus, Loader2 } from 'lucide-react';
+import { FileText, Plus, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
+import { HeroKpi } from '@/components/piling/hero-kpi';
 import { cn } from '@/lib/utils';
 import { pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -93,9 +94,42 @@ export function AdminReports() {
     <div className="space-y-4 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900">Все отчёты</h1>
-        <span className="text-sm text-slate-500 font-mono tabular-nums">{formatReportCount(reports.length)}</span>
+        <h1 className="text-xl font-bold text-foreground">Все отчёты</h1>
+        <span className="text-sm text-muted-foreground font-mono tabular-nums">{formatReportCount(reports.length)}</span>
       </div>
+
+      {/* Hero KPI: period summary if filter active, otherwise total reports */}
+      <HeroKpi
+        label={periodActive ? `Сводка за период ${periodFrom} — ${periodTo}` : 'Всего отчётов'}
+        value={periodActive && periodSummary ? periodSummary.reportCount : reports.length}
+        unit="шт"
+        icon={FileText}
+        detail={
+          periodActive && periodSummary ? (
+            <span className="font-mono tabular-nums">
+              {periodSummary.totalPiles} свай
+              <span className="mx-2 text-white/50">·</span>
+              {Math.round(periodSummary.totalDrilling)} м.п. бурения
+              <span className="mx-2 text-white/50">·</span>
+              {Math.round(periodSummary.totalDowntime)} ч простоев
+            </span>
+          ) : (
+            <span>Используйте фильтр периода ниже для сводки и PDF-выгрузки.</span>
+          )
+        }
+        action={periodActive ? (
+          <Button
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={generatingPdf}
+            className="bg-white/15 hover:bg-white/25 text-white border-0 backdrop-blur"
+          >
+            {generatingPdf
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <><Download className="w-4 h-4 mr-1.5" />PDF</>}
+          </Button>
+        ) : undefined}
+      />
 
       {/* Filters */}
       <ReportFilters

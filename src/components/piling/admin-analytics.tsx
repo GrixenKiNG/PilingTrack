@@ -6,6 +6,7 @@ import {
   BarChart3,
   TrendingUp,
   Users,
+  HardHat,
   Loader2,
 } from 'lucide-react';
 import {
@@ -15,6 +16,7 @@ import {
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { HeroKpi } from '@/components/piling/hero-kpi';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -150,16 +152,39 @@ export function AdminAnalytics() {
       }));
   }, [trendRows]);
 
+  // Hero stats: total piles + best operator across the loaded period.
+  const totalPilesPeriod = operatorSummary.reduce((s, o) => s + o.totalPiles, 0);
+  const bestOperator = operatorSummary.length > 0
+    ? operatorSummary.reduce((a, b) => (a.totalPiles >= b.totalPiles ? a : b))
+    : null;
+  const periodLabel = `${dateFrom} — ${dateTo}`;
+
   return (
     <div className="space-y-4 p-4 lg:p-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Аналитика</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Производительность операторов и тренды по объектам
-          </p>
-        </div>
+      <div>
+        <h1 className="text-xl font-bold text-foreground">Аналитика</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Производительность операторов и тренды по объектам
+        </p>
       </div>
+
+      <HeroKpi
+        label="Свай за период"
+        value={totalPilesPeriod}
+        unit="шт"
+        icon={HardHat}
+        detail={
+          <span className="font-mono tabular-nums">
+            {periodLabel}
+            {bestOperator && (
+              <>
+                <span className="mx-2 text-white/50">·</span>
+                Лидер: <b>{bestOperator.userName}</b> ({bestOperator.totalPiles})
+              </>
+            )}
+          </span>
+        }
+      />
 
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((t) => (

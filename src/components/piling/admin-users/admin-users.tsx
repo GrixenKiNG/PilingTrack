@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HeroKpi } from '@/components/piling/hero-kpi';
 import { usePilingStore } from '@/lib/store';
 import { ROLE_LABELS, type UserDTO, type UserRole } from '@/lib/types';
 import { useUsersList } from './use-users-list';
@@ -59,10 +60,7 @@ export function AdminUsers() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-          <Users className="h-5 w-5 text-orange-500" />
-          Пользователи
-        </h1>
+        <h1 className="text-xl font-bold text-foreground">Пользователи</h1>
         <Button
           onClick={() => setShowCreate(true)}
           className="bg-orange-500 text-white hover:bg-orange-600"
@@ -71,6 +69,21 @@ export function AdminUsers() {
           Новый пользователь
         </Button>
       </div>
+
+      <HeroKpi
+        label="Активные пользователи"
+        value={users.filter((u) => u.isActive).length}
+        unit={`/ ${users.length}`}
+        icon={Users}
+        detail={(() => {
+          const counts: Record<UserRole, number> = { ADMIN: 0, DISPATCHER: 0, OPERATOR: 0, ASSISTANT: 0 };
+          for (const u of users) if (u.isActive) counts[u.role] += 1;
+          const parts = (Object.keys(counts) as UserRole[])
+            .filter((r) => counts[r] > 0)
+            .map((r) => `${counts[r]} ${ROLE_LABELS[r].toLowerCase()}`);
+          return <span className="font-mono tabular-nums">{parts.join(' · ')}</span>;
+        })()}
+      />
 
       <UserFilters
         search={search}
