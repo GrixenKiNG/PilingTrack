@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, MapPin } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ import {
   AddHierarchyDialog,
 } from './site-editor';
 import { UserAssignmentDialog } from './user-assignment';
-import { HeroKpi } from '@/components/piling/hero-kpi';
 
 export function AdminSites() {
   const [sites, setSites] = useState<SiteListItem[]>([]);
@@ -446,7 +445,10 @@ export function AdminSites() {
     <div className="space-y-4 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground">Объекты</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-bold text-slate-900">Объекты</h1>
+          <span className="text-sm font-mono tabular-nums text-slate-500">{sites.length}</span>
+        </div>
         <Button
           onClick={() => setShowCreateDialog(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white"
@@ -455,19 +457,6 @@ export function AdminSites() {
           Новый объект
         </Button>
       </div>
-
-      <HeroKpi
-        label="Активные объекты"
-        value={sites.filter((s) => s.isActive).length}
-        unit={`/ ${sites.length}`}
-        icon={MapPin}
-        detail={(() => {
-          const inactive = sites.filter((s) => !s.isActive).length;
-          return inactive > 0
-            ? <span>{inactive} деактивированных. Кликните на объект, чтобы развернуть иерархию.</span>
-            : <span>Все объекты активны.</span>;
-        })()}
-      />
 
       {/* Sites List */}
       <SiteList
