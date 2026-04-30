@@ -18,9 +18,15 @@ import { logger } from '@/lib/logger';
 export function registerAnalyticsEventHandler() {
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED, handleReportForAnalytics);
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForAnalytics);
-  on(REPORT_DOMAIN_EVENT_TYPES.PILE_WORK_ADDED, handlePileWorkForAnalytics);
-  on(REPORT_DOMAIN_EVENT_TYPES.DRILLING_ADDED, handleDrillingForAnalytics);
-  on(REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED, handleDowntimeForAnalytics);
+  // SiteDailySummary used to be maintained incrementally from item-level
+  // events (PILE_WORK_ADDED / DRILLING_ADDED / DOWNTIME_ADDED). That had two
+  // bugs: (1) `siteId || ''` fallback wrote rows with an empty key when an
+  // event lacked siteId, and (2) reportCount was incremented per work item
+  // instead of per report, so one report with 5 piles + 3 drillings counted
+  // as 8 reports. Rebuilding from the Report row on REPORT_SUBMITTED /
+  // REPORT_UPDATED is idempotent and matches scripts/backfill-projections.ts.
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForDailySummary);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,   handleReportForDailySummary);
 }
 
 async function handleReportForAnalytics(event: ReportDomainEvent) {
@@ -62,99 +68,80 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
   }
 }
 
-async function handlePileWorkForAnalytics(event: ReportDomainEvent) {
-  try {
-    const { db } = await import('@/lib/db');
+/**
+ * Recompute SiteDailySummary for the (siteId, date) of a given report.
+ *
+ * Idempotent: aggregates piles/drillings/downtimes/reportCount across ALL
+ * reports for that site+date, then upserts. Safe to call repeatedly.
+ *
+ * Triggered on REPORT_SUBMITTED / REPORT_UPDATED — i.e. once per report
+ * lifecycle change, never per work item.
+ */
+export async function recomputeSiteDailySummary(siteId: string, date: string) {
+  const { db } = await import('@/lib/db');
+  const reports = await db.report.findMany({
+    where: { siteId, date },
+    select: {
+      piles: { select: { count: true } },
+      drillings: { select: { meters: true } },
+      downtimes: { select: { duration: true } },
+    },
+  });
+  const totalPiles = reports.reduce(
+    (sum, r) => sum + r.piles.reduce((a, p) => a + (p.count || 0), 0), 0);
+  const totalDrilling = reports.reduce(
+    (sum, r) => sum + r.drillings.reduce((a, d) => a + (d.meters || 0), 0), 0);
+  const totalDowntime = reports.reduce(
+    (sum, r) => sum + r.downtimes.reduce((a, d) => a + (d.duration || 0), 0), 0);
+  const reportCount = reports.length;
 
-    await db.siteDailySummary.upsert({
-      where: {
-        siteId_date: {
-          siteId: event.siteId || '',
-          date: new Date().toISOString().split('T')[0],
-        },
-      },
-      create: {
-        siteId: event.siteId || '',
-        date: new Date().toISOString().split('T')[0],
-        totalPiles: (event.data.count as number) || 0,
-        totalDrilling: 0,
-        totalDowntime: 0,
-        reportCount: 1,
-      },
-      update: {
-        totalPiles: { increment: (event.data.count as number) || 0 },
-        reportCount: { increment: 1 },
-      },
-    });
-  } catch (error) {
-    logger.error('Pile work analytics failed', error, {
-      eventType: event.type,
-      aggregateId: event.aggregateId,
-    });
+  if (reportCount === 0) {
+    // Last report on this day was deleted — drop the row so admin charts
+    // don't show a phantom zero day.
+    await db.siteDailySummary.deleteMany({ where: { siteId, date } });
+    return;
   }
+
+  await db.siteDailySummary.upsert({
+    where: { siteId_date: { siteId, date } },
+    create: { siteId, date, totalPiles, totalDrilling, totalDowntime, reportCount },
+    update: { totalPiles, totalDrilling, totalDowntime, reportCount },
+  });
 }
 
-async function handleDrillingForAnalytics(event: ReportDomainEvent) {
-  try {
-    const { db } = await import('@/lib/db');
-    const meters = (event.data.meters as number) || 0;
-
-    await db.siteDailySummary.upsert({
-      where: {
-        siteId_date: {
-          siteId: event.siteId || '',
-          date: new Date().toISOString().split('T')[0],
-        },
-      },
-      create: {
-        siteId: event.siteId || '',
-        date: new Date().toISOString().split('T')[0],
-        totalPiles: 0,
-        totalDrilling: meters,
-        totalDowntime: 0,
-        reportCount: 1,
-      },
-      update: {
-        totalDrilling: { increment: meters },
-        reportCount: { increment: 1 },
-      },
+async function handleReportForDailySummary(event: ReportDomainEvent) {
+  // Bug guard: never write a daily-summary row keyed on an empty siteId.
+  if (!event.siteId) {
+    logger.warn('SiteDailySummary skipped: missing siteId on event', {
+      eventType: event.type, aggregateId: event.aggregateId,
     });
-  } catch (error) {
-    logger.error('Drilling analytics failed', error, {
-      eventType: event.type,
-      aggregateId: event.aggregateId,
-    });
+    return;
   }
-}
 
-async function handleDowntimeForAnalytics(event: ReportDomainEvent) {
-  try {
+  // Resolve the report's date from the event payload first; fall back to
+  // the report row itself for older events that don't carry it.
+  let date = (event.data?.date as string | undefined) || null;
+  if (!date) {
     const { db } = await import('@/lib/db');
-    const duration = (event.data.duration as number) || 0;
-
-    await db.siteDailySummary.upsert({
-      where: {
-        siteId_date: {
-          siteId: event.siteId || '',
-          date: new Date().toISOString().split('T')[0],
-        },
-      },
-      create: {
-        siteId: event.siteId || '',
-        date: new Date().toISOString().split('T')[0],
-        totalPiles: 0,
-        totalDrilling: 0,
-        totalDowntime: duration,
-        reportCount: 1,
-      },
-      update: {
-        totalDowntime: { increment: duration },
-      },
+    const report = await db.report.findUnique({
+      where: { id: event.aggregateId },
+      select: { date: true },
     });
+    date = report?.date || null;
+  }
+  if (!date) {
+    logger.warn('SiteDailySummary skipped: cannot resolve report date', {
+      eventType: event.type, aggregateId: event.aggregateId,
+    });
+    return;
+  }
+
+  try {
+    await recomputeSiteDailySummary(event.siteId, date);
   } catch (error) {
-    logger.error('Downtime analytics failed', error, {
-      eventType: event.type,
-      aggregateId: event.aggregateId,
+    logger.error('SiteDailySummary recompute failed', error, {
+      eventType: event.type, aggregateId: event.aggregateId,
+      siteId: event.siteId, date,
     });
   }
 }
