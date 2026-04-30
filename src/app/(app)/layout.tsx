@@ -21,60 +21,36 @@ const pageVariants = {
   exit: { opacity: 0, y: -8 },
 };
 
-interface NavItem { label: string; href: string; roles: UserRole[] }
-interface NavGroup { title: string | null; items: NavItem[] }
-
-const ALL_ROLES: UserRole[] = ['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'];
-const ADMIN_DISPATCHER: UserRole[] = ['ADMIN', 'DISPATCHER'];
-const ADMIN_ONLY: UserRole[] = ['ADMIN'];
-const FIELD_ROLES: UserRole[] = ['OPERATOR', 'ASSISTANT'];
-
-// Operator/assistant get a flat 3-item nav (mobile bottom-bar).
-const operatorNavItems: NavItem[] = [
-  { label: 'Главная', href: '/operator', roles: FIELD_ROLES },
-  { label: 'Отчёт',   href: '/report',   roles: FIELD_ROLES },
-  { label: 'История', href: '/history',  roles: ALL_ROLES },
-];
-
-// Admin/dispatcher get a grouped sidebar by domain (matches dashboard quickLinks).
-const adminNavGroups: NavGroup[] = [
-  {
-    title: null, // entry point — no group header
-    items: [
-      { label: 'Дашборд', href: '/admin', roles: ADMIN_DISPATCHER },
-    ],
-  },
-  {
-    title: 'Производство',
-    items: [
-      { label: 'Объекты',    href: '/admin/sites',     roles: ADMIN_DISPATCHER },
-      { label: 'Установки',  href: '/admin/equipment', roles: ADMIN_DISPATCHER },
-      { label: 'Бригады',    href: '/admin/crews',     roles: ADMIN_DISPATCHER },
-      { label: 'Отчёты',     href: '/admin/reports',   roles: ADMIN_DISPATCHER },
-      { label: 'Аналитика',  href: '/admin/analytics', roles: ADMIN_DISPATCHER },
-    ],
-  },
-  {
-    title: 'Конфигурация',
-    items: [
-      { label: 'Справочники',   href: '/admin/dictionaries', roles: ADMIN_DISPATCHER },
-      { label: 'Пользователи',  href: '/admin/users',        roles: ADMIN_ONLY },
-      { label: 'Telegram',      href: '/admin/telegram',     roles: ADMIN_ONLY },
-    ],
-  },
-  {
-    title: 'Эксплуатация',
-    items: [
-      { label: 'DLQ', href: '/admin/dlq', roles: ADMIN_ONLY },
-    ],
-  },
-];
-
-function filterAdminGroups(role: UserRole): NavGroup[] {
-  return adminNavGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(role)) }))
-    .filter((g) => g.items.length > 0);
-}
+const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
+  OPERATOR: [
+    { label: 'Главная', href: '/operator' },
+    { label: 'Отчёт', href: '/report' },
+    { label: 'История', href: '/history' },
+  ],
+  ASSISTANT: [
+    { label: 'Главная', href: '/operator' },
+    { label: 'Отчёт', href: '/report' },
+    { label: 'История', href: '/history' },
+  ],
+  ADMIN: [
+    { label: 'Дашборд', href: '/admin' },
+    { label: 'Объекты', href: '/admin/sites' },
+    { label: 'Установки', href: '/admin/equipment' },
+    { label: 'Бригады', href: '/admin/crews' },
+    { label: 'Отчёты', href: '/admin/reports' },
+    { label: 'Справочники', href: '/admin/dictionaries' },
+    { label: 'Пользователи', href: '/admin/users' },
+    { label: 'Telegram', href: '/admin/telegram' },
+  ],
+  DISPATCHER: [
+    { label: 'Дашборд', href: '/admin' },
+    { label: 'Объекты', href: '/admin/sites' },
+    { label: 'Установки', href: '/admin/equipment' },
+    { label: 'Бригады', href: '/admin/crews' },
+    { label: 'Отчёты', href: '/admin/reports' },
+    { label: 'Справочники', href: '/admin/dictionaries' },
+  ],
+};
 
 function isActivePath(currentPath: string, href: string): boolean {
   if (href === '/admin') {
@@ -89,7 +65,7 @@ function isActivePath(currentPath: string, href: string): boolean {
 function OperatorLayout({ children }: { children: React.ReactNode }) {
   const user = usePilingStore((s) => s.currentUser);
   const pathname = usePathname();
-  const navItems = operatorNavItems.filter((i) => i.roles.includes(user?.role || 'OPERATOR'));
+  const navItems = roleNavigation[user?.role || 'OPERATOR'];
 
   const nav = (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t safe-area-bottom">
@@ -173,7 +149,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = usePilingStore((s) => s.currentUser);
   const pathname = usePathname();
-  const navGroups = filterAdminGroups(user?.role || 'ADMIN');
+  const navItems = roleNavigation[user?.role || 'ADMIN'];
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isDispatcher = user?.role === 'DISPATCHER';
@@ -194,34 +170,26 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
       <Separator />
 
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-        {navGroups.map((group, gi) => (
-          <div key={group.title || `group-${gi}`} className="space-y-0.5">
-            {group.title && (
-              <h2 className="px-3 mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {group.title}
-              </h2>
-            )}
-            {group.items.map((item) => {
-              const isActive = isActivePath(pathname, item.href);
-              return (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all no-underline',
-                    isActive
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                >
-                  {item.label}
-                </a>
-              );
-            })}
-          </div>
-        ))}
+      <nav className="flex-1 px-3 py-3 space-y-0.5">
+        {navItems.map((item) => {
+          const isActive = isActivePath(pathname, item.href);
+
+          return (
+            <a
+              key={item.href}
+              href={item.href}
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all no-underline',
+                isActive
+                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {item.label}
+            </a>
+          );
+        })}
       </nav>
 
       <Separator />
@@ -253,7 +221,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 xl:w-64 lg:flex-col bg-card border-r z-30">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-card border-r z-30">
         {sidebarContent}
       </aside>
 
@@ -281,20 +249,18 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="lg:ml-60 xl:ml-64 min-h-screen">
-        <div className="mx-auto w-full max-w-7xl">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={user?.id}
-              initial={pageVariants.initial}
-              animate={pageVariants.animate}
-              exit={pageVariants.exit}
-              transition={{ duration: 0.2 }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+      <main className="lg:ml-60 min-h-screen">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={user?.id}
+            initial={pageVariants.initial}
+            animate={pageVariants.animate}
+            exit={pageVariants.exit}
+            transition={{ duration: 0.2 }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );
