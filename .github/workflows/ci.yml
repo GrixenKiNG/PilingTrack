@@ -56,6 +56,13 @@ jobs:
         # next build which is too heavy for the lint-and-tests gate.
         run: npx tsc --noEmit
 
+      - name: Layer boundaries
+        # Catches new core→services / modules→app / cross-module imports.
+        # Existing violations are grandfathered in
+        # scripts/.layer-boundaries-baseline.txt — see the script for how
+        # to update after intentional cleanup.
+        run: npx tsx scripts/check-layer-boundaries.ts
+
       - name: Unit tests
         # Only the in-src unit tests. Integration / contract suites need a
         # real Postgres + Redis and are kept in a separate (future) job.

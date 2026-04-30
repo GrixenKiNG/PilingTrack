@@ -1,0 +1,13 @@
+src/core/api-wrapper.ts|@/services/auth/session-service|core/ may not import from services/
+src/core/api-wrapper.ts|@/services/service-error|core/ may not import from services/
+src/core/event-bus/event-bus.ts|@/services/reports/domain-events|core/ may not import from services/
+src/core/event-bus/index.ts|@/services/reports/domain-events|core/ may not import from services/
+src/core/event-bus/kafka-nats-adapters.ts|@/services/reports/domain-events|core/ may not import from services/
+src/core/media/media-service.ts|@/services/service-error|core/ may not import from services/
+src/core/observability/health-tracker.ts|@/services/reports/outbox-publisher|core/ may not import from services/
+src/core/observability/slo-metrics.ts|@/services/reports/outbox-publisher|core/ may not import from services/
+src/core/realtime/server/auth.ts|@/services/auth/session-service|core/ may not import from services/
+src/core/security/idempotency.ts|@/services/service-error|core/ may not import from services/
+src/core/security/refresh-tokens.ts|@/services/auth/session-service|core/ may not import from services/
+src/core/security/refresh-tokens.ts|@/services/service-error|core/ may not import from services/
+src/core/security/tenant-enforcement.ts|@/services/service-error|core/ may not import from services/
