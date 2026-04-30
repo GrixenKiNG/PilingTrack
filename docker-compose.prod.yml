@@ -1,0 +1,120 @@
+# ============================================================
+# PilingTrack — Production overlay
+# ============================================================
+# Apply on top of the base docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences vs the base compose (which is dev-friendly):
+#   - DB / Redis / PgBouncer / MinIO ports NOT exposed to the host (only
+#     the app, ws, and minio-console reach them via the internal network).
+#   - NEXT_PUBLIC_WS_URL is taken from env (no hardcoded ws://localhost).
+#   - Resource limits per service so a single container can't starve the
+#     host. Tweak based on your VM size.
+#   - JSON-file log driver with rotation so /var/lib/docker doesn't fill up.
+#   - SKIP_SEED defaults to 1 — production data is seeded once at install,
+#     not on every container restart.
+#
+# Required env vars (will fail fast if missing — see base compose for the
+# full list of `:?` constraints):
+#   POSTGRES_PASSWORD, SESSION_SECRET, ENCRYPTION_KEY, PIN_LOOKUP_SECRET,
+#   DEVICE_KEY_LOOKUP_SECRET, NEXT_PUBLIC_WS_URL
+# ============================================================
+
+services:
+  app:
+    ports:
+      # Override: bind only to localhost so a reverse proxy (nginx/caddy)
+      # is the only public entry point. Comment this out and use the base
+      # `- "3000:3000"` if you intentionally want app on 0.0.0.0.
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:?NEXT_PUBLIC_WS_URL must be set in production}
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  workers:
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  ws:
+    ports:
+      - "127.0.0.1:3001:3001"
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  postgres:
+    # Wipe the host port mapping — Postgres is only reachable from the
+    # internal `pilingtrack` network. Reuse a managed RDS / Yandex Cloud
+    # Postgres in real production by replacing this service with an
+    # `external: true` network reference.
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  redis:
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  pgbouncer:
+    ports: !reset []
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  minio:
+    ports:
+      # Keep the S3 API internal; expose only the console for ops.
+      - "127.0.0.1:9001:9001"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  migrate:
+    environment:
+      - SKIP_SEED=${SKIP_SEED:-1}
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+
+  # The base compose already gates pgadmin behind `profiles: [dev]`, so it
+  # won't start here unless explicitly requested. Nothing to override.
