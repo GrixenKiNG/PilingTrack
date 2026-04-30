@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel older runs of the same branch when a new push lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests + typecheck + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Test env: random secrets so encryption module loads cleanly.
+      # (Tests that exercise the encryption module override these per-test.)
+      ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
+      SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
+      PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
+      DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
+      DATABASE_URL: 'postgresql://stub:stub@localhost:5432/stub'
+      REDIS_URL: 'redis://localhost:6379'
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Generate Prisma client
+        # Tests import generated types; run generate but skip migrations
+        # (no DB in this job — unit tests mock @/lib/db).
+        run: npm run db:generate
+
+      # NOTE: `npm run lint` is currently broken locally due to a version
+      # mismatch between eslint 10 and eslint-plugin-react inside
+      # eslint-config-next ('contextOrFilename.getFilename is not a function').
+      # Re-enable once we move to flat config or pin a working ESLint stack.
+      # - name: Lint
+      #   run: npm run lint
+
+      - name: Typecheck
+        # Use plain tsc here, not `npm run typecheck` — that one wraps a full
+        # next build which is too heavy for the lint-and-tests gate.
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        # Only the in-src unit tests. Integration / contract suites need a
+        # real Postgres + Redis and are kept in a separate (future) job.
+        run: npx vitest run src/
