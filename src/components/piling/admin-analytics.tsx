@@ -6,6 +6,9 @@ import {
   BarChart3,
   TrendingUp,
   Users,
+  HardHat,
+  Drill,
+  Clock,
   Loader2,
 } from 'lucide-react';
 import {
@@ -154,7 +157,10 @@ export function AdminAnalytics() {
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Аналитика</h1>
+          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            Аналитика
+          </h1>
           <p className="text-sm text-slate-500 mt-1">
             Производительность операторов и тренды по объектам
           </p>
@@ -226,7 +232,7 @@ export function AdminAnalytics() {
             <>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base font-semibold">Топ-10 по забитым сваям</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" /> Топ-10 по забитым сваям</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -245,7 +251,7 @@ export function AdminAnalytics() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base font-semibold">Сводка по операторам</CardTitle>
+                  <CardTitle className="text-sm">Сводка по операторам</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -294,7 +300,7 @@ export function AdminAnalytics() {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-semibold">Тренд за 8 недель</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Тренд за 8 недель</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>

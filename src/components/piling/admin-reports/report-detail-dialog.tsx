@@ -83,7 +83,7 @@ export function ReportDetailDialog({
                         <div>
                           <span>{p.pileGrade?.name || '—'}</span>
                           {p.pileGrade?.name && (
-                            <p className="text-xs text-slate-500">
+                            <p className="text-[10px] text-slate-500">
                               {getPileLengthMeters(p.pileGrade.name).toFixed(1)} м × {p.count} шт. = {(getPileLengthMeters(p.pileGrade.name) * p.count).toFixed(1)} м.п.
                             </p>
                           )}
@@ -136,7 +136,7 @@ export function ReportDetailDialog({
                       <div key={dt.id} className="flex justify-between text-sm p-2 bg-slate-50 rounded">
                         <div>
                           <span>{dt.reason?.name || '—'}</span>
-                          {dt.comment && <p className="text-xs text-slate-500">{dt.comment}</p>}
+                          {dt.comment && <p className="text-[10px] text-slate-500">{dt.comment}</p>}
                         </div>
                         <span className="font-mono font-semibold text-amber-600">{dt.duration} ч</span>
                       </div>

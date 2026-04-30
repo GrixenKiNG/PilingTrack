@@ -253,7 +253,7 @@ export function AdminTelegram() {
                         <p className="text-xs text-slate-500 font-mono mt-0.5">
                           Chat ID: {config.chatId}
                         </p>
-                        <p className="text-xs text-slate-400 font-mono">
+                        <p className="text-[10px] text-slate-400 font-mono">
                           Token: ••••{config.botToken.slice(-6)}
                         </p>
                       </div>

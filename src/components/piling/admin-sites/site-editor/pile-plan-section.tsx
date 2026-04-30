@@ -47,7 +47,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
         <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
           {plans.map((row, idx) => (
             <div key={row.tempId} className="flex items-center gap-1.5 bg-slate-50 rounded-lg p-2">
-              <span className="text-xs text-slate-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
+              <span className="text-[10px] text-slate-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
               <Select
                 value={row.pileGradeId}
                 onValueChange={(val) =>
@@ -88,7 +88,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
                   className="h-8 w-18 text-xs font-mono text-center"
                 />
               </div>
-              <span className="text-xs font-mono text-slate-500 w-14 text-right flex-shrink-0">
+              <span className="text-[10px] font-mono text-slate-500 w-14 text-right flex-shrink-0">
                 {row.count * row.metersPerUnit > 0
                   ? `${(row.count * row.metersPerUnit).toFixed(1)} м`
                   : '—'}

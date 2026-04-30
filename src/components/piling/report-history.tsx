@@ -258,14 +258,14 @@ export function ReportHistory() {
                       <span className="text-sm font-mono font-semibold text-slate-900">
                         {report.totalPiles}/{(report.totalPileMeters ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-xs text-slate-500">шт/м.п.</span>
+                      <span className="text-[10px] text-slate-500">шт/м.п.</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Drill className="w-3.5 h-3.5 text-blue-500" />
                       <span className="text-sm font-mono font-semibold text-slate-900">
                         {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-xs text-slate-500">шт/м</span>
+                      <span className="text-[10px] text-slate-500">шт/м</span>
                     </div>
                     {report.totalDowntime > 0 && (
                       <div className="flex items-center gap-1.5">
@@ -273,7 +273,7 @@ export function ReportHistory() {
                         <span className="text-sm font-mono font-semibold text-amber-600">
                           {report.totalDowntime}
                         </span>
-                        <span className="text-xs text-slate-500">ч</span>
+                        <span className="text-[10px] text-slate-500">ч</span>
                       </div>
                     )}
                   </div>
@@ -416,7 +416,7 @@ export function ReportHistory() {
                             <div>
                               <span>{downtime.reason?.name || '-'}</span>
                               {downtime.comment && (
-                                <p className="text-xs text-slate-500">{downtime.comment}</p>
+                                <p className="text-[10px] text-slate-500">{downtime.comment}</p>
                               )}
                             </div>
                             <span className="font-mono font-semibold text-amber-600">

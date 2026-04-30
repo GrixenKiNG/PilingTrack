@@ -1,10 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import {
+  MapPin,
+  Plus,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog } from '@/components/ui/dialog';
 import type { PileGradeDTO } from '@/lib/types';
@@ -445,10 +449,13 @@ export function AdminSites() {
     <div className="space-y-4 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-bold text-slate-900">Объекты</h1>
-          <span className="text-sm font-mono tabular-nums text-slate-500">{sites.length}</span>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-orange-500" />
+          Объекты
+          <Badge variant="secondary" className="ml-2 font-mono text-xs">
+            {sites.length}
+          </Badge>
+        </h1>
         <Button
           onClick={() => setShowCreateDialog(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white"

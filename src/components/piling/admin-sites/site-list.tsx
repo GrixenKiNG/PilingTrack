@@ -92,19 +92,19 @@ export function SiteList({
                         {site.name}
                       </p>
                       {!site.isActive && (
-                        <Badge variant="secondary" className="text-xs bg-slate-200 text-slate-500">
+                        <Badge variant="secondary" className="text-[10px] bg-slate-200 text-slate-500">
                           Неактивен
                         </Badge>
                       )}
                       {site._count && (site._count.pilePlans > 0 || site._count.drillingPlans > 0) && (
                         <div className="flex items-center gap-1.5 ml-1">
                           {site._count.pilePlans > 0 && (
-                            <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
+                            <Badge variant="outline" className="text-[10px] text-orange-600 border-orange-200 bg-orange-50">
                               {site._count.pilePlans} план{site._count.pilePlans > 1 ? 'а' : ''} свай
                             </Badge>
                           )}
                           {site._count.drillingPlans > 0 && (
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-200 bg-blue-50">
+                            <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200 bg-blue-50">
                               {site._count.drillingPlans} план{site._count.drillingPlans > 1 ? 'а' : ''} бурения
                             </Badge>
                           )}
