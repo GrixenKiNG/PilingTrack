@@ -21,7 +21,8 @@ export type Ability =
   | 'telegram.manage'
   | 'system.read'
   | 'media.upload'
-  | 'dlq.manage';
+  | 'dlq.manage'
+  | 'projections.rebuild';
 
 export interface SessionActor {
   id: string;
@@ -48,6 +49,7 @@ const abilityRoles: Record<Ability, Role[]> = {
   'system.read': ['ADMIN', 'DISPATCHER'],
   'media.upload': ['ADMIN', 'DISPATCHER', 'OPERATOR'],
   'dlq.manage': ['ADMIN'],
+  'projections.rebuild': ['ADMIN'],
 };
 
 export function isPrivilegedRole(role: string) {
