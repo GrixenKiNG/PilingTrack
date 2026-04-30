@@ -118,10 +118,30 @@ npm run test:e2e
 
 ## Документация
 
+- [Аудит проекта](docs/audit.md) — приоритезированный список долга и рисков
+- [Локальная разработка (`npm run dev` vs Docker)](docs/dev-workflow.md)
+- [Развёртывание в продакшен](docs/deployment.md)
+- [Ротация ключа шифрования](docs/encryption-key-rotation.md)
+- [Бриф для дизайнера](docs/design-brief.md)
 - [ADR index](docs/adr/README.md)
 - [Disaster Recovery Plan](docs/DISASTER-RECOVERY-PLAN.md)
 - [Kubernetes Deployment](docs/KUBERNETES-DEPLOYMENT.md)
 - [Test Architecture](docs/TEST-ARCHITECTURE.md)
+
+## Известные предупреждения зависимостей
+
+`npm audit` сейчас сообщает о 7 moderate-уязвимостях:
+
+| Пакет | Где | Воздействие |
+|---|---|---|
+| `postcss <8.5.10` | через `next` | Build-time only. На рантайм не выходит. |
+| `@hono/node-server <1.19.13` | через `@prisma/dev` | Только в dev-режиме Prisma. На прод-сборку и рантайм не влияет. |
+
+Все — транзитивные через Next.js / Prisma. Прямого прод-импакта нет, но `npm audit fix --force` сейчас потребует мажорных откатов (`next@9`, `prisma@6.19.3`), что мы делать не будем. Резолвим через апдейт Next + Prisma на следующей мажорной версии.
+
+## Переменные окружения для прода
+
+Минимально: `POSTGRES_PASSWORD`, `SESSION_SECRET`, `PIN_LOOKUP_SECRET`, `DEVICE_KEY_LOOKUP_SECRET`, `ENCRYPTION_KEY` (все 32-байтные hex), `NEXT_PUBLIC_WS_URL=wss://<домен>/ws`. **`NEXT_PUBLIC_WS_URL` обязательна** — это публичный адрес WebSocket-сервера, который встраивается в bundle при сборке. По умолчанию в `.env.docker` стоит `ws://localhost:3001`, что годится только для локального dev. Полный список — `docs/deployment.md`.
 
 ## Состояние репозитория
 

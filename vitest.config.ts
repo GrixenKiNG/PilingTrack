@@ -33,6 +33,15 @@ export default defineConfig({
         '**/*.config.{ts,js}',
         'src/components/ui/**', // shadcn primitives — не требуют unit-тестов
       ],
+      // Floor, not target. Current is ~23% lines / 20% branches; thresholds
+      // are set just below so PRs can't silently regress. Ratchet up as
+      // coverage grows. Run locally: `npm run test:coverage`.
+      thresholds: {
+        lines: 20,
+        statements: 20,
+        functions: 18,
+        branches: 18,
+      },
     },
   },
   resolve: {
