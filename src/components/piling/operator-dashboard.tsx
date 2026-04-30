@@ -87,13 +87,13 @@ export function OperatorDashboard() {
     <div className="p-4 pb-24 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-muted-foreground">Здравствуйте,</p>
-          <h1 className="text-lg font-semibold text-foreground">{displayName}</h1>
+          <p className="text-xs text-slate-500">Здравствуйте,</p>
+          <h1 className="text-lg font-semibold text-slate-900">{displayName}</h1>
         </div>
         {reports.length > 0 && (
           <button
             onClick={() => router.push('/history')}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-slate-700"
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
           >
             <History className="w-3.5 h-3.5" />
             История
@@ -121,8 +121,8 @@ export function OperatorDashboard() {
             : 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30'
         }`}
       >
-        <div className="absolute top-4 right-4 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider bg-card/20 backdrop-blur px-2.5 py-1 rounded-full">
-          <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-200 animate-pulse' : 'bg-card/80'}`} />
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider bg-white/20 backdrop-blur px-2.5 py-1 rounded-full">
+          <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-200 animate-pulse' : 'bg-white/80'}`} />
           {noSite ? 'Нет объекта' : siteNotSelected ? 'Выберите объект' : active ? 'Смена идёт' : 'Начать смену'}
         </div>
 
@@ -162,7 +162,7 @@ export function OperatorDashboard() {
 
       {/* Secondary: site selector */}
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
           <MapPin className="w-3.5 h-3.5" />
           Объект
         </label>
@@ -178,15 +178,15 @@ export function OperatorDashboard() {
             </SelectContent>
           </Select>
         ) : (
-          <div className="h-12 rounded-md border border-dashed border-slate-300 bg-muted/40 flex items-center justify-center text-sm text-muted-foreground/70">
+          <div className="h-12 rounded-md border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-sm text-slate-400">
             Нет назначенных объектов
           </div>
         )}
       </div>
 
       {reports.length > 0 && (
-        <section className="border-t border-border pt-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+        <section className="border-t border-slate-200 pt-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
             Последние отчёты
           </h2>
           <ul className="divide-y divide-slate-100">
@@ -194,19 +194,19 @@ export function OperatorDashboard() {
               <li key={r.id}>
                 <button
                   onClick={() => router.push(`/history?reportId=${r.id}`)}
-                  className="w-full flex items-center justify-between py-3 text-left hover:bg-muted/40 rounded-md px-2 -mx-2 transition-colors"
+                  className="w-full flex items-center justify-between py-3 text-left hover:bg-slate-50 rounded-md px-2 -mx-2 transition-colors"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{r.siteName}</p>
-                    <p className="text-xs text-muted-foreground font-mono">
+                    <p className="text-sm font-medium text-slate-900 truncate">{r.siteName}</p>
+                    <p className="text-xs text-slate-500 font-mono">
                       {new Date(r.date).toLocaleDateString('ru-RU')}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono tabular-nums whitespace-nowrap">
+                  <div className="flex items-center gap-2 text-xs text-slate-600 font-mono tabular-nums whitespace-nowrap">
                     <span>{r.totalPiles} св.</span>
-                    <span className="text-muted-foreground/40">·</span>
+                    <span className="text-slate-300">·</span>
                     <span>{r.totalDrilling} м</span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground/70 ml-1" />
+                    <ChevronRight className="w-4 h-4 text-slate-400 ml-1" />
                   </div>
                 </button>
               </li>

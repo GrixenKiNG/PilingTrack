@@ -10,7 +10,6 @@ import { FeedbackCenter } from '@/components/piling/feedback-center';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { logoutClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/lib/types';
@@ -68,7 +67,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
   const navItems = roleNavigation[user?.role || 'OPERATOR'];
 
   const nav = (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t safe-area-bottom">
       <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
           const isActive = isActivePath(pathname, item.href);
@@ -79,7 +78,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
               href={item.href}
               className={cn(
                 'flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all min-w-[64px] no-underline',
-                isActive ? 'text-orange-600' : 'text-muted-foreground hover:text-foreground'
+                isActive ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'
               )}
             >
               <div
@@ -95,7 +94,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
                   <div className="absolute inset-0 w-10 h-10 rounded-xl bg-orange-500" />
                 )}
               </div>
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className="text-[10px] font-medium">{item.label}</span>
             </a>
           );
         })}
@@ -104,24 +103,25 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-30 bg-card border-b">
+    <div className="min-h-screen bg-slate-50">
+      <div className="sticky top-0 z-30 bg-white border-b">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center">
               <HardHat className="w-4 h-4 text-white" />
             </div>
-            <h1 className="text-sm font-bold text-foreground">PilingTrack</h1>
+            <div>
+              <h1 className="text-sm font-bold text-slate-900">PilingTrack</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
+          <div className="flex items-center gap-2">
             <FeedbackCenter />
-            <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
+            <span className="text-xs text-slate-500 hidden sm:block">{user?.name}</span>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => void logoutClient()}
-              className="h-8 text-muted-foreground hover:text-red-500"
+              className="h-8 text-slate-400 hover:text-red-500"
             >
               <LogOut className="w-4 h-4" />
             </Button>
@@ -161,8 +161,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           <HardHat className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-sm font-bold text-foreground">PilingTrack</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-sm font-bold text-slate-900">PilingTrack</h1>
+          <p className="text-[10px] text-slate-500">
             {isDispatcher ? 'Панель диспетчера' : 'Панель администратора'}
           </p>
         </div>
@@ -182,8 +182,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all no-underline',
                 isActive
-                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'bg-orange-100 text-orange-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               )}
             >
               {item.label}
@@ -197,20 +197,19 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="px-4 py-4">
         <div className="flex items-center gap-3 mb-3">
           <FeedbackCenter />
-          <ThemeToggle />
-          <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
-            <span className="text-xs font-bold text-purple-600 dark:text-purple-300">{user?.name?.charAt(0) || 'A'}</span>
+          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+            <span className="text-xs font-bold text-purple-600">{user?.name?.charAt(0) || 'A'}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
+            <p className="text-[10px] text-slate-500">{user?.email}</p>
           </div>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={() => void logoutClient()}
-          className="w-full justify-start text-muted-foreground hover:text-red-600 hover:border-red-200"
+          className="w-full justify-start text-slate-500 hover:text-red-600 hover:border-red-200"
         >
           <LogOut className="w-4 h-4 mr-2" />
           Выйти
@@ -220,17 +219,17 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-card border-r z-30">
+    <div className="min-h-screen bg-slate-50">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-white border-r z-30">
         {sidebarContent}
       </aside>
 
-      <div className="lg:hidden sticky top-0 z-30 bg-card border-b">
+      <div className="lg:hidden sticky top-0 z-30 bg-white border-b">
         <div className="flex items-center gap-3 px-4 py-3">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <button className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted">
-                <Menu className="w-5 h-5 text-muted-foreground" />
+              <button className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100">
+                <Menu className="w-5 h-5 text-slate-600" />
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0">
@@ -238,13 +237,12 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
               {sidebarContent}
             </SheetContent>
           </Sheet>
-          <div className="flex items-center gap-2 ml-auto">
-            <ThemeToggle />
+          <div className="flex items-center gap-2">
             <FeedbackCenter />
             <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
               <HardHat className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="text-sm font-bold text-foreground">PilingTrack</span>
+            <span className="text-sm font-bold text-slate-900">PilingTrack</span>
           </div>
         </div>
       </div>
@@ -335,8 +333,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (bootstrapping) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex items-center gap-3 text-muted-foreground">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 text-slate-500">
           <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center">
             <HardHat className="w-4 h-4 text-white" />
           </div>

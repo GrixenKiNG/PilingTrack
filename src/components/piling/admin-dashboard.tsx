@@ -136,8 +136,8 @@ export function AdminDashboard() {
     <div className="space-y-6 p-4 lg:p-6">
       {/* Page title — no decorative icon */}
       <div>
-        <h1 className="text-xl font-bold text-foreground">Панель управления</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Обзор по всем объектам</p>
+        <h1 className="text-xl font-bold text-slate-900">Панель управления</h1>
+        <p className="mt-1 text-sm text-slate-500">Обзор по всем объектам</p>
       </div>
 
       {/* HERO KPI — single dominant metric: % of pile plan */}
@@ -159,14 +159,14 @@ export function AdminDashboard() {
                   {formatNumber(totalActualPileMeters)} / {formatNumber(totalPlannedPileMeters)} м.п.
                 </p>
               </div>
-              <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-card/15 backdrop-blur">
+              <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
                 <HardHat className="h-7 w-7" />
               </span>
             </div>
 
             {totalPlanned > 0 && (
               <div className="mt-5">
-                <Progress value={overallPileProgress} className="h-2 bg-card/20 [&>div]:bg-card" />
+                <Progress value={overallPileProgress} className="h-2 bg-white/20 [&>div]:bg-white" />
               </div>
             )}
           </CardContent>
@@ -184,18 +184,18 @@ export function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 + index * 0.03 }}
             >
-              <Card className="border border-border bg-card">
+              <Card className="border border-slate-200 bg-white">
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
                       {stat.label}
                     </span>
-                    <Icon className="h-4 w-4 text-muted-foreground/70" />
+                    <Icon className="h-4 w-4 text-slate-400" />
                   </div>
-                  <p className="font-mono text-3xl font-bold tabular-nums leading-none text-foreground">
+                  <p className="font-mono text-3xl font-bold tabular-nums leading-none text-slate-900">
                     {stat.primary}
                   </p>
-                  <p className="mt-2 truncate text-xs text-muted-foreground">{stat.secondary}</p>
+                  <p className="mt-2 truncate text-xs text-slate-500">{stat.secondary}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -207,7 +207,7 @@ export function AdminDashboard() {
       {analytics.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">Прогресс по объектам</h2>
+            <h2 className="text-base font-semibold text-slate-900">Прогресс по объектам</h2>
             <button
               onClick={() => router.push(appPageRoute('admin-sites'))}
               className="flex items-center gap-1 text-sm font-medium text-orange-600 hover:text-orange-700"
@@ -228,8 +228,8 @@ export function AdminDashboard() {
                   <CardContent className="p-4">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{site.siteName}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{site.siteName}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
                           {formatReportLabel(site.totalReports)} · {formatNumber(site.totalDowntime)} ч простоев
                         </p>
                       </div>
@@ -251,8 +251,8 @@ export function AdminDashboard() {
                     {site.plannedPiles > 0 && (
                       <div className="mb-2">
                         <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="text-xs text-muted-foreground">Сваи</span>
-                          <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                          <span className="text-xs text-slate-500">Сваи</span>
+                          <span className="text-right font-mono text-xs tabular-nums text-slate-600">
                             {formatNumber(site.actualPiles)} / {formatNumber(site.plannedPiles)} шт
                           </span>
                         </div>
@@ -263,8 +263,8 @@ export function AdminDashboard() {
                     {site.plannedDrilling > 0 && (
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="text-xs text-muted-foreground">Бурение</span>
-                          <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                          <span className="text-xs text-slate-500">Бурение</span>
+                          <span className="text-right font-mono text-xs tabular-nums text-slate-600">
                             {formatNumber(site.actualDrilling)} / {formatNumber(site.plannedDrilling)} м.п.
                           </span>
                         </div>
@@ -281,9 +281,9 @@ export function AdminDashboard() {
 
       {!loading && analytics.length === 0 && (
         <div className="py-16 text-center">
-          <MapPin className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">Нет данных по объектам</p>
-          <p className="mt-1 text-xs text-muted-foreground/70">Создайте первый объект в разделе «Объекты»</p>
+          <MapPin className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+          <p className="text-sm text-slate-500">Нет данных по объектам</p>
+          <p className="mt-1 text-xs text-slate-400">Создайте первый объект в разделе «Объекты»</p>
         </div>
       )}
 
@@ -296,7 +296,7 @@ export function AdminDashboard() {
       >
         {navGroups.map((group) => (
           <div key={group.title}>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               {group.title}
             </h2>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -307,11 +307,11 @@ export function AdminDashboard() {
                   onClick={() => router.push(appPageRoute(link.page))}
                 >
                   <CardContent className="flex items-center gap-3 p-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                       <link.icon className="h-4 w-4" />
                     </span>
-                    <span className="text-sm font-medium text-foreground">{link.label}</span>
-                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/70" />
+                    <span className="text-sm font-medium text-slate-900">{link.label}</span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
                   </CardContent>
                 </Card>
               ))}
