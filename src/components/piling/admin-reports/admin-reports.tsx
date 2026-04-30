@@ -93,10 +93,8 @@ export function AdminReports() {
     <div className="space-y-4 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <FileText className="w-5 h-5 text-orange-500" />Все отчёты
-        </h1>
-        <span className="text-xs text-slate-500 font-mono tabular-nums">{formatReportCount(reports.length)}</span>
+        <h1 className="text-xl font-bold text-slate-900">Все отчёты</h1>
+        <span className="text-sm text-slate-500 font-mono tabular-nums">{formatReportCount(reports.length)}</span>
       </div>
 
       {/* Filters */}

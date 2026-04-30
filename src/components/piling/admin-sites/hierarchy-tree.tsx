@@ -53,7 +53,7 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
             {/* Clusters */}
             <div className="pl-4 border-l border-slate-200 space-y-1">
               {field.clusters.length === 0 ? (
-                <p className="text-[10px] text-slate-400 py-0.5">Нет кустов</p>
+                <p className="text-xs text-slate-400 py-0.5">Нет кустов</p>
               ) : (
                 field.clusters.map((cluster) => (
                   <div key={cluster.id}>
@@ -77,14 +77,14 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
                     {/* Pickets */}
                     <div className="pl-3 space-y-0.5">
                       {cluster.pickets.length === 0 ? (
-                        <p className="text-[10px] text-slate-400 py-0.5">Нет пикетов</p>
+                        <p className="text-xs text-slate-400 py-0.5">Нет пикетов</p>
                       ) : (
                         cluster.pickets.map((picket) => (
                           <div
                             key={picket.id}
                             className="flex items-center justify-between py-0.5"
                           >
-                            <span className="text-[11px] text-slate-500">
+                            <span className="text-xs text-slate-500">
                               {'\ud83d\udccd'} {picket.name}
                             </span>
                             <button

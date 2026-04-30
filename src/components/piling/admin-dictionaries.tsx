@@ -213,7 +213,7 @@ export function AdminDictionaries() {
                   <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                     <Icon className={`h-4 w-4 ${section.iconColor}`} />
                     {section.title}
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-xs">
                       {section.items.length}
                     </Badge>
                   </CardTitle>
