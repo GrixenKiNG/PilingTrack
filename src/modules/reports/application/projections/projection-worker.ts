@@ -179,7 +179,7 @@ async function projectOperatorPerformance(event: ReportDomainEvent) {
   await projectOperatorPerformanceFull(userId, siteId, date);
 }
 
-async function projectOperatorPerformanceFull(userId: string, siteId: string, date: string) {
+export async function projectOperatorPerformanceFull(userId: string, siteId: string, date: string) {
   const reports = await db.report.findMany({
     where: { userId, siteId, date },
     include: {
