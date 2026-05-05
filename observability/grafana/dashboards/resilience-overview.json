@@ -1,403 +1,591 @@
 {
-  "dashboard": {
-    "id": null,
-    "uid": "pilingtrack-resilience",
-    "title": "PilingTrack — Resilience & Failure Recovery",
-    "tags": ["pilingtrack", "resilience", "sre", "failure-recovery"],
-    "timezone": "browser",
-    "refresh": "10s",
-    "time": { "from": "now-6h", "to": "now" },
-    "templating": {
-      "list": [
-        {
-          "name": "datasource",
-          "type": "datasource",
-          "query": "prometheus",
-          "current": { "text": "Prometheus", "value": "prometheus" }
-        },
-        {
-          "name": "job",
-          "type": "query",
-          "query": "label_values(up, job)",
-          "current": { "text": "All", "value": "$__all" }
+  "id": null,
+  "uid": "pilingtrack-resilience",
+  "title": "PilingTrack — Resilience & Failure Recovery",
+  "tags": [
+    "pilingtrack",
+    "resilience",
+    "sre",
+    "failure-recovery"
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
         }
-      ]
+      },
+      {
+        "name": "job",
+        "type": "query",
+        "query": "label_values(up, job)",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "🔴 Outbox Lag (seconds)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "outbox_lag_seconds",
+          "legendFormat": "Outbox lag",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          }
+        }
+      },
+      "alert": {
+        "name": "Outbox lag critical",
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                300
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "A",
+                "5m",
+                "now"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "avg"
+            },
+            "type": "query"
+          }
+        ],
+        "executionErrorState": "alerting",
+        "frequency": "1m",
+        "handler": 1,
+        "message": "Outbox lag is above 300s — workers may be stalled",
+        "noDataState": "no_data",
+        "notifications": []
+      }
     },
-    "panels": [
-      {
-        "id": 1,
-        "title": "🔴 Outbox Lag (seconds)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-        "targets": [
-          {
-            "expr": "outbox_lag_seconds",
-            "legendFormat": "Outbox lag",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "s",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 60 },
-                { "color": "red", "value": 300 }
-              ]
-            }
-          }
-        },
-        "alert": {
-          "name": "Outbox lag critical",
-          "conditions": [
-            {
-              "evaluator": { "params": [300], "type": "gt" },
-              "operator": { "type": "and" },
-              "query": { "params": ["A", "5m", "now"] },
-              "reducer": { "params": [], "type": "avg" },
-              "type": "query"
-            }
-          ],
-          "executionErrorState": "alerting",
-          "frequency": "1m",
-          "handler": 1,
-          "message": "Outbox lag is above 300s — workers may be stalled",
-          "noDataState": "no_data",
-          "notifications": []
-        }
+    {
+      "id": 2,
+      "title": "📦 Outbox Pending Events",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
       },
-      {
-        "id": 2,
-        "title": "📦 Outbox Pending Events",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-        "targets": [
-          {
-            "expr": "outbox_pending_count",
-            "legendFormat": "Pending events",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 1000 },
-                { "color": "red", "value": 5000 }
-              ]
-            }
-          }
+      "targets": [
+        {
+          "expr": "outbox_pending_count",
+          "legendFormat": "Pending events",
+          "refId": "A"
         }
-      },
-      {
-        "id": 3,
-        "title": "📊 Outbox Publish Rate (events/sec, 5m avg)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-        "targets": [
-          {
-            "expr": "outbox_publish_rate",
-            "legendFormat": "Publish rate",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "reqps",
-            "color": { "mode": "palette-classic" }
-          }
-        }
-      },
-      {
-        "id": 4,
-        "title": "⚠️ Dead Letter Queue Pending",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-        "targets": [
-          {
-            "expr": "dlq_pending_count",
-            "legendFormat": "DLQ events",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 1 },
-                { "color": "red", "value": 10 }
-              ]
-            }
-          }
-        }
-      },
-      {
-        "id": 5,
-        "title": "👑 Leader Election Status",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
-        "targets": [
-          {
-            "expr": "outbox_leader",
-            "legendFormat": "Outbox leader",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "red", "value": null },
-                { "color": "green", "value": 1 }
-              ]
-            }
-          }
-        },
-        "options": {
-          "colorMode": "background",
-          "graphMode": "none",
-          "textMode": "value_and_name"
-        }
-      },
-      {
-        "id": 6,
-        "title": "📐 Projection Leader Status",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
-        "targets": [
-          {
-            "expr": "projection_leader",
-            "legendFormat": "Projection leader",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "red", "value": null },
-                { "color": "green", "value": 1 }
-              ]
-            }
-          }
-        },
-        "options": {
-          "colorMode": "background",
-          "graphMode": "none",
-          "textMode": "value_and_name"
-        }
-      },
-      {
-        "id": 7,
-        "title": "💾 Backup Freshness (hours since last backup)",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
-        "targets": [
-          {
-            "expr": "backup_age_hours",
-            "legendFormat": "Backup age",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "h",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 26 },
-                { "color": "red", "value": 48 }
-              ]
-            }
-          }
-        },
-        "options": {
-          "colorMode": "background",
-          "graphMode": "none",
-          "textMode": "value_and_name"
-        }
-      },
-      {
-        "id": 8,
-        "title": "🗄️ Backup S3 Sync Status",
-        "type": "stat",
-        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
-        "targets": [
-          {
-            "expr": "backup_s3_synced",
-            "legendFormat": "S3 synced",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "mappings": [
-              { "options": { "0": { "text": "Not synced" }, "1": { "text": "Synced" } }, "type": "value" }
-            ],
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "red", "value": null },
-                { "color": "green", "value": 1 }
-              ]
-            }
-          }
-        },
-        "options": {
-          "colorMode": "background",
-          "graphMode": "none",
-          "textMode": "value_and_name"
-        }
-      },
-      {
-        "id": 9,
-        "title": "⏱️ API Response Time (p50, p95, p99)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le, domain))",
-            "legendFormat": "p50 {{domain}}",
-            "refId": "A"
-          },
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le, domain))",
-            "legendFormat": "p95 {{domain}}",
-            "refId": "B"
-          },
-          {
-            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le, domain))",
-            "legendFormat": "p99 {{domain}}",
-            "refId": "C"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "s",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 0.5 },
-                { "color": "red", "value": 2 }
-              ]
-            }
-          }
-        }
-      },
-      {
-        "id": 10,
-        "title": "🔥 Error Rate by Domain (%)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total{job=~\"$job\",status=~\"5..\"}[5m])) by (domain) / sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (domain) * 100",
-            "legendFormat": "{{domain}}",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percent",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 1 },
-                { "color": "red", "value": 5 }
-              ]
-            }
-          }
-        }
-      },
-      {
-        "id": 11,
-        "title": "📉 Error Budget Burn Rate (30d window)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
-        "targets": [
-          {
-            "expr": "(1 - (sum(rate(http_requests_total{job=~\"$job\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=~\"$job\"}[5m])))) / 0.999",
-            "legendFormat": "Burn rate (target 99.9%)",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percentunit",
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                { "color": "green", "value": null },
-                { "color": "yellow", "value": 2 },
-                { "color": "red", "value": 14.4 }
-              ]
-            }
-          }
-        }
-      },
-      {
-        "id": 12,
-        "title": "🔒 Rate Limited Requests (429s)",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total{job=~\"$job\",status=\"429\"}[5m])) by (domain)",
-            "legendFormat": "{{domain}}",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "reqps",
-            "color": { "mode": "palette-classic" }
-          }
-        }
-      },
-      {
-        "id": 13,
-        "title": "📊 HPA — API Replicas",
-        "type": "timeseries",
-        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
-        "targets": [
-          {
-            "expr": "kube_hpa_status_current_replicas{hpa=~\"pilingtrack.*\"}",
-            "legendFormat": "Current replicas",
-            "refId": "A"
-          },
-          {
-            "expr": "kube_hpa_spec_max_replicas{hpa=~\"pilingtrack.*\"}",
-            "legendFormat": "Max replicas",
-            "refId": "B"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "color": { "mode": "palette-classic" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 5000
+              }
+            ]
           }
         }
       }
-    ],
-    "schemaVersion": 39,
-    "version": 1
-  },
-  "overwrite": true,
-  "message": "PilingTrack Resilience Dashboard — Circuit Breaker, Outbox, Leader Election, Backup, Error Budget"
+    },
+    {
+      "id": 3,
+      "title": "📊 Outbox Publish Rate (events/sec, 5m avg)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "outbox_publish_rate",
+          "legendFormat": "Publish rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "⚠️ Dead Letter Queue Pending",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "dlq_pending_count",
+          "legendFormat": "DLQ events",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "👑 Leader Election Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "outbox_leader",
+          "legendFormat": "Outbox leader",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "title": "📐 Projection Leader Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "projection_leader",
+          "legendFormat": "Projection leader",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 7,
+      "title": "💾 Backup Freshness (hours since last backup)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "backup_age_hours",
+          "legendFormat": "Backup age",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 26
+              },
+              {
+                "color": "red",
+                "value": 48
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 8,
+      "title": "🗄️ Backup S3 Sync Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "backup_s3_synced",
+          "legendFormat": "S3 synced",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Not synced"
+                },
+                "1": {
+                  "text": "Synced"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 9,
+      "title": "⏱️ API Response Time (p50, p95, p99)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le, domain))",
+          "legendFormat": "p50 {{domain}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le, domain))",
+          "legendFormat": "p95 {{domain}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le, domain))",
+          "legendFormat": "p99 {{domain}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "🔥 Error Rate by Domain (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=~\"$job\",status=~\"5..\"}[5m])) by (domain) / sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (domain) * 100",
+          "legendFormat": "{{domain}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "📉 Error Budget Burn Rate (30d window)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "(1 - (sum(rate(http_requests_total{job=~\"$job\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=~\"$job\"}[5m])))) / 0.999",
+          "legendFormat": "Burn rate (target 99.9%)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "🔒 Rate Limited Requests (429s)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=~\"$job\",status=\"429\"}[5m])) by (domain)",
+          "legendFormat": "{{domain}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "📊 HPA — API Replicas",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "kube_hpa_status_current_replicas{hpa=~\"pilingtrack.*\"}",
+          "legendFormat": "Current replicas",
+          "refId": "A"
+        },
+        {
+          "expr": "kube_hpa_spec_max_replicas{hpa=~\"pilingtrack.*\"}",
+          "legendFormat": "Max replicas",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
 }
