@@ -1,0 +1,61 @@
+# ============================================================
+# Prometheus — production config (slim)
+# ============================================================
+# Без AlertManager и pushgateway. Скрейпим: app, ws, node-exporter,
+# postgres-exporter, redis-exporter, сам Prometheus.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    cluster: 'pilingtrack'
+    environment: 'production'
+
+scrape_configs:
+  - job_name: 'pilingtrack-app'
+    metrics_path: '/api/metrics'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['app:3000']
+        labels:
+          service: 'pilingtrack-app'
+          tier: 'frontend'
+
+  - job_name: 'pilingtrack-ws'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['ws:3001']
+        labels:
+          service: 'pilingtrack-ws'
+          tier: 'realtime'
+
+  - job_name: 'node'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'host'
+          tier: 'infra'
+
+  - job_name: 'postgresql'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+          tier: 'database'
+
+  - job_name: 'redis'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          tier: 'cache'
+
+  - job_name: 'prometheus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['localhost:9090']

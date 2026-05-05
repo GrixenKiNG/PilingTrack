@@ -1,0 +1,120 @@
+# ============================================================
+# Production monitoring (slim) — Prometheus + Grafana + node-exporter
+# ============================================================
+# Без Loki/Tempo (экономим диск). Логи смотрим через `docker logs`.
+#
+# Usage on prod VM:
+#   docker compose -f docker-compose.monitoring-prod.yml up -d
+#
+# Ports (только 127.0.0.1 — наружу через Caddy с basic-auth):
+#   Prometheus: 127.0.0.1:9090
+#   Grafana:    127.0.0.1:3010
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pilingtrack-prometheus
+    ports:
+      - '127.0.0.1:9090:9090'
+    volumes:
+      - ./observability/prometheus/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=14d'
+      - '--storage.tsdb.retention.size=2GB'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - monitoring
+      - pilingtrack_pilingtrack
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pilingtrack-grafana
+    ports:
+      - '127.0.0.1:3010:3000'
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://orionpiling.ru/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards/files:ro
+      - ./observability/grafana/datasources/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: pilingtrack-node-exporter
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    restart: unless-stopped
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: pilingtrack-postgres-exporter
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-piling}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pilingtrack}?sslmode=disable
+    restart: unless-stopped
+    networks:
+      - monitoring
+      - pilingtrack_pilingtrack
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: pilingtrack-redis-exporter
+    command:
+      - '--redis.addr=redis://redis:6379'
+    restart: unless-stopped
+    networks:
+      - monitoring
+      - pilingtrack_pilingtrack
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  monitoring:
+    driver: bridge
+  pilingtrack_pilingtrack:
+    external: true
