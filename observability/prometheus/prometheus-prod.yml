@@ -22,14 +22,12 @@ scrape_configs:
           service: 'pilingtrack-app'
           tier: 'frontend'
 
-  - job_name: 'pilingtrack-ws'
-    metrics_path: '/metrics'
-    scrape_interval: 15s
-    static_configs:
-      - targets: ['ws:3001']
-        labels:
-          service: 'pilingtrack-ws'
-          tier: 'realtime'
+  # ws:3001/metrics отдаёт JSON, не Prom-формат — пропускаем пока. Когда
+  # ws начнёт экспонировать prom-метрики — раскомментировать.
+  # - job_name: 'pilingtrack-ws'
+  #   metrics_path: '/metrics'
+  #   static_configs:
+  #     - targets: ['ws:3001']
 
   - job_name: 'node'
     scrape_interval: 15s
