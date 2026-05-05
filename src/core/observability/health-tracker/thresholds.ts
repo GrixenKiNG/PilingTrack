@@ -1,0 +1,11 @@
+export const DB_SLOW_THRESHOLD_MS = 1000;
+export const REDIS_SLOW_THRESHOLD_MS = 500;
+export const OUTBOX_BACKLOG_THRESHOLD = 1000;
+export const OUTBOX_STALE_MS = 60 * 60 * 1000;
+export const WORKER_STALE_MS = 90 * 1000;
+export const DB_CHECK_TIMEOUT_MS = 2000;
+export const REDIS_CHECK_TIMEOUT_MS = 1000;
+export const POLL_INTERVAL_MS = 15000;
+export const BACKUP_STALE_HOURS = 26;
+export const BACKUP_CRITICAL_HOURS = 48;
+export const DEFAULT_BACKUP_DIR = '/backups/pilingtrack';
