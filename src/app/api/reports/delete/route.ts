@@ -26,7 +26,7 @@ export const DELETE = withMutation(
     }
 
     try {
-      await db.report.delete({ where: { id: parsed.data.reportId } });
+      await db.report.delete({ where: { reportId: parsed.data.reportId } });
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
       if (message.includes('Record to delete') || message.includes('not found')) {
