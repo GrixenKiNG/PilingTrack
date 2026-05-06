@@ -28,6 +28,32 @@ export function AdminReports() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editReport, setEditReport] = useState<ReportDTO | null>(null);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (report: ReportDTO) => {
+    if (!report.reportId) return;
+    if (!window.confirm(`Удалить отчёт от ${formatDate(report.date)} (${report.user?.name || 'Неизвестный'})? Действие необратимо.`)) {
+      return;
+    }
+    setDeletingId(report.reportId);
+    try {
+      const { authFetch } = await import('@/lib/api');
+      const res = await authFetch('/api/reports/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId: report.reportId }),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(`Ошибка удаления (${res.status}): ${msg.slice(0, 200)}`);
+      }
+      await loadReports();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     if (showCreateDialog) {
@@ -130,6 +156,8 @@ export function AdminReports() {
               onView={setSelectedReport}
               onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
               onPreviewPdf={handlePreviewPdf}
+              onDelete={handleDelete}
+              deleting={deletingId === report.reportId}
             />
           ))}
         </div>

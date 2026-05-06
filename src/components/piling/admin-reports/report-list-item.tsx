@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { FileText, HardHat, Drill, Clock, CalendarDays, User, Eye, Pencil } from 'lucide-react';
+import { FileText, HardHat, Drill, Clock, CalendarDays, User, Eye, Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { ReportDTO } from '@/lib/types';
@@ -17,6 +17,8 @@ interface ReportListItemProps {
   onView: (r: ReportDTO) => void;
   onEdit: (r: ReportDTO) => void;
   onPreviewPdf: (r: ReportDTO) => void;
+  onDelete: (r: ReportDTO) => void;
+  deleting?: boolean;
 }
 
 function getPileLengthMeters(pileGradeName: string) {
@@ -26,7 +28,7 @@ function getPileLengthMeters(pileGradeName: string) {
 
 export function ReportListItem({
   report, index, pileGradeNames, drillTypeNames, dtReasonNames,
-  formatDate, formatLastEditor, onView, onEdit, onPreviewPdf,
+  formatDate, formatLastEditor, onView, onEdit, onPreviewPdf, onDelete, deleting,
 }: ReportListItemProps) {
   const totalPiles = report.piles?.reduce((s, p) => s + p.count, 0) || 0;
   const totalPileMeters = report.piles?.reduce((s, p) => s + getPileLengthMeters(p.pileGrade?.name || '') * p.count, 0) || 0;
@@ -72,6 +74,12 @@ export function ReportListItem({
                 className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
                 title="Редактировать">
                 <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onDelete(report); }}
+                disabled={deleting}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                title="Удалить">
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
