@@ -278,11 +278,15 @@ async function runBackgroundSync() {
 
   while (attempt < MAX_SYNC_RETRIES) {
     try {
+      const body = await getQueuedChanges();
+      if (!body) {
+        notifyClients('sync-complete', { success: true, applied: 0, conflicts: [] });
+        return;
+      }
       const response = await fetch('/api/sync/v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Body is constructed from IndexedDB by the client before registering sync
-        body: await getQueuedChanges(),
+        body,
         credentials: 'include',
       });
 
@@ -336,27 +340,50 @@ async function getQueuedChanges() {
       if (!db.objectStoreNames.contains('syncQueue')) {
         db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
       }
+      if (!db.objectStoreNames.contains('syncState')) {
+        db.createObjectStore('syncState', { keyPath: 'key' });
+      }
     };
 
     request.onsuccess = () => {
       try {
         const db = request.result;
         if (!db.objectStoreNames.contains('syncQueue')) {
-          // Fallback: if object store still doesn't exist, close and reject
           db.close();
           reject(new Error('syncQueue object store not found'));
           return;
         }
-        
-        const tx = db.transaction('syncQueue', 'readonly');
+        const hasState = db.objectStoreNames.contains('syncState');
+        const stores = hasState ? ['syncQueue', 'syncState'] : ['syncQueue'];
+        const tx = db.transaction(stores, hasState ? 'readwrite' : 'readonly');
         const store = tx.objectStore('syncQueue');
         const getAll = store.getAll();
 
-        getAll.onsuccess = () => {
+        const readDeviceId = () => new Promise((res) => {
+          if (!hasState) return res('');
+          const stateStore = tx.objectStore('syncState');
+          const getReq = stateStore.get('deviceId');
+          getReq.onsuccess = () => {
+            const existing = getReq.result && getReq.result.value;
+            if (existing) return res(existing);
+            const fresh = `device-${(crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(16).slice(2, 10)}`;
+            const putReq = stateStore.put({ key: 'deviceId', value: fresh });
+            putReq.onsuccess = () => res(fresh);
+            putReq.onerror = () => res(fresh);
+          };
+          getReq.onerror = () => res('');
+        });
+
+        getAll.onsuccess = async () => {
           const entries = getAll.result.filter(e => e.status === 'pending');
+          const deviceId = await readDeviceId();
           db.close();
+          if (entries.length === 0) {
+            resolve(null);
+            return;
+          }
           resolve(JSON.stringify({
-            deviceId: '', // Will be read from syncState
+            deviceId,
             changes: entries.map(e => ({
               entity: e.entity,
               op: e.op,
