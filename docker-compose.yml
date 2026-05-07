@@ -79,6 +79,7 @@ services:
       - S3_BUCKET=${S3_BUCKET:-pilingtrack-reports}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - TELEGRAM_API_BASE=${TELEGRAM_API_BASE:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -128,6 +129,7 @@ services:
       - S3_BUCKET=${S3_BUCKET:-pilingtrack-reports}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      - TELEGRAM_API_BASE=${TELEGRAM_API_BASE:-}
     depends_on:
       postgres:
         condition: service_healthy
