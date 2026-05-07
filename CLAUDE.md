@@ -138,6 +138,47 @@ You can write unit tests. Flag if you need integration test infrastructure.
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
+---
+
+## Production (orionpiling.ru)
+
+**Server:** single VPS, Ubuntu, Docker Compose stack at `/opt/pilingtrack`. 30 GB disk (often near-full — check `df -h /` before docker rebuild). 3.8 GB RAM + 4 GB swap.
+
+**Tenancy:** single tenant `orion`. `DEFAULT_TENANT_ID=orion` in `.env.production` (and `.env`). All `User`, `Site`, `Report`, `ReportAnalytics`, `SiteWeeklyTrend` rows must have `tenantId='orion'`.
+
+**Containers** (`docker compose ps`):
+- `pilingtrack-app` — Next.js (port 3000, behind Caddy)
+- `pilingtrack-ws` — websocket server
+- `pilingtrack-workers` — outbox/projection/PDF workers
+- `pilingtrack-postgres` — DB (user `piling`, db `pilingtrack`)
+- `pilingtrack-redis`, `pilingtrack-minio`, `pilingtrack-pgbouncer`, `pilingtrack-grafana`, `pilingtrack-prometheus`
+
+**DB access:**
+```bash
+docker compose exec postgres psql -U piling -d pilingtrack
+```
+
+**Deploy runbook (after pushing to `main`):**
+```bash
+cd /opt/pilingtrack
+git pull origin main
+docker compose stop app && docker compose rm -f app
+docker rmi pilingtrack-app:latest
+docker compose build app && docker compose up -d app
+# repeat for ws / workers if changed
+```
+
+If disk tight: `docker builder prune -af` (frees ~2 GB), `docker image prune -af`.
+
+**Migrate service** runs `prisma migrate deploy` and seed. Seed must be skipped on prod (`SKIP_SEED=1` in `.env`) — Prisma 7 driver-adapter requires options that `prisma/seed.ts` doesn't pass; would fail on bare `new PrismaClient()`.
+
+**Known limitations:**
+- **Telegram API blocked** at network level (`api.telegram.org` unreachable from VPS — Russian provider). Telegram notifications need an outbound proxy (`HTTPS_PROXY`) to work; without it `/api/notifications/telegram/test` returns `{ok:false, error:"fetch failed"}`.
+- **`/api/sync/v2` requires `reports.manage_all`** — operators get 403. Service worker fires syncs from all clients regardless. By design or open question, not yet decided.
+- **App reports `unhealthy`** in `docker compose ps` — Next.js binds to container hostname only, not `localhost`; the compose healthcheck uses `localhost:3000`. App actually serves fine externally; cosmetic.
+
+**User context:** non-programmer in Russian. Reply in Russian, prefer concrete commands the user can paste, avoid open-ended "what do you want to do" questions when the next step is obvious. See user memory for more.
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
