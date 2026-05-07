@@ -21,7 +21,7 @@ if /I "%~1"=="docker"      set MODE=docker
 
 echo.
 echo ============================================================
-echo  PilingTrack v2.1.0  -  %MODE% mode
+echo  PilingTrack v2.2.1  -  %MODE% mode
 echo  URL: http://localhost:3000
 echo ============================================================
 

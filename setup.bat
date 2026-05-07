@@ -110,7 +110,7 @@ echo    App:        http://localhost:3000
 echo    WebSocket:  ws://localhost:3001 (Docker only by default)
 echo    Postgres:   localhost:5435   (user: piling, db: pilingtrack)
 echo    PgBouncer:  localhost:6432
-echo    Redis:      localhost:6379
+echo    Redis:      localhost:6380   (container 6379, mapped to host 6380)
 echo    MinIO UI:   http://localhost:9001  (user/pass: minioadmin)
 echo.
 echo  Default credentials (change after first login):
