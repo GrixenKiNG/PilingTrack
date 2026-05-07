@@ -116,7 +116,7 @@ async function sendTelegramMessage(
   parse_mode = 'HTML'
 ): Promise<boolean> {
   try {
-    const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
+    const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendMessage`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -195,7 +195,7 @@ export class TelegramNotifier {
     }
 
     try {
-      const url = `https://api.telegram.org/bot${config.botToken}/sendDocument`;
+      const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendDocument`;
       const form = new FormData();
       form.append('chat_id', config.chatId);
       if (caption) {
@@ -226,7 +226,7 @@ export class TelegramNotifier {
     if (!config) return { ok: false, error: 'Not configured' };
 
     try {
-      const url = `https://api.telegram.org/bot${config.botToken}/getChat`;
+      const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/getChat`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
