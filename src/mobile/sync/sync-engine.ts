@@ -1,6 +1,24 @@
 /**
  * Sync Engine v3 — Push Outbox + Pull Updates with Vector Clocks
  *
+ * STATUS: Disabled (no-op). The push/pull functions return early without
+ * hitting the network. Re-enable by deleting the early `return` lines in
+ * pushOutbox() and pullUpdates() — and at the same time decide what to do
+ * about /api/sync/v2 requiring `reports.manage_all`, which makes operators
+ * get 403/429 in a tight loop.
+ *
+ * Why disabled: in production the sync loop fired against an unauthenticated
+ * service-worker context (no session cookie) and produced 401/429 storms in
+ * the logs. A previous prod-only patch silenced this by checking
+ * localStorage.getItem('accessToken'), but tokens are not kept there in this
+ * codebase, so the patch effectively short-circuited every call. Rather than
+ * keep that subtle behaviour as drift between repo and prod, we make the
+ * disabled state explicit here.
+ *
+ * What still works without sync v3: online CRUD via /api/reports/upsert,
+ * /api/reports/delete, etc. Only the offline outbox + vector-clock pull is
+ * paused.
+ *
  * Coordinates:
  * 1. Push: send pending outbox items to backend (with vector clocks)
  * 2. Pull: fetch server updates since last sync (with vector clocks)
@@ -40,76 +58,8 @@ const SYNC_CONFIG = {
 // ============================================================
 
 async function pushOutbox(): Promise<{ pushed: number; failed: number }> {
-  const pending = await outboxService.getPendingItems(SYNC_CONFIG.batchSize);
-
-  if (pending.length === 0) {
-    return { pushed: 0, failed: 0 };
-  }
-
-  let pushed = 0;
-  let failed = 0;
-
-  for (const item of pending) {
-    if (!item.id) {
-      console.warn('[Sync] Skipping outbox item without id');
-      continue;
-    }
-    const itemId = item.id;
-    try {
-      await outboxService.markSyncing(itemId);
-
-      const response = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operations: [serializeOutboxItem(item)],
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Sync failed: ${response.status} — ${error}`);
-      }
-
-      const result = await response.json();
-
-      // Update local report with server response
-      if (item.entityId && result.reports?.length > 0) {
-        const serverReport = result.reports[0];
-        await getDB().reports.update(item.entityId, {
-          syncStatus: 'synced',
-          serverVersion: serverReport.version,
-          lastSyncedAt: new Date().toISOString(),
-          syncError: undefined,
-        });
-      }
-
-      await outboxService.markSynced(itemId);
-      pushed++;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const attempts = item.attempts ?? 0;
-
-      if (attempts >= SYNC_CONFIG.maxRetries) {
-        // Mark as permanently failed
-        await outboxService.markFailed(itemId, message);
-        await getDB().reports.update(item.entityId, {
-          syncStatus: 'error',
-          syncError: message,
-        });
-        failed++;
-      } else {
-        // Schedule retry
-        await outboxService.markFailed(itemId, message);
-        setTimeout(() => {
-          outboxService.resetFailedForRetry(itemId);
-        }, calculateRetryDelay(attempts));
-        failed++;
-      }
-    }
-  }
-
-  return { pushed, failed };
+  // sync v3 disabled — see file header.
+  return { pushed: 0, failed: 0 };
 }
 
 export function serializeOutboxItem(item: OutboxEntry) {
@@ -131,51 +81,8 @@ export function serializeOutboxItem(item: OutboxEntry) {
 // ============================================================
 
 async function pullUpdates(): Promise<{ received: number }> {
-  const since = await outboxService.getLastPullSync();
-
-  try {
-    const url = new URL('/api/sync/updates', window.location.origin);
-    url.searchParams.set('since', String(since));
-
-    const response = await fetch(url.toString(), {
-      credentials: 'include', // Include session cookies
-    });
-
-    if (response.status === 401) {
-      // Not authenticated — skip pull until user logs in
-      return { received: 0 };
-    }
-
-    if (!response.ok) {
-      // Log but don't throw — sync should be resilient
-      return { received: 0 };
-    }
-
-    const data = await response.json();
-
-    // Apply server updates to local DB
-    let received = 0;
-
-    if (data.reports?.length > 0) {
-      received += await applyServerReports(data.reports);
-    }
-
-    if (data.events?.length > 0) {
-      // Apply domain events (downtime alerts, status changes, etc.)
-      await applyServerEvents(data.events);
-      received += data.events.length;
-    }
-
-    // Update cursor
-    if (data.cursor) {
-      await outboxService.setLastPullSync(data.cursor);
-    }
-
-    return { received };
-  } catch {
-    // Silently fail — sync will retry on next cycle
-    return { received: 0 };
-  }
+  // sync v3 disabled — see file header.
+  return { received: 0 };
 }
 
 async function applyServerReports(reports: any[]): Promise<number> {
