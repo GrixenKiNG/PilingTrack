@@ -1,0 +1,77 @@
+# ============================================================
+# PilingTrack — Production Caddy configuration
+# ------------------------------------------------------------
+# Lives on the VPS at /etc/caddy/Caddyfile. This file is the
+# source of truth — server config should mirror it exactly.
+#
+# Deploy:
+#   scp deploy/Caddyfile.prod user1@<host>:/tmp/Caddyfile
+#   ssh user1@<host> 'sudo install -m 644 /tmp/Caddyfile /etc/caddy/Caddyfile \
+#     && sudo caddy validate --config /etc/caddy/Caddyfile \
+#     && sudo systemctl reload caddy'
+#
+# Security headers are owned HERE, NOT in next.config.ts, to
+# avoid the duplicate-header problem that broke HSTS preload
+# and Mozilla Observatory parsing.
+#
+# CSP stays in next.config.ts for now — it needs per-route
+# control (PDF preview frames) and will move here once we
+# switch to nonce-based CSP.
+# ============================================================
+
+# --- Main domain ---
+orionpiling.ru, www.orionpiling.ru {
+	encode gzip zstd
+
+	# Strip the Server banner and add security headers in one block.
+	header {
+		-Server
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+	}
+
+	# ----- Grafana behind /grafana -----
+	@grafana path /grafana /grafana/*
+	handle @grafana {
+		reverse_proxy 127.0.0.1:3010
+	}
+
+	# ----- WebSocket -----
+	@ws path /ws/*
+	handle @ws {
+		reverse_proxy 127.0.0.1:3001
+	}
+
+	# ----- Next.js app -----
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# TLS. Caddy enables OCSP stapling by default.
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	# Access log — to journald via stdout (default).
+	# File-based logging requires LogsDirectory= in the systemd unit;
+	# revisit once we add a proper /etc/systemd/system/caddy.service.d/
+	# override (deploy/systemd/caddy-override.conf — TODO).
+	log
+}
+
+# --- .online mirror → permanent redirect to .ru ---
+orionpiling.online, www.orionpiling.online {
+	redir https://orionpiling.ru{uri} permanent
+}
+
+# ============================================================
+# DNS prerequisites (document here — Caddy does not enforce):
+#   1. CAA record: orionpiling.ru. IN CAA 0 issue "letsencrypt.org"
+#   2. After deploy + 1 week of clean HSTS, submit to
+#      https://hstspreload.org
+# ============================================================

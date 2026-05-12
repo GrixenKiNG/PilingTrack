@@ -54,18 +54,14 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Global security headers for all routes
+      // CSP — kept here (per-route, needs nonce work in Sprint-2).
+      // All OTHER security headers (HSTS, X-Frame-Options, X-Content-Type-Options,
+      // Referrer-Policy, Permissions-Policy) are owned by Caddy in deploy/Caddyfile.prod
+      // to avoid duplicate-header drift that broke HSTS preload eligibility.
       {
         source: "/(.*)",
         headers: [
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-XSS-Protection", value: "0" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-          },
           { key: "X-DNS-Prefetch-Control", value: "off" },
           {
             key: "Content-Security-Policy",
@@ -92,20 +88,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // HSTS — production only
-      ...(process.env.NODE_ENV === "production"
-        ? [
-            {
-              source: "/(.*)",
-              headers: [
-                {
-                  key: "Strict-Transport-Security",
-                  value: "max-age=63072000; includeSubDomains; preload",
-                },
-              ],
-            },
-          ]
-        : []),
+      // HSTS removed — owned by Caddy in deploy/Caddyfile.prod.
       // Service Worker: always revalidate
       {
         source: "/sw.js",
