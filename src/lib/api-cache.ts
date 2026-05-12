@@ -13,7 +13,9 @@ let redis: Redis | null = null;
 function getRedis(): Redis | null {
   if (redis === undefined) {
     try {
-      const url = process.env.REDIS_URL;
+      // Prefer the dedicated cache instance (allkeys-lru). Fall back to
+      // REDIS_URL (state instance, noeviction) for single-Redis deployments.
+      const url = process.env.REDIS_URL_CACHE || process.env.REDIS_URL;
       if (url) {
         redis = new Redis(url, {
           maxRetriesPerRequest: 2,

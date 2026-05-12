@@ -68,7 +68,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
+      - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
       - WS_URL=ws://ws:3001
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
@@ -85,6 +86,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -118,7 +121,8 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
+      - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
       - WORKER_HEALTH_PORT=3002
       - OUTBOX_INTERVAL_MS=${OUTBOX_INTERVAL_MS:-10000}
       - PROJECTION_INTERVAL_MS=${PROJECTION_INTERVAL_MS:-5000}
@@ -135,6 +139,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -173,7 +179,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - WS_PORT=3001
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
@@ -183,6 +189,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -217,7 +225,11 @@ services:
       - pilingtrack
 
   # ============================================================
-  # Redis — Pub/Sub + Cache
+  # Redis (state) — rate-limit counters, queues, pub/sub
+  # ------------------------------------------------------------
+  # noeviction: losing a counter means a brute-force gets a free
+  # extra window; losing a queued job means the work is dropped.
+  # AOF on for durability across restarts.
   # ============================================================
   redis:
     image: redis:7-alpine
@@ -229,12 +241,54 @@ services:
       - "6380:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    networks:
+      - pilingtrack
+
+  # ============================================================
+  # Redis (cache) — response cache, API cache
+  # ------------------------------------------------------------
+  # allkeys-lru: cache miss is just a fresh fetch, eviction is fine.
+  # No AOF — cache is rebuildable from source of truth.
+  # ============================================================
+  redis-cache:
+    image: redis:7-alpine
+    container_name: pilingtrack-redis-cache
+    restart: unless-stopped
+    # No host port — internal only. Reachable via redis-cache:6379.
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      - --save
+      - ""
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     networks:
       - pilingtrack
 

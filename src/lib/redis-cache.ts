@@ -39,7 +39,9 @@ import { logger } from '@/lib/logger';
 // Configuration
 // ============================================================
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+// Prefer the dedicated cache instance (allkeys-lru). Fall back to
+// REDIS_URL (state instance, noeviction) for single-Redis deployments.
+const REDIS_URL = process.env.REDIS_URL_CACHE || process.env.REDIS_URL || 'redis://localhost:6379';
 const CACHE_DEFAULT_TTL = parseInt(process.env.CACHE_DEFAULT_TTL || '300', 10); // 5 min
 const CACHE_MAX_RETRIES = 2;
 const CACHE_CONNECT_TIMEOUT = 5000;
