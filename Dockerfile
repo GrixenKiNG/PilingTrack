@@ -8,7 +8,11 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 COPY package.json package-lock.json ./
-RUN npm ci --prefer-offline --no-audit --ignore-scripts 2>/dev/null || npm install --prefer-offline --no-audit
+# Strict install: fail the build if the lockfile is out of sync
+# (the old `|| npm install` fallback silently ran postinstall scripts
+# that --ignore-scripts had intentionally skipped — supply-chain risk).
+# Prisma's postinstall is run explicitly below via `npx prisma generate`.
+RUN npm ci --prefer-offline --no-audit --ignore-scripts
 
 # ============================================================
 # Stage 2: Build application
