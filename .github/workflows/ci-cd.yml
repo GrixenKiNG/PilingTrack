@@ -8,7 +8,8 @@ on:
 
 env:
   NODE_VERSION: "22"
-  DATABASE_URL: "file:./test.db"
+  # No DATABASE_URL here — Prisma reads DATABASE_URL_POSTGRES via prisma.config.ts.
+  # Integration tests run in .github/workflows/ci.yml with a real Postgres service.
   NEXT_PUBLIC_WS_URL: "ws://localhost:3001"
 
 jobs:

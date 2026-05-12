@@ -65,5 +65,81 @@ jobs:
 
       - name: Unit tests
         # Only the in-src unit tests. Integration / contract suites need a
-        # real Postgres + Redis and are kept in a separate (future) job.
+        # real Postgres + Redis — see the `integration` job below.
         run: npx vitest run src/
+
+  # Validates that Prisma migrations apply cleanly on a real Postgres.
+  # This catches a class of bugs that pure-mock unit tests miss:
+  # syntax that Prisma's parser accepts but Postgres rejects,
+  # ordering issues, and RLS policies that need DB state to compile.
+  #
+  # The tests under `tests/integration/` currently mock Prisma, so they
+  # are not run here. A real-DB integration suite is a follow-up.
+  schema-validation:
+    name: Schema + migrations (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pilingtrack_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pilingtrack_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_PROVIDER: postgres
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/pilingtrack_ci?schema=public'
+      DATABASE_URL_POSTGRES: 'postgresql://postgres:postgres@localhost:5432/pilingtrack_ci?schema=public'
+      REDIS_URL: 'redis://localhost:6379'
+      SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
+      ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
+      PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
+      DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
+      NEXT_TELEMETRY_DISABLED: '1'
+      SKIP_SEED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      # Validates migrations against a real Postgres — this is the
+      # check that was missing from the audit (CI was on SQLite stubs).
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      # Smoke-check that migrations produced the expected schema —
+      # cheap insurance against a silently-empty migration.
+      - name: Verify schema applied
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d pilingtrack_ci \
+            -tAc "select count(*) from information_schema.tables where table_schema='public'" \
+            | awk '{ if ($1 < 30) { print "FAIL: only " $1 " tables, expected >= 30"; exit 1 } else { print "OK: " $1 " tables" } }'
