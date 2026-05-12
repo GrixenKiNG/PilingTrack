@@ -95,3 +95,7 @@ pnpm-lock.yaml
 yarn.lock
 .gitnexus
 tmp-screenshots/
+
+# Database dumps — may contain real PII / auth material.
+*.dump
+*.sql.gz
