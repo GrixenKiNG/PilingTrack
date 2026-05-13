@@ -90,6 +90,11 @@ function createPrismaClient(): PostgresPrismaClient {
     connectionString: url,
     connectionTimeoutMillis: poolTimeout * 1000,
     max: connectionLimit,
+    // Keep pooled connections open. With PgBouncer + SCRAM-SHA-256 every
+    // reconnect costs two round-trips of auth, so churn from the default
+    // 10s idle timeout was burning CPU and adding first-query latency.
+    idleTimeoutMillis: 0,
+    keepAlive: true,
   });
 
   return new PrismaClient({
