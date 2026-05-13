@@ -95,15 +95,10 @@ async function consumeOutboxEvents(
   let processedCount = 0;
 
   for (const outboxEvent of events) {
-    // Idempotency check: skip if another replica of this consumer already
-    // processed the row.
-    const current = await db.outboxEvent.findUnique({
-      where: { id: outboxEvent.id },
-      select: { [consumerColumn]: true } as any,
-    }) as Record<string, boolean> | null;
-
-    if (current?.[consumerColumn]) continue;
-
+    // NOTE: handlers MUST be idempotent. Two replicas of this consumer can
+    // race, both pass the findMany window, both run the handler, only one
+    // wins the atomic updateMany below. Duplicate side effects are not
+    // prevented here — they're absorbed by handler idempotency.
     try {
       // Reconstruct the domain event from outbox columns. Some writers store
       // the full event in `payload`, others store only `event.data`. We treat
@@ -125,9 +120,11 @@ async function consumeOutboxEvents(
 
       await handler(event);
 
-      // Mark this consumer as done. Only this consumer's column is touched
-      // — the other consumer still sees the row as unconsumed.
-      await db.outboxEvent.update({
+      // Atomic claim: only this consumer's column is touched. updateMany
+      // (not update) so a losing race returns {count:0} instead of
+      // throwing P2025, which would otherwise land in the catch below and
+      // re-schedule retry for an event that's already been processed.
+      const claim = await db.outboxEvent.updateMany({
         where: { id: outboxEvent.id, [consumerColumn]: false } as any,
         data: {
           [consumerColumn]: true,
@@ -135,7 +132,9 @@ async function consumeOutboxEvents(
         } as any,
       });
 
-      processedCount++;
+      if (claim.count > 0) {
+        processedCount++;
+      }
     } catch (error) {
       const attempts = outboxEvent.attempts + 1;
       const errorMessage = error instanceof Error ? error.message : String(error);

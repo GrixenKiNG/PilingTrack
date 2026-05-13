@@ -80,6 +80,9 @@ services:
       resources:
         limits:
           memory: 64m
+    logging:
+      driver: json-file
+      options: { max-size: '5m', max-file: '3' }
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
@@ -94,6 +97,9 @@ services:
       resources:
         limits:
           memory: 64m
+    logging:
+      driver: json-file
+      options: { max-size: '5m', max-file: '3' }
 
   redis-exporter:
     image: oliver006/redis_exporter:latest
@@ -108,6 +114,9 @@ services:
       resources:
         limits:
           memory: 64m
+    logging:
+      driver: json-file
+      options: { max-size: '5m', max-file: '3' }
 
 volumes:
   prometheus-data:
