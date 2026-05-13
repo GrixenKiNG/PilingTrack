@@ -1,0 +1,62 @@
+name: Deploy to prod
+
+# Manual-only — no auto-deploy on push.
+# Triggered from GitHub UI: Actions → Deploy to prod → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to redeploy (space-separated)'
+        required: false
+        default: 'app'
+        type: choice
+        options:
+          - app
+          - app workers
+          - app workers ws
+          - workers
+          - ws
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH + rebuild + restart
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Install SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id
+          chmod 600 ~/.ssh/id
+          ssh-keyscan -H 87.242.102.125 >> ~/.ssh/known_hosts
+
+      - name: Pull, rebuild, restart
+        env:
+          SERVICES: ${{ inputs.services }}
+        run: |
+          ssh -i ~/.ssh/id user1@87.242.102.125 \
+            "cd /opt/pilingtrack \
+             && git pull origin main \
+             && docker compose build $SERVICES \
+             && docker compose up -d $SERVICES"
+
+      - name: Verify health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf https://orionpiling.ru/api/health > /dev/null; then
+              curl -s https://orionpiling.ru/api/health
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Health check timed out after 90s"
+          curl -s https://orionpiling.ru/api/health
+          exit 1
