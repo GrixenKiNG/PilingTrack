@@ -222,6 +222,9 @@ services:
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=20
       - ADMIN_USERS=${POSTGRES_USER:-postgres}
+      # Postgres 18 stores passwords as SCRAM-SHA-256 by default;
+      # the edoburu default of md5 produces "wrong password type" (08P01).
+      - AUTH_TYPE=scram-sha-256
     depends_on:
       postgres:
         condition: service_healthy
