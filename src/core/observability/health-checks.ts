@@ -10,6 +10,7 @@
  *   { status: "ok" | "degraded" | "unhealthy", checks: {...}, uptime: number }
  */
 
+import * as v8 from 'node:v8';
 import { db } from '@/lib/db';
 import { getDatabaseProvider } from '@/lib/db';
 
@@ -58,8 +59,13 @@ function checkMemory(): HealthCheck {
   const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
   const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
 
-  // Warn if heap used > 80% of total
-  const heapUsagePercent = used.heapTotal > 0 ? (used.heapUsed / used.heapTotal) * 100 : 0;
+  // Compare against the V8 heap ceiling, not the dynamic heapTotal.
+  // heapTotal tracks heapUsed closely (Node grows it on demand), so the
+  // old `heapUsed/heapTotal` ratio sat near 90% permanently and made
+  // /api/health report "warn" forever.
+  const heapLimit = v8.getHeapStatistics().heap_size_limit;
+  const heapLimitMB = Math.round(heapLimit / 1024 / 1024);
+  const heapUsagePercent = heapLimit > 0 ? (used.heapUsed / heapLimit) * 100 : 0;
 
   return {
     name: 'memory',
@@ -67,6 +73,7 @@ function checkMemory(): HealthCheck {
     details: {
       heapUsedMB,
       heapTotalMB,
+      heapLimitMB,
       heapUsagePercent: Math.round(heapUsagePercent),
       rssMB: Math.round(used.rss / 1024 / 1024),
     },
