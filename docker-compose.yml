@@ -68,7 +68,7 @@ services:
       # H-3: runtime goes through PgBouncer (transaction pooling).
       # Migrations still use direct postgres (see migrate service).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
-      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:6432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
@@ -122,7 +122,7 @@ services:
       - NODE_ENV=production
       # H-3: runtime through PgBouncer; migrations stay direct (see migrate).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
-      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:6432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
@@ -181,7 +181,7 @@ services:
       - NODE_ENV=production
       # H-3: runtime through PgBouncer; migrations stay direct (see migrate).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
-      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:6432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - WS_PORT=3001
