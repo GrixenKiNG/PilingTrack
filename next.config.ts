@@ -54,7 +54,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Global CSP is now owned by src/middleware.ts (per-request nonce, C-4).
+      // Global CSP is now owned by src/proxy.ts (per-request nonce, C-4).
       // The PDF route above keeps its own CSP because it needs framing rules
       // distinct from the nonce policy.
       // All OTHER security headers (HSTS, X-Frame-Options, X-Content-Type-Options,

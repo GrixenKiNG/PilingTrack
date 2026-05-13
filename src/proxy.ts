@@ -130,44 +130,110 @@ function enforceTenant(request: NextRequest, response: NextResponse): NextRespon
 }
 
 // ============================================================
+// CSP Nonce (C-4)
+// ============================================================
+
+/**
+ * Build a per-request nonce CSP for HTML routes. Replaces the previous
+ * `script-src 'unsafe-inline'`. Next.js 16 auto-applies the nonce to its
+ * own bootstrap/hydration scripts when it sees `x-nonce` on the request.
+ *
+ * The PDF route owns its own CSP via next.config.ts and is matched by /api,
+ * so it bypasses this branch entirely.
+ */
+function buildNonceCsp(nonce: string): string {
+  const isProd = process.env.NODE_ENV === 'production';
+
+  return [
+    "default-src 'self'",
+    // Dev needs 'unsafe-eval' for React Refresh / HMR. Prod must NOT have it.
+    isProd
+      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'`
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' 'wasm-unsafe-eval'`,
+    // style-src keeps 'unsafe-inline' — Tailwind/CSS-in-JS rely on it, and
+    // inline CSS is materially lower risk than inline JS.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https: ws: wss:",
+    "media-src 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-src 'self' blob:",
+  ].join('; ');
+}
+
+// ============================================================
 // Proxy
 // ============================================================
 
 export function proxy(request: NextRequest) {
-  const origin = request.headers.get('origin');
-  const allowedOrigins = getAllowedOrigins();
+  const pathname = request.nextUrl.pathname;
+  const isApi = pathname.startsWith('/api');
 
-  // Handle CORS preflight
-  if (request.method === 'OPTIONS') {
-    if (origin && isOriginAllowed(origin, allowedOrigins)) {
-      const response = new NextResponse(null, { status: 204 });
-      response.headers.set('Access-Control-Allow-Origin', origin);
-      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Idempotency-Key, X-Tenant-ID');
-      response.headers.set('Access-Control-Expose-Headers', 'X-Request-Id, X-Tenant-ID');
-      response.headers.set('Access-Control-Max-Age', '86400');
-      response.headers.set('Access-Control-Allow-Credentials', 'true');
-      return addSecurityHeaders(response);
+  // -------- API branch: CORS + tenant + reinforced security headers --------
+  if (isApi) {
+    const origin = request.headers.get('origin');
+    const allowedOrigins = getAllowedOrigins();
+
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      if (origin && isOriginAllowed(origin, allowedOrigins)) {
+        const response = new NextResponse(null, { status: 204 });
+        response.headers.set('Access-Control-Allow-Origin', origin);
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Idempotency-Key, X-Tenant-ID');
+        response.headers.set('Access-Control-Expose-Headers', 'X-Request-Id, X-Tenant-ID');
+        response.headers.set('Access-Control-Max-Age', '86400');
+        response.headers.set('Access-Control-Allow-Credentials', 'true');
+        return addSecurityHeaders(response);
+      }
+      return new NextResponse('CORS: Origin not allowed', { status: 403 });
     }
-    return new NextResponse('CORS: Origin not allowed', { status: 403 });
+
+    let response = NextResponse.next();
+
+    if (origin && isOriginAllowed(origin, allowedOrigins)) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
+      response.headers.set('Access-Control-Allow-Credentials', 'true');
+      response.headers.set('Access-Control-Expose-Headers', 'X-Request-Id, X-Tenant-ID');
+    }
+
+    response = addSecurityHeaders(response);
+    response = enforceTenant(request, response);
+
+    return response;
   }
 
-  // Add CORS headers to actual responses (when origin present)
-  let response = NextResponse.next();
+  // -------- HTML branch: nonce CSP --------
+  // Edge-runtime-safe: Buffer isn't available in edge proxy, but btoa is.
+  const nonce = btoa(crypto.randomUUID());
+  const csp = buildNonceCsp(nonce);
 
-  if (origin && isOriginAllowed(origin, allowedOrigins)) {
-    response.headers.set('Access-Control-Allow-Origin', origin);
-    response.headers.set('Access-Control-Allow-Credentials', 'true');
-    response.headers.set('Access-Control-Expose-Headers', 'X-Request-Id, X-Tenant-ID');
-  }
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  // Next.js reads CSP off the request header to nonce its inline scripts.
+  requestHeaders.set('content-security-policy', csp);
 
-  response = addSecurityHeaders(response);
-  response = enforceTenant(request, response);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy', csp);
 
   return response;
 }
 
-// Match only API routes
+// Match all paths except static assets and Next internals.
+// Prefetch requests are skipped — they don't render scripts and would
+// otherwise burn a new nonce per prefetch.
 export const config = {
-  matcher: '/api/:path*',
+  matcher: [
+    {
+      source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icon-).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
 };
