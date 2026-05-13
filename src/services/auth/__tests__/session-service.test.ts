@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createSessionToken,
   verifySessionToken,
+  verifyTokenSignature,
+  revokeSessionToken,
   readSessionToken,
   attachSessionCookie,
   clearSessionCookie,
+  __setRevocationStoreForTests,
+  type RevocationStore,
   SESSION_COOKIE_NAME,
 } from '../session-service';
 import { NextRequest, NextResponse } from 'next/server';
@@ -138,6 +142,84 @@ describe('session-service', () => {
       expect(cookie!.value).toBe('some-token');
       expect(cookie!.httpOnly).toBe(true);
       expect(cookie!.sameSite).toBe('lax');
+    });
+  });
+
+  describe('revocation', () => {
+    function makeMemoryStore(): RevocationStore & { entries: Map<string, number> } {
+      const entries = new Map<string, number>();
+      return {
+        entries,
+        async isRevoked(jti) {
+          const exp = entries.get(jti);
+          if (!exp) return false;
+          if (exp <= Math.floor(Date.now() / 1000)) {
+            entries.delete(jti);
+            return false;
+          }
+          return true;
+        },
+        async revoke(jti, ttl) {
+          entries.set(jti, Math.floor(Date.now() / 1000) + ttl);
+        },
+      };
+    }
+
+    it('createSessionToken sets a jti claim', async () => {
+      const token = await createSessionToken(mockUser);
+      const payload = await verifyTokenSignature(token);
+      expect(payload?.jti).toMatch(/^[a-f0-9]{32}$/);
+    });
+
+    it('verifySessionToken returns null for a revoked token', async () => {
+      const store = makeMemoryStore();
+      const restore = __setRevocationStoreForTests(store);
+      try {
+        const token = await createSessionToken(mockUser);
+        expect(await verifySessionToken(token)).not.toBeNull();
+
+        const revoked = await revokeSessionToken(token);
+        expect(revoked).toBe(true);
+        expect(store.entries.size).toBe(1);
+
+        expect(await verifySessionToken(token)).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+
+    it('verifyTokenSignature still accepts a revoked token (signature-only path)', async () => {
+      const store = makeMemoryStore();
+      const restore = __setRevocationStoreForTests(store);
+      try {
+        const token = await createSessionToken(mockUser);
+        await revokeSessionToken(token);
+
+        const payload = await verifyTokenSignature(token);
+        expect(payload).not.toBeNull();
+        expect(payload?.sub).toBe('user-1');
+      } finally {
+        restore();
+      }
+    });
+
+    it('revokeSessionToken stores TTL bounded by exp claim', async () => {
+      const store = makeMemoryStore();
+      const restore = __setRevocationStoreForTests(store);
+      try {
+        const token = await createSessionToken(mockUser);
+        const payload = await verifyTokenSignature(token);
+        await revokeSessionToken(token);
+
+        const storedExp = store.entries.get(payload!.jti!);
+        expect(storedExp).toBe(payload!.exp);
+      } finally {
+        restore();
+      }
+    });
+
+    it('revokeSessionToken returns false for invalid token', async () => {
+      expect(await revokeSessionToken('not.a.jwt')).toBe(false);
     });
   });
 

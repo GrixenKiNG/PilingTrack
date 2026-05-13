@@ -107,6 +107,16 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
   return resolutionPromise;
 }
 
+/**
+ * Drop the cached auth-user entry for a given token. Called from logout so the
+ * current process doesn't keep serving the revoked session from its 5s cache.
+ * Other processes pick up the Redis denylist within their own cache window.
+ */
+export function clearAuthUserCacheEntry(token: string) {
+  authUserCache.delete(token);
+  authUserInFlight.delete(token);
+}
+
 export async function requireAuth(request: NextRequest): Promise<AuthResult> {
   const requestId = getRequestId(request);
 
