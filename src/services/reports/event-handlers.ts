@@ -33,13 +33,35 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
   try {
     const { db } = await import('@/lib/db');
 
+    // Older emit sites construct events without siteId/userId/tenantId.
+    // Falling back to '' wrote ~26 unjoinable rows on prod. Look up the
+    // Report row to fill the gaps; skip if the report itself is missing.
+    let siteId = event.siteId;
+    let userId = event.userId;
+    let tenantId = event.tenantId;
+    if (!siteId || !userId) {
+      const report = await db.report.findUnique({
+        where: { id: event.aggregateId },
+        select: { siteId: true, userId: true, tenantId: true },
+      });
+      siteId = siteId || report?.siteId;
+      userId = userId || report?.userId;
+      tenantId = tenantId || report?.tenantId || undefined;
+    }
+    if (!siteId || !userId) {
+      logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId', {
+        eventType: event.type, aggregateId: event.aggregateId,
+      });
+      return;
+    }
+
     await db.reportAnalytics.upsert({
       where: { reportId: event.aggregateId },
       create: {
         reportId: event.aggregateId,
-        siteId: event.siteId || '',
-        userId: event.userId || '',
-        tenantId: event.tenantId || null,
+        siteId,
+        userId,
+        tenantId: tenantId || null,
         status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft',
         totalPiles: (event.data.totalPiles as number) || 0,
         totalDrilling: (event.data.totalDrilling as number) || 0,
