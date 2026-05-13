@@ -1,0 +1,16 @@
+[Unit]
+Description=PilingTrack Postgres backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=user1
+Group=user1
+WorkingDirectory=/opt/pilingtrack
+Environment=ENV_FILE=.env
+Environment=BACKUP_DIR=/var/backups/pilingtrack
+Environment=RETENTION_DAYS=30
+ExecStart=/bin/bash /opt/pilingtrack/scripts/backup-postgres.sh
+StandardOutput=journal
+StandardError=journal
