@@ -54,7 +54,9 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // CSP — kept here (per-route, needs nonce work in Sprint-2).
+      // Global CSP is now owned by src/middleware.ts (per-request nonce, C-4).
+      // The PDF route above keeps its own CSP because it needs framing rules
+      // distinct from the nonce policy.
       // All OTHER security headers (HSTS, X-Frame-Options, X-Content-Type-Options,
       // Referrer-Policy, Permissions-Policy) are owned by Caddy in deploy/Caddyfile.prod
       // to avoid duplicate-header drift that broke HSTS preload eligibility.
@@ -63,29 +65,6 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-XSS-Protection", value: "0" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              // Next.js emits inline bootstrap/hydration scripts; without
-              // 'unsafe-inline' (or a per-request nonce), the app white-screens
-              // in production. 'unsafe-eval' stays disabled in prod — that's
-              // the bigger risk. A nonce-based CSP is the proper long-term fix.
-              process.env.NODE_ENV === "production"
-                ? "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'"
-                : "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
-              "font-src 'self' data:",
-              "connect-src 'self' https: ws: wss:",
-              "media-src 'self'",
-              "object-src 'none'",
-              "frame-ancestors 'self'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-src 'self' blob:",
-            ].filter(Boolean).join("; "),
-          },
         ],
       },
       // HSTS removed — owned by Caddy in deploy/Caddyfile.prod.
