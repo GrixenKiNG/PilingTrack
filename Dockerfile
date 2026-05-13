@@ -47,6 +47,10 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# Next.js standalone server defaults to binding the container hostname only.
+# Forcing 0.0.0.0 makes it listen on all interfaces so the compose healthcheck
+# (wget http://localhost:3000/api/health) actually reaches it.
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Copy standalone build

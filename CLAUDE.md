@@ -175,7 +175,6 @@ If disk tight: `docker builder prune -af` (frees ~2 GB), `docker image prune -af
 **Known limitations:**
 - **Telegram API blocked** at network level (`api.telegram.org` unreachable from VPS — Russian provider). Telegram notifications need an outbound proxy (`HTTPS_PROXY`) to work; without it `/api/notifications/telegram/test` returns `{ok:false, error:"fetch failed"}`.
 - **`/api/sync/v2` requires `reports.manage_all`** — operators get 403. Service worker fires syncs from all clients regardless. By design or open question, not yet decided.
-- **App reports `unhealthy`** in `docker compose ps` — Next.js binds to container hostname only, not `localhost`; the compose healthcheck uses `localhost:3000`. App actually serves fine externally; cosmetic.
 
 **User context:** non-programmer in Russian. Reply in Russian, prefer concrete commands the user can paste, avoid open-ended "what do you want to do" questions when the next step is obvious. See user memory for more.
 
