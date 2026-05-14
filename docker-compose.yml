@@ -138,6 +138,14 @@ services:
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       - TELEGRAM_API_BASE=${TELEGRAM_API_BASE:-}
+      # The Telegram bot token is encrypted at rest in DB; the outbox
+      # event handler (which runs INSIDE this workers container, not
+      # app) needs ENCRYPTION_KEY to decrypt it. Without this the
+      # logs show "Failed to load Telegram config: No encryption key
+      # configured" and every submitted-report Telegram notification
+      # is silently skipped.
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
+      - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
