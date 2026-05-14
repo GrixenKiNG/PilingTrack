@@ -5,6 +5,14 @@ import { ServiceWorkerRegistration } from '@/components/piling/service-worker-re
 import { OfflineInitializer } from '@/mobile/ui-adapters/offline-initializer';
 import './globals.css';
 
+// Force every HTML route to be rendered per request so the proxy can
+// inject a fresh CSP nonce. Without this, client-component pages (login,
+// admin, operator) get prerendered at build time with no nonce attribute
+// on their <script> tags — the runtime proxy then sends a strict CSP
+// that blocks every one of those tags, yielding a blank screen on first
+// load (most visible on mobile where Ctrl+Shift+R isn't an option).
+export const dynamic = 'force-dynamic';
+
 const APP_TITLE = 'PilingTrack';
 const APP_DESCRIPTION =
   'Платформа учёта и управления свайными работами: объекты, бригады, установки, отчёты и аналитика.';
