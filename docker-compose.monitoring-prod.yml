@@ -107,6 +107,12 @@ services:
     container_name: pilingtrack-redis-exporter
     command:
       - '--redis.addr=redis://redis:6379'
+    environment:
+      # Redis on prod has requirepass set; without this the exporter
+      # serves /metrics but every redis_* metric is NOAUTH-failed,
+      # which surfaces as "no data" in every Grafana panel except
+      # the PostgreSQL ones.
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     restart: unless-stopped
     networks:
       - monitoring
