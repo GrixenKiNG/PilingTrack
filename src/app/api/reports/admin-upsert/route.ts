@@ -26,11 +26,16 @@ export const POST = withMutation(
       );
     }
     const { upsertReport } = await getReportCommandService();
+    // Same tenantId-from-session fix as in the operator route — admin
+    // edits were also writing NULL tenantId, hiding the edited report
+    // from the tenant-scoped history view.
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || undefined;
     const result = await upsertReport(
       {
         reportId: dto.reportId,
         siteId: dto.siteId,
         userId: dto.userId,
+        tenantId,
         date: dto.date,
         shiftType: dto.shiftType,
         shiftStart: dto.shiftStart,

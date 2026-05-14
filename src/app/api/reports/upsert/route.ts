@@ -54,11 +54,20 @@ export const POST = withMutation(
     const { assertCanActForUser, resolveReportUserId, upsertReport } = await getReportCommandService();
     assertCanActForUser(user!, requestedUserId);
 
+    // Single-tenant prod was leaving every new Report.tenantId as NULL
+    // because nothing on the write path supplied it. The history /
+    // analytics queries then filter by tenantId=orion and silently
+    // hide those reports (operator sees "no history", admin period
+    // filter shows zeros). Resolve it once here, identically to
+    // /api/sync/v2.
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || null;
+
     const result = await upsertReport(
       {
         reportId: validatedDto.reportId || validatedDto.id || crypto.randomUUID(),
         siteId: validatedDto.siteId,
         userId: resolveReportUserId(user!, requestedUserId),
+        tenantId: tenantId || undefined,
         date: validatedDto.date,
         shiftType: validatedDto.shiftType,
         shiftStart: validatedDto.shiftStart,
