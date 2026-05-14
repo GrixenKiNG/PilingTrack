@@ -192,6 +192,26 @@ groups:
           summary: "Redis memory usage > 80%"
           description: "Redis is using {{ $value | humanizePercentage }} of max memory"
 
+      - alert: HostDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/host",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/host",fstype!~"tmpfs|overlay"}) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          service: host
+        annotations:
+          summary: "Host disk free < 15%"
+          description: "Free space on / is {{ $value | humanizePercentage }} — docker prune may be needed before next rebuild"
+
+      - alert: HostDiskSpaceCritical
+        expr: node_filesystem_avail_bytes{mountpoint="/host",fstype!~"tmpfs|overlay"} < 2 * 1024 * 1024 * 1024
+        for: 2m
+        labels:
+          severity: critical
+          service: host
+        annotations:
+          summary: "CRITICAL: Host disk free < 2 GB"
+          description: "Only {{ $value | humanize1024 }}B free on / — Prometheus TSDB / docker builds will fail"
+
       - alert: WebSocketConnectionsDropping
         expr: rate(ws_connections_closed_total{job="pilingtrack-ws"}[5m]) > rate(ws_connections_opened_total{job="pilingtrack-ws"}[5m]) * 1.2
         for: 5m

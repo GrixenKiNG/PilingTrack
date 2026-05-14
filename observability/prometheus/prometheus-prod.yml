@@ -12,6 +12,9 @@ global:
     cluster: 'pilingtrack'
     environment: 'production'
 
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
 scrape_configs:
   # /api/metrics требует auth (requireAuth + assertCan('system.read')).
   # TODO M-10b: добавить bearer-token bypass для service-to-service scrape,
