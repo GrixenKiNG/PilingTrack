@@ -10,7 +10,8 @@ import { processReportChange } from './report-processor';
 import { getServerChanges } from './server-changes';
 
 export async function handleSync(request: SyncRequest): Promise<SyncResponse> {
-  const { deviceId, tenantId, userId, lastSyncAt, changes } = request;
+  const { deviceId, tenantId, userId, isPrivileged, lastSyncAt, changes } = request;
+  const actor = { userId, isPrivileged };
 
   const conflicts: Conflict[] = [];
   const serverChanges: ServerChange[] = [];
@@ -23,7 +24,7 @@ export async function handleSync(request: SyncRequest): Promise<SyncResponse> {
     // Process client changes
     for (const change of changes) {
       try {
-        const result = await processReportChange(change, tenantId);
+        const result = await processReportChange(change, tenantId, actor);
 
         if (!result.applied) {
           skipped++;

@@ -35,7 +35,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { assertCan } from '@/services/auth/authorization-service';
+import { isPrivilegedRole } from '@/services/auth/authorization-service';
 import { ServiceError } from '@/services/service-error';
 import { handleSync, type SyncRequest } from '@/modules/reports/application/sync-engine-v2';
 import { getRequestId } from '@/lib/request-context';
@@ -48,8 +48,10 @@ export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
-  // Authorization — sync v2 can mutate any entity
-  assertCan(user!, 'reports.manage_all');
+  // Authorization — any authenticated user may sync. Per-row ownership
+  // is enforced inside the sync engine: non-privileged actors can only
+  // create/update/delete reports they own; ADMIN/DISPATCHER stay free.
+  const isPrivileged = isPrivilegedRole(user!.role);
 
   const requestId = getRequestId(request);
 
@@ -70,6 +72,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       deviceId: body.deviceId,
       tenantId,
       userId: user!.id,
+      isPrivileged,
       lastSyncAt: body.lastSyncAt || '1970-01-01T00:00:00Z',
       changes: body.changes || [],
     };

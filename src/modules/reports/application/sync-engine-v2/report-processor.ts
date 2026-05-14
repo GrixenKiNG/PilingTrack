@@ -7,9 +7,22 @@ import { VectorClock, determineConflictType } from '@/core/shared/sync/vector-cl
 import type { Conflict, LocalChange } from '@/core/shared/types/sync';
 import { isIdempotent, recordIdempotency } from './idempotency';
 
+export interface ActorContext {
+  userId: string;
+  isPrivileged: boolean;
+}
+
+export class SyncForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SyncForbiddenError';
+  }
+}
+
 export async function processReportChange(
   change: LocalChange,
-  tenantId: string
+  tenantId: string,
+  actor: ActorContext,
 ): Promise<{ applied: boolean; conflict?: Conflict }> {
   const { data, baseVersion, op, opId, vectorClock: clientVC } = change;
   const reportData = data as Record<string, unknown>;
@@ -22,8 +35,17 @@ export async function processReportChange(
 
   const existing = await db.report.findUnique({
     where: { id: reportId },
-    select: { id: true, version: true, status: true, vectorClock: true },
+    // Need userId for ownership check below.
+    select: { id: true, version: true, status: true, vectorClock: true, userId: true },
   });
+
+  // Ownership check on UPDATE/DELETE: non-privileged operators may only
+  // mutate reports they own. Without this, dropping the route-level
+  // `manage_all` gate would let any operator update/delete any report by
+  // ID inside the tenant.
+  if (existing && !actor.isPrivileged && existing.userId !== actor.userId) {
+    throw new SyncForbiddenError(`actor ${actor.userId} not allowed to modify report owned by ${existing.userId}`);
+  }
 
   // CREATE
   if (!existing) {
@@ -32,6 +54,12 @@ export async function processReportChange(
     }
 
     const vc = clientVC || { [reportData.deviceId as string || 'server']: 1 };
+    // Force ownership to the actor for non-privileged users — the client
+    // payload is untrusted. Privileged users (ADMIN/DISPATCHER) keep the
+    // ability to backfill on behalf of others.
+    const ownerUserId = actor.isPrivileged
+      ? ((reportData.userId as string) || actor.userId)
+      : actor.userId;
 
     await db.$transaction([
       db.report.create({
@@ -41,7 +69,7 @@ export async function processReportChange(
           tenantId,
           version: 1,
           status: (reportData.status as string) || 'draft',
-          userId: reportData.userId as string,
+          userId: ownerUserId,
           siteId: reportData.siteId as string,
           date: reportData.date as string,
           shiftType: (reportData.shiftType as string) || 'day',
@@ -58,7 +86,7 @@ export async function processReportChange(
           reportId,
           version: 1,
           data: reportData as any,
-          actorId: (reportData.userId as string) || 'sync',
+          actorId: ownerUserId,
         },
       }),
     ]);
@@ -95,7 +123,7 @@ export async function processReportChange(
       serverVersion: existing.version,
       deviceId: ((change.data as Record<string, unknown>)?.deviceId as string) || 'unknown',
       tenantId,
-      userId: (reportData.userId as string) || 'unknown',
+      userId: actor.userId,
     };
 
     const resolution = engine.resolve(ctx);
@@ -196,7 +224,7 @@ export async function processReportChange(
             ...reportData,
             vectorClock: mergedVC,
           } as any,
-          actorId: (reportData.userId as string) || 'sync',
+          actorId: actor.userId,
         },
       }),
     ]);

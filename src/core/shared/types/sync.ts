@@ -75,6 +75,10 @@ export interface SyncRequest {
   deviceId: string;
   tenantId: string;
   userId: string;
+  // Privileged actors (ADMIN/DISPATCHER) may sync arbitrary records;
+  // operators may only touch rows they own. The route resolves this from
+  // the session — never trust a flag sent by the client.
+  isPrivileged: boolean;
   lastSyncAt: string;     // ISO timestamp последнего успешного sync
   changes: LocalChange[];
 }
