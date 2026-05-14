@@ -97,8 +97,23 @@ export async function upsertReport(
 
   const repo = getReportRepository();
 
-  // Phase 2: Load existing or create new aggregate
-  const existing = await repo.findById(input.reportId);
+  // Phase 2: Load existing or create new aggregate.
+  //
+  // The Report table has @@unique([userId, siteId, date]) — one report per
+  // operator per site per day. The client supplies its own reportId (used
+  // as the idempotency token), so when a client retries with a different
+  // reportId for the same natural key (mobile form regenerates UUID on
+  // resubmit, offline outbox replays after server-side save, etc.) the
+  // CREATE path would hit a P2002 unique-constraint and surface as 409.
+  // Fall back to the natural key to honour the "one report per day" rule
+  // and let the user edit the existing row instead of failing.
+  let existing = await repo.findById(input.reportId);
+  if (!existing) {
+    existing = await repo.findByUserIdAndDate(input.userId, input.siteId, input.date);
+    if (existing) {
+      input.reportId = existing.getState().reportId;
+    }
+  }
   let aggregate: ReportAggregate;
 
   if (existing) {
