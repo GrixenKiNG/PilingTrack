@@ -17,8 +17,8 @@
  * - Retry with exponential backoff on failure
  */
 
-const SHELL_CACHE = 'pilingtrack-shell-v4';
-const API_CACHE = 'pilingtrack-api-v4';
+const SHELL_CACHE = 'pilingtrack-shell-v5';
+const API_CACHE = 'pilingtrack-api-v5';
 const MAX_SYNC_RETRIES = 5;
 const BASE_RETRY_DELAY = 1000; // 1 second
 
@@ -50,6 +50,16 @@ self.addEventListener('activate', (event) => {
         )
       )
       .then(() => self.clients.claim())
+      .then(async () => {
+        // After a cache-version bump, clients may still be running on
+        // HTML that references chunks deleted in the latest deploy
+        // (white-screen symptom on mobile). Force a one-shot reload so
+        // each tab pulls fresh HTML + chunks under the new SW.
+        const clients = await self.clients.matchAll({ type: 'window' });
+        for (const client of clients) {
+          client.postMessage({ type: 'SW_ACTIVATED_RELOAD' });
+        }
+      })
   );
 });
 
@@ -126,7 +136,13 @@ async function networkFirstCacheFallback(request) {
   try {
     const response = await fetch(request);
 
-    if (response.ok) {
+    // Never cache HTML documents. Each new build emits chunks with fresh
+    // hashed filenames; a stale cached HTML keeps pointing at deleted
+    // chunks and renders a blank screen on the next visit.
+    const contentType = response.headers.get('content-type') || '';
+    const isHtml = contentType.includes('text/html');
+
+    if (response.ok && !isHtml) {
       const clone = response.clone();
       caches.open(API_CACHE).then((cache) => cache.put(request, clone));
     }

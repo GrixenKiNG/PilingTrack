@@ -81,6 +81,19 @@ export function ServiceWorkerRegistration() {
       return undefined;
     }
 
+    // When a freshly activated SW signals that a cache-version bump just
+    // happened, the current page is still running on HTML that may point
+    // to deleted chunks. Reload once to escape the white-screen state.
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SW_ACTIVATED_RELOAD') {
+        const sessionKey = 'sw-reloaded-once';
+        if (window.sessionStorage.getItem(sessionKey)) return;
+        window.sessionStorage.setItem(sessionKey, '1');
+        window.location.reload();
+      }
+    };
+    navigator.serviceWorker?.addEventListener?.('message', handleSwMessage);
+
     if ('serviceWorker' in navigator && window.isSecureContext) {
       void navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
@@ -106,7 +119,9 @@ export function ServiceWorkerRegistration() {
         });
     }
 
-    return undefined;
+    return () => {
+      navigator.serviceWorker?.removeEventListener?.('message', handleSwMessage);
+    };
   }, []);
 
   useEffect(() => {

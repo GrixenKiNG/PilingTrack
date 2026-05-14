@@ -152,8 +152,8 @@ export function ReportFormDialog({
     if (!formUserId || !formSiteId || !formDate) {
       toast.error('Заполните оператора, объект и дату'); return;
     }
-    if (formPiles.length === 0 && formDrillings.length === 0) {
-      toast.error('Добавьте хотя бы одну сваю или бурение'); return;
+    if (formPiles.length === 0 && formDrillings.length === 0 && formDowntimes.length === 0) {
+      toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return;
     }
     const reportId = editReport?.reportId || crypto.randomUUID();
     setSubmitting(true);

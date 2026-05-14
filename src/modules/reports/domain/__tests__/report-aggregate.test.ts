@@ -99,8 +99,15 @@ describe('ReportAggregate', () => {
     it('should reject submit with no entries', () => {
       const report = createTestReport();
       expect(() => report.submit('user-1')).toThrow(
-        'Report must contain at least pile work or drilling entries'
+        'Report must contain at least pile work, drilling, or a downtime entry'
       );
+    });
+
+    it('should submit report with only downtime (idle shift, no piles or drilling)', () => {
+      const report = createTestReport();
+      report.addDowntime({ reasonId: 'reason-1', duration: 11, comment: 'нет свай' }, 'user-1');
+      report.submit('user-1', 'Test User', 'OPERATOR');
+      expect(report.getState().status).toBe('submitted');
     });
 
     it('should not allow editing after submit', () => {

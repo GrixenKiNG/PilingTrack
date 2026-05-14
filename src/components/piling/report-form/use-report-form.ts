@@ -258,7 +258,7 @@ export function useReportForm(): UseReportFormReturn {
 
   const handleSubmit = async () => {
     if (!selectedSiteId || !user) { toast.error('Выберите объект'); return; }
-    if (piles.length === 0 && drillings.length === 0) { toast.error('Добавьте хотя бы одну сваю или бурение'); return; }
+    if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
     const finalReportId = reportId || crypto.randomUUID();
     setSubmitting(true);
     try {

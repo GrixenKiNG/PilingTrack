@@ -57,7 +57,7 @@ export function SubmitBar({
           <div className="flex items-center gap-1.5 mb-2 justify-center">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
             <p className="text-xs text-amber-600 font-medium">
-              {!selectedSiteId ? 'Сначала выберите объект выше' : 'Добавьте хотя бы одну сваю или бурение'}
+              {!selectedSiteId ? 'Сначала выберите объект выше' : 'Добавьте хотя бы одну сваю, бурение или простой'}
             </p>
           </div>
         )}

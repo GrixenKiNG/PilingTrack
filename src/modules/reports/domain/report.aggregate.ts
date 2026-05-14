@@ -227,8 +227,12 @@ export class ReportAggregate {
   submit(userId: string, actorName?: string, actorRole?: string): void {
     this.assertDraft();
 
-    if (this.state.piles.length === 0 && this.state.drillings.length === 0) {
-      throw new Error('Report must contain at least pile work or drilling entries');
+    if (
+      this.state.piles.length === 0 &&
+      this.state.drillings.length === 0 &&
+      this.state.downtimes.length === 0
+    ) {
+      throw new Error('Report must contain at least pile work, drilling, or a downtime entry');
     }
 
     this.state.status = 'submitted';
