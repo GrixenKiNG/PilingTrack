@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
 import { ServiceWorkerRegistration } from '@/components/piling/service-worker-registration';
@@ -56,11 +57,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Pull the per-request CSP nonce the proxy minted so next-themes'
+  // anti-flash inline script can carry it. Without an explicit `nonce`
+  // prop, ThemeProvider injects a <script> without the attribute and
+  // strict-dynamic CSP blocks it — the visible symptom is one
+  // "Executing inline script violates" error per page load on iOS.
+  const nonce = (await headers()).get('x-nonce') || undefined;
+
   return (
     <html lang="ru" suppressHydrationWarning>
       <body className="font-sans antialiased bg-background text-foreground">
@@ -69,6 +77,7 @@ export default function RootLayout({
           defaultTheme="light"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           <ServiceWorkerRegistration />
           <OfflineInitializer />

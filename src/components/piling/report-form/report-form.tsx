@@ -101,7 +101,7 @@ export function ReportForm() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 pt-safe flex items-center gap-3">
         <button onClick={() => router.push('/operator')}
           className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
           <ArrowLeft className="w-5 h-5 text-slate-600" />

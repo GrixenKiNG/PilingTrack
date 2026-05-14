@@ -104,7 +104,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="sticky top-0 z-30 bg-white border-b">
+      <div className="sticky top-0 z-30 bg-white border-b pt-safe">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center">
@@ -224,7 +224,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         {sidebarContent}
       </aside>
 
-      <div className="lg:hidden sticky top-0 z-30 bg-white border-b">
+      <div className="lg:hidden sticky top-0 z-30 bg-white border-b pt-safe">
         <div className="flex items-center gap-3 px-4 py-3">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>

@@ -123,6 +123,17 @@
   }
 }
 
+/* iOS safe-area utilities — needed for iPhone 14+ with Dynamic Island.
+   Without these, the sticky top bar slides under the status bar /
+   Dynamic Island area, making the dashboard / logout buttons there
+   unreachable. Used on every sticky top:0 surface. */
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+}
+
 /* Tabular numbers for data */
 .font-mono-data {
   font-family: var(--font-mono), 'JetBrains Mono', 'IBM Plex Mono', monospace;
