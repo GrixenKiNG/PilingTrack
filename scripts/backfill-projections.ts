@@ -13,19 +13,23 @@ import 'dotenv/config';
 
 async function main() {
   const arg = (process.argv[2] || 'all').trim();
-  const { rebuildAll, rebuildOperatorPerformance, rebuildSiteDailySummary, rebuildSiteWeeklyTrend } =
-    await import('../src/modules/reports/application/projections/rebuild');
+  const {
+    rebuildAll, rebuildOperatorPerformance, rebuildSiteDailySummary,
+    rebuildSiteWeeklyTrend, rebuildReportAnalytics, rebuildReportStats,
+  } = await import('../src/modules/reports/application/projections/rebuild');
 
   const results =
     arg === 'all' ? await rebuildAll() :
     arg === 'operator-performance' ? [await rebuildOperatorPerformance()] :
     arg === 'site-daily' ? [await rebuildSiteDailySummary()] :
     arg === 'site-weekly' ? [await rebuildSiteWeeklyTrend()] :
+    arg === 'report-analytics' ? [await rebuildReportAnalytics()] :
+    arg === 'report-stats' ? [await rebuildReportStats()] :
     null;
 
   if (!results) {
     console.error(`Unknown projection: ${arg}`);
-    console.error('Allowed: operator-performance | site-daily | site-weekly | all');
+    console.error('Allowed: operator-performance | site-daily | site-weekly | report-analytics | report-stats | all');
     process.exit(1);
   }
 
