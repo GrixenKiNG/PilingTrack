@@ -173,8 +173,8 @@ If disk tight: `docker builder prune -af` (frees ~2 GB), `docker image prune -af
 **Migrate service** runs `prisma migrate deploy` and seed. Seed must be skipped on prod (`SKIP_SEED=1` in `.env`) — Prisma 7 driver-adapter requires options that `prisma/seed.ts` doesn't pass; would fail on bare `new PrismaClient()`.
 
 **Known limitations:**
-- **Telegram API blocked** at network level (`api.telegram.org` unreachable from VPS — Russian provider). Telegram notifications need an outbound proxy (`HTTPS_PROXY`) to work; without it `/api/notifications/telegram/test` returns `{ok:false, error:"fetch failed"}`.
-- **`/api/sync/v2` requires `reports.manage_all`** — operators get 403. Service worker fires syncs from all clients regardless. By design or open question, not yet decided.
+- **Telegram API blocked at provider** — `api.telegram.org` unreachable directly from the VPS (Russian ISP). Routed through a Cloudflare Worker proxy set via `TELEGRAM_API_BASE=https://pilingtrack-tg-proxy.sasorion02.workers.dev` in `.env`. Notifications work; if the env var disappears, fetches fail.
+- **`/api/sync/v2` authorization** — coarse `reports.manage_all` gate replaced with per-row ownership inside the sync engine. Operators sync only reports they own; ADMIN/DISPATCHER stay free to sync across users. Enforcement lives in `src/modules/reports/application/sync-engine-v2/report-processor.ts` (`SyncForbiddenError`).
 
 **User context:** non-programmer in Russian. Reply in Russian, prefer concrete commands the user can paste, avoid open-ended "what do you want to do" questions when the next step is obvious. See user memory for more.
 
