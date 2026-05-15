@@ -20,6 +20,11 @@ vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   },
+  AnimatePresence: ({ children }: any) => <>{children}</>,
+}));
+
+vi.mock('next/image', () => ({
+  default: ({ alt, ...props }: any) => <img alt={alt} {...props} />,
 }));
 
 vi.mock('lucide-react', () => ({
@@ -57,7 +62,8 @@ describe('LoginPage', () => {
   it('renders the login form', () => {
     render(<LoginPage />);
 
-    expect(screen.getByText('PilingTrack')).toBeDefined();
+    expect(screen.getByText('Piling')).toBeDefined();
+    expect(screen.getByText('Track')).toBeDefined();
     expect(screen.getByLabelText('Email')).toBeDefined();
     expect(screen.getByLabelText('Пароль')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Войти' })).toBeDefined();
