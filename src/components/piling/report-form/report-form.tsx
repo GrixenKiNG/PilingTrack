@@ -11,6 +11,7 @@ import { PileSection } from './pile-section';
 import { DrillingSection } from './drilling-section';
 import { DowntimeSection } from './downtime-section';
 import { SubmitBar } from './submit-bar';
+import { PhotoSection } from './photo-section';
 import { filterPileGradesBySitePlan } from './filter-pile-grades';
 
 // Temp state for form inputs (kept local to avoid re-renders on every keystroke)
@@ -55,6 +56,7 @@ function useTempState() {
 
 export function ReportForm() {
   const {
+    reportId,
     date, setDate, shiftStart, setShiftStart, shiftEnd, setShiftEnd,
     sites, siteTree, setSiteTree, selectedSiteId, setSelectedSiteId,
     pileGrades, drillingTypes, downtimeReasons, equipment,
@@ -145,6 +147,8 @@ export function ReportForm() {
             onTempReasonChange={temp.setTempDowntimeReason} onTempDurationChange={temp.setTempDowntimeDuration}
             onTempCommentChange={temp.setTempDowntimeComment} onAdd={() => temp.addDowntime(addDowntime)}
             onRemove={removeDowntime} getDowntimeReasonName={getDowntimeReasonName} totalDowntime={totalDowntime} />
+
+          <PhotoSection reportId={reportId} canEdit />
 
           <SubmitBar totalPiles={totalPiles} totalPileMeters={totalPileMeters}
             totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}

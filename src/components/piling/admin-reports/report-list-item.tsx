@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FileText, HardHat, Drill, Clock, CalendarDays, User, Eye, Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ReportThumbnail } from './report-thumbnail';
 import type { ReportDTO } from '@/lib/types';
 
 interface ReportListItemProps {
@@ -65,6 +66,7 @@ export function ReportListItem({
               }>
                 {report.status === 'submitted' ? 'Отправлен' : 'Черновик'}
               </Badge>
+              <ReportThumbnail reportId={report.reportId} />
               <button onClick={(e) => { e.stopPropagation(); onPreviewPdf(report); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
                 title="Предпросмотр PDF">

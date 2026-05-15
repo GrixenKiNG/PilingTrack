@@ -220,22 +220,42 @@ export class MediaService {
       return this.toMediaRecord(media);
     }
 
-    // Verify file exists in S3
-    await s3CircuitBreaker.execute(async () => {
-      const command = new GetObjectCommand({
-        Bucket: this.config.bucket,
-        Key: media.key,
-      });
-      await this.s3Client.send(command);
+    // Download to verify the upload landed AND to feed the thumbnail step
+    // in one round-trip. We need the bytes either way for sharp.
+    const fetched = await s3CircuitBreaker.execute(async () => {
+      const command = new GetObjectCommand({ Bucket: this.config.bucket, Key: media.key });
+      return this.s3Client.send(command);
     });
 
-    // Generate thumbnail for images
     let thumbnailKey: string | null = null;
-    if (media.contentType.startsWith('image/')) {
-      thumbnailKey = `${media.key}.thumb.jpg`;
-      // In production: download image, resize, upload thumbnail
-      // For now: placeholder — integrate with sharp library
-      logger.info('Thumbnail generation placeholder', { mediaId, thumbnailKey });
+    if (media.contentType.startsWith('image/') && fetched.Body) {
+      try {
+        const { default: sharp } = await import('sharp');
+        const sourceBytes = Buffer.from(await fetched.Body.transformToByteArray());
+        const thumbBuffer = await sharp(sourceBytes)
+          .rotate() // honour EXIF orientation — phone photos otherwise come out sideways
+          .resize(this.config.thumbnailWidth, this.config.thumbnailWidth, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+
+        thumbnailKey = `${media.key}.thumb.jpg`;
+        await s3CircuitBreaker.execute(async () => {
+          const putCommand = new PutObjectCommand({
+            Bucket: this.config.bucket,
+            Key: thumbnailKey!,
+            Body: thumbBuffer,
+            ContentType: 'image/jpeg',
+          });
+          await this.s3Client.send(putCommand);
+        });
+      } catch (error) {
+        // Thumbnail failure must not break the confirm flow — original is uploaded.
+        logger.warn('Thumbnail generation failed, continuing without thumbnail', { mediaId, error });
+        thumbnailKey = null;
+      }
     }
 
     // Update media record
@@ -286,33 +306,22 @@ export class MediaService {
   /**
    * Soft delete a media file.
    * Actual S3 deletion happens after retention period.
+   *
+   * Authorization is the caller's responsibility — for the report flow it
+   * runs through assertCanAccessMediaEntity in the route layer, which
+   * checks both admin role and per-report ownership uniformly.
    */
-  async softDelete(mediaId: string, userId: string): Promise<void> {
+  async softDelete(mediaId: string, deletedBy: string): Promise<void> {
     const db = await getDbClient();
-    const media = await db.media.findUnique({
-      where: { id: mediaId },
-    });
-
-    if (!media) {
-      throw new ServiceError('Media not found', 404);
-    }
-
-    // Only owner or admin can delete
-    if (media.userId !== userId) {
-      // In production: check admin role
-      throw new ServiceError('Permission denied', 403);
-    }
+    const media = await db.media.findUnique({ where: { id: mediaId } });
+    if (!media) throw new ServiceError('Media not found', 404);
 
     await db.media.update({
       where: { id: mediaId },
-      data: {
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedBy: userId,
-      },
+      data: { isDeleted: true, deletedAt: new Date(), deletedBy },
     });
 
-    logger.info('Media soft deleted', { mediaId, userId });
+    logger.info('Media soft deleted', { mediaId, deletedBy });
   }
 
   /**

@@ -61,7 +61,9 @@ export function useReportForm(): UseReportFormReturn {
   const setSelectedSite = usePilingStore((s) => s.setSelectedSite);
   const router = useRouter();
 
-  const [reportId, setReportId] = useState('');
+  // Pre-generate so the photo widget can attach a file before the report
+  // is submitted; loadReport replaces this with the persisted id when editing.
+  const [reportId, setReportId] = useState(() => crypto.randomUUID());
   const [date, setDate] = useState('');
   const [shiftStart, setShiftStart] = useState('08:00');
   const [shiftEnd, setShiftEnd] = useState('20:00');

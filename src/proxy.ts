@@ -153,9 +153,13 @@ function buildNonceCsp(nonce: string): string {
     // style-src keeps 'unsafe-inline' — Tailwind/CSS-in-JS rely on it, and
     // inline CSS is materially lower risk than inline JS.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    isProd
+      ? "img-src 'self' data: blob: https:"
+      : "img-src 'self' data: blob: https: http://localhost:*",
     "font-src 'self' data:",
-    "connect-src 'self' https: ws: wss:",
+    isProd
+      ? "connect-src 'self' https: ws: wss:"
+      : "connect-src 'self' https: ws: wss: http://localhost:*",
     "media-src 'self'",
     "object-src 'none'",
     "frame-ancestors 'self'",

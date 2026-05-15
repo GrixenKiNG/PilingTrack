@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, HardHat, Drill, Clock, Wrench, Loader2 } from 'lu
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -83,6 +84,10 @@ export function ReportFormDialog({
   const [tempDtDuration, setTempDtDuration] = useState('');
   const [tempDtComment, setTempDtComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Stable id so PhotoSection can attach a photo to the report before it's
+  // submitted; if editing, we use the persisted reportId instead.
+  const [draftReportId] = useState(() => crypto.randomUUID());
+  const photoReportId = editReport?.reportId || draftReportId;
 
   const getPileGradeName = (id: string) => pileGrades.find((g) => g.id === id)?.name || id;
   const getDrillTypeName = (id: string) => drillingTypes.find((t) => t.id === id)?.name || id;
@@ -155,7 +160,7 @@ export function ReportFormDialog({
     if (formPiles.length === 0 && formDrillings.length === 0 && formDowntimes.length === 0) {
       toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return;
     }
-    const reportId = editReport?.reportId || crypto.randomUUID();
+    const reportId = photoReportId;
     setSubmitting(true);
     try {
       const res = await authFetch('/api/reports/admin-upsert', {
@@ -369,6 +374,8 @@ export function ReportFormDialog({
               </div>
             )}
           </div>
+
+          <PhotoSection reportId={photoReportId} canEdit />
 
           {/* Summary */}
           {(formPiles.length > 0 || formDrillings.length > 0 || formDowntimes.length > 0) && (

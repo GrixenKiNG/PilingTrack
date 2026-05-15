@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
+import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import type { ReportDTO } from '@/lib/types';
 import { pluralizeRu } from '@/lib/format';
 
@@ -145,6 +146,9 @@ export function ReportDetailDialog({
                 </div>
               </>
             )}
+
+            <Separator />
+            <PhotoSection reportId={report.reportId} canEdit={false} />
           </div>
         </DialogContent>
       </Dialog>
