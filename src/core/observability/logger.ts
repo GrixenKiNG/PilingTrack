@@ -60,18 +60,6 @@ function getPinoOptions(): LoggerOptions {
     formatters: {
       level: (label) => ({ level: label }),
     },
-    ...(isProduction
-      ? {}
-      : {
-          transport: {
-            target: 'pino-pretty',
-            options: {
-              colorize: true,
-              translateTime: 'SYS:standard',
-              ignore: 'pid,hostname',
-            },
-          },
-        }),
     hooks: {
       logMethod(inputArgs: unknown[], method: unknown) {
         // If first arg is a string, treat as message; otherwise as object

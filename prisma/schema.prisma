@@ -194,6 +194,7 @@ model SitePilePlan {
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([siteId])
+  @@index([pileGradeId])
 }
 
 // Site drilling plan: diameter → count × meters per unit → auto total meters

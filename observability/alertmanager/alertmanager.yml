@@ -6,13 +6,25 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  receiver: 'log-only'
+  receiver: 'pilingtrack-telegram'
+  routes:
+    - matchers: [severity="critical"]
+      receiver: 'pilingtrack-telegram'
+      group_wait: 10s
+      repeat_interval: 1h
 
 receivers:
-  - name: 'log-only'
+  - name: 'pilingtrack-telegram'
     webhook_configs:
-      - url: 'http://localhost:5001/alerts'
-        send_resolved: false
+      # App webhook fans every firing alert out to Telegram via the
+      # existing notifier. Token-gated; container entrypoint writes
+      # /etc/alertmanager/webhook-token from ALERTMANAGER_WEBHOOK_TOKEN env.
+      - url: 'http://app:3000/api/alerts/webhook'
+        http_config:
+          authorization:
+            type: Bearer
+            credentials_file: /etc/alertmanager/webhook-token
+        send_resolved: true
 
 inhibit_rules:
   - source_matchers: [severity="critical"]

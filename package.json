@@ -3,8 +3,10 @@
   "version": "2.2.1",
   "private": true,
   "scripts": {
+    "predev": "node scripts/kill-port.js 3000",
     "dev": "npx tsx scripts/validate-env.ts && next dev -p 3000",
     "build": "npx tsx scripts/validate-env.ts && npm run db:generate && next build && node scripts/copy-standalone-assets.js",
+    "prestart": "node scripts/kill-port.js 3000",
     "start": "npx tsx scripts/validate-env.ts && node .next/standalone/server.js",
     "validate:env": "npx tsx scripts/validate-env.ts",
     "lint": "eslint . && node scripts/check-text-integrity.js",

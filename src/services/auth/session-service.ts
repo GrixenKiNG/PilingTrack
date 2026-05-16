@@ -97,13 +97,19 @@ class RedisRevocationStore implements RevocationStore {
 
   async isRevoked(jti: string): Promise<boolean> {
     const client = this.getClient();
-    if (!client) return false;
+    // Fail-closed: if Redis is unavailable we cannot prove the token is *not*
+    // revoked, so we reject it. A stolen token must never be re-accepted just
+    // because the revocation store is degraded.
+    if (!client) {
+      logger.warn('session-revocation: redis unavailable — failing closed');
+      return true;
+    }
     try {
       const v = await client.get(`revoked-jti:${jti}`);
       return v !== null;
     } catch (err) {
-      logger.warn('session-revocation: GET failed (fail-open)', { error: (err as Error).message });
-      return false;
+      logger.warn('session-revocation: GET failed (fail-closed)', { error: (err as Error).message });
+      return true;
     }
   }
 

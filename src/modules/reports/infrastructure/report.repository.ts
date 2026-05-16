@@ -72,11 +72,28 @@ export class PrismaReportRepository implements ReportRepository {
     const isPostgres = process.env.DATABASE_PROVIDER === 'postgres';
 
     await db.$transaction(async (tx: any) => {
-      // Check if report exists
-      const existing = await tx.report.findUnique({
+      // Check if report exists by reportId first, then by the natural unique
+      // (userId, siteId, date) tuple. Offline clients can generate a fresh
+      // reportId on retry, which previously caused a P2002 race on
+      // Report_userId_siteId_date_key. Looking up by both keys lets us route
+      // a retry to the UPDATE path instead of crashing.
+      let existing = await tx.report.findUnique({
         where: { reportId: state.reportId },
         select: { id: true },
       });
+
+      if (!existing) {
+        existing = await tx.report.findUnique({
+          where: {
+            unique_user_site_date: {
+              userId: state.userId,
+              siteId: state.siteId,
+              date: state.date,
+            },
+          },
+          select: { id: true },
+        });
+      }
 
       if (existing) {
         // === UPDATE PATH ===

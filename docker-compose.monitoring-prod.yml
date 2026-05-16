@@ -102,6 +102,39 @@ services:
       driver: json-file
       options: { max-size: '5m', max-file: '3' }
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: pilingtrack-alertmanager
+    ports:
+      - '127.0.0.1:9093:9093'
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=https://orionpiling.ru/alertmanager'
+    environment:
+      # The webhook receiver in alertmanager.yml references
+      # /etc/alertmanager/webhook-token; we materialize it from env at
+      # container start via the entrypoint override below.
+      - ALERTMANAGER_WEBHOOK_TOKEN=${ALERTMANAGER_WEBHOOK_TOKEN:?ALERTMANAGER_WEBHOOK_TOKEN must be set}
+    entrypoint:
+      - sh
+      - -c
+      - 'printf %s "$$ALERTMANAGER_WEBHOOK_TOKEN" > /etc/alertmanager/webhook-token && exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager'
+    restart: unless-stopped
+    networks:
+      - monitoring
+      - pilingtrack_pilingtrack
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging:
+      driver: json-file
+      options: { max-size: '5m', max-file: '3' }
+
   redis-exporter:
     image: oliver006/redis_exporter:latest
     container_name: pilingtrack-redis-exporter
@@ -128,6 +161,7 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
 
 networks:
   monitoring:
