@@ -172,12 +172,16 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
 
       {/* No `capture` — iOS Safari forces camera-only when it's set and the
          resulting photo isn't auto-saved to Photos. Without it the OS shows
-         the full picker (library + camera + file). */}
+         the full picker (library + camera + file).
+
+         The off-screen positioning (not `display: none` / `hidden`) is
+         deliberate: iOS PWA mode refuses to open the system picker for a
+         truly hidden input when triggered via a JS-fired click. */}
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
-        className="hidden"
+        accept="image/*,.heic,.heif"
+        className="sr-only absolute"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) handleFile(file);

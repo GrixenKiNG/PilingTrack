@@ -102,6 +102,13 @@ const DEFAULT_CONFIG: Partial<MediaServiceConfig> = {
     'image/png',
     'image/webp',
     'image/gif',
+    // iPhone defaults to HEIC; Safari sends image/heic[-sequence]/heif.
+    // Sharp's bundled libvips reads HEIC on every platform we ship, so
+    // thumbnailing still works; if it ever can't, the confirm step falls
+    // back gracefully and the original still serves.
+    'image/heic',
+    'image/heif',
+    'image/heic-sequence',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
