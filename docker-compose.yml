@@ -71,7 +71,7 @@ services:
       # DIRECT_DATABASE_URL keeps a session-mode path open for the rare Prisma
       # internals that need it (migrations are run by the migrate service).
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DIRECT_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
@@ -126,7 +126,7 @@ services:
       # Workers also go through PgBouncer (transaction pooling) — see app
       # service for full rationale.
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DIRECT_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
@@ -193,7 +193,7 @@ services:
       - NODE_ENV=production
       # WS server uses PgBouncer for runtime queries too.
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DIRECT_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - WS_PORT=3001
