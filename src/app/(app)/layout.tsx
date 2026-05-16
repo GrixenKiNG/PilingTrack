@@ -24,15 +24,18 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
   OPERATOR: [
     { label: 'Главная', href: '/operator' },
     { label: 'Отчёт', href: '/report' },
+    { label: 'Мониторинг', href: '/monitoring' },
     { label: 'История', href: '/history' },
   ],
   ASSISTANT: [
     { label: 'Главная', href: '/operator' },
     { label: 'Отчёт', href: '/report' },
+    { label: 'Мониторинг', href: '/monitoring' },
     { label: 'История', href: '/history' },
   ],
   ADMIN: [
     { label: 'Дашборд', href: '/admin' },
+    { label: 'Мониторинг', href: '/monitoring' },
     { label: 'Объекты', href: '/admin/sites' },
     { label: 'Установки', href: '/admin/equipment' },
     { label: 'Бригады', href: '/admin/crews' },
@@ -43,6 +46,7 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
   ],
   DISPATCHER: [
     { label: 'Дашборд', href: '/admin' },
+    { label: 'Мониторинг', href: '/monitoring' },
     { label: 'Объекты', href: '/admin/sites' },
     { label: 'Установки', href: '/admin/equipment' },
     { label: 'Бригады', href: '/admin/crews' },
@@ -88,7 +92,13 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <span className={cn('text-lg', isActive && item.href === '/report' && 'text-white')}>
-                  {item.href === '/operator' ? '📊' : item.href === '/report' ? '➕' : '📋'}
+                  {item.href === '/operator'
+                    ? '📊'
+                    : item.href === '/report'
+                      ? '➕'
+                      : item.href === '/monitoring'
+                        ? '🛰️'
+                        : '📋'}
                 </span>
                 {isActive && item.href === '/report' && (
                   <div className="absolute inset-0 w-10 h-10 rounded-xl bg-orange-500" />
