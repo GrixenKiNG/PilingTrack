@@ -27,7 +27,6 @@ import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { withApi } from '@/core/api-wrapper';
 import { authenticateDeviceByKey } from '@/services/telemetry/device-key-service';
-import { publishToRedis, CHANNEL_TELEMETRY } from '@/core/realtime/redis/pubsub';
 
 export const runtime = 'nodejs';
 
@@ -291,25 +290,6 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = await getDbClient();
   await db.telemetryRecord.createMany({ data: telemetryRecords as any });
-
-  // Realtime fan-out. Lossy on purpose — the map shows the latest known
-  // value; if Redis is briefly down we drop the packet rather than back
-  // up the request. ws-server picks it up via CHANNEL_TELEMETRY.
-  void publishToRedis(CHANNEL_TELEMETRY, {
-    tenantId: identity.tenantId,
-    siteId: identity.siteId,
-    equipmentId: identity.equipmentId,
-    records: telemetryRecords.map((r) => ({
-      type: r.type,
-      value: r.value,
-      unit: r.unit,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      metadata: r.metadata,
-      timestamp: r.timestamp ?? new Date(),
-    })),
-    ts: Date.now(),
-  });
 
   return telemetryRecords;
 }

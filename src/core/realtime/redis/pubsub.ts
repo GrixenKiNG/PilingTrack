@@ -14,10 +14,6 @@ import { logger } from '@/lib/logger';
 
 export const CHANNEL_EVENTS = 'realtime:events';
 export const CHANNEL_ALERTS = 'realtime:alerts';
-// Telemetry stream — fire-and-forget, lossy. The map cares about the
-// latest position, not every single packet, so we publish directly to
-// Redis without the outbox round-trip used for domain events.
-export const CHANNEL_TELEMETRY = 'realtime:telemetry';
 
 // Publisher connection
 let _pub: Redis | null = null;

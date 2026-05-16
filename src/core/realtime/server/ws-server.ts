@@ -22,7 +22,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { ClientManager } from './client-manager';
 import { canSubscribe, getDefaultChannels } from './channel-router';
 import { authenticateWS } from './auth';
-import { onChannel, CHANNEL_EVENTS, CHANNEL_TELEMETRY } from '../redis/pubsub';
+import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
 import { WSClientMessage } from '../types/events';
 import { logger } from '@/lib/logger';
 import { setWsConnectionCount, recordWorkerHeartbeat } from '@/core/observability/health-tracker';
@@ -301,40 +301,6 @@ export async function startWSServer(): Promise<ServerHandle> {
       }
     } catch (error) {
       logger.error('Failed to broadcast event from Redis', error);
-    }
-  });
-
-  // ============================================================
-  // Telemetry → WS broadcast (lossy stream, no reliability/replay)
-  // ============================================================
-  // Goes through site:<siteId> channel; map clients pick `type=telemetry`
-  // packets and ignore the rest.
-  onChannel(CHANNEL_TELEMETRY, (_channel, message) => {
-    try {
-      const packet = JSON.parse(message) as {
-        tenantId: string | null;
-        siteId: string | null;
-        equipmentId: string;
-        records: Array<Record<string, unknown>>;
-        ts: number;
-      };
-
-      const channels: string[] = [];
-      if (packet.tenantId) channels.push(`tenant:${packet.tenantId}`);
-      if (packet.siteId) channels.push(`site:${packet.siteId}`);
-      if (channels.length === 0) return;
-
-      const wire = JSON.stringify({
-        type: 'telemetry',
-        equipmentId: packet.equipmentId,
-        siteId: packet.siteId,
-        records: packet.records,
-        ts: packet.ts,
-      });
-
-      clients.broadcast(wire, channels);
-    } catch (error) {
-      logger.error('Failed to broadcast telemetry from Redis', error);
     }
   });
 
