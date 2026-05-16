@@ -58,7 +58,19 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
   }, [reportId]);
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    // Desktop Chrome and some Safari builds don't know HEIC and hand us an
+    // empty `file.type`. Infer from the extension so the server still gets
+    // a valid content-type rather than rejecting on the allowedContentTypes
+    // check.
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const EXT_MAP: Record<string, string> = {
+      heic: 'image/heic', heif: 'image/heif',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+    };
+    const contentType = file.type || EXT_MAP[ext] || '';
+
+    if (!contentType.startsWith('image/')) {
       toast.error('Можно загрузить только изображение');
       return;
     }
@@ -75,7 +87,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
-          contentType: file.type,
+          contentType,
           fileSize: file.size,
           entityType: 'report',
           entityId: reportId,
@@ -84,8 +96,9 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
       if (!presign.ok) throw new Error((await presign.json()).error || 'Не удалось получить ссылку для загрузки');
       const { mediaId, uploadUrl } = await presign.json();
 
-      // 2. PUT directly to R2
-      const put = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      // 2. PUT directly to R2 — must match the contentType used in the
+      // presign, otherwise R2 rejects the signature.
+      const put = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': contentType } });
       if (!put.ok) throw new Error('Загрузка не удалась');
 
       // 3. confirm (server downloads + builds thumbnail)
