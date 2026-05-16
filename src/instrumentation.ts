@@ -54,13 +54,13 @@ export async function register() {
     const { startEmbeddedWorkers } = await import('@/workers/embedded-workers');
     await startEmbeddedWorkers();
   } catch (err) {
-    console.warn('[Instrumentation] Failed to start embedded workers:', err);
+    logger.warn('instrumentation: failed to start embedded workers', { error: (err as Error).message });
   }
 
   try {
     const { startHealthTracker } = await import('@/core/observability/health-tracker');
     startHealthTracker();
   } catch (err) {
-    console.warn('[Instrumentation] Failed to start health tracker:', err);
+    logger.warn('instrumentation: failed to start health tracker', { error: (err as Error).message });
   }
 }
