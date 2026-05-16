@@ -99,3 +99,4 @@ tmp-screenshots/
 # Database dumps — may contain real PII / auth material.
 *.dump
 *.sql.gz
+scripts/.telemetry-simulator-keys.json

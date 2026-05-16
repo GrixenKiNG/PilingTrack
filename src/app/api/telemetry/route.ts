@@ -205,13 +205,12 @@ export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
-    assertCan(user!, 'analytics.read');
-
     const { searchParams } = request.nextUrl;
     const action = searchParams.get('action');
 
-    // Stats endpoint: GET /api/telemetry?action=stats
+    // Stats endpoint is admin-only — keep behind analytics.read.
     if (action === 'stats') {
+      assertCan(user!, 'analytics.read');
       const ingestStats = getIngestStats();
       const samplingConfig = getSamplingConfig();
       const bufferDetailedStats = telemetryBuffer.getDetailedStats();
@@ -222,6 +221,29 @@ export const GET = withApi(async (request: NextRequest) => {
         buffer: bufferDetailedStats,
         circuitBreaker: databaseCircuitBreaker.getStats(),
       });
+    }
+
+    // Read scope by role:
+    // - OPERATOR / ASSISTANT see only telemetry for equipment they're
+    //   crew-assigned to. We resolve the equipment ids up front and pass
+    //   them as an explicit filter — never trust the client to scope itself.
+    // - DISPATCHER / ADMIN keep the existing analytics.read gate.
+    const role = user!.role;
+    let allowedEquipmentIds: string[] | null = null;
+    if (role === 'OPERATOR' || role === 'ASSISTANT') {
+      const { listAllEquipment } = await import('@/modules/equipment');
+      // Page through accessible equipment — typically small for an operator.
+      const owned = await listAllEquipment(
+        { limit: 200, getNextCursor: () => null } as any,
+        null,
+        user!.id
+      );
+      allowedEquipmentIds = (owned as Array<{ id: string }>).map((e) => e.id);
+      if (allowedEquipmentIds.length === 0) {
+        return NextResponse.json({ records: [] });
+      }
+    } else {
+      assertCan(user!, 'analytics.read');
     }
 
     // Default: query telemetry records
@@ -239,6 +261,10 @@ export const GET = withApi(async (request: NextRequest) => {
       );
     }
 
+    if (allowedEquipmentIds && equipmentId && !allowedEquipmentIds.includes(equipmentId)) {
+      return NextResponse.json({ records: [] });
+    }
+
     const { getTelemetryByRange } = await import(
       '@/services/telemetry/telemetry-ingestion-service'
     );
@@ -249,7 +275,8 @@ export const GET = withApi(async (request: NextRequest) => {
       from: new Date(from),
       to: new Date(to),
       limit,
-    });
+      ...(allowedEquipmentIds && !equipmentId ? { equipmentIds: allowedEquipmentIds } : {}),
+    } as any);
 
     return NextResponse.json({ records });
 }, { domain: 'telemetry' });

@@ -261,6 +261,7 @@ export async function getLatestTelemetry(
  */
 export async function getTelemetryByRange(params: {
   equipmentId?: string;
+  equipmentIds?: string[]; // restrict to this set — used for operator-scoped reads
   siteId?: string;
   type?: TelemetryType;
   from: Date;
@@ -270,7 +271,11 @@ export async function getTelemetryByRange(params: {
   const db = await getDbClient();
   return db.telemetryRecord.findMany({
     where: {
-      ...(params.equipmentId ? { equipmentId: params.equipmentId } : {}),
+      ...(params.equipmentId
+        ? { equipmentId: params.equipmentId }
+        : params.equipmentIds && params.equipmentIds.length > 0
+          ? { equipmentId: { in: params.equipmentIds } }
+          : {}),
       ...(params.siteId ? { siteId: params.siteId } : {}),
       ...(params.type ? { type: params.type } : {}),
       timestamp: {

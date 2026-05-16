@@ -25,14 +25,17 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
     { label: 'Главная', href: '/operator' },
     { label: 'Отчёт', href: '/report' },
     { label: 'История', href: '/history' },
+    { label: 'Карта', href: '/monitoring' },
   ],
   ASSISTANT: [
     { label: 'Главная', href: '/operator' },
     { label: 'Отчёт', href: '/report' },
     { label: 'История', href: '/history' },
+    { label: 'Карта', href: '/monitoring' },
   ],
   ADMIN: [
     { label: 'Дашборд', href: '/admin' },
+    { label: 'Мониторинг', href: '/monitoring' },
     { label: 'Объекты', href: '/admin/sites' },
     { label: 'Установки', href: '/admin/equipment' },
     { label: 'Бригады', href: '/admin/crews' },
@@ -43,6 +46,7 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
   ],
   DISPATCHER: [
     { label: 'Дашборд', href: '/admin' },
+    { label: 'Мониторинг', href: '/monitoring' },
     { label: 'Объекты', href: '/admin/sites' },
     { label: 'Установки', href: '/admin/equipment' },
     { label: 'Бригады', href: '/admin/crews' },
