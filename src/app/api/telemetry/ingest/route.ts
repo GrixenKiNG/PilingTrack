@@ -221,8 +221,13 @@ function validateTelemetry(data: unknown): ValidationResult {
     errors.push('value must be a number');
   }
 
-  // Valid telemetry types
+  // Valid telemetry types.
+  // The first block is pile/drilling-specific data we already accept.
+  // The second block was added for aftermarket Teltonika / Galileosky
+  // boxes that decode J1939 from the carrier machine — we'll see those
+  // as soon as a TelematicsDevice ships its first batch.
   const validTypes = [
+    // Domain-specific
     'pile_strike',
     'drilling_depth',
     'equipment_gps',
@@ -233,6 +238,13 @@ function validateTelemetry(data: unknown): ValidationResult {
     'fuel_level',
     'engine_hours',
     'impact_force',
+    // Aftermarket box / J1939 / engine ECU
+    'engine_on',
+    'engine_load',
+    'coolant_temp',
+    'oil_pressure',
+    'idle_time',
+    'dtc_code',
   ];
 
   if (telemetry.type && !validTypes.includes(telemetry.type as string)) {

@@ -40,6 +40,7 @@ model Tenant {
   users       User[]
   sites       Site[]
   invoices    TenantInvoice[]
+  telematicsDevices TelematicsDevice[]
 
   @@index([slug])
   @@index([isActive])
@@ -115,12 +116,19 @@ model Equipment {
   isActive    Boolean  @default(true)
   description String   @default("")
 
+  // Identification — заполняется по факту, опционально.
+  serialNumber    String?
+  manufactureYear Int?
+  vin             String?
+
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   crews       Crew[]
   reports     Report[] @relation("ReportEquipment")
   deviceKeys  DeviceKey[]
+  telematicsDevices       TelematicsDevice[]
+  telematicsAssignments   TelematicsDeviceAssignment[]
 
   @@index([isActive])
 }
@@ -143,11 +151,126 @@ model DeviceKey {
   createdById  String?
   lastUsedAt   DateTime? @db.Timestamptz(3)
 
-  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  // Опциональная ссылка на физическое/виртуальное устройство.
+  // Для PUSH-боксов (Teltonika и пр.) один TelematicsDevice → один-два
+  // активных DeviceKey (текущий + переходный при ротации).
+  telematicsDeviceId String?
+
+  equipment        Equipment         @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  telematicsDevice TelematicsDevice? @relation(fields: [telematicsDeviceId], references: [id], onDelete: SetNull)
 
   @@index([equipmentId])
   @@index([tenantId])
   @@index([revoked])
+  @@index([telematicsDeviceId])
+}
+
+// ============================================================
+// TELEMATICS DEVICE — точка телеметрии на машине
+// ------------------------------------------------------------
+// Один device = одна "точка съёма данных". Это может быть:
+//   PUSH — физический бокс (Teltonika FMC640, Galileosky 7x),
+//          шлёт данные нам по HTTP/MQTT; авторизация через DeviceKey.
+//   PULL — виртуальный коннектор к OEM API (LiDAT, Volvo CareTrack...),
+//          мы поллим их облако. Поллер появится позже; поля
+//          (endpointUrl, pollIntervalSec, lastPolledAt, nextPollAt)
+//          уже заведены — БД готова, миграции не понадобится.
+//
+// Жизненный цикл status:
+//   PROVISIONED → ACTIVE → DEGRADED → OFFLINE → ARCHIVED
+// ============================================================
+model TelematicsDevice {
+  id              String   @id @default(cuid())
+  tenantId        String
+
+  provider        TelematicsProvider
+  model           String?            // субмодель: "FMC640", "Hiper VR"
+  firmwareVersion String?
+
+  imei            String?            // для cellular-боксов
+  serialNumber    String?
+  oemAccountId    String?            // ID в Wialon / Volvo CareTrack и т.п.
+
+  authType        TelematicsAuthType
+
+  // Зарезервировано для PULL-режима. Сейчас все строки = NULL.
+  endpointUrl     String?
+  pollIntervalSec Int?
+  lastPolledAt    DateTime?          @db.Timestamptz(3)
+  nextPollAt      DateTime?          @db.Timestamptz(3)
+
+  equipmentId     String?
+  installedAt     DateTime?          @db.Timestamptz(3)
+
+  status          TelematicsStatus   @default(PROVISIONED)
+  lastSeenAt      DateTime?          @db.Timestamptz(3)
+  lastError       String?
+
+  label           String             // operator-facing: "Бауман-100 (FMC640)"
+  notes           String             @default("")
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+
+  equipment       Equipment?         @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  deviceKeys      DeviceKey[]
+  assignments     TelematicsDeviceAssignment[]
+
+  @@index([tenantId])
+  @@index([equipmentId])
+  @@index([provider])
+  @@index([status])
+  @@index([nextPollAt])
+  @@unique([provider, imei], map: "uq_telematics_provider_imei")
+}
+
+enum TelematicsProvider {
+  TELTONIKA_FMC640
+  TELTONIKA_FMB640
+  GALILEOSKY_7X
+  WIALON_GENERIC
+  OTHER
+}
+
+enum TelematicsAuthType {
+  PUSH_TOKEN     // device пушит к нам, авторизация через DeviceKey
+  API_KEY        // зарезервировано (PULL)
+  OAUTH2         // зарезервировано (PULL)
+  IP_ALLOWLIST   // зарезервировано
+  NONE
+}
+
+enum TelematicsStatus {
+  PROVISIONED
+  ACTIVE
+  DEGRADED
+  OFFLINE
+  ARCHIVED
+}
+
+// ============================================================
+// TELEMATICS DEVICE ASSIGNMENT — append-only история привязок
+// ------------------------------------------------------------
+// "Teltonika #FMC-1234 стояла на LRH 100 №1 с 2026-05-17
+//  по 2026-09-15, потом перенесена на Banut 655."
+// Нужен для аудита ("чьи это данные были по той свае?")
+// и для замен боксов в эксплуатации.
+// ============================================================
+model TelematicsDeviceAssignment {
+  id          String    @id @default(cuid())
+  tenantId    String
+  deviceId    String
+  equipmentId String
+  startedAt   DateTime  @default(now()) @db.Timestamptz(3)
+  endedAt     DateTime? @db.Timestamptz(3)  // NULL = текущая активная
+  reason      String?                        // "first install", "swap to rig-7"
+
+  device      TelematicsDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  equipment   Equipment        @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, startedAt])
+  @@index([equipmentId, startedAt])
+  @@index([tenantId])
 }
 
 // ============================================================
