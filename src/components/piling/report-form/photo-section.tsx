@@ -162,7 +162,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           ) : (
             <>
               <Camera className="w-7 h-7" />
-              <span className="text-sm">Сделать фото или выбрать из галереи</span>
+              <span className="text-sm">Выбрать из галереи или сделать фото</span>
             </>
           )}
         </button>
@@ -170,11 +170,13 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
         <p className="text-sm text-slate-400 text-center py-6">Фото не прикреплено</p>
       )}
 
+      {/* No `capture` — iOS Safari forces camera-only when it's set and the
+         resulting photo isn't auto-saved to Photos. Without it the OS shows
+         the full picker (library + camera + file). */}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
