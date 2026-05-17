@@ -36,18 +36,24 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     // Older emit sites construct events without siteId/userId/tenantId.
     // Falling back to '' wrote ~26 unjoinable rows on prod. Look up the
     // Report row to fill the gaps; skip if the report itself is missing.
-    let siteId = event.siteId;
-    let userId = event.userId;
-    let tenantId = event.tenantId;
-    if (!siteId || !userId) {
-      const report = await db.report.findUnique({
-        where: { id: event.aggregateId },
-        select: { siteId: true, userId: true, tenantId: true },
+    //
+    // `event.aggregateId` is Report.id (cuid). ReportAnalytics is keyed
+    // by Report.reportId (uuid) — every monitoring/equipment query joins
+    // on the uuid form. We MUST translate here, otherwise analytics rows
+    // never join back and dashboards show zeros.
+    const report = await db.report.findUnique({
+      where: { id: event.aggregateId },
+      select: { reportId: true, siteId: true, userId: true, tenantId: true },
+    });
+    if (!report) {
+      logger.warn('ReportAnalytics skipped: report row missing', {
+        eventType: event.type, aggregateId: event.aggregateId,
       });
-      siteId = siteId || report?.siteId;
-      userId = userId || report?.userId;
-      tenantId = tenantId || report?.tenantId || undefined;
+      return;
     }
+    const siteId = event.siteId || report.siteId;
+    const userId = event.userId || report.userId;
+    const tenantId = event.tenantId || report.tenantId || undefined;
     if (!siteId || !userId) {
       logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId', {
         eventType: event.type, aggregateId: event.aggregateId,
@@ -56,9 +62,9 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     }
 
     await db.reportAnalytics.upsert({
-      where: { reportId: event.aggregateId },
+      where: { reportId: report.reportId },
       create: {
-        reportId: event.aggregateId,
+        reportId: report.reportId,
         siteId,
         userId,
         tenantId: tenantId || null,
