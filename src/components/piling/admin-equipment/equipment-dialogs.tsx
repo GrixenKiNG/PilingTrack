@@ -4,9 +4,6 @@ import { useEffect, useState } from 'react';
 import { Wrench, Pencil, AlertTriangle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -17,40 +14,40 @@ import {
 } from '@/components/ui/dialog';
 import { pluralizeRu } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import {
+  EquipmentForm,
+  EMPTY_EQUIPMENT_FORM,
+  type EquipmentFormState,
+  formStateToPayload,
+  equipmentToFormState,
+} from './equipment-form';
+
+// --------------------------------------------------------------------------
+// CREATE
+// --------------------------------------------------------------------------
 
 interface CreateProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (input: { name: string; model?: string; description?: string }) => Promise<void>;
+  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }
 
 export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreateProps) {
-  const [name, setName] = useState('');
-  const [model, setModel] = useState('');
-  const [description, setDescription] = useState('');
+  const [state, setState] = useState<EquipmentFormState>(EMPTY_EQUIPMENT_FORM);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setName('');
-      setModel('');
-      setDescription('');
-    }
+    if (open) setState(EMPTY_EQUIPMENT_FORM);
   }, [open]);
 
   const submit = async () => {
-    if (!name.trim()) {
+    if (!state.name.trim()) {
       toast.error('Введите название установки');
       return;
     }
     setSubmitting(true);
     try {
-      await onSubmit({
-        name: name.trim(),
-        model: model.trim() || undefined,
-        description: description.trim() || undefined,
-      });
+      await onSubmit(formStateToPayload(state));
       onOpenChange(false);
       toast.success('Установка создана');
     } catch (err: unknown) {
@@ -62,52 +59,21 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Wrench className="w-4 h-4" />
-            Новая установка
+            <Wrench className="w-4 h-4" /> Новая установка
           </DialogTitle>
+          <DialogDescription>
+            Заполни хотя бы название. Технические характеристики и эксплуатационные данные можно дозаполнять потом.
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>
-              Название <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Например: Бауман 100"
-              className="h-11"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Модель</Label>
-            <Input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="Модель установки"
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Описание</Label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Необязательное описание установки"
-              className="min-h-[80px] resize-none"
-            />
-          </div>
-        </div>
+        <EquipmentForm state={state} onChange={(patch) => setState((s) => ({ ...s, ...patch }))} />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
-            disabled={submitting || !name.trim()}
+            disabled={submitting || !state.name.trim()}
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Создать'}
@@ -118,46 +84,34 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
   );
 }
 
+// --------------------------------------------------------------------------
+// EDIT
+// --------------------------------------------------------------------------
+
 interface EditProps {
   open: boolean;
   item: EquipmentDTO | null;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (
-    id: string,
-    input: { name: string; model?: string; description?: string; isActive: boolean }
-  ) => Promise<void>;
+  onSubmit: (id: string, payload: Record<string, unknown>) => Promise<void>;
 }
 
 export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: EditProps) {
-  const [name, setName] = useState('');
-  const [model, setModel] = useState('');
-  const [description, setDescription] = useState('');
-  const [active, setActive] = useState(true);
+  const [state, setState] = useState<EquipmentFormState>(EMPTY_EQUIPMENT_FORM);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (open && item) {
-      setName(item.name);
-      setModel(item.model);
-      setDescription(item.description);
-      setActive(item.isActive);
-    }
+    if (open) setState(equipmentToFormState(item as unknown as Record<string, unknown> | null));
   }, [open, item]);
 
   const submit = async () => {
     if (!item) return;
-    if (!name.trim()) {
+    if (!state.name.trim()) {
       toast.error('Введите название установки');
       return;
     }
     setSubmitting(true);
     try {
-      await onSubmit(item.id, {
-        name: name.trim(),
-        model: model.trim() || undefined,
-        description: description.trim() || undefined,
-        isActive: active,
-      });
+      await onSubmit(item.id, formStateToPayload(state));
       onOpenChange(false);
       toast.success('Установка сохранена');
     } catch (err: unknown) {
@@ -169,67 +123,18 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Pencil className="w-4 h-4" />
-            Редактировать установку
+            <Pencil className="w-4 h-4" /> Редактировать установку
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>
-              Название <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-11"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Модель</Label>
-            <Input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="h-11"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Описание</Label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Необязательное описание установки"
-              className="min-h-[80px] resize-none"
-            />
-          </div>
-          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-            <Label className="text-sm">Активна</Label>
-            <button
-              onClick={() => setActive(!active)}
-              className={cn(
-                'w-10 h-6 rounded-full transition-colors relative',
-                active ? 'bg-green-500' : 'bg-slate-300'
-              )}
-            >
-              <div
-                className={cn(
-                  'w-4 h-4 rounded-full bg-white absolute top-1 transition-transform',
-                  active ? 'translate-x-5' : 'translate-x-1'
-                )}
-              />
-            </button>
-          </div>
-        </div>
+        <EquipmentForm state={state} onChange={(patch) => setState((s) => ({ ...s, ...patch }))} />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
-            disabled={submitting || !name.trim()}
+            disabled={submitting || !state.name.trim()}
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Сохранить'}
@@ -240,6 +145,10 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
   );
 }
 
+// --------------------------------------------------------------------------
+// DELETE — unchanged
+// --------------------------------------------------------------------------
+
 interface DeleteProps {
   open: boolean;
   item: EquipmentDTO | null;
@@ -249,11 +158,7 @@ interface DeleteProps {
 }
 
 export function DeleteEquipmentDialog({
-  open,
-  item,
-  crewCount,
-  onOpenChange,
-  onConfirm,
+  open, item, crewCount, onOpenChange, onConfirm,
 }: DeleteProps) {
   const [submitting, setSubmitting] = useState(false);
 
@@ -291,9 +196,7 @@ export function DeleteEquipmentDialog({
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
             disabled={submitting}

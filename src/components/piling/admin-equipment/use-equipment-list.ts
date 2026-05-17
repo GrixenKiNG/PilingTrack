@@ -59,11 +59,11 @@ export function useEquipmentList() {
     };
   }, []);
 
-  const create = async (input: { name: string; model?: string; description?: string }) => {
+  const create = async (payload: Record<string, unknown>) => {
     const res = await authFetch('/api/equipment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -73,14 +73,11 @@ export function useEquipmentList() {
     setEquipment((prev) => [...prev, data.equipment]);
   };
 
-  const update = async (
-    id: string,
-    input: { name: string; model?: string; description?: string; isActive: boolean }
-  ) => {
+  const update = async (id: string, payload: Record<string, unknown>) => {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { createEquipment, listAllEquipment } from '@/modules/equipment';
+import { createEquipment, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
 import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
@@ -47,6 +47,13 @@ export const POST = withMutation(
       description: validation.data.description,
       userId: user!.id,
     });
+
+    // Apply template metadata in the same request — operators usually
+    // fill the whole form in one go via the multi-tab edit dialog.
+    if (equipment) {
+      await updateEquipmentMetadata(equipment.id, validation.data);
+    }
+
     return NextResponse.json({ equipment }, { status: 201 });
   },
   { domain: 'equipment' }

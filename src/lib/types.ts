@@ -296,7 +296,51 @@ export interface CreateTelegramConfigPayload {
 // EQUIPMENT
 // ============================================================
 
-export interface EquipmentDTO {
+export type EquipmentKindDTO =
+  | 'PILE_DRIVER'
+  | 'DRILLING_RIG'
+  | 'VIBRO_HAMMER'
+  | 'HYBRID'
+  | 'OTHER';
+
+/**
+ * Unified passport template. All optional — operators fill these in
+ * progressively via the multi-tab edit dialog. null = explicitly empty,
+ * undefined = not loaded.
+ */
+export interface EquipmentMetadata {
+  // A. Identification
+  inventoryNumber?: string | null;
+  registrationNumber?: string | null;
+  kind?: EquipmentKindDTO;
+  baseVehicle?: string | null;
+  serialNumber?: string | null;
+  manufactureYear?: number | null;
+  vin?: string | null;
+  // B. Technical specs
+  weightTons?: number | null;
+  weightWithEquipmentTons?: number | null;
+  heightMm?: number | null;
+  lengthMm?: number | null;
+  widthMm?: number | null;
+  engineBrand?: string | null;
+  engineSerialNumber?: string | null;
+  enginePower?: number | null;
+  maxPileLength?: number | null;
+  maxDrillingDepth?: number | null;
+  hammerType?: string | null;
+  hammerSerialNumber?: string | null;
+  hammerEnergyKj?: number | null;
+  // C. Operation
+  purchaseDate?: string | null;
+  purchasePrice?: number | null;
+  engineHoursTotal?: number | null;
+  nextMaintenanceAtHours?: number | null;
+  nextMaintenanceDate?: string | null;
+  homeBaseLocation?: string | null;
+}
+
+export interface EquipmentDTO extends EquipmentMetadata {
   id: string;
   name: string;
   model: string;
@@ -305,7 +349,7 @@ export interface EquipmentDTO {
   description: string;
 }
 
-export interface CreateEquipmentPayload {
+export interface CreateEquipmentPayload extends EquipmentMetadata {
   name: string;
   model?: string;
   qty?: number;

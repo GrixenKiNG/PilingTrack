@@ -100,13 +100,49 @@ export const siteHierarchySchema = z.object({
 // Equipment schemas
 // ============================================================
 
+// Метаданные техпаспорта установки. Все поля опциональные —
+// они заполняются операторами через диалог редактирования по мере
+// сбора паспортов; служат расшифровкой того что я уже описал в
+// schema.prisma (поля A/B/C).
+const equipmentMetadataSchema = z.object({
+  // A. Identification
+  inventoryNumber:    z.string().max(100).optional().or(z.literal('')),
+  registrationNumber: z.string().max(50).optional().or(z.literal('')),
+  kind: z.enum(['PILE_DRIVER', 'DRILLING_RIG', 'VIBRO_HAMMER', 'HYBRID', 'OTHER']).optional(),
+  baseVehicle:        z.string().max(200).optional().or(z.literal('')),
+  serialNumber:       z.string().max(100).optional().or(z.literal('')),
+  manufactureYear:    z.coerce.number().int().min(1950).max(2100).optional().nullable(),
+  vin:                z.string().max(50).optional().or(z.literal('')),
+  // B. Technical specs (единый шаблон)
+  weightTons:              z.coerce.number().nonnegative().max(2000).optional().nullable(),
+  weightWithEquipmentTons: z.coerce.number().nonnegative().max(2000).optional().nullable(),
+  heightMm: z.coerce.number().int().min(0).max(100_000).optional().nullable(),
+  lengthMm: z.coerce.number().int().min(0).max(100_000).optional().nullable(),
+  widthMm:  z.coerce.number().int().min(0).max(100_000).optional().nullable(),
+  engineBrand:        z.string().max(200).optional().or(z.literal('')),
+  engineSerialNumber: z.string().max(100).optional().or(z.literal('')),
+  enginePower:        z.coerce.number().int().min(0).max(10_000).optional().nullable(),
+  maxPileLength:      z.coerce.number().nonnegative().max(200).optional().nullable(),
+  maxDrillingDepth:   z.coerce.number().nonnegative().max(500).optional().nullable(),
+  hammerType:         z.string().max(200).optional().or(z.literal('')),
+  hammerSerialNumber: z.string().max(100).optional().or(z.literal('')),
+  hammerEnergyKj:     z.coerce.number().nonnegative().max(10_000).optional().nullable(),
+  // C. Operation
+  purchaseDate:           z.coerce.date().optional().nullable(),
+  purchasePrice:          z.coerce.number().nonnegative().max(1_000_000_000).optional().nullable(),
+  engineHoursTotal:       z.coerce.number().int().min(0).max(1_000_000).optional().nullable(),
+  nextMaintenanceAtHours: z.coerce.number().int().min(0).max(1_000_000).optional().nullable(),
+  nextMaintenanceDate:    z.coerce.date().optional().nullable(),
+  homeBaseLocation:       z.string().max(200).optional().or(z.literal('')),
+});
+
 export const createEquipmentSchema = z.object({
   name: z.string().min(1, 'Equipment name is required').max(200),
   model: z.string().max(200).optional(),
   description: z.string().max(2000).optional(),
   qty: z.number().int().min(0).max(100).default(1),
   isActive: z.boolean().default(true),
-});
+}).extend(equipmentMetadataSchema.shape);
 
 export const updateEquipmentSchema = createEquipmentSchema.partial();
 
@@ -249,7 +285,9 @@ export const equipmentManageSchema = z.object({
   description: z.string().max(2000).optional().or(z.literal('')),
   qty: z.coerce.number().int().min(1).max(100).default(1),
   isActive: z.boolean().default(true),
-});
+}).extend(equipmentMetadataSchema.shape);
+
+export type EquipmentMetadataInput = z.infer<typeof equipmentMetadataSchema>;
 
 export const equipmentIdSchema = z.object({
   id: internalIdSchema,

@@ -116,10 +116,47 @@ model Equipment {
   isActive    Boolean  @default(true)
   description String   @default("")
 
-  // Identification — заполняется по факту, опционально.
-  serialNumber    String?
-  manufactureYear Int?
-  vin             String?
+  // A. Identification --------------------------------------------------
+  inventoryNumber    String?
+  registrationNumber String?         // госномер для самоходных
+  kind               EquipmentKind  @default(OTHER)
+  baseVehicle        String?         // "Volvo EC360BLC" — носитель для КБУРГа и т.п.
+  serialNumber       String?
+  manufactureYear    Int?
+  vin                String?
+
+  // B. Technical specs (единый шаблон) --------------------------------
+  weightTons              Float?
+  weightWithEquipmentTons Float?
+  // Логистические габариты в миллиметрах
+  heightMm                Int?
+  lengthMm                Int?
+  widthMm                 Int?
+  // Двигатель
+  engineBrand             String?
+  engineSerialNumber      String?
+  enginePower             Int?      // кВт
+  // Свайные / буровые
+  maxPileLength           Float?    // м
+  maxDrillingDepth        Float?    // м
+  // Молот
+  hammerType              String?   // "Junttan HHK-5/7", "PVE 50PR"
+  hammerSerialNumber      String?
+  hammerEnergyKj          Float?    // кДж
+
+  // Устаревшие поля из предыдущей итерации — оставлены чтобы не делать
+  // destructive миграцию. UI шаблона их не показывает; удалить отдельной
+  // миграцией когда подтвердишь что не нужны.
+  heightMeters     Float?
+  maxPileDiameter  Int?
+
+  // C. Operation -------------------------------------------------------
+  purchaseDate            DateTime? @db.Timestamptz(3)
+  purchasePrice           Decimal?  @db.Decimal(14, 2)
+  engineHoursTotal        Int?      // суммарная наработка
+  nextMaintenanceAtHours  Int?
+  nextMaintenanceDate     DateTime? @db.Timestamptz(3)
+  homeBaseLocation        String?
 
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
@@ -129,8 +166,55 @@ model Equipment {
   deviceKeys  DeviceKey[]
   telematicsDevices       TelematicsDevice[]
   telematicsAssignments   TelematicsDeviceAssignment[]
+  documents               EquipmentDocument[]
 
   @@index([isActive])
+  @@index([kind])
+  @@index([inventoryNumber])
+}
+
+enum EquipmentKind {
+  PILE_DRIVER    // забивные копры с молотом
+  DRILLING_RIG   // буровые установки
+  VIBRO_HAMMER   // вибропогружатели
+  HYBRID         // умеющие и забивку, и бурение (Liebherr LRH и т.п.)
+  OTHER
+}
+
+// ============================================================
+// EQUIPMENT DOCUMENTS — паспорт, ОТС, страховка, ТО и т.п.
+// Файлы хранятся в Media (entityType="equipment"), здесь
+// только метаданные документа: тип, срок действия, заметки.
+// ============================================================
+model EquipmentDocument {
+  id          String                 @id @default(cuid())
+  tenantId    String
+  equipmentId String
+  type        EquipmentDocumentType
+  title       String                                  // user-facing название документа
+  issuedAt    DateTime?              @db.Timestamptz(3)
+  expiresAt   DateTime?              @db.Timestamptz(3)
+  mediaId     String?                                 // привязка к файлу в Media (опц.)
+  notes       String                 @default("")
+  createdAt   DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime               @updatedAt      @db.Timestamptz(3)
+
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([equipmentId])
+  @@index([type])
+  @@index([expiresAt])
+}
+
+enum EquipmentDocumentType {
+  PASSPORT          // паспорт установки
+  OTS               // освидетельствование транспортного средства
+  INSURANCE         // страховка ОСАГО / КАСКО / спецтехника
+  INSPECTION        // технический осмотр / диагностика
+  CERTIFICATE       // сертификат соответствия
+  MAINTENANCE_LOG   // журнал ТО / акт ТО
+  OTHER
 }
 
 // ============================================================

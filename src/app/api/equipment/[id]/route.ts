@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { getEquipmentByIdOrThrow, updateEquipment, deleteEquipment } from '@/modules/equipment';
+import { getEquipmentByIdOrThrow, updateEquipment, updateEquipmentMetadata, deleteEquipment } from '@/modules/equipment';
 import { equipmentManageSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 
@@ -45,6 +45,9 @@ export const PUT = withMutation(
       description: validation.data.description,
       userId: user!.id,
     });
+
+    // Apply template metadata fields (no-op if the form didn't send any).
+    await updateEquipmentMetadata(id, validation.data);
 
     const equipment = await getEquipmentByIdOrThrow(id);
     return NextResponse.json({ equipment });
