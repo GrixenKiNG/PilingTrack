@@ -33,27 +33,26 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
   try {
     const { db } = await import('@/lib/db');
 
-    // Older emit sites construct events without siteId/userId/tenantId.
-    // Falling back to '' wrote ~26 unjoinable rows on prod. Look up the
-    // Report row to fill the gaps; skip if the report itself is missing.
+    // `event.aggregateId` is Report.reportId (uuid) — the outbox emit
+    // passes state.reportId, not state.id. ReportAnalytics.reportId is
+    // also the uuid form (every query joins r.reportId = ra.reportId),
+    // so we write event.aggregateId directly.
     //
-    // `event.aggregateId` is Report.id (cuid). ReportAnalytics is keyed
-    // by Report.reportId (uuid) — every monitoring/equipment query joins
-    // on the uuid form. We MUST translate here, otherwise analytics rows
-    // never join back and dashboards show zeros.
-    const report = await db.report.findUnique({
-      where: { id: event.aggregateId },
-      select: { reportId: true, siteId: true, userId: true, tenantId: true },
-    });
-    if (!report) {
-      logger.warn('ReportAnalytics skipped: report row missing', {
-        eventType: event.type, aggregateId: event.aggregateId,
+    // Older emit sites sometimes lacked siteId/userId/tenantId; fall back
+    // to a Report lookup by reportId to fill the gaps. Skip if Report is
+    // missing entirely (replay of a deleted aggregate).
+    let siteId = event.siteId;
+    let userId = event.userId;
+    let tenantId = event.tenantId;
+    if (!siteId || !userId) {
+      const report = await db.report.findUnique({
+        where: { reportId: event.aggregateId },
+        select: { siteId: true, userId: true, tenantId: true },
       });
-      return;
+      siteId = siteId || report?.siteId;
+      userId = userId || report?.userId;
+      tenantId = tenantId || report?.tenantId || undefined;
     }
-    const siteId = event.siteId || report.siteId;
-    const userId = event.userId || report.userId;
-    const tenantId = event.tenantId || report.tenantId || undefined;
     if (!siteId || !userId) {
       logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId', {
         eventType: event.type, aggregateId: event.aggregateId,
@@ -62,9 +61,9 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     }
 
     await db.reportAnalytics.upsert({
-      where: { reportId: report.reportId },
+      where: { reportId: event.aggregateId },
       create: {
-        reportId: report.reportId,
+        reportId: event.aggregateId,
         siteId,
         userId,
         tenantId: tenantId || null,
