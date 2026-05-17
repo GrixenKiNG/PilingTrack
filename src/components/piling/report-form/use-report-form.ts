@@ -38,6 +38,8 @@ export interface UseReportFormReturn {
   showDowntime: boolean; setShowDowntime: (v: boolean) => void;
   quickMode: boolean; setQuickMode: (v: boolean) => void;
   loading: boolean;
+  loadError: boolean;
+  reloadData: () => void;
   submitting: boolean;
   loadingReport: boolean;
   addPile: (gradeId: string, count: number) => void;
@@ -84,6 +86,7 @@ export function useReportForm(): UseReportFormReturn {
   const [downtimes, setDowntimes] = useState<DowntimeEntry[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const [showDowntime, setShowDowntime] = useState(false);
@@ -109,21 +112,21 @@ export function useReportForm(): UseReportFormReturn {
   const loadData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const [sitesRes, dictRes] = await Promise.all([
         authFetch(`/api/sites?userId=${user.id}`),
         authFetch('/api/dictionary/all'),
       ]);
-      if (sitesRes.ok) {
-        const data = await sitesRes.json();
-        setSites(data.data || data.sites || []);
+      if (!sitesRes.ok || !dictRes.ok) {
+        throw new Error(`load failed: sites=${sitesRes.status} dict=${dictRes.status}`);
       }
-      if (dictRes.ok) {
-        const data = await dictRes.json();
-        setPileGrades(data.pileGrades || []);
-        setDrillingTypes(data.drillingTypes || []);
-        setDowntimeReasons(data.downtimeReasons || []);
-      }
+      const sitesData = await sitesRes.json();
+      setSites(sitesData.data || sitesData.sites || []);
+      const dictData = await dictRes.json();
+      setPileGrades(dictData.pileGrades || []);
+      setDrillingTypes(dictData.drillingTypes || []);
+      setDowntimeReasons(dictData.downtimeReasons || []);
       // Load equipment
       try {
         const eqUrl = selectedSiteId ? `/api/equipment?siteId=${selectedSiteId}` : '/api/equipment';
@@ -161,7 +164,8 @@ export function useReportForm(): UseReportFormReturn {
         } finally { setLoadingReport(false); }
       }
     } catch {
-      toast.error('Ошибка загрузки данных');
+      setLoadError(true);
+      toast.error('Не удалось загрузить данные формы');
     } finally { setLoading(false); }
   }, [user, selectedSiteId, date]);
 
@@ -292,7 +296,7 @@ export function useReportForm(): UseReportFormReturn {
     selectedFieldId, setSelectedFieldId, selectedClusterId, setSelectedClusterId, selectedPicketId, setSelectedPicketId,
     piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
-    loading, submitting, loadingReport,
+    loading, loadError, reloadData: loadData, submitting, loadingReport,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,

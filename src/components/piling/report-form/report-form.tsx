@@ -65,7 +65,7 @@ export function ReportForm() {
     selectedPicketId, setSelectedPicketId,
     piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
-    loading, submitting, loadingReport,
+    loading, loadError, reloadData, submitting, loadingReport,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,
@@ -96,6 +96,19 @@ export function ReportForm() {
       <div className="space-y-4 p-4">
         <Skeleton className="h-10 w-full" /><Skeleton className="h-20 w-full" />
         <Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <p className="text-base font-semibold text-slate-900 mb-2">Не удалось загрузить данные формы</p>
+        <p className="text-sm text-slate-500 mb-6">Проверьте интернет и попробуйте ещё раз.</p>
+        <button onClick={reloadData}
+          className="h-11 px-6 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold">
+          Повторить
+        </button>
       </div>
     );
   }
