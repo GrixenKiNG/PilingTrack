@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
@@ -185,19 +185,24 @@ export function useReportForm(): UseReportFormReturn {
   useEffect(() => { loadSiteTree(selectedSiteId); }, [selectedSiteId, loadSiteTree]);
   useEffect(() => { if (!date) return; loadData(); }, [date, loadData]);
 
-  // Draft management
+  // Draft management — snapshot via ref so the interval isn't torn
+  // down/recreated on every keystroke.
+  const draftSnapshotRef = useRef({ piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId });
+  draftSnapshotRef.current = { piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId };
+
   useEffect(() => {
     if (!user || !selectedSiteId || !date) return;
     const draftKey = `report-draft-${user.id}-${selectedSiteId}-${date}`;
     const saveDraft = () => {
-      if (piles.length > 0 || drillings.length > 0 || downtimes.length > 0) {
-        localStorage.setItem(draftKey, JSON.stringify({ piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId, savedAt: new Date().toISOString() }));
+      const s = draftSnapshotRef.current;
+      if (s.piles.length > 0 || s.drillings.length > 0 || s.downtimes.length > 0) {
+        localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt: new Date().toISOString() }));
       }
     };
     const interval = setInterval(saveDraft, 30_000);
     window.addEventListener('beforeunload', saveDraft);
-    return () => { clearInterval(interval); window.removeEventListener('beforeunload', saveDraft); };
-  }, [piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId, user, selectedSiteId, date]);
+    return () => { clearInterval(interval); window.removeEventListener('beforeunload', saveDraft); saveDraft(); };
+  }, [user, selectedSiteId, date]);
 
   // Restore draft
   useEffect(() => {
