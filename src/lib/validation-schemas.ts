@@ -104,36 +104,55 @@ export const siteHierarchySchema = z.object({
 // они заполняются операторами через диалог редактирования по мере
 // сбора паспортов; служат расшифровкой того что я уже описал в
 // schema.prisma (поля A/B/C).
+// Помощник: текстовое поле, которое форма может прислать как
+// undefined / '' / null. Все три варианта приводим к пустоте без 400.
+const optStr = (max: number) =>
+  z.preprocess(
+    (v) => (v === null || v === '' ? undefined : v),
+    z.string().max(max).optional(),
+  );
+// Числовое поле: пустая строка/null трактуются как undefined,
+// иначе coerce → number (так выживают и формы, и API).
+const optNum = (s: z.ZodNumber) =>
+  z.preprocess(
+    (v) => (v === null || v === '' || v === undefined ? undefined : v),
+    z.coerce.number().pipe(s).optional(),
+  );
+const optDate = z.preprocess(
+  (v) => (v === null || v === '' || v === undefined ? undefined : v),
+  z.coerce.date().optional(),
+);
+
 const equipmentMetadataSchema = z.object({
   // A. Identification
-  inventoryNumber:    z.string().max(100).optional().or(z.literal('')),
-  registrationNumber: z.string().max(50).optional().or(z.literal('')),
+  inventoryNumber:    optStr(100),
+  registrationNumber: optStr(50),
   kind: z.enum(['PILE_DRIVER', 'DRILLING_RIG', 'VIBRO_HAMMER', 'HYBRID', 'OTHER']).optional(),
-  baseVehicle:        z.string().max(200).optional().or(z.literal('')),
-  serialNumber:       z.string().max(100).optional().or(z.literal('')),
-  manufactureYear:    z.coerce.number().int().min(1950).max(2100).optional().nullable(),
-  vin:                z.string().max(50).optional().or(z.literal('')),
+  baseVehicle:        optStr(200),
+  serialNumber:       optStr(100),
+  manufactureYear:    optNum(z.number().int().min(1950).max(2100)),
+  vin:                optStr(50),
   // B. Technical specs (единый шаблон)
-  weightTons:              z.coerce.number().nonnegative().max(2000).optional().nullable(),
-  weightWithEquipmentTons: z.coerce.number().nonnegative().max(2000).optional().nullable(),
-  heightMm: z.coerce.number().int().min(0).max(100_000).optional().nullable(),
-  lengthMm: z.coerce.number().int().min(0).max(100_000).optional().nullable(),
-  widthMm:  z.coerce.number().int().min(0).max(100_000).optional().nullable(),
-  engineBrand:        z.string().max(200).optional().or(z.literal('')),
-  engineSerialNumber: z.string().max(100).optional().or(z.literal('')),
-  enginePower:        z.coerce.number().int().min(0).max(10_000).optional().nullable(),
-  maxPileLength:      z.coerce.number().nonnegative().max(200).optional().nullable(),
-  maxDrillingDepth:   z.coerce.number().nonnegative().max(500).optional().nullable(),
-  hammerType:         z.string().max(200).optional().or(z.literal('')),
-  hammerSerialNumber: z.string().max(100).optional().or(z.literal('')),
-  hammerEnergyKj:     z.coerce.number().nonnegative().max(10_000).optional().nullable(),
+  weightTons:              optNum(z.number().nonnegative().max(2000)),
+  weightWithEquipmentTons: optNum(z.number().nonnegative().max(2000)),
+  heightMm: optNum(z.number().int().min(0).max(100_000)),
+  lengthMm: optNum(z.number().int().min(0).max(100_000)),
+  widthMm:  optNum(z.number().int().min(0).max(100_000)),
+  engineBrand:        optStr(200),
+  engineSerialNumber: optStr(100),
+  enginePower:        optNum(z.number().int().min(0).max(10_000)),
+  maxPileLength:      optNum(z.number().nonnegative().max(200)),
+  maxDrillingDepth:   optNum(z.number().nonnegative().max(500)),
+  hammerType:         optStr(200),
+  hammerSerialNumber: optStr(100),
+  hammerEnergyKj:     optNum(z.number().nonnegative().max(10_000)),
   // C. Operation
-  purchaseDate:           z.coerce.date().optional().nullable(),
-  purchasePrice:          z.coerce.number().nonnegative().max(1_000_000_000).optional().nullable(),
-  engineHoursTotal:       z.coerce.number().int().min(0).max(1_000_000).optional().nullable(),
-  nextMaintenanceAtHours: z.coerce.number().int().min(0).max(1_000_000).optional().nullable(),
-  nextMaintenanceDate:    z.coerce.date().optional().nullable(),
-  homeBaseLocation:       z.string().max(200).optional().or(z.literal('')),
+  purchaseDate:           optDate,
+  purchasePrice:          optNum(z.number().nonnegative().max(1_000_000_000)),
+  engineHoursTotal:       optNum(z.number().int().min(0).max(1_000_000)),
+  nextMaintenanceAtHours: optNum(z.number().int().min(0).max(1_000_000)),
+  nextMaintenanceDate:    optDate,
+  homeBaseLocation:       optStr(200),
 });
 
 export const createEquipmentSchema = z.object({
@@ -281,8 +300,8 @@ export const recognizeImageSchema = z.object({
 export const equipmentManageSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Equipment name is required').max(200),
-  model: z.string().max(200).optional().or(z.literal('')),
-  description: z.string().max(2000).optional().or(z.literal('')),
+  model: optStr(200),
+  description: optStr(2000),
   qty: z.coerce.number().int().min(1).max(100).default(1),
   isActive: z.boolean().default(true),
 }).extend(equipmentMetadataSchema.shape);
