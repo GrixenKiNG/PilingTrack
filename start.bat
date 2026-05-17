@@ -25,7 +25,10 @@ if /I "%~1"=="docker"      set MODE=docker
 
 echo.
 echo ============================================================
-echo  PilingTrack v2.2.1  -  %MODE% mode
+for /f "tokens=2 delims=:," %%v in ('findstr /C:"\"version\"" package.json') do set PT_VERSION=%%v
+set PT_VERSION=%PT_VERSION:"=%
+set PT_VERSION=%PT_VERSION: =%
+echo  PilingTrack v%PT_VERSION%  -  %MODE% mode
 echo  URL: http://localhost:3000
 echo ============================================================
 
@@ -64,8 +67,9 @@ echo.
 
 if "%MODE%"=="prod" goto prod
 
-echo Starting PDF worker in a separate window (BullMQ queue consumer)...
-start "PilingTrack PDF Worker" cmd /k "npm run worker:pdf"
+echo Starting unified worker in a separate window: outbox + projection + PDF.
+echo Without it /monitoring stays empty - ReportAnalytics is never built.
+start "PilingTrack Workers" cmd /k "npm run worker:all"
 
 echo Starting npm dev server (hot reload)...
 echo App connects to Postgres at localhost:5435, Redis at localhost:6380.

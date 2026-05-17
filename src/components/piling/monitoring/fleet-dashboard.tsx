@@ -94,7 +94,15 @@ export function FleetDashboard() {
 
   // WebSocket subscription
   useEffect(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.host}/ws`;
+    // Explicit opt-in: only connect when NEXT_PUBLIC_WS_URL is set and non-empty.
+    // Locally we don't run the ws server most of the time; falling back to the
+    // page host's /ws was creating noisy "WebSocket connection failed" lines
+    // in the console on every render.
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    if (!wsUrl) {
+      setConn('offline');
+      return;
+    }
     let ws: WebSocket;
     try {
       ws = new WebSocket(wsUrl);

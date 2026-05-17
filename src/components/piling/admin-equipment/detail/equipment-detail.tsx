@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Calendar, Activity } from 'lucide-react';
+import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +23,8 @@ import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { KIND_LABELS } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
+import { EquipmentPhotos } from './equipment-photos';
+import { EquipmentDocuments } from './equipment-documents';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 
 interface DetailsResponse {
@@ -280,27 +282,18 @@ export function EquipmentDetail({ equipmentId }: Props) {
         )}
       </Section>
 
+      {/* Фото */}
+      <Section icon={Camera} title="Фото">
+        <EquipmentPhotos equipmentId={equipmentId} />
+      </Section>
+
       {/* Документы */}
       <Section icon={FileText} title="Документы">
-        {details.documents.length > 0 ? (
-          <ul className="space-y-2">
-            {details.documents.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
-                <div>
-                  <div className="font-medium">{d.title}</div>
-                  <div className="text-xs text-slate-500">
-                    <DocumentTypeBadge type={d.type} />
-                    {d.issuedAt && (<> · выдан {formatRuDate(d.issuedAt.slice(0, 10))}</>)}
-                  </div>
-                  {d.notes && <div className="text-xs text-slate-400 mt-0.5">{d.notes}</div>}
-                </div>
-                <ExpiresIndicator iso={d.expiresAt} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState message="Документы не загружены (паспорт, ОТС, страховка, акты ТО). Загрузка файлов появится в следующей итерации." />
-        )}
+        <EquipmentDocuments
+          equipmentId={equipmentId}
+          documents={details.documents}
+          onChanged={refresh}
+        />
       </Section>
 
       <EditEquipmentDialog
@@ -381,28 +374,6 @@ function TelematicsStatusBadge({ status }: { status: string }) {
     ARCHIVED:   'bg-slate-100 text-slate-400',
   };
   return <span className={cn('rounded px-1.5 py-0.5', map[status] || 'bg-slate-100 text-slate-600')}>{status}</span>;
-}
-
-function DocumentTypeBadge({ type }: { type: string }) {
-  const map: Record<string, string> = {
-    PASSPORT: 'Паспорт',
-    OTS: 'ОТС',
-    INSURANCE: 'Страховка',
-    INSPECTION: 'Тех. осмотр',
-    CERTIFICATE: 'Сертификат',
-    MAINTENANCE_LOG: 'Журнал ТО',
-    OTHER: 'Прочее',
-  };
-  return <span className="font-medium text-slate-600">{map[type] ?? type}</span>;
-}
-
-function ExpiresIndicator({ iso }: { iso: string | null }) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-700">Истёк {Math.abs(days)} дн. назад</span>;
-  if (days <= 30) return <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Истекает через {days} дн.</span>;
-  return <span className="text-xs text-slate-400">до {formatRuDate(iso.slice(0, 10))}</span>;
 }
 
 // --------------------------------------------------------------------------
