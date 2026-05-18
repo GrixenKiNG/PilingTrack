@@ -20,6 +20,24 @@ _(пока нечего)_
 
 ---
 
+## [2.4.1] — 2026-05-18
+
+### Fixed
+- **Projection handler skipped все события после 20:14** — фикс в `7f1f0e6` ошибочно предполагал, что `event.aggregateId` это `Report.id` (cuid), и делал лишний lookup. На самом деле outbox emit пишет `state.reportId` (uuid), и handler никогда не находил Report → логи полнились `"ReportAnalytics skipped: report row missing"`. Дашборды показывали ноль для свежих отчётов. Теперь handler пишет `event.aggregateId` напрямую, lookup — fallback для легаси-событий без `siteId/userId` в payload.
+
+### Added
+- **Локальная копия прод-БД** для разработки. Скрипты:
+  - `npm run db:refresh-prod-snapshot` — снять свежий дамп с прода и развернуть в БД `pilingtrack_prod_copy`
+  - `npm run db:use-prod` / `npm run db:use-dev` — переключение `DATABASE_URL` между снимком и dev-БД
+  - `npm run db:status` — показать, какая БД активна
+  - См. `RELEASE.md` раздел «Локальная копия прод-БД»
+
+### Deploy
+- Передеплоить только `workers` (handler живёт там): `docker compose stop workers && docker compose rm -f workers && docker rmi pilingtrack-workers:latest && docker builder prune -af && docker compose build workers && docker compose up -d workers`
+- Бэкфилл уже применён на проде, повторный запуск не нужен.
+
+---
+
 ## [2.4.0] — 2026-05-17
 
 ### Added

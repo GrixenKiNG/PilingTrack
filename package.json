@@ -1,6 +1,6 @@
 {
   "name": "nextjs_tailwind_shadcn_ts",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "private": true,
   "scripts": {
     "predev": "node scripts/kill-port.js 3000",
@@ -9,6 +9,10 @@
     "prestart": "node scripts/kill-port.js 3000",
     "start": "npx tsx scripts/validate-env.ts && node .next/standalone/server.js",
     "validate:env": "npx tsx scripts/validate-env.ts",
+    "db:use-prod": "node scripts/switch-db.js prod",
+    "db:use-dev": "node scripts/switch-db.js dev",
+    "db:status": "node scripts/switch-db.js status",
+    "db:refresh-prod-snapshot": "bash scripts/refresh-prod-snapshot.sh",
     "lint": "eslint . && node scripts/check-text-integrity.js",
     "typecheck": "npm run build && tsc --noEmit",
     "test:smoke:auth-access": "npm run build && node scripts/smoke-auth-access.js",
