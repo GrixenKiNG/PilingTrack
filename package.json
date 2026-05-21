@@ -13,6 +13,7 @@
     "db:use-dev": "node scripts/switch-db.js dev",
     "db:status": "node scripts/switch-db.js status",
     "db:refresh-prod-snapshot": "bash scripts/refresh-prod-snapshot.sh",
+    "backfill:analytics": "bash scripts/backfill-report-analytics.sh",
     "lint": "eslint . && node scripts/check-text-integrity.js",
     "typecheck": "npm run build && tsc --noEmit",
     "test:smoke:auth-access": "npm run build && node scripts/smoke-auth-access.js",
