@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Pre-push hook — fail fast before barrel-export breakage reaches the
+# remote (and from there, prod). vitest covers individual imports but
+# NOT the full compile graph; only `npm run build` catches dead
+# re-exports in barrel index.ts files. See lessons-learned 2026-05-21:
+# the deleted modules/reports/application/event-bus.ts was still
+# re-exported from modules/reports/index.ts:60, vitest stayed green,
+# and the prod build broke 2 hours later.
+#
+# To enable this hook on your machine (one-time, per clone):
+#
+#   git config core.hooksPath .githooks
+#
+# Bypass for emergencies (e.g. force-push a tested branch):
+#
+#   git push --no-verify
+#
+# Skipped automatically when LOCAL=0 commits are being pushed
+# (no-op pushes, branch deletions).
+
+set -euo pipefail
+
+# Read git's stdin to detect deletion / no-op push.
+have_changes=0
+while read -r _local_ref _local_sha _remote_ref _remote_sha; do
+  zero="0000000000000000000000000000000000000000"
+  if [ "$_local_sha" != "$zero" ]; then
+    have_changes=1
+  fi
+done
+
+if [ "$have_changes" -eq 0 ]; then
+  exit 0
+fi
+
+echo "→ pre-push: running verify (lint + typecheck + tests + build + smoke)"
+echo "  bypass with: git push --no-verify"
+echo
+
+# Run from repo root.
+cd "$(git rev-parse --show-toplevel)"
+npm run verify

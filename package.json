@@ -27,7 +27,7 @@
     "postgres:setup-partitioning": "npx tsx scripts/setup-partitioning.ts",
     "test:load": "npx k6 run scripts/load-test.js",
     "test:load:spike": "npx k6 run scripts/load-test.js --vus 100 --duration 30s",
-    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run test:smoke:auth-access",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run test:smoke:auth-access",
     "cleanup:local": "powershell -ExecutionPolicy Bypass -File scripts/cleanup-local-artifacts.ps1",
     "agents:test": "npx tsx agents/run-agents.ts",
     "agents:test:quick": "npx tsx agents/run-agents.ts --quick",

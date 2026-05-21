@@ -94,6 +94,18 @@ npm run dev
 
 Приложение поднимется на [http://localhost:3000](http://localhost:3000).
 
+### Режимы разработки
+
+В проекте три режима запуска (выбирай через `start.bat <mode>`):
+
+| Режим | Команда | Что внутри | Когда использовать |
+|---|---|---|---|
+| `dev` (по умолч.) | `start.bat` | `npm run dev` + Docker для БД/Redis/MinIO | 99% времени — обычная разработка |
+| `docker` | `start.bat docker` | Полный Docker-стек (app + workers + ws + БД) | Изменения в инфраструктуре, отладка cold-start |
+| `prod` | `start.bat prod` | Локальный `npm run build && npm run start` | Проверка production-сборки перед деплоем |
+
+**Важно:** не запускай `docker compose up workers` одновременно с `npm run dev` — outbox leader-election даст одному из них замолчать. Подробности и подводные камни — `docs/dev-modes.md`.
+
 ## Ключевые команды
 
 ```bash
@@ -104,7 +116,19 @@ npm run test:unit
 npm run test:contract
 npm run test:integration
 npm run test:e2e
+npm run verify              # lint + typecheck + unit + build + smoke (запусти перед push)
+npm run backfill:analytics  # восстановить ReportAnalytics за последние 7 дней
 ```
+
+### Git pre-push hook (рекомендуется)
+
+Чтобы случайно не запушить сломанную сборку (vitest зелёный, но `npm run build` падает — реальный кейс 2026-05-21), включи pre-push хук **один раз на клон**:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+После этого каждый `git push` сначала прогонит `npm run verify`. Bypass для срочных случаев: `git push --no-verify`.
 
 ## Архитектурное правило
 

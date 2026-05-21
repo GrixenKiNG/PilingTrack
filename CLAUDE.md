@@ -158,17 +158,18 @@ You can write unit tests. Flag if you need integration test infrastructure.
 docker compose exec postgres psql -U piling -d pilingtrack
 ```
 
-**Deploy runbook (after pushing to `main`):**
+**Deploy runbook (after pushing to `main`):** zero-downtime, build first, swap when ready. Full version in `docs/runbooks/008-manual-deploy.md`.
 ```bash
 cd /opt/pilingtrack
+df -h /                         # if >85%, prune first (see below)
 git pull origin main
-docker compose stop app && docker compose rm -f app
-docker rmi pilingtrack-app:latest
-docker compose build app && docker compose up -d app
-# repeat for ws / workers if changed
+docker compose build app workers  # builds in parallel, old containers keep serving
+docker compose up -d app workers  # atomic swap, old containers stopped after new ones healthy
+# add 'ws' to both lines if ws-server changed (rare)
 ```
+Old runbook (`stop && rm && rmi → build → up`) created a 3–5 min outage window when the build crashed. Don't use it unless you specifically want to free RAM before the build (heavy on this VPS only).
 
-If disk tight: `docker builder prune -af` (frees ~2 GB), `docker image prune -af`.
+If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -af`.
 
 **Migrate service** runs `prisma migrate deploy` and seed. Seed must be skipped on prod (`SKIP_SEED=1` in `.env`) — Prisma 7 driver-adapter requires options that `prisma/seed.ts` doesn't pass; would fail on bare `new PrismaClient()`.
 
@@ -181,7 +182,7 @@ If disk tight: `docker builder prune -af` (frees ~2 GB), `docker image prune -af
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (12383 symbols, 23083 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (12447 symbols, 23152 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

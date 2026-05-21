@@ -20,12 +20,13 @@
 | Категория | Открыто | Закрыто | Всего |
 |---|---|---|---|
 | 🔴 Critical | 0 | 3 (C-1, C-3, C-4) | 3 |
-| 🟠 High | 3 (H-4, H-7, N-2) | 8 | 11 |
+| 🟠 High | 2 (H-7, N-2) | 9 | 11 |
 | 🟡 Medium | 6 | 8 | 14 |
 | 🟢 Low | 2 | 1 | 3 |
-| **Всего** | **11** | **20** | **31** |
+| Latent / process | 1 (N-4) | 2 (N-12, N-13) | 3 |
+| **Всего** | **11** | **23** | **34** |
 
-**Закрыто за период 2026-04-30 → 2026-05-21:** 20 пунктов.
+**Закрыто за период 2026-04-30 → 2026-05-21:** 23 пункта.
 
 ---
 
@@ -55,6 +56,9 @@
 | **N-7** | Тесты для `audit-service`, `tenancy/`, `telegram/` (+45 тестов) | `7af4b44` |
 | **N-8** | Тесты для `csrf-double-submit`, `csrf-protection`, `idempotency-middleware` (+62 теста) | `6a0940b` |
 | **N-9** | Тесты для `sync-engine-v2/handler` и `report-processor` (+20 тестов) | `899cecf` |
+| **H-4** | Два режима dev (full Docker vs local + Docker DB) задокументированы | новый коммит — `docs/dev-modes.md` + раздел в README |
+| **N-12** | Zero-downtime deploy runbook (build → swap) | новый коммит — `docs/runbooks/008-manual-deploy.md` + обновлён CLAUDE.md |
+| **N-13** | `npm run build` теперь в `verify`; git pre-push hook ловит barrel-break перед push | новый коммит — `.githooks/pre-push` + раздел в README |
 
 Также за это время:
 - **DLQ-механизм** — был архитектурно недостижим (handlers глотали → outbox не видел провалов → MAX_RETRIES не достигалось). Исправлен в `899cecf`: `emitDomainEvent` теперь async + propagate; `moveToDlq` больше не re-queue; `unified-worker/outbox.ts` регистрирует подписчиков. См. подробный post-mortem 2026-05-20 в коммит-сообщении.
@@ -65,14 +69,6 @@
 ## Открыто
 
 ### 🟠 High
-
-#### H-4. Outbox-leader конфликт между Docker и local dev
-
-**Симптом:** локальный `npm run dev` не может стать outbox-лидером, пока Docker-`workers` держит lease. Обходное решение в `start.bat` явно гасит Docker-воркеры. Это удобно, но спрятано как «скрытое знание».
-
-**Как закрыть:** документировать в `README.md` (или новом `docs/dev-modes.md`) две конфигурации: «full Docker» vs «local dev + Docker DB only». Опционально — env-флаг `DISABLE_OUTBOX_WORKER=true` для embedded режима в dev.
-
-**Усилие:** 1–2ч.
 
 #### H-7. Нет prod-deployment автоматизации
 
