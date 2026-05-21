@@ -56,8 +56,11 @@ export {
 } from './application';
 export type { DashboardData } from './application';
 
-// Event Bus
-export { on, emitDomainEvent, getRegisteredEventTypes } from './application/event-bus';
+// Event Bus — re-exported from the legacy bus (per ADR-0006 addendum
+// 2026-05-21, the modern wrapper at ./application/event-bus was deleted).
+// Kept for backward compatibility with any caller importing through
+// the @/modules/reports barrel.
+export { on, emitDomainEvent, getRegisteredEventTypes } from '@/services/reports/domain-events';
 
 // Projections
 export { startProjectionWorker } from './application/projections/projection-worker';
