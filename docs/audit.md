@@ -20,13 +20,13 @@
 | Категория | Открыто | Закрыто | Всего |
 |---|---|---|---|
 | 🔴 Critical | 0 | 3 (C-1, C-3, C-4) | 3 |
-| 🟠 High | 2 (H-7, N-2) | 9 | 11 |
+| 🟠 High | 1 (N-2) | 10 | 11 |
 | 🟡 Medium | 6 | 8 | 14 |
 | 🟢 Low | 2 | 1 | 3 |
 | Latent / process | 1 (N-4) | 2 (N-12, N-13) | 3 |
-| **Всего** | **11** | **23** | **34** |
+| **Всего** | **10** | **24** | **34** |
 
-**Закрыто за период 2026-04-30 → 2026-05-21:** 23 пункта.
+**Закрыто за период 2026-04-30 → 2026-05-21:** 24 пункта.
 
 ---
 
@@ -59,6 +59,7 @@
 | **H-4** | Два режима dev (full Docker vs local + Docker DB) задокументированы | новый коммит — `docs/dev-modes.md` + раздел в README |
 | **N-12** | Zero-downtime deploy runbook (build → swap) | новый коммит — `docs/runbooks/008-manual-deploy.md` + обновлён CLAUDE.md |
 | **N-13** | `npm run build` теперь в `verify`; git pre-push hook ловит barrel-break перед push | новый коммит — `.githooks/pre-push` + раздел в README |
+| **H-7** | Prod-deploy уже автоматизирован: multi-stage Dockerfile + Dockerfile.workers + Dockerfile.ws + docker-compose.prod.yml + GitHub Actions deploy + runbooks 007/008 | проверка 2026-05-21 показала всё на месте; аудит был устаревшим |
 
 Также за это время:
 - **DLQ-механизм** — был архитектурно недостижим (handlers глотали → outbox не видел провалов → MAX_RETRIES не достигалось). Исправлен в `899cecf`: `emitDomainEvent` теперь async + propagate; `moveToDlq` больше не re-queue; `unified-worker/outbox.ts` регистрирует подписчиков. См. подробный post-mortem 2026-05-20 в коммит-сообщении.
@@ -69,14 +70,6 @@
 ## Открыто
 
 ### 🟠 High
-
-#### H-7. Нет prod-deployment автоматизации
-
-**Симптом:** есть `docker-compose.production.yml`, но нет `Dockerfile.prod` с multi-stage build, нет Helm-чарта в боевом виде, нет staging-сборки. Деплой описан как раннбук в `CLAUDE.md`, но это не «один скрипт».
-
-**Как закрыть:** `Dockerfile.prod` multi-stage (build → runtime) + минимальный `docker-compose.staging.yml`. Уже есть скрипт `npm run docker:build:prod` — нужен реальный Dockerfile.
-
-**Усилие:** 4ч.
 
 #### N-2. Sync v3 (клиентский автосинк) выключен
 
