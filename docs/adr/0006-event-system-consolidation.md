@@ -2,11 +2,30 @@
 
 | Metadata | Value |
 |----------|-------|
-| **Status** | Accepted |
+| **Status** | **Superseded — reversed direction** (see addendum 2026-05-21) |
 | **Date** | 2026-04-08 |
 | **Authors** | Core Team |
 | **Reviewers** | @pilingtrack/core-team |
 | **Context** | Parallel event systems in services/ and modules/ |
+
+> **Addendum 2026-05-21:** Phase 2 (migrate imports off legacy) never
+> happened. The "new" event bus (`core/event-bus/event-bus.ts` and the
+> Kafka/NATS adapters, ~947 lines) had zero callers in production code —
+> only its own barrel and the unused `modules/reports/application/event-bus.ts`
+> wrapper. Meanwhile the legacy bus in `services/reports/domain-events.ts`
+> ran the production pipeline (proved during the 2026-05-20 monitoring
+> incident — the bug was registration race, not the bus itself).
+>
+> **Reversal:** the modern bus was deleted instead of migrated to. The
+> legacy bus is now the single source of truth. `core/event-bus/` keeps
+> only `schema-registry/` (used by workers for event-payload validation)
+> and re-exports legacy bus functions under the `@/core/event-bus`
+> namespace for callers that already wrote the path.
+>
+> If a future feature needs Kafka/NATS or per-event Redis pub/sub, build
+> that as a separate `core/event-bus-v3` with a clear adoption plan —
+> don't resurrect the deleted code from git history without first
+> demonstrating a caller exists for it.
 
 ---
 

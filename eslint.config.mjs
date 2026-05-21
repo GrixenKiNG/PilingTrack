@@ -44,6 +44,10 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-undef": "off",
     "no-unreachable": "warn",
     "no-useless-escape": "warn",
+    // Surface unreferenced TODO/FIXME/HACK comments (audit M-7). Once a
+    // comment is tracked (issue link, audit ref, or a `// eslint-disable
+    // -- tracked in …` directive), the warning goes away.
+    "no-warning-comments": ["warn", { terms: ["todo", "fixme", "hack", "xxx"], location: "start" }],
   },
 }, {
   files: [

@@ -1,39 +1,24 @@
 /**
- * Core Event Bus — Unified Event System
+ * Core Event Bus — Public API
  *
- * Single source of truth for event publishing and handling.
+ * Per ADR-0006 (superseded by inline note 2026-05-21): the parallel
+ * "modern" InMemoryEventBus / RedisEventBus / Kafka / NATS implementation
+ * was retired as unused. The legacy in-process event bus in
+ * services/reports/domain-events.ts is the production-active path and
+ * was retained.
  *
- * Per ADR-0006: Event System Consolidation
- * - All events flow through modules/reports domain
+ * What this barrel exposes:
+ *   - schema-registry: event-payload validation used by all workers
+ *   - emitDomainEvent / on / registerAllEventHandlers (re-exported from
+ *     services/reports/domain-events for the cases that import from
+ *     @/core/event-bus rather than the source module)
+ *   - DomainEvent type
  */
 
-// EventBus interface (production)
-export {
-  createEventBus,
-  getEventBus,
-  InMemoryEventBus,
-  RedisEventBus,
-} from './event-bus';
-export type { EventBus, EventBusStats, EventHandler } from './event-bus';
-
-// Kafka/NATS adapters (optional — for migration)
-export {
-  KafkaEventBus,
-  NATSEventBus,
-  createEventBusV2,
-} from './kafka-nats-adapters';
-export type { EventBusTransport, EventBusConfig, TransportType } from './kafka-nats-adapters';
-
-// Schema Registry for event validation
 export { schemaRegistry, registerAllEventSchemas } from './schema-registry';
 
-// Event Ordering for sequence enforcement
-export { sequenceTracker, withOrderingEnforcement } from './event-ordering';
-
-// Domain event types (single source — services/reports)
 export type { DomainEvent, DomainEventType } from '@/services/reports/domain-events';
 
-// Legacy re-exports for backward compatibility
 export {
   emitDomainEvent,
   on,
