@@ -38,16 +38,22 @@ const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 const CSRF_HEADER_NAME = 'x-csrf-token';
 const CSRF_TOKEN_LENGTH = 32; // 256 bits
 
-// Paths exempt from CSRF double-submit checks
+// Paths exempt from CSRF double-submit checks. Use specific paths only —
+// matching is `pathname.startsWith(exempt)`, so a single '/api' here
+// would silently exempt the ENTIRE API surface (caught by
+// csrf-double-submit.test.ts when this module gets wired into the
+// withMutation chain).
 const CSRF_DOUBLE_SUBMIT_EXEMPT_PATHS = [
   '/api/ready',
+  '/api/health',
+  '/api/liveness',
+  '/api/readiness',
   '/api/recognize',
   '/api/auth/login',
   '/api/auth/pin',
   '/api/auth/logout',
   '/api/auth/me',
   '/api/auth/refresh',
-  '/api', // health check
 ];
 
 /**
