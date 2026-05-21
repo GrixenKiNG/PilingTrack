@@ -58,12 +58,9 @@ describe('Dead Letter Queue', () => {
       }),
     });
 
-    expect(mocks.mockOutboxUpdate).toHaveBeenCalledWith({
-      where: { id: 'outbox-1' },
-      data: expect.objectContaining({
-        published: false,
-      }),
-    });
+    // moveToDlq must NOT touch OutboxEvent — that's the caller's job.
+    // Setting published=false here previously caused infinite re-queueing.
+    expect(mocks.mockOutboxUpdate).not.toHaveBeenCalled();
   });
 
   it('retries DLQ entry by re-inserting into outbox', async () => {

@@ -5,9 +5,10 @@
  * event bus that connects services/reports/domain-events to the registered
  * handlers (analytics, alerts, audit). The contract under test is:
  *
- *   emitDomainEvent(event) → all handlers for event.type fire
- *   handler error in one handler does not stop the others
- *   unknown event types are dropped without throwing
+ *   emitDomainEvent(event) → awaits every handler subscribed to event.type
+ *   one failing handler does not skip its siblings (Promise.allSettled)
+ *   but ANY rejection propagates so the outbox publisher can retry / DLQ
+ *   unknown event types are a no-op (logged at warn, no throw)
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -36,20 +37,20 @@ describe('outbox → domain events bus', () => {
     // by design (matching production), so we count from the current baseline.
   });
 
-  it('routes an event to every handler subscribed to its type', () => {
+  it('routes an event to every handler subscribed to its type', async () => {
     const a = vi.fn();
     const b = vi.fn();
     on('ReportSubmitted', a);
     on('ReportSubmitted', b);
 
     const event = makeEvent('ReportSubmitted');
-    emitDomainEvent(event);
+    await emitDomainEvent(event);
 
     expect(a).toHaveBeenCalledWith(event);
     expect(b).toHaveBeenCalledWith(event);
   });
 
-  it('isolates handler failures — a throwing handler does not block siblings', async () => {
+  it('runs all sibling handlers even when one throws, then re-throws the failure', async () => {
     const ok = vi.fn();
     const broken = vi.fn(() => {
       throw new Error('handler exploded');
@@ -57,13 +58,31 @@ describe('outbox → domain events bus', () => {
     on('ReportDeleted', broken);
     on('ReportDeleted', ok);
 
-    expect(() => emitDomainEvent(makeEvent('ReportDeleted'))).not.toThrow();
+    // Both handlers run (Promise.allSettled), AND the failure surfaces so
+    // outbox publisher can decide to retry / DLQ. Swallowing here used to
+    // mask projection failures completely (see DLQ post-mortem 2026-05-20).
+    await expect(emitDomainEvent(makeEvent('ReportDeleted'))).rejects.toThrow(
+      'handler exploded',
+    );
     expect(ok).toHaveBeenCalledOnce();
     expect(broken).toHaveBeenCalledOnce();
   });
 
-  it('drops unknown event types without throwing', () => {
-    expect(() =>
+  it('aggregates multiple handler failures into AggregateError', async () => {
+    const fail1 = vi.fn().mockRejectedValue(new Error('boom-1'));
+    const fail2 = vi.fn().mockRejectedValue(new Error('boom-2'));
+    on('ReportVersionCreated', fail1);
+    on('ReportVersionCreated', fail2);
+
+    await expect(
+      emitDomainEvent(makeEvent('ReportVersionCreated')),
+    ).rejects.toBeInstanceOf(AggregateError);
+    expect(fail1).toHaveBeenCalled();
+    expect(fail2).toHaveBeenCalled();
+  });
+
+  it('drops unknown event types without throwing', async () => {
+    await expect(
       emitDomainEvent({
         type: 'report.no_such_event' as ReportDomainEvent['type'],
         aggregateId: 'x',
@@ -71,8 +90,8 @@ describe('outbox → domain events bus', () => {
         payload: {},
         occurredAt: new Date().toISOString(),
         eventVersion: 1,
-      } as ReportDomainEvent)
-    ).not.toThrow();
+      } as ReportDomainEvent),
+    ).resolves.toBeUndefined();
   });
 
   it('exposes registered event types and handler counts for observability', () => {
@@ -81,16 +100,13 @@ describe('outbox → domain events bus', () => {
     expect(getHandlerCount('ReportExported')).toBeGreaterThanOrEqual(1);
   });
 
-  it('awaits async handler errors without rejecting the caller', async () => {
+  it('propagates async handler rejections so the outbox publisher can retry', async () => {
     const failing = vi.fn().mockRejectedValue(new Error('async failure'));
     on('ReportUpdated', failing);
 
-    // The bus must not propagate async rejections to the publisher — that
-    // would cause an entire outbox batch to be retried because one handler
-    // failed, which is the wrong granularity.
-    expect(() => emitDomainEvent(makeEvent('ReportUpdated'))).not.toThrow();
-    // Allow microtask queue to flush so the rejection is observed by Node.
-    await new Promise((resolve) => setImmediate(resolve));
+    await expect(emitDomainEvent(makeEvent('ReportUpdated'))).rejects.toThrow(
+      'async failure',
+    );
     expect(failing).toHaveBeenCalled();
   });
 });

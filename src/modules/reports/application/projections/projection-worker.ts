@@ -431,10 +431,16 @@ async function projectEvent(event: ReportDomainEvent) {
       }
     }
   } catch (error) {
+    // Re-throw so consumeOutboxEvents can drive retry / DLQ. Swallowing
+    // here used to mark every event as `projected=true` even when the
+    // upsert failed, hiding silent data loss in ReportStats /
+    // OperatorPerformance / DowntimeSummary / SiteWeeklyTrend the same
+    // way ReportAnalytics was hidden until the 2026-05-20 incident.
     logger.error('Projection failed', error, {
       eventType: normalizedEvent.type,
       aggregateId: normalizedEvent.aggregateId,
     });
+    throw error;
   }
 }
 

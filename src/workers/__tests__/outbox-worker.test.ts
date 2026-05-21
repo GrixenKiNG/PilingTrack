@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   mockFindMany: vi.fn(),
   mockFindUnique: vi.fn(),
   mockUpdate: vi.fn(),
+  mockUpdateMany: vi.fn(),
   mockCount: vi.fn(),
 }));
 
@@ -25,6 +26,9 @@ vi.mock('@/lib/db', () => ({
       findMany: mocks.mockFindMany,
       findUnique: mocks.mockFindUnique,
       update: mocks.mockUpdate,
+      // The publisher uses updateMany for the atomic claim (compare-and-swap
+      // on the consumer column). update is reserved for the retry path.
+      updateMany: mocks.mockUpdateMany,
       count: mocks.mockCount,
     },
   },
@@ -86,8 +90,7 @@ describe('Outbox Publisher', () => {
     it('publishes unpublished events to handler', async () => {
       const event = createOutboxEvent();
       mocks.mockFindMany.mockResolvedValue([event]);
-      mocks.mockFindUnique.mockResolvedValue({ published: false });
-      mocks.mockUpdate.mockResolvedValue({});
+      mocks.mockUpdateMany.mockResolvedValue({ count: 1 });
 
       const handler = vi.fn().mockResolvedValue(undefined);
       const count = await publishOutboxEvents(handler);
@@ -119,14 +122,13 @@ describe('Outbox Publisher', () => {
     it('marks events as published after successful handling', async () => {
       const event = createOutboxEvent();
       mocks.mockFindMany.mockResolvedValue([event]);
-      mocks.mockFindUnique.mockResolvedValue({ published: false });
-      mocks.mockUpdate.mockResolvedValue({});
+      mocks.mockUpdateMany.mockResolvedValue({ count: 1 });
 
       const handler = vi.fn().mockResolvedValue(undefined);
       await publishOutboxEvents(handler);
 
-      // Should update with published: true and where published: false (atomic)
-      expect(mocks.mockUpdate).toHaveBeenCalledWith(
+      // Atomic compare-and-swap: claim the row only if still published=false.
+      expect(mocks.mockUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: event.id, published: false },
           data: expect.objectContaining({ published: true }),
@@ -134,23 +136,25 @@ describe('Outbox Publisher', () => {
       );
     });
 
-    it('skips already-published events (idempotency)', async () => {
+    it('handles race when another worker claimed the row first', async () => {
+      // Two replicas can both pass the findMany window. The atomic updateMany
+      // returns {count: 0} for the loser, which must NOT count toward
+      // processedCount. The handler still ran (idempotency is the handler's
+      // responsibility — see consumeOutboxEvents comment).
       const event = createOutboxEvent();
       mocks.mockFindMany.mockResolvedValue([event]);
-      // Race condition: another worker already published it
-      mocks.mockFindUnique.mockResolvedValue({ published: true });
+      mocks.mockUpdateMany.mockResolvedValue({ count: 0 });
 
-      const handler = vi.fn();
+      const handler = vi.fn().mockResolvedValue(undefined);
       const count = await publishOutboxEvents(handler);
 
       expect(count).toBe(0);
-      expect(handler).not.toHaveBeenCalled();
+      expect(handler).toHaveBeenCalledTimes(1);
     });
 
     it('retries failed events (increments attempts)', async () => {
       const event = createOutboxEvent({ attempts: 2 });
       mocks.mockFindMany.mockResolvedValue([event]);
-      mocks.mockFindUnique.mockResolvedValue({ published: false });
       mocks.mockUpdate.mockResolvedValue({});
 
       const handler = vi.fn().mockRejectedValue(new Error('Handler error'));
@@ -172,7 +176,7 @@ describe('Outbox Publisher', () => {
     it('moves to DLQ after max retries exceeded', async () => {
       const event = createOutboxEvent({ attempts: 4 }); // One more = MAX_RETRIES (5)
       mocks.mockFindMany.mockResolvedValue([event]);
-      mocks.mockFindUnique.mockResolvedValue({ published: false });
+      mocks.mockUpdate.mockResolvedValue({});
 
       const handler = vi.fn().mockRejectedValue(new Error('Persistent failure'));
       await publishOutboxEvents(handler);
@@ -192,8 +196,7 @@ describe('Outbox Publisher', () => {
         createOutboxEvent({ id: `event-${i}` })
       );
       mocks.mockFindMany.mockResolvedValue(events);
-      mocks.mockFindUnique.mockResolvedValue({ published: false });
-      mocks.mockUpdate.mockResolvedValue({});
+      mocks.mockUpdateMany.mockResolvedValue({ count: 1 });
 
       const handler = vi.fn().mockResolvedValue(undefined);
       const count = await publishOutboxEvents(handler);
@@ -209,8 +212,8 @@ describe('Outbox Publisher', () => {
         createOutboxEvent({ id: 'event-ok-2', aggregateId: 'r3' }),
       ];
       mocks.mockFindMany.mockResolvedValue(events);
-      mocks.mockFindUnique.mockResolvedValue({ published: false });
       mocks.mockUpdate.mockResolvedValue({});
+      mocks.mockUpdateMany.mockResolvedValue({ count: 1 });
 
       let failCount = 0;
       const handler = vi.fn().mockImplementation(async () => {
@@ -224,8 +227,9 @@ describe('Outbox Publisher', () => {
       await publishOutboxEvents(handler);
       expect(handler).toHaveBeenCalledTimes(3);
 
-      // All 3 events should have update called (2 published, 1 retry)
-      expect(mocks.mockUpdate).toHaveBeenCalledTimes(3);
+      // 2 successful claims via updateMany, 1 retry via update.
+      expect(mocks.mockUpdateMany).toHaveBeenCalledTimes(2);
+      expect(mocks.mockUpdate).toHaveBeenCalledTimes(1);
     });
   });
 

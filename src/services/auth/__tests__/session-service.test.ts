@@ -23,14 +23,29 @@ const mockUser = {
 
 describe('session-service', () => {
   const originalEnv = { ...process.env };
+  let restoreRevocation: (() => void) | null = null;
 
   beforeEach(() => {
     vi.restoreAllMocks();
     process.env.SESSION_SECRET = 'test-secret-key-for-unit-tests';
+    // The default RedisRevocationStore fails closed when Redis is
+    // unreachable (returns isRevoked=true → verifySessionToken returns null).
+    // Tests run without Redis, so install an in-memory denylist instead.
+    const revoked = new Set<string>();
+    restoreRevocation = __setRevocationStoreForTests({
+      isRevoked: async (jti) => revoked.has(jti),
+      revoke: async (jti) => {
+        revoked.add(jti);
+      },
+    });
   });
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    if (restoreRevocation) {
+      restoreRevocation();
+      restoreRevocation = null;
+    }
   });
 
   describe('createSessionToken', () => {

@@ -51,18 +51,32 @@ export function on(eventType: string, handler: EventHandler) {
 }
 
 /**
- * Emit a domain event. Handlers are called synchronously.
- * If a handler throws, the error is logged but doesn't stop other handlers.
+ * Emit a domain event. Awaits all handlers (in parallel via Promise.allSettled
+ * so a slow/failing one doesn't block the rest), then re-throws if any rejected.
+ *
+ * Re-throwing is critical: callers like the outbox publisher catch this and
+ * use it to drive their retry/DLQ logic. Swallowing handler errors here used
+ * to make the outbox think every event was processed successfully, even
+ * when projections silently failed — attempts never incremented, DLQ never
+ * received anything, and read models drifted out of sync without alerts.
+ *
+ * Handlers that legitimately should NOT fail the event (e.g. Telegram
+ * notifications, audit logging) MUST swallow their own errors internally.
+ * Critical handlers (analytics projections, daily summary) MUST propagate.
  */
-export function emitDomainEvent(event: DomainEvent) {
+export async function emitDomainEvent(event: DomainEvent): Promise<void> {
   const normalizedType = normalizeReportDomainEventType(event.type) || event.type;
   const normalizedEvent =
     normalizedType === event.type ? event : { ...event, type: normalizedType };
   const eventHandlers = handlers.get(normalizedType);
-  if (!eventHandlers) {
-    if (process.env.LOG_UNHANDLED_EVENTS === 'true') {
-      logger.debug('No handlers for event', { eventType: normalizedType });
-    }
+  if (!eventHandlers || eventHandlers.size === 0) {
+    // No subscribers — log as warn so silent gaps in registration are visible
+    // by default. Previously this was debug-under-env-flag, which is how
+    // 11 projection events vanished in production on 2026-05-20 with no trace.
+    logger.warn('No handlers for domain event', {
+      type: normalizedType,
+      aggregateId: normalizedEvent.aggregateId,
+    });
     return;
   }
 
@@ -73,22 +87,31 @@ export function emitDomainEvent(event: DomainEvent) {
     handlerCount: eventHandlers.size,
   });
 
-  for (const handler of eventHandlers) {
-    try {
-      const result = handler(normalizedEvent);
-      if (result instanceof Promise) {
-        result.catch((err) => {
-          logger.error(`Event handler error for ${normalizedType}`, err, {
-            aggregateId: normalizedEvent.aggregateId,
-          });
-        });
-      }
-    } catch (err) {
-      logger.error(`Event handler error for ${normalizedType}`, err, {
-        aggregateId: normalizedEvent.aggregateId,
-      });
-    }
+  const results = await Promise.allSettled(
+    Array.from(eventHandlers).map((handler) =>
+      Promise.resolve().then(() => handler(normalizedEvent)),
+    ),
+  );
+
+  const failures = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map((r) => r.reason);
+
+  if (failures.length === 0) return;
+
+  for (const err of failures) {
+    logger.error(`Event handler error for ${normalizedType}`, err, {
+      aggregateId: normalizedEvent.aggregateId,
+    });
   }
+
+  if (failures.length === 1) {
+    throw failures[0];
+  }
+  throw new AggregateError(
+    failures,
+    `${failures.length} handlers failed for ${normalizedType}`,
+  );
 }
 
 /**

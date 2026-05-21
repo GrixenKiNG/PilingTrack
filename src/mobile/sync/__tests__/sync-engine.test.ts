@@ -315,7 +315,10 @@ describe('runSyncCycle', () => {
     expect(mocks.markSynced).toHaveBeenCalledWith(100);
   });
 
-  it('should skip pull when no pending outbox items', async () => {
+  // Skipped: sync v3 is intentionally disabled in sync-engine.ts (pushOutbox
+  // and pullUpdates return early without hitting the network). Re-enable the
+  // test together with the early returns in sync-engine.ts.
+  it.skip('should skip pull when no pending outbox items', async () => {
     mocks.getPendingItems.mockResolvedValue([]);
     mockFetch.mockResolvedValue({
       ok: true,
@@ -362,7 +365,9 @@ describe('applyServerReports — conflict resolution', () => {
     mocks.getPendingItems.mockResolvedValue([]);
   });
 
-  it('should NOT call DB update for local pending reports', async () => {
+  // Skipped: sync v3 disabled — pullUpdates returns early, applyServerReports
+  // is unreachable from runSyncCycle. See sync-engine.ts header.
+  it.skip('should NOT call DB update for local pending reports', async () => {
     // This tests the logic inside pullUpdates -> applyServerReports.
     // Since applyServerReports is not exported, we test it through runSyncCycle.
     // We verify by checking that the sync cycle completes without errors.
@@ -399,7 +404,8 @@ describe('applyServerReports — conflict resolution', () => {
     expect(result.pulled).toBe(1);
   });
 
-  it('should upsert new server reports', async () => {
+  // Skipped: sync v3 disabled — pullUpdates returns early. See sync-engine.ts.
+  it.skip('should upsert new server reports', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: () =>
@@ -511,7 +517,9 @@ describe('startAutoSync / stopAutoSync', () => {
     stopAutoSync();
   });
 
-  it('should trigger sync on visibility change when online', async () => {
+  // Skipped: sync v3 disabled — visibility triggers a sync cycle but
+  // pushOutbox/pullUpdates return early. See sync-engine.ts.
+  it.skip('should trigger sync on visibility change when online', async () => {
     mocks.getPendingItems.mockResolvedValue([]);
     mockFetch.mockResolvedValue({
       ok: true,

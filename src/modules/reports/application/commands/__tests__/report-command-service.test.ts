@@ -144,7 +144,7 @@ describe('Report Command Service', () => {
       };
 
       await expect(upsertReport(input)).rejects.toThrow(
-        'Report must contain at least pile work or drilling entries'
+        'Report must contain at least pile work, drilling, or a downtime entry'
       );
       expect(mockRepoSave).not.toHaveBeenCalled();
     });

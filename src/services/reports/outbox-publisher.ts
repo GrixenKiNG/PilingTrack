@@ -149,6 +149,21 @@ async function consumeOutboxEvents(
           error,
           attempts,
         );
+        // Claim this consumer's column so the row is not re-fetched on the
+        // next tick. moveToDlq only writes to DeadLetterQueue; without this
+        // claim, the polling loop re-picks the row, the handler fails again,
+        // attempts ticks past MAX_RETRIES again, and a duplicate lands in
+        // DLQ every interval. The two consumers ('published' / 'projected')
+        // are independent — only the one that hit max retries is advanced.
+        await db.outboxEvent.update({
+          where: { id: outboxEvent.id },
+          data: {
+            attempts,
+            lastError: `Moved to DLQ: ${errorMessage.substring(0, 500)}`,
+            [consumerColumn]: true,
+            ...(consumerColumn === 'published' ? { publishedAt: new Date() } : {}),
+          } as any,
+        });
       } else {
         // Schedule next retry with exponential backoff
         const backoffMs = getBackoffDelay(attempts);

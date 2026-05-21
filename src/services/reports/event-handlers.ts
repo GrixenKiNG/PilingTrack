@@ -30,6 +30,8 @@ export function registerAnalyticsEventHandler() {
 }
 
 async function handleReportForAnalytics(event: ReportDomainEvent) {
+  // Critical projection — errors must propagate so the outbox publisher
+  // can retry / DLQ. The local catch logs context and re-throws.
   try {
     const { db } = await import('@/lib/db');
 
@@ -92,6 +94,7 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       eventType: event.type,
       reportId: event.aggregateId,
     });
+    throw error;
   }
 }
 
@@ -163,6 +166,7 @@ async function handleReportForDailySummary(event: ReportDomainEvent) {
     return;
   }
 
+  // Critical projection — propagate so outbox publisher can retry / DLQ.
   try {
     await recomputeSiteDailySummary(event.siteId, date);
   } catch (error) {
@@ -170,6 +174,7 @@ async function handleReportForDailySummary(event: ReportDomainEvent) {
       eventType: event.type, aggregateId: event.aggregateId,
       siteId: event.siteId, date,
     });
+    throw error;
   }
 }
 

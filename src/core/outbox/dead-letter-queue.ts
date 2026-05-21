@@ -49,15 +49,13 @@ export async function moveToDlq(
       },
     });
 
-    // Mark original outbox event as failed (won't be retried)
-    await db.outboxEvent.update({
-      where: { id: outboxId },
-      data: {
-        attempts,
-        published: false,
-        lastError: `Moved to DLQ: ${errorMessage.substring(0, 500)}`,
-      },
-    });
+    // NOTE: Marking the source OutboxEvent as consumed is the caller's job
+    // (consumeOutboxEvents sets its own consumer column atomically). Setting
+    // published=false here used to re-queue the row forever — every tick
+    // would re-fetch it, the handler would fail again, attempts would tick
+    // past MAX_RETRIES, and moveToDlq would be called repeatedly, spamming
+    // duplicates into DLQ. Now this function only writes to DLQ; the caller
+    // claims the outbox row.
 
     logger.error('Event moved to Dead Letter Queue', {
       outboxId,

@@ -64,6 +64,45 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-console": "off",
   },
 }, {
+  // Architectural boundaries (CLAUDE.md §1):
+  //   modules/ = domain logic
+  //   services/ = cross-cutting services
+  //   core/    = infrastructure
+  //   app/     = HTTP entry points
+  // Allowed direction is downward only: app → services → core, modules → core.
+  // Warn (not error) so legacy crossings (event-handlers.ts already imports
+  // from modules/) surface in lint without breaking the build. Tests under
+  // __tests__/ are exempt — they reach across layers by design.
+  files: ["src/core/**/*.{ts,tsx}"],
+  ignores: ["src/**/__tests__/**", "src/generated/**"],
+  rules: {
+    "no-restricted-imports": ["warn", {
+      patterns: [
+        { group: ["@/modules/*", "@/services/*", "@/app/*", "../modules/*", "../services/*", "../app/*"], message: "core/ must not depend on upper layers (modules/services/app)" },
+      ],
+    }],
+  },
+}, {
+  files: ["src/services/**/*.{ts,tsx}"],
+  ignores: ["src/**/__tests__/**"],
+  rules: {
+    "no-restricted-imports": ["warn", {
+      patterns: [
+        { group: ["@/modules/*", "@/app/*", "../modules/*", "../../modules/*", "../app/*", "../../app/*"], message: "services/ may only depend on services/, core/, lib/ (CLAUDE.md §1)" },
+      ],
+    }],
+  },
+}, {
+  files: ["src/modules/**/*.{ts,tsx}"],
+  ignores: ["src/**/__tests__/**"],
+  rules: {
+    "no-restricted-imports": ["warn", {
+      patterns: [
+        { group: ["@/services/*", "@/app/*", "../services/*", "../../services/*", "../app/*", "../../app/*", "../../../app/*"], message: "modules/ may only depend on modules/, core/, lib/ (CLAUDE.md §1)" },
+      ],
+    }],
+  },
+}, {
   ignores: [
     "node_modules/**",
     ".next/**",

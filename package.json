@@ -32,6 +32,7 @@
     "agents:test:quick": "npx tsx agents/run-agents.ts --quick",
     "test:e2e": "npx playwright test",
     "test:coverage": "vitest run --coverage",
+    "coverage:check": "vitest run --coverage --reporter=dot",
     "test:e2e:ui": "npx playwright test --ui",
     "test:unit": "vitest run",
     "test:contract": "vitest run tests/contract",

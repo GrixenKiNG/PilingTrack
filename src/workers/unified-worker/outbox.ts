@@ -2,6 +2,7 @@ import { getOutboxLeaderElection } from '@/core/infrastructure/leader-election';
 import { logger } from '@/lib/logger';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';
+import { registerAllEventHandlers } from '@/services/reports/event-handlers';
 import { getOutboxStats, startOutboxWorker } from '@/services/reports/outbox-publisher';
 import { OUTBOX_INTERVAL } from './config';
 import { recordLeaderHeartbeat, setRunning, workerStates } from './state';
@@ -17,6 +18,21 @@ export async function startOutbox(): Promise<void> {
     registerAllEventSchemas();
   } catch (error) {
     logger.warn('Failed to register event schemas', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Register in-process subscribers BEFORE the outbox loop starts emitting.
+  // The outbox callback calls emitDomainEvent(); without handlers registered
+  // here, the very first events go into a void — ReportAnalytics never gets
+  // written and the failure is silent (emitDomainEvent only logs at debug
+  // level when LOG_UNHANDLED_EVENTS=true). startProjection registers the
+  // same handlers, but races with this loop on startup; this duplicate call
+  // is idempotent (registerAllEventHandlers internally guards re-entry).
+  try {
+    registerAllEventHandlers();
+  } catch (error) {
+    logger.warn('Failed to register event handlers in outbox loop', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

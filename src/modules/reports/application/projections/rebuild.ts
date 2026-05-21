@@ -152,7 +152,7 @@ export async function rebuildReportAnalytics(): Promise<RebuildResult> {
   const start = Date.now();
   const reports = await db.report.findMany({
     select: {
-      id: true, siteId: true, userId: true, tenantId: true, status: true, updatedAt: true,
+      id: true, reportId: true, siteId: true, userId: true, tenantId: true, status: true, updatedAt: true,
       piles: { select: { count: true } },
       drillings: { select: { meters: true } },
       downtimes: { select: { duration: true } },
@@ -165,10 +165,16 @@ export async function rebuildReportAnalytics(): Promise<RebuildResult> {
     const totalPiles = r.piles.reduce((s, p) => s + (p.count || 0), 0);
     const totalDrilling = r.drillings.reduce((s, d) => s + (d.meters || 0), 0);
     const totalDowntime = r.downtimes.reduce((s, d) => s + (d.duration || 0), 0);
+    // ReportAnalytics.reportId stores Report.reportId (uuid), NOT Report.id
+    // (cuid). The realtime handler (services/reports/event-handlers.ts
+    // handleReportForAnalytics) writes the uuid — see commits 3b07426 /
+    // 7f1f0e6. This rebuilder used to write the cuid, which created
+    // unreachable rows alongside the real ones (every monitoring query
+    // joins on r.reportId = ra.reportId). Now writes the uuid to match.
     await db.reportAnalytics.upsert({
-      where: { reportId: r.id },
+      where: { reportId: r.reportId },
       create: {
-        reportId: r.id,
+        reportId: r.reportId,
         siteId: r.siteId,
         userId: r.userId,
         tenantId: r.tenantId || null,
