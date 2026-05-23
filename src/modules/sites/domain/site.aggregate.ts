@@ -118,13 +118,9 @@ export class SiteAggregate {
   deactivate(userId?: string): void {
     if (!this.state.isActive) return;
 
-    // TODO: Check if there are active reports before deactivating
-    // Implementation should:
-    // 1. Query for any active (non-deleted) reports for this site
-    // 2. Throw validation error if active reports exist
-    // 3. Only allow deactivation if all reports are archived or completed
-    // 4. Consider cascade behavior: deactivate all crews assigned to site too
-    
+    // Active-reports guard lives in the command service (deactivateSite)
+    // because aggregates must stay pure — they cannot reach the DB.
+    // See src/modules/sites/application/commands/site-command.service.ts.
     this.state.isActive = false;
     this.state.status = 'INACTIVE';
     this.state.updatedAt = new Date().toISOString();

@@ -189,20 +189,31 @@ export function registerAlertEventHandler() {
 async function handleDowntimeAlert(event: ReportDomainEvent) {
   const duration = (event.data.duration as number) || 0;
 
-  // Alert if downtime > 2 hours (120 min)
-  if (duration > 120) {
-    logger.warn('High downtime detected', {
-      duration,
+  if (duration <= 120) return;
+
+  logger.warn('High downtime detected', {
+    duration,
+    siteId: event.siteId,
+    reportId: event.aggregateId,
+    reasonId: event.data.reasonId,
+  });
+
+  try {
+    const { telegramNotifier } = await import('@/core/notifications/telegram');
+    await telegramNotifier.sendAlert({
+      severity: duration > 240 ? 'high' : 'medium',
+      message: `Простой ${duration} мин зафиксирован в отчёте`,
       siteId: event.siteId,
       reportId: event.aggregateId,
-      reasonId: event.data.reasonId,
     });
-
-    // TODO: Send Telegram notification
-    // await sendTelegramAlert({
-    //   message: `Простой ${duration}мин на объекте ${event.siteId}`,
-    //   siteId: event.siteId,
-    // });
+  } catch (err) {
+    // Notification must never fail the event — log and continue.
+    // The audit/projection paths re-throw on failure (see emitDomainEvent
+    // contract); alerts are best-effort.
+    logger.error('Telegram downtime alert failed', err, {
+      reportId: event.aggregateId,
+      duration,
+    });
   }
 }
 
