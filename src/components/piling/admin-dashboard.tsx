@@ -19,12 +19,12 @@ import {
   Wrench,
   AlertTriangle,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { formatNumber, formatPercent, pluralizeRu } from '@/lib/format';
 import type { SiteAnalyticsDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -34,17 +34,22 @@ export function AdminDashboard() {
   const router = useRouter();
   const [analytics, setAnalytics] = useState<SiteAnalyticsDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const showSkeleton = useMinSkeletonDuration(loading);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await authFetch('/api/analytics/sites');
       if (res.ok) {
         const data = await res.json();
         setAnalytics(data.analytics || []);
+      } else {
+        setLoadError('Сервер вернул ошибку. Попробуйте ещё раз.');
       }
     } catch {
-      toast.error('Ошибка загрузки аналитики');
+      setLoadError('Не удалось связаться с сервером. Проверьте сеть и повторите.');
     } finally {
       setLoading(false);
     }
@@ -125,7 +130,7 @@ export function AdminDashboard() {
     },
   ];
 
-  if (loading) {
+  if (showSkeleton) {
     return (
       <div className="space-y-6 p-4 lg:p-6">
         <Skeleton className="h-8 w-48" />
@@ -135,6 +140,18 @@ export function AdminDashboard() {
           ))}
         </div>
         <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-6 p-4 lg:p-6">
+        <QueryErrorBanner
+          message={loadError}
+          onRetry={() => void loadData()}
+          retrying={loading}
+        />
       </div>
     );
   }

@@ -5,6 +5,7 @@ export {
   degradeEmptyList,
   degradeEmptyObject,
   degradeWithCache,
+  recordLastKnownGood,
   degradePartial,
   UserError,
   TimeoutError,

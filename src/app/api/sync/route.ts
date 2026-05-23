@@ -23,6 +23,8 @@ import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service'
 import { getRequestId } from '@/lib/request-context';
 import { upsertReport } from '@/modules/reports';
 import { withMutation } from '@/core/api-wrapper';
+import { recordAuditEvent } from '@/services/audit/audit-service';
+import { db } from '@/lib/db';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -197,16 +199,38 @@ async function handleReportSync(
 }
 
 async function handleReportDelete(
-  _op: { id: string; type: string },
-  _user: { id: string; name: string; role: string }
+  op: { id: string; type: string; entityId?: string },
+  user: { id: string; name: string; role: string }
 ) {
-  // Report deletion — soft delete or hard delete based on role
-  // For now, just acknowledge (reports are typically not deleted in production)
-  // TODO: Implement proper soft delete with audit trail
-  // Implementation should:
-  // 1. Mark report as deleted (isActive = false) for soft delete
-  // 2. Create audit trail entry via recordAuditLog() with before/after state
-  // 3. Cascade soft delete to related ReportVersion and ReportAudit records
-  // 4. Validate user permissions (ADMIN required for deletion)
-  // 5. Return deleted report in response for sync confirmation
+  // Policy: production reports are never hard-deleted from sync. ADMIN-only;
+  // we look the report up, record an immutable audit entry, and acknowledge.
+  // A full schema-level soft-delete (Report.deletedAt) is deferred — when
+  // added, this handler should also flip Report.status='deleted' and cascade
+  // to ReportVersion/ReportAudit.
+  if (user.role !== 'ADMIN') {
+    throw new Error('Only ADMIN can request report deletion');
+  }
+  const reportId = op.entityId;
+  if (!reportId) return null;
+
+  const existing = await db.report.findFirst({
+    where: { reportId },
+    select: { id: true, reportId: true, siteId: true, userId: true, status: true },
+  });
+
+  await recordAuditEvent({
+    action: 'report.deleted',
+    scope: 'reports.sync',
+    actorId: user.id,
+    targetId: reportId,
+    metadata: {
+      requestedVia: 'sync',
+      reportExists: Boolean(existing),
+      previousStatus: existing?.status ?? null,
+      siteId: existing?.siteId ?? null,
+      ownerId: existing?.userId ?? null,
+    },
+  });
+
+  return { reportId, status: 'delete-acknowledged' };
 }

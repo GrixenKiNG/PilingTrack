@@ -219,8 +219,9 @@ describe('pullUpdates', () => {
   });
 
   it.skip('should apply server reports from successful pull', async () => {
-    // TODO: Known issue — Dexie mock complexity. The sync engine works correctly
-    // in production; this test fails due to IndexedDB mocking limitations.
+    // Skipped: Dexie/IndexedDB mock complexity. Sync v3 is consciously
+    // deferred per audit N-2 (see docs/audit.md); re-enable when the
+    // sync engine is reactivated alongside a proper Dexie test harness.
     const serverReports = [
       {
         reportId: 'srv-report-1',
@@ -290,7 +291,7 @@ describe('runSyncCycle', () => {
   });
 
   it.skip('should push then pull in sequence', async () => {
-    // TODO: Known issue — Dexie mock complexity.
+    // Skipped: Dexie mock complexity — see audit N-2 (sync v3 deferred).
     const item = makeOutboxItem({ id: 100 });
     mocks.getPendingItems.mockResolvedValue([item]);
     mockFetch
@@ -473,7 +474,7 @@ describe('getSyncStatusUI', () => {
   });
 
   it.skip('should return combined status from outbox and sync state', async () => {
-    // TODO: Known issue — Dexie mock complexity.
+    // Skipped: Dexie mock complexity — see audit N-2 (sync v3 deferred).
     mocks.getSyncStatus.mockResolvedValue({ pending: 3, failed: 1 });
 
     Object.defineProperty(navigator, 'onLine', {

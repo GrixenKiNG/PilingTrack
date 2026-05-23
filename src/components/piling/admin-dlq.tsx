@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
 
 type DlqStatus = 'pending' | 'resolved' | 'discarded' | 'all';
@@ -51,11 +52,15 @@ export function AdminDlq() {
   const [stats, setStats] = useState<DlqStats | null>(null);
   const [status, setStatus] = useState<DlqStatus>('pending');
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useMinSkeletonDuration(loading);
   const [actingId, setActingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await authFetch(`/api/admin/dlq?status=${status}&limit=200`);
       if (res.ok) {
@@ -63,10 +68,10 @@ export function AdminDlq() {
         setEntries(data.entries || []);
         setStats(data.stats || null);
       } else {
-        toast.error('Ошибка загрузки DLQ');
+        setLoadError('Сервер не смог отдать список DLQ. Попробуйте обновить.');
       }
     } catch {
-      toast.error('Ошибка загрузки DLQ');
+      setLoadError('Не удалось связаться с сервером. Проверьте сеть и повторите.');
     } finally {
       setLoading(false);
     }
@@ -147,7 +152,15 @@ export function AdminDlq() {
         ))}
       </div>
 
-      {loading ? (
+      {loadError && !loading ? (
+        <QueryErrorBanner
+          message={loadError}
+          onRetry={() => void load()}
+          retrying={loading}
+        />
+      ) : null}
+
+      {showSkeleton ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full" />
