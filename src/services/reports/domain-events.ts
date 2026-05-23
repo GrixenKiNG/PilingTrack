@@ -128,46 +128,7 @@ export function getHandlerCount(eventType: string): number {
   return handlers.get(eventType)?.size || 0;
 }
 
-// ============================================================
-// Auto-registration
-// ============================================================
-
-let handlersRegistered = false;
-
-/**
- * Register all event handlers. Call once on server startup.
- */
-export function registerAllEventHandlers() {
-  if (handlersRegistered) return;
-
-  // Import handlers lazily to avoid circular deps
-  import('@/services/reports/event-handlers').then(({ registerAllEventHandlers }) => {
-    registerAllEventHandlers();
-    handlersRegistered = true;
-    if (shouldLogHandlerRegistration()) {
-      logger.info('All event handlers registered', {
-        eventTypes: getRegisteredEventTypes(),
-      });
-    }
-  });
-}
-
-/**
- * Ensure handlers are registered (synchronous check).
- */
-export function ensureHandlersRegistered() {
-  if (!handlersRegistered) {
-    try {
-      void import('@/services/reports/event-handlers')
-        .then(({ registerAllEventHandlers }) => {
-          registerAllEventHandlers();
-          handlersRegistered = true;
-        })
-        .catch(() => {
-          // Handlers not available yet - will be registered on first event
-        });
-    } catch {
-      // Handlers not available yet - will be registered on first event
-    }
-  }
-}
+// Handler registration moved to @/services/reports/event-handlers.
+// Import registerAllEventHandlers directly from there to register
+// synchronously at startup (avoids the fire-and-forget race that
+// caused N-4: events firing before lazy import().then() resolved).

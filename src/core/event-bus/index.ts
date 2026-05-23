@@ -9,9 +9,9 @@
  *
  * What this barrel exposes:
  *   - schema-registry: event-payload validation used by all workers
- *   - emitDomainEvent / on / registerAllEventHandlers (re-exported from
- *     services/reports/domain-events for the cases that import from
- *     @/core/event-bus rather than the source module)
+ *   - emitDomainEvent / on (re-exported from services/reports/domain-events)
+ *   - registerAllEventHandlers (re-exported from services/reports/event-handlers —
+ *     synchronous; call once at startup, idempotent via Set-based on())
  *   - DomainEvent type
  */
 
@@ -24,6 +24,6 @@ export {
   on,
   getRegisteredEventTypes,
   getHandlerCount,
-  ensureHandlersRegistered,
-  registerAllEventHandlers,
 } from '@/services/reports/domain-events';
+
+export { registerAllEventHandlers } from '@/services/reports/event-handlers';
