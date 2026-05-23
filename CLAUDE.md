@@ -175,14 +175,13 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 
 **Known limitations:**
 - **Telegram API blocked at provider** — `api.telegram.org` unreachable directly from the VPS (Russian ISP). Routed through a Cloudflare Worker proxy set via `TELEGRAM_API_BASE=https://pilingtrack-tg-proxy.sasorion02.workers.dev` in `.env`. Notifications work; if the env var disappears, fetches fail.
-- **`/api/sync/v2` authorization** — coarse `reports.manage_all` gate replaced with per-row ownership inside the sync engine. Operators sync only reports they own; ADMIN/DISPATCHER stay free to sync across users. Enforcement lives in `src/modules/reports/application/sync-engine-v2/report-processor.ts` (`SyncForbiddenError`).
 
 **User context:** non-programmer in Russian. Reply in Russian, prefer concrete commands the user can paste, avoid open-ended "what do you want to do" questions when the next step is obvious. See user memory for more.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (12447 symbols, 23152 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (12382 symbols, 22775 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

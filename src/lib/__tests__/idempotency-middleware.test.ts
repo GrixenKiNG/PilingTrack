@@ -97,13 +97,13 @@ describe('withIdempotency — pass-through cases', () => {
     mocks.findUnique.mockResolvedValue(null);
 
     await withIdempotency(
-      new NextRequest('http://localhost/api/sync/v2?device=abc', {
+      new NextRequest('http://localhost/api/reports/upsert?device=abc', {
         method: 'POST',
         headers: { 'idempotency-key': 'k-1' },
       }),
     );
 
-    expect(mocks.findUnique.mock.calls[0][0].where.scope_key.scope).toBe('/api/sync/v2');
+    expect(mocks.findUnique.mock.calls[0][0].where.scope_key.scope).toBe('/api/reports/upsert');
   });
 
   it('lets retries through when the previous attempt was marked failed', async () => {

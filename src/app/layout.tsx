@@ -2,8 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/toaster';
-import { ServiceWorkerRegistration } from '@/components/piling/service-worker-registration';
-import { OfflineInitializer } from '@/mobile/ui-adapters/offline-initializer';
 import './globals.css';
 
 // Force every HTML route to be rendered per request so the proxy can
@@ -33,13 +31,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: `${APP_TITLE} - Управление свайными работами`,
   description: APP_DESCRIPTION,
-  manifest: '/manifest.json',
   applicationName: APP_TITLE,
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: APP_TITLE,
-  },
   formatDetection: {
     telephone: false,
   },
@@ -79,8 +71,6 @@ export default async function RootLayout({
           disableTransitionOnChange
           nonce={nonce}
         >
-          <ServiceWorkerRegistration />
-          <OfflineInitializer />
           {children}
           <Toaster />
         </ThemeProvider>

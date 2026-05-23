@@ -58,8 +58,7 @@ export const POST = withMutation(
     // because nothing on the write path supplied it. The history /
     // analytics queries then filter by tenantId=orion and silently
     // hide those reports (operator sees "no history", admin period
-    // filter shows zeros). Resolve it once here, identically to
-    // /api/sync/v2.
+    // filter shows zeros). Resolve it once here.
     const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || null;
 
     const result = await upsertReport(
