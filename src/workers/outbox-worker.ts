@@ -52,13 +52,23 @@ async function main() {
     await recordWorkerHeartbeat('outbox');
   }
 
+  // Only emit INFO when stats are noteworthy (>0 backlog) or changed since
+  // last tick; otherwise debug. Avoids the steady-state log flood (audit-
+  // adjacent: same fix as in unified-worker/outbox.ts).
+  let lastStatsSignature = '';
   const statsInterval = setInterval(async () => {
     try {
       const stats = await getOutboxStats();
-      logger.info('Outbox stats', {
-        ...stats,
-        isLeader: election.isLeader(),
-      });
+      const signature = `${stats.unpublished}|${stats.failed}|${stats.total}`;
+      const noteworthy = stats.unpublished > 0 || stats.failed > 0;
+      const changed = signature !== lastStatsSignature;
+      lastStatsSignature = signature;
+      const payload = { ...stats, isLeader: election.isLeader() };
+      if (noteworthy || changed) {
+        logger.info('Outbox stats', payload);
+      } else {
+        logger.debug('Outbox stats (steady-state)', payload);
+      }
     } catch (error) {
       logger.error(
         'Failed to get outbox stats',

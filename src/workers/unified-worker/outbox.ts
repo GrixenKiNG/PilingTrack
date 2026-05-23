@@ -79,12 +79,25 @@ export async function startOutbox(): Promise<void> {
     });
   }, 30_000);
 
+  // Heartbeat-style stats log was firing INFO every minute even when nothing
+  // changed (305 events, 0 unpublished, 0 failed — same line forever). Keep
+  // the periodic check, but only emit INFO when there's something worth
+  // operator attention; otherwise demote to debug.
+  let lastStatsSignature = '';
   const statsInterval = setInterval(() => {
     if (!election.isLeader()) return;
 
     void getOutboxStats()
       .then((stats) => {
-        logger.info('Outbox stats', stats);
+        const signature = `${stats.unpublished}|${stats.failed}|${stats.total}`;
+        const noteworthy = stats.unpublished > 0 || stats.failed > 0;
+        const changed = signature !== lastStatsSignature;
+        lastStatsSignature = signature;
+        if (noteworthy || changed) {
+          logger.info('Outbox stats', stats);
+        } else {
+          logger.debug('Outbox stats (steady-state)', stats);
+        }
       })
       .catch((error) => {
         logger.error('Failed to get outbox stats', {
