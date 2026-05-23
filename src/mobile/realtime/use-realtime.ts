@@ -28,8 +28,9 @@ import { logger } from '@/lib/logger';
 const POLLING_FALLBACK_THRESHOLD = 10; // Reconnect attempts before switching to polling
 const POLLING_INTERVAL_MS = 15000; // 15 seconds
 
-function getWSUrl(): string {
-  const host = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+function getWSUrl(): string | null {
+  const host = process.env.NEXT_PUBLIC_WS_URL;
+  if (!host) return null;
   return `${host}/ws`;
 }
 
@@ -45,9 +46,11 @@ function getSessionToken(): string | null {
 
 let _client: WSClient | null = null;
 
-function getClient(): WSClient {
+function getClient(): WSClient | null {
   if (!_client) {
-    _client = new WSClient(getWSUrl(), getSessionToken);
+    const url = getWSUrl();
+    if (!url) return null;
+    _client = new WSClient(url, getSessionToken);
   }
   return _client;
 }
@@ -164,6 +167,11 @@ export function useRealtime(options: UseRealtimeOptions = {}): UseRealtimeResult
     if (!enabled) return;
 
     const client = getClient();
+    if (!client) {
+      // NEXT_PUBLIC_WS_URL not set — stay in initial 'disconnected' state,
+      // matching fleet-dashboard's explicit-opt-in pattern (audit L-1).
+      return;
+    }
     const dispatcher = getReliableDispatcher();
     client.connect();
 
@@ -222,27 +230,28 @@ export function useRealtime(options: UseRealtimeOptions = {}): UseRealtimeResult
     };
   }, [enabled]);
 
-  // Actions
+  // Actions — all no-op when NEXT_PUBLIC_WS_URL is unset (audit L-1).
   const reconnect = useCallback(() => {
     reconnectAttemptsRef.current = 0;
     setReconnectAttempts(0);
     stopPolling();
     const client = getClient();
+    if (!client) return;
     client.disconnect();
     client.connect();
   }, [stopPolling]);
 
   const disconnect = useCallback(() => {
     stopPolling();
-    getClient().disconnect();
+    getClient()?.disconnect();
   }, [stopPolling]);
 
   const subscribe = useCallback((channel: string) => {
-    getClient().subscribe(channel);
+    getClient()?.subscribe(channel);
   }, []);
 
   const unsubscribe = useCallback((channel: string) => {
-    getClient().unsubscribe(channel);
+    getClient()?.unsubscribe(channel);
   }, []);
 
   return {

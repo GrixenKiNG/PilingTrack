@@ -48,6 +48,13 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     // comment is tracked (issue link, audit ref, or a `// eslint-disable
     // -- tracked in …` directive), the warning goes away.
     "no-warning-comments": ["warn", { terms: ["todo", "fixme", "hack", "xxx"], location: "start" }],
+    // Audit L-2: regression watchdog for ad-hoc Tailwind sizes. Use the
+    // design scale (text-xs/sm/base/…) instead of arbitrary pixel values.
+    // Existing 56 occurrences are tracked in audit; new ones surface here.
+    "no-restricted-syntax": ["warn", {
+      selector: "Literal[value=/text-\\[\\d+px\\]/]",
+      message: "Avoid ad-hoc text-[Npx]; use a Tailwind size token (text-xs, text-sm, …) or extend tailwind.config theme.fontSize.",
+    }],
   },
 }, {
   files: [
