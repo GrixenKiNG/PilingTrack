@@ -101,13 +101,13 @@ class RedisRevocationStore implements RevocationStore {
     // single-Redis deployment, treating every hiccup as "token revoked" would
     // log out every active operator on any momentary outage. JWT TTL stays
     // short, so the worst-case window of an actually-revoked token slipping
-    // through is bounded. A previous version of this code was fail-closed,
-    // which contradicted the comment and produced session-revocation warns
-    // on every admin render during Redis cold-start.
-    if (!client) {
-      logger.debug('session-revocation: redis unavailable — failing open');
-      return false;
-    }
+    // through is bounded.
+    if (!client) return false;
+    // ioredis is created with enableOfflineQueue:false. Until status === 'ready'
+    // any .get() throws "Stream isn't writeable" — that's expected during
+    // cold-start, not an operator signal. Skip the call entirely to avoid
+    // log forwarding into the browser console on every admin render.
+    if (client.status !== 'ready') return false;
     try {
       const v = await client.get(`revoked-jti:${jti}`);
       return v !== null;
