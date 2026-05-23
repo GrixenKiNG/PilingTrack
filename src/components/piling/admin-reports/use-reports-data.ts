@@ -31,6 +31,8 @@ export interface UseReportsDataReturn {
   equipment: { id: string; name: string }[];
   filterSiteId: string;
   setFilterSiteId: (v: string) => void;
+  filterUserId: string;
+  setFilterUserId: (v: string) => void;
   periodFrom: string;
   setPeriodFrom: (v: string) => void;
   periodTo: string;
@@ -56,6 +58,7 @@ export function useReportsData(): UseReportsDataReturn {
   const [equipment, setEquipment] = useState<{ id: string; name: string }[]>([]);
 
   const [filterSiteId, setFilterSiteId] = useState<string>('all');
+  const [filterUserId, setFilterUserId] = useState<string>('all');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
   const [periodActive, setPeriodActive] = useState(false);
@@ -72,13 +75,21 @@ export function useReportsData(): UseReportsDataReturn {
     const abortController = new AbortController();
     let isMounted = true;
 
-    const loadSites = async () => {
+    const loadSitesAndOperators = async () => {
       setLoadingSites(true);
       try {
-        const res = await authFetch('/api/sites/all', { signal: abortController.signal });
-        if (isMounted && res.ok) {
-          const data = await res.json();
+        const [sitesRes, operatorsRes] = await Promise.all([
+          authFetch('/api/sites/all', { signal: abortController.signal }),
+          authFetch('/api/users?role=OPERATOR', { signal: abortController.signal }),
+        ]);
+        if (!isMounted) return;
+        if (sitesRes.ok) {
+          const data = await sitesRes.json();
           setSites(data.sites || []);
+        }
+        if (operatorsRes.ok) {
+          const data = await operatorsRes.json();
+          setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
         }
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
@@ -89,7 +100,7 @@ export function useReportsData(): UseReportsDataReturn {
       }
     };
 
-    void loadSites();
+    void loadSitesAndOperators();
 
     return () => {
       isMounted = false;
@@ -108,17 +119,13 @@ export function useReportsData(): UseReportsDataReturn {
 
     setLoadingReferenceData(true);
 
+    // Operators are now loaded eagerly on mount alongside sites — no need to
+    // re-fetch them here. We only need dictionary + equipment for the dialog.
     const promise = Promise.all([
-      authFetch('/api/users?role=OPERATOR'),
       authFetch('/api/dictionary/all'),
       authFetch('/api/equipment'),
     ])
-      .then(async ([operatorsRes, dictionaryRes, equipmentRes]) => {
-        if (operatorsRes.ok) {
-          const data = await operatorsRes.json();
-          setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
-        }
-
+      .then(async ([dictionaryRes, equipmentRes]) => {
         if (dictionaryRes.ok) {
           const data = await dictionaryRes.json();
           setPileGrades(data.pileGrades || []);
@@ -156,11 +163,14 @@ export function useReportsData(): UseReportsDataReturn {
         if (periodActive && periodFrom && periodTo) {
           const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo });
           if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+          if (filterUserId !== 'all') params.set('userId', filterUserId);
           url = `/api/reports/period?${params}`;
         } else {
-          url = filterSiteId === 'all'
-            ? '/api/reports/all'
-            : `/api/reports/all?siteId=${filterSiteId}`;
+          const params = new URLSearchParams();
+          if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+          if (filterUserId !== 'all') params.set('userId', filterUserId);
+          const qs = params.toString();
+          url = qs ? `/api/reports/all?${qs}` : '/api/reports/all';
         }
         const res = await authFetch(url, { signal: abortController.signal });
         if (isMounted && res.ok) {
@@ -190,7 +200,7 @@ export function useReportsData(): UseReportsDataReturn {
       isMounted = false;
       abortController.abort();
     };
-  }, [filterSiteId, periodActive, periodFrom, periodTo]);
+  }, [filterSiteId, filterUserId, periodActive, periodFrom, periodTo]);
 
   const loadReports = useCallback(async () => {
     // This is a stub function to maintain the interface
@@ -219,7 +229,9 @@ export function useReportsData(): UseReportsDataReturn {
 
   return {
     reports, sites, operators, pileGrades, drillingTypes, downtimeReasons, equipment,
-    filterSiteId, setFilterSiteId, periodFrom, setPeriodFrom, periodTo, setPeriodTo,
+    filterSiteId, setFilterSiteId,
+    filterUserId, setFilterUserId,
+    periodFrom, setPeriodFrom, periodTo, setPeriodTo,
     periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
     handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   };

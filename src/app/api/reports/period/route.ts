@@ -79,9 +79,10 @@ export const GET = withApi(
     const dateFrom = request.nextUrl.searchParams.get('dateFrom');
     const dateTo = request.nextUrl.searchParams.get('dateTo');
     const siteId = request.nextUrl.searchParams.get('siteId');
+    const userId = request.nextUrl.searchParams.get('userId');
 
     const { getReportsByPeriod } = await getReportQueryService();
-    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null);
+    const reports = await getReportsByPeriod(dateFrom, dateTo, siteId, user?.tenantId || null, userId);
 
     // PileWork has no metersPerUnit — it's stored per-site on SitePilePlan.
     const pileKeys = new Set<string>();

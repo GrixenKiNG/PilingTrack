@@ -67,7 +67,8 @@ export async function getReportsByPeriod(
   dateFrom: string | null,
   dateTo: string | null,
   siteId?: string | null,
-  tenantId?: string | null
+  tenantId?: string | null,
+  userId?: string | null
 ) {
   if (!dateFrom || !dateTo) {
     throw new ServiceError('dateFrom and dateTo are required', 400);
@@ -75,13 +76,14 @@ export async function getReportsByPeriod(
 
   // Use raw SQL for performance — 4-10x faster than Prisma includes
   const { getReportsByPeriodRaw } = await import('@/core/infrastructure/raw-queries');
-  return getReportsByPeriodRaw(tenantId || '', dateFrom, dateTo, siteId);
+  return getReportsByPeriodRaw(tenantId || '', dateFrom, dateTo, siteId, userId);
 }
 
 export async function listReportsForReview(
   sessionUser: { id: string; role: string; tenantId?: string | null },
   siteId?: string | null,
-  pagination?: { cursor?: string; limit?: number }
+  pagination?: { cursor?: string; limit?: number },
+  userId?: string | null
 ) {
   const { paginateQuery } = await import('@/lib/pagination');
 
@@ -92,6 +94,9 @@ export async function listReportsForReview(
   }
   if (siteId) {
     where.siteId = siteId;
+  }
+  if (userId) {
+    where.userId = userId;
   }
 
   return paginateQuery(

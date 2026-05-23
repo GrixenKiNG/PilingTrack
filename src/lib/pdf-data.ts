@@ -86,13 +86,15 @@ export async function buildPeriodPdfData(input: {
   dateTo: string;
   siteId?: string | null;
   tenantId?: string | null;
+  userId?: string | null;
 }): Promise<PeriodPdfData> {
   const { getReportsByPeriod } = await getReportQueryService();
   const reports = (await getReportsByPeriod(
     input.dateFrom,
     input.dateTo,
     input.siteId || null,
-    input.tenantId || null
+    input.tenantId || null,
+    input.userId || null
   )) as PeriodReportRecord[];
 
   const fallbackCrewByKey = await buildFallbackCrewMap(

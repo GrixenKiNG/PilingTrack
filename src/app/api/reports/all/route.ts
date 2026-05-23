@@ -17,8 +17,9 @@ export const GET = withApi(
 
     assertCan(user!, 'reports.read_all');
     const siteId = request.nextUrl.searchParams.get('siteId');
+    const userId = request.nextUrl.searchParams.get('userId');
     const { listReportsForReview } = await getReportsModule();
-    const paginated = await listReportsForReview(user!, siteId);
+    const paginated = await listReportsForReview(user!, siteId, undefined, userId);
     return NextResponse.json({ reports: paginated.data, hasMore: paginated.hasMore, nextCursor: paginated.nextCursor });
   },
   { domain: 'reports', cache: true, cacheTTL: 10_000 }

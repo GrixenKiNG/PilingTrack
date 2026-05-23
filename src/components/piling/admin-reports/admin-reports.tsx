@@ -18,7 +18,9 @@ import { ReportFormDialog } from './report-form-dialog';
 export function AdminReports() {
   const {
     reports, sites, operators, pileGrades, drillingTypes, downtimeReasons, equipment,
-    filterSiteId, setFilterSiteId, periodFrom, setPeriodFrom, periodTo, setPeriodTo,
+    filterSiteId, setFilterSiteId,
+    filterUserId, setFilterUserId,
+    periodFrom, setPeriodFrom, periodTo, setPeriodTo,
     periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
     handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   } = useReportsData();
@@ -73,6 +75,7 @@ export function AdminReports() {
       const { authFetch } = await import('@/lib/api');
       const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo, inline: '1' });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+      if (filterUserId !== 'all') params.set('userId', filterUserId);
       const res = await authFetch(`/api/reports/pdf?${params}`);
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
@@ -128,6 +131,7 @@ export function AdminReports() {
       {/* Filters */}
       <ReportFilters
         sites={sites} filterSiteId={filterSiteId} onFilterSiteChange={setFilterSiteId}
+        operators={operators} filterUserId={filterUserId} onFilterUserChange={setFilterUserId}
         periodFrom={periodFrom} onPeriodFromChange={setPeriodFrom}
         periodTo={periodTo} onPeriodToChange={setPeriodTo}
         periodActive={periodActive} periodSummary={periodSummary}

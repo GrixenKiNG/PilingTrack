@@ -14,10 +14,18 @@ import {
 import type { SiteFlatDTO } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 
+interface OperatorOption {
+  id: string;
+  name: string;
+}
+
 interface ReportFiltersProps {
   sites: SiteFlatDTO[];
   filterSiteId: string;
   onFilterSiteChange: (v: string) => void;
+  operators: OperatorOption[];
+  filterUserId: string;
+  onFilterUserChange: (v: string) => void;
   periodFrom: string;
   onPeriodFromChange: (v: string) => void;
   periodTo: string;
@@ -32,28 +40,44 @@ interface ReportFiltersProps {
 
 export function ReportFilters({
   sites, filterSiteId, onFilterSiteChange,
+  operators, filterUserId, onFilterUserChange,
   periodFrom, onPeriodFromChange, periodTo, onPeriodToChange,
   periodActive, periodSummary, onApplyPeriod, onResetPeriod,
   onExportPdf, generatingPdf,
 }: ReportFiltersProps) {
-  if (sites.length === 0 && !periodActive) return null;
+  if (sites.length === 0 && operators.length === 0 && !periodActive) return null;
 
   return (
     <div className="space-y-3">
-      {sites.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
-          <Select value={filterSiteId} onValueChange={onFilterSiteChange}>
-            <SelectTrigger className="w-full max-w-xs h-10">
-              <SelectValue placeholder="Все объекты" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все объекты</SelectItem>
-              {sites.map((site) => (
-                <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {(sites.length > 0 || operators.length > 0) && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <Filter className="w-4 h-4 text-slate-400 flex-shrink-0 hidden sm:block" />
+          {sites.length > 0 && (
+            <Select value={filterSiteId} onValueChange={onFilterSiteChange}>
+              <SelectTrigger className="w-full sm:max-w-xs h-10">
+                <SelectValue placeholder="Все объекты" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все объекты</SelectItem>
+                {sites.map((site) => (
+                  <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {operators.length > 0 && (
+            <Select value={filterUserId} onValueChange={onFilterUserChange}>
+              <SelectTrigger className="w-full sm:max-w-xs h-10">
+                <SelectValue placeholder="Все операторы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все операторы</SelectItem>
+                {operators.map((op) => (
+                  <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       )}
 

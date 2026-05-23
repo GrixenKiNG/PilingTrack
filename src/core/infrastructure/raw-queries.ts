@@ -49,7 +49,8 @@ export async function getReportsByPeriodRaw(
   tenantId: string | null,
   dateFrom: string,
   dateTo: string,
-  siteId?: string | null
+  siteId?: string | null,
+  userId?: string | null
 ) {
   const start = Date.now();
 
@@ -58,6 +59,7 @@ export async function getReportsByPeriodRaw(
   };
   where.tenantId = tenantId && tenantId.trim().length > 0 ? tenantId : null;
   if (siteId) where.siteId = siteId;
+  if (userId) where.userId = userId;
 
   const rows = await db.report.findMany({
     where,
