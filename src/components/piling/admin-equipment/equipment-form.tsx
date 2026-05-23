@@ -245,7 +245,7 @@ function NumberField({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="sm:col-span-2 mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+    <div className="sm:col-span-2 mt-1 text-2xs uppercase tracking-wide text-muted-foreground">
       {children}
     </div>
   );

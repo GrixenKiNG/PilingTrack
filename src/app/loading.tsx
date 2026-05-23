@@ -12,7 +12,7 @@ export default function Loading() {
             </div>
             <div>
               <p className="text-sm font-bold text-slate-900">PilingTrack</p>
-              <p className="text-[10px] text-slate-500">Загрузка приложения...</p>
+              <p className="text-3xs text-slate-500">Загрузка приложения...</p>
             </div>
           </div>
 

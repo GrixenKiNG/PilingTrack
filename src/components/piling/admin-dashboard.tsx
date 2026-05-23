@@ -188,7 +188,7 @@ export function AdminDashboard() {
                   <p className={cn('font-mono text-xl font-bold leading-tight tabular-nums lg:text-2xl', card.valueClass)}>
                     {card.value}
                   </p>
-                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">{card.detail}</p>
+                  <p className="mt-1.5 text-3xs leading-relaxed text-slate-500">{card.detail}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -210,7 +210,7 @@ export function AdminDashboard() {
                 <div>
                   <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-slate-600">Забивка свай</span>
-                    <span className="text-right font-mono text-[11px] font-bold text-slate-900">
+                    <span className="text-right font-mono text-2xs font-bold text-slate-900">
                       {formatCountMeters(totalActual, totalActualPileMeters)} /{' '}
                       {formatCountMeters(totalPlanned, totalPlannedPileMeters)}
                     </span>
@@ -223,7 +223,7 @@ export function AdminDashboard() {
                 <div>
                   <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-slate-600">Лидерное бурение</span>
-                    <span className="text-right font-mono text-[11px] font-bold text-slate-900">
+                    <span className="text-right font-mono text-2xs font-bold text-slate-900">
                       {formatCountMeters(totalActualDrillingCount, totalActualDrilling)} /{' '}
                       {formatCountMeters(totalPlannedDrillingCount, totalPlannedDrilling)}
                     </span>
@@ -285,8 +285,8 @@ export function AdminDashboard() {
                     {site.plannedPiles > 0 && (
                       <div className="mb-2">
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-[10px] text-slate-500">Сваи</span>
-                          <span className="text-right font-mono text-[10px] text-slate-600">
+                          <span className="text-3xs text-slate-500">Сваи</span>
+                          <span className="text-right font-mono text-3xs text-slate-600">
                             {formatCountMeters(site.actualPiles, site.actualPileMeters)} /{' '}
                             {formatCountMeters(site.plannedPiles, site.plannedPileMeters)}
                           </span>
@@ -298,8 +298,8 @@ export function AdminDashboard() {
                     {site.plannedDrilling > 0 && (
                       <div>
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-[10px] text-slate-500">Лидерное бурение</span>
-                          <span className="text-right font-mono text-[10px] text-slate-600">
+                          <span className="text-3xs text-slate-500">Лидерное бурение</span>
+                          <span className="text-right font-mono text-3xs text-slate-600">
                             {formatCountMeters(site.actualDrillingCount, site.actualDrilling)} /{' '}
                             {formatCountMeters(site.plannedDrillingCount, site.plannedDrilling)}
                           </span>

@@ -206,7 +206,7 @@ export function AdminDlq() {
                         {expandedId === entry.id ? 'Скрыть payload' : 'Показать payload'}
                       </button>
                       {expandedId === entry.id && (
-                        <pre className="mt-2 text-[10px] bg-slate-50 border border-slate-200 rounded p-2 overflow-x-auto max-h-60">
+                        <pre className="mt-2 text-3xs bg-slate-50 border border-slate-200 rounded p-2 overflow-x-auto max-h-60">
                           {JSON.stringify(entry.payload, null, 2)}
                         </pre>
                       )}
@@ -259,7 +259,7 @@ function StatCard({
     <div className={cn('rounded-xl p-3 flex items-center gap-3', bg)}>
       <Icon className={cn('w-5 h-5', color)} />
       <div>
-        <p className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</p>
+        <p className="text-3xs text-slate-500 uppercase tracking-wide">{label}</p>
         <p className={cn('text-xl font-bold', color)}>{value}</p>
       </div>
     </div>

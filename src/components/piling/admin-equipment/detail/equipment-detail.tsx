@@ -328,7 +328,7 @@ function Section({
 function KV({ label, value, full = false }: { label: string; value: React.ReactNode; full?: boolean }) {
   return (
     <div className={cn(full && 'sm:col-span-3')}>
-      <dt className="text-[11px] uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="text-2xs uppercase tracking-wide text-slate-400">{label}</dt>
       <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
     </div>
   );
@@ -337,7 +337,7 @@ function KV({ label, value, full = false }: { label: string; value: React.ReactN
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-lg border bg-card px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="text-2xs uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-0.5 font-mono text-lg tabular-nums">{value}</div>
     </div>
   );
@@ -437,7 +437,7 @@ function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown> }) {
     <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 text-sm">
       {rows.map((r, i) => (
         <div key={i}>
-          <dt className="text-[11px] uppercase tracking-wide text-slate-400">{r.label}</dt>
+          <dt className="text-2xs uppercase tracking-wide text-slate-400">{r.label}</dt>
           <dd className="mt-0.5 text-slate-900">{r.value}</dd>
         </div>
       ))}

@@ -112,7 +112,7 @@ export function UserAssignmentDialog({ siteId, onOpenChange, loadingUsers, users
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
                       <div>
                         <p className="text-sm font-medium text-slate-900">{a.user.name}</p>
-                        <p className="text-[10px] text-slate-500">{a.user.email}</p>
+                        <p className="text-3xs text-slate-500">{a.user.email}</p>
                       </div>
                     </div>
                     <button

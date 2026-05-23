@@ -276,7 +276,7 @@ export function FeedbackCenter() {
         <button className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100">
           <Bell className="h-4.5 w-4.5 text-slate-600" />
           {unreadCount > 0 && (
-            <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-red-500 px-1 text-3xs font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -368,7 +368,7 @@ export function FeedbackCenter() {
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900">{event.title}</p>
                             {getPriorityBadge(event.priority)}
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-3xs">
                               {event.source === 'client' ? 'локально' : event.scope}
                             </Badge>
                             {event.unread && (
@@ -381,7 +381,7 @@ export function FeedbackCenter() {
                             )}
                           </div>
                           <p className="mt-1 text-sm text-slate-600">{event.message}</p>
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-slate-500">
                             <span>{formatEventDate(event.createdAt)}</span>
                             {event.requestId && <span>requestId: {event.requestId}</span>}
                             {event.actorName && <span>Инициатор: {event.actorName}</span>}

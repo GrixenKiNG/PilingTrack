@@ -133,12 +133,12 @@ export function SyncStatus() {
         </span>
         <span>{displayState.label}</span>
         {(status.pending > 0 || status.failed > 0) && (
-          <span className="ml-0.5 text-[10px] opacity-75">
+          <span className="ml-0.5 text-3xs opacity-75">
             ({status.pending + status.failed})
           </span>
         )}
         {eventCount > 0 && wsState === 'connected' && (
-          <span className="ml-0.5 text-[10px] opacity-50" title="Realtime events received">
+          <span className="ml-0.5 text-3xs opacity-50" title="Realtime events received">
             ·{eventCount > 99 ? '99+' : eventCount}
           </span>
         )}

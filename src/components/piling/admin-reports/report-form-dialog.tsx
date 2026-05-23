@@ -276,7 +276,7 @@ export function ReportFormDialog({
                   <div key={pile.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
                     <div className="min-w-0">
                       <span className="font-medium">{getPileGradeName(pile.pileGradeId)}</span>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-3xs text-slate-500">
                         {getPileLengthMeters(pile.pileGradeId).toFixed(1)} м × {pile.count} шт. = {getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.
                       </p>
                     </div>
@@ -360,7 +360,7 @@ export function ReportFormDialog({
                       <div key={dt.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
                         <div className="min-w-0">
                           <span className="font-medium">{getDtReasonName(dt.reasonId)}</span>
-                          {dt.comment && <p className="text-[10px] text-slate-500 truncate">{dt.comment}</p>}
+                          {dt.comment && <p className="text-3xs text-slate-500 truncate">{dt.comment}</p>}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-semibold text-amber-600">{dt.duration} ч</span>
@@ -380,7 +380,7 @@ export function ReportFormDialog({
           {/* Summary */}
           {(formPiles.length > 0 || formDrillings.length > 0 || formDowntimes.length > 0) && (
             <div className="bg-slate-900 rounded-lg p-3 text-white">
-              <p className="text-[10px] font-medium text-slate-400 mb-2">Итого</p>
+              <p className="text-3xs font-medium text-slate-400 mb-2">Итого</p>
               <div className="flex items-center gap-4 text-sm">
                 <span className="font-mono font-bold">{formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п. сваи</span>
                 <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м.п. бурение</span>

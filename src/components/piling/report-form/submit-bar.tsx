@@ -35,16 +35,16 @@ export function SubmitBar({
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalPiles} шт. / {formatNumber(totalPileMeters)} м.п.</p>
-                <p className="text-[10px] text-slate-400">Сваи, шт. / м.п.</p>
+                <p className="text-3xs text-slate-400">Сваи, шт. / м.п.</p>
               </div>
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalDrillingCount} шт. / {formatNumber(totalMeters)} м.п.</p>
-                <p className="text-[10px] text-slate-400">Бурение, шт. / м.п.</p>
+                <p className="text-3xs text-slate-400">Бурение, шт. / м.п.</p>
               </div>
               {hasDowntime && (
                 <div>
                   <p className="text-lg font-bold font-mono tabular-nums text-amber-400">{formatNumber(totalDowntime)} ч</p>
-                  <p className="text-[10px] text-slate-400">Простой</p>
+                  <p className="text-3xs text-slate-400">Простой</p>
                 </div>
               )}
             </div>

@@ -104,7 +104,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
                   <div className="absolute inset-0 w-10 h-10 rounded-xl bg-orange-500" />
                 )}
               </div>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-3xs font-medium">{item.label}</span>
             </a>
           );
         })}
@@ -172,7 +172,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         </div>
         <div>
           <h1 className="text-sm font-bold text-slate-900">PilingTrack</h1>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-3xs text-slate-500">
             {isDispatcher ? 'Панель диспетчера' : 'Панель администратора'}
           </p>
         </div>
@@ -212,7 +212,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-            <p className="text-[10px] text-slate-500">{user?.email}</p>
+            <p className="text-3xs text-slate-500">{user?.email}</p>
           </div>
         </div>
         <Button

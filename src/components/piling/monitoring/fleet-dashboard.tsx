@@ -184,7 +184,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
           </div>
         </div>
         <div className={cn(
-          'rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide',
+          'rounded-full px-2.5 py-1 text-3xs uppercase tracking-wide',
           conn === 'live' && 'bg-emerald-100 text-emerald-700',
           conn === 'connecting' && 'bg-amber-100 text-amber-700',
           conn === 'offline' && 'bg-rose-100 text-rose-700',
@@ -206,7 +206,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
 function Metric({ label, value, muted = false }: { label: string; value: string | number; muted?: boolean }) {
   return (
     <div>
-      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className={cn('mt-0.5 font-mono text-lg tabular-nums', muted && 'text-muted-foreground')}>{value}</dd>
     </div>
   );
@@ -231,7 +231,7 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
               <span className={cn('h-2.5 w-2.5 rounded-full ring-4', s.dot, s.ring)} aria-label={s.label} />
               <h3 className="truncate text-base font-semibold leading-tight">{card.name}</h3>
               {card.todaysReports > 1 && (
-                <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-3xs font-semibold text-indigo-700">
                   ×{card.todaysReports}
                 </span>
               )}

@@ -240,20 +240,20 @@ function FieldDiffRow({ diff }: { diff: ConflictFieldDiff }) {
       <div className="flex items-center justify-between px-2 py-1">
         <span className="text-xs font-medium text-gray-700">{diff.field}</span>
         {diff.isCritical && (
-          <span className="text-[10px] font-semibold uppercase text-red-600">
+          <span className="text-3xs font-semibold uppercase text-red-600">
             Critical
           </span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-px">
         <div className="bg-white p-2">
-          <div className="text-[10px] uppercase text-gray-500">Yours</div>
+          <div className="text-3xs uppercase text-gray-500">Yours</div>
           <div className="truncate text-xs text-blue-700" title={formatValue(diff.clientValue)}>
             {formatValue(diff.clientValue)}
           </div>
         </div>
         <div className="bg-white p-2">
-          <div className="text-[10px] uppercase text-gray-500">Server</div>
+          <div className="text-3xs uppercase text-gray-500">Server</div>
           <div className="truncate text-xs text-gray-700" title={formatValue(diff.serverValue)}>
             {formatValue(diff.serverValue)}
           </div>
