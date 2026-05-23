@@ -28,9 +28,10 @@ describe('session-service', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     process.env.SESSION_SECRET = 'test-secret-key-for-unit-tests';
-    // The default RedisRevocationStore fails closed when Redis is
-    // unreachable (returns isRevoked=true → verifySessionToken returns null).
-    // Tests run without Redis, so install an in-memory denylist instead.
+    // Tests run without Redis. The default RedisRevocationStore fails open
+    // when Redis is unreachable (returns isRevoked=false), so verification
+    // would succeed regardless. We install an in-memory denylist anyway so
+    // tests can exercise both the revoked and non-revoked branches explicitly.
     const revoked = new Set<string>();
     restoreRevocation = __setRevocationStoreForTests({
       isRevoked: async (jti) => revoked.has(jti),

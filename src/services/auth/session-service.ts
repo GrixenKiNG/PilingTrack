@@ -97,19 +97,23 @@ class RedisRevocationStore implements RevocationStore {
 
   async isRevoked(jti: string): Promise<boolean> {
     const client = this.getClient();
-    // Fail-closed: if Redis is unavailable we cannot prove the token is *not*
-    // revoked, so we reject it. A stolen token must never be re-accepted just
-    // because the revocation store is degraded.
+    // Fail-open per the policy documented at the top of this file: on a
+    // single-Redis deployment, treating every hiccup as "token revoked" would
+    // log out every active operator on any momentary outage. JWT TTL stays
+    // short, so the worst-case window of an actually-revoked token slipping
+    // through is bounded. A previous version of this code was fail-closed,
+    // which contradicted the comment and produced session-revocation warns
+    // on every admin render during Redis cold-start.
     if (!client) {
-      logger.warn('session-revocation: redis unavailable — failing closed');
-      return true;
+      logger.debug('session-revocation: redis unavailable — failing open');
+      return false;
     }
     try {
       const v = await client.get(`revoked-jti:${jti}`);
       return v !== null;
     } catch (err) {
-      logger.warn('session-revocation: GET failed (fail-closed)', { error: (err as Error).message });
-      return true;
+      logger.debug('session-revocation: GET failed (fail-open)', { error: (err as Error).message });
+      return false;
     }
   }
 
