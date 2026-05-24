@@ -56,3 +56,10 @@ LICENSE
 *.log
 lerna-debug.log*
 pnpm-debug.log*
+
+# PITR data — these live alongside the repo on the VPS but must not
+# enter the build context. wal-archive/ is mode 700 owned by uid 70,
+# so the docker daemon (running as user1) can't even read it — the
+# build fails with "permission denied" without this entry.
+wal-archive
+basebackups
