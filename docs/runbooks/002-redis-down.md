@@ -3,91 +3,121 @@
 | Metadata | Value |
 |----------|-------|
 | **Severity** | 🟡 P1 — High |
-| **Impact** | Rate limiting fallback to in-memory, event bus in-memory, circuit breakers open |
+| **Impact** | Rate-limit fallback to in-memory, JWT denylist недоступен, очереди/pub-sub стоят |
 | **SLA** | Восстановление < 30 мин |
-| **Escalation** | On-call engineer → Tech Lead |
+| **Owned by** | Whoever holds prod SSH |
+
+> **Стек:** одиночный VPS, Docker Compose. НЕ Kubernetes.
+
+```bash
+cd /opt/pilingtrack
+alias dc='docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml'
+# redis под паролем — без -a будет NOAUTH. Достаём из .env:
+RP=$(grep '^REDIS_PASSWORD=' /opt/pilingtrack/.env | cut -d= -f2-)
+```
+
+---
+
+## ДВА Redis-инстанса — важно различать
+
+| Контейнер | Роль | Persistence | FLUSHDB безопасен? |
+|---|---|---|---|
+| `pilingtrack-redis` | rate-limit, очереди (BullMQ), JWT denylist, pub/sub | да (`redis_data`) | ❌ потеряете denylist + очереди задач |
+| `pilingtrack-redis-cache` | только кэш | нет (`--save ""`) | ✅ кэш отстроится сам |
+
+Прежде чем что-то чистить — поймите КАКОЙ инстанс лёг.
 
 ---
 
 ## Симптомы
 
-- Rate limiting не распределяется между pod'ами
-- Event bus fallback to in-memory (events не доставляются между pod'ами)
-- Circuit breakers для Redis в состоянии OPEN
-- Health check показывает `redis: down`
+- `/api/health/deep` → `redis: "down"`
+- Rate-limit перестал быть распределённым (fallback in-memory)
+- Telegram/realtime тормозят (pub/sub очереди стоят)
+- Logout/отозванные токены снова работают (denylist недоступен) — **риск безопасности**
+
+---
 
 ## Диагностика
 
 ```bash
-# 1. Проверь статус pod
-kubectl get pods -n pilingtrack-prod -l app=redis
+# 1. Статус обоих контейнеров
+dc ps redis redis-cache
 
-# 2. Проверь Redis connectivity
-kubectl exec -n pilingtrack-prod -it deployment/redis -- redis-cli ping
+# 2. Пинг (с паролем!)
+dc exec redis       redis-cli -a "$RP" --no-auth-warning ping
+dc exec redis-cache redis-cli -a "$RP" --no-auth-warning ping
+# Оба должны вернуть PONG
 
-# 3. Проверь память
-kubectl exec -n pilingtrack-prod -it deployment/redis -- redis-cli INFO memory
+# 3. Память state-инстанса
+dc exec redis redis-cli -a "$RP" --no-auth-warning INFO memory | grep -E "used_memory_human|maxmemory_human"
 
-# 4. Проверь connected clients
-kubectl exec -n pilingtrack-prod -it deployment/redis -- redis-cli INFO clients
+# 4. Логи
+dc logs redis --tail 50
+dc logs redis-cache --tail 50
 ```
+
+---
 
 ## Восстановление
 
-### Вариант 1: Pod crash — перезапуск
+### Вариант 1 — контейнер упал: перезапуск
 
 ```bash
-kubectl delete pod -n pilingtrack-prod -l app=redis
+dc restart redis          # или redis-cache — тот что лёг
+dc exec redis redis-cli -a "$RP" --no-auth-warning ping
 ```
 
-### Вариант 2: Out of memory — очистка
+### Вариант 2 — кэш переполнен / странное поведение кэша
+
+Безопасно очистить ТОЛЬКО cache-инстанс:
 
 ```bash
-# Подключись к Redis
-kubectl exec -n pilingtrack-prod -it deployment/redis -- redis-cli
-
-# Проверь память
-INFO memory
-
-# Очисти ключи
-FLUSHDB
-
-# Настрой maxmemory-policy если нужно
-CONFIG SET maxmemory-policy allkeys-lru
-CONFIG SET maxmemory 512mb
+dc exec redis-cache redis-cli -a "$RP" --no-auth-warning FLUSHALL
+# Кэш отстроится при следующих запросах. Данные не теряются.
 ```
 
-### Вариант 3: Corruption — рестарт с чистой базой
+### Вариант 3 — state-инстанс переполнен памятью
+
+НЕ делайте FLUSHALL на `pilingtrack-redis` — потеряете JWT denylist
+(отозванные токены снова станут валидными) и очереди задач. Вместо этого
+проверьте политику вытеснения и что именно занимает память:
 
 ```bash
-# Удали pod и PVC (данные Redis не критичны — это cache/queue)
-kubectl delete pvc -n pilingtrack-prod -l app=redis
-kubectl delete pod -n pilingtrack-prod -l app=redis
+dc exec redis redis-cli -a "$RP" --no-auth-warning INFO memory | grep used_memory_human
+dc exec redis redis-cli -a "$RP" --no-auth-warning --bigkeys
+# Если реально некуда деваться и нужен срочный рестарт — данные на диске
+# (redis_data), переживут перезапуск контейнера:
+dc restart redis
 ```
+
+---
 
 ## Проверка
 
 ```bash
-# Redis ping
-kubectl exec -n pilingtrack-prod -it deployment/redis -- redis-cli ping
-# Должен вернуть: PONG
+dc exec redis       redis-cli -a "$RP" --no-auth-warning ping
+dc exec redis-cache redis-cli -a "$RP" --no-auth-warning ping
 
-# Circuit breaker status
-curl -s http://localhost:3000/api/system/status | jq '.components.redis'
-# Должен вернуть: { "status": "ok" }
+curl -s https://orionpiling.ru/api/health/deep
+# redis должно быть "ok"
 ```
+
+---
 
 ## Post-Incident
 
-- [ ] Root cause analysis документирован
-- [ ] Runbook обновлён если шаги изменились
-- [ ] Мониторинг обновлён (memory threshold)
+- [ ] Какой инстанс лёг и почему (OOM? краш?)
+- [ ] Если денилист был недоступен — проверить не остались ли валидными
+      токены, которые должны были быть отозваны
+- [ ] Memory alert если упёрлись в лимит
 
 ---
 
 ## Prevention
 
-- **Memory monitoring**: Alert при > 80% usage
-- **maxmemory-policy**: allkeys-lru для автоматической eviction
-- **Redis Sentinel**: Для automatic failover в production
-- **Graceful degradation**: Система работает без Redis (in-memory fallback)
+- **Graceful degradation:** приложение переживает падение Redis
+  (in-memory fallback для rate-limit), но denylist при этом не работает —
+  это известный риск, минимизировать время простоя
+- **Разделение инстансов** уже сделано: кэш отдельно от состояния, чтобы
+  очистка кэша не сносила денилист

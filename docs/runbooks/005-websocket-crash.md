@@ -3,88 +3,105 @@
 | Metadata | Value |
 |----------|-------|
 | **Severity** | 🟡 P1 — High |
-| **Impact** | Realtime уведомления не работают, offline sync не получает updates |
+| **Impact** | Realtime-обновления не приходят (fleet-dashboard, уведомления). Запись отчётов работает |
 | **SLA** | Восстановление < 10 мин |
-| **Escalation** | On-call engineer → Tech Lead |
+| **Owned by** | Whoever holds prod SSH |
+
+> **Стек:** одиночный VPS, Docker Compose. НЕ Kubernetes.
+> WS-контейнер: `pilingtrack-ws`, порт **3001** (за Caddy).
+
+```bash
+cd /opt/pilingtrack
+alias dc='docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml'
+```
 
 ---
 
 ## Симптомы
 
-- Клиенты не получают realtime обновления
-- Sync status не обновляется
-- Health check: `websocket: down`
-- Логи WS pod: ошибки подключения, memory leaks
+- Клиенты не получают realtime-обновления (дашборд не двигается)
+- `/api/health/deep` → `websocket: "down"`
+- Логи `pilingtrack-ws`: ошибки подключения, рост памяти
+
+---
 
 ## Диагностика
 
 ```bash
-# 1. Проверь статус pod
-kubectl get pods -n pilingtrack-prod -l app=websocket
+# 1. Статус контейнера
+dc ps ws
 
-# 2. Проверь логи
-kubectl logs -n pilingtrack-prod -l app=websocket --tail=100
+# 2. Логи
+dc logs ws --tail 100
 
-# 3. Проверь connections
-kubectl exec -n pilingtrack-prod -it deployment/websocket -- \
-  curl -s http://localhost:4000/health
+# 3. Здоровье через приложение (агрегированный статус)
+curl -s https://orionpiling.ru/api/health/deep
+# websocket должно быть "ok"
 
-# 4. Проверь memory usage
-kubectl top pod -n pilingtrack-prod -l app=websocket
+# 4. WS зависит от Redis pub/sub — если Redis лёг, WS не доставляет.
+#    Проверить Redis (см. runbook 002):
+RP=$(grep '^REDIS_PASSWORD=' /opt/pilingtrack/.env | cut -d= -f2-)
+dc exec redis redis-cli -a "$RP" --no-auth-warning ping
 ```
+
+---
 
 ## Восстановление
 
-### Вариант 1: Pod crash — перезапуск
+### Вариант 1 — контейнер упал / течёт память: перезапуск
 
 ```bash
-kubectl delete pod -n pilingtrack-prod -l app=websocket
+dc restart ws
+dc logs ws --tail 50 -f
+# Ctrl-C когда увидите что сервер слушает порт и подключился к Redis
 ```
 
-### Вариант 2: Memory leak — rollout restart
+Перезапуск WS безопасен — клиенты автоматически переподключатся.
+Записи отчётов идут через HTTP API, не через WS, так что данные не теряются.
+
+### Вариант 2 — Redis pub/sub отвалился
+
+WS раздаёт события через Redis. Если Redis лежал — сначала поднять Redis
+(runbook 002), потом перезапустить WS чтобы пересоздать подписки:
 
 ```bash
-kubectl rollout restart deployment -n pilingtrack-prod websocket
-kubectl rollout status deployment -n pilingtrack-prod websocket
+# (после восстановления Redis)
+dc restart ws
 ```
 
-### Вариант 3: Redis Pub/Sub disconnected
+### Вариант 3 — WS не стартует после изменения кода/конфига
 
 ```bash
-# Проверь Redis connectivity из WS pod
-kubectl exec -n pilingtrack-prod -it deployment/websocket -- \
-  redis-cli -h redis-master -p 6379 ping
-
-# Если не отвечает — перезапусти WS после Redis recovery
-kubectl rollout restart deployment -n pilingtrack-prod websocket
+git pull origin main
+dc build ws
+dc up -d ws
 ```
+
+---
 
 ## Проверка
 
 ```bash
-# Health check
-kubectl exec -n pilingtrack-prod -it deployment/websocket -- \
-  curl -s http://localhost:4000/health
-
-# System status
-curl -s http://localhost:3000/api/system/status | jq '.components.websocket'
-
-# Connection test (через wscat)
-wscat -c ws://localhost:4001
-# Должно подключиться
+dc ps ws                     # Up (healthy)
+curl -s https://orionpiling.ru/api/health/deep   # websocket: "ok"
 ```
+
+Затем откройте дашборд в браузере — realtime-показатели должны снова
+обновляться.
+
+---
 
 ## Post-Incident
 
-- [ ] Root cause analysis (memory leak? Redis disconnect?)
-- [ ] Memory monitoring added если нужно
-- [ ] Runbook обновлён
+- [ ] Причина: утечка памяти? падение Redis? OOM?
+- [ ] Если память — снять метрики роста, проверить лимит контейнера в overlay
+- [ ] Обновить runbook если шаги изменились
 
 ---
 
 ## Prevention
 
-- **Memory limits**: Pod memory limit 512Mi, request 256Mi
-- **Health checks**: Liveness + readiness probes
-- **Auto-restart**: При memory > 80% limit — automatic restart
-- **Connection monitoring**: Alert при > 5000 concurrent connections
+- **Авто-restart:** `restart: unless-stopped` уже в compose
+- **Лимит памяти:** задан в `docker-compose.prod.yml` (ws: 384m)
+- **Graceful degradation:** падение WS не блокирует запись отчётов —
+  только realtime-обновления; клиент переподключается сам
