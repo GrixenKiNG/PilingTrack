@@ -44,16 +44,19 @@ OUT="$BASEBACKUP_DIR/base-${TS}.tar.gz"
 echo "Creating base backup → $OUT"
 
 # pg_basebackup with:
-#   -Ft  tar format (single archive per output stream)
-#   -X stream  include all required WAL via streaming (self-contained)
+#   -Ft  tar format (single archive)
+#   -X fetch  collect required WAL at the END of the backup. We use fetch
+#             (not stream) because -D - (stdout) cannot multiplex two
+#             output streams. Safe here: our archive_command also keeps
+#             every WAL on disk, so if fetch happens to miss a recycled
+#             WAL between start and end of backup, the restore process
+#             can pull it from the WAL archive directory anyway.
 #   -z   gzip-compress on the server
-#   -P   show progress
-#   -D - write to stdout (we redirect to a host file)
-# We redirect the "base" tar (not "pg_wal.tar") to the file. The streamed
-# WAL is included inline in the base tar when -X is "stream".
+#   -P   show progress to stderr
+#   -D - write the resulting tar to stdout
 docker compose --env-file "$ENV_FILE" exec -T postgres \
   pg_basebackup -U "$POSTGRES_USER" -h /var/run/postgresql \
-  -D - -Ft -X stream -z -P \
+  -D - -Ft -X fetch -z -P \
   > "$OUT"
 
 if [ ! -s "$OUT" ]; then
