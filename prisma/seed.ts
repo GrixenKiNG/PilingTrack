@@ -1,7 +1,19 @@
 import { PrismaClient } from '../src/generated/postgres-client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { hashSync } from 'bcryptjs';
 
-const db = new PrismaClient();
+// Prisma 7 requires an adapter when driverAdapters is set in the schema.
+// Without this, `new PrismaClient()` throws and the migrate container had
+// to be run with SKIP_SEED=1. Now seed works in dev/CI; prod still skips
+// via SKIP_SEED=1 + the assertNotProduction guard below.
+const connectionString =
+  process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL_POSTGRES (or DATABASE_URL) is required to seed.');
+}
+const db = new PrismaClient({
+  adapter: new PrismaPg({ connectionString }),
+});
 
 /**
  * Generate a random secure password.

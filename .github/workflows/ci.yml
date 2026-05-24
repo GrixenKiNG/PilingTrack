@@ -143,3 +143,137 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d pilingtrack_ci \
             -tAc "select count(*) from information_schema.tables where table_schema='public'" \
             | awk '{ if ($1 < 30) { print "FAIL: only " $1 " tables, expected >= 30"; exit 1 } else { print "OK: " $1 " tables" } }'
+
+  # Golden-path browser tests so the operator/admin core flows don't
+  # silently break between releases. We don't run the full Playwright
+  # suite here — only a curated set against chromium. The other specs
+  # cover features in flux (PWA, sync v3 cleanup) and would block PRs
+  # for the wrong reasons. Revisit once those areas stabilise.
+  e2e:
+    name: E2E (Playwright, chromium golden path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: unit
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pilingtrack_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pilingtrack_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_PROVIDER: postgres
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/pilingtrack_ci?schema=public'
+      DATABASE_URL_POSTGRES: 'postgresql://postgres:postgres@localhost:5432/pilingtrack_ci?schema=public'
+      REDIS_URL: 'redis://localhost:6379'
+      SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
+      ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
+      PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
+      DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
+      DEFAULT_TENANT_ID: 'ci'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NODE_ENV: 'development'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed test users
+        # Seed creates the operator@piling.ru / admin@piling.ru accounts
+        # the E2E specs log in with. Fixed passwords from prisma/seed.ts.
+        run: npx tsx prisma/seed.ts
+
+      - name: Build Next.js
+        run: npm run build
+
+      # Cache the Playwright browser binaries so cold start isn't 1 min.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright (chromium only)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps when cache hit
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Start app
+        # Background; we'll wait on /api/liveness next.
+        run: |
+          npm run start &
+          echo $! > .next-app.pid
+
+      - name: Wait for app to be ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/liveness > /dev/null 2>&1; then
+              echo "App is live after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "FAIL: app did not start within 60s"
+          curl -v http://localhost:3000/api/liveness || true
+          exit 1
+
+      - name: Run E2E (golden path subset, chromium only)
+        # Curated list — these specs don't depend on retired features.
+        # When the rest of e2e/ is cleaned up (sync v3 references, PWA),
+        # widen this glob or drop it for the full suite.
+        run: |
+          npx playwright test \
+            --project=chromium \
+            e2e/app.spec.ts \
+            e2e/operator-report-smoke.spec.ts \
+            e2e/report-creation-flow.spec.ts
+        env:
+          BASE_URL: 'http://localhost:3000'
+
+      - name: Stop app
+        if: always()
+        run: |
+          [ -f .next-app.pid ] && kill "$(cat .next-app.pid)" || true
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
