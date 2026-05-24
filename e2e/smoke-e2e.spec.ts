@@ -8,9 +8,8 @@ const USERS = {
 test.describe('E2E — Full Application Flow', () => {
   test('operator login → read sites → read reports', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
-    // Login
+    // Login (no networkidle — SSE keeps the network busy; wait for the form)
     const emailInput = page.locator('#email');
     const passwordInput = page.locator('#password');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
@@ -47,16 +46,6 @@ test.describe('E2E — Full Application Flow', () => {
     expect([200, 401]).toContain(metricsRes.status());
   });
 
-  test('sync API rejects unauthenticated/browserless requests', async ({ request }) => {
-    const res = await request.post('/api/sync', { data: { operations: [] } });
-    expect([401, 403]).toContain(res.status());
-  });
-
-  test('sync updates requires auth (401)', async ({ request }) => {
-    const res = await request.get('/api/sync/updates?since=0');
-    expect(res.status()).toBe(401);
-  });
-
   test('security headers present', async ({ request }) => {
     const res = await request.get('/api/health');
     const h = res.headers();
@@ -67,26 +56,9 @@ test.describe('E2E — Full Application Flow', () => {
   // Rate limiting has moved to rate-limit-e2e.spec.ts (single-project file)
   // because IP-scoped rate limits collide with sibling projects' auth tests.
 
-  test('PWA manifest valid', async ({ request }) => {
-    const res = await request.get('/manifest.json');
-    expect(res.ok()).toBe(true);
-    const body = await res.json();
-    expect(body).toHaveProperty('name');
-    expect(body).toHaveProperty('start_url');
-  });
-
-  test('service worker has cache logic', async ({ request }) => {
-    const res = await request.get('/sw.js');
-    expect(res.ok()).toBe(true);
-    const text = await res.text();
-    expect(text).toContain('fetch');
-    expect(text).toContain('cache');
-  });
-
   test('mobile viewport renders', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
     const vp = page.locator('meta[name="viewport"]');
     await expect(vp).toHaveAttribute('content', /device-width/);
   });

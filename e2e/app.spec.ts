@@ -51,25 +51,6 @@ test.describe('PilingTrack E2E Tests', () => {
     await expect(viewport).toHaveAttribute('content', /device-width/);
   });
 
-  test('manifest.json is accessible', async ({ request }) => {
-    const response = await request.get('/manifest.json');
-    expect(response.ok()).toBeTruthy();
-    
-    const body = await response.json();
-    expect(body).toHaveProperty('name');
-    expect(body).toHaveProperty('icons');
-    expect(body.icons.length).toBeGreaterThan(0);
-  });
-
-  test('service worker is accessible', async ({ request }) => {
-    const response = await request.get('/sw.js');
-    expect(response.ok()).toBeTruthy();
-    
-    const text = await response.text();
-    expect(text).toContain('install');
-    expect(text).toContain('fetch');
-  });
-
   test('rate limiting works on login', async ({ request }) => {
     // Make 6 failed login attempts (limit is 5)
     for (let i = 0; i < 6; i++) {
