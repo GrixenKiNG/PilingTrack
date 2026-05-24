@@ -57,23 +57,11 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  workers-pdf:
-    # No host port exposed — each replica's health endpoint is reachable
-    # via the internal network if needed. Keeping 3003 free on the host
-    # avoids collisions when docker-compose maps a single port to two
-    # replicas.
-    ports: !reset []
-    deploy:
-      replicas: 2
-      resources:
-        limits:
-          memory: 384m
-          cpus: "0.5"
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
+  # NOTE: workers-pdf overlay removed 2026-05-24 — the base docker-compose.yml
+  # has the service in working tree but never landed on origin/main, so this
+  # overlay referenced a non-existent service and broke `docker compose` on
+  # prod. When the PDF-worker split is ready to ship, restore this block AND
+  # commit the base service definition together in a single PR.
 
   ws:
     ports: !override
