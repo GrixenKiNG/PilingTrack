@@ -124,6 +124,7 @@ You can write unit tests. Flag if you need integration test infrastructure.
 | `as any` in security-critical code | Use proper types, especially in auth/ |
 | `console.log` in production services | Use `logger.*` from `src/lib/logger` |
 | Speculative abstractions (strategy pattern for one use case) | Write the simple version first |
+| Bundling schema changes for 5+ models into one Prisma migration | One migration = one logical change. Splits keep PR review tractable as the model count grows. |
 
 ### Performance Considerations
 
@@ -181,7 +182,7 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (12382 symbols, 22775 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (11512 symbols, 20740 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
