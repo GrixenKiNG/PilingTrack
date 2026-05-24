@@ -100,3 +100,7 @@ tmp-screenshots/
 *.dump
 *.sql.gz
 scripts/.telemetry-simulator-keys.json
+scripts/prod-dump.sql.gz
+
+# Sentry Config File
+.env.sentry-build-plugin

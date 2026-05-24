@@ -2,7 +2,10 @@
  * Next.js server startup hooks.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
+
+export const onRequestError = Sentry.captureRequestError;
 
 let startupDiagnosticsLogged = false;
 
@@ -26,11 +29,17 @@ function logEffectiveRuntimeFlags() {
 }
 
 export async function register() {
-  if (typeof process === 'undefined' || typeof process.on !== 'function') {
+  // Wire Sentry server/edge configs early so any error during the rest of
+  // boot is captured. Each config decides itself whether to enable.
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('../sentry.server.config');
+  }
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    await import('../sentry.edge.config');
     return;
   }
 
-  if (process.env.NEXT_RUNTIME === 'edge') {
+  if (typeof process === 'undefined' || typeof process.on !== 'function') {
     return;
   }
 

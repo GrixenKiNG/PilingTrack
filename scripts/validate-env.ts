@@ -181,8 +181,22 @@ function validateEnv(): { valid: boolean; errors: string[]; warnings: string[] }
   if (!process.env.REDIS_URL) {
     warnings.push('REDIS_URL not set — rate limiting falls back to in-memory (not distributed-safe)');
   }
+  // Sentry plugin loads SENTRY_AUTH_TOKEN from .env.sentry-build-plugin
+  // itself (separate from .env that dotenv loaded above). Suppress the
+  // warning when that file exists with a token.
   if (!process.env.SENTRY_AUTH_TOKEN) {
-    warnings.push('SENTRY_AUTH_TOKEN not set — Sentry source maps will not be uploaded');
+    let tokenAvailable = false;
+    try {
+      const fs = require('node:fs');
+      if (fs.existsSync('.env.sentry-build-plugin')) {
+        tokenAvailable = /^SENTRY_AUTH_TOKEN=\S/m.test(
+          fs.readFileSync('.env.sentry-build-plugin', 'utf8'),
+        );
+      }
+    } catch { /* ignore */ }
+    if (!tokenAvailable) {
+      warnings.push('SENTRY_AUTH_TOKEN not set — Sentry source maps will not be uploaded');
+    }
   }
 
   return { valid: errors.length === 0, errors, warnings };

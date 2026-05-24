@@ -107,9 +107,47 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG || "",
-  project: process.env.SENTRY_PROJECT || "pilingtrack",
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: "9589921309a2",
+  project: "pilingtrack",
+
+  // SENTRY_AUTH_TOKEN is read from env at build time (.env.sentry-build-plugin
+  // locally, CI/prod secret on the server). Without it, source maps upload
+  // is skipped silently — the app still builds.
   silent: !process.env.CI,
   telemetry: false,
+
+  // Capture a wider set of source-map files for readable stack traces.
+  widenClientFileUpload: true,
+
+  // Route Sentry browser requests through our own /monitoring path to dodge
+  // ad-blockers. Keep an eye on src/proxy.ts — if any middleware starts
+  // matching /monitoring, client errors stop reaching Sentry.
+  tunnelRoute: "/monitoring",
+
+  sourcemaps: {
+    // Skip upload entirely when no auth token is present (local builds).
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    // After Sentry has the maps, remove them from the build output so
+    // /_next/static/.../*.js.map cannot be downloaded by visitors. Without
+    // this, original source code leaks publicly on prod.
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Tie uploaded source maps to a specific build so Sentry knows which
+  // release a given error belongs to.
+  release: {
+    name:
+      process.env.SENTRY_RELEASE ||
+      (process.env.npm_package_version
+        ? `pilingtrack@${process.env.npm_package_version}`
+        : undefined),
+    create: !!process.env.SENTRY_AUTH_TOKEN,
+    finalize: !!process.env.SENTRY_AUTH_TOKEN,
+  },
+
+  webpack: {
+    // Strip Sentry debug logging from the production bundle.
+    treeshake: { removeDebugLogging: true },
+    // automaticVercelMonitors removed — we run on a self-hosted VPS, not Vercel.
+  },
 });
