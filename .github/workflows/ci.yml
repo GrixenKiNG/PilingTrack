@@ -195,7 +195,12 @@ jobs:
       DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
       DEFAULT_TENANT_ID: 'ci'
       NEXT_TELEMETRY_DISABLED: '1'
-      NODE_ENV: 'development'
+      # NODE_ENV is deliberately NOT set at job level. `next build` and
+      # `next start` need production (their default); building with
+      # NODE_ENV=development loads the dev React build and crashes the
+      # prerender of /_global-error ("Cannot read properties of null
+      # (reading 'useContext')"). The seed step sets development locally
+      # to pass prisma/seed.ts's assertNotProduction() guard.
 
     steps:
       - uses: actions/checkout@v4
@@ -217,7 +222,10 @@ jobs:
       - name: Seed test users
         # Seed creates the operator@piling.ru / admin@piling.ru accounts
         # the E2E specs log in with. Fixed passwords from prisma/seed.ts.
+        # NODE_ENV=development only here — seed refuses to run in production.
         run: npx tsx prisma/seed.ts
+        env:
+          NODE_ENV: development
 
       - name: Build Next.js
         run: npm run build
