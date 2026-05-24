@@ -86,29 +86,42 @@ A backup you never restore is not a backup — it's a hope.
 BASE=$(ls -1 /opt/pilingtrack/basebackups/base-*.tar.gz | sort | tail -1)
 echo "Restoring from $BASE"
 
-# Make a workspace
-sudo mkdir -p /tmp/pitr-test/pgdata
+# Make a workspace matching prod's PG18 layout
+sudo mkdir -p /tmp/pitr-test/pg-volume/18/docker
 sudo chown -R 70:70 /tmp/pitr-test
 
 # Unpack base into the workspace
-sudo tar xzf "$BASE" -C /tmp/pitr-test/pgdata
+sudo tar xzf "$BASE" -C /tmp/pitr-test/pg-volume/18/docker
+sudo chown -R 70:70 /tmp/pitr-test/pg-volume
 
-# Tell Postgres how to find the WAL archive when it replays
-sudo tee /tmp/pitr-test/pgdata/postgresql.auto.conf > /dev/null <<'CONF'
-restore_command = 'cp /var/lib/postgresql/wal-archive/%f %p'
-recovery_target_action = 'pause'
-CONF
-sudo touch /tmp/pitr-test/pgdata/recovery.signal
-sudo chown 70:70 /tmp/pitr-test/pgdata/postgresql.auto.conf /tmp/pitr-test/pgdata/recovery.signal
+# Tell Postgres how to find the WAL archive when it replays. Use echo|tee
+# instead of a heredoc — heredocs with indented terminators break when
+# pasted through some SSH terminals.
+echo "restore_command = 'cp /var/lib/postgresql/wal-archive/%f %p'" \
+  | sudo tee /tmp/pitr-test/pg-volume/18/docker/postgresql.auto.conf
+sudo touch /tmp/pitr-test/pg-volume/18/docker/recovery.signal
+sudo chown 70:70 /tmp/pitr-test/pg-volume/18/docker/postgresql.auto.conf \
+                /tmp/pitr-test/pg-volume/18/docker/recovery.signal
 
 # Start a temporary Postgres pointing at the unpacked base + WAL archive.
 # Different port (5433) so it doesn't fight the live container.
+#
+# CRITICAL: pass the SAME tuning params the primary uses. Postgres aborts
+# recovery with "recovery aborted because of insufficient parameter
+# settings" if max_connections (and a few others) are lower than what
+# the primary had at backup time. Keep this list in sync with the
+# postgres command in docker-compose.prod.yml.
+#
+# PG18 docker image: PGDATA lives at /var/lib/postgresql/<MAJOR>/docker
+# so we mount the parent (/var/lib/postgresql), and unpack the base
+# tarball into /tmp/pitr-test/pg-volume/18/docker on the host.
 docker run --rm -d --name pitr-test \
   -e POSTGRES_PASSWORD=ignored \
-  -v /tmp/pitr-test/pgdata:/var/lib/postgresql/data \
+  -v /tmp/pitr-test/pg-volume:/var/lib/postgresql \
   -v /opt/pilingtrack/wal-archive:/var/lib/postgresql/wal-archive:ro \
   -p 127.0.0.1:5433:5432 \
-  postgres:18-alpine
+  postgres:18-alpine \
+  postgres -c max_connections=200 -c shared_buffers=256MB -c wal_level=replica
 
 # Wait until recovery pauses (logs should say "recovery has paused")
 docker logs -f pitr-test
