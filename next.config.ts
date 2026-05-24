@@ -72,36 +72,9 @@ const nextConfig: NextConfig = {
         ],
       },
       // HSTS removed — owned by Caddy in deploy/Caddyfile.prod.
-      // Service Worker: always revalidate
-      {
-        source: "/sw.js",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-cache, no-store, must-revalidate",
-          },
-        ],
-      },
-      // PWA manifest
-      {
-        source: "/manifest.json",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=3600, must-revalidate",
-          },
-        ],
-      },
-      // PWA icons
-      {
-        source: "/icon-:size.svg",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=86400, immutable",
-          },
-        ],
-      },
+      // PWA cache headers (/sw.js, /manifest.json, /icon-:size.svg) removed
+      // 2026-05-24 — the PWA was retired (no service worker, no manifest).
+      // The app is a plain server-rendered site now.
     ];
   },
 };
