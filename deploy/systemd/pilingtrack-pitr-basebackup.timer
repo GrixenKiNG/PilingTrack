@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly PilingTrack Postgres base backup (PITR)
+
+[Timer]
+# Sundays at 04:00 — one hour after the nightly logical dump so they don't
+# fight over docker exec / postgres locks. Jittered to avoid lock-step.
+OnCalendar=Sun *-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

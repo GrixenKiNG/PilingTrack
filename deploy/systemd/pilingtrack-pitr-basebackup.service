@@ -1,0 +1,16 @@
+[Unit]
+Description=PilingTrack weekly Postgres base backup (PITR)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=user1
+Group=user1
+WorkingDirectory=/opt/pilingtrack
+Environment=ENV_FILE=.env
+Environment=BASEBACKUP_DIR=/opt/pilingtrack/basebackups
+Environment=RETENTION_COUNT=4
+ExecStart=/bin/bash /opt/pilingtrack/scripts/pitr-basebackup.sh
+StandardOutput=journal
+StandardError=journal
