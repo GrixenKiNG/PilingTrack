@@ -25,6 +25,11 @@ jobs:
       PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
       DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
       DATABASE_URL: 'postgresql://stub:stub@localhost:5432/stub'
+      # prisma.config.ts resolves env('DATABASE_URL_POSTGRES') at load time
+      # and throws if it's absent — even for `prisma generate`, which never
+      # connects. The postinstall hook (npm run db:generate) runs during
+      # `npm ci`, so without this stub the whole job dies at "Install deps".
+      DATABASE_URL_POSTGRES: 'postgresql://stub:stub@localhost:5432/stub'
       REDIS_URL: 'redis://localhost:6379'
       NEXT_TELEMETRY_DISABLED: '1'
 
