@@ -172,7 +172,7 @@ Old runbook (`stop && rm && rmi → build → up`) created a 3–5 min outage wi
 
 If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -af`.
 
-**Migrate service** runs `prisma migrate deploy` and seed. Seed must be skipped on prod (`SKIP_SEED=1` in `.env`) — Prisma 7 driver-adapter requires options that `prisma/seed.ts` doesn't pass; would fail on bare `new PrismaClient()`.
+**Migrate service** runs `prisma migrate deploy` and seed. Seed stays skipped on prod (`SKIP_SEED=1` in `.env`) as defence in depth — `prisma/seed.ts` also has `assertNotProduction()`. The historical reason ("bare `new PrismaClient()` crashes on the driver-adapter") was fixed 2026-05-24 — seed now constructs the client with `PrismaPg`, so dev/CI run it cleanly.
 
 **Known limitations:**
 - **Telegram API blocked at provider** — `api.telegram.org` unreachable directly from the VPS (Russian ISP). Routed through a Cloudflare Worker proxy set via `TELEGRAM_API_BASE=https://pilingtrack-tg-proxy.sasorion02.workers.dev` in `.env`. Notifications work; if the env var disappears, fetches fail.
