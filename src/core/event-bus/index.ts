@@ -10,9 +10,12 @@
  * What this barrel exposes:
  *   - schema-registry: event-payload validation used by all workers
  *   - emitDomainEvent / on (re-exported from services/reports/domain-events)
- *   - registerAllEventHandlers (re-exported from services/reports/event-handlers —
- *     synchronous; call once at startup, idempotent via Set-based on())
  *   - DomainEvent type
+ *
+ * NOTE: registerAllEventHandlers is intentionally NOT re-exported here.
+ * Every caller imports it directly from @/services/reports/event-handlers,
+ * so the barrel re-export was dead weight AND a core→services layer
+ * violation. Import it from services directly.
  */
 
 export { schemaRegistry, registerAllEventSchemas } from './schema-registry';
@@ -25,5 +28,3 @@ export {
   getRegisteredEventTypes,
   getHandlerCount,
 } from '@/services/reports/domain-events';
-
-export { registerAllEventHandlers } from '@/services/reports/event-handlers';
