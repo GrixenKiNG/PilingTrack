@@ -15,8 +15,10 @@ import { test, expect } from '@playwright/test';
 test.describe('Real Report Creation Flow', () => {
   test('operator creates a report end-to-end', async ({ page }) => {
     // 1. Login
+    // No networkidle wait — the app's SSE stream keeps the network busy
+    // forever, so networkidle times out. The emailInput.waitFor below is
+    // the real readiness signal.
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
@@ -86,9 +88,8 @@ test.describe('Real Report Creation Flow', () => {
   });
 
   test('operator submits report via UI form', async ({ page }) => {
-    // Login
+    // Login (no networkidle — SSE keeps the network busy; see test above)
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
@@ -109,7 +110,7 @@ test.describe('Real Report Creation Flow', () => {
 
     // Navigate around the app
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1000);
 
     // Verify no JS errors
@@ -124,9 +125,8 @@ test.describe('Real Report Creation Flow', () => {
   });
 
   test('dispatcher views all reports', async ({ page }) => {
-    // Login as dispatcher
+    // Login as dispatcher (no networkidle — SSE keeps network busy)
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
     const emailInput = page.locator('#email');
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });

@@ -12,8 +12,9 @@ test.describe('PilingTrack E2E Tests', () => {
 
   test('login page loads and shows form', async ({ page }) => {
     await page.goto('/');
-    // SPA needs time to hydrate
-    await page.waitForLoadState('networkidle');
+    // NB: do NOT waitForLoadState('networkidle') — the app holds an SSE
+    // connection (/api/feedback/stream) open, so the network never goes
+    // idle and networkidle times out at 30s. Wait for concrete UI instead.
     await expect(page).toHaveTitle(/PilingTrack/);
 
     // Check login form exists — wait for email input to be visible
