@@ -120,7 +120,7 @@ export async function getHealth() {
     status,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    version: process.env.npm_package_version || 'unknown',
+    version: process.env.APP_VERSION || process.env.npm_package_version || 'unknown',
     database_provider: getDatabaseProvider(),
     checks: Object.fromEntries(checks.map(c => [c.name, c])),
   };

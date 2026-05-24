@@ -123,7 +123,9 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
     status: overallStatus,
     timestamp: new Date().toISOString(),
     version:
-      typeof process !== 'undefined' ? process.env.npm_package_version || 'unknown' : 'unknown',
+      typeof process !== 'undefined'
+        ? process.env.APP_VERSION || process.env.npm_package_version || 'unknown'
+        : 'unknown',
     components,
     metrics:
       metrics.status === 'fulfilled'

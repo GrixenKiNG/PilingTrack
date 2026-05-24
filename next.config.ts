@@ -5,6 +5,13 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  // Bake the package version into the bundle at build time. The standalone
+  // server starts via `node server.js` (not `npm`), so npm_package_version
+  // is absent at runtime and /api/health reported "unknown". next build runs
+  // via npm, so npm_package_version IS set here — capture it for runtime.
+  env: {
+    APP_VERSION: process.env.npm_package_version ?? "unknown",
+  },
   turbopack: {
     root: path.resolve(import.meta.dirname),
   },

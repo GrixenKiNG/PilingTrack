@@ -62,7 +62,7 @@ export const GET = withApi(
     // Version info
     output += `# HELP app_version_info Application version info\n`;
     output += `# TYPE app_version_info gauge\n`;
-    output += `app_version_info{version="${process.env.npm_package_version || '1.0.0'}",node="${process.version}",platform="${process.platform}"} 1\n\n`;
+    output += `app_version_info{version="${process.env.APP_VERSION || process.env.npm_package_version || '1.0.0'}",node="${process.version}",platform="${process.platform}"} 1\n\n`;
 
     // Worker lag metrics
     try {

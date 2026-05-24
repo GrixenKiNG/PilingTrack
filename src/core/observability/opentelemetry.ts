@@ -38,7 +38,7 @@ const SAMPLE_RATE = parseFloat(process.env.OTEL_TRACES_SAMPLER_ARG || '1.0');
 
 const resource = resourceFromAttributes({
   [SEMRESATTRS_SERVICE_NAME]: SERVICE_NAME,
-  [SEMRESATTRS_SERVICE_VERSION]: process.env.npm_package_version || 'unknown',
+  [SEMRESATTRS_SERVICE_VERSION]: process.env.APP_VERSION || process.env.npm_package_version || 'unknown',
   [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: ENVIRONMENT,
   [SEMRESATTRS_HOST_NAME]: process.env.HOSTNAME || 'localhost',
   'app.tenant_id': process.env.DEFAULT_TENANT_ID || '',
