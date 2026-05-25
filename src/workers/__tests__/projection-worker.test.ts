@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 // Mock DB
 const mocks = vi.hoisted(() => ({
   mockReportFindUnique: vi.fn(),
+  mockReportFindMany: vi.fn().mockResolvedValue([]),
   mockOutboxFindMany: vi.fn(),
   mockOutboxFindUnique: vi.fn(),
   mockOutboxUpdate: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     report: {
       findUnique: mocks.mockReportFindUnique,
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: mocks.mockReportFindMany,
     },
     reportStats: { upsert: mocks.mockUpsert },
     operatorPerformance: { upsert: mocks.mockUpsert },
@@ -126,7 +127,7 @@ describe('Projection Worker', () => {
         .mockResolvedValue([]);
       mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
       mocks.mockOutboxUpdate.mockResolvedValue({});
-      mocks.mockReportFindUnique.mockResolvedValueOnce({
+      mocks.mockReportFindUnique.mockResolvedValue({
         id: 'report-1',
         reportId: 'report-1',
         siteId: 'site-1',
@@ -187,7 +188,7 @@ describe('Projection Worker', () => {
       mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
       mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
       mocks.mockOutboxUpdate.mockResolvedValue({});
-      mocks.mockReportFindUnique.mockResolvedValueOnce({
+      mocks.mockReportFindUnique.mockResolvedValue({
         id: 'report-1',
         reportId: 'report-1',
         siteId: 'site-1',
@@ -230,13 +231,71 @@ describe('Projection Worker', () => {
       mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
       mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
       mocks.mockOutboxUpdate.mockResolvedValue({});
-      mocks.mockReportFindUnique.mockResolvedValueOnce(null); // Report not found
+      mocks.mockReportFindUnique.mockResolvedValue(null); // Report not found
 
       const worker = startProjectionWorker(500);
       await vi.advanceTimersByTimeAsync(500);
 
       // No projections should be created
       expect(mocks.mockUpsert).not.toHaveBeenCalled();
+
+      worker.stop();
+    });
+  });
+
+  describe('OperatorPerformance projection', () => {
+    it('aggregates by the report work date, not the event submission day', async () => {
+      const { startProjectionWorker } = await import(
+        '@/modules/reports/application/projections/projection-worker'
+      );
+
+      // Operator submits today a report for an earlier shift.
+      const workDate = '2026-05-06';
+      const submittedAt = '2026-05-25T08:00:00.000Z';
+
+      const event = {
+        id: 'outbox-1',
+        type: 'ReportSubmitted',
+        aggregateId: 'report-1',
+        aggregateType: 'Report',
+        payload: createEvent({ type: 'ReportSubmitted', occurredAt: submittedAt }),
+        published: false,
+        attempts: 0,
+        occurredAt: new Date(submittedAt),
+        createdAt: new Date(submittedAt),
+      };
+
+      mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
+      mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
+      mocks.mockOutboxUpdate.mockResolvedValue({});
+      mocks.mockReportFindUnique.mockResolvedValue({
+        id: 'report-1',
+        reportId: 'report-1',
+        siteId: 'site-1',
+        userId: 'user-1',
+        status: 'submitted',
+        date: workDate,
+        piles: [],
+        drillings: [],
+        downtimes: [],
+      });
+      mocks.mockReportFindMany.mockResolvedValue([]);
+
+      const worker = startProjectionWorker(500);
+      await vi.advanceTimersByTimeAsync(500);
+
+      // projectOperatorPerformanceFull must query reports for the WORK date.
+      // Before the fix it used occurredAt's date (2026-05-25) and found nothing.
+      expect(mocks.mockReportFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ date: workDate }),
+        })
+      );
+      expect(mocks.mockReportFindMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ date: '2026-05-25' }),
+        })
+      );
 
       worker.stop();
     });

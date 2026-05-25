@@ -173,10 +173,18 @@ async function projectOperatorPerformance(event: ReportDomainEvent) {
   const { siteId, userId } = event;
   if (!siteId || !userId) return;
 
-  const date = getProjectionDate(event);
-  if (!date) return;
+  // Aggregate by the report's WORK date, not the event's occurredAt. occurredAt
+  // is the submission instant (UTC); operators routinely file reports for an
+  // earlier shift, so occurredAt's date sends projectOperatorPerformanceFull to
+  // a day with no reports and it silently writes nothing — the gap that left
+  // the operator analytics undercounting (33 of 63 reports on prod).
+  const report = await db.report.findUnique({
+    where: { reportId: event.aggregateId },
+    select: { date: true },
+  });
+  if (!report) return;
 
-  await projectOperatorPerformanceFull(userId, siteId, date);
+  await projectOperatorPerformanceFull(userId, siteId, report.date);
 }
 
 export async function projectOperatorPerformanceFull(userId: string, siteId: string, date: string) {
