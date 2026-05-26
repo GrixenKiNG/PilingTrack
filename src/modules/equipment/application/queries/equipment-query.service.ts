@@ -148,6 +148,17 @@ export async function listEquipmentCatalog() {
   return db.equipment.findMany({ orderBy: { name: 'asc' } });
 }
 
+/**
+ * Журнал ТО/ремонтов установки — запланированные сверху по плановой дате,
+ * затем выполненные по дате завершения (новые раньше).
+ */
+export async function listMaintenance(equipmentId: string) {
+  return db.maintenanceRecord.findMany({
+    where: { equipmentId },
+    orderBy: [{ status: 'asc' }, { scheduledAt: 'desc' }, { createdAt: 'desc' }],
+  });
+}
+
 export async function listAllEquipment(
   pagination?: CursorPaginationResult,
   siteId?: string | null,

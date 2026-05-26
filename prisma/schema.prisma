@@ -167,6 +167,7 @@ model Equipment {
   telematicsDevices       TelematicsDevice[]
   telematicsAssignments   TelematicsDeviceAssignment[]
   documents               EquipmentDocument[]
+  maintenanceRecords      MaintenanceRecord[]
 
   @@index([isActive])
   @@index([kind])
@@ -215,6 +216,51 @@ enum EquipmentDocumentType {
   CERTIFICATE       // сертификат соответствия
   MAINTENANCE_LOG   // журнал ТО / акт ТО
   OTHER
+}
+
+// ============================================================
+// MAINTENANCE — журнал ТО и ремонтов по установке
+// Ручной ввод (диспетчер/админ). Без склада запчастей и workflow
+// согласования — это MVP сервисного контура. Стоимость опциональна,
+// заложена под будущую аналитику затрат.
+// ============================================================
+model MaintenanceRecord {
+  id          String            @id @default(cuid())
+  tenantId    String
+  equipmentId String
+  type        MaintenanceType
+  status      MaintenanceStatus @default(PLANNED)
+  title       String
+  description String            @default("")
+  scheduledAt DateTime?         @db.Timestamptz(3)   // плановая дата
+  completedAt DateTime?         @db.Timestamptz(3)   // факт выполнения
+  engineHoursAtService Int?                          // моточасы на момент работ
+  cost        Decimal?          @db.Decimal(14, 2)   // опц., затраты
+  performedBy String?                                // кто выполнил (свободный текст)
+  createdById String?
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt      @db.Timestamptz(3)
+
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([equipmentId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+enum MaintenanceType {
+  SCHEDULED    // плановое ТО
+  REPAIR       // ремонт
+  FAULT        // неисправность
+  INSPECTION   // осмотр / диагностика
+}
+
+enum MaintenanceStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  CANCELLED
 }
 
 // ============================================================

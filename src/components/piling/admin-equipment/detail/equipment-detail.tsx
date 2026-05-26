@@ -26,6 +26,7 @@ import { EditEquipmentDialog } from '../equipment-dialogs';
 import { EquipmentPhotos } from './equipment-photos';
 import { EquipmentDocuments } from './equipment-documents';
 import { EquipmentMonitoring } from './equipment-monitoring';
+import { EquipmentMaintenance } from './equipment-maintenance';
 import { EquipmentReportExport } from './equipment-report-export';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 
@@ -238,6 +239,7 @@ export function EquipmentDetail({ equipmentId }: Props) {
       {/* Обслуживание (ТО) */}
       <Section icon={Timer} title="Обслуживание">
         <MaintenanceBlock eq={eq} />
+        <EquipmentMaintenance equipmentId={equipmentId} />
       </Section>
 
       {/* Технический паспорт */}

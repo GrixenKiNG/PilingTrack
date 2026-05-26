@@ -14,6 +14,7 @@ export type Ability =
   | 'sites.manage_hierarchy'
   | 'users.manage'
   | 'equipment.manage'
+  | 'maintenance.manage'
   | 'crews.read'
   | 'crews.manage'
   | 'crews.legacy_manage'
@@ -41,6 +42,7 @@ const abilityRoles: Record<Ability, Role[]> = {
   'sites.manage_hierarchy': ['ADMIN', 'DISPATCHER'],
   'users.manage': ['ADMIN'],
   'equipment.manage': ['ADMIN'],
+  'maintenance.manage': ['ADMIN', 'DISPATCHER'],
   'crews.read': ['ADMIN', 'DISPATCHER'],
   'crews.manage': ['ADMIN', 'DISPATCHER'],
   'crews.legacy_manage': ['ADMIN'],
