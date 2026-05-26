@@ -262,7 +262,23 @@ export const GET = withApi(async (request: NextRequest) => {
     }
 
     if (allowedEquipmentIds && equipmentId && !allowedEquipmentIds.includes(equipmentId)) {
-      return NextResponse.json({ records: [] });
+      return NextResponse.json(action === 'analysis' ? { analysis: [] } : { records: [] });
+    }
+
+    // Per-parameter aggregated analysis over the range (engine/hydraulics/etc.)
+    if (action === 'analysis') {
+      if (!equipmentId) {
+        return NextResponse.json({ error: 'equipmentId required for analysis' }, { status: 400 });
+      }
+      const { getTelemetryAnalysis } = await import(
+        '@/services/telemetry/telemetry-ingestion-service'
+      );
+      const analysis = await getTelemetryAnalysis({
+        equipmentId,
+        from: new Date(from),
+        to: new Date(to),
+      });
+      return NextResponse.json({ analysis });
     }
 
     const { getTelemetryByRange } = await import(

@@ -77,12 +77,16 @@ export async function getEquipmentDetails(equipmentId: string) {
   });
   if (!equipment) throw new ServiceError('Equipment not found', 404);
 
-  // 30-day activity aggregation — last report dates are 'YYYY-MM-DD'
-  // strings (Report.date is String in the schema, see prisma/schema.prisma).
+  // Full work history — one row per report, newest first. Report dates are
+  // 'YYYY-MM-DD' strings (Report.date is String, see prisma/schema.prisma), so
+  // the 30-day cutoff is a lexicographic string compare. The KPI block still
+  // summarises the last 30 days; the timeline table shows the whole history
+  // (capped to keep the payload bounded for very long-lived rigs).
   const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
-  const recentReports = await db.report.findMany({
-    where: { equipmentId, date: { gte: cutoff } },
+  const allReports = await db.report.findMany({
+    where: { equipmentId },
     orderBy: { date: 'desc' },
+    take: 1000,
     select: {
       id: true, reportId: true, date: true, shiftType: true, status: true,
       site: { select: { id: true, name: true } },
@@ -90,15 +94,16 @@ export async function getEquipmentDetails(equipmentId: string) {
       updatedAt: true,
     },
   });
-  const analyticsRows = recentReports.length
+  const analyticsRows = allReports.length
     ? await db.reportAnalytics.findMany({
-        where: { reportId: { in: recentReports.map((r) => r.reportId) } },
+        where: { reportId: { in: allReports.map((r) => r.reportId) } },
         select: { reportId: true, totalPiles: true, totalDrilling: true, totalDowntime: true },
       })
     : [];
   const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
 
-  const stats30d = recentReports.reduce(
+  const reports30d = allReports.filter((r) => r.date >= cutoff);
+  const stats30d = reports30d.reduce(
     (acc, r) => {
       const a = analyticsByReport.get(r.reportId);
       if (!a) return acc;
@@ -111,7 +116,7 @@ export async function getEquipmentDetails(equipmentId: string) {
   );
 
   // Timeline: one row per report with totals attached.
-  const timeline = recentReports.map((r) => {
+  const timeline = allReports.map((r) => {
     const a = analyticsByReport.get(r.reportId);
     return {
       reportId: r.reportId,
@@ -133,7 +138,7 @@ export async function getEquipmentDetails(equipmentId: string) {
     telematicsDevices: equipment.telematicsDevices,
     documents: equipment.documents,
     stats30d: {
-      reportCount: recentReports.length,
+      reportCount: reports30d.length,
       ...stats30d,
     },
     timeline,

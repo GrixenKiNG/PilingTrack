@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera } from 'lucide-react';
+import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, ChevronRight, ChevronDown, Printer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,6 +25,8 @@ import { KIND_LABELS } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
 import { EquipmentPhotos } from './equipment-photos';
 import { EquipmentDocuments } from './equipment-documents';
+import { EquipmentMonitoring } from './equipment-monitoring';
+import { EquipmentReportExport } from './equipment-report-export';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 
 interface DetailsResponse {
@@ -212,45 +214,25 @@ export function EquipmentDetail({ equipmentId }: Props) {
           <Metric label="Бурение, м" value={formatNumber(details.stats30d.drillingMeters, 1)} />
           <Metric label="Простой" value={formatMinutes(details.stats30d.downtimeMinutes)} />
         </div>
+      </Section>
 
+      {/* Full work history */}
+      <Section icon={History} title="История работ">
         {details.timeline.length > 0 ? (
-          <div className="mt-4 overflow-hidden rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 text-left">Дата</th>
-                  <th className="px-3 py-2 text-left">Смена</th>
-                  <th className="px-3 py-2 text-left">Объект</th>
-                  <th className="px-3 py-2 text-left">Оператор</th>
-                  <th className="px-3 py-2 text-right">Свай</th>
-                  <th className="px-3 py-2 text-right">Бурение</th>
-                  <th className="px-3 py-2 text-right">Простой</th>
-                </tr>
-              </thead>
-              <tbody>
-                {details.timeline.map((row) => (
-                  <tr key={row.reportId} className="border-t hover:bg-slate-50/50">
-                    <td className="px-3 py-2 font-mono">{formatRuDate(row.date)}</td>
-                    <td className="px-3 py-2 text-xs">
-                      <ShiftBadge type={row.shiftType} />
-                    </td>
-                    <td className="px-3 py-2">{row.siteName ?? '—'}</td>
-                    <td className="px-3 py-2">{row.operatorName ?? '—'}</td>
-                    <td className="px-3 py-2 text-right font-mono">{row.piles ?? '—'}</td>
-                    <td className="px-3 py-2 text-right font-mono">
-                      {row.drillingMeters != null ? formatNumber(row.drillingMeters, 1) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">
-                      {row.downtimeMinutes != null ? formatMinutes(row.downtimeMinutes) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <HistoryTable rows={details.timeline} />
         ) : (
-          <EmptyState message="За последние 30 дней отчётов по этой установке нет." />
+          <EmptyState message="Отчётов по этой установке пока нет." />
         )}
+      </Section>
+
+      {/* Отчёт за период (печать / PDF) */}
+      <Section icon={Printer} title="Отчёт (печать / PDF)">
+        <EquipmentReportExport equipmentId={equipmentId} />
+      </Section>
+
+      {/* Мониторинг (телеметрия) */}
+      <Section icon={Gauge} title="Мониторинг" collapsible defaultOpen={false}>
+        <EquipmentMonitoring equipmentId={equipmentId} kind={kind} />
       </Section>
 
       {/* Технический паспорт */}
@@ -311,15 +293,34 @@ export function EquipmentDetail({ equipmentId }: Props) {
 // --------------------------------------------------------------------------
 
 function Section({
-  icon: Icon, title, children,
-}: { icon: typeof Wrench; title: string; children: React.ReactNode }) {
+  icon: Icon, title, children, collapsible = false, defaultOpen = true,
+}: {
+  icon: typeof Wrench;
+  title: string;
+  children: React.ReactNode;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <Card>
       <CardContent className="p-4 sm:p-5">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          <Icon className="w-4 h-4" /> {title}
-        </h2>
-        {children}
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="mb-3 flex w-full items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+          >
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <Icon className="w-4 h-4" /> {title}
+          </button>
+        ) : (
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <Icon className="w-4 h-4" /> {title}
+          </h2>
+        )}
+        {(!collapsible || open) && children}
       </CardContent>
     </Card>
   );
@@ -345,6 +346,77 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 
 function EmptyState({ message }: { message: string }) {
   return <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">{message}</p>;
+}
+
+// Collapsible work history: shows only the latest report by default; the
+// chevron on the latest row (and the footer toggle) expands to the full
+// history inside a scrollable area.
+function HistoryTable({ rows }: { rows: DetailsResponse['timeline'] }) {
+  const [open, setOpen] = useState(false);
+  const hasMore = rows.length > 1;
+  const visible = open ? rows : rows.slice(0, 1);
+
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <div className={cn(open && 'max-h-64 overflow-y-auto')}>
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              <th className="w-8 px-2 py-2" />
+              <th className="px-3 py-2 text-left">Дата</th>
+              <th className="px-3 py-2 text-left">Смена</th>
+              <th className="px-3 py-2 text-left">Объект</th>
+              <th className="px-3 py-2 text-left">Оператор</th>
+              <th className="px-3 py-2 text-right">Свай</th>
+              <th className="px-3 py-2 text-right">Бурение</th>
+              <th className="px-3 py-2 text-right">Простой</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((row, i) => (
+              <tr key={row.reportId} className="border-t hover:bg-slate-50/50">
+                <td className="px-2 py-2 align-middle">
+                  {i === 0 && hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => setOpen((o) => !o)}
+                      aria-expanded={open}
+                      aria-label={open ? 'Свернуть историю' : 'Развернуть историю'}
+                      className="flex items-center justify-center rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  )}
+                </td>
+                <td className="px-3 py-2 font-mono">{formatRuDate(row.date)}</td>
+                <td className="px-3 py-2 text-xs">
+                  <ShiftBadge type={row.shiftType} />
+                </td>
+                <td className="px-3 py-2">{row.siteName ?? '—'}</td>
+                <td className="px-3 py-2">{row.operatorName ?? '—'}</td>
+                <td className="px-3 py-2 text-right font-mono">{row.piles ?? '—'}</td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {row.drillingMeters != null ? formatNumber(row.drillingMeters, 1) : '—'}
+                </td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {row.downtimeMinutes != null ? formatMinutes(row.downtimeMinutes) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center justify-center gap-1 border-t bg-slate-50/50 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        >
+          {open ? 'Свернуть' : `Показать всю историю (${rows.length})`}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function BackLink() {

@@ -25,7 +25,7 @@ export const POST = withMutation(async (request: NextRequest) => {
     assertCan(user!, 'reports.read_all');
 
     const body = await request.json();
-    const { dateFrom, dateTo, siteId, filterUserId } = body;
+    const { dateFrom, dateTo, siteId, filterUserId, equipmentId } = body;
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
@@ -40,6 +40,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       siteId,
       tenantId: user?.tenantId || null,
       userId: filterUserId || null,
+      equipmentId: equipmentId || null,
     });
 
     const jobId = await enqueuePdfGeneration({
@@ -161,6 +162,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
     const dateTo = request.nextUrl.searchParams.get('dateTo');
     const siteId = request.nextUrl.searchParams.get('siteId');
     const filterUserId = request.nextUrl.searchParams.get('userId');
+    const equipmentId = request.nextUrl.searchParams.get('equipmentId');
     const inline = request.nextUrl.searchParams.get('inline') === '1';
 
     if (!dateFrom || !dateTo) {
@@ -176,6 +178,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       siteId,
       tenantId: user?.tenantId || null,
       userId: filterUserId,
+      equipmentId,
     });
     const pdfBuffer = await generatePeriodPdf(pdfData);
 

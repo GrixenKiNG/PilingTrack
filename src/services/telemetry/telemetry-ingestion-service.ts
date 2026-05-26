@@ -324,3 +324,57 @@ export async function getTelemetryStats(params: {
     latestRecord: result._max.timestamp,
   };
 }
+
+/**
+ * Per-parameter telemetry analysis for one rig over a range. Aggregates DB-side
+ * (GROUP BY type) so it stays correct no matter how many readings the period
+ * holds — unlike pulling raw rows and reducing in the client. Returns one row
+ * per signal type with count / min / avg / max plus the latest value & unit.
+ * `machine_state` is excluded (it's a state code, not a metric).
+ */
+export async function getTelemetryAnalysis(params: {
+  equipmentId: string;
+  from: Date;
+  to: Date;
+}) {
+  const db = await getDbClient();
+  const where = {
+    equipmentId: params.equipmentId,
+    timestamp: { gte: params.from, lte: params.to },
+  };
+
+  const [grouped, latest] = await Promise.all([
+    db.telemetryRecord.groupBy({
+      by: ['type'],
+      where,
+      _count: { _all: true },
+      _avg: { value: true },
+      _min: { value: true },
+      _max: { value: true },
+    }),
+    db.telemetryRecord.findMany({
+      where,
+      distinct: ['type'],
+      orderBy: { timestamp: 'desc' },
+      select: { type: true, value: true, unit: true, timestamp: true },
+    }),
+  ]);
+
+  const latestByType = new Map(latest.map((r) => [r.type, r]));
+
+  return grouped
+    .filter((g) => g.type !== 'machine_state')
+    .map((g) => {
+      const last = latestByType.get(g.type);
+      return {
+        type: g.type,
+        count: g._count._all,
+        min: g._min.value,
+        avg: g._avg.value,
+        max: g._max.value,
+        lastValue: last?.value ?? null,
+        lastTimestamp: last?.timestamp ? last.timestamp.toISOString() : null,
+        unit: last?.unit ?? null,
+      };
+    });
+}

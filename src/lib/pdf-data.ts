@@ -87,15 +87,23 @@ export async function buildPeriodPdfData(input: {
   siteId?: string | null;
   tenantId?: string | null;
   userId?: string | null;
+  equipmentId?: string | null;
 }): Promise<PeriodPdfData> {
   const { getReportsByPeriod } = await getReportQueryService();
-  const reports = (await getReportsByPeriod(
+  const allReports = (await getReportsByPeriod(
     input.dateFrom,
     input.dateTo,
     input.siteId || null,
     input.tenantId || null,
     input.userId || null
   )) as PeriodReportRecord[];
+
+  // Equipment scope is applied here (post-filter) rather than in the raw SQL,
+  // so the parametrised period query stays untouched. RawReportRow carries
+  // equipmentId, so this is an exact match per rig.
+  const reports = input.equipmentId
+    ? allReports.filter((report) => report.equipmentId === input.equipmentId)
+    : allReports;
 
   const fallbackCrewByKey = await buildFallbackCrewMap(
     reports.map((report) => ({ userId: report.userId, siteId: report.siteId }))

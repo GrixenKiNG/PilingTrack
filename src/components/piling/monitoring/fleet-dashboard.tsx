@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -223,8 +224,12 @@ const STATUS_COLOR: Record<EquipmentStatus, { dot: string; ring: string; bg: str
 function EquipmentCardView({ card }: { card: FleetCard }) {
   const s = STATUS_COLOR[card.status];
   return (
-    <Card className={cn('overflow-hidden transition-shadow hover:shadow-md', s.bg)}>
-      <CardContent className="p-4 sm:p-5">
+    <Link
+      href={`/admin/equipment/${card.id}`}
+      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Card className={cn('h-full overflow-hidden transition-shadow hover:shadow-md cursor-pointer', s.bg)}>
+        <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -262,8 +267,9 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
         ) : (
           <div className="mt-3 text-sm text-muted-foreground">Нет отчётов за последние 7 дней.</div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
