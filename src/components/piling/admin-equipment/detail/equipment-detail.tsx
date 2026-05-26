@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, ChevronRight, ChevronDown, Printer } from 'lucide-react';
+import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, ChevronRight, ChevronDown, Printer, Timer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -232,7 +232,12 @@ export function EquipmentDetail({ equipmentId }: Props) {
 
       {/* Мониторинг (телеметрия) */}
       <Section icon={Gauge} title="Мониторинг" collapsible defaultOpen={false}>
-        <EquipmentMonitoring equipmentId={equipmentId} kind={kind} />
+        <EquipmentMonitoring equipmentId={equipmentId} />
+      </Section>
+
+      {/* Обслуживание (ТО) */}
+      <Section icon={Timer} title="Обслуживание">
+        <MaintenanceBlock eq={eq} />
       </Section>
 
       {/* Технический паспорт */}
@@ -415,6 +420,69 @@ function HistoryTable({ rows }: { rows: DetailsResponse['timeline'] }) {
           {open ? 'Свернуть' : `Показать всю историю (${rows.length})`}
         </button>
       )}
+    </div>
+  );
+}
+
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unknown> }) {
+  const hoursTotal = numOrNull(eq.engineHoursTotal);
+  const nextHours = numOrNull(eq.nextMaintenanceAtHours);
+  const nextDateStr = eq.nextMaintenanceDate ? String(eq.nextMaintenanceDate) : null;
+
+  const hasHours = hoursTotal != null && nextHours != null;
+  const hasDate = !!nextDateStr;
+  if (!hasHours && !hasDate) {
+    return <EmptyState message="Данные ТО не заполнены. Откройте «Редактировать» и укажите наработку и следующее ТО." />;
+  }
+
+  const remainingHours = hasHours ? nextHours! - hoursTotal! : null;
+  const hoursPct = hasHours && nextHours! > 0 ? Math.min(100, Math.max(0, (hoursTotal! / nextHours!) * 100)) : 0;
+  const daysLeft = hasDate ? Math.round((new Date(nextDateStr!).getTime() - Date.now()) / 86_400_000) : null;
+
+  const hoursStatus = remainingHours == null ? 'ok' : remainingHours <= 0 ? 'alarm' : remainingHours <= 50 ? 'warn' : 'ok';
+  const dateStatus = daysLeft == null ? 'ok' : daysLeft < 0 ? 'alarm' : daysLeft <= 14 ? 'warn' : 'ok';
+
+  const barColor = (st: string) => (st === 'alarm' ? 'bg-rose-500' : st === 'warn' ? 'bg-amber-500' : 'bg-emerald-500');
+  const txtColor = (st: string) => (st === 'alarm' ? 'text-rose-600' : st === 'warn' ? 'text-amber-600' : 'text-slate-700');
+
+  return (
+    <div className="space-y-4">
+      {hasHours && (
+        <div>
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+            <span className="text-slate-600">Моточасы до ТО</span>
+            <span className={cn('font-mono text-xs', txtColor(hoursStatus))}>
+              {remainingHours! > 0
+                ? `осталось ${formatNumber(remainingHours!, 0)} ч`
+                : `просрочено на ${formatNumber(-remainingHours!, 0)} ч`}
+              <span className="text-slate-400"> · {formatNumber(hoursTotal!, 0)} / {formatNumber(nextHours!, 0)} ч</span>
+            </span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded bg-slate-100">
+            <div className={cn('h-full rounded', barColor(hoursStatus))} style={{ width: `${hoursPct}%` }} />
+          </div>
+        </div>
+      )}
+
+      {hasDate && (
+        <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+          <span className="text-slate-600">Следующее ТО по дате</span>
+          <span className={cn('font-mono text-xs', txtColor(dateStatus))}>
+            {formatRuDate(nextDateStr!.slice(0, 10))}
+            {daysLeft != null && (
+              <span> · {daysLeft < 0 ? `просрочено на ${-daysLeft} дн` : daysLeft === 0 ? 'сегодня' : `через ${daysLeft} дн`}</span>
+            )}
+          </span>
+        </div>
+      )}
+
+      <p className="text-3xs text-slate-400">Прогноз по темпу наработки появится с подключением телеметрии моточасов.</p>
     </div>
   );
 }

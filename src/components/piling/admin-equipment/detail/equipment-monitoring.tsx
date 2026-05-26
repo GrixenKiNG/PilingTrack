@@ -1,18 +1,16 @@
 'use client';
 
 /**
- * EquipmentMonitoring — machine state + telemetry for one rig, in two modes:
- *   - "Сейчас": latest value per parameter (snapshot).
- *   - "Анализ за период": DB-aggregated min / avg / max / count per parameter
- *     over a chosen day or range (GET /api/telemetry?action=analysis).
+ * EquipmentMonitoring — machine state + telemetry for one rig.
  *
- * Self-contained (like EquipmentPhotos / EquipmentDocuments). No live box is
- * connected yet, so the telemetry area normally shows "ожидаем данные".
- * PARAM_SPECS is the single source of truth for label / subsystem / order /
- * thresholds / formatting; unknown signals fall back to Прочее. Threshold
- * ranges are provisional defaults — tune per equipment. Machine state is a
- * manual stand-in (not persisted) defaulting from the equipment kind, until
- * the box + state-derivation logic compute it from live signals.
+ * One unified view (no mode toggle): pick a period, each parameter card shows
+ * the current (latest) value + a mini trend sparkline + min/max over the
+ * window. Machine state is READ-ONLY — derived from the latest `machine_state`
+ * signal (no manual override; "Нет данных" until a box reports it).
+ *
+ * Self-contained. No live box is connected yet, so the telemetry area normally
+ * shows "ожидаем данные". PARAM_SPECS holds labels/subsystems/order and the
+ * REFERENCE thresholds (provisional — calibrate per rig; see the legend).
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -39,6 +37,7 @@ interface ParamSpec {
   alarm?: { min?: number; max?: number };
 }
 
+// Reference thresholds — provisional defaults, calibrate per equipment.
 const PARAM_SPECS: Record<string, ParamSpec> = {
   engine_rpm:         { label: 'Обороты двигателя', subsystem: 'engine', order: 1, warn: { max: 2200 }, alarm: { max: 2500 } },
   fuel_rate:          { label: 'Расход топлива', subsystem: 'engine', order: 2 },
@@ -57,20 +56,16 @@ const PARAM_SPECS: Record<string, ParamSpec> = {
   hydraulic_flow:     { label: 'Расход гидрожидкости', subsystem: 'hydraulics', order: 5 },
 };
 
-const MACHINE_STATES: Array<{ code: number; label: string; cls: string }> = [
-  { code: 0, label: 'Выключена', cls: 'bg-slate-200 text-slate-700' },
-  { code: 1, label: 'Простой', cls: 'bg-amber-100 text-amber-700' },
-  { code: 2, label: 'Движение', cls: 'bg-sky-100 text-sky-700' },
-  { code: 3, label: 'Работа', cls: 'bg-emerald-100 text-emerald-700' },
-  { code: 4, label: 'Бурение', cls: 'bg-teal-100 text-teal-700' },
-  { code: 5, label: 'Забивка свай', cls: 'bg-indigo-100 text-indigo-700' },
-  { code: 6, label: 'Извлечение', cls: 'bg-violet-100 text-violet-700' },
-  { code: 7, label: 'Ошибка', cls: 'bg-rose-100 text-rose-700' },
-  { code: 8, label: 'Обслуживание', cls: 'bg-orange-100 text-orange-700' },
-];
-
-const KIND_DEFAULT_STATE: Record<string, number> = {
-  DRILLING_RIG: 4, PILE_DRIVER: 5, VIBRO_HAMMER: 5, HYBRID: 3, OTHER: 1,
+const MACHINE_STATES: Record<number, { label: string; cls: string }> = {
+  0: { label: 'Выключена', cls: 'bg-slate-200 text-slate-700' },
+  1: { label: 'Простой', cls: 'bg-amber-100 text-amber-700' },
+  2: { label: 'Движение', cls: 'bg-sky-100 text-sky-700' },
+  3: { label: 'Работа', cls: 'bg-emerald-100 text-emerald-700' },
+  4: { label: 'Бурение', cls: 'bg-teal-100 text-teal-700' },
+  5: { label: 'Забивка свай', cls: 'bg-indigo-100 text-indigo-700' },
+  6: { label: 'Извлечение', cls: 'bg-violet-100 text-violet-700' },
+  7: { label: 'Ошибка', cls: 'bg-rose-100 text-rose-700' },
+  8: { label: 'Обслуживание', cls: 'bg-orange-100 text-orange-700' },
 };
 
 function classifyByKeyword(type: string): Subsystem {
@@ -88,14 +83,12 @@ function outOfRange(value: number | null, range?: { min?: number; max?: number }
   if (range.max !== undefined && value > range.max) return true;
   return false;
 }
-
 function statusOf(value: number | null, spec?: ParamSpec): Status {
   if (!spec || value === null) return 'ok';
   if (outOfRange(value, spec.alarm)) return 'alarm';
   if (outOfRange(value, spec.warn)) return 'warn';
   return 'ok';
 }
-
 function worst(...s: Status[]): Status {
   if (s.includes('alarm')) return 'alarm';
   if (s.includes('warn')) return 'warn';
@@ -112,84 +105,16 @@ const STATUS_VALUE: Record<Status, string> = {
   warn: 'text-amber-600',
   alarm: 'text-rose-600',
 };
+const SPARK_STROKE: Record<Status, string> = {
+  ok: '#0d9488',
+  warn: '#d97706',
+  alarm: '#e11d48',
+};
 
 const orderOf = (type: string) => PARAM_SPECS[type]?.order ?? 99;
 const subsystemOf = (type: string) => PARAM_SPECS[type]?.subsystem ?? classifyByKeyword(type);
 
-function groupBySubsystem<T extends { type: string }>(items: T[]): Map<Subsystem, T[]> {
-  const grouped = new Map<Subsystem, T[]>();
-  for (const it of items) {
-    const key = subsystemOf(it.type);
-    const arr = grouped.get(key) ?? [];
-    arr.push(it);
-    grouped.set(key, arr);
-  }
-  for (const arr of grouped.values()) {
-    arr.sort((a, b) => orderOf(a.type) - orderOf(b.type) || a.type.localeCompare(b.type));
-  }
-  return grouped;
-}
-
-interface Props {
-  equipmentId: string;
-  kind?: string;
-}
-
-export function EquipmentMonitoring({ equipmentId, kind }: Props) {
-  const [stateCode, setStateCode] = useState<number>(() => KIND_DEFAULT_STATE[kind ?? 'OTHER'] ?? 1);
-  const [mode, setMode] = useState<'now' | 'period'>('now');
-
-  return (
-    <div className="space-y-4">
-      <MachineStateControl stateCode={stateCode} onChange={setStateCode} />
-
-      <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-sm">
-        <ModeButton active={mode === 'now'} onClick={() => setMode('now')}>Сейчас</ModeButton>
-        <ModeButton active={mode === 'period'} onClick={() => setMode('period')}>Анализ за период</ModeButton>
-      </div>
-
-      {mode === 'now'
-        ? <TelemetrySnapshot equipmentId={equipmentId} />
-        : <TelemetryAnalysis equipmentId={equipmentId} />}
-    </div>
-  );
-}
-
-function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn('rounded-md px-3 py-1', active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100')}
-    >
-      {children}
-    </button>
-  );
-}
-
-function MachineStateControl({ stateCode, onChange }: { stateCode: number; onChange: (code: number) => void }) {
-  const state = MACHINE_STATES.find((s) => s.code === stateCode) ?? MACHINE_STATES[0];
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Состояние машины</span>
-      <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium', state.cls)}>{state.label}</span>
-      <select
-        value={stateCode}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm text-slate-700"
-        aria-label="Выбрать состояние машины"
-      >
-        {MACHINE_STATES.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
-      </select>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Mode 1: latest snapshot
-// ---------------------------------------------------------------------------
-
-interface SnapshotRecord {
+interface TelemetryRecord {
   id: string;
   type: string;
   value: number;
@@ -197,63 +122,15 @@ interface SnapshotRecord {
   timestamp: string;
 }
 
-function TelemetrySnapshot({ equipmentId }: { equipmentId: string }) {
-  const [records, setRecords] = useState<SnapshotRecord[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const to = new Date();
-    const from = new Date(to.getTime() - 7 * 86_400_000);
-    const qs = new URLSearchParams({ equipmentId, from: from.toISOString(), to: to.toISOString(), limit: '1000' });
-    authFetch(`/api/telemetry?${qs.toString()}`)
-      .then(async (res) => {
-        if (!res.ok) { setError(`Сервер вернул ${res.status}`); return; }
-        const data = await res.json();
-        setRecords(Array.isArray(data.records) ? data.records : []);
-        setError(null);
-      })
-      .catch((err) => setError((err as Error).message));
-  }, [equipmentId]);
-
-  if (error) return <ErrorBox error={error} />;
-  if (records === null) return <Loading />;
-  if (records.length === 0) return <EmptyTelemetry />;
-
-  const latestByType = new Map<string, SnapshotRecord>();
-  for (const r of records) {
-    if (r.type === 'machine_state') continue;
-    latestByType.set(r.type, r);
-  }
-  const grouped = groupBySubsystem([...latestByType.values()]);
-
-  return (
-    <Groups grouped={grouped} render={(p) => {
-      const spec = PARAM_SPECS[p.type];
-      const status = statusOf(p.value, spec);
-      const { text, unit } = renderValue(p.value, p.unit, spec);
-      return (
-        <Card key={p.id} status={status} label={spec?.label ?? p.type} type={p.type}>
-          <dd className={cn('mt-0.5 font-mono text-lg tabular-nums', STATUS_VALUE[status])}>
-            {text}{unit ? <span className="ml-1 text-xs text-slate-400">{unit}</span> : null}
-          </dd>
-          <div className="text-3xs text-slate-400">{formatRelative(p.timestamp)}</div>
-        </Card>
-      );
-    }} />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Mode 2: period analysis
-// ---------------------------------------------------------------------------
-
-interface AnalysisRow {
+interface ParamSeries {
   type: string;
-  count: number;
-  min: number | null;
-  avg: number | null;
-  max: number | null;
   unit: string | null;
+  values: number[];
+  last: number;
+  lastTs: string;
+  min: number;
+  max: number;
+  count: number;
 }
 
 function todayYmd(): string {
@@ -266,25 +143,29 @@ function shiftYmd(days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function TelemetryAnalysis({ equipmentId }: { equipmentId: string }) {
+interface Props {
+  equipmentId: string;
+}
+
+export function EquipmentMonitoring({ equipmentId }: Props) {
   const [from, setFrom] = useState(shiftYmd(-6));
   const [to, setTo] = useState(todayYmd());
-  const [rows, setRows] = useState<AnalysisRow[] | null>(null);
+  const [records, setRecords] = useState<TelemetryRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const invalid = from > to;
 
   const load = useCallback(async () => {
     if (from > to) return;
-    setRows(null);
+    setRecords(null);
     setError(null);
     const fromIso = new Date(`${from}T00:00:00`).toISOString();
     const toIso = new Date(`${to}T23:59:59.999`).toISOString();
-    const qs = new URLSearchParams({ action: 'analysis', equipmentId, from: fromIso, to: toIso });
+    const qs = new URLSearchParams({ equipmentId, from: fromIso, to: toIso, limit: '1000' });
     try {
       const res = await authFetch(`/api/telemetry?${qs.toString()}`);
       if (!res.ok) { setError(`Сервер вернул ${res.status}`); return; }
       const data = await res.json();
-      setRows(Array.isArray(data.analysis) ? data.analysis : []);
+      setRecords(Array.isArray(data.records) ? data.records : []);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -292,11 +173,42 @@ function TelemetryAnalysis({ equipmentId }: { equipmentId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Records arrive oldest-first.
+  let stateRec: TelemetryRecord | null = null;
+  const seriesByType = new Map<string, ParamSeries>();
+  for (const r of records ?? []) {
+    if (r.type === 'machine_state') { stateRec = r; continue; }
+    const s = seriesByType.get(r.type);
+    if (s) {
+      s.values.push(r.value);
+      s.last = r.value; s.lastTs = r.timestamp;
+      s.min = Math.min(s.min, r.value); s.max = Math.max(s.max, r.value);
+      s.count += 1;
+    } else {
+      seriesByType.set(r.type, {
+        type: r.type, unit: r.unit, values: [r.value],
+        last: r.value, lastTs: r.timestamp, min: r.value, max: r.value, count: 1,
+      });
+    }
+  }
+
+  const grouped = new Map<Subsystem, ParamSeries[]>();
+  for (const s of seriesByType.values()) {
+    const key = subsystemOf(s.type);
+    const arr = grouped.get(key) ?? [];
+    arr.push(s);
+    grouped.set(key, arr);
+  }
+  for (const arr of grouped.values()) {
+    arr.sort((a, b) => orderOf(a.type) - orderOf(b.type) || a.type.localeCompare(b.type));
+  }
+
   const chip = 'rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50';
-  const grouped = rows ? groupBySubsystem(rows) : null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <MachineStateBadge rec={stateRec} loading={records === null} />
+
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="block text-2xs uppercase tracking-wide text-slate-400">С</span>
@@ -316,97 +228,104 @@ function TelemetryAnalysis({ equipmentId }: { equipmentId: string }) {
       {invalid ? (
         <p className="text-xs text-rose-500">Дата «С» позже даты «По».</p>
       ) : error ? (
-        <ErrorBox error={error} />
-      ) : rows === null ? (
-        <Loading />
-      ) : rows.length === 0 ? (
-        <EmptyTelemetry />
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Не удалось загрузить телеметрию: {error}</p>
+      ) : records === null ? (
+        <p className="text-sm text-slate-400">Загрузка…</p>
+      ) : seriesByType.size === 0 ? (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+          Телеметрия за этот период не поступала. Подключите телематический бокс
+          (Teltonika / Galileosky) — данные о двигателе и гидравлике появятся здесь автоматически.
+        </p>
       ) : (
-        <Groups grouped={grouped!} render={(r) => {
-          const spec = PARAM_SPECS[r.type];
-          const status = worst(statusOf(r.min, spec), statusOf(r.max, spec));
-          return (
-            <Card key={r.type} status={status} label={spec?.label ?? r.type} type={r.type}>
-              <dd className={cn('mt-0.5 font-mono text-lg tabular-nums', STATUS_VALUE[status])}>
-                {fmt(r.avg)}{r.unit ? <span className="ml-1 text-xs text-slate-400">{r.unit}</span> : null}
-                <span className="ml-1 text-2xs font-sans text-slate-400">сред.</span>
-              </dd>
-              <div className="mt-0.5 font-mono text-2xs text-slate-500">мин {fmt(r.min)} · макс {fmt(r.max)}</div>
-              <div className="text-3xs text-slate-400">{r.count} замеров</div>
-            </Card>
-          );
-        }} />
+        <>
+          {SUBSYSTEMS.map(({ key, title, icon: Icon }) => {
+            const items = grouped.get(key);
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={key}>
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <Icon className="h-3.5 w-3.5" /> {title}
+                </h3>
+                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {items.map((s) => <ParamCard key={s.type} s={s} />)}
+                </dl>
+              </div>
+            );
+          })}
+          <p className="text-3xs text-slate-400">Цветовые пороги — ориентировочные, калибруются по установке.</p>
+        </>
       )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Shared bits
-// ---------------------------------------------------------------------------
-
-function Groups<T extends { type: string }>({
-  grouped, render,
-}: { grouped: Map<Subsystem, T[]>; render: (item: T) => React.ReactNode }) {
+function MachineStateBadge({ rec, loading }: { rec: TelemetryRecord | null; loading: boolean }) {
+  const state = rec ? MACHINE_STATES[Math.round(rec.value)] : null;
   return (
-    <div className="space-y-4">
-      {SUBSYSTEMS.map(({ key, title, icon: Icon }) => {
-        const items = grouped.get(key);
-        if (!items || items.length === 0) return null;
-        return (
-          <div key={key}>
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <Icon className="h-3.5 w-3.5" /> {title}
-            </h3>
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {items.map(render)}
-            </dl>
-          </div>
-        );
-      })}
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Состояние машины</span>
+      {loading ? (
+        <span className="text-sm text-slate-400">…</span>
+      ) : state ? (
+        <>
+          <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium', state.cls)}>{state.label}</span>
+          <span className="text-3xs text-slate-400">{formatRelative(rec!.timestamp)}</span>
+        </>
+      ) : (
+        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-sm text-slate-400">Нет данных</span>
+      )}
     </div>
   );
 }
 
-function Card({
-  status, label, type, children,
-}: { status: Status; label: string; type: string; children: React.ReactNode }) {
+function ParamCard({ s }: { s: ParamSeries }) {
+  const spec = PARAM_SPECS[s.type];
+  const status = worst(statusOf(s.min, spec), statusOf(s.max, spec));
+  const { text, unit } = renderValue(s.last, s.unit, spec);
+  const showSpark = spec?.kind !== 'bool' && spec?.kind !== 'count' && s.values.length >= 2;
   return (
     <div className={cn('rounded-lg border bg-card px-3 py-2', STATUS_CARD[status])}>
-      <dt className="truncate text-2xs text-slate-500" title={type}>{label}</dt>
-      {children}
+      <dt className="truncate text-2xs text-slate-500" title={s.type}>{spec?.label ?? s.type}</dt>
+      <div className="mt-0.5 flex items-end justify-between gap-2">
+        <dd className={cn('font-mono text-lg leading-none tabular-nums', STATUS_VALUE[status])}>
+          {text}{unit ? <span className="ml-1 text-xs text-slate-400">{unit}</span> : null}
+        </dd>
+        {showSpark && <Sparkline values={s.values} status={status} />}
+      </div>
+      <div className="mt-1 font-mono text-3xs text-slate-400">
+        мин {formatNum(s.min)} · макс {formatNum(s.max)} · {formatRelative(s.lastTs)}
+      </div>
     </div>
   );
 }
 
-function ErrorBox({ error }: { error: string }) {
+function Sparkline({ values, status }: { values: number[]; status: Status }) {
+  const w = 80;
+  const h = 22;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / span) * (h - 2) - 1;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
   return (
-    <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-      Не удалось загрузить телеметрию: {error}
-    </p>
-  );
-}
-
-function Loading() {
-  return <p className="text-sm text-slate-400">Загрузка…</p>;
-}
-
-function EmptyTelemetry() {
-  return (
-    <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
-      Телеметрия за этот период не поступала. Подключите телематический бокс
-      (Teltonika / Galileosky) — данные о двигателе и гидравлике появятся здесь автоматически.
-    </p>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden>
+      <polyline points={pts} fill="none" stroke={SPARK_STROKE[status]} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
 function renderValue(value: number, unit: string | null, spec?: ParamSpec): { text: string; unit: string } {
   if (spec?.kind === 'bool') return { text: value >= 0.5 ? 'Вкл' : 'Выкл', unit: '' };
   if (spec?.kind === 'count') return { text: String(Math.round(value)), unit: unit ?? '' };
-  return { text: fmt(value), unit: unit ?? '' };
+  return { text: formatNum(value), unit: unit ?? '' };
 }
 
-function fmt(n: number | null): string {
+function formatNum(n: number | null): string {
   if (n === null || n === undefined) return '—';
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 }
