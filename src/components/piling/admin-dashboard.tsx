@@ -18,6 +18,7 @@ import {
   Send,
   Wrench,
   AlertTriangle,
+  Gauge,
 } from 'lucide-react';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,6 +83,7 @@ export function AdminDashboard() {
     { label: 'Telegram', icon: Send, page: 'admin-telegram' as const, color: 'text-sky-600 bg-sky-100' },
     { label: 'Аналитика', icon: BarChart3, page: 'admin-analytics' as const, color: 'text-blue-600 bg-blue-100' },
     { label: 'DLQ', icon: AlertTriangle, page: 'admin-dlq' as const, color: 'text-amber-600 bg-amber-100' },
+    { label: 'Аналитика по установкам', icon: Gauge, page: 'admin-equipment-analytics' as const, color: 'text-teal-600 bg-teal-100' },
   ];
 
   const formatReportLabel = (count: number) =>

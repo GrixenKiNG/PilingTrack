@@ -405,4 +405,5 @@ export type AppPage =
   | 'admin-telegram'
   | 'admin-dlq'
   | 'admin-analytics'
+  | 'admin-equipment-analytics'
   | 'admin-users';
