@@ -36,6 +36,8 @@ git log -1 --oneline       # confirm expected HEAD
 ```bash
 # Build first — old containers keep serving traffic during this step.
 # Parallel build is safe; both share the same node_modules layer cache.
+# NOTE: if the diff adds a new prisma/migrations/* folder, build `migrate`
+# too — see the "Migrations" section below. Otherwise it runs stale.
 docker compose build app workers
 
 # Atomic swap. Compose stops the old container only after the new one
@@ -46,6 +48,46 @@ docker compose up -d app workers
 
 Add `ws` to both lines only if the WebSocket server changed (rare —
 look for `src/core/realtime/server/` in the diff).
+
+## Migrations (if the diff adds a `prisma/migrations/*` folder)
+
+**The `migrate` service bakes `prisma/migrations` into its image at build
+time** (it builds from `target: builder`, which `COPY`s the source — it
+does NOT volume-mount the host dir). `app` depends on `migrate`
+(`service_completed_successfully`), so `up -d app` *runs* migrate — but if
+migrate's image predates the `git pull`, it runs with **stale baked-in
+migrations**, logs `"N migrations found … No pending migrations to apply"`,
+and **exits 0**. The deploy looks green while the schema never changed,
+leaving new app code pointed at a missing table.
+
+Observed live 2026-05-27 deploying `20260526202204_equipment_maintenance`:
+migrate said "no pending", `MaintenanceRecord` was absent, app was already
+serving code that needed it.
+
+So when the diff includes a new migration, **rebuild `migrate` too**:
+
+```bash
+# detect: does the diff add a migration?
+git diff --name-only --diff-filter=A HEAD@{1}..HEAD -- 'prisma/migrations/**'
+
+# if yes, add `migrate` to the build line:
+docker compose build migrate app workers
+docker compose up -d app workers          # runs the fresh migrate via depends_on
+```
+
+Then **verify the migration actually applied — don't trust exit 0**:
+
+```bash
+docker compose logs --tail 15 migrate     # must show "Applying migration ..."
+docker compose exec -T postgres psql -U piling -d pilingtrack -c \
+  "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1;"
+# must be the migration you just shipped, not the previous one.
+```
+
+If the migration is **destructive** (Prisma prints a `Warnings:` /
+`DROP COLUMN` / `DROP TABLE` block in the `.sql`), check the target on prod
+*before* swapping — e.g. `SELECT count("col") FROM "Table";` — and confirm
+the data is expendable. Prod data is not in your local DB.
 
 ## Verify
 

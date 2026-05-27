@@ -170,6 +170,8 @@ docker compose up -d app workers  # atomic swap, old containers stopped after ne
 ```
 Old runbook (`stop && rm && rmi → build → up`) created a 3–5 min outage window when the build crashed. Don't use it unless you specifically want to free RAM before the build (heavy on this VPS only).
 
+**⚠️ New migration in the diff → build `migrate` too.** The `migrate` service bakes `prisma/migrations` into its image at build time, so `build app workers` alone leaves it stale: it runs, logs `"No pending migrations to apply"`, exits 0, and silently skips the migration — leaving new app code on an old schema. If `git diff --name-only --diff-filter=A HEAD@{1}..HEAD -- 'prisma/migrations/**'` shows a new folder, use `docker compose build migrate app workers`, then verify it landed (don't trust exit 0): `SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1;`. For destructive migrations (`DROP COLUMN`/`DROP TABLE` in the .sql), check prod data first. Hit live 2026-05-27. Full detail: runbook 008 "Migrations" section.
+
 If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -af`.
 
 **Migrate service** runs `prisma migrate deploy` and seed. Seed stays skipped on prod (`SKIP_SEED=1` in `.env`) as defence in depth — `prisma/seed.ts` also has `assertNotProduction()`. The historical reason ("bare `new PrismaClient()` crashes on the driver-adapter") was fixed 2026-05-24 — seed now constructs the client with `PrismaPg`, so dev/CI run it cleanly.
