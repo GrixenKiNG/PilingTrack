@@ -12,8 +12,11 @@ vi.mock('@/lib/db', () => ({
   getDatabaseProvider: () => 'postgresql',
 }));
 
-import { getHealth, getReadiness, getLiveness } from '../health-checks';
+import { getHealth, getReadiness, getLiveness, diskHealthFromStats } from '../health-checks';
 import { db } from '@/lib/db';
+
+// 100 blocks × 4 KiB; bavail = 100 - usedPercent → an exact used% for assertions.
+const diskStats = (usedPercent: number) => ({ blocks: 100, bsize: 4096, bavail: 100 - usedPercent });
 
 describe('Health Checks', () => {
   beforeEach(() => {
@@ -83,6 +86,34 @@ describe('Health Checks', () => {
 
       expect(result.checks.database.latencyMs).toBeDefined();
       expect(result.checks.database.latencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should include a disk check with a valid status', async () => {
+      vi.mocked(db.$queryRaw).mockResolvedValue([{ '?column?': 1 }]);
+
+      const result = await getHealth();
+
+      expect(result.checks.disk).toBeDefined();
+      expect(['pass', 'warn']).toContain(result.checks.disk.status);
+    });
+  });
+
+  describe('diskHealthFromStats', () => {
+    it('passes below the 85% warn threshold', () => {
+      const check = diskHealthFromStats(diskStats(50));
+      expect(check.status).toBe('pass');
+      expect(check.details).toMatchObject({ usedPercent: 50 });
+    });
+
+    it('warns at exactly the 85% threshold', () => {
+      expect(diskHealthFromStats(diskStats(85)).status).toBe('warn');
+    });
+
+    it('warns when nearly full — never fail, so /api/health stays 200 (no restart loop)', () => {
+      const check = diskHealthFromStats(diskStats(97));
+      expect(check.status).toBe('warn');
+      expect(check.status).not.toBe('fail');
+      expect(check.details).toMatchObject({ usedPercent: 97 });
     });
   });
 

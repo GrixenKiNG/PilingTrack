@@ -11,6 +11,7 @@
  */
 
 import * as v8 from 'node:v8';
+import { statfs } from 'node:fs/promises';
 import { db } from '@/lib/db';
 import { getDatabaseProvider } from '@/lib/db';
 
@@ -80,13 +81,41 @@ function checkMemory(): HealthCheck {
   };
 }
 
-function checkDisk(): HealthCheck {
-  // Placeholder — in production, check disk space via exec or filesystem API
+const DISK_WARN_PERCENT = 85;
+
+/**
+ * Pure decision from filesystem stats → health verdict. Exported for testing
+ * (statfs is a node builtin that vitest externalizes, so the logic lives here
+ * where it can be exercised directly).
+ *
+ * Pressure is reported as 'warn' (degraded → still HTTP 200), never 'fail': a
+ * full disk must not flip /api/health to 503 and trigger a container restart
+ * loop that can't fix it. Host-level Prometheus disk alerts are the real pager.
+ */
+export function diskHealthFromStats(stats: { blocks: number; bsize: number; bavail: number }): HealthCheck {
+  const totalBytes = stats.blocks * stats.bsize;
+  const availBytes = stats.bavail * stats.bsize;
+  const usedPercent = totalBytes > 0
+    ? Math.round(((totalBytes - availBytes) / totalBytes) * 100)
+    : 0;
   return {
     name: 'disk',
-    status: 'pass',
-    details: { note: 'Disk check not implemented' },
+    status: usedPercent >= DISK_WARN_PERCENT ? 'warn' : 'pass',
+    details: { usedPercent, availMB: Math.round(availBytes / 1024 / 1024) },
   };
+}
+
+async function checkDisk(): Promise<HealthCheck> {
+  // VPS root fs is 30 GB and often runs near-full (a build can tip it over).
+  try {
+    return diskHealthFromStats(await statfs('/'));
+  } catch (error) {
+    return {
+      name: 'disk',
+      status: 'warn',
+      details: { error: error instanceof Error ? error.message : 'statfs failed' },
+    };
+  }
 }
 
 function checkEnv(): HealthCheck {
@@ -109,6 +138,7 @@ export async function getHealth() {
     checkDatabase(),
     Promise.resolve(checkMemory()),
     Promise.resolve(checkEnv()),
+    checkDisk(),
   ]);
 
   const hasFailure = checks.some(c => c.status === 'fail');
