@@ -3,7 +3,7 @@
  *
  * Documents (паспорт, ОТС, страховка, акты ТО) are equipment-scoped
  * metadata. No domain invariants → straight Prisma writes, no aggregate.
- * Tenant inherits from the parent equipment row.
+ * Tenant comes from the acting user — Equipment has no tenantId column.
  */
 
 import { db } from '@/lib/db';
@@ -28,16 +28,20 @@ const toDate = (v: string | Date | null | undefined): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-export async function createEquipmentDocument(equipmentId: string, input: EquipmentDocumentInput) {
+export async function createEquipmentDocument(
+  equipmentId: string,
+  input: EquipmentDocumentInput,
+  ctx: { tenantId: string },
+) {
   const equipment = await db.equipment.findUnique({
     where: { id: equipmentId },
-    select: { id: true, tenantId: true },
+    select: { id: true },
   });
   if (!equipment) throw new ServiceError('Equipment not found', 404);
 
   return db.equipmentDocument.create({
     data: {
-      tenantId: equipment.tenantId,
+      tenantId: ctx.tenantId,
       equipmentId: equipment.id,
       type: input.type,
       title: input.title.trim(),

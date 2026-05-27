@@ -42,7 +42,12 @@ export const POST = withMutation(
       );
     }
 
-    const doc = await createEquipmentDocument(id, parsed.data);
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
+
+    const doc = await createEquipmentDocument(id, parsed.data, { tenantId });
     return NextResponse.json({ document: doc }, { status: 201 });
   },
   { domain: 'equipment.documents' }
