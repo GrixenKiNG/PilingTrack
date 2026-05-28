@@ -114,6 +114,7 @@ model Equipment {
   model       String   @default("")
   qty         Int      @default(1)
   isActive    Boolean  @default(true)
+  tenantId    String
   description String   @default("")
 
   // A. Identification --------------------------------------------------
@@ -169,6 +170,7 @@ model Equipment {
   documents               EquipmentDocument[]
   maintenanceRecords      MaintenanceRecord[]
 
+  @@index([tenantId])
   @@index([isActive])
   @@index([kind])
   @@index([inventoryNumber])
@@ -589,6 +591,7 @@ model Report {
   lastEditedById   String?
   lastEditedByName String?
   lastEditedByRole String?
+  journalPhotoMediaId String?
 
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
