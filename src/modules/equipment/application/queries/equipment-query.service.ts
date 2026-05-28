@@ -2,12 +2,20 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 
-export async function getAccessibleEquipment() { return db.equipment.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }); }
-export async function getEquipmentById(id: string) { return db.equipment.findUnique({ where: { id }, include: { crews: { select: { id: true, name: true, siteId: true } } } }); }
+export async function getAccessibleEquipment(tenantId: string) {
+  return db.equipment.findMany({ where: { isActive: true, tenantId }, orderBy: { name: 'asc' } });
+}
 
-export async function getEquipmentByIdOrThrow(id: string) {
+export async function getEquipmentById(id: string, tenantId: string) {
+  return db.equipment.findUnique({
+    where: { id, tenantId },
+    include: { crews: { select: { id: true, name: true, siteId: true } } },
+  });
+}
+
+export async function getEquipmentByIdOrThrow(id: string, tenantId: string) {
   const equipment = await db.equipment.findUnique({
-    where: { id },
+    where: { id, tenantId },
     include: {
       crews: {
         where: { isActive: true },
@@ -22,16 +30,15 @@ export async function getEquipmentByIdOrThrow(id: string) {
   return equipment;
 }
 
-export async function listEquipmentWithCrewCounts() {
+export async function listEquipmentWithCrewCounts(tenantId: string) {
   const list = await db.equipment.findMany({
+    where: { tenantId },
     include: { crews: { where: { isActive: true } } },
     orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
   });
   return list.map((eq) => ({
     id: eq.id, name: eq.name, model: eq.model, qty: eq.qty,
     isActive: eq.isActive, description: eq.description,
-    // Template fields — surfaced on the list page so dispatchers can
-    // tell at a glance what kind of rig / inventory number something is.
     kind: eq.kind,
     inventoryNumber: eq.inventoryNumber,
     registrationNumber: eq.registrationNumber,
@@ -43,16 +50,11 @@ export async function listEquipmentWithCrewCounts() {
 }
 
 /**
- * Rich snapshot for /admin/equipment/[id]. One call returns:
- *   - the equipment row with the full template metadata
- *   - active crew (operator + assistants + current site)
- *   - 30-day activity totals from ReportAnalytics
- *   - active telematics devices (when we install boxes — empty for now)
- *   - documents (paspport / OTS / insurance / etc.)
+ * Rich snapshot for /admin/equipment/[id].
  */
-export async function getEquipmentDetails(equipmentId: string) {
+export async function getEquipmentDetails(equipmentId: string, tenantId: string) {
   const equipment = await db.equipment.findUnique({
-    where: { id: equipmentId },
+    where: { id: equipmentId, tenantId },
     include: {
       crews: {
         where: { isActive: true },
@@ -77,11 +79,6 @@ export async function getEquipmentDetails(equipmentId: string) {
   });
   if (!equipment) throw new ServiceError('Equipment not found', 404);
 
-  // Full work history — one row per report, newest first. Report dates are
-  // 'YYYY-MM-DD' strings (Report.date is String, see prisma/schema.prisma), so
-  // the 30-day cutoff is a lexicographic string compare. The KPI block still
-  // summarises the last 30 days; the timeline table shows the whole history
-  // (capped to keep the payload bounded for very long-lived rigs).
   const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const allReports = await db.report.findMany({
     where: { equipmentId },
@@ -115,19 +112,13 @@ export async function getEquipmentDetails(equipmentId: string) {
     { piles: 0, drillingMeters: 0, downtimeMinutes: 0 }
   );
 
-  // Timeline: one row per report with totals attached.
   const timeline = allReports.map((r) => {
     const a = analyticsByReport.get(r.reportId);
     return {
-      reportId: r.reportId,
-      date: r.date,
-      shiftType: r.shiftType,
-      status: r.status,
-      siteName: r.site?.name ?? null,
-      operatorName: r.user?.name ?? null,
+      reportId: r.reportId, date: r.date, shiftType: r.shiftType, status: r.status,
+      siteName: r.site?.name ?? null, operatorName: r.user?.name ?? null,
       updatedAt: r.updatedAt.toISOString(),
-      piles: a?.totalPiles ?? null,
-      drillingMeters: a?.totalDrilling ?? null,
+      piles: a?.totalPiles ?? null, drillingMeters: a?.totalDrilling ?? null,
       downtimeMinutes: a?.totalDowntime ?? null,
     };
   });
@@ -137,24 +128,21 @@ export async function getEquipmentDetails(equipmentId: string) {
     crew: equipment.crews[0] ?? null,
     telematicsDevices: equipment.telematicsDevices,
     documents: equipment.documents,
-    stats30d: {
-      reportCount: reports30d.length,
-      ...stats30d,
-    },
+    stats30d: { reportCount: reports30d.length, ...stats30d },
     timeline,
   };
 }
-export async function listEquipmentCatalog() {
-  return db.equipment.findMany({ orderBy: { name: 'asc' } });
+
+export async function listEquipmentCatalog(tenantId: string) {
+  return db.equipment.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
 }
 
 /**
- * Журнал ТО/ремонтов установки — запланированные сверху по плановой дате,
- * затем выполненные по дате завершения (новые раньше).
+ * Журнал ТО/ремонтов установки
  */
-export async function listMaintenance(equipmentId: string) {
+export async function listMaintenance(equipmentId: string, tenantId: string) {
   return db.maintenanceRecord.findMany({
-    where: { equipmentId },
+    where: { equipmentId, tenantId },
     orderBy: [{ status: 'asc' }, { scheduledAt: 'desc' }, { createdAt: 'desc' }],
   });
 }
@@ -163,13 +151,14 @@ export async function listAllEquipment(
   pagination?: CursorPaginationResult,
   siteId?: string | null,
   operatorUserId?: string | null,
+  tenantId?: string,
 ) {
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
   const where: Record<string, unknown> = {};
 
-  // Operator scope: only equipment they are assigned to via an active crew.
-  // Optionally further narrowed to a specific site if siteId is provided.
+  if (tenantId) where.tenantId = tenantId;
+
   if (operatorUserId) {
     where.crews = {
       some: {
