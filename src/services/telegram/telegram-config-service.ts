@@ -15,13 +15,21 @@ export async function listTelegramConfigs() {
     orderBy: { createdAt: 'desc' },
   });
 
-  // Decrypt botToken for each config
-  return configs.map((config) => ({
-    ...config,
-    botToken: config.botToken && isEncrypted(config.botToken)
-      ? decrypt(config.botToken)
-      : config.botToken,
-  }));
+  // Decrypt botToken for each config. A token encrypted under a different
+  // ENCRYPTION_KEY (e.g. prod data loaded into a local DB) can't be decrypted
+  // here — degrade to an empty token instead of failing the whole list, so the
+  // settings page still loads and the token can be re-entered.
+  return configs.map((config) => {
+    let botToken = config.botToken;
+    if (botToken && isEncrypted(botToken)) {
+      try {
+        botToken = decrypt(botToken);
+      } catch {
+        botToken = '';
+      }
+    }
+    return { ...config, botToken };
+  });
 }
 
 export async function createTelegramConfig(input: {

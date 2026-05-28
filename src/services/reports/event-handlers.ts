@@ -272,6 +272,27 @@ function fmtNum(n: number): string {
 
 async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
   try {
+    const { db } = await import('@/lib/db');
+
+    // If there are newer unprocessed ReportSubmitted events for the same report,
+    // skip this one — only the last event in the batch should send the PDF.
+    // This prevents Telegram spam when the outbox catches up after downtime.
+    const newerPending = await db.outboxEvent.count({
+      where: {
+        aggregateId: event.aggregateId,
+        type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+        published: false,
+        id: { not: event.id },
+      } as any,
+    });
+    if (newerPending > 0) {
+      logger.info('Telegram: skipping outdated ReportSubmitted, newer pending in outbox', {
+        reportId: event.aggregateId,
+        newerPending,
+      });
+      return;
+    }
+
     const { loadSingleReportPdfContext } = await import('@/lib/pdf-data');
     const { generateSinglePdf } = await import('@/lib/pdf-generator');
     const { telegramNotifier } = await import('@/core/notifications/telegram');

@@ -29,7 +29,9 @@ interface DlqEntry {
   payload: unknown;
   errorMessage: string;
   attempts: number;
+  sourceOutboxId: string | null;
   createdAt: string;
+  updatedAt: string;
   status: 'pending' | 'resolved' | 'discarded';
 }
 
@@ -197,7 +199,17 @@ export function AdminDlq() {
                           aggregateId: {entry.aggregateId}
                         </p>
                       )}
-                      <p className="text-xs text-slate-400 mt-1">{formatDate(entry.createdAt)}</p>
+                      {entry.sourceOutboxId && (
+                        <p className="text-xs text-slate-400 mt-0.5 font-mono truncate">
+                          outboxId: {entry.sourceOutboxId}
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-400 mt-1">
+                        Создано: {formatDate(entry.createdAt)}
+                        {entry.updatedAt !== entry.createdAt && (
+                          <span className="ml-2">· Обновлено: {formatDate(entry.updatedAt)}</span>
+                        )}
+                      </p>
                       <p className="text-sm text-red-600 mt-2 line-clamp-2">{entry.errorMessage}</p>
                       <button
                         onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}

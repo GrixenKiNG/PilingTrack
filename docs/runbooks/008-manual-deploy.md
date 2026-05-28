@@ -20,10 +20,11 @@ built and tested. `docker compose up -d` does the swap atomically.
 ssh -i ~/.ssh/orionpiling user1@87.242.102.125
 cd /opt/pilingtrack
 
-# 1. Disk check — build needs ~3 GB free
+# 1. Disk check — a single image export needs ~5-6 GB transient headroom.
+# Start the build at <=75% (≈7 GB free); even then it can dip toward 100%
+# mid-export. Free space first if tight:
 df -h /
-# If >85%, free space:
-docker builder prune -af   # frees ~2 GB
+docker builder prune -af   # frees ~2-3 GB
 docker image prune -af     # frees more if old images linger
 
 # 2. Pull
@@ -35,10 +36,16 @@ git log -1 --oneline       # confirm expected HEAD
 
 ```bash
 # Build first — old containers keep serving traffic during this step.
-# Parallel build is safe; both share the same node_modules layer cache.
+# BUILD SEQUENTIALLY on this 30 GB VPS — do NOT use `build app workers`.
+# BuildKit builds the two targets in parallel, and exporting both images at
+# once roughly doubles peak transient disk use; observed live 2026-05-28 the
+# parallel build filled the disk to 100% ("no space left on device") at the
+# workers export. Sequential + a prune between keeps the peak survivable.
+docker compose build app
+docker builder prune -af          # reclaim this build's cache before the next
+docker compose build workers
 # NOTE: if the diff adds a new prisma/migrations/* folder, build `migrate`
-# too — see the "Migrations" section below. Otherwise it runs stale.
-docker compose build app workers
+# too (separately, same pattern) — see the "Migrations" section below.
 
 # Atomic swap. Compose stops the old container only after the new one
 # starts and reports healthy. If the new container fails to start,
