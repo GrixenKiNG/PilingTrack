@@ -31,20 +31,18 @@ export const PUT = withMutation(
     assertCan(user!, 'equipment.manage');
 
     const { id, docId } = await params;
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        {
-          error: 'Validation failed',
-          details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
-        },
+        { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }
 
     try {
-      const doc = await updateEquipmentDocument(id, docId, parsed.data);
+      const doc = await updateEquipmentDocument(id, docId, parsed.data, { tenantId });
       return NextResponse.json({ document: doc });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
@@ -61,8 +59,9 @@ export const DELETE = withMutation(
     assertCan(user!, 'equipment.manage');
 
     const { id, docId } = await params;
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     try {
-      await deleteEquipmentDocument(id, docId);
+      await deleteEquipmentDocument(id, docId, { tenantId });
       return NextResponse.json({ ok: true });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

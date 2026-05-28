@@ -253,6 +253,7 @@ async function seed() {
       create: {
         ...equipment,
         isActive: true,
+        tenantId: process.env.DEFAULT_TENANT_ID ?? 'orion',
       },
     });
   }

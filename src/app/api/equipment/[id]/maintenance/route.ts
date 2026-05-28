@@ -27,11 +27,12 @@ const createSchema = z.object({
 
 export const GET = withApi(
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    const { error } = await requireAuth(request);
+    const { user, error } = await requireAuth(request);
     if (error) return error;
 
     const { id } = await params;
-    const records = await listMaintenance(id);
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const records = await listMaintenance(id, tenantId);
     return NextResponse.json({ records });
   },
   { domain: 'equipment.maintenance' }
@@ -48,10 +49,7 @@ export const POST = withMutation(
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        {
-          error: 'Validation failed',
-          details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
-        },
+        { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }

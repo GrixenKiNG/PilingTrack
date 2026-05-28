@@ -58,6 +58,7 @@ async function seedEquipment() {
             qty: eq.qty,
             description: eq.description,
             isActive: true,
+            tenantId: process.env.DEFAULT_TENANT_ID ?? 'orion',
           },
         });
         console.log(`  ✓ ${eq.name}`);

@@ -6,7 +6,6 @@ import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 
-
 export const runtime = 'nodejs';
 
 export const GET = withApi(
@@ -14,10 +13,11 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const siteId = request.nextUrl.searchParams.get('siteId');
     const operatorUserId = user!.role === 'OPERATOR' ? user!.id : null;
-    const equipment = await listAllEquipment(pagination, siteId, operatorUserId);
+    const equipment = await listAllEquipment(pagination, siteId, operatorUserId, tenantId);
     const nextCursor = pagination.getNextCursor(equipment);
     return NextResponse.json({ data: equipment, nextCursor });
   },
@@ -30,8 +30,12 @@ export const POST = withMutation(
     if (error) return error;
 
     assertCan(user!, 'equipment.manage');
-    const body = await request.json();
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
 
+    const body = await request.json();
     const validation = createEquipmentSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -46,10 +50,9 @@ export const POST = withMutation(
       qty: validation.data.qty,
       description: validation.data.description,
       userId: user!.id,
+      tenantId,
     });
 
-    // Apply template metadata in the same request — operators usually
-    // fill the whole form in one go via the multi-tab edit dialog.
     if (equipment) {
       await updateEquipmentMetadata(equipment.id, validation.data);
     }

@@ -27,7 +27,8 @@ export const GET = withApi(
     assertCan(user!, 'equipment.manage');
 
     const { id } = await params;
-    const details = await getEquipmentDetails(id);
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const details = await getEquipmentDetails(id, tenantId);
     return NextResponse.json(details);
   },
   { domain: 'equipment' }

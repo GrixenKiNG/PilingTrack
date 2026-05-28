@@ -15,6 +15,11 @@ export const POST = withMutation(
     if (error) return error;
 
     assertCan(user!, 'equipment.manage');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
+
     let body;
     try {
       body = await request.json();
@@ -37,6 +42,7 @@ export const POST = withMutation(
         qty: validation.data.qty,
         description: validation.data.description,
         userId: user!.id,
+        tenantId,
       })
     );
 
@@ -51,6 +57,8 @@ export const PUT = withMutation(
     if (error) return error;
 
     assertCan(user!, 'equipment.manage');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+
     let body;
     try {
       body = await request.json();
@@ -75,6 +83,7 @@ export const PUT = withMutation(
         qty: validation.data.qty,
         description: validation.data.description || undefined,
         userId: user!.id,
+        tenantId,
       })
     );
 
@@ -89,6 +98,8 @@ export const DELETE = withMutation(
     if (error) return error;
 
     assertCan(user!, 'equipment.manage');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+
     let body;
     try {
       body = await request.json();
@@ -105,7 +116,7 @@ export const DELETE = withMutation(
     }
 
     const result = await withDbProtection(async () =>
-      deleteEquipment(validation.data.id)
+      deleteEquipment(validation.data.id, tenantId)
     );
     return NextResponse.json(result);
   },
