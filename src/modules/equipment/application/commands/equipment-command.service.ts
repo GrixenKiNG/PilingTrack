@@ -8,30 +8,33 @@ import { getEquipmentRepository } from '../../infrastructure';
 import { CreateEquipmentCommand, UpdateEquipmentCommand } from './equipment.command';
 
 export async function createEquipment(cmd: CreateEquipmentCommand) {
-  const agg = EquipmentAggregate.create({ name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description }, cmd.userId);
+  const agg = EquipmentAggregate.create(
+    { name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description, tenantId: cmd.tenantId },
+    cmd.userId,
+  );
   await getEquipmentRepository().save(agg);
   return db.equipment.findUnique({ where: { id: agg.getState().id } });
 }
 
 export async function updateEquipment(cmd: UpdateEquipmentCommand) {
   const repo = getEquipmentRepository();
-  const agg = await repo.findById(cmd.equipmentId);
-  if (!agg) throw new Error('Equipment not found');
+  const agg = await repo.findById(cmd.equipmentId, cmd.tenantId);
+  if (!agg) throw new ServiceError('Equipment not found', 404);
   agg.update({ name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description }, cmd.userId);
   await repo.save(agg);
 }
 
-export async function retireEquipment(equipmentId: string, userId?: string) {
+export async function retireEquipment(equipmentId: string, tenantId: string, userId?: string) {
   const repo = getEquipmentRepository();
-  const agg = await repo.findById(equipmentId);
-  if (!agg) throw new Error('Equipment not found');
+  const agg = await repo.findById(equipmentId, tenantId);
+  if (!agg) throw new ServiceError('Equipment not found', 404);
   agg.retire(userId);
   await repo.save(agg);
 }
 
-export async function deleteEquipment(equipmentId: string) {
+export async function deleteEquipment(equipmentId: string, tenantId: string) {
   const existing = await db.equipment.findUnique({
-    where: { id: equipmentId },
+    where: { id: equipmentId, tenantId },
     include: { crews: { where: { isActive: true } } },
   });
   if (!existing) throw new ServiceError('Equipment not found', 404);
