@@ -1,9 +1,8 @@
 /**
  * EquipmentDocument CRUD.
  *
- * Documents (паспорт, ОТС, страховка, акты ТО) are equipment-scoped
- * metadata. No domain invariants → straight Prisma writes, no aggregate.
- * Tenant comes from the acting user — Equipment has no tenantId column.
+ * Tenant comes from the acting user via ctx.tenantId. Equipment existence checks
+ * are scoped to the same tenant to prevent cross-tenant document attachment (IDOR fix).
  */
 
 import { db } from '@/lib/db';
@@ -34,7 +33,7 @@ export async function createEquipmentDocument(
   ctx: { tenantId: string },
 ) {
   const equipment = await db.equipment.findUnique({
-    where: { id: equipmentId },
+    where: { id: equipmentId, tenantId: ctx.tenantId },
     select: { id: true },
   });
   if (!equipment) throw new ServiceError('Equipment not found', 404);
@@ -56,13 +55,14 @@ export async function createEquipmentDocument(
 export async function updateEquipmentDocument(
   equipmentId: string,
   documentId: string,
-  input: Partial<EquipmentDocumentInput>
+  input: Partial<EquipmentDocumentInput>,
+  ctx: { tenantId: string },
 ) {
   const doc = await db.equipmentDocument.findUnique({
     where: { id: documentId },
-    select: { id: true, equipmentId: true },
+    select: { id: true, equipmentId: true, tenantId: true },
   });
-  if (!doc || doc.equipmentId !== equipmentId) {
+  if (!doc || doc.equipmentId !== equipmentId || doc.tenantId !== ctx.tenantId) {
     throw new ServiceError('Document not found', 404);
   }
 
@@ -77,12 +77,16 @@ export async function updateEquipmentDocument(
   return db.equipmentDocument.update({ where: { id: documentId }, data });
 }
 
-export async function deleteEquipmentDocument(equipmentId: string, documentId: string) {
+export async function deleteEquipmentDocument(
+  equipmentId: string,
+  documentId: string,
+  ctx: { tenantId: string },
+) {
   const doc = await db.equipmentDocument.findUnique({
     where: { id: documentId },
-    select: { id: true, equipmentId: true },
+    select: { id: true, equipmentId: true, tenantId: true },
   });
-  if (!doc || doc.equipmentId !== equipmentId) {
+  if (!doc || doc.equipmentId !== equipmentId || doc.tenantId !== ctx.tenantId) {
     throw new ServiceError('Document not found', 404);
   }
   await db.equipmentDocument.delete({ where: { id: documentId } });

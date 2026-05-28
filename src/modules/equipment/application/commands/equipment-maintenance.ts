@@ -1,10 +1,8 @@
 /**
- * MaintenanceRecord CRUD — журнал ТО и ремонтов по установке.
+ * MaintenanceRecord CRUD.
  *
- * Ручной ввод диспетчером/админом. Нет доменных инвариантов → прямые
- * Prisma-записи без агрегата (как у EquipmentDocument). Tenant наследуется
- * от родительской установки. completedAt ставится автоматически при
- * переходе в DONE, если не задан явно.
+ * Tenant comes from ctx.tenantId. Existence checks for parent Equipment and
+ * individual records are scoped to the same tenant (IDOR fix).
  */
 
 import { db } from '@/lib/db';
@@ -37,13 +35,12 @@ export async function createMaintenance(
   ctx: { tenantId: string; createdById?: string | null },
 ) {
   const equipment = await db.equipment.findUnique({
-    where: { id: equipmentId },
+    where: { id: equipmentId, tenantId: ctx.tenantId },
     select: { id: true },
   });
   if (!equipment) throw new ServiceError('Equipment not found', 404);
 
   const status = input.status ?? 'PLANNED';
-  // DONE без явной даты завершения — проставляем «сейчас».
   const completedAt = toDate(input.completedAt) ?? (status === 'DONE' ? new Date() : null);
 
   return db.maintenanceRecord.create({
@@ -68,12 +65,13 @@ export async function updateMaintenance(
   equipmentId: string,
   recordId: string,
   input: Partial<MaintenanceInput>,
+  ctx: { tenantId: string },
 ) {
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, equipmentId: true, completedAt: true },
+    select: { id: true, equipmentId: true, completedAt: true, tenantId: true },
   });
-  if (!existing || existing.equipmentId !== equipmentId) {
+  if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
   }
 
@@ -89,7 +87,6 @@ export async function updateMaintenance(
 
   if (input.status !== undefined) {
     data.status = input.status;
-    // Переход в DONE без даты завершения (текущей или новой) — ставим «сейчас».
     if (input.status === 'DONE' && input.completedAt === undefined && !existing.completedAt) {
       data.completedAt = new Date();
     }
@@ -98,12 +95,16 @@ export async function updateMaintenance(
   return db.maintenanceRecord.update({ where: { id: recordId }, data });
 }
 
-export async function deleteMaintenance(equipmentId: string, recordId: string) {
+export async function deleteMaintenance(
+  equipmentId: string,
+  recordId: string,
+  ctx: { tenantId: string },
+) {
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, equipmentId: true },
+    select: { id: true, equipmentId: true, tenantId: true },
   });
-  if (!existing || existing.equipmentId !== equipmentId) {
+  if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
   }
   await db.maintenanceRecord.delete({ where: { id: recordId } });
