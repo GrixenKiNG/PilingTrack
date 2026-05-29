@@ -11,6 +11,7 @@ import { PileSection } from './pile-section';
 import { DrillingSection } from './drilling-section';
 import { DowntimeSection } from './downtime-section';
 import { SubmitBar } from './submit-bar';
+import { ReportSentScreen } from './report-sent-screen';
 import { PhotoSection } from './photo-section';
 import { filterPileGradesBySitePlan } from './filter-pile-grades';
 
@@ -65,7 +66,7 @@ export function ReportForm() {
     selectedPicketId, setSelectedPicketId,
     piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
-    loading, loadError, reloadData, submitting, loadingReport,
+    loading, loadError, reloadData, submitting, submittedAt, loadingReport,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,
@@ -110,6 +111,19 @@ export function ReportForm() {
           Повторить
         </button>
       </div>
+    );
+  }
+
+  if (submittedAt) {
+    return (
+      <ReportSentScreen
+        siteName={sites.find((s) => s.id === selectedSiteId)?.name || ''}
+        date={date} time={submittedAt}
+        totalPiles={totalPiles} totalPileMeters={totalPileMeters}
+        totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
+        totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
+        onDone={() => router.push('/operator')}
+      />
     );
   }
 

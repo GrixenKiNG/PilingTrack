@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
@@ -42,6 +41,7 @@ export interface UseReportFormReturn {
   reloadData: () => void;
   submitting: boolean;
   loadingReport: boolean;
+  submittedAt: string | null;
   addPile: (gradeId: string, count: number) => void;
   addDrilling: (typeId: string, count: number, metersPerUnit: number) => void;
   addDowntime: (reasonId: string, duration: number, comment: string) => void;
@@ -61,7 +61,6 @@ export function useReportForm(): UseReportFormReturn {
   const user = usePilingStore((s) => s.currentUser);
   const selectedSiteId = usePilingStore((s) => s.selectedSiteId);
   const setSelectedSite = usePilingStore((s) => s.setSelectedSite);
-  const router = useRouter();
 
   // Pre-generate so the photo widget can attach a file before the report
   // is submitted; loadReport replaces this with the persisted id when editing.
@@ -88,6 +87,7 @@ export function useReportForm(): UseReportFormReturn {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [showDowntime, setShowDowntime] = useState(false);
   const [quickMode, setQuickMode] = useState(true);
@@ -286,7 +286,9 @@ export function useReportForm(): UseReportFormReturn {
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });
       if (user && selectedSiteId && date) localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);
-      router.push('/operator');
+      // Show the confirmation screen instead of redirecting silently; its
+      // "Готово" button takes the operator back to /operator.
+      setSubmittedAt(new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Ошибка отправки';
       toast.error(message); hapticError();
@@ -301,7 +303,7 @@ export function useReportForm(): UseReportFormReturn {
     selectedFieldId, setSelectedFieldId, selectedClusterId, setSelectedClusterId, selectedPicketId, setSelectedPicketId,
     piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
-    loading, loadError, reloadData: loadData, submitting, loadingReport,
+    loading, loadError, reloadData: loadData, submitting, submittedAt, loadingReport,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,
