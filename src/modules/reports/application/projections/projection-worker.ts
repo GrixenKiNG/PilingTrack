@@ -334,6 +334,13 @@ async function projectWeeklyTrend(siteId: string) {
   const weekStart = monday.toISOString().split('T')[0];
   const weekEnd = sunday.toISOString().split('T')[0];
 
+  // SiteWeeklyTrend.tenantId is NOT NULL in the DB (schema.prisma marks it
+  // optional, hence the silent omission). Source it from the site.
+  const site = await db.site.findUnique({
+    where: { id: siteId },
+    select: { tenantId: true },
+  });
+
   const dailySummaries = await db.siteDailySummary.findMany({
     where: {
       siteId,
@@ -387,6 +394,7 @@ async function projectWeeklyTrend(siteId: string) {
     where: { siteId_weekStart: { siteId, weekStart } },
     create: {
       siteId,
+      tenantId: site?.tenantId ?? null,
       weekStart,
       weekEnd,
       dailyMetrics: dailyMetrics as never,

@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   mockOutboxFindUnique: vi.fn(),
   mockOutboxUpdate: vi.fn(),
   mockUpsert: vi.fn(),
+  mockWeeklyUpsert: vi.fn(),
+  mockSiteFindUnique: vi.fn().mockResolvedValue({ tenantId: 'tenant-1' }),
+  mockDailyFindMany: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -30,8 +33,9 @@ vi.mock('@/lib/db', () => ({
     reportStats: { upsert: mocks.mockUpsert },
     operatorPerformance: { upsert: mocks.mockUpsert },
     downtimeSummary: { upsert: mocks.mockUpsert },
-    siteDailySummary: { upsert: mocks.mockUpsert },
-    siteWeeklyTrend: { upsert: mocks.mockUpsert },
+    site: { findUnique: mocks.mockSiteFindUnique },
+    siteDailySummary: { upsert: mocks.mockUpsert, findMany: mocks.mockDailyFindMany },
+    siteWeeklyTrend: { upsert: mocks.mockWeeklyUpsert },
     reportAnalytics: { upsert: mocks.mockUpsert },
     outboxEvent: {
       findMany: mocks.mockOutboxFindMany,
@@ -206,6 +210,52 @@ describe('Projection Worker', () => {
       // Report was fetched and projections updated
       expect(mocks.mockReportFindUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { reportId: 'report-1' } })
+      );
+
+      worker.stop();
+    });
+
+    it('sets tenantId on the weekly trend upsert (NOT NULL in DB)', async () => {
+      const { startProjectionWorker } = await import(
+        '@/modules/reports/application/projections/projection-worker'
+      );
+
+      const event = {
+        id: 'outbox-1',
+        type: 'ReportCreated',
+        aggregateId: 'report-1',
+        aggregateType: 'Report',
+        payload: createEvent({ type: 'ReportCreated' }),
+        published: false,
+        attempts: 0,
+        occurredAt: new Date(),
+        createdAt: new Date(),
+      };
+
+      mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
+      mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
+      mocks.mockOutboxUpdate.mockResolvedValue({});
+      mocks.mockSiteFindUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+      mocks.mockDailyFindMany.mockResolvedValue([]);
+      mocks.mockReportFindUnique.mockResolvedValue({
+        id: 'report-1',
+        reportId: 'report-1',
+        siteId: 'site-1',
+        userId: 'user-1',
+        status: 'draft',
+        date: '2026-04-09',
+        piles: [],
+        drillings: [],
+        downtimes: [],
+      });
+
+      const worker = startProjectionWorker(500);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(mocks.mockWeeklyUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ tenantId: 'tenant-1' }),
+        })
       );
 
       worker.stop();
