@@ -60,23 +60,28 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy standalone output (for shared modules)
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
+# --chown sets ownership inline; a separate `RUN chown -R /app` would rewrite
+# every file's metadata into a duplicate overlay layer (~3 GB), doubling the
+# image on disk — the cause of the VPS "no space left" build failures.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 # Workers need full node_modules (standalone only traces Next.js code)
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Copy worker source (tsx will resolve @/ paths via tsconfig)
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder --chown=nextjs:nodejs /app/src ./src
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 
 # Install tsx for running TypeScript directly
 RUN npm install -g tsx
 
-# Set ownership
-RUN chown -R nextjs:nodejs /app
+# Own the /app dir itself (its contents are already nextjs-owned via COPY --chown).
+# Without this, the local-fallback PDF path (savePdfBuffer → cwd/storage when S3
+# is off) can't mkdir under /app. One dir = negligible layer, unlike `chown -R`.
+RUN chown nextjs:nodejs /app
 
 # Use tini as init system (proper signal handling)
 ENTRYPOINT ["/sbin/tini", "--"]
