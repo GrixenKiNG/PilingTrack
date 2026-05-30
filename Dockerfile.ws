@@ -44,6 +44,11 @@ RUN npx esbuild src/core/realtime/server/index.ts \
     --format=cjs \
     --minify
 
+# Drop dev dependencies (esbuild/next/typescript/etc. were only needed for the
+# build above). The compiled bundle requires only the --external prod packages
+# at runtime, so the runner can ship the pruned tree instead of the full one.
+RUN npm prune --production
+
 # Stage 3: Production — Minimal image with compiled JS
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -58,8 +63,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 ENV NODE_ENV=production
 ENV WS_PORT=3001
 
-# Copy only compiled output and dependencies
-COPY --from=deps /app/node_modules ./node_modules
+# Copy only compiled output and dependencies (pruned to production in builder)
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist/ws ./dist/ws
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/.next/standalone ./
