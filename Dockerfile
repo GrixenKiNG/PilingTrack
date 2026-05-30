@@ -36,6 +36,31 @@ RUN npx prisma generate --schema prisma/schema.prisma
 RUN npm run build
 
 # ============================================================
+# Stage 2b: Migrate — lean image for `prisma migrate deploy` (+ dev seed)
+# ============================================================
+# The migrate compose service previously used `target: builder`, dragging in
+# the full dev node_modules, the entire source tree AND the Next.js build
+# output (~2.46 GB) just to run `prisma migrate deploy`. This stage keeps only
+# what migrate + the dev seed need: deps' node_modules (carries the prisma CLI
+# devDep), the prisma/ folder, and the generated client. No `npm run build`,
+# no `COPY . .`.
+FROM node:22-alpine AS migrate
+WORKDIR /app
+RUN apk add --no-cache openssl
+ENV DATABASE_PROVIDER=postgres
+# Build-time stub: prisma.config.ts eagerly resolves env('DATABASE_URL_POSTGRES')
+# when `prisma generate` loads it. The real URL is injected at runtime by compose.
+ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
+COPY --from=deps /app/node_modules ./node_modules
+COPY prisma ./prisma
+# prisma.config.ts holds the datasource.url (env-based) + seed command — Prisma 7
+# requires it for `migrate deploy`/`status`; the schema has no inline url.
+COPY package.json tsconfig.json prisma.config.ts ./
+# Generate the client (seed.ts imports it from ../src/generated/postgres-client)
+# and prime the engine binaries used by `migrate deploy`.
+RUN npx prisma generate --schema prisma/schema.prisma
+
+# ============================================================
 # Stage 3: Production runtime (minimal, secure)
 # ============================================================
 FROM node:22-alpine AS runner
