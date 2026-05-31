@@ -68,6 +68,7 @@ db/*.db-journal
 .playwright-mcp/
 .kilo/
 .claude/
+!.claude/settings.json
 .codex/
 .openclaw/
 .bin/
