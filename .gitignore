@@ -69,6 +69,7 @@ db/*.db-journal
 .kilo/
 .claude/
 !.claude/settings.json
+.claude.local.md
 .codex/
 .openclaw/
 .bin/

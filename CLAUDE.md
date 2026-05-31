@@ -151,6 +151,7 @@ You can write unit tests. Flag if you need integration test infrastructure.
 | `console.log` in production services | Use `logger.*` from `src/lib/logger` |
 | Speculative abstractions (strategy pattern for one use case) | Write the simple version first |
 | Bundling schema changes for 5+ models into one Prisma migration | One migration = one logical change. Splits keep PR review tractable as the model count grows. |
+| `IS NULL OR tenantId` in a tenant-scoped query | Fail closed: throw on a missing `tenantId` + use strict equality. A null tenant via `IS NULL OR` returns **every** tenant's rows (IDOR — hit 2026-05-31). Policy: `resource-access-service.ts`. |
 
 ### Performance Considerations
 
@@ -213,7 +214,7 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (11741 symbols, 21229 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (11718 symbols, 21213 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
