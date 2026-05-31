@@ -45,6 +45,7 @@ When editing existing code:
 When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
+- Before deleting code that looks dead or "defensive", prove it's unreachable from its **contract** (types, signatures), not from an assumption about today's callers. A `string | null` parameter can still be null even if the one current caller never passes null — removing the guard can turn a loud failure into a silent one, or open a security hole.
 
 The test: Every changed line should trace directly to the user's request.
 

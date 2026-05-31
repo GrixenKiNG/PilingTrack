@@ -202,6 +202,40 @@ function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
   );
 }
 
+type FleetColumn = { k: SortKey; label: string; right?: boolean };
+
+const FLEET_COLUMNS: FleetColumn[] = [
+  { k: 'name', label: 'Установка' },
+  { k: 'piles', label: 'Сваи', right: true },
+  { k: 'drillingMeters', label: 'Бурение', right: true },
+  { k: 'reportCount', label: 'Отчётов', right: true },
+  { k: 'activeDays', label: 'Утилизация', right: true },
+  { k: 'downtimeMinutes', label: 'Простой', right: true },
+  { k: 'fuelLiters', label: 'Топливо', right: true },
+];
+
+// Module-level (not defined inside FleetTable's render) — the React Compiler
+// flags components created during render (react-hooks/static-components).
+function FleetTh({
+  column, sortKey, sortDir, onSort,
+}: {
+  column: FleetColumn;
+  sortKey: SortKey;
+  sortDir: 'asc' | 'desc';
+  onSort: (k: SortKey) => void;
+}) {
+  const { k, label, right } = column;
+  return (
+    <th className={cn('px-3 py-2', right ? 'text-right' : 'text-left')}>
+      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex items-center gap-1 hover:text-slate-700', sortKey === k && 'text-slate-900')}>
+        {label}
+        <ArrowUpDown className="h-3 w-3 opacity-50" />
+        {sortKey === k && <span className="text-3xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+      </button>
+    </th>
+  );
+}
+
 function FleetTable({
   rows, sortKey, sortDir, onSort, periodDays, onOpen,
 }: {
@@ -215,27 +249,14 @@ function FleetTable({
   if (rows.length === 0) {
     return <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">Нет установок за выбранный период.</p>;
   }
-  const Th = ({ k, label, right }: { k: SortKey; label: string; right?: boolean }) => (
-    <th className={cn('px-3 py-2', right ? 'text-right' : 'text-left')}>
-      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex items-center gap-1 hover:text-slate-700', sortKey === k && 'text-slate-900')}>
-        {label}
-        <ArrowUpDown className="h-3 w-3 opacity-50" />
-        {sortKey === k && <span className="text-3xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
-      </button>
-    </th>
-  );
   return (
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
-            <Th k="name" label="Установка" />
-            <Th k="piles" label="Сваи" right />
-            <Th k="drillingMeters" label="Бурение" right />
-            <Th k="reportCount" label="Отчётов" right />
-            <Th k="activeDays" label="Утилизация" right />
-            <Th k="downtimeMinutes" label="Простой" right />
-            <Th k="fuelLiters" label="Топливо" right />
+            {FLEET_COLUMNS.map((column) => (
+              <FleetTh key={column.k} column={column} sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            ))}
             <th className="px-3 py-2 text-right">ТО</th>
           </tr>
         </thead>

@@ -6,6 +6,7 @@ import { FileText, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
 import { pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -21,7 +22,7 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
+    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, error,
     handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   } = useReportsData();
 
@@ -146,7 +147,13 @@ export function AdminReports() {
       </Button>
 
       {/* Reports List */}
-      {reports.length === 0 ? (
+      {error ? (
+        <QueryErrorBanner
+          title="Не удалось загрузить отчёты"
+          message={error}
+          onRetry={loadReports}
+        />
+      ) : reports.length === 0 ? (
         <div className="text-center py-16">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-sm text-slate-500">Нет отчётов</p>

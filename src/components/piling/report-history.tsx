@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Eye,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
@@ -25,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Separator } from '@/components/ui/separator';
 import type { ReportListItemDTO, ReportDTO } from '@/lib/types';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 
 export function ReportHistory() {
   const user = usePilingStore((s) => s.currentUser);
@@ -32,6 +34,9 @@ export function ReportHistory() {
   const [sites, setSites] = useState<{ id: string; name: string }[]>([]);
   const [filterSiteId, setFilterSiteId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  // Set when loading reports fails, so a server/network error shows a real
+  // error state instead of a silently-empty "Нет отчётов" (incident 2026-05-30).
+  const [error, setError] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<ReportDTO | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
@@ -40,6 +45,7 @@ export function ReportHistory() {
     if (!user) return;
 
     setLoading(true);
+    setError(null);
 
     try {
       const [reportsRes, sitesRes] = await Promise.all([
@@ -50,6 +56,11 @@ export function ReportHistory() {
       if (reportsRes.ok) {
         const data = await reportsRes.json();
         setReports(data.data || data.reports || []);
+      } else {
+        // HTTP error does NOT throw — without this the list would render
+        // empty as if the operator had no reports.
+        setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+        toast.error('Ошибка загрузки отчётов');
       }
 
       if (sitesRes.ok) {
@@ -57,6 +68,7 @@ export function ReportHistory() {
         setSites(data.data || data.sites || []);
       }
     } catch {
+      setError('Не удалось загрузить отчёты. Проверьте соединение.');
       toast.error('Ошибка загрузки отчётов');
     } finally {
       setLoading(false);
@@ -206,7 +218,13 @@ export function ReportHistory() {
         </div>
       )}
 
-      {filteredReports.length === 0 ? (
+      {error ? (
+        <QueryErrorBanner
+          title="Не удалось загрузить отчёты"
+          message={error}
+          onRetry={() => void loadData()}
+        />
+      ) : filteredReports.length === 0 ? (
         <div className="text-center py-16">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-sm text-slate-500">Нет отчётов</p>
