@@ -239,13 +239,13 @@ model MaintenanceRecord {
   engineHoursAtService Int?                          // моточасы на момент работ
   cost        Decimal?          @db.Decimal(14, 2)   // опц., затраты
   performedBy String?                                // кто выполнил (свободный текст)
-  priority    MaintenancePriority @default(NORMAL)
-  assigneeId  String?
-  startedAt   DateTime?         @db.Timestamptz(3)
-  laborHours  Float?
-  faultCause  String?
-  partsUsedText String          @default("")
-  closedById  String?
+  priority    MaintenancePriority @default(NORMAL)   // приоритет наряда
+  assigneeId  String?                                // исполнитель (User.id), без relation — как createdById
+  startedAt   DateTime?         @db.Timestamptz(3)   // начало работ (для MTTR)
+  laborHours  Float?                                 // трудозатраты, ч
+  faultCause  String?                                // причина отказа (свободный текст)
+  partsUsedText String          @default("")          // израсходованные запчасти текстом ("крючок" под склад)
+  closedById  String?                                // кто проверил/закрыл (User.id)
   createdById String?
   createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime          @updatedAt      @db.Timestamptz(3)
