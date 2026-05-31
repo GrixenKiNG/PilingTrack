@@ -4,6 +4,18 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
+## Model Economy (a note for the human, not Claude)
+
+Claude **cannot switch its own model mid-session** — it runs as one model until you change it with `/model`. This table is therefore a reminder for **you, the operator**, on when to switch:
+
+| Task | Pick |
+|------|------|
+| Filtering, formatting, log greps, one-liners | **Haiku** — cheap, fast |
+| Refactor a function, write tests, a small module | **Sonnet** — the everyday default |
+| Architecture, a gnarly bug, multi-step or security-critical work | **Opus** — when getting it right matters more than cost |
+
+Regardless of model, Claude should: keep answers terse on trivial tasks, and delegate large mechanical work (mass greps, bulk edits) to cheap-model subagents.
+
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
@@ -59,6 +71,20 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+### Optional: lay out a plan before level-5 work
+
+For genuinely complex tasks **only** (architecture, security-critical changes, or 3+ files with unclear blast radius), it's worth pausing before touching code to surface:
+
+```
+Understanding: [2-3 sentences]
+Assumptions:   [bullets]
+Plan:          1. [step] → verify: [check]
+               2. [step] → verify: [check]
+Proceed?
+```
+
+For everyday edits, skip the ceremony — just do the work (a one-line plan only if it's multi-step). Don't apply this template to trivial tasks; that wastes tokens, which contradicts Simplicity First.
 
 ---
 
@@ -164,9 +190,12 @@ docker compose exec postgres psql -U piling -d pilingtrack
 cd /opt/pilingtrack
 df -h /                         # if >85%, prune first (see below)
 git pull origin main
-docker compose build app workers  # builds in parallel, old containers keep serving
-docker compose up -d app workers  # atomic swap, old containers stopped after new ones healthy
-# add 'ws' to both lines if ws-server changed (rare)
+docker compose build app          # build SEQUENTIALLY — a parallel `build app workers`
+docker compose build workers      # fills the 30 GB disk to 100% (run `docker builder prune -f`
+                                  # between builds if `df -h /` is tight)
+docker compose up -d app workers  # atomic swap; old containers keep serving until new ones are
+                                  # healthy. Zero-downtime comes from build-before-swap, not parallelism.
+# add 'ws' to the build/up lines if ws-server changed (rare)
 ```
 Old runbook (`stop && rm && rmi → build → up`) created a 3–5 min outage window when the build crashed. Don't use it unless you specifically want to free RAM before the build (heavy on this VPS only).
 
@@ -184,7 +213,7 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (11734 symbols, 21219 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (11741 symbols, 21229 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
