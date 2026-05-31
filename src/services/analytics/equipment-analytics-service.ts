@@ -126,6 +126,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       GROUP BY rep."equipmentId"
     ) dt ON dt."equipmentId" = e.id
     WHERE e."isActive" = true
+      AND (${tenantId}::text IS NULL OR e."tenantId" = ${tenantId})
     ORDER BY e.name ASC
   `;
 

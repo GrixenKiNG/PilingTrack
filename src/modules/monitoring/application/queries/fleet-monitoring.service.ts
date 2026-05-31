@@ -81,6 +81,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
   const equipment = await db.equipment.findMany({
     where: {
       isActive: true,
+      tenantId: opts.tenantId,
       ...(opts.operatorUserId
         ? {
             // Operator sees only what they're assigned to via an active crew.
