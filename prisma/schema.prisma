@@ -239,6 +239,13 @@ model MaintenanceRecord {
   engineHoursAtService Int?                          // моточасы на момент работ
   cost        Decimal?          @db.Decimal(14, 2)   // опц., затраты
   performedBy String?                                // кто выполнил (свободный текст)
+  priority    MaintenancePriority @default(NORMAL)
+  assigneeId  String?
+  startedAt   DateTime?         @db.Timestamptz(3)
+  laborHours  Float?
+  faultCause  String?
+  partsUsedText String          @default("")
+  closedById  String?
   createdById String?
   createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime          @updatedAt      @db.Timestamptz(3)
@@ -249,6 +256,8 @@ model MaintenanceRecord {
   @@index([equipmentId])
   @@index([status])
   @@index([scheduledAt])
+  @@index([assigneeId])
+  @@index([priority])
 }
 
 enum MaintenanceType {
@@ -260,9 +269,18 @@ enum MaintenanceType {
 
 enum MaintenanceStatus {
   PLANNED
+  ASSIGNED
   IN_PROGRESS
+  ON_HOLD
   DONE
   CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
 }
 
 // ============================================================
