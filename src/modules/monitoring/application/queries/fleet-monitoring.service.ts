@@ -72,6 +72,13 @@ export interface FleetSnapshotOptions {
 // --------------------------------------------------------------------------
 
 export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<FleetSnapshot> {
+  // Fail closed on a missing tenant. The type and route already guard this;
+  // this throws loudly rather than letting a falsy tenant silently return an
+  // empty fleet (symmetric with getEquipmentAnalytics).
+  if (!opts.tenantId) {
+    throw new Error('getFleetSnapshot: tenantId is required');
+  }
+
   const now = new Date();
   const today = ymd(now);
   const recentCutoff = ymd(daysAgo(now, RECENT_WINDOW_DAYS));

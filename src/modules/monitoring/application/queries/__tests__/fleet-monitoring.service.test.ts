@@ -46,4 +46,14 @@ describe('getFleetSnapshot — tenant isolation', () => {
     expect(where.tenantId).toBe('orion');
     expect(where.crews).toBeDefined();
   });
+
+  // Defence-in-depth, symmetric with getEquipmentAnalytics: the type says
+  // tenantId is a non-empty string and the route fails closed, but a falsy
+  // tenant ('') would make Prisma match nothing and silently return an empty
+  // fleet. Fail loud at the boundary instead.
+  it('throws on an empty tenantId instead of querying', async () => {
+    await expect(getFleetSnapshot({ tenantId: '' })).rejects.toThrow(/tenantId/i);
+
+    expect(equipmentFindMany).not.toHaveBeenCalled();
+  });
 });
