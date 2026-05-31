@@ -40,6 +40,10 @@ export interface UseReportsDataReturn {
   periodActive: boolean;
   periodSummary: PeriodSummary | null;
   loading: boolean;
+  /** Set when the reports request fails (HTTP error or network). Lets the UI
+   *  show a real error state instead of a silently-empty list — see the
+   *  2026-05-30 incident where a failing query rendered as "no reports". */
+  error: string | null;
   loadingSites: boolean;
   loadingReferenceData: boolean;
   handleApplyPeriod: () => void;
@@ -67,9 +71,13 @@ export function useReportsData(): UseReportsDataReturn {
   const [loading, setLoading] = useState(true);
   const [loadingSites, setLoadingSites] = useState(false);
   const [loadingReferenceData, setLoadingReferenceData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const referenceDataLoadedRef = useRef(false);
   const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
+  // Bumped to force a reports refetch (retry after error, refresh after
+  // create/delete). The load itself lives in the effect below.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -158,6 +166,7 @@ export function useReportsData(): UseReportsDataReturn {
 
     const loadReports = async () => {
       setLoading(true);
+      setError(null);
       try {
         let url: string;
         if (periodActive && periodFrom && periodTo) {
@@ -173,7 +182,8 @@ export function useReportsData(): UseReportsDataReturn {
           url = qs ? `/api/reports/all?${qs}` : '/api/reports/all';
         }
         const res = await authFetch(url, { signal: abortController.signal });
-        if (isMounted && res.ok) {
+        if (!isMounted) return;
+        if (res.ok) {
           const data = await res.json();
           const reportsArray = Array.isArray(data.reports) ? data.reports : [];
           setReports(reportsArray);
@@ -182,9 +192,16 @@ export function useReportsData(): UseReportsDataReturn {
           } else {
             setPeriodSummary(null);
           }
+        } else {
+          // HTTP error (e.g. 500): fetch resolves with res.ok=false and does
+          // NOT throw, so without this branch the list would render empty as
+          // if there were simply no reports. Surface it as a real error.
+          setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+          toast.error('Ошибка загрузки отчётов');
         }
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
+          setError('Не удалось загрузить отчёты. Проверьте соединение.');
           toast.error('Ошибка загрузки отчётов');
         }
       } finally {
@@ -200,12 +217,12 @@ export function useReportsData(): UseReportsDataReturn {
       isMounted = false;
       abortController.abort();
     };
-  }, [filterSiteId, filterUserId, periodActive, periodFrom, periodTo]);
+  }, [filterSiteId, filterUserId, periodActive, periodFrom, periodTo, reloadKey]);
 
+  // Trigger a refetch: used by the error-state "retry" button and to refresh
+  // the list after a report is created or deleted.
   const loadReports = useCallback(async () => {
-    // This is a stub function to maintain the interface
-    // The actual loading is done through the useEffect above
-    // This can be called explicitly if needed from the component
+    setReloadKey((k) => k + 1);
   }, []);
 
   const handleApplyPeriod = () => {
@@ -232,7 +249,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
+    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, error,
     handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   };
 }

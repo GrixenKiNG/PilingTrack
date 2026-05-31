@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Plus, Loader2 } from 'lucide-react';
+import { FileText, Plus, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
@@ -21,7 +21,7 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData,
+    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, error,
     handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
   } = useReportsData();
 
@@ -146,7 +146,16 @@ export function AdminReports() {
       </Button>
 
       {/* Reports List */}
-      {reports.length === 0 ? (
+      {error ? (
+        <div className="text-center py-16">
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <p className="text-sm font-medium text-slate-900">Не удалось загрузить отчёты</p>
+          <p className="text-xs text-slate-500 mt-1">{error}</p>
+          <Button variant="outline" className="mt-4 h-10" onClick={() => loadReports()}>
+            Повторить
+          </Button>
+        </div>
+      ) : reports.length === 0 ? (
         <div className="text-center py-16">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-sm text-slate-500">Нет отчётов</p>
