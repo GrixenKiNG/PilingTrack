@@ -1,0 +1,12 @@
+# Migrations reviewed and known to contain intentional destructive
+# statements (DROP COLUMN / DROP TABLE / TRUNCATE). Checked by
+# scripts/check-migrations.js. One migration directory name per line.
+#
+# Add a line here ONLY after reading the migration.sql and confirming
+# the destructive change is intentional. See check-migrations.js header.
+
+# Contains the historical `DROP COLUMN "journalPhotoMediaId"` (the
+# 2026-05-30 incident). Already applied to prod and compensated by
+# migration 20260529000000_restore_report_journal_photo. Cannot be
+# edited (Prisma checksums applied migrations), so it is allowlisted.
+20260526202204_equipment_maintenance
