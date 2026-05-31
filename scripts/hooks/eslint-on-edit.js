@@ -1,29 +1,25 @@
 #!/usr/bin/env node
 // Runs eslint --fix on a single .ts/.tsx file after Claude edits it.
-// Skips all other file types silently.
-
-const { spawnSync } = require('child_process');
+// Uses the ESLint Node API (no subprocess/npx overhead).
 
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
-process.stdin.on('end', () => {
+process.stdin.on('end', async () => {
   try {
     const { tool_input } = JSON.parse(input);
     const filePath = tool_input?.file_path || '';
 
     if (!/\.(ts|tsx)$/.test(filePath)) return;
 
-    const result = spawnSync(
-      'npx',
-      ['eslint', '--fix', '--max-warnings=0', filePath],
-      { encoding: 'utf8', cwd: process.cwd() },
-    );
+    const { ESLint } = require('eslint');
+    const eslint = new ESLint({ fix: true });
+    const results = await eslint.lintFiles([filePath]);
+    await ESLint.outputFixes(results);
 
-    if (result.status !== 0) {
-      const output = (result.stdout || '') + (result.stderr || '');
-      if (output.trim()) process.stderr.write(`ESLint: ${output.trim()}\n`);
-    }
+    const formatter = await eslint.loadFormatter('stylish');
+    const output = await formatter.format(results);
+    if (output.trim()) process.stderr.write(output + '\n');
   } catch {
-    // Unparseable input → skip silently
+    // ESLint not available or unparseable input → skip silently
   }
 });
