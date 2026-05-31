@@ -67,6 +67,14 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
   const siteId = params.siteId || null;
   const tenantId = params.tenantId || null;
 
+  // Fail closed on a missing tenant (codebase policy — see
+  // resource-access-service.ts). Without this, a nullable tenant filter would
+  // return every tenant's equipment instead of scoping to one. siteId stays
+  // optional below; tenantId is mandatory.
+  if (!tenantId) {
+    throw new Error('getEquipmentAnalytics: tenantId is required');
+  }
+
   const rows = await db.$queryRaw<EquipmentRow[]>`
     WITH rep AS (
       SELECT r.id, r."equipmentId", r.date, r."siteId"
@@ -74,7 +82,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
-        AND (${tenantId}::text IS NULL OR r."tenantId" = ${tenantId})
+        AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
     SELECT
@@ -126,7 +134,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       GROUP BY rep."equipmentId"
     ) dt ON dt."equipmentId" = e.id
     WHERE e."isActive" = true
-      AND (${tenantId}::text IS NULL OR e."tenantId" = ${tenantId})
+      AND e."tenantId" = ${tenantId}
     ORDER BY e.name ASC
   `;
 
@@ -137,7 +145,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
-        AND (${tenantId}::text IS NULL OR r."tenantId" = ${tenantId})
+        AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
     SELECT rd."reasonId" AS "reasonId", dr.name AS "reasonName", SUM(rd.duration)::float AS "minutes"

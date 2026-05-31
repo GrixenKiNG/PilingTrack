@@ -43,4 +43,17 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
     // And the tenant value must actually be bound as a parameter.
     expect(values).toContain('orion');
   });
+
+  // Fail-closed: a missing tenantId must throw, never run an unscoped query.
+  // The codebase policy (resource-access-service.ts) is that multi-tenant
+  // installs fail closed on a missing tenantId. A nullable tenant filter
+  // (`IS NULL OR ...`) would instead return EVERY tenant's equipment — a
+  // cross-tenant leak flagged by security review on 2026-05-31.
+  it('throws when tenantId is missing instead of running an unscoped query', async () => {
+    await expect(
+      getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: null }),
+    ).rejects.toThrow(/tenantId/i);
+
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
 });
