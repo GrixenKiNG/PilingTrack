@@ -9,6 +9,15 @@ function isUniqueConstraintError(message: string) {
   return message.includes('Unique') || message.includes('unique constraint');
 }
 
+export async function listAssignableUsers(tenantId: string) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  return db.user.findMany({
+    where: { tenantId, isActive: true },
+    select: { id: true, name: true, role: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
 export async function listUsers(
   role?: string | null,
   pagination?: CursorPaginationResult

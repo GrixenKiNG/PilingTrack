@@ -6,6 +6,7 @@
  */
 
 export {
+  listAssignableUsers,
   listUsers,
   createUser,
   updateUser,
