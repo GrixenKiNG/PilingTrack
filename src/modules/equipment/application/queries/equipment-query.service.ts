@@ -147,6 +147,29 @@ export async function listMaintenance(equipmentId: string, tenantId: string) {
   });
 }
 
+export interface MaintenanceListFilter {
+  status?: 'PLANNED' | 'ASSIGNED' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE' | 'CANCELLED';
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  assigneeId?: string;
+  type?: 'SCHEDULED' | 'REPAIR' | 'FAULT' | 'INSPECTION';
+}
+
+export async function listAllMaintenance(tenantId: string, filter: MaintenanceListFilter) {
+  if (!tenantId) throw new Error('tenantId is required'); // fail-closed (IDOR guard)
+  return db.maintenanceRecord.findMany({
+    where: {
+      tenantId,
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.priority ? { priority: filter.priority } : {}),
+      ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
+      ...(filter.type ? { type: filter.type } : {}),
+    },
+    include: { equipment: { select: { id: true, name: true, model: true } } },
+    orderBy: [{ priority: 'desc' }, { scheduledAt: 'asc' }, { createdAt: 'desc' }],
+    take: 500,
+  });
+}
+
 export async function listAllEquipment(
   pagination?: CursorPaginationResult,
   siteId?: string | null,
