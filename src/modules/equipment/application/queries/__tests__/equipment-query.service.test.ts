@@ -7,10 +7,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock } = vi.hoisted(() => ({ findManyMock: vi.fn() }));
+const { findManyMock, findManyRecMock } = vi.hoisted(() => ({
+  findManyMock: vi.fn(),
+  findManyRecMock: vi.fn(),
+}));
 
 vi.mock('@/lib/db', () => ({
-  db: { equipment: { findMany: findManyMock } },
+  db: {
+    equipment: { findMany: findManyMock },
+    maintenanceRecord: { findMany: findManyRecMock },
+  },
 }));
 
 import { listAllEquipment } from '../equipment-query.service';
@@ -51,5 +57,39 @@ describe('listAllEquipment — operator scope', () => {
     await listAllEquipment(undefined, 'site_1', null);
     const args = findManyMock.mock.calls[0][0];
     expect(args.where).toEqual({});
+  });
+});
+
+describe('listAllMaintenance', () => {
+  it('scopes by tenantId and applies status filter', async () => {
+    findManyRecMock.mockResolvedValue([{ id: 'rec_1' }]);
+    const { listAllMaintenance } = await import('../equipment-query.service');
+    await listAllMaintenance('orion', { status: 'PLANNED' });
+
+    const arg = findManyRecMock.mock.calls[0][0];
+    expect(arg.where.tenantId).toBe('orion');
+    expect(arg.where.status).toBe('PLANNED');
+  });
+
+  it('throws when tenantId is empty (fail-closed)', async () => {
+    const { listAllMaintenance } = await import('../equipment-query.service');
+    await expect(listAllMaintenance('', {})).rejects.toThrow();
+  });
+
+  it('applies only tenantId when no filters given', async () => {
+    findManyRecMock.mockResolvedValue([]);
+    const { listAllMaintenance } = await import('../equipment-query.service');
+    await listAllMaintenance('orion');
+    const arg = findManyRecMock.mock.calls.at(-1)![0];
+    expect(arg.where).toEqual({ tenantId: 'orion' });
+  });
+
+  it('applies priority and assigneeId filters when given', async () => {
+    findManyRecMock.mockResolvedValue([]);
+    const { listAllMaintenance } = await import('../equipment-query.service');
+    await listAllMaintenance('orion', { priority: 'HIGH', assigneeId: 'usr_3' });
+    const arg = findManyRecMock.mock.calls.at(-1)![0];
+    expect(arg.where.priority).toBe('HIGH');
+    expect(arg.where.assigneeId).toBe('usr_3');
   });
 });

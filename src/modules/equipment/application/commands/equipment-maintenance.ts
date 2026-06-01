@@ -9,18 +9,25 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 
 export type MaintenanceType = 'SCHEDULED' | 'REPAIR' | 'FAULT' | 'INSPECTION';
-export type MaintenanceStatus = 'PLANNED' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+export type MaintenanceStatus = 'PLANNED' | 'ASSIGNED' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE' | 'CANCELLED';
+export type MaintenancePriority = 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
 
 export interface MaintenanceInput {
   type: MaintenanceType;
   status?: MaintenanceStatus;
+  priority?: MaintenancePriority;
   title: string;
   description?: string;
   scheduledAt?: string | Date | null;
   completedAt?: string | Date | null;
+  startedAt?: string | Date | null;
   engineHoursAtService?: number | null;
+  laborHours?: number | null;
   cost?: number | null;
   performedBy?: string | null;
+  assigneeId?: string | null;
+  faultCause?: string | null;
+  partsUsedText?: string | null;
 }
 
 const toDate = (v: string | Date | null | undefined): Date | null => {
@@ -42,6 +49,7 @@ export async function createMaintenance(
 
   const status = input.status ?? 'PLANNED';
   const completedAt = toDate(input.completedAt) ?? (status === 'DONE' ? new Date() : null);
+  const startedAt = toDate(input.startedAt) ?? (status === 'IN_PROGRESS' ? new Date() : null);
 
   return db.maintenanceRecord.create({
     data: {
@@ -57,6 +65,12 @@ export async function createMaintenance(
       cost: input.cost ?? null,
       performedBy: input.performedBy?.trim() || null,
       createdById: ctx.createdById ?? null,
+      priority: input.priority ?? 'NORMAL',
+      assigneeId: input.assigneeId ?? null,
+      startedAt,
+      laborHours: input.laborHours ?? null,
+      faultCause: input.faultCause?.trim() || null,
+      partsUsedText: input.partsUsedText?.trim() ?? '',
     },
   });
 }
@@ -65,11 +79,11 @@ export async function updateMaintenance(
   equipmentId: string,
   recordId: string,
   input: Partial<MaintenanceInput>,
-  ctx: { tenantId: string },
+  ctx: { tenantId: string; userId?: string | null },
 ) {
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, equipmentId: true, completedAt: true, tenantId: true },
+    select: { id: true, equipmentId: true, completedAt: true, startedAt: true, tenantId: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
@@ -84,11 +98,21 @@ export async function updateMaintenance(
   if (input.cost !== undefined) data.cost = input.cost ?? null;
   if (input.performedBy !== undefined) data.performedBy = input.performedBy?.trim() || null;
   if (input.completedAt !== undefined) data.completedAt = toDate(input.completedAt);
+  if (input.priority !== undefined) data.priority = input.priority;
+  if (input.assigneeId !== undefined) data.assigneeId = input.assigneeId ?? null;
+  if (input.laborHours !== undefined) data.laborHours = input.laborHours ?? null;
+  if (input.faultCause !== undefined) data.faultCause = input.faultCause?.trim() || null;
+  if (input.partsUsedText !== undefined) data.partsUsedText = input.partsUsedText?.trim() ?? '';
+  if (input.startedAt !== undefined) data.startedAt = toDate(input.startedAt);
 
   if (input.status !== undefined) {
     data.status = input.status;
-    if (input.status === 'DONE' && input.completedAt === undefined && !existing.completedAt) {
-      data.completedAt = new Date();
+    if (input.status === 'IN_PROGRESS' && !existing.startedAt && input.startedAt === undefined) {
+      data.startedAt = new Date();
+    }
+    if (input.status === 'DONE') {
+      if (input.completedAt === undefined && !existing.completedAt) data.completedAt = new Date();
+      data.closedById = ctx.userId ?? null;
     }
   }
 

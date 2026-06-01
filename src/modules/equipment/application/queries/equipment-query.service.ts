@@ -1,6 +1,11 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
+import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '../commands/equipment-maintenance';
+
+// Safety cap for the cross-fleet work order list. Single-tenant volumes are
+// low today; revisit with cursor pagination if a tenant exceeds this.
+const MAINTENANCE_LIST_LIMIT = 500;
 
 export async function getAccessibleEquipment(tenantId: string) {
   return db.equipment.findMany({ where: { isActive: true, tenantId }, orderBy: { name: 'asc' } });
@@ -144,6 +149,29 @@ export async function listMaintenance(equipmentId: string, tenantId: string) {
   return db.maintenanceRecord.findMany({
     where: { equipmentId, tenantId },
     orderBy: [{ status: 'asc' }, { scheduledAt: 'desc' }, { createdAt: 'desc' }],
+  });
+}
+
+export interface MaintenanceListFilter {
+  status?: MaintenanceStatus;
+  priority?: MaintenancePriority;
+  assigneeId?: string;
+  type?: MaintenanceType;
+}
+
+export async function listAllMaintenance(tenantId: string, filter: MaintenanceListFilter = {}) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  return db.maintenanceRecord.findMany({
+    where: {
+      tenantId,
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.priority ? { priority: filter.priority } : {}),
+      ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
+      ...(filter.type ? { type: filter.type } : {}),
+    },
+    include: { equipment: { select: { id: true, name: true, model: true } } },
+    orderBy: [{ priority: 'desc' }, { scheduledAt: 'asc' }, { createdAt: 'desc' }],
+    take: MAINTENANCE_LIST_LIMIT,
   });
 }
 

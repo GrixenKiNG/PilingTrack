@@ -10,5 +10,6 @@ export type { EquipmentDocumentInput, EquipmentDocumentType } from './applicatio
 export { createMaintenance, updateMaintenance, deleteMaintenance } from './application/commands/equipment-maintenance';
 export type { MaintenanceInput, MaintenanceType, MaintenanceStatus } from './application/commands/equipment-maintenance';
 export type { CreateEquipmentCommand, UpdateEquipmentCommand } from './application/commands/equipment.command';
-export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, listAllEquipment, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance } from './application/queries/equipment-query.service';
+export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, listAllEquipment, listAllMaintenance, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance } from './application/queries/equipment-query.service';
+export type { MaintenanceListFilter } from './application/queries/equipment-query.service';
 export { getEquipmentRepository } from './infrastructure/equipment.repository';
