@@ -9,7 +9,8 @@ import { ServiceError } from '@/services/service-error';
 export const runtime = 'nodejs';
 
 const typeEnum = z.enum(['SCHEDULED', 'REPAIR', 'FAULT', 'INSPECTION']);
-const statusEnum = z.enum(['PLANNED', 'IN_PROGRESS', 'DONE', 'CANCELLED']);
+const statusEnum = z.enum(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'DONE', 'CANCELLED']);
+const priorityEnum = z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']);
 
 const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 
@@ -23,6 +24,12 @@ const createSchema = z.object({
   engineHoursAtService: z.preprocess(emptyToUndef, z.coerce.number().int().min(0)).optional().nullable(),
   cost: z.preprocess(emptyToUndef, z.coerce.number().min(0)).optional().nullable(),
   performedBy: z.string().max(200).optional().nullable(),
+  priority: priorityEnum.optional(),
+  startedAt: z.preprocess(emptyToUndef, z.coerce.date()).optional().nullable(),
+  laborHours: z.preprocess(emptyToUndef, z.coerce.number().min(0)).optional().nullable(),
+  assigneeId: z.string().optional().nullable(),
+  faultCause: z.string().max(2000).optional().nullable(),
+  partsUsedText: z.string().max(2000).optional().nullable(),
 });
 
 export const GET = withApi(
