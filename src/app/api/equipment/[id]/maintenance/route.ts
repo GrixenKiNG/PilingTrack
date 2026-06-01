@@ -36,6 +36,7 @@ export const GET = withApi(
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    assertCan(user!, 'maintenance.manage');
 
     const { id } = await params;
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
