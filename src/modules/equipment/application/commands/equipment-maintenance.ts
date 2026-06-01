@@ -49,6 +49,7 @@ export async function createMaintenance(
 
   const status = input.status ?? 'PLANNED';
   const completedAt = toDate(input.completedAt) ?? (status === 'DONE' ? new Date() : null);
+  const startedAt = toDate(input.startedAt) ?? (status === 'IN_PROGRESS' ? new Date() : null);
 
   return db.maintenanceRecord.create({
     data: {
@@ -66,7 +67,7 @@ export async function createMaintenance(
       createdById: ctx.createdById ?? null,
       priority: input.priority ?? 'NORMAL',
       assigneeId: input.assigneeId ?? null,
-      startedAt: toDate(input.startedAt),
+      startedAt,
       laborHours: input.laborHours ?? null,
       faultCause: input.faultCause?.trim() || null,
       partsUsedText: input.partsUsedText?.trim() ?? '',
@@ -106,7 +107,7 @@ export async function updateMaintenance(
 
   if (input.status !== undefined) {
     data.status = input.status;
-    if (input.status === 'IN_PROGRESS' && !existing.startedAt) {
+    if (input.status === 'IN_PROGRESS' && !existing.startedAt && input.startedAt === undefined) {
       data.startedAt = new Date();
     }
     if (input.status === 'DONE') {

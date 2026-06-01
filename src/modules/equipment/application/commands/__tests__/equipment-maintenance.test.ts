@@ -53,6 +53,18 @@ describe('createMaintenance — work order fields', () => {
       createMaintenance('missing', { type: 'FAULT', title: 'x' }, { tenantId: 'orion' }),
     ).rejects.toThrow('Equipment not found');
   });
+
+  it('coerces null partsUsedText to empty string', async () => {
+    await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', partsUsedText: null }, { tenantId: 'orion' });
+    const data = createRecMock.mock.calls[0][0].data;
+    expect(data.partsUsedText).toBe('');
+  });
+
+  it('auto-stamps startedAt when created directly as IN_PROGRESS', async () => {
+    await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', status: 'IN_PROGRESS' }, { tenantId: 'orion' });
+    const data = createRecMock.mock.calls[0][0].data;
+    expect(data.startedAt).toBeInstanceOf(Date);
+  });
 });
 
 describe('updateMaintenance — lifecycle transitions', () => {
@@ -82,5 +94,12 @@ describe('updateMaintenance — lifecycle transitions', () => {
     await expect(
       updateMaintenance('eq_1', 'rec_1', { status: 'DONE' }, { tenantId: 'orion', userId: 'usr_9' }),
     ).rejects.toThrow('Maintenance record not found');
+  });
+
+  it('does not overwrite startedAt when already started', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', completedAt: null, startedAt: new Date('2026-01-01T00:00:00Z'), tenantId: 'orion' });
+    await updateMaintenance('eq_1', 'rec_1', { status: 'IN_PROGRESS' }, { tenantId: 'orion', userId: 'usr_9' });
+    const data = updateRecMock.mock.calls[0][0].data;
+    expect(data.startedAt).toBeUndefined();
   });
 });
