@@ -75,4 +75,21 @@ describe('listAllMaintenance', () => {
     const { listAllMaintenance } = await import('../equipment-query.service');
     await expect(listAllMaintenance('', {})).rejects.toThrow();
   });
+
+  it('applies only tenantId when no filters given', async () => {
+    findManyRecMock.mockResolvedValue([]);
+    const { listAllMaintenance } = await import('../equipment-query.service');
+    await listAllMaintenance('orion');
+    const arg = findManyRecMock.mock.calls.at(-1)![0];
+    expect(arg.where).toEqual({ tenantId: 'orion' });
+  });
+
+  it('applies priority and assigneeId filters when given', async () => {
+    findManyRecMock.mockResolvedValue([]);
+    const { listAllMaintenance } = await import('../equipment-query.service');
+    await listAllMaintenance('orion', { priority: 'HIGH', assigneeId: 'usr_3' });
+    const arg = findManyRecMock.mock.calls.at(-1)![0];
+    expect(arg.where.priority).toBe('HIGH');
+    expect(arg.where.assigneeId).toBe('usr_3');
+  });
 });
