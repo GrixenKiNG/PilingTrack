@@ -159,6 +159,18 @@ export interface MaintenanceListFilter {
   type?: MaintenanceType;
 }
 
+export async function getMaintenanceById(id: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  const record = await db.maintenanceRecord.findUnique({
+    where: { id },
+    include: { equipment: { select: { id: true, name: true, model: true } } },
+  });
+  if (!record || record.tenantId !== tenantId) {
+    throw new ServiceError('Maintenance record not found', 404);
+  }
+  return record;
+}
+
 export async function listAllMaintenance(tenantId: string, filter: MaintenanceListFilter = {}) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
   return db.maintenanceRecord.findMany({

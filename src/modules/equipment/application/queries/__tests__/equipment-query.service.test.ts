@@ -7,15 +7,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock, findManyRecMock } = vi.hoisted(() => ({
+const { findManyMock, findManyRecMock, findUniqueRecMock } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   findManyRecMock: vi.fn(),
+  findUniqueRecMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     equipment: { findMany: findManyMock },
-    maintenanceRecord: { findMany: findManyRecMock },
+    maintenanceRecord: { findMany: findManyRecMock, findUnique: findUniqueRecMock },
   },
 }));
 
@@ -91,5 +92,28 @@ describe('listAllMaintenance', () => {
     const arg = findManyRecMock.mock.calls.at(-1)![0];
     expect(arg.where.priority).toBe('HIGH');
     expect(arg.where.assigneeId).toBe('usr_3');
+  });
+});
+
+describe('getMaintenanceById', () => {
+  it('returns the record when tenant matches', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', equipmentId: 'eq_1' });
+    const { getMaintenanceById } = await import('../equipment-query.service');
+    const rec = await getMaintenanceById('rec_1', 'orion');
+    expect(rec.id).toBe('rec_1');
+  });
+  it('throws 404 for cross-tenant record', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'other', equipmentId: 'eq_1' });
+    const { getMaintenanceById } = await import('../equipment-query.service');
+    await expect(getMaintenanceById('rec_1', 'orion')).rejects.toThrow('Maintenance record not found');
+  });
+  it('throws when tenantId empty (fail-closed)', async () => {
+    const { getMaintenanceById } = await import('../equipment-query.service');
+    await expect(getMaintenanceById('rec_1', '')).rejects.toThrow();
+  });
+  it('throws 404 when not found', async () => {
+    findUniqueRecMock.mockResolvedValue(null);
+    const { getMaintenanceById } = await import('../equipment-query.service');
+    await expect(getMaintenanceById('missing', 'orion')).rejects.toThrow('Maintenance record not found');
   });
 });
