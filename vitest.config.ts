@@ -32,6 +32,11 @@ export default defineConfig({
         '**/*.d.ts',
         '**/*.config.{ts,js}',
         'src/components/ui/**', // shadcn primitives — не требуют unit-тестов
+        // Dormant MQTT ingestion (activates only with telemetry hardware) trips a
+        // rolldown PARSE_ERROR in the v8 coverage remapper on the uncovered file,
+        // which aborts the whole report. It's 0% either way; excluding it keeps
+        // `npm run test:coverage` runnable.
+        'src/services/telemetry/mqtt-ingestion-service.ts',
       ],
       // Floor, not target. Current is ~23% lines / 20% branches; thresholds
       // are set just below so PRs can't silently regress. Ratchet up as

@@ -175,6 +175,10 @@ describe('contract — POST /api/auth/logout', () => {
 // ============================================================
 
 describe('contract — auth wrapper application', () => {
+  // Cold dynamic import of auth routes pulls in jose + bcrypt + db + wrappers;
+  // on a cold run that can exceed vitest's default 5s. Give these import-heavy
+  // contract tests a generous timeout so they don't flake (was: intermittent
+  // "Test timed out in 5000ms").
   it('every auth route module exports its expected HTTP verb function', async () => {
     // Smoke check: if a route module forgets to export GET/POST/DELETE,
     // Next.js silently 405s in production. This test catches that drift.
@@ -186,7 +190,7 @@ describe('contract — auth wrapper application', () => {
     expect(typeof refreshModule.POST).toBe('function');
     expect(typeof refreshModule.DELETE).toBe('function');
     expect(typeof logoutModule.POST).toBe('function');
-  });
+  }, 30000);
 
   it('all auth route modules declare the nodejs runtime (jose + bcrypt need it)', async () => {
     const meModule = await import('@/app/api/auth/me/route');
@@ -196,5 +200,5 @@ describe('contract — auth wrapper application', () => {
     expect((meModule as any).runtime).toBe('nodejs');
     expect((refreshModule as any).runtime).toBe('nodejs');
     expect((logoutModule as any).runtime).toBe('nodejs');
-  });
+  }, 30000);
 });
