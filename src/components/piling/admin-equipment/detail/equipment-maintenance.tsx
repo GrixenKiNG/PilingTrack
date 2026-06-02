@@ -3,55 +3,31 @@
 /**
  * EquipmentMaintenance — журнал ТО и ремонтов установки.
  *
- * Self-fetch из GET /api/equipment/:id/maintenance. Создание/правка/смена
- * статуса/удаление через тот же эндпоинт (write требует maintenance.manage —
- * кнопки показываются всем, неавторизованный получит 403, как у документов).
+ * Self-fetch из GET /api/equipment/:id/maintenance. Создание/правка идут через
+ * общий WorkOrderFormDialog; смена статуса/удаление — через тот же эндпоинт
+ * (write требует maintenance.manage — кнопки показываются всем, неавторизованный
+ * получит 403, как у документов). Лейблы/статусы/типы — из shared maintenance-labels.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Pencil, Trash2, Plus, Wrench, Loader2, CheckCircle2, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-
-type MaintenanceType = 'SCHEDULED' | 'REPAIR' | 'FAULT' | 'INSPECTION';
-type MaintenanceStatus = 'PLANNED' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
-
-const TYPE_LABEL: Record<MaintenanceType, string> = {
-  SCHEDULED: 'Плановое ТО',
-  REPAIR: 'Ремонт',
-  FAULT: 'Неисправность',
-  INSPECTION: 'Осмотр',
-};
-
-const STATUS_LABEL: Record<MaintenanceStatus, string> = {
-  PLANNED: 'Запланировано',
-  IN_PROGRESS: 'В работе',
-  DONE: 'Выполнено',
-  CANCELLED: 'Отменено',
-};
-
-const STATUS_STYLE: Record<MaintenanceStatus, string> = {
-  PLANNED: 'bg-slate-100 text-slate-600',
-  IN_PROGRESS: 'bg-amber-100 text-amber-700',
-  DONE: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-slate-100 text-slate-400 line-through',
-};
+import {
+  TYPE_LABEL, STATUS_LABEL, STATUS_STYLE, PRIORITY_LABEL, PRIORITY_STYLE,
+  type MaintenanceType, type MaintenanceStatus, type MaintenancePriority,
+} from '@/components/piling/maintenance/maintenance-labels';
+import { resolveAssigneeName } from '@/components/piling/maintenance/maintenance-helpers';
+import { WorkOrderFormDialog } from '@/components/piling/maintenance/work-order-form-dialog';
 
 interface MaintenanceRow {
   id: string;
   type: string;
   status: string;
+  priority: MaintenancePriority;
   title: string;
   description: string;
   scheduledAt: string | null;
@@ -59,41 +35,17 @@ interface MaintenanceRow {
   engineHoursAtService: number | null;
   cost: string | number | null;
   performedBy: string | null;
+  assigneeId: string | null;
 }
 
-interface FormState {
-  type: MaintenanceType;
-  status: MaintenanceStatus;
-  title: string;
-  description: string;
-  scheduledAt: string;
-  completedAt: string;
-  engineHoursAtService: string;
-  cost: string;
-  performedBy: string;
-}
-
-const EMPTY_FORM: FormState = {
-  type: 'SCHEDULED',
-  status: 'PLANNED',
-  title: '',
-  description: '',
-  scheduledAt: '',
-  completedAt: '',
-  engineHoursAtService: '',
-  cost: '',
-  performedBy: '',
-};
-
-const toInputDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '');
+interface AssigneeOption { id: string; name: string }
 
 export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   const [records, setRecords] = useState<MaintenanceRow[]>([]);
+  const [names, setNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<MaintenanceRow | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [busy, setBusy] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -112,66 +64,24 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    void (async () => {
+      const res = await authFetch('/api/maintenance/assignees');
+      if (res.ok) {
+        const users = ((await res.json()).users ?? []) as AssigneeOption[];
+        setNames(new Map(users.map((u) => [u.id, u.name])));
+      }
+    })();
+  }, []);
+
   const openCreate = () => {
-    setEditing(null);
-    setForm(EMPTY_FORM);
+    setEditingId(null);
     setDialogOpen(true);
   };
 
   const openEdit = (r: MaintenanceRow) => {
-    setEditing(r);
-    setForm({
-      type: (r.type as MaintenanceType) || 'SCHEDULED',
-      status: (r.status as MaintenanceStatus) || 'PLANNED',
-      title: r.title,
-      description: r.description,
-      scheduledAt: toInputDate(r.scheduledAt),
-      completedAt: toInputDate(r.completedAt),
-      engineHoursAtService: r.engineHoursAtService != null ? String(r.engineHoursAtService) : '',
-      cost: r.cost != null ? String(r.cost) : '',
-      performedBy: r.performedBy ?? '',
-    });
+    setEditingId(r.id);
     setDialogOpen(true);
-  };
-
-  const submit = async () => {
-    if (!form.title.trim()) {
-      toast.error('Заполните название работы');
-      return;
-    }
-    setBusy(true);
-    try {
-      const payload = {
-        type: form.type,
-        status: form.status,
-        title: form.title.trim(),
-        description: form.description.trim(),
-        scheduledAt: form.scheduledAt || null,
-        completedAt: form.completedAt || null,
-        engineHoursAtService: form.engineHoursAtService || null,
-        cost: form.cost || null,
-        performedBy: form.performedBy.trim() || null,
-      };
-      const url = editing
-        ? `/api/equipment/${equipmentId}/maintenance/${editing.id}`
-        : `/api/equipment/${equipmentId}/maintenance`;
-      const res = await authFetch(url, {
-        method: editing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка сохранения');
-      }
-      toast.success(editing ? 'Запись обновлена' : 'Запись добавлена');
-      setDialogOpen(false);
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
-    } finally {
-      setBusy(false);
-    }
   };
 
   const patchStatus = async (r: MaintenanceRow, status: MaintenanceStatus) => {
@@ -226,23 +136,27 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
         <ul className="space-y-2">
           {records.map((r) => {
             const st = (r.status as MaintenanceStatus) ?? 'PLANNED';
+            const pr = (r.priority as MaintenancePriority) ?? 'NORMAL';
             return (
               <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', PRIORITY_STYLE[pr])} title={PRIORITY_LABEL[pr]} />
                     <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-medium truncate">{r.title}</span>
+                    <Link href={`/admin/maintenance/${r.id}`} className="font-medium truncate hover:text-orange-600 hover:underline">
+                      {r.title}
+                    </Link>
                     <span className={cn('rounded px-1.5 py-0.5 text-2xs font-medium', STATUS_STYLE[st])}>
                       {STATUS_LABEL[st]}
                     </span>
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
                     <span className="font-medium text-slate-600">{TYPE_LABEL[r.type as MaintenanceType] ?? r.type}</span>
+                    <span>исполнитель: {r.assigneeId ? resolveAssigneeName(r.assigneeId, names) : (r.performedBy || '—')}</span>
                     {r.scheduledAt && <span>план {formatRuDate(r.scheduledAt.slice(0, 10))}</span>}
                     {r.completedAt && <span>факт {formatRuDate(r.completedAt.slice(0, 10))}</span>}
                     {r.engineHoursAtService != null && <span>{r.engineHoursAtService} м/ч</span>}
                     {r.cost != null && <span>{formatCost(r.cost)}</span>}
-                    {r.performedBy && <span>исполнитель: {r.performedBy}</span>}
                   </div>
                   {r.description && <p className="mt-0.5 text-xs text-slate-400">{r.description}</p>}
                 </div>
@@ -274,94 +188,13 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
         </ul>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Редактировать запись' : 'Новая запись ТО / ремонта'}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="m-type">Тип</Label>
-                <Select value={form.type} onValueChange={(v) => setForm((p) => ({ ...p, type: v as MaintenanceType }))}>
-                  <SelectTrigger id="m-type"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(TYPE_LABEL) as MaintenanceType[]).map((k) => (
-                      <SelectItem key={k} value={k}>{TYPE_LABEL[k]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="m-status">Статус</Label>
-                <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v as MaintenanceStatus }))}>
-                  <SelectTrigger id="m-status"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(STATUS_LABEL) as MaintenanceStatus[]).map((k) => (
-                      <SelectItem key={k} value={k}>{STATUS_LABEL[k]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="m-title">Название *</Label>
-              <Input id="m-title" value={form.title}
-                onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                placeholder="Напр. Замена масла ГСМ, ТО-2" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="m-scheduled">Плановая дата</Label>
-                <Input id="m-scheduled" type="date" value={form.scheduledAt}
-                  onChange={(e) => setForm((p) => ({ ...p, scheduledAt: e.target.value }))} />
-              </div>
-              <div>
-                <Label htmlFor="m-completed">Дата выполнения</Label>
-                <Input id="m-completed" type="date" value={form.completedAt}
-                  onChange={(e) => setForm((p) => ({ ...p, completedAt: e.target.value }))} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="m-hours">Моточасы</Label>
-                <Input id="m-hours" type="number" min={0} value={form.engineHoursAtService}
-                  onChange={(e) => setForm((p) => ({ ...p, engineHoursAtService: e.target.value }))} />
-              </div>
-              <div>
-                <Label htmlFor="m-cost">Стоимость, ₽</Label>
-                <Input id="m-cost" type="number" min={0} value={form.cost}
-                  onChange={(e) => setForm((p) => ({ ...p, cost: e.target.value }))} />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="m-by">Исполнитель</Label>
-              <Input id="m-by" value={form.performedBy}
-                onChange={(e) => setForm((p) => ({ ...p, performedBy: e.target.value }))}
-                placeholder="ФИО или подрядчик" />
-            </div>
-
-            <div>
-              <Label htmlFor="m-desc">Описание</Label>
-              <Textarea id="m-desc" rows={3} value={form.description}
-                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Отмена</Button>
-            <Button onClick={submit} disabled={busy} className="bg-orange-500 hover:bg-orange-600 text-white">
-              {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-              {editing ? 'Сохранить' : 'Добавить'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkOrderFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        equipmentId={equipmentId}
+        editingId={editingId}
+        onSaved={load}
+      />
     </div>
   );
 }
