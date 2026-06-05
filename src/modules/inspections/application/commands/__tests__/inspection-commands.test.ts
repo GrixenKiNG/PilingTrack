@@ -12,7 +12,7 @@ vi.mock('@/lib/db', () => ({
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
   },
 }));
-import { startInspection, completeInspection } from '../inspection-commands';
+import { startInspection, saveAnswers, completeInspection } from '../inspection-commands';
 
 beforeEach(() => Object.values(m).forEach((fn) => fn.mockReset()));
 
@@ -34,6 +34,30 @@ describe('startInspection', () => {
     m.eqFindUnique.mockResolvedValue(null);
     await expect(startInspection({ equipmentId: 'x', templateId: 't1', inspectionDate: '2026-06-03' },
       { tenantId: 'orion', userId: 'u1' })).rejects.toThrow('Equipment not found');
+  });
+});
+
+describe('saveAnswers', () => {
+  it('throws 404 when inspection cross-tenant; does not write', async () => {
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'other', status: 'DRAFT' });
+    await expect(saveAnswers('ins1', [{ itemId: 'i1', result: 'YES' }], { tenantId: 'orion' }))
+      .rejects.toThrow('Inspection not found');
+    expect(m.ansCreateMany).not.toHaveBeenCalled();
+  });
+  it('throws 409 when inspection already completed; does not write', async () => {
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'COMPLETED' });
+    await expect(saveAnswers('ins1', [{ itemId: 'i1', result: 'YES' }], { tenantId: 'orion' }))
+      .rejects.toThrow(/already completed/i);
+    expect(m.ansCreateMany).not.toHaveBeenCalled();
+  });
+  it('replaces answers and stamps tenantId + inspectionId on each', async () => {
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT' });
+    m.ansDeleteMany.mockResolvedValue({ count: 0 });
+    m.ansCreateMany.mockResolvedValue({ count: 1 });
+    await saveAnswers('ins1', [{ itemId: 'i1', result: 'OK', note: 'ok', photoCount: 2 }], { tenantId: 'orion' });
+    expect(m.ansDeleteMany.mock.calls[0][0]).toEqual({ where: { inspectionId: 'ins1' } });
+    const rows = m.ansCreateMany.mock.calls[0][0].data;
+    expect(rows[0]).toMatchObject({ tenantId: 'orion', inspectionId: 'ins1', itemId: 'i1', result: 'OK', photoCount: 2 });
   });
 });
 
