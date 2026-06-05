@@ -169,6 +169,7 @@ model Equipment {
   telematicsAssignments   TelematicsDeviceAssignment[]
   documents               EquipmentDocument[]
   maintenanceRecords      MaintenanceRecord[]
+  inspections             Inspection[]
 
   @@index([tenantId])
   @@index([isActive])
@@ -281,6 +282,114 @@ enum MaintenancePriority {
   NORMAL
   HIGH
   CRITICAL
+}
+
+// ============================================================
+// INSPECTIONS — Checklist engine (ЕО/ТО)
+// ============================================================
+
+enum ChecklistLevel {
+  EO
+  TO1
+  TO2
+  TO3
+  SEASONAL
+}
+
+enum AnswerType {
+  YES_NO
+  STATUS4
+  DONE
+  MEASURE
+}
+
+enum InspectionStatus {
+  DRAFT
+  COMPLETED
+}
+
+model ChecklistTemplate {
+  id             String   @id @default(cuid())
+  tenantId       String
+  name           String
+  level          ChecklistLevel
+  appliesToModel String?
+  isActive       Boolean  @default(true)
+  createdById    String?
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt      @db.Timestamptz(3)
+  sections       ChecklistSection[]
+  inspections    Inspection[]
+  @@index([tenantId])
+  @@index([tenantId, level])
+}
+
+model ChecklistSection {
+  id         String @id @default(cuid())
+  tenantId   String
+  templateId String
+  title      String
+  order      Int
+  items      ChecklistItem[]
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
+  @@index([templateId])
+}
+
+model ChecklistItem {
+  id            String     @id @default(cuid())
+  tenantId      String
+  sectionId     String
+  text          String
+  answerType    AnswerType @default(YES_NO)
+  unit          String?
+  norm          String?
+  provenance    String?
+  photoRequired Boolean    @default(false)
+  required      Boolean    @default(true)
+  order         Int
+  section       ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
+  @@index([sectionId])
+}
+
+model Inspection {
+  id               String   @id @default(cuid())
+  tenantId         String
+  equipmentId      String
+  templateId       String
+  level            ChecklistLevel
+  performedById    String
+  shift            String?
+  inspectionDate   DateTime @db.Timestamptz(3)
+  engineHours      Int?
+  healthScore      Int?
+  status           InspectionStatus @default(DRAFT)
+  templateSnapshot Json
+  signedByName     String?
+  signedAt         DateTime? @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt      @db.Timestamptz(3)
+  answers          InspectionAnswer[]
+  equipment        Equipment        @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  template         ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  @@index([tenantId, equipmentId])
+  @@index([tenantId, status])
+}
+
+model InspectionAnswer {
+  id           String @id @default(cuid())
+  tenantId     String
+  inspectionId String
+  itemId       String
+  result       String
+  value        String?
+  note         String?
+  photoCount   Int    @default(0)
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
+  @@index([inspectionId])
 }
 
 // ============================================================
