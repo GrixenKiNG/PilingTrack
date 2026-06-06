@@ -20,6 +20,22 @@ export async function listInspections(
   });
 }
 
+/**
+ * Unified ТО journal for one machine: every maintenance record (ЕО/ТО/ремонт/
+ * неисправность) with the linked inspection's summary (health score, status).
+ */
+export async function listToJournal(tenantId: string, equipmentId: string) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  return db.maintenanceRecord.findMany({
+    where: { tenantId, equipmentId },
+    include: {
+      inspection: { select: { id: true, healthScore: true, status: true, level: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+}
+
 export async function getInspection(id: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({
