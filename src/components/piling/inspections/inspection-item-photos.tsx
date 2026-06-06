@@ -47,6 +47,14 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  // Keep the latest onCountChange in a ref so `refresh` does not depend on it.
+  // The parent passes an inline callback; depending on it would re-create
+  // `refresh` every render and re-fire the fetch effect in a loop.
+  const onCountChangeRef = useRef(onCountChange);
+  useEffect(() => {
+    onCountChangeRef.current = onCountChange;
+  });
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -55,7 +63,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       );
       if (!res.ok) {
         setPhotos([]);
-        onCountChange?.(0);
+        onCountChangeRef.current?.(0);
         return;
       }
       const json = await res.json();
@@ -69,11 +77,11 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
         })
       );
       setPhotos(tiles);
-      onCountChange?.(tiles.length);
+      onCountChangeRef.current?.(tiles.length);
     } finally {
       setLoading(false);
     }
-  }, [entityId, onCountChange]);
+  }, [entityId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
