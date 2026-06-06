@@ -54,6 +54,8 @@ export interface EquipmentFormState {
   hammerType: string;
   hammerSerialNumber: string;
   hammerEnergyKj: string;
+  hammerKind: HammerKindDTO;   // подбор блока МОЛОТ чек-листа
+  isCombined: boolean;         // есть вращатель → подбор блока ВРАЩАТЕЛЬ
   // C
   purchaseDate: string;        // YYYY-MM-DD
   purchasePrice: string;
@@ -72,6 +74,7 @@ export const EMPTY_EQUIPMENT_FORM: EquipmentFormState = {
   engineBrand: '', engineSerialNumber: '', enginePower: '',
   maxPileLength: '', maxDrillingDepth: '',
   hammerType: '', hammerSerialNumber: '', hammerEnergyKj: '',
+  hammerKind: 'NONE', isCombined: false,
   purchaseDate: '', purchasePrice: '',
   engineHoursTotal: '', nextMaintenanceAtHours: '', nextMaintenanceDate: '',
   homeBaseLocation: '',
@@ -83,6 +86,13 @@ const KIND_LABELS: Record<EquipmentKindDTO, string> = {
   VIBRO_HAMMER: 'Вибропогружатель',
   HYBRID: 'Гибрид (забивка + бурение)',
   OTHER: 'Другое',
+};
+
+type HammerKindDTO = 'HYDRAULIC' | 'DIESEL' | 'NONE';
+const HAMMER_KIND_LABELS: Record<HammerKindDTO, string> = {
+  HYDRAULIC: 'Гидравлический',
+  DIESEL: 'Дизельный',
+  NONE: 'Нет молота',
 };
 
 interface Props {
@@ -186,6 +196,27 @@ export function EquipmentForm({ state, onChange, compact = false }: Props) {
           <NumberField label="Макс. длина сваи (м)" value={state.maxPileLength} onChange={(v) => onChange({ maxPileLength: v })} step="0.1" />
           <NumberField label="Макс. глубина бурения (м)" value={state.maxDrillingDepth} onChange={(v) => onChange({ maxDrillingDepth: v })} step="0.1" />
           <SectionTitle>Молот</SectionTitle>
+          <Field label="Вид молота (для чек-листа)">
+            <Select value={state.hammerKind} onValueChange={(v) => onChange({ hammerKind: v as HammerKindDTO })}>
+              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(HAMMER_KIND_LABELS) as HammerKindDTO[]).map((k) => (
+                  <SelectItem key={k} value={k}>{HAMMER_KIND_LABELS[k]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Комбинированная (есть вращатель)">
+            <label className="flex h-11 cursor-pointer items-center gap-2 text-sm select-none">
+              <input
+                type="checkbox"
+                checked={state.isCombined}
+                onChange={(e) => onChange({ isCombined: e.target.checked })}
+                className="h-4 w-4 rounded"
+              />
+              Да, добавлять блок вращателя
+            </label>
+          </Field>
           <Field label="Тип молота">
             <Input value={state.hammerType} onChange={(e) => onChange({ hammerType: e.target.value })} placeholder='напр. "Junttan HHK-5/7"' className="h-11" />
           </Field>
@@ -308,6 +339,8 @@ export function formStateToPayload(state: EquipmentFormState): Record<string, un
     hammerType: str(state.hammerType),
     hammerSerialNumber: str(state.hammerSerialNumber),
     hammerEnergyKj: num(state.hammerEnergyKj),
+    hammerKind: state.hammerKind,
+    isCombined: state.isCombined,
     // C
     purchaseDate: str(state.purchaseDate),
     purchasePrice: num(state.purchasePrice),
@@ -356,6 +389,8 @@ export function equipmentToFormState(item: Record<string, unknown> | null): Equi
     hammerType: s('hammerType'),
     hammerSerialNumber: s('hammerSerialNumber'),
     hammerEnergyKj: s('hammerEnergyKj'),
+    hammerKind: (item.hammerKind as HammerKindDTO) || 'NONE',
+    isCombined: item.isCombined === true,
     purchaseDate: dateOnly('purchaseDate'),
     purchasePrice: s('purchasePrice'),
     engineHoursTotal: s('engineHoursTotal'),

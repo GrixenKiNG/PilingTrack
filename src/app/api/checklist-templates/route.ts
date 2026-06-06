@@ -9,6 +9,8 @@ import { ServiceError } from '@/services/service-error';
 export const runtime = 'nodejs';
 
 const levelEnum = z.enum(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL']);
+const blockEnum = z.enum(['BASE', 'HAMMER', 'ROTARY']);
+const hammerEnum = z.enum(['HYDRAULIC', 'DIESEL', 'NONE']);
 const answerEnum = z.enum(['YES_NO', 'STATUS4', 'DONE', 'MEASURE']);
 const itemSchema = z.object({
   text: z.string().trim().min(1).max(500),
@@ -28,7 +30,9 @@ const sectionSchema = z.object({
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
   level: levelEnum,
+  blockType: blockEnum.default('BASE'),
   appliesToModel: z.string().max(120).optional().nullable(),
+  appliesToHammerKind: hammerEnum.optional().nullable(),
   sections: z.array(sectionSchema),
 });
 

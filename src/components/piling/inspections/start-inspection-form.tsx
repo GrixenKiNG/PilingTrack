@@ -1,16 +1,18 @@
 'use client';
 
 /**
- * StartInspectionForm — форма запуска нового осмотра (/inspections/new).
+ * StartInspectionForm — запуск ЕО/ТО (/inspections/new).
  *
- * Загружает список техники и шаблонов, формирует заявку на создание осмотра
- * (POST /api/inspections), затем переходит на страницу заполнения.
+ * Пользователь выбирает установку и уровень (ЕО/ТО-1/2/3/сезонное); чек-лист
+ * собирается сервером из блоков (БАЗА + МОЛОТ + ВРАЩАТЕЛЬ) по атрибутам машины.
+ * Показывает предпросмотр состава блоков. Создаёт запись ТО + осмотр и переходит
+ * на страницу заполнения.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Layers, Hammer, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -19,19 +21,23 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
+
+type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 
 interface EquipmentOption {
   id: string;
   name: string;
   model: string | null;
+  hammerKind: HammerKind;
+  isCombined: boolean;
 }
 
-interface TemplateOption {
-  id: string;
-  name: string;
-  level: string;
-  appliesToModel: string | null;
-}
+const HAMMER_LABEL: Record<HammerKind, string> = {
+  HYDRAULIC: 'Гидравлический',
+  DIESEL: 'Дизельный',
+  NONE: 'Нет',
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -39,11 +45,10 @@ export function StartInspectionForm() {
   const router = useRouter();
 
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
-  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [equipmentId, setEquipmentId] = useState('');
-  const [templateId, setTemplateId] = useState('');
+  const [level, setLevel] = useState<InspectionLevel>('EO');
   const [inspectionDate, setInspectionDate] = useState(today());
   const [shift, setShift] = useState('');
   const [engineHours, setEngineHours] = useState('');
@@ -52,14 +57,10 @@ export function StartInspectionForm() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eqRes, tplRes] = await Promise.all([
-        authFetch('/api/equipment?limit=100'),
-        authFetch('/api/checklist-templates?level=EO'),
-      ]);
+      const eqRes = await authFetch('/api/equipment?limit=100');
       if (eqRes.ok) setEquipment(((await eqRes.json()).data ?? []) as EquipmentOption[]);
-      if (tplRes.ok) setTemplates(((await tplRes.json()).templates ?? []) as TemplateOption[]);
     } catch {
-      toast.error('Не удалось загрузить справочники');
+      toast.error('Не удалось загрузить технику');
     } finally {
       setLoading(false);
     }
@@ -67,22 +68,19 @@ export function StartInspectionForm() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Reset template when equipment changes
-  useEffect(() => { setTemplateId(''); }, [equipmentId]);
+  const selected = equipment.find((e) => e.id === equipmentId) ?? null;
 
-  const selectedEquipment = equipment.find((e) => e.id === equipmentId) ?? null;
-
-  // Templates sorted: matching model first, then the rest
-  const sortedTemplates = [...templates].sort((a, b) => {
-    const modelMatch = selectedEquipment?.model;
-    const aMatch = modelMatch && a.appliesToModel === modelMatch ? -1 : 0;
-    const bMatch = modelMatch && b.appliesToModel === modelMatch ? -1 : 0;
-    return aMatch - bMatch;
-  });
+  // Which blocks the server will assemble for this machine.
+  const blocks = selected
+    ? [
+        { key: 'BASE', label: `База · ${selected.model || selected.name}`, icon: Layers, show: true },
+        { key: 'HAMMER', label: `Молот · ${HAMMER_LABEL[selected.hammerKind].toLowerCase()}`, icon: Hammer, show: selected.hammerKind !== 'NONE' },
+        { key: 'ROTARY', label: 'Вращатель', icon: RotateCw, show: selected.isCombined },
+      ].filter((b) => b.show)
+    : [];
 
   const submit = async () => {
     if (!equipmentId) { toast.error('Выберите установку'); return; }
-    if (!templateId) { toast.error('Выберите шаблон осмотра'); return; }
     if (!inspectionDate) { toast.error('Укажите дату'); return; }
     setBusy(true);
     try {
@@ -91,7 +89,7 @@ export function StartInspectionForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           equipmentId,
-          templateId,
+          level,
           inspectionDate,
           shift: shift || undefined,
           engineHours: engineHours ? Number(engineHours) : undefined,
@@ -113,15 +111,12 @@ export function StartInspectionForm() {
   return (
     <div className="mx-auto w-full max-w-lg px-4 py-6">
       <div className="mb-5 flex items-center gap-2">
-        <Link
-          href="/inspections"
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
-        >
+        <Link href="/inspections" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
         </Link>
       </div>
 
-      <h1 className="mb-5 text-lg font-semibold text-slate-800">Провести осмотр</h1>
+      <h1 className="mb-5 text-lg font-semibold text-slate-800">Провести осмотр / ТО</h1>
 
       {loading ? (
         <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">Загрузка…</p>
@@ -144,40 +139,44 @@ export function StartInspectionForm() {
           </div>
 
           <div>
-            <Label htmlFor="si-template">Шаблон осмотра *</Label>
-            <Select value={templateId} onValueChange={setTemplateId} disabled={!equipmentId}>
-              <SelectTrigger id="si-template">
-                <SelectValue placeholder={equipmentId ? 'Выберите шаблон' : 'Сначала выберите установку'} />
-              </SelectTrigger>
+            <Label htmlFor="si-level">Уровень *</Label>
+            <Select value={level} onValueChange={(v) => setLevel(v as InspectionLevel)}>
+              <SelectTrigger id="si-level"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {sortedTemplates.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
-                    {selectedEquipment?.model && t.appliesToModel === selectedEquipment.model
-                      ? ' ★'
-                      : ''}
-                  </SelectItem>
+                {(Object.keys(LEVEL_LABEL) as InspectionLevel[]).map((k) => (
+                  <SelectItem key={k} value={k}>{LEVEL_LABEL[k]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Block composition preview */}
+          {selected && (
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <div className="mb-2 text-xs font-medium text-slate-500">Чек-лист соберётся из блоков:</div>
+              <div className="space-y-1.5">
+                {blocks.map((b) => (
+                  <div key={b.key} className="flex items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm">
+                    <b.icon className="w-3.5 h-3.5 text-orange-500" /> {b.label}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-2xs text-slate-400">
+                Молот: {HAMMER_LABEL[selected.hammerKind]} · {selected.isCombined ? 'комбинированная (есть вращатель)' : 'без вращателя'}.
+                Атрибуты меняются в карточке техники.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="si-date">Дата *</Label>
-              <Input
-                id="si-date"
-                type="date"
-                value={inspectionDate}
-                onChange={(e) => setInspectionDate(e.target.value)}
-              />
+              <Input id="si-date" type="date" value={inspectionDate} onChange={(e) => setInspectionDate(e.target.value)} />
             </div>
             <div>
               <Label htmlFor="si-shift">Смена</Label>
               <Select value={shift || '__none__'} onValueChange={(v) => setShift(v === '__none__' ? '' : v)}>
-                <SelectTrigger id="si-shift">
-                  <SelectValue placeholder="— не указана —" />
-                </SelectTrigger>
+                <SelectTrigger id="si-shift"><SelectValue placeholder="— не указана —" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">— не указана —</SelectItem>
                   <SelectItem value="День">День</SelectItem>
@@ -189,29 +188,14 @@ export function StartInspectionForm() {
 
           <div>
             <Label htmlFor="si-hours">Моточасы</Label>
-            <Input
-              id="si-hours"
-              type="number"
-              min={0}
-              placeholder="Необязательно"
-              value={engineHours}
-              onChange={(e) => setEngineHours(e.target.value)}
-            />
+            <Input id="si-hours" type="number" min={0} placeholder="Необязательно" value={engineHours} onChange={(e) => setEngineHours(e.target.value)} />
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              asChild
-              disabled={busy}
-            >
+            <Button variant="outline" asChild disabled={busy}>
               <Link href="/inspections">Отмена</Link>
             </Button>
-            <Button
-              onClick={submit}
-              disabled={busy || loading}
-              className="bg-orange-500 hover:bg-orange-600 text-white flex-1"
-            >
+            <Button onClick={submit} disabled={busy || loading} className="bg-orange-500 hover:bg-orange-600 text-white flex-1">
               {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Начать осмотр
             </Button>

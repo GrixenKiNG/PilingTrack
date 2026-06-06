@@ -37,6 +37,8 @@ const METADATA_KEYS = [
   'hammerType',
   'hammerSerialNumber',
   'hammerEnergyKj',
+  'hammerKind',
+  'isCombined',
   // C. Operation
   'purchaseDate',
   'purchasePrice',

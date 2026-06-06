@@ -27,12 +27,25 @@ import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AnswerType = 'YES_NO' | 'STATUS4' | 'DONE' | 'MEASURE';
+type BlockType = 'BASE' | 'HAMMER' | 'ROTARY';
+type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 
 const ANSWER_LABEL: Record<AnswerType, string> = {
   YES_NO: 'Да / Нет',
   STATUS4: '4 статуса',
   DONE: 'Выполнено',
   MEASURE: 'Замер',
+};
+
+const BLOCK_LABEL: Record<BlockType, string> = {
+  BASE: 'База (по марке/модели)',
+  HAMMER: 'Молот (по типу молота)',
+  ROTARY: 'Вращатель',
+};
+
+const HAMMER_LABEL: Record<Exclude<HammerKind, 'NONE'>, string> = {
+  HYDRAULIC: 'Гидравлический',
+  DIESEL: 'Дизельный',
 };
 
 interface ItemDraft {
@@ -280,7 +293,9 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
 
   const [name, setName] = useState('');
   const [level, setLevel] = useState<InspectionLevel>('EO');
+  const [blockType, setBlockType] = useState<BlockType>('BASE');
   const [appliesToModel, setAppliesToModel] = useState('');
+  const [appliesToHammerKind, setAppliesToHammerKind] = useState<Exclude<HammerKind, 'NONE'>>('HYDRAULIC');
   const [sections, setSections] = useState<SectionDraft[]>([emptySection()]);
   const [loading, setLoading] = useState(!isNew);
   const [busy, setBusy] = useState(false);
@@ -294,7 +309,11 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       const { template } = await res.json();
       setName(template.name ?? '');
       setLevel(template.level as InspectionLevel);
+      setBlockType((template.blockType ?? 'BASE') as BlockType);
       setAppliesToModel(template.appliesToModel ?? '');
+      if (template.appliesToHammerKind && template.appliesToHammerKind !== 'NONE') {
+        setAppliesToHammerKind(template.appliesToHammerKind as Exclude<HammerKind, 'NONE'>);
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setSections((template.sections ?? []).map((s: any) => ({
         _key: uid(),
@@ -351,7 +370,9 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     const payload = {
       name: name.trim(),
       level,
-      appliesToModel: appliesToModel.trim() || null,
+      blockType,
+      appliesToModel: blockType === 'BASE' ? (appliesToModel.trim() || null) : null,
+      appliesToHammerKind: blockType === 'HAMMER' ? appliesToHammerKind : null,
       sections: sections.map((s, si) => ({
         title: s.title.trim(),
         order: si,
@@ -442,15 +463,46 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="tpl-model">Применимость (модель)</Label>
+            <Label htmlFor="tpl-block">Тип блока *</Label>
+            <Select value={blockType} onValueChange={(v) => setBlockType(v as BlockType)}>
+              <SelectTrigger id="tpl-block"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(BLOCK_LABEL) as BlockType[]).map((k) => (
+                  <SelectItem key={k} value={k}>{BLOCK_LABEL[k]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Matcher depends on the block kind */}
+        {blockType === 'BASE' && (
+          <div>
+            <Label htmlFor="tpl-model">Применимость (марка/модель)</Label>
             <Input
               id="tpl-model"
               value={appliesToModel}
               onChange={(e) => setAppliesToModel(e.target.value)}
-              placeholder="BSP 1200G (необязательно)"
+              placeholder="Banut 655 (пусто = общий блок для всех)"
             />
           </div>
-        </div>
+        )}
+        {blockType === 'HAMMER' && (
+          <div>
+            <Label htmlFor="tpl-hammer">Тип молота *</Label>
+            <Select value={appliesToHammerKind} onValueChange={(v) => setAppliesToHammerKind(v as Exclude<HammerKind, 'NONE'>)}>
+              <SelectTrigger id="tpl-hammer"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(HAMMER_LABEL) as Exclude<HammerKind, 'NONE'>[]).map((k) => (
+                  <SelectItem key={k} value={k}>{HAMMER_LABEL[k]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {blockType === 'ROTARY' && (
+          <p className="text-xs text-slate-500">Блок вращателя подбирается для комбинированных установок автоматически.</p>
+        )}
       </div>
 
       {/* Sections */}

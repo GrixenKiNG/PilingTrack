@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
-import type { AnswerType, ChecklistLevel } from '@/generated/postgres-client';
+import type { AnswerType, BlockType, ChecklistLevel, HammerKind } from '@/generated/postgres-client';
 
 export interface TemplateItemInput {
   text: string; answerType: AnswerType; unit?: string | null; norm?: string | null;
@@ -8,17 +8,27 @@ export interface TemplateItemInput {
 }
 export interface TemplateSectionInput { title: string; order: number; items: TemplateItemInput[] }
 export interface TemplateInput {
-  name: string; level: ChecklistLevel; appliesToModel?: string | null; sections: TemplateSectionInput[];
+  name: string; level: ChecklistLevel;
+  blockType?: BlockType;            // default BASE
+  appliesToModel?: string | null;
+  appliesToHammerKind?: HammerKind | null;
+  sections: TemplateSectionInput[];
 }
 
 export async function createTemplate(input: TemplateInput, ctx: { tenantId: string; createdById?: string | null }) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  const blockType = input.blockType ?? 'BASE';
+  // Normalize matchers to the block kind: BASE keys on model, HAMMER on hammer kind.
+  const appliesToModel = blockType === 'BASE' ? (input.appliesToModel?.trim() || null) : null;
+  const appliesToHammerKind = blockType === 'HAMMER' ? (input.appliesToHammerKind ?? null) : null;
   return db.checklistTemplate.create({
     data: {
       tenantId: ctx.tenantId,
       name: input.name.trim(),
       level: input.level,
-      appliesToModel: input.appliesToModel?.trim() || null,
+      blockType,
+      appliesToModel,
+      appliesToHammerKind,
       createdById: ctx.createdById ?? null,
       sections: {
         create: input.sections.map((s) => ({

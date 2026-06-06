@@ -146,6 +146,8 @@ const equipmentMetadataSchema = z.object({
   hammerType:         optStr(200),
   hammerSerialNumber: optStr(100),
   hammerEnergyKj:     optNum(z.number().nonnegative().max(10_000)),
+  hammerKind:         z.enum(['HYDRAULIC', 'DIESEL', 'NONE']).optional(),
+  isCombined:         z.boolean().optional(),
   // C. Operation
   purchaseDate:           optDate,
   purchasePrice:          optNum(z.number().nonnegative().max(1_000_000_000)),

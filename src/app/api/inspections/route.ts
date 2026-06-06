@@ -2,15 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { listInspections, startInspection } from '@/modules/inspections';
+import { listInspections, startInspection, startToInspection } from '@/modules/inspections';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
 
-const startSchema = z.object({
+// Legacy start: explicit single template.
+const legacyStartSchema = z.object({
   equipmentId: z.string().min(1),
   templateId: z.string().min(1),
+  inspectionDate: z.coerce.date(),
+  shift: z.string().max(20).optional().nullable(),
+  engineHours: z.coerce.number().int().min(0).optional().nullable(),
+});
+// Block-composed start: pick a level, server assembles BASE+HAMMER+ROTARY.
+const blockStartSchema = z.object({
+  equipmentId: z.string().min(1),
+  level: z.enum(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL']),
   inspectionDate: z.coerce.date(),
   shift: z.string().max(20).optional().nullable(),
   engineHours: z.coerce.number().int().min(0).optional().nullable(),
@@ -38,7 +47,10 @@ export const POST = withMutation(
     assertCan(user!, 'maintenance.manage');
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    const parsed = startSchema.safeParse(await request.json());
+    const body = await request.json();
+    const isBlockStart = body && typeof body === 'object' && 'level' in body && !('templateId' in body);
+
+    const parsed = isBlockStart ? blockStartSchema.safeParse(body) : legacyStartSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
@@ -46,7 +58,9 @@ export const POST = withMutation(
       );
     }
     try {
-      const inspection = await startInspection(parsed.data, { tenantId, userId: user!.id });
+      const inspection = isBlockStart
+        ? await startToInspection(parsed.data as z.infer<typeof blockStartSchema>, { tenantId, userId: user!.id })
+        : await startInspection(parsed.data as z.infer<typeof legacyStartSchema>, { tenantId, userId: user!.id });
       return NextResponse.json({ inspection }, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
