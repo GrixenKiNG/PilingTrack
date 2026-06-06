@@ -30,7 +30,7 @@ interface FleetCard {
   manufactureYear: number | null;
   status: EquipmentStatus;
   todaysReports: number;
-  todayTotals: { piles: number; drillingMeters: number; downtimeMinutes: number } | null;
+  todayTotals: { piles: number; drillingMeters: number; downtimeHours: number } | null;
   latestReport: {
     date: string;
     siteName: string | null;
@@ -50,7 +50,7 @@ interface FleetSnapshot {
     idle: number;
     pilesToday: number;
     drillingToday: number;
-    downtimeMinutesToday: number;
+    downtimeHoursToday: number;
   };
   equipment: FleetCard[];
 }
@@ -197,7 +197,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
       <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Metric label="Свай" value={snap.totals.pilesToday} />
         <Metric label="Бурения, м" value={formatNumber(snap.totals.drillingToday, 1)} />
-        <Metric label="Простой" value={formatMinutes(snap.totals.downtimeMinutesToday)} />
+        <Metric label="Простой" value={formatHours(snap.totals.downtimeHoursToday)} />
         <Metric label="Ждём отчёт" value={snap.totals.expected} muted />
       </dl>
     </div>
@@ -256,8 +256,8 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
               <>
                 <RowKV label="Свай" value={String(card.todayTotals.piles)} />
                 <RowKV label="Бурение, м" value={formatNumber(card.todayTotals.drillingMeters, 1)} />
-                {card.todayTotals.downtimeMinutes > 0 && (
-                  <RowKV label="Простой" value={formatMinutes(card.todayTotals.downtimeMinutes)} />
+                {card.todayTotals.downtimeHours > 0 && (
+                  <RowKV label="Простой" value={formatHours(card.todayTotals.downtimeHours)} />
                 )}
               </>
             ) : (
@@ -289,13 +289,13 @@ function formatNumber(n: number, decimals = 0): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-function formatMinutes(min: number): string {
-  if (min <= 0) return '0 мин';
-  const h = Math.floor(min / 60);
-  const m = Math.round(min - h * 60);
-  if (h === 0) return `${m} мин`;
-  if (m === 0) return `${h} ч`;
-  return `${h} ч ${m} мин`;
+function formatHours(hours: number): string {
+  if (!hours || hours <= 0) return '0 ч';
+  const whole = Math.floor(hours);
+  const mins = Math.round((hours - whole) * 60);
+  if (mins === 0) return `${whole} ч`;
+  if (whole === 0) return `${mins} мин`;
+  return `${whole} ч ${mins} мин`;
 }
 
 function formatRuDate(ymd: string): string {

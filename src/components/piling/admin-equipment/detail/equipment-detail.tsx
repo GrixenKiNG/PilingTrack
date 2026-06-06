@@ -61,7 +61,7 @@ interface DetailsResponse {
     reportCount: number;
     piles: number;
     drillingMeters: number;
-    downtimeMinutes: number;
+    downtimeHours: number;
   };
   timeline: Array<{
     reportId: string;
@@ -73,7 +73,7 @@ interface DetailsResponse {
     updatedAt: string;
     piles: number | null;
     drillingMeters: number | null;
-    downtimeMinutes: number | null;
+    downtimeHours: number | null;
   }>;
 }
 
@@ -213,7 +213,7 @@ export function EquipmentDetail({ equipmentId }: Props) {
           <Metric label="Отчётов" value={details.stats30d.reportCount} />
           <Metric label="Свай" value={details.stats30d.piles} />
           <Metric label="Бурение, м" value={formatNumber(details.stats30d.drillingMeters, 1)} />
-          <Metric label="Простой" value={formatMinutes(details.stats30d.downtimeMinutes)} />
+          <Metric label="Простой" value={formatHours(details.stats30d.downtimeHours)} />
         </div>
       </Section>
 
@@ -406,7 +406,7 @@ function HistoryTable({ rows }: { rows: DetailsResponse['timeline'] }) {
                   {row.drillingMeters != null ? formatNumber(row.drillingMeters, 1) : '—'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono">
-                  {row.downtimeMinutes != null ? formatMinutes(row.downtimeMinutes) : '—'}
+                  {row.downtimeHours != null ? formatHours(row.downtimeHours) : '—'}
                 </td>
               </tr>
             ))}
@@ -595,13 +595,13 @@ function formatNumber(n: number, decimals = 0): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-function formatMinutes(min: number): string {
-  if (!min || min <= 0) return '0 мин';
-  const h = Math.floor(min / 60);
-  const m = Math.round(min - h * 60);
-  if (h === 0) return `${m} мин`;
-  if (m === 0) return `${h} ч`;
-  return `${h} ч ${m} мин`;
+function formatHours(hours: number): string {
+  if (!hours || hours <= 0) return '0 ч';
+  const whole = Math.floor(hours);
+  const mins = Math.round((hours - whole) * 60);
+  if (mins === 0) return `${whole} ч`;
+  if (whole === 0) return `${mins} мин`;
+  return `${whole} ч ${mins} мин`;
 }
 
 function formatRuDate(ymd: string): string {

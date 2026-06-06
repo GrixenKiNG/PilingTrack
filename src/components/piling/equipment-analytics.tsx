@@ -323,11 +323,11 @@ function fmt(n: number): string {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
 }
 
-function fmtHours(min: number): string {
-  if (!min || min <= 0) return '0 ч';
-  const h = Math.floor(min / 60);
-  const m = Math.round(min - h * 60);
-  if (h === 0) return `${m} мин`;
-  if (m === 0) return `${h} ч`;
-  return `${h} ч ${m} мин`;
+function fmtHours(hours: number): string {
+  if (!hours || hours <= 0) return '0 ч';
+  const whole = Math.floor(hours);
+  const mins = Math.round((hours - whole) * 60);
+  if (mins === 0) return `${whole} ч`;
+  if (whole === 0) return `${mins} мин`;
+  return `${whole} ч ${mins} мин`;
 }

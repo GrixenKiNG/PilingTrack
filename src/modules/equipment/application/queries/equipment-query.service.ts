@@ -111,10 +111,10 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       if (!a) return acc;
       acc.piles += a.totalPiles;
       acc.drillingMeters += a.totalDrilling;
-      acc.downtimeMinutes += a.totalDowntime;
+      acc.downtimeHours += a.totalDowntime;
       return acc;
     },
-    { piles: 0, drillingMeters: 0, downtimeMinutes: 0 }
+    { piles: 0, drillingMeters: 0, downtimeHours: 0 }
   );
 
   const timeline = allReports.map((r) => {
@@ -124,7 +124,7 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       siteName: r.site?.name ?? null, operatorName: r.user?.name ?? null,
       updatedAt: r.updatedAt.toISOString(),
       piles: a?.totalPiles ?? null, drillingMeters: a?.totalDrilling ?? null,
-      downtimeMinutes: a?.totalDowntime ?? null,
+      downtimeHours: a?.totalDowntime ?? null,
     };
   });
 

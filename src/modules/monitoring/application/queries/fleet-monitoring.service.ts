@@ -36,7 +36,7 @@ export interface FleetCard {
   todayTotals: {
     piles: number;
     drillingMeters: number;
-    downtimeMinutes: number;
+    downtimeHours: number;
   } | null;
   latestReport: {
     date: string;
@@ -57,7 +57,7 @@ export interface FleetSnapshot {
     idle: number;
     pilesToday: number;
     drillingToday: number;
-    downtimeMinutesToday: number;
+    downtimeHoursToday: number;
   };
   equipment: FleetCard[];
 }
@@ -112,7 +112,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     return {
       asOf: now.toISOString(),
       today,
-      totals: { totalEquipment: 0, activeToday: 0, expected: 0, idle: 0, pilesToday: 0, drillingToday: 0, downtimeMinutesToday: 0 },
+      totals: { totalEquipment: 0, activeToday: 0, expected: 0, idle: 0, pilesToday: 0, drillingToday: 0, downtimeHoursToday: 0 },
       equipment: [],
     };
   }
@@ -175,13 +175,13 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
 
     let todayTotals: FleetCard['todayTotals'] = null;
     if (todays.length > 0) {
-      todayTotals = { piles: 0, drillingMeters: 0, downtimeMinutes: 0 };
+      todayTotals = { piles: 0, drillingMeters: 0, downtimeHours: 0 };
       for (const r of todays) {
         const a = analyticsByReport.get(r.reportId);
         if (!a) continue;
         todayTotals.piles += a.totalPiles;
         todayTotals.drillingMeters += a.totalDrilling;
-        todayTotals.downtimeMinutes += a.totalDowntime;
+        todayTotals.downtimeHours += a.totalDowntime;
       }
     }
 
@@ -213,7 +213,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     idle: cards.filter((c) => c.status === 'idle').length,
     pilesToday: cards.reduce((s, c) => s + (c.todayTotals?.piles ?? 0), 0),
     drillingToday: cards.reduce((s, c) => s + (c.todayTotals?.drillingMeters ?? 0), 0),
-    downtimeMinutesToday: cards.reduce((s, c) => s + (c.todayTotals?.downtimeMinutes ?? 0), 0),
+    downtimeHoursToday: cards.reduce((s, c) => s + (c.todayTotals?.downtimeHours ?? 0), 0),
   };
 
   return {
