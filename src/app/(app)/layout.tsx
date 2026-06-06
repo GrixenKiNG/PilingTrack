@@ -40,6 +40,7 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
     { label: 'Установки', href: '/admin/equipment' },
     { label: 'Обслуживание', href: '/admin/maintenance' },
     { label: 'Осмотры', href: '/inspections' },
+    { label: 'Чек-листы', href: '/admin/checklists' },
     { label: 'Бригады', href: '/admin/crews' },
     { label: 'Отчёты', href: '/admin/reports' },
     { label: 'Справочники', href: '/admin/dictionaries' },

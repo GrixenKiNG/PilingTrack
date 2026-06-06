@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { updateTemplate, deleteTemplate } from '@/modules/inspections';
-import { withMutation } from '@/core/api-wrapper';
+import { getTemplate, updateTemplate, deleteTemplate } from '@/modules/inspections';
+import { withApi, withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
@@ -31,6 +31,24 @@ const createSchema = z.object({
   appliesToModel: z.string().max(120).optional().nullable(),
   sections: z.array(sectionSchema),
 });
+
+export const GET = withApi(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const { user, error } = await requireAuth(request);
+    if (error) return error;
+    assertCan(user!, 'maintenance.manage');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const { id } = await params;
+    try {
+      const template = await getTemplate(id, tenantId);
+      return NextResponse.json({ template });
+    } catch (err) {
+      if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
+      throw err;
+    }
+  },
+  { domain: 'inspections' }
+);
 
 export const PUT = withMutation(
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
