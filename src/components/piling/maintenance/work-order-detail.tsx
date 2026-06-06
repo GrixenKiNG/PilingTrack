@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { usePilingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,11 +40,14 @@ interface WorkOrderRecord {
   title: string;
   description: string;
   faultCause: string | null;
+  workDone: string | null;
   partsUsedText: string | null;
   assigneeId: string | null;
   scheduledAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  acceptedById: string | null;
+  acceptedAt: string | null;
   engineHoursAtService: number | null;
   laborHours: number | null;
   cost: string | number | null;
@@ -69,6 +73,7 @@ interface QuickFields {
   engineHoursAtService: string;
   startedAt: string;
   faultCause: string;
+  workDone: string;
   partsUsedText: string;
 }
 
@@ -79,6 +84,7 @@ const quickFromRecord = (r: WorkOrderRecord): QuickFields => ({
   engineHoursAtService: numToStr(r.engineHoursAtService),
   startedAt: toInputDate(r.startedAt),
   faultCause: r.faultCause ?? '',
+  workDone: r.workDone ?? '',
   partsUsedText: r.partsUsedText ?? '',
 });
 
@@ -89,7 +95,9 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<MaintenanceStatus | null>(null);
   const [savingQuick, setSavingQuick] = useState(false);
+  const [accepting, setAccepting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const isAdmin = usePilingStore((s) => s.currentUser?.role === 'ADMIN');
 
   const names = useMemo(() => new Map(assignees.map((u) => [u.id, u.name])), [assignees]);
 
@@ -152,6 +160,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       engineHoursAtService: quick.engineHoursAtService || null,
       startedAt: quick.startedAt || null,
       faultCause: quick.faultCause.trim() || null,
+      workDone: quick.workDone.trim() || null,
       partsUsedText: quick.partsUsedText.trim() || null,
     });
     if (ok) {
@@ -159,6 +168,24 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       await load();
     }
     setSavingQuick(false);
+  };
+
+  const accept = async () => {
+    if (!record) return;
+    setAccepting(true);
+    try {
+      const res = await authFetch(`/api/maintenance/${recordId}/accept`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Не удалось принять');
+      }
+      toast.success('Принято');
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Ошибка');
+    } finally {
+      setAccepting(false);
+    }
   };
 
   const setQ = <K extends keyof QuickFields>(key: K, value: QuickFields[K]) =>
@@ -264,10 +291,14 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
             <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} />
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-3 space-y-3">
           <div>
-            <Label htmlFor="q-fault">Причина неисправности</Label>
-            <Textarea id="q-fault" rows={2} value={quick.faultCause} onChange={(e) => setQ('faultCause', e.target.value)} />
+            <Label htmlFor="q-fault">Стадия 1 — неисправность / диагностика</Label>
+            <Textarea id="q-fault" rows={2} value={quick.faultCause} onChange={(e) => setQ('faultCause', e.target.value)} placeholder="Что обнаружено, причина отказа…" />
+          </div>
+          <div>
+            <Label htmlFor="q-work">Стадия 2 — выполненные работы</Label>
+            <Textarea id="q-work" rows={2} value={quick.workDone} onChange={(e) => setQ('workDone', e.target.value)} placeholder="Что сделано для устранения…" />
           </div>
           <div>
             <Label htmlFor="q-parts">Использованные запчасти</Label>
@@ -283,9 +314,35 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         </div>
       </div>
 
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border bg-card p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">Фото — диагностика</h2>
+          <WorkOrderPhotos recordId={recordId} entityId={recordId} />
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">Фото — выполненные работы</h2>
+          <WorkOrderPhotos recordId={recordId} entityId={`${recordId}__work`} />
+        </div>
+      </div>
+
+      {/* Приёмка работ администратором */}
       <div className="mt-4 rounded-xl border bg-card p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Фото</h2>
-        <WorkOrderPhotos recordId={recordId} />
+        <h2 className="mb-2 text-sm font-semibold text-slate-700">Приёмка</h2>
+        {record.acceptedAt ? (
+          <p className="text-sm text-emerald-700">
+            ✓ Принято {formatRuDate(record.acceptedAt)}
+          </p>
+        ) : isAdmin ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-500">Работа ещё не принята.</span>
+            <Button size="sm" disabled={accepting} className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={accept}>
+              {accepting && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
+              Принять
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Ожидает приёмки администратором.</p>
+        )}
       </div>
 
       <WorkOrderFormDialog

@@ -254,9 +254,12 @@ model MaintenanceRecord {
   assigneeId  String?                                // исполнитель (User.id), без relation — как createdById
   startedAt   DateTime?         @db.Timestamptz(3)   // начало работ (для MTTR)
   laborHours  Float?                                 // трудозатраты, ч
-  faultCause  String?                                // причина отказа (свободный текст)
+  faultCause  String?                                // стадия 1: диагностика / причина отказа
+  workDone    String          @default("")           // стадия 2: выполненные работы
   partsUsedText String          @default("")          // израсходованные запчасти текстом ("крючок" под склад)
   closedById  String?                                // кто проверил/закрыл (User.id)
+  acceptedById String?                               // кто принял работу (админ, User.id)
+  acceptedAt  DateTime?         @db.Timestamptz(3)    // когда принято
   createdById String?
   createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime          @updatedAt      @db.Timestamptz(3)

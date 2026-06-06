@@ -30,6 +30,8 @@ interface PhotoTile extends MediaRecord {
 
 interface Props {
   recordId: string;
+  /** Optional sub-scope so one record can hold separate galleries per stage. */
+  entityId?: string;
 }
 
 const EXT_MAP: Record<string, string> = {
@@ -38,7 +40,8 @@ const EXT_MAP: Record<string, string> = {
   png: 'image/png', webp: 'image/webp', gif: 'image/gif',
 };
 
-export function WorkOrderPhotos({ recordId }: Props) {
+export function WorkOrderPhotos({ recordId, entityId }: Props) {
+  const eid = entityId ?? recordId;
   const inputRef = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<PhotoTile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,7 @@ export function WorkOrderPhotos({ recordId }: Props) {
     setLoading(true);
     try {
       const res = await authFetch(
-        `/api/media?entityType=maintenance&entityId=${encodeURIComponent(recordId)}`
+        `/api/media?entityType=maintenance&entityId=${encodeURIComponent(eid)}`
       );
       if (!res.ok) {
         setPhotos([]);
@@ -68,7 +71,7 @@ export function WorkOrderPhotos({ recordId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [recordId]);
+  }, [eid]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -94,7 +97,7 @@ export function WorkOrderPhotos({ recordId }: Props) {
           contentType,
           fileSize: file.size,
           entityType: 'maintenance',
-          entityId: recordId,
+          entityId: eid,
         }),
       });
       if (!presign.ok) throw new Error((await presign.json()).error || 'Не удалось получить ссылку');

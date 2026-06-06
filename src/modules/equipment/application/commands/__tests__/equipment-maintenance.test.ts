@@ -18,7 +18,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-import { createMaintenance, updateMaintenance } from '../equipment-maintenance';
+import { createMaintenance, updateMaintenance, acceptMaintenance } from '../equipment-maintenance';
 
 describe('createMaintenance — work order fields', () => {
   beforeEach(() => {
@@ -58,6 +58,14 @@ describe('createMaintenance — work order fields', () => {
     await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', partsUsedText: null }, { tenantId: 'orion' });
     const data = createRecMock.mock.calls[0][0].data;
     expect(data.partsUsedText).toBe('');
+  });
+
+  it('persists two-stage workDone, empty by default', async () => {
+    await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', workDone: 'заменили насос' }, { tenantId: 'orion' });
+    expect(createRecMock.mock.calls[0][0].data.workDone).toBe('заменили насос');
+    createRecMock.mockClear();
+    await createMaintenance('eq_1', { type: 'REPAIR', title: 'x' }, { tenantId: 'orion' });
+    expect(createRecMock.mock.calls[0][0].data.workDone).toBe('');
   });
 
   it('auto-stamps startedAt when created directly as IN_PROGRESS', async () => {
@@ -101,5 +109,42 @@ describe('updateMaintenance — lifecycle transitions', () => {
     await updateMaintenance('eq_1', 'rec_1', { status: 'IN_PROGRESS' }, { tenantId: 'orion', userId: 'usr_9' });
     const data = updateRecMock.mock.calls[0][0].data;
     expect(data.startedAt).toBeUndefined();
+  });
+
+  it('persists two-stage workDone on update', async () => {
+    await updateMaintenance('eq_1', 'rec_1', { workDone: 'продули радиатор' }, { tenantId: 'orion', userId: 'usr_9' });
+    expect(updateRecMock.mock.calls[0][0].data.workDone).toBe('продули радиатор');
+  });
+});
+
+describe('acceptMaintenance — приёмка', () => {
+  beforeEach(() => {
+    findUniqueRecMock.mockReset();
+    updateRecMock.mockReset();
+    updateRecMock.mockResolvedValue({ id: 'rec_1' });
+  });
+
+  it('stamps acceptedBy/acceptedAt and closes the record', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: null, completedAt: null });
+    await acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' });
+    const data = updateRecMock.mock.calls[0][0].data;
+    expect(data.acceptedById).toBe('admin_1');
+    expect(data.acceptedAt).toBeInstanceOf(Date);
+    expect(data.status).toBe('DONE');
+    expect(data.completedAt).toBeInstanceOf(Date);
+  });
+
+  it('rejects cross-tenant record; writes nothing', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'other', acceptedById: null, completedAt: null });
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' }))
+      .rejects.toThrow('Maintenance record not found');
+    expect(updateRecMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects double-accept (409); writes nothing', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: 'admin_0', completedAt: new Date() });
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' }))
+      .rejects.toThrow(/принят/i);
+    expect(updateRecMock).not.toHaveBeenCalled();
   });
 });

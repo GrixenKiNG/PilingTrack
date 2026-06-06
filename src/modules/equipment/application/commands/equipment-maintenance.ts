@@ -26,7 +26,8 @@ export interface MaintenanceInput {
   cost?: number | null;
   performedBy?: string | null;
   assigneeId?: string | null;
-  faultCause?: string | null;
+  faultCause?: string | null;     // стадия 1: диагностика
+  workDone?: string | null;       // стадия 2: выполненные работы
   partsUsedText?: string | null;
 }
 
@@ -70,6 +71,7 @@ export async function createMaintenance(
       startedAt,
       laborHours: input.laborHours ?? null,
       faultCause: input.faultCause?.trim() || null,
+      workDone: input.workDone?.trim() ?? '',
       partsUsedText: input.partsUsedText?.trim() ?? '',
     },
   });
@@ -102,6 +104,7 @@ export async function updateMaintenance(
   if (input.assigneeId !== undefined) data.assigneeId = input.assigneeId ?? null;
   if (input.laborHours !== undefined) data.laborHours = input.laborHours ?? null;
   if (input.faultCause !== undefined) data.faultCause = input.faultCause?.trim() || null;
+  if (input.workDone !== undefined) data.workDone = input.workDone?.trim() ?? '';
   if (input.partsUsedText !== undefined) data.partsUsedText = input.partsUsedText?.trim() ?? '';
   if (input.startedAt !== undefined) data.startedAt = toDate(input.startedAt);
 
@@ -117,6 +120,37 @@ export async function updateMaintenance(
   }
 
   return db.maintenanceRecord.update({ where: { id: recordId }, data });
+}
+
+/**
+ * Accept a finished work order («Принять»). Admin-only at the route layer.
+ * Stamps acceptedBy/acceptedAt, closes the record. Idempotency: rejects if
+ * already accepted. Tenant-scoped, fail-closed.
+ */
+export async function acceptMaintenance(
+  recordId: string,
+  ctx: { tenantId: string; userId: string },
+) {
+  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  const existing = await db.maintenanceRecord.findUnique({
+    where: { id: recordId },
+    select: { id: true, tenantId: true, acceptedById: true, completedAt: true },
+  });
+  if (!existing || existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError('Maintenance record not found', 404);
+  }
+  if (existing.acceptedById) throw new ServiceError('Запись уже принята', 409);
+
+  return db.maintenanceRecord.update({
+    where: { id: recordId },
+    data: {
+      acceptedById: ctx.userId,
+      acceptedAt: new Date(),
+      status: 'DONE',
+      closedById: ctx.userId,
+      completedAt: existing.completedAt ?? new Date(),
+    },
+  });
 }
 
 export async function deleteMaintenance(
