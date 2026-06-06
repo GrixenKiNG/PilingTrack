@@ -41,6 +41,57 @@ function hashPassword(password: string): string {
   return hashSync(password, 12); // Increased from 10 to 12 rounds
 }
 
+async function seedHydraulicHammerEO(prisma: PrismaClient, tenantId: string) {
+  const exists = await prisma.checklistTemplate.findFirst({
+    where: { tenantId, name: 'ЕО гидромолота', level: 'EO' },
+  });
+  if (exists) return;
+  await prisma.checklistTemplate.create({
+    data: {
+      tenantId,
+      name: 'ЕО гидромолота',
+      level: 'EO',
+      appliesToModel: 'HHK7A',
+      sections: {
+        create: [
+          {
+            tenantId,
+            title: 'Гидросистема',
+            order: 0,
+            items: {
+              create: [
+                { tenantId, text: 'РВД без течей и повреждений', answerType: 'YES_NO', required: true, photoRequired: false, order: 0 },
+                { tenantId, text: 'Рабочее давление по манометру', answerType: 'MEASURE', unit: 'бар', norm: 'HHK7A ~183, HHK5A ~131', required: true, photoRequired: false, order: 1 },
+              ],
+            },
+          },
+          {
+            tenantId,
+            title: 'Свайный наголовник',
+            order: 1,
+            items: {
+              create: [
+                { tenantId, text: 'Наголовник без трещин', answerType: 'STATUS4', required: true, photoRequired: true, order: 0 },
+                { tenantId, text: 'Износ демпферной подушки (Ø600 — замена ≤150 мм)', answerType: 'MEASURE', unit: 'мм', norm: 'замена при ≤150 мм', required: true, photoRequired: false, order: 1 },
+              ],
+            },
+          },
+          {
+            tenantId,
+            title: 'Смазка',
+            order: 2,
+            items: {
+              create: [
+                { tenantId, text: 'Смазка наголовника и направляющих выполнена', answerType: 'DONE', required: true, photoRequired: false, order: 0 },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+}
+
 async function seed() {
   assertNotProduction();
   console.log('Seeding database...');
@@ -470,6 +521,10 @@ async function seed() {
   });
 
   console.log('Crews created');
+
+  await seedHydraulicHammerEO(db, process.env.DEFAULT_TENANT_ID ?? 'orion');
+  console.log('Checklist templates seeded');
+
   console.log('Seed complete');
 }
 
