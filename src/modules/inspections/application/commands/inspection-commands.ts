@@ -50,15 +50,25 @@ export async function startToInspection(
   }));
 
   const blocks = selectBlocks(candidates, eq);
+
+  // Actionable guard: a checklist needs a BASE block matching the machine model
+  // (or a generic BASE with empty model). Tell the admin exactly what to create.
+  const baseBlock = blocks.find((b) => b.blockType === 'BASE');
+  if (!baseBlock) {
+    throw new ServiceError(
+      `Нет блока «База» для модели «${eq.model || '—'}» (уровень ${input.level}). ` +
+        `Создайте в разделе «Чек-листы» шаблон типа «База» с применимостью «${eq.model || '—'}» ` +
+        `или без модели (общий блок для всех машин).`,
+      400,
+    );
+  }
+
   let snapshot;
   try {
     snapshot = composeChecklist(blocks);
   } catch (e) {
     throw new ServiceError(e instanceof Error ? e.message : 'Не удалось собрать чек-лист', 400);
   }
-  // composeChecklist above guarantees a BASE block; this also gives the FK template id.
-  const baseBlock = blocks.find((b) => b.blockType === 'BASE');
-  if (!baseBlock) throw new ServiceError('Невозможно собрать чек-лист: нет блока «База»', 400);
   const baseTemplateId = baseBlock.id;
 
   // Sequential create (record → inspection): the FK needs the record id first.

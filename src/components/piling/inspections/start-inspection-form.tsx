@@ -33,6 +33,12 @@ interface EquipmentOption {
   isCombined: boolean;
 }
 
+interface TemplateLite {
+  blockType: 'BASE' | 'HAMMER' | 'ROTARY';
+  appliesToModel: string | null;
+  appliesToHammerKind: HammerKind | null;
+}
+
 const HAMMER_LABEL: Record<HammerKind, string> = {
   HYDRAULIC: 'Гидравлический',
   DIESEL: 'Дизельный',
@@ -45,6 +51,7 @@ export function StartInspectionForm() {
   const router = useRouter();
 
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
+  const [templates, setTemplates] = useState<TemplateLite[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [equipmentId, setEquipmentId] = useState('');
@@ -68,14 +75,34 @@ export function StartInspectionForm() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Load templates for the chosen level to show which blocks really exist.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await authFetch(`/api/checklist-templates?level=${level}`);
+        if (res.ok && active) setTemplates(((await res.json()).templates ?? []) as TemplateLite[]);
+      } catch { /* preview only */ }
+    })();
+    return () => { active = false; };
+  }, [level]);
+
   const selected = equipment.find((e) => e.id === equipmentId) ?? null;
 
-  // Which blocks the server will assemble for this machine.
+  const hasBase = !!selected && templates.some(
+    (t) => t.blockType === 'BASE' && (t.appliesToModel === selected.model || !t.appliesToModel),
+  );
+  const hasHammer = !!selected && templates.some(
+    (t) => t.blockType === 'HAMMER' && t.appliesToHammerKind === selected.hammerKind,
+  );
+  const hasRotary = templates.some((t) => t.blockType === 'ROTARY');
+
+  // Which blocks the server will assemble, and whether a template exists for each.
   const blocks = selected
     ? [
-        { key: 'BASE', label: `База · ${selected.model || selected.name}`, icon: Layers, show: true },
-        { key: 'HAMMER', label: `Молот · ${HAMMER_LABEL[selected.hammerKind].toLowerCase()}`, icon: Hammer, show: selected.hammerKind !== 'NONE' },
-        { key: 'ROTARY', label: 'Вращатель', icon: RotateCw, show: selected.isCombined },
+        { key: 'BASE', label: `База · ${selected.model || selected.name}`, icon: Layers, show: true, ok: hasBase },
+        { key: 'HAMMER', label: `Молот · ${HAMMER_LABEL[selected.hammerKind].toLowerCase()}`, icon: Hammer, show: selected.hammerKind !== 'NONE', ok: hasHammer },
+        { key: 'ROTARY', label: 'Вращатель', icon: RotateCw, show: selected.isCombined, ok: hasRotary },
       ].filter((b) => b.show)
     : [];
 
@@ -157,10 +184,21 @@ export function StartInspectionForm() {
               <div className="space-y-1.5">
                 {blocks.map((b) => (
                   <div key={b.key} className="flex items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm">
-                    <b.icon className="w-3.5 h-3.5 text-orange-500" /> {b.label}
+                    <b.icon className="w-3.5 h-3.5 text-orange-500" />
+                    <span className="flex-1">{b.label}</span>
+                    {b.ok
+                      ? <span className="text-2xs text-emerald-600">✓ шаблон есть</span>
+                      : <span className="text-2xs text-rose-600">нет шаблона</span>}
                   </div>
                 ))}
               </div>
+              {!hasBase && (
+                <p className="mt-2 rounded bg-rose-50 px-2 py-1.5 text-2xs text-rose-700">
+                  Нет блока «База» для модели «{selected.model || '—'}». Создайте его в разделе{' '}
+                  <Link href="/admin/checklists" className="underline">Чек-листы</Link>{' '}
+                  (тип «База», применимость «{selected.model || '—'}» или без модели — общий для всех).
+                </p>
+              )}
               <p className="mt-2 text-2xs text-slate-400">
                 Молот: {HAMMER_LABEL[selected.hammerKind]} · {selected.isCombined ? 'комбинированная (есть вращатель)' : 'без вращателя'}.
                 Атрибуты меняются в карточке техники.
@@ -195,7 +233,7 @@ export function StartInspectionForm() {
             <Button variant="outline" asChild disabled={busy}>
               <Link href="/inspections">Отмена</Link>
             </Button>
-            <Button onClick={submit} disabled={busy || loading} className="bg-orange-500 hover:bg-orange-600 text-white flex-1">
+            <Button onClick={submit} disabled={busy || loading || (!!selected && !hasBase)} className="bg-orange-500 hover:bg-orange-600 text-white flex-1">
               {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Начать осмотр
             </Button>
