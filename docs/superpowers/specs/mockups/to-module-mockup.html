@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Макет — Модуль ТО</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; }
+  .tab-active { color:#ea580c; border-color:#ea580c; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<!-- ░░░ Шапка приложения ░░░ -->
+<header class="bg-white border-b sticky top-0 z-10">
+  <div class="max-w-6xl mx-auto px-5 h-14 flex items-center gap-6">
+    <div class="font-bold text-lg tracking-tight">Piling<span class="text-orange-600">Track</span></div>
+    <nav class="flex gap-5 text-sm text-slate-500">
+      <span>Объекты</span><span>Отчёты</span><span>Техника</span>
+      <span class="text-orange-600 font-semibold border-b-2 border-orange-600 pb-[18px]">ТО</span>
+      <span>Мониторинг</span>
+    </nav>
+    <div class="ml-auto text-sm text-slate-400">admin@orionpiling.ru</div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-5 py-6">
+
+  <!-- ░░░ Заголовок модуля + выбор машины ░░░ -->
+  <div class="flex items-end justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold">Техническое обслуживание</h1>
+      <p class="text-sm text-slate-500 mt-1">Единый журнал: ЕО · ТО-1/2/3 · сезонное · ремонт · неисправности</p>
+    </div>
+    <select class="border rounded-lg px-3 py-2 text-sm bg-white shadow-sm">
+      <option>Banut 655 — копёр (борт 4)</option>
+      <option>Junttan PM25 — копёр</option>
+      <option>Liebherr LRH 100 — комбинированная</option>
+    </select>
+  </div>
+
+  <!-- ░░░ Карточка машины с атрибутами подбора ░░░ -->
+  <div class="bg-white rounded-xl border shadow-sm p-5 mb-5">
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
+      <div>
+        <div class="text-xs text-slate-400 uppercase tracking-wide">Установка</div>
+        <div class="font-semibold text-lg">Banut 655</div>
+      </div>
+      <div class="h-10 w-px bg-slate-200"></div>
+      <div>
+        <div class="text-xs text-slate-400 uppercase tracking-wide">Тип машины</div>
+        <div class="font-medium">Копёр забивной</div>
+      </div>
+      <div>
+        <div class="text-xs text-slate-400 uppercase tracking-wide">Молот</div>
+        <span class="inline-flex items-center gap-1 bg-sky-50 text-sky-700 text-sm font-medium px-2.5 py-1 rounded-md">⚙ Гидравлический</span>
+      </div>
+      <div>
+        <div class="text-xs text-slate-400 uppercase tracking-wide">Комбинированная</div>
+        <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-sm font-medium px-2.5 py-1 rounded-md">✓ Да (есть вращатель)</span>
+      </div>
+      <div class="ml-auto text-right">
+        <div class="text-xs text-slate-400 uppercase tracking-wide">Моточасы</div>
+        <div class="font-semibold text-lg">4 280 ч</div>
+      </div>
+    </div>
+    <p class="text-xs text-slate-400 mt-3">Эти атрибуты управляют автоматической сборкой чек-листа. Редактируются в карточке техники.</p>
+  </div>
+
+  <!-- ░░░ Вкладки ░░░ -->
+  <div class="flex gap-6 border-b mb-5 text-sm font-medium">
+    <button class="pb-3 border-b-2 tab-active">ТО и осмотры</button>
+    <button class="pb-3 border-b-2 border-transparent text-slate-400">Ремонт и неисправности</button>
+    <button class="pb-3 border-b-2 border-transparent text-slate-400 ml-auto">Шаблоны-блоки (админ)</button>
+  </div>
+
+  <div class="grid grid-cols-3 gap-5">
+
+    <!-- ░░░ Левая колонка: запуск осмотра со сборкой из блоков ░░░ -->
+    <section class="col-span-1">
+      <div class="bg-white rounded-xl border shadow-sm p-5">
+        <h2 class="font-semibold mb-1">Начать осмотр / ТО</h2>
+        <p class="text-xs text-slate-500 mb-4">Чек-лист соберётся из блоков под эту машину</p>
+
+        <label class="text-xs text-slate-500">Уровень</label>
+        <select class="w-full border rounded-lg px-3 py-2 text-sm mb-4 bg-white">
+          <option>ЕО — ежедневный осмотр и обслуживание</option>
+          <option>ТО-1</option><option>ТО-2</option><option>ТО-3</option><option>Сезонное</option>
+        </select>
+
+        <div class="text-xs text-slate-500 mb-2">Будут включены блоки:</div>
+        <div class="space-y-2 mb-4">
+          <div class="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+            <span class="text-orange-600">▣</span> База · Banut 655 <span class="ml-auto text-xs text-slate-400">12 пунктов</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+            <span class="text-sky-600">▣</span> Молот · гидравлический <span class="ml-auto text-xs text-slate-400">7 пунктов</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+            <span class="text-emerald-600">▣</span> Вращатель <span class="ml-auto text-xs text-slate-400">5 пунктов</span>
+          </div>
+        </div>
+        <button class="w-full bg-orange-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-orange-700">Начать осмотр (24 пункта)</button>
+
+        <div class="border-t mt-5 pt-4">
+          <button class="w-full border border-slate-300 text-slate-700 rounded-lg py-2.5 text-sm font-medium hover:bg-slate-50">+ Записать ремонт / неисправность</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░░ Правая колонка: история (журнал) ░░░ -->
+    <section class="col-span-2">
+      <div class="bg-white rounded-xl border shadow-sm divide-y">
+        <div class="px-5 py-3 flex items-center justify-between">
+          <h2 class="font-semibold">История ТО и осмотров</h2>
+          <span class="text-xs text-slate-400">последние записи</span>
+        </div>
+
+        <!-- запись 1 -->
+        <div class="px-5 py-4 flex items-center gap-4 hover:bg-slate-50">
+          <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 grid place-items-center font-bold">98</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-0.5 rounded">ЕО</span>
+              <span class="font-medium text-sm">Ежедневный осмотр и обслуживание</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">06.06.2026 · смена 1 · машинист Петров · 4 280 ч</div>
+          </div>
+          <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded">Принят</span>
+        </div>
+
+        <!-- запись 2 -->
+        <div class="px-5 py-4 flex items-center gap-4 hover:bg-slate-50">
+          <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-700 grid place-items-center font-bold">84</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded">ТО-1</span>
+              <span class="font-medium text-sm">Плановое ТО-1</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">02.06.2026 · механик Сидоров · 4 180 ч · 2 замечания</div>
+          </div>
+          <span class="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded">На приёмке</span>
+        </div>
+
+        <!-- запись 3 -->
+        <div class="px-5 py-4 flex items-center gap-4 hover:bg-slate-50">
+          <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-700 grid place-items-center text-xl">🔧</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="bg-rose-100 text-rose-700 text-xs font-medium px-2 py-0.5 rounded">Ремонт</span>
+              <span class="font-medium text-sm">Замена РВД гидромолота</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">28.05.2026 · механик Сидоров · простой 6 ч · РВД ×2</div>
+          </div>
+          <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded">Закрыт</span>
+        </div>
+
+        <!-- запись 4 -->
+        <div class="px-5 py-4 flex items-center gap-4 hover:bg-slate-50">
+          <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 grid place-items-center font-bold">100</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-0.5 rounded">ЕО</span>
+              <span class="font-medium text-sm">Ежедневный осмотр и обслуживание</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">27.05.2026 · смена 2 · машинист Петров · 4 120 ч</div>
+          </div>
+          <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded">Принят</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ░░░ Превью заполнения чек-листа (как открывается осмотр) ░░░ -->
+  <h2 class="text-lg font-bold mt-10 mb-3">Так выглядит заполнение собранного чек-листа</h2>
+  <div class="bg-white rounded-xl border shadow-sm p-5 max-w-3xl">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div class="font-semibold">ЕО · Banut 655</div>
+        <div class="text-xs text-slate-500">06.06.2026 · машинист Петров · 4 280 ч</div>
+      </div>
+      <div class="text-right">
+        <div class="text-xs text-slate-400">Health Score</div>
+        <div class="text-2xl font-bold text-emerald-600">98</div>
+      </div>
+    </div>
+
+    <!-- Блок База -->
+    <div class="mb-4">
+      <div class="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-2">▣ База · Banut 655</div>
+      <div class="space-y-2">
+        <div class="flex items-center gap-3 border rounded-lg px-3 py-2">
+          <span class="text-sm flex-1">Уровень масла в гидробаке</span>
+          <span class="text-xs text-slate-400">норма: 3/4</span>
+          <div class="flex gap-1">
+            <span class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-medium">Норма</span>
+            <span class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-400">Замечание</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 border rounded-lg px-3 py-2">
+          <span class="text-sm flex-1">Очистить рабочую зону, смазать направляющие</span>
+          <span class="text-2xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">📷 фото</span>
+          <span class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-medium">Выполнено</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Блок Молот -->
+    <div class="mb-4">
+      <div class="text-xs font-semibold text-sky-600 uppercase tracking-wide mb-2">▣ Молот · гидравлический</div>
+      <div class="space-y-2">
+        <div class="flex items-center gap-3 border rounded-lg px-3 py-2">
+          <span class="text-sm flex-1">Давление в гидросистеме молота</span>
+          <input class="w-16 border rounded px-2 py-1 text-sm text-right" value="210" />
+          <span class="text-xs text-slate-400">бар · норма 200–230</span>
+        </div>
+        <div class="flex items-center gap-3 border rounded-lg px-3 py-2">
+          <span class="text-sm flex-1">Состояние РВД и быстроразъёмов</span>
+          <div class="flex gap-1">
+            <span class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-medium">Да</span>
+            <span class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-400">Нет</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Блок Вращатель -->
+    <div class="mb-4">
+      <div class="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">▣ Вращатель</div>
+      <div class="space-y-2">
+        <div class="flex items-center gap-3 border rounded-lg px-3 py-2">
+          <span class="text-sm flex-1">Уровень масла в редукторе вращателя</span>
+          <div class="flex gap-1">
+            <span class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-medium">Норма</span>
+            <span class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-400">Долить</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3 pt-3 border-t">
+      <button class="border border-slate-300 rounded-lg px-4 py-2 text-sm">Сохранить черновик</button>
+      <button class="bg-orange-600 text-white rounded-lg px-4 py-2 text-sm font-medium ml-auto">Завершить осмотр</button>
+    </div>
+  </div>
+
+  <p class="text-xs text-slate-400 mt-6 max-w-3xl">
+    Макет для обсуждения. Цвета/иконки условны. «Принят» ставит админ. Машинист видит только закреплённую за ним технику (роли — отдельный срез).
+  </p>
+</main>
+</body>
+</html>
