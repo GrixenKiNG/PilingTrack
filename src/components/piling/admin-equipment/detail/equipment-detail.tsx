@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, ChevronRight, ChevronDown, Printer, Timer } from 'lucide-react';
+import { ArrowLeft, Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, ChevronRight, ChevronDown, Printer, Timer, ClipboardList } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +27,7 @@ import { EquipmentPhotos } from './equipment-photos';
 import { EquipmentDocuments } from './equipment-documents';
 import { EquipmentMonitoring } from './equipment-monitoring';
 import { EquipmentMaintenance } from './equipment-maintenance';
+import { EquipmentInspections } from './equipment-inspections';
 import { EquipmentReportExport } from './equipment-report-export';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 
@@ -240,6 +241,11 @@ export function EquipmentDetail({ equipmentId }: Props) {
       <Section icon={Timer} title="Обслуживание">
         <MaintenanceBlock eq={eq} />
         <EquipmentMaintenance equipmentId={equipmentId} />
+      </Section>
+
+      {/* Осмотры */}
+      <Section icon={ClipboardList} title="Осмотры">
+        <EquipmentInspections equipmentId={equipmentId} />
       </Section>
 
       {/* Технический паспорт */}
