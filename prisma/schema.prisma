@@ -144,6 +144,9 @@ model Equipment {
   hammerType              String?   // "Junttan HHK-5/7", "PVE 50PR"
   hammerSerialNumber      String?
   hammerEnergyKj          Float?    // кДж
+  // Атрибуты сборки чек-листа: подбор блоков МОЛОТ и ВРАЩАТЕЛЬ
+  hammerKind              HammerKind @default(NONE)   // гидро / дизель / нет
+  isCombined              Boolean    @default(false)  // есть вращатель
 
   // Устаревшие поля из предыдущей итерации — оставлены чтобы не делать
   // destructive миграцию. UI шаблона их не показывает; удалить отдельной
@@ -183,6 +186,13 @@ enum EquipmentKind {
   VIBRO_HAMMER   // вибропогружатели
   HYBRID         // умеющие и забивку, и бурение (Liebherr LRH и т.п.)
   OTHER
+}
+
+// Тип молота на установке — управляет подбором блока МОЛОТ чек-листа
+enum HammerKind {
+  HYDRAULIC   // гидравлический
+  DIESEL      // дизельный
+  NONE        // молота нет
 }
 
 // ============================================================
@@ -252,6 +262,7 @@ model MaintenanceRecord {
   updatedAt   DateTime          @updatedAt      @db.Timestamptz(3)
 
   equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  inspection  Inspection?   // заполненный чек-лист для записей ЕО/ТО (1:1)
 
   @@index([tenantId])
   @@index([equipmentId])
@@ -262,10 +273,18 @@ model MaintenanceRecord {
 }
 
 enum MaintenanceType {
-  SCHEDULED    // плановое ТО
+  // Уровни ТО (с собранным чек-листом):
+  EO           // ежедневный осмотр и обслуживание
+  TO1          // плановое ТО-1
+  TO2          // плановое ТО-2
+  TO3          // плановое ТО-3
+  SEASONAL     // сезонное ТО
+  // Свободный ввод:
   REPAIR       // ремонт
   FAULT        // неисправность
-  INSPECTION   // осмотр / диагностика
+  // Deprecated — оставлены ради недеструктивной миграции; новые записи не создаём:
+  SCHEDULED    // (≈ TO1)
+  INSPECTION   // (≈ EO)
 }
 
 enum MaintenanceStatus {
@@ -308,20 +327,29 @@ enum InspectionStatus {
   COMPLETED
 }
 
+enum BlockType {
+  BASE     // база установки (по марке/модели)
+  HAMMER   // блок молота (по типу молота)
+  ROTARY   // блок вращателя (для комбинированных)
+}
+
 model ChecklistTemplate {
-  id             String   @id @default(cuid())
-  tenantId       String
-  name           String
-  level          ChecklistLevel
-  appliesToModel String?
-  isActive       Boolean  @default(true)
-  createdById    String?
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt      @db.Timestamptz(3)
-  sections       ChecklistSection[]
-  inspections    Inspection[]
+  id                  String         @id @default(cuid())
+  tenantId            String
+  name                String
+  level               ChecklistLevel
+  blockType           BlockType      @default(BASE)
+  appliesToModel      String?        // для BASE-блоков: марка/модель
+  appliesToHammerKind HammerKind?    // для HAMMER-блоков: тип молота
+  isActive            Boolean        @default(true)
+  createdById         String?
+  createdAt           DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt      @db.Timestamptz(3)
+  sections            ChecklistSection[]
+  inspections         Inspection[]
   @@index([tenantId])
   @@index([tenantId, level])
+  @@index([tenantId, blockType, level])
 }
 
 model ChecklistSection {
@@ -354,10 +382,11 @@ model ChecklistItem {
 }
 
 model Inspection {
-  id               String   @id @default(cuid())
-  tenantId         String
-  equipmentId      String
-  templateId       String
+  id                  String   @id @default(cuid())
+  tenantId            String
+  equipmentId         String
+  templateId          String
+  maintenanceRecordId String?  @unique   // 1:1 с записью ТО (ЕО/ТО)
   level            ChecklistLevel
   performedById    String
   shift            String?
@@ -373,6 +402,7 @@ model Inspection {
   answers          InspectionAnswer[]
   equipment        Equipment        @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
   template         ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  maintenanceRecord MaintenanceRecord? @relation(fields: [maintenanceRecordId], references: [id], onDelete: SetNull)
   @@index([tenantId])
   @@index([tenantId, equipmentId])
   @@index([tenantId, status])

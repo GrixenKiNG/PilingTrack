@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const m = vi.hoisted(() => ({
-  tplFindUnique: vi.fn(), eqFindUnique: vi.fn(),
+  tplFindUnique: vi.fn(), tplFindMany: vi.fn(), eqFindUnique: vi.fn(),
   insCreate: vi.fn(), insFindUnique: vi.fn(), insUpdate: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
+  recCreate: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
   db: {
-    checklistTemplate: { findUnique: m.tplFindUnique },
+    checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },
     equipment: { findUnique: m.eqFindUnique },
     inspection: { create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
+    maintenanceRecord: { create: m.recCreate },
   },
 }));
-import { startInspection, saveAnswers, completeInspection } from '../inspection-commands';
+import { startInspection, startToInspection, saveAnswers, completeInspection } from '../inspection-commands';
 
 beforeEach(() => Object.values(m).forEach((fn) => fn.mockReset()));
 
@@ -34,6 +36,52 @@ describe('startInspection', () => {
     m.eqFindUnique.mockResolvedValue(null);
     await expect(startInspection({ equipmentId: 'x', templateId: 't1', inspectionDate: '2026-06-03' },
       { tenantId: 'orion', userId: 'u1' })).rejects.toThrow('Equipment not found');
+  });
+});
+
+describe('startToInspection', () => {
+  const baseTpl = {
+    id: 'base1', blockType: 'BASE', name: 'Banut 655', appliesToModel: 'Banut 655', appliesToHammerKind: null,
+    sections: [{ title: 'Двигатель', order: 1, items: [
+      { id: 'b1', text: 'Масло', answerType: 'STATUS4', unit: null, norm: '3/4', provenance: null, required: true, photoRequired: false, order: 1 },
+    ] }],
+  };
+  const hammerTpl = {
+    id: 'ham1', blockType: 'HAMMER', name: 'Гидро', appliesToModel: null, appliesToHammerKind: 'HYDRAULIC',
+    sections: [{ title: 'Гидросистема', order: 1, items: [
+      { id: 'h1', text: 'Давление', answerType: 'MEASURE', unit: 'бар', norm: '200-230', provenance: null, required: true, photoRequired: false, order: 1 },
+    ] }],
+  };
+
+  it('composes BASE+HAMMER, creates record then inspection, links them', async () => {
+    m.eqFindUnique.mockResolvedValue({ id: 'eq1', model: 'Banut 655', hammerKind: 'HYDRAULIC', isCombined: false });
+    m.tplFindMany.mockResolvedValue([baseTpl, hammerTpl]);
+    m.recCreate.mockResolvedValue({ id: 'rec1' });
+    m.insCreate.mockResolvedValue({ id: 'ins1' });
+
+    await startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1' });
+
+    const recData = m.recCreate.mock.calls[0][0].data;
+    expect(recData).toMatchObject({ tenantId: 'orion', equipmentId: 'eq1', type: 'EO', status: 'IN_PROGRESS' });
+    const insData = m.insCreate.mock.calls[0][0].data;
+    expect(insData).toMatchObject({ tenantId: 'orion', maintenanceRecordId: 'rec1', templateId: 'base1', level: 'EO', status: 'DRAFT' });
+    expect(insData.templateSnapshot.map((s: { id: string }) => s.id)).toEqual(['b1', 'h1']);
+  });
+
+  it('throws 404 for cross-tenant equipment; writes nothing', async () => {
+    m.eqFindUnique.mockResolvedValue(null);
+    await expect(startToInspection({ equipmentId: 'x', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1' }))
+      .rejects.toThrow('Equipment not found');
+    expect(m.recCreate).not.toHaveBeenCalled();
+    expect(m.insCreate).not.toHaveBeenCalled();
+  });
+
+  it('throws 400 when no BASE block exists for the machine; writes nothing', async () => {
+    m.eqFindUnique.mockResolvedValue({ id: 'eq1', model: 'Banut 655', hammerKind: 'HYDRAULIC', isCombined: false });
+    m.tplFindMany.mockResolvedValue([hammerTpl]); // only hammer, no base
+    await expect(startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1' }))
+      .rejects.toThrow(/база/i);
+    expect(m.recCreate).not.toHaveBeenCalled();
   });
 });
 
