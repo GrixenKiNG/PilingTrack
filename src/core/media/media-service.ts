@@ -122,6 +122,25 @@ async function getDbClient() {
   return db;
 }
 
+/**
+ * Build the S3/MinIO object key, organized into real per-entity folders:
+ *   media/{tenant}/{entityType}/{entityId}/{mediaId}{ext}
+ * e.g. equipment docs → media/orion/equipment/<id>/...  (folder per установка).
+ * Without an entity → media/{tenant}/misc/...  Segments are sanitized so the
+ * inspection composite id ("insId__itemId") and others stay path-safe.
+ */
+export function buildMediaKey(
+  tenantId: string,
+  entityType: string | null | undefined,
+  entityId: string | null | undefined,
+  mediaId: string,
+  extension: string,
+): string {
+  const safe = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+  const folder = entityType && entityId ? `${safe(entityType)}/${safe(entityId)}` : 'misc';
+  return `media/${safe(tenantId)}/${folder}/${mediaId}${extension}`;
+}
+
 // ============================================================
 // Media Service
 // ============================================================
@@ -165,10 +184,10 @@ export class MediaService {
       );
     }
 
-    // Generate unique key
+    // Generate unique key — organized into per-entity folders (folder per установка).
     const extension = this.getExtension(request.fileName);
     const mediaId = crypto.randomUUID();
-    const key = `media/${request.tenantId}/${mediaId}${extension}`;
+    const key = buildMediaKey(request.tenantId, request.entityType, request.entityId, mediaId, extension);
     const db = await getDbClient();
 
     // Create media record (pending upload)
