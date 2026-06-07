@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Layers, Hammer, RotateCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Layers, Hammer, RotateCw, ShoppingCart, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
+import { getConsumables } from '@/modules/inspections/domain/consumables';
+import { LubricationMap } from './lubrication-map';
 
 type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 
@@ -105,6 +107,22 @@ export function StartInspectionForm() {
         { key: 'ROTARY', label: 'Вращатель', icon: RotateCw, show: selected.isCombined, ok: hasRotary },
       ].filter((b) => b.show)
     : [];
+
+  // Расходники к заказу для выбранной модели и уровня ТО (накопительно).
+  const consumables = selected ? getConsumables(selected.model, level) : [];
+
+  const copyConsumables = async () => {
+    const text = [
+      `Расходники к ТО (${LEVEL_LABEL[level]}) — ${selected?.name ?? ''}${selected?.model ? ` (${selected.model})` : ''}`,
+      ...consumables.map((c) => `• ${c.name} — ${c.marking} — ${c.qty}${c.note ? ` (${c.note})` : ''}`),
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Список расходников скопирован');
+    } catch {
+      toast.error('Не удалось скопировать');
+    }
+  };
 
   const submit = async () => {
     if (!equipmentId) { toast.error('Выберите установку'); return; }
@@ -205,6 +223,49 @@ export function StartInspectionForm() {
               </p>
             </div>
           )}
+
+          {/* Расходники к заказу (для уровней ТО) */}
+          {selected && consumables.length > 0 && (
+            <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-teal-800">
+                  <ShoppingCart className="h-4 w-4" /> Заказать перед ТО
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={copyConsumables} className="h-7 gap-1 px-2 text-xs">
+                  <Copy className="h-3 w-3" /> Скопировать
+                </Button>
+              </div>
+              <div className="overflow-hidden rounded-md border border-teal-100 bg-white">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-2xs uppercase tracking-wide text-slate-400">
+                      <th className="px-2 py-1.5 font-medium">Материал</th>
+                      <th className="px-2 py-1.5 font-medium">Маркировка</th>
+                      <th className="px-2 py-1.5 font-medium">Кол-во</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {consumables.map((c, i) => (
+                      <tr key={i} className="border-t border-slate-100 align-top">
+                        <td className="px-2 py-1.5 text-slate-800">
+                          {c.name}
+                          {c.note && <span className="block text-2xs text-slate-400">{c.note}</span>}
+                        </td>
+                        <td className="px-2 py-1.5 font-medium text-teal-700">{c.marking}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-900">{c.qty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-2xs text-slate-400">
+                Состав по уровню ТО (накопительно). Где марка/объём не заданы производителем — «по руководству».
+              </p>
+            </div>
+          )}
+
+          {/* Карта смазки (если для модели есть) */}
+          {selected && <LubricationMap model={selected.model} />}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

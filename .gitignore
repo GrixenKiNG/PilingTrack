@@ -106,3 +106,6 @@ scripts/prod-dump.sql.gz
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Brainstorming visual-companion mockups (local only)
+.superpowers/
