@@ -129,7 +129,7 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
             <Pencil className="w-4 h-4" /> Редактировать установку
           </DialogTitle>
         </DialogHeader>
-        <EquipmentForm state={state} onChange={(patch) => setState((s) => ({ ...s, ...patch }))} />
+        <EquipmentForm state={state} onChange={(patch) => setState((s) => ({ ...s, ...patch }))} equipmentId={item?.id} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { EquipmentToTab } from './equipment-to-tab';
 
 export interface EquipmentFormState {
   // core
@@ -100,16 +101,26 @@ interface Props {
   onChange: (patch: Partial<EquipmentFormState>) => void;
   /** When true, only the "Основное" tab is shown (used in create mode). */
   compact?: boolean;
+  /** Set in edit mode → enables the read-only «ТО» journal tab. */
+  equipmentId?: string;
 }
 
-export function EquipmentForm({ state, onChange, compact = false }: Props) {
+export function EquipmentForm({ state, onChange, compact = false, equipmentId }: Props) {
+  const showTo = !compact && !!equipmentId;
   return (
     <Tabs defaultValue="basic" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className={cn('grid w-full', showTo ? 'grid-cols-4' : 'grid-cols-3')}>
         <TabsTrigger value="basic">Основное</TabsTrigger>
         <TabsTrigger value="tech" disabled={compact}>Тех. характеристики</TabsTrigger>
+        {showTo && <TabsTrigger value="to">ТО</TabsTrigger>}
         <TabsTrigger value="ops" disabled={compact}>Эксплуатация</TabsTrigger>
       </TabsList>
+
+      {showTo && equipmentId && (
+        <TabsContent value="to" className="mt-4">
+          <EquipmentToTab equipmentId={equipmentId} />
+        </TabsContent>
+      )}
 
       {/* ---------- Tab 1: identification + core ---------- */}
       <TabsContent value="basic" className="mt-4">
