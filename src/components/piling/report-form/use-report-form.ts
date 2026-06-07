@@ -127,10 +127,12 @@ export function useReportForm(): UseReportFormReturn {
       setPileGrades(dictData.pileGrades || []);
       setDrillingTypes(dictData.drillingTypes || []);
       setDowntimeReasons(dictData.downtimeReasons || []);
-      // Load equipment
+      // Load equipment. Операторам показываем закреплённую за ними технику
+      // независимо от выбранного объекта — так же, как Мониторинг (fleet).
+      // Раньше передавали siteId, и установка пропадала из отчёта, если объект
+      // не совпадал с объектом бригады оператора.
       try {
-        const eqUrl = selectedSiteId ? `/api/equipment?siteId=${selectedSiteId}` : '/api/equipment';
-        const eqRes = await authFetch(eqUrl);
+        const eqRes = await authFetch('/api/equipment');
         if (eqRes.ok) {
           const data = await eqRes.json();
           setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
