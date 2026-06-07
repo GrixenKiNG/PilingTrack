@@ -375,7 +375,11 @@ const BLOCKS: BlockDef[] = [
 ];
 
 async function main() {
-  const tenantId = process.env.DEFAULT_TENANT_ID ?? 'orion';
+  // NB: on machines whose data was loaded from prod, DEFAULT_TENANT_ID may be
+  // 'default' while the real data lives under 'orion'. Pass SEED_TENANT_ID to
+  // target the tenant that actually owns the equipment.
+  const tenantId = process.env.SEED_TENANT_ID || process.env.DEFAULT_TENANT_ID || 'orion';
+  console.log(`Seeding checklist blocks for tenant: "${tenantId}"`);
 
   // Retire the old mislabeled seed (BASE/HHK7A "ЕО гидромолота" matched no machine).
   const retired = await db.checklistTemplate.updateMany({
