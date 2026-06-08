@@ -185,6 +185,50 @@ const SD_TO3_EXTRA: Section[] = [
   ] },
 ];
 
+// ─── Дизель-молот DD/DDT-45 — ТО (DDT-45 TO разд. 2.6). Интервалы по машино-часам:
+// ТО-1 ≈ 30 м/ч (~100 свай), ТО-2 ≈ 100 м/ч, сезонное 2×/год. Кумулятивно.
+const DH_TO1: Section[] = [
+  { title: 'ТО-1 дизель-молота (30 м/ч ≈ 100 свай)', items: [
+    D('Выполнить ежесменное ТО молота (ЕО)'),
+    D('Очистить молот от пыли и грязи'),
+    { text: 'Нет течей в соединениях насоса, форсунки и топливопровода' },
+    D('Заменить/добавить смазку по карте смазки'),
+    { text: 'Болтовые соединения подтянуты' },
+  ] },
+];
+const DH_TO2_EXTRA: Section[] = [
+  { title: 'ТО-2 дизель-молота (100 м/ч)', items: [
+    { text: 'Зазоры и зачистка рабочих поверхностей' },
+    { text: 'Поршневые кольца (заменить при необходимости)', answerType: 'STATUS4' },
+    { text: 'Топливный насос и регулировка фаз подачи топлива' },
+  ] },
+];
+const DH_SEASONAL_EXTRA: Section[] = [
+  { title: 'Сезонное ТО дизель-молота (2×/год)', items: [
+    { text: 'Коррозия всех деталей проверена, антикор обновлён', answerType: 'STATUS4' },
+    D('Топливная система обслужена (промывка, фильтрация)'),
+  ] },
+];
+
+// ─── Гидромолот PVE 7NL / Junttan HHK — ТО (PVE 7NL рук-во: сервисный интервал).
+// ТО по часам: периодическая проверка аккумуляторов; 1000 ч — уплотнения/болты.
+const HH_TO_PERIODIC: Section[] = [
+  { title: 'Гидромолот — периодический контроль', items: [
+    D('Выполнить ежедневное ТО молота (ЕО)'),
+    { text: 'Давление аккумулятора HP (рабочее)', answerType: 'MEASURE', unit: 'бар', norm: 'раб. 90, диапазон 30–150', provenance: 'PVE 7NL рук-во' },
+    { text: 'Давление аккумулятора LP (обратка)', answerType: 'MEASURE', unit: 'бар', norm: '6' },
+    { text: 'Амортизатор наголовника', answerType: 'MEASURE', unit: '%', norm: 'заменить при высоте < 20% исходной' },
+  ] },
+];
+const HH_TO_1000_EXTRA: Section[] = [
+  { title: 'Гидромолот — 1000 ч', items: [
+    D('Замена уплотнений цилиндра (1000 ч или при износе)'),
+    D('Замена болтов цилиндра (1000 ч или при замене уплотнений)'),
+    { text: 'Затяжка верхней пластины (110 → 310 Н·м, затем 90°)' },
+    { text: 'Проверка штока/цилиндра на царапины и износ', answerType: 'STATUS4' },
+  ] },
+];
+
 const BLOCKS: BlockDef[] = [
   // ─────────────── HAMMER · HYDRAULIC (PVE 7NL / Junttan HHK) §12d-FINAL/CANON
   {
@@ -573,6 +617,26 @@ const BLOCKS: BlockDef[] = [
     appliesToModel: 'SD-20', sections: [...SD_TO1, ...SD_TO2_EXTRA] },
   { name: 'ТО-3 (1000 ч, годовое) — Jintai SD-20', blockType: 'BASE', level: 'TO3',
     appliesToModel: 'SD-20', sections: [...SD_TO1, ...SD_TO2_EXTRA, ...SD_TO3_EXTRA] },
+
+  // ─────────────── HAMMER · ТО дизель-молота (DD/DDT-45), кумулятивно
+  { name: 'ТО-1 — дизель-молот (DD/DDT-45)', blockType: 'HAMMER', level: 'TO1',
+    appliesToHammerKind: 'DIESEL', sections: DH_TO1 },
+  { name: 'ТО-2 — дизель-молот (DD/DDT-45)', blockType: 'HAMMER', level: 'TO2',
+    appliesToHammerKind: 'DIESEL', sections: [...DH_TO1, ...DH_TO2_EXTRA] },
+  { name: 'ТО-3 — дизель-молот (DD/DDT-45)', blockType: 'HAMMER', level: 'TO3',
+    appliesToHammerKind: 'DIESEL', sections: [...DH_TO1, ...DH_TO2_EXTRA] },
+  { name: 'Сезонное — дизель-молот (DD/DDT-45)', blockType: 'HAMMER', level: 'SEASONAL',
+    appliesToHammerKind: 'DIESEL', sections: [...DH_TO1, ...DH_TO2_EXTRA, ...DH_SEASONAL_EXTRA] },
+
+  // ─────────────── HAMMER · ТО гидромолота (PVE 7NL / Junttan HHK), кумулятивно
+  { name: 'ТО-1 — гидромолот (PVE 7NL / Junttan HHK)', blockType: 'HAMMER', level: 'TO1',
+    appliesToHammerKind: 'HYDRAULIC', sections: HH_TO_PERIODIC },
+  { name: 'ТО-2 — гидромолот (PVE 7NL / Junttan HHK)', blockType: 'HAMMER', level: 'TO2',
+    appliesToHammerKind: 'HYDRAULIC', sections: HH_TO_PERIODIC },
+  { name: 'ТО-3 — гидромолот (PVE 7NL / Junttan HHK)', blockType: 'HAMMER', level: 'TO3',
+    appliesToHammerKind: 'HYDRAULIC', sections: [...HH_TO_PERIODIC, ...HH_TO_1000_EXTRA] },
+  { name: 'Сезонное — гидромолот (PVE 7NL / Junttan HHK)', blockType: 'HAMMER', level: 'SEASONAL',
+    appliesToHammerKind: 'HYDRAULIC', sections: [...HH_TO_PERIODIC, ...HH_TO_1000_EXTRA] },
 
   // ─────────────── ROTARY · буровой привод (вращатель) — руководство Liebherr BA 12 (110209)
   {
