@@ -7,14 +7,13 @@
  * §16.4, Jintai SD-20 §9.4). Где точная марка/объём не указаны производителем —
  * стоит «по руководству»/«по объёму узла», а не выдуманное значение.
  *
- * Накопительно по уровню: заказ на ТО-2 включает расходники ТО-1 (механик
- * выполняет ТО-1 в рамках ТО-2), и т.д. Исключение — модели из NON_CUMULATIVE
- * (КБУРГ-16): по руководству столбцы ТО самодостаточны, поэтому каждый уровень
- * содержит полный список своего ТО, без накопления.
+ * Полный комплект на любом уровне ТО: на ТО-1/2/3/Сезонное выводится весь
+ * набор расходников машины (двигатель, гидравлика, трансмиссия, смазки).
+ * Механик/администратор сам отмечает в заказе нужное и убирает лишнее — так
+ * ничего не забывается. Интервал каждой позиции указан в примечании (note).
  *
  * Кроме расходников базовой машины (по модели) учитываются расходники навесного
- * оборудования: молота (по типу) и вращателя (для комбинированных установок) —
- * чтобы заказ на ТО был полным.
+ * оборудования: молота (по типу) и вращателя (для комбинированных установок).
  */
 
 export type MaintLevel = 'TO1' | 'TO2' | 'TO3' | 'SEASONAL';
@@ -31,9 +30,6 @@ export interface Consumable {
 }
 
 const ORDER: MaintLevel[] = ['TO1', 'TO2', 'TO3', 'SEASONAL'];
-
-/** Модели, у которых столбцы ТО самодостаточны (списки полные, без накопления). */
-const NON_CUMULATIVE = new Set<string>(['КБУРГ-16']);
 
 // Смазочные материалы КБУРГ (Табл.5–6): нужны на каждом ТО (мачта, опора, канаты).
 const KB_GREASE: Consumable[] = [
@@ -161,12 +157,16 @@ const ROTARY_CONSUM: Partial<Record<MaintLevel, Consumable[]>> = {
   ],
 };
 
-/** Накопить расходники карты до выбранного уровня включительно. */
-function accumulate(map: Partial<Record<MaintLevel, Consumable[]>>, level: MaintLevel): Consumable[] {
+/** Полный комплект расходников карты (все уровни ТО), без дублей по названию. */
+function fullKit(map: Partial<Record<MaintLevel, Consumable[]>>): Consumable[] {
   const out: Consumable[] = [];
+  const seen = new Set<string>();
   for (const lv of ORDER) {
-    if (map[lv]) out.push(...map[lv]!);
-    if (lv === level) break;
+    for (const c of map[lv] ?? []) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      out.push(c);
+    }
   }
   return out;
 }
@@ -179,9 +179,9 @@ export interface ConsumableOpts {
 }
 
 /**
- * Полный список расходников к заказу для уровня ТО: база (по модели) + молот
- * (по типу) + вращатель (для комбинированных). Для ЕО и неизвестных уровней —
- * пусто. Накопительно, кроме моделей из NON_CUMULATIVE.
+ * Полный комплект расходников к заказу на ТО: база (по модели) + молот (по типу)
+ * + вращатель (для комбинированных). Один и тот же полный список для любого
+ * уровня ТО — механик отмечает нужное. Для ЕО и неизвестных уровней — пусто.
  */
 export function getConsumables(
   model: string | null | undefined,
@@ -189,18 +189,14 @@ export function getConsumables(
   opts: ConsumableOpts = {},
 ): Consumable[] {
   if (!ORDER.includes(level as MaintLevel)) return [];
-  const lv = level as MaintLevel;
   const out: Consumable[] = [];
 
   const byLevel = model ? DATA[model] : undefined;
-  if (byLevel) {
-    if (model && NON_CUMULATIVE.has(model)) out.push(...(byLevel[lv] ?? []));
-    else out.push(...accumulate(byLevel, lv));
-  }
+  if (byLevel) out.push(...fullKit(byLevel));
 
   const hk = opts.hammerKind;
-  if (hk === 'DIESEL' || hk === 'HYDRAULIC') out.push(...accumulate(HAMMER_CONSUM[hk], lv));
-  if (opts.isCombined) out.push(...accumulate(ROTARY_CONSUM, lv));
+  if (hk === 'DIESEL' || hk === 'HYDRAULIC') out.push(...fullKit(HAMMER_CONSUM[hk]));
+  if (opts.isCombined) out.push(...fullKit(ROTARY_CONSUM));
 
   return out;
 }

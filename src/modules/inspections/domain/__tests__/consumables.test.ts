@@ -8,25 +8,29 @@ describe('getConsumables', () => {
     expect(getConsumables(null, 'TO1')).toEqual([]);
   });
 
-  it('накопительно: ТО-2 включает расходники ТО-1', () => {
+  it('полный комплект: один и тот же список на любом уровне ТО', () => {
     const to1 = getConsumables('PVE 50PR', 'TO1');
     const to2 = getConsumables('PVE 50PR', 'TO2');
+    const to3 = getConsumables('PVE 50PR', 'TO3');
     expect(to1.length).toBeGreaterThan(0);
-    expect(to2.length).toBeGreaterThan(to1.length);
-    // все позиции ТО-1 присутствуют в ТО-2
-    for (const c of to1) expect(to2.some((x) => x.name === c.name)).toBe(true);
+    const names = (l: typeof to1) => l.map((c) => c.name).sort();
+    expect(names(to1)).toEqual(names(to2));
+    expect(names(to2)).toEqual(names(to3));
   });
 
-  it('ТО-3 ⊇ ТО-2 ⊇ ТО-1 (монотонно растёт)', () => {
-    const sizes = (['TO1', 'TO2', 'TO3'] as const).map((l) => getConsumables('PVE 50PR', l).length);
-    expect(sizes[0]).toBeLessThanOrEqual(sizes[1]);
-    expect(sizes[1]).toBeLessThanOrEqual(sizes[2]);
+  it('полный комплект PVE 50PR содержит двигатель, гидравлику и смазку', () => {
+    const kit = getConsumables('PVE 50PR', 'TO1');
+    expect(kit.some((c) => c.name.includes('Масло моторное'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Воздушный фильтр'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Масло гидравлическое'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Фильтр гидравлики'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Смазка'))).toBe(true);
   });
 
-  it('Liebherr: Сезонное накапливает все уровни ТО', () => {
-    const seasonal = getConsumables('LRH 100', 'SEASONAL');
-    const to3 = getConsumables('LRH 100', 'TO3');
-    expect(seasonal.length).toBeGreaterThan(to3.length);
+  it('без дублей по названию (КБУРГ: смазка не повторяется)', () => {
+    const kit = getConsumables('КБУРГ-16', 'TO3');
+    const names = kit.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it('каждая позиция имеет название, маркировку и количество', () => {
@@ -37,20 +41,14 @@ describe('getConsumables', () => {
     }
   });
 
-  it('КБУРГ-16: каждый уровень — полный список (не накопительно)', () => {
-    const to1 = getConsumables('КБУРГ-16', 'TO1');
-    const to2 = getConsumables('КБУРГ-16', 'TO2');
-    const to3 = getConsumables('КБУРГ-16', 'TO3');
-    // все уровни непустые и содержат смазку мачты
-    for (const list of [to1, to2, to3]) {
-      expect(list.length).toBeGreaterThan(0);
-      expect(list.some((c) => c.marking.includes('Литол-24'))).toBe(true);
-    }
-    // ТО-2 — замена рабочей жидкости и фильтроэлементов ГС
-    expect(to2.some((c) => c.name.includes('Рабочая жидкость'))).toBe(true);
-    expect(to2.some((c) => c.name.includes('Фильтроэлементы'))).toBe(true);
-    // не накопительно: ТО-3 НЕ содержит позицию ТО-1 «Керосин для промывки»
-    expect(to3.some((c) => c.name.includes('Керосин'))).toBe(false);
+  it('КБУРГ-16: полный комплект содержит смазки, гидравлику и масла', () => {
+    const kit = getConsumables('КБУРГ-16', 'TO1');
+    expect(kit.some((c) => c.marking.includes('Литол-24'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Рабочая жидкость'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Фильтроэлементы'))).toBe(true);
+    expect(kit.some((c) => c.name.includes('Керосин'))).toBe(true);
+    // тот же полный список на ТО-3
+    expect(getConsumables('КБУРГ-16', 'TO3').length).toBe(kit.length);
   });
 
   it('учитывает расходники молота и вращателя', () => {
