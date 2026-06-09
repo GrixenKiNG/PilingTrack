@@ -173,6 +173,8 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
   const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
   // photo counts keyed by itemId
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
+  // expanded extras (note + photos) keyed by itemId — компактный вид: по умолчанию скрыто
+  const [expandedExtras, setExpandedExtras] = useState<Record<string, boolean>>({});
 
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -430,27 +432,47 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
                       />
                     )}
 
-                    {/* Note */}
-                    <Textarea
-                      rows={1}
-                      placeholder="Примечание…"
-                      value={ans.note}
-                      disabled={isDone}
-                      onChange={(e) => setAnswer(item.id, { note: e.target.value })}
-                      className="mt-2 text-xs resize-none"
-                    />
-
-                    {/* Photos — always show; required items are visually marked */}
-                    {item.photoRequired && (
-                      <p className="mt-2 text-2xs text-amber-600 font-medium">Требуется фото</p>
-                    )}
-                    <InspectionItemPhotos
-                      inspectionId={inspectionId}
-                      itemId={item.id}
-                      onCountChange={(n) =>
-                        setPhotoCounts((prev) => ({ ...prev, [item.id]: n }))
+                    {/* Примечание + фото — компактно: свёрнуто по умолчанию, авто-раскрыто
+                        если уже есть примечание/фото или фото обязательно. */}
+                    {(() => {
+                      const photoN = photoCounts[item.id] ?? 0;
+                      const showExtras =
+                        expandedExtras[item.id] || !!ans.note || photoN > 0 || item.photoRequired;
+                      if (!showExtras) {
+                        return (
+                          <button
+                            type="button"
+                            disabled={isDone}
+                            onClick={() => setExpandedExtras((p) => ({ ...p, [item.id]: true }))}
+                            className="mt-2 text-2xs text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                          >
+                            + замечание / фото
+                          </button>
+                        );
                       }
-                    />
+                      return (
+                        <>
+                          <Textarea
+                            rows={1}
+                            placeholder="Примечание…"
+                            value={ans.note}
+                            disabled={isDone}
+                            onChange={(e) => setAnswer(item.id, { note: e.target.value })}
+                            className="mt-2 text-xs resize-none"
+                          />
+                          {item.photoRequired && (
+                            <p className="mt-2 text-2xs text-amber-600 font-medium">Требуется фото</p>
+                          )}
+                          <InspectionItemPhotos
+                            inspectionId={inspectionId}
+                            itemId={item.id}
+                            onCountChange={(n) =>
+                              setPhotoCounts((prev) => ({ ...prev, [item.id]: n }))
+                            }
+                          />
+                        </>
+                      );
+                    })()}
                   </div>
                 );
               })}
