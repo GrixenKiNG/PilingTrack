@@ -2,9 +2,16 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Wrench, Pencil, Trash2, Power, PowerOff, Loader2, Users, ExternalLink } from 'lucide-react';
+import { Wrench, Pencil, Trash2, Power, PowerOff, Loader2, Users, ExternalLink, MoreVertical } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { pluralizeRu } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -78,7 +85,7 @@ export function EquipmentRow({
                 <div className="flex flex-wrap items-center gap-2">
                   <p
                     className={cn(
-                      'text-sm font-semibold text-slate-900 truncate',
+                      'text-sm font-semibold text-slate-900 break-words',
                       !item.isActive && 'text-slate-400 line-through'
                     )}
                   >
@@ -121,47 +128,84 @@ export function EquipmentRow({
               </div>
             </div>
 
-            <div className="flex items-center gap-0.5 ml-2 flex-shrink-0">
+            {/* Десктоп: инлайн-иконки */}
+            <div className="ml-2 hidden flex-shrink-0 items-center gap-0.5 sm:flex">
               <Link
                 href={`/admin/equipment/${item.id}`}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                 title="Открыть карточку"
+                aria-label="Открыть карточку"
               >
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="h-4 w-4" />
               </Link>
               <button
                 onClick={() => onEdit(item)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-orange-50 hover:text-orange-600"
                 title="Редактировать"
+                aria-label="Редактировать"
               >
-                <Pencil className="w-4 h-4" />
+                <Pencil className="h-4 w-4" />
               </button>
               <button
                 onClick={() => onToggle(item)}
                 disabled={isToggling}
                 className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50',
+                  'flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:opacity-50',
                   item.isActive
-                    ? 'hover:bg-amber-100 text-slate-400 hover:text-amber-600'
-                    : 'hover:bg-green-100 text-slate-400 hover:text-green-600'
+                    ? 'text-slate-400 hover:bg-amber-100 hover:text-amber-600'
+                    : 'text-slate-400 hover:bg-green-100 hover:text-green-600'
                 )}
                 title={item.isActive ? 'Деактивировать' : 'Активировать'}
+                aria-label={item.isActive ? 'Деактивировать' : 'Активировать'}
               >
                 {isToggling ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : item.isActive ? (
-                  <PowerOff className="w-4 h-4" />
+                  <PowerOff className="h-4 w-4" />
                 ) : (
-                  <Power className="w-4 h-4" />
+                  <Power className="h-4 w-4" />
                 )}
               </button>
               <button
                 onClick={() => onDelete(item)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                 title="Удалить"
+                aria-label="Удалить"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="h-4 w-4" />
               </button>
+            </div>
+
+            {/* Мобильный: меню «⋯» с тач-таргетом 44px */}
+            <div className="ml-2 flex-shrink-0 sm:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100"
+                    aria-label="Действия"
+                  >
+                    {isToggling ? <Loader2 className="h-5 w-5 animate-spin" /> : <MoreVertical className="h-5 w-5" />}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild className="py-2.5">
+                    <Link href={`/admin/equipment/${item.id}`}>
+                      <ExternalLink className="h-4 w-4" /> Открыть карточку
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="py-2.5" onClick={() => onEdit(item)}>
+                    <Pencil className="h-4 w-4" /> Редактировать
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="py-2.5" onClick={() => onToggle(item)} disabled={isToggling}>
+                    {item.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                    {item.isActive ? 'Деактивировать' : 'Активировать'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="py-2.5 text-red-600 focus:text-red-600" onClick={() => onDelete(item)}>
+                    <Trash2 className="h-4 w-4" /> Удалить
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardContent>
