@@ -125,7 +125,9 @@ export function EquipmentAnalytics() {
     else { setSortKey(key); setSortDir(key === 'name' ? 'asc' : 'desc'); }
   };
 
-  const chip = 'rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50';
+  // Тач-таргеты ≥40px на мобильном, компактно на десктопе.
+  const chip = 'min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 sm:min-h-0 sm:py-1 sm:text-xs';
+  const dateInput = 'min-h-10 rounded-md border border-slate-200 bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
 
   return (
     <div className="space-y-5 p-4 lg:p-6">
@@ -145,11 +147,11 @@ export function EquipmentAnalytics() {
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="block text-2xs uppercase tracking-wide text-slate-400">С</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm" />
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={dateInput} />
         </label>
         <label className="text-sm">
           <span className="block text-2xs uppercase tracking-wide text-slate-400">По</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={dateInput} />
         </label>
         <div className="flex gap-1">
           <button type="button" onClick={() => { const t = todayYmd(); setFrom(t); setTo(t); }} className={chip}>Сегодня</button>
@@ -250,7 +252,53 @@ function FleetTable({
     return <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">Нет установок за выбранный период.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <>
+      {/* Мобильный: карточки + сортировка (таблица из 8 колонок не помещается) */}
+      <div className="md:hidden">
+        <label className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+          Сортировка:
+          <select
+            value={sortKey}
+            onChange={(e) => onSort(e.target.value as SortKey)}
+            className="min-h-10 flex-1 rounded-md border border-slate-200 bg-card px-2 py-2 text-sm text-slate-700"
+          >
+            {FLEET_COLUMNS.map((c) => (
+              <option key={c.k} value={c.k}>{c.label}{sortKey === c.k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</option>
+            ))}
+          </select>
+        </label>
+        <div className="space-y-2">
+          {rows.map((r) => (
+            <button
+              key={r.equipmentId}
+              type="button"
+              onClick={() => onOpen(r.equipmentId)}
+              className="block w-full rounded-lg border bg-card p-3 text-left active:bg-slate-50"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-900">{r.name}</div>
+                  <div className="text-2xs text-slate-400">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
+                </div>
+                {r.maintenanceDue && (
+                  <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">ТО скоро</span>
+                )}
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+                <Stat label="Сваи" value={`${fmt(r.piles)} шт`} sub={`${fmt(r.pileMeters)} м`} />
+                <Stat label="Бурение" value={`${fmt(r.drillingCount)} шт`} sub={`${fmt(r.drillingMeters)} м`} />
+                <Stat label="Отчётов" value={String(r.reportCount)} />
+                <Stat label="Утилизация" value={`${Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%`} sub={`${r.activeDays}/${periodDays} дн`} />
+                <Stat label="Простой" value={fmtHours(r.downtimeMinutes)} />
+                <Stat label="Топливо" value={r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'} />
+              </dl>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Десктоп: полная таблица */}
+      <div className="hidden overflow-x-auto rounded-lg border md:block">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
@@ -285,6 +333,19 @@ function FleetTable({
           ))}
         </tbody>
       </table>
+      </div>
+    </>
+  );
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-2xs uppercase tracking-wide text-slate-400">{label}</dt>
+      <dd className="font-mono tabular-nums text-slate-900">
+        {value}
+        {sub && <span className="text-2xs font-sans text-slate-400"> / {sub}</span>}
+      </dd>
     </div>
   );
 }
