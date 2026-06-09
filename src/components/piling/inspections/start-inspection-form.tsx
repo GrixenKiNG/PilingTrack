@@ -108,8 +108,10 @@ export function StartInspectionForm() {
       ].filter((b) => b.show)
     : [];
 
-  // Расходники к заказу для выбранной модели и уровня ТО (накопительно).
-  const consumables = selected ? getConsumables(selected.model, level) : [];
+  // Расходники к заказу для выбранной модели и уровня ТО: база + молот + вращатель.
+  const consumables = selected
+    ? getConsumables(selected.model, level, { hammerKind: selected.hammerKind, isCombined: selected.isCombined })
+    : [];
 
   const copyConsumables = async () => {
     const text = [
@@ -259,7 +261,7 @@ export function StartInspectionForm() {
                 </table>
               </div>
               <p className="mt-2 text-2xs text-slate-400">
-                Состав по уровню ТО (накопительно). Где марка/объём не заданы производителем — «по руководству».
+                Полный состав на этот уровень ТО: база + молот + вращатель. Где марка/объём не заданы производителем — «по руководству».
               </p>
             </div>
           )}

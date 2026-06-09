@@ -36,4 +36,35 @@ describe('getConsumables', () => {
       expect(c.qty).toBeTruthy();
     }
   });
+
+  it('КБУРГ-16: каждый уровень — полный список (не накопительно)', () => {
+    const to1 = getConsumables('КБУРГ-16', 'TO1');
+    const to2 = getConsumables('КБУРГ-16', 'TO2');
+    const to3 = getConsumables('КБУРГ-16', 'TO3');
+    // все уровни непустые и содержат смазку мачты
+    for (const list of [to1, to2, to3]) {
+      expect(list.length).toBeGreaterThan(0);
+      expect(list.some((c) => c.marking.includes('Литол-24'))).toBe(true);
+    }
+    // ТО-2 — замена рабочей жидкости и фильтроэлементов ГС
+    expect(to2.some((c) => c.name.includes('Рабочая жидкость'))).toBe(true);
+    expect(to2.some((c) => c.name.includes('Фильтроэлементы'))).toBe(true);
+    // не накопительно: ТО-3 НЕ содержит позицию ТО-1 «Керосин для промывки»
+    expect(to3.some((c) => c.name.includes('Керосин'))).toBe(false);
+  });
+
+  it('учитывает расходники молота и вращателя', () => {
+    const base = getConsumables('SD-20', 'TO1');
+    const withDiesel = getConsumables('SD-20', 'TO1', { hammerKind: 'DIESEL' });
+    expect(withDiesel.length).toBeGreaterThan(base.length);
+    expect(withDiesel.some((c) => c.name.includes('Топливная смесь'))).toBe(true);
+
+    const hyd1000 = getConsumables('PVE 50PR', 'TO3', { hammerKind: 'HYDRAULIC' });
+    expect(hyd1000.some((c) => c.name.includes('Азот'))).toBe(true);
+    expect(hyd1000.some((c) => c.name.includes('уплотнений цилиндра'))).toBe(true);
+
+    const combined = getConsumables('КБУРГ-16', 'TO3', { hammerKind: 'DIESEL', isCombined: true });
+    expect(combined.some((c) => c.note === 'вращатель')).toBe(true);
+    expect(combined.some((c) => c.note === 'молот')).toBe(true);
+  });
 });
