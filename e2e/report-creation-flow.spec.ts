@@ -101,7 +101,7 @@ test.describe('Real Report Creation Flow', () => {
 
   test('dispatcher views all reports', async ({ page }) => {
     // Login as dispatcher (hydration-safe helper)
-    await login(page, 'dispatcher@piling.ru', 'operator123');
+    await login(page, 'dispatch@piling.ru', 'dispatch123');
 
     // Dispatcher should have access to all reports
     const allReportsRes = await page.request.get('/api/reports/all');

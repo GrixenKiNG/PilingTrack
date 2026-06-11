@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { login } from './page-objects/login.page';
 
 /**
  * E2E — Проведение ТО (осмотра) end-to-end.
@@ -16,39 +17,10 @@ import { test, expect, type Page } from '@playwright/test';
  * допустимо (черновики не влияют на аналитику).
  */
 
-/**
- * Логин с защитой от гонки гидрации: fill до монтирования React стирается
- * при гидрации (контролируемые инпуты), поэтому заполняем с проверкой
- * значения и ретраем, а вместо слепого таймаута ждём ответ /api/auth/login.
- */
-async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto('/');
-  const email = page.locator('#email');
-  const password = page.locator('#password');
-  await email.waitFor({ state: 'visible', timeout: 10000 });
-
-  // До гидрации клик по submit делает нативный сабмит формы (страница
-  // перезагружается, поля очищаются, /api/auth/login не вызывается),
-  // поэтому ретраим связку целиком, пока не увидим ответ API.
-  await expect(async () => {
-    await email.fill('admin@piling.ru');
-    await password.fill('admin123');
-    const respPromise = page
-      .waitForResponse((r) => r.url().includes('/api/auth/login'), { timeout: 4000 })
-      .catch(() => null);
-    await page.locator('button[type="submit"]').click();
-    const resp = await respPromise;
-    expect(resp, 'submit ушёл до гидрации — /api/auth/login не вызван').not.toBeNull();
-    expect(resp!.ok()).toBe(true);
-  }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000] });
-
-  await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
-}
-
 test.describe('Inspection (ТО) flow', () => {
   test('admin starts ТО-1, answers an item and saves a draft', async ({ page }) => {
-    // 1. Login (no networkidle — SSE keeps the network busy; see report-creation-flow)
-    await loginAsAdmin(page);
+    // 1. Login (hydration-safe shared helper; see page-objects/login.page.ts)
+    await login(page, 'admin@piling.ru', 'admin123');
 
     // 2. Start-inspection form
     await page.goto('/inspections/new');
@@ -120,7 +92,7 @@ test.describe('Inspection (ТО) flow', () => {
   });
 
   test('hammer block resolves to a template on ТО levels', async ({ page }) => {
-    await loginAsAdmin(page);
+    await login(page, 'admin@piling.ru', 'admin123');
 
     await page.goto('/inspections/new');
     await page.locator('#si-equipment').waitFor({ state: 'visible', timeout: 10000 });
