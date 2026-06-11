@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './page-objects/login.page';
 
 /**
  * E2E — Real Report Creation Flow
@@ -14,24 +15,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Real Report Creation Flow', () => {
   test('operator creates a report end-to-end', async ({ page }) => {
-    // 1. Login
-    // No networkidle wait — the app's SSE stream keeps the network busy
-    // forever, so networkidle times out. The emailInput.waitFor below is
-    // the real readiness signal.
-    await page.goto('/');
-
-    const emailInput = page.locator('#email');
-    await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-    await emailInput.fill('operator@piling.ru');
-    await page.locator('#password').fill('operator123');
-    await page.locator('button[type="submit"]').click();
-
-    // Wait for navigation
-    await page.waitForTimeout(3000);
-
-    // 2. Verify logged in — URL should not be login
-    const currentUrl = page.url();
-    expect(currentUrl).not.toContain('login');
+    // 1. Login (hydration-safe; helper waits for /api/auth/login + redirect)
+    await login(page, 'operator@piling.ru', 'operator123');
 
     // 3. Navigate to report creation (if there's a button/link)
     // Look for "New Report" or similar
@@ -88,18 +73,8 @@ test.describe('Real Report Creation Flow', () => {
   });
 
   test('operator submits report via UI form', async ({ page }) => {
-    // Login (no networkidle — SSE keeps the network busy; see test above)
-    await page.goto('/');
-
-    const emailInput = page.locator('#email');
-    await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-    await emailInput.fill('operator@piling.ru');
-    await page.locator('#password').fill('operator123');
-    await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(3000);
-
-    // Check that the app loaded
-    expect(page.url()).not.toContain('login');
+    // Login (hydration-safe; helper waits for /api/auth/login + redirect)
+    await login(page, 'operator@piling.ru', 'operator123');
 
     // Verify dictionaries load
     await page.route('/api/dictionary/all', async (route) => {
@@ -125,15 +100,8 @@ test.describe('Real Report Creation Flow', () => {
   });
 
   test('dispatcher views all reports', async ({ page }) => {
-    // Login as dispatcher (no networkidle — SSE keeps network busy)
-    await page.goto('/');
-
-    const emailInput = page.locator('#email');
-    await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-    await emailInput.fill('dispatcher@piling.ru');
-    await page.locator('#password').fill('operator123');
-    await page.locator('button[type="submit"]').click();
-    await page.waitForTimeout(3000);
+    // Login as dispatcher (hydration-safe helper)
+    await login(page, 'dispatcher@piling.ru', 'operator123');
 
     // Dispatcher should have access to all reports
     const allReportsRes = await page.request.get('/api/reports/all');

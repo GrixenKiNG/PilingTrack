@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './page-objects/login.page';
 
 const USERS = {
   admin: { email: 'admin@piling.ru', password: 'admin123' },
@@ -7,22 +8,11 @@ const USERS = {
 
 test.describe('E2E — Full Application Flow', () => {
   test('operator login → read sites → read reports', async ({ page }) => {
-    await page.goto('/');
+    // Login (hydration-safe; helper waits for /api/auth/login + redirect)
+    await login(page, USERS.operator.email, USERS.operator.password);
 
-    // Login (no networkidle — SSE keeps the network busy; wait for the form)
-    const emailInput = page.locator('#email');
-    const passwordInput = page.locator('#password');
-    await emailInput.waitFor({ state: 'visible', timeout: 10000 });
-    await emailInput.fill(USERS.operator.email);
-    await passwordInput.fill(USERS.operator.password);
-    await page.locator('button[type="submit"]').click();
-
-    // Wait for navigation after login
-    await page.waitForTimeout(2000);
-
-    // Verify logged in — should see site selector or dashboard
-    const url = page.url();
-    expect(url).not.toContain('login');
+    // Verify logged in — should not be on the login page
+    expect(page.url()).not.toContain('login');
   });
 
   test('health endpoints return correct data', async ({ request }) => {
