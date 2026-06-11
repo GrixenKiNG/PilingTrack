@@ -81,7 +81,7 @@ npm run start
 
 ```bash
 # Запуск PostgreSQL
-docker compose -f docker-compose.production.yml up -d postgres
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d postgres
 
 # Сборка и запуск приложения
 npm run docker:build:prod
