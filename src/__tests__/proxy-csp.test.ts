@@ -60,6 +60,22 @@ describe('proxy CSP nonce (C-4)', () => {
     expect(csp).toContain("'unsafe-eval'");
   });
 
+  it("dev script-src drops strict-dynamic so 'self' authorizes /_next/static chunks", () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const scriptSrc = getCsp(proxy(makeReq()))
+      .split(';')
+      .map((d) => d.trim())
+      .find((d) => d.startsWith('script-src '));
+
+    expect(scriptSrc).toBeDefined();
+    // strict-dynamic would make the browser ignore 'self' and block dev chunks.
+    expect(scriptSrc).not.toContain("'strict-dynamic'");
+    expect(scriptSrc).toContain("'self'");
+    // 'unsafe-inline' is only effective with no nonce-source present.
+    expect(scriptSrc).toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toMatch(/'nonce-/);
+  });
+
   it('keeps object-src none and frame-ancestors self', () => {
     const csp = getCsp(proxy(makeReq()));
     expect(csp).toContain("object-src 'none'");

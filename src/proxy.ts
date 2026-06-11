@@ -142,24 +142,36 @@ function enforceTenant(request: NextRequest, response: NextResponse): NextRespon
  * so it bypasses this branch entirely.
  */
 function buildNonceCsp(nonce: string): string {
-  const isProd = process.env.NODE_ENV === 'production';
+  // Only real `next dev` gets the relaxed policy. Test (NODE_ENV=test) and
+  // prod both keep the hardened nonce + strict-dynamic policy — keying off
+  // `=== 'development'` (not `!== 'production'`) keeps proxy-csp.test.ts green.
+  const isDev = process.env.NODE_ENV === 'development';
 
   return [
     "default-src 'self'",
-    // Dev needs 'unsafe-eval' for React Refresh / HMR. Prod must NOT have it.
-    isProd
-      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'`
-      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' 'wasm-unsafe-eval'`,
+    // Prod/test: nonce + strict-dynamic. Note strict-dynamic makes the browser
+    // IGNORE 'self', so chunks are authorized only via nonce-propagation (Next
+    // stamps the nonce on every SSR'd <script>).
+    //
+    // Dev: drop strict-dynamic AND the nonce. Next's HMR/React-Refresh runtime
+    // loads some chunks (incl. the app/loading.tsx + not-found boundary) without
+    // a nonce; with strict-dynamic neutering 'self' those legitimate same-origin
+    // /_next/static/chunks/* get CSP-blocked (e.g. on a 404). Without
+    // strict-dynamic, 'self' is honored again. 'unsafe-inline' is only effective
+    // because no nonce-source is present here (a nonce would suppress it).
+    isDev
+      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'`,
     // style-src keeps 'unsafe-inline' — Tailwind/CSS-in-JS rely on it, and
     // inline CSS is materially lower risk than inline JS.
     "style-src 'self' 'unsafe-inline'",
-    isProd
-      ? "img-src 'self' data: blob: https:"
-      : "img-src 'self' data: blob: https: http://localhost:*",
+    isDev
+      ? "img-src 'self' data: blob: https: http://localhost:*"
+      : "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    isProd
-      ? "connect-src 'self' https: ws: wss:"
-      : "connect-src 'self' https: ws: wss: http://localhost:*",
+    isDev
+      ? "connect-src 'self' https: ws: wss: http://localhost:*"
+      : "connect-src 'self' https: ws: wss:",
     "media-src 'self'",
     "object-src 'none'",
     "frame-ancestors 'self'",
