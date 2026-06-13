@@ -65,4 +65,21 @@ describe('getConsumables', () => {
     expect(combined.some((c) => c.note === 'вращатель')).toBe(true);
     expect(combined.some((c) => c.note === 'молот')).toBe(true);
   });
+
+  // Regression guard for the Liebherr LRH 100 reference data: these part numbers
+  // were transcribed from the LB 20 LRH~100 manual and are easy to break by an
+  // accidental edit. Pin the exact catalogue numbers per ТО level.
+  it('LRH 100: полный комплект содержит точные артикулы из руководства', () => {
+    const kit = getConsumables('LRH 100', 'TO3');
+    const markings = kit.map((c) => c.marking).join(' | ');
+
+    // Engine oil filter (D 936 L A6) + the two interchangeable numbers.
+    expect(markings).toContain('5601056');
+    expect(markings).toContain('10490037');
+    // Air filter (main + safety), fuel and hydraulic filters.
+    expect(markings).toContain('10802649');
+    expect(markings).toContain('LE7367182');
+    expect(markings).toContain('LE7367045');
+    expect(markings).toContain('7616098');
+  });
 });
