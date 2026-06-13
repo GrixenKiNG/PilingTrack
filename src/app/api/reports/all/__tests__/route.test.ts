@@ -51,14 +51,15 @@ describe('GET /api/reports/all', () => {
     requireAuthMock.mockResolvedValue({ user: { id: 'admin', role: 'ADMIN' }, error: null });
     listReviewMock.mockResolvedValue({ data: [{ reportId: 'r1' }], hasMore: true, nextCursor: 'c1' });
 
-    const res = await GET(req('siteId=site_X&userId=u9'));
+    const res = await GET(req('siteId=site_X&userId=u9&cursor=c0&limit=75'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ reports: [{ reportId: 'r1' }], hasMore: true, nextCursor: 'c1' });
 
-    const [user, siteId, , userId] = listReviewMock.mock.calls[0];
+    const [user, siteId, pagination, userId] = listReviewMock.mock.calls[0];
     expect(user).toMatchObject({ id: 'admin' });
     expect(siteId).toBe('site_X');
+    expect(pagination).toEqual({ cursor: 'c0', limit: 75 });
     expect(userId).toBe('u9');
   });
 });

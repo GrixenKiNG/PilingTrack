@@ -18,8 +18,11 @@ export const GET = withApi(
     assertCan(user!, 'reports.read_all');
     const siteId = request.nextUrl.searchParams.get('siteId');
     const userId = request.nextUrl.searchParams.get('userId');
+    const cursor = request.nextUrl.searchParams.get('cursor') || undefined;
+    const limitParam = Number(request.nextUrl.searchParams.get('limit') || 25);
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 100) : 25;
     const { listReportsForReview } = await getReportsModule();
-    const paginated = await listReportsForReview(user!, siteId, undefined, userId);
+    const paginated = await listReportsForReview(user!, siteId, { cursor, limit }, userId);
     return NextResponse.json({ reports: paginated.data, hasMore: paginated.hasMore, nextCursor: paginated.nextCursor });
   },
   { domain: 'reports', cache: true, cacheTTL: 10_000 }

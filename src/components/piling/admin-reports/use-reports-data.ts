@@ -46,11 +46,16 @@ export interface UseReportsDataReturn {
   error: string | null;
   loadingSites: boolean;
   loadingReferenceData: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
   handleApplyPeriod: () => void;
   handleResetPeriod: () => void;
+  loadMoreReports: () => Promise<void>;
   loadReports: () => Promise<void>;
   loadReferenceData: () => Promise<void>;
 }
+
+const REPORTS_PAGE_LIMIT = 100;
 
 export function useReportsData(): UseReportsDataReturn {
   const [reports, setReports] = useState<ReportDTO[]>([]);
@@ -71,6 +76,9 @@ export function useReportsData(): UseReportsDataReturn {
   const [loading, setLoading] = useState(true);
   const [loadingSites, setLoadingSites] = useState(false);
   const [loadingReferenceData, setLoadingReferenceData] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const referenceDataLoadedRef = useRef(false);
@@ -86,9 +94,10 @@ export function useReportsData(): UseReportsDataReturn {
     const loadSitesAndOperators = async () => {
       setLoadingSites(true);
       try {
-        const [sitesRes, operatorsRes] = await Promise.all([
+        const [sitesRes, operatorsRes, equipmentRes] = await Promise.all([
           authFetch('/api/sites/all', { signal: abortController.signal }),
           authFetch('/api/users?role=OPERATOR', { signal: abortController.signal }),
+          authFetch('/api/equipment', { signal: abortController.signal }),
         ]);
         if (!isMounted) return;
         if (sitesRes.ok) {
@@ -98,6 +107,10 @@ export function useReportsData(): UseReportsDataReturn {
         if (operatorsRes.ok) {
           const data = await operatorsRes.json();
           setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
+        }
+        if (equipmentRes.ok) {
+          const data = await equipmentRes.json();
+          setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
         }
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
@@ -127,23 +140,17 @@ export function useReportsData(): UseReportsDataReturn {
 
     setLoadingReferenceData(true);
 
-    // Operators are now loaded eagerly on mount alongside sites — no need to
-    // re-fetch them here. We only need dictionary + equipment for the dialog.
+    // Operators/equipment are now loaded eagerly on mount alongside sites —
+    // no need to re-fetch them here. We only need dictionaries for the dialog.
     const promise = Promise.all([
       authFetch('/api/dictionary/all'),
-      authFetch('/api/equipment'),
     ])
-      .then(async ([dictionaryRes, equipmentRes]) => {
+      .then(async ([dictionaryRes]) => {
         if (dictionaryRes.ok) {
           const data = await dictionaryRes.json();
           setPileGrades(data.pileGrades || []);
           setDrillingTypes(data.drillingTypes || []);
           setDowntimeReasons(data.downtimeReasons || []);
-        }
-
-        if (equipmentRes.ok) {
-          const data = await equipmentRes.json();
-          setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
         }
 
         referenceDataLoadedRef.current = true;
@@ -178,6 +185,7 @@ export function useReportsData(): UseReportsDataReturn {
           const params = new URLSearchParams();
           if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
           if (filterUserId !== 'all') params.set('userId', filterUserId);
+          params.set('limit', String(REPORTS_PAGE_LIMIT));
           const qs = params.toString();
           url = qs ? `/api/reports/all?${qs}` : '/api/reports/all';
         }
@@ -187,6 +195,8 @@ export function useReportsData(): UseReportsDataReturn {
           const data = await res.json();
           const reportsArray = Array.isArray(data.reports) ? data.reports : [];
           setReports(reportsArray);
+          setHasMore(!periodActive && Boolean(data.hasMore));
+          setNextCursor(!periodActive ? data.nextCursor ?? null : null);
           if (periodActive) {
             setPeriodSummary(data.summary || null);
           } else {
@@ -197,11 +207,15 @@ export function useReportsData(): UseReportsDataReturn {
           // NOT throw, so without this branch the list would render empty as
           // if there were simply no reports. Surface it as a real error.
           setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+          setHasMore(false);
+          setNextCursor(null);
           toast.error('Ошибка загрузки отчётов');
         }
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
           setError('Не удалось загрузить отчёты. Проверьте соединение.');
+          setHasMore(false);
+          setNextCursor(null);
           toast.error('Ошибка загрузки отчётов');
         }
       } finally {
@@ -224,6 +238,33 @@ export function useReportsData(): UseReportsDataReturn {
   const loadReports = useCallback(async () => {
     setReloadKey((k) => k + 1);
   }, []);
+
+  const loadMoreReports = useCallback(async () => {
+    if (periodActive || loadingMore || !hasMore || !nextCursor) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ cursor: nextCursor, limit: String(REPORTS_PAGE_LIMIT) });
+      if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+      if (filterUserId !== 'all') params.set('userId', filterUserId);
+      const res = await authFetch(`/api/reports/all?${params.toString()}`);
+      if (!res.ok) {
+        setError('Не удалось догрузить отчёты. Сервер вернул ошибку.');
+        toast.error('Ошибка догрузки отчётов');
+        return;
+      }
+      const data = await res.json();
+      const reportsArray = Array.isArray(data.reports) ? data.reports : [];
+      setReports((prev) => [...prev, ...reportsArray]);
+      setHasMore(Boolean(data.hasMore));
+      setNextCursor(data.nextCursor ?? null);
+    } catch {
+      setError('Не удалось догрузить отчёты. Проверьте соединение.');
+      toast.error('Ошибка догрузки отчётов');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [filterSiteId, filterUserId, hasMore, loadingMore, nextCursor, periodActive]);
 
   const handleApplyPeriod = () => {
     if (!periodFrom || !periodTo) {
@@ -249,7 +290,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, error,
-    handleApplyPeriod, handleResetPeriod, loadReports, loadReferenceData,
+    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, loadingMore, hasMore, error,
+    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { HardHat, Drill, Clock, Eye } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
@@ -57,12 +56,6 @@ export function ReportDetailDialog({
               <div>
                 <p className="text-xs text-slate-500">Установка</p>
                 <p className="font-medium">{report.equipment?.name || '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Статус</p>
-                <Badge variant="secondary" className={
-                  report.status === 'submitted' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                }>{report.status === 'submitted' ? 'Отправлен' : 'Черновик'}</Badge>
               </div>
               <div className="col-span-2">
                 <p className="text-xs text-slate-500">Последнее редактирование</p>
