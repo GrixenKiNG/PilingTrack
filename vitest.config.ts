@@ -38,13 +38,13 @@ export default defineConfig({
         // `npm run test:coverage` runnable.
         'src/services/telemetry/mqtt-ingestion-service.ts',
       ],
-      // Ratchet floor, not target. Set just below current actual (lines 23.3 /
-      // statements 22.5 / functions 19.2 / branches 19.2) so a PR that adds
+      // Ratchet floor, not target. Set just below current actual (lines 24.1 /
+      // statements 23.3 / functions 19.9 / branches 19.6) so a PR that adds
       // code without tests trips the gate. Bump these up whenever coverage
       // grows — never down without a deliberate reason. Run: `npm run test:coverage`.
       thresholds: {
-        lines: 23,
-        statements: 22,
+        lines: 24,
+        statements: 23,
         functions: 19,
         branches: 19,
       },
