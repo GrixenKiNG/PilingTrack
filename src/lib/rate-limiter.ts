@@ -472,28 +472,19 @@ function resolveClientIp(request: Request, fallback: string): string {
 }
 
 /**
- * Helper to extract identifier from request.
- * Supports tenant-aware rate limiting.
+ * Helper to extract a rate-limit identifier from a request.
  *
- * NOTE: when `includeTenant` is set, tenant ID MUST be resolved server-side
- * after auth and passed via the second positional arg in the future. The
- * `x-tenant-id` header is client-controlled and should never partition
- * rate-limit buckets on its own.
+ * The bucket key is derived only from the IP (TRUST_PROXY-gated, see
+ * `resolveClientIp`) or the host — never from a client-controlled header.
+ * Partitioning by an attacker-controllable value (e.g. `x-tenant-id` on a
+ * pre-auth endpoint) lets the caller rotate it to mint unlimited buckets and
+ * defeat brute-force protection.
  */
 export function getRateLimitIdentifier(
   request: Request,
-  fallback: string = 'unknown',
-  options?: { includeTenant?: boolean }
+  fallback: string = 'unknown'
 ): string {
   const ip = resolveClientIp(request, fallback);
-
-  if (options?.includeTenant) {
-    // Header is untrusted; treat as opaque suffix only — never as a security
-    // boundary. Real tenant isolation comes from session-bound checks elsewhere.
-    const tenantId = request.headers.get('x-tenant-id');
-    return tenantId ? `tenant:${tenantId}:ip:${ip}` : `ip:${ip}`;
-  }
-
   return ip === fallback ? `host-${request.headers.get('host') || 'localhost'}` : ip;
 }
 

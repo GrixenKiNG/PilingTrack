@@ -32,12 +32,12 @@ export const POST = withApi(async (request: NextRequest) => {
 
   const { pin } = validation.data;
 
-  // Rate-limit by client identifier (IP, or tenant+IP if tenant header present).
-  // Prevents a brute-force of "try all PINs from one IP" that rate-limiting
-  // by PIN value would miss.
-  const clientIdentifier = getRateLimitIdentifier(request, 'unknown', {
-    includeTenant: true,
-  });
+  // Rate-limit by client identifier (IP/host). Prevents a brute-force of
+  // "try all PINs from one IP" that rate-limiting by PIN value would miss.
+  // Must NOT partition by x-tenant-id: pre-auth that header is attacker-
+  // controlled, so including it lets an attacker rotate it to mint a fresh
+  // PIN-attempt allowance per value.
+  const clientIdentifier = getRateLimitIdentifier(request);
   const result = await authenticateUserByPin(pin, clientIdentifier);
 
   if (result.rateLimited) {

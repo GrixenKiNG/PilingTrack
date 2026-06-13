@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT } from '../rate-limiter';
+import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT, getRateLimitIdentifier } from '../rate-limiter';
 
 describe('rate-limiter', () => {
   beforeEach(async () => {
@@ -166,6 +166,22 @@ describe('rate-limiter', () => {
 
       const result = await rateLimiter.check('user-1', PIN_RATE_LIMIT);
       expect(result.allowed).toBe(false);
+    });
+  });
+
+  describe('getRateLimitIdentifier', () => {
+    function req(headers: Record<string, string>): Request {
+      return new Request('http://localhost/api/auth/pin', { headers });
+    }
+
+    // Brute-force amplification guard: the bucket key must never depend on a
+    // client-controlled header. An attacker who can vary the value rotates it
+    // to mint a fresh bucket per request and defeats the PIN attempt limit —
+    // the same class of bug `resolveClientIp` already gates behind TRUST_PROXY.
+    it('ignores the untrusted x-tenant-id header when bucketing', () => {
+      const a = getRateLimitIdentifier(req({ 'x-tenant-id': 'attacker-1' }));
+      const b = getRateLimitIdentifier(req({ 'x-tenant-id': 'attacker-2' }));
+      expect(a).toBe(b);
     });
   });
 });
