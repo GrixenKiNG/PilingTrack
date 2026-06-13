@@ -38,14 +38,15 @@ export default defineConfig({
         // `npm run test:coverage` runnable.
         'src/services/telemetry/mqtt-ingestion-service.ts',
       ],
-      // Floor, not target. Current is ~23% lines / 20% branches; thresholds
-      // are set just below so PRs can't silently regress. Ratchet up as
-      // coverage grows. Run locally: `npm run test:coverage`.
+      // Ratchet floor, not target. Set just below current actual (lines 23.3 /
+      // statements 22.5 / functions 19.2 / branches 19.2) so a PR that adds
+      // code without tests trips the gate. Bump these up whenever coverage
+      // grows — never down without a deliberate reason. Run: `npm run test:coverage`.
       thresholds: {
-        lines: 20,
-        statements: 20,
-        functions: 18,
-        branches: 18,
+        lines: 23,
+        statements: 22,
+        functions: 19,
+        branches: 19,
       },
     },
   },
