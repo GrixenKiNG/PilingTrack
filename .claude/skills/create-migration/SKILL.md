@@ -52,6 +52,36 @@ npm run db:check-migrations
   name to `scripts/.migration-guard-baseline.txt` with a comment explaining
   why the destructive change is safe (see existing entries for the format).
 
+## New tenant-scoped table → add RLS
+
+If the migration adds a table that carries `tenantId`, it also needs Row-Level
+Security, in a **separate `_rls` migration** (the project keeps schema and RLS
+split — e.g. `..._checklist_engine_slice1` + `..._checklist_engine_rls`).
+
+Follow the established pattern (mirror `app.current_tenant`, audit-mode: allow
+when the GUC is unset/empty, else strict match). Copy from an existing `_rls`
+migration like `20260603120100_checklist_engine_rls`:
+
+```sql
+ALTER TABLE "NewTable" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_new_table ON "NewTable"
+  FOR ALL
+  USING (
+    current_setting('app.current_tenant', true) IS NULL
+    OR current_setting('app.current_tenant', true) = ''
+    OR "tenantId" = current_setting('app.current_tenant', true)
+  )
+  WITH CHECK ( /* same three conditions */ );
+```
+
+Notes:
+- The `IS NULL OR '' OR` branch here is the **DB audit-mode** allowance (GUC not
+  set), NOT the app-layer `IS NULL OR tenantId` IDOR antipattern. App queries must
+  still fail closed on a missing `tenantId`.
+- If `tenantId` is `NOT NULL` on the table, no legacy-NULL row branch is needed.
+- After deploy, verify the policy exists:
+  `SELECT polname FROM pg_policy WHERE polrelid = '"NewTable"'::regclass;`
+
 ## Destructive migrations on prod
 
 If the migration drops a column/table and prod has data in it, check prod
