@@ -37,7 +37,7 @@ import { ReportDetailDialog } from './report-detail-dialog';
 import { ReportFormDialog } from './report-form-dialog';
 import { ReportThumbnail } from './report-thumbnail';
 import { useReportHistory } from './use-report-history';
-import { statusLabel, type ReportHistory } from '@/services/reports/report-history-service';
+import { statusLabel, type ReportHistory } from '@/services/reports/report-history';
 
 type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
 

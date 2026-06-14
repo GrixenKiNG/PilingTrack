@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/api';
-import type { ReportHistory } from '@/services/reports/report-history-service';
+import type { ReportHistory } from '@/services/reports/report-history';
 
 interface UseReportHistoryState {
   data: ReportHistory | null;
