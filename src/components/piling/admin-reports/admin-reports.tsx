@@ -36,6 +36,8 @@ import { ReportFilters } from './report-filters';
 import { ReportDetailDialog } from './report-detail-dialog';
 import { ReportFormDialog } from './report-form-dialog';
 import { ReportThumbnail } from './report-thumbnail';
+import { useReportHistory } from './use-report-history';
+import { statusLabel, type ReportHistory } from '@/services/reports/report-history-service';
 
 type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
 
@@ -131,6 +133,13 @@ function formatIsoDateTime(value: string | null | undefined): string {
   });
 }
 
+function roleLabel(role: string): string {
+  if (role === 'ADMIN') return 'Администратор';
+  if (role === 'DISPATCHER') return 'Диспетчер';
+  if (role === 'ASSISTANT') return 'Помощник';
+  return 'Оператор';
+}
+
 function shiftDurationHours(report: ReportDTO): number | null {
   if (!report.shiftStart || !report.shiftEnd) return null;
   const [startHour, startMinute] = report.shiftStart.split(':').map(Number);
@@ -166,6 +175,7 @@ export function AdminReports() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   const [photoReportIds, setPhotoReportIds] = useState<Record<string, boolean>>({});
+  const reportHistory = useReportHistory(previewReport?.reportId);
 
   useEffect(() => {
     if (showCreateDialog) {
@@ -288,6 +298,10 @@ export function AdminReports() {
   }, [filterEquipmentId, photoReportIds, quickFilter, reports]);
 
   const totals = useMemo(() => addTotals(filteredReports), [filteredReports]);
+  const photoCount = useMemo(
+    () => filteredReports.filter((r) => photoReportIds[r.reportId] === true).length,
+    [filteredReports, photoReportIds],
+  );
   const reportWord = `${filteredReports.length} ${pluralizeRu(filteredReports.length, ['отчёт', 'отчёта', 'отчётов'])}`;
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -335,7 +349,7 @@ export function AdminReports() {
               onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
             />
 
-            <EvidenceSummary reportCount={filteredReports.length} totals={totals} />
+            <EvidenceSummary reportCount={filteredReports.length} totals={totals} photoCount={photoCount} />
 
             <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
@@ -448,6 +462,7 @@ export function AdminReports() {
 
           <ReportEvidencePreview
             report={previewReport}
+            history={reportHistory}
             formatDate={formatDate}
             onClose={() => setPreviewReport(null)}
             onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
@@ -524,13 +539,13 @@ function ReportsHeader({
   );
 }
 
-function EvidenceSummary({ reportCount, totals }: { reportCount: number; totals: ReportTotals }) {
+function EvidenceSummary({ reportCount, totals, photoCount }: { reportCount: number; totals: ReportTotals; photoCount: number }) {
   const items = [
     { label: 'Отчёты', value: String(reportCount), icon: FileText, detail: 'за выбранный срез', tone: 'slate' },
     { label: 'Сваи', value: formatNumber(totals.piles), icon: HardHat, detail: `${formatNumber(totals.pileMeters)} м.п.`, tone: 'orange' },
     { label: 'Бурение', value: formatNumber(totals.drillingCount), icon: Drill, detail: `${formatNumber(totals.drillingMeters)} м`, tone: 'blue' },
     { label: 'Простой', value: formatHours(totals.downtimeHours), icon: Clock, detail: 'суммарно', tone: 'amber' },
-    { label: 'Фото', value: '-', icon: ImageIcon, detail: 'счётчик нужен из API', tone: 'emerald' },
+    { label: 'Фото', value: String(photoCount), icon: ImageIcon, detail: 'отчётов с фото', tone: 'emerald' },
   ];
 
   return (
@@ -611,6 +626,10 @@ function EvidenceReportRow({
           <span className="truncate font-medium text-slate-800">{report.user?.name || 'Неизвестный'}</span>
         </div>
         <div className="mt-0.5 truncate text-2xs text-slate-400">{formatLastEditor(report)}</div>
+        <span className={cn(
+          'mt-0.5 inline-block rounded px-1.5 py-0.5 text-3xs font-medium',
+          report.status === 'submitted' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+        )}>{statusLabel(report.status)}</span>
       </div>
 
       <MetricCell value={formatNumber(totals.piles)} sub={`${formatNumber(totals.pileMeters)} м.п.`} tone="orange" />
@@ -678,6 +697,7 @@ function IconButton({
 
 function ReportEvidencePreview({
   report,
+  history,
   formatDate,
   onClose,
   onEdit,
@@ -685,6 +705,7 @@ function ReportEvidencePreview({
   onPrint,
 }: {
   report: ReportDTO | null;
+  history: { data: ReportHistory | null; loading: boolean; error: boolean };
   formatDate: (d: string) => string;
   onClose: () => void;
   onEdit: (r: ReportDTO) => void;
@@ -704,12 +725,6 @@ function ReportEvidencePreview({
   const efficiency = duration ? ((duration - totals.downtimeHours) / duration) * 100 : null;
   const downtimeMax = Math.max(...report.downtimes.map((item) => item.duration), 1);
   const workTotal = Math.max(totals.pileMeters + totals.drillingMeters, 1);
-  const auditItems = [
-    { icon: CheckCircle2, label: 'Создан оператором', value: report.user?.name || 'Неизвестный', at: formatIsoDateTime(report.createdAt) },
-    { icon: History, label: 'Изменён диспетчером', value: report.lastEditedByName || '-', at: formatIsoDateTime(report.updatedAt) },
-    { icon: FileDown, label: 'PDF сформирован', value: 'По запросу', at: formatIsoDateTime(report.updatedAt) },
-  ];
-
   return (
     <aside className="self-start rounded-lg border border-slate-200 bg-white shadow-sm xl:sticky xl:top-4">
       <div className="border-b border-slate-200 bg-white p-3">
@@ -717,6 +732,10 @@ function ReportEvidencePreview({
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-slate-950">Отчёт #{report.reportId}</h2>
             <p className="mt-0.5 text-2xs text-slate-500">Доказательства смены · {formatDate(report.date)}</p>
+            <span className={cn(
+              'mt-1 inline-block rounded px-2 py-0.5 text-3xs font-medium',
+              report.status === 'submitted' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+            )}>{statusLabel(report.status)}</span>
           </div>
           <button
             type="button"
@@ -748,18 +767,37 @@ function ReportEvidencePreview({
             История изменений
           </h3>
           <div className="rounded-md border border-slate-200">
-            {auditItems.map((item) => (
-              <div key={item.label} className="grid grid-cols-[108px_1fr] gap-2 border-b border-slate-100 px-2.5 py-1.5 last:border-b-0">
-                <div className="flex items-center gap-1.5 text-3xs text-slate-500">
-                  <item.icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  {item.at}
+            {history.loading ? (
+              <div className="px-2.5 py-3 text-2xs text-slate-400">Загрузка истории…</div>
+            ) : history.error ? (
+              <div className="px-2.5 py-3 text-2xs text-red-500">Не удалось загрузить историю изменений</div>
+            ) : !history.data || history.data.events.length === 0 ? (
+              <div className="px-2.5 py-3 text-2xs text-slate-400">Событий пока нет</div>
+            ) : (
+              history.data.events.map((event) => (
+                <div key={event.id} className="border-b border-slate-100 px-2.5 py-2 last:border-b-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-700">{event.actionLabel}</span>
+                    <span className="text-3xs text-slate-400">{formatIsoDateTime(event.createdAt)}</span>
+                  </div>
+                  <p className="mt-0.5 text-2xs text-slate-500">
+                    {event.actorName || 'Неизвестный'}{event.actorRole ? ` · ${roleLabel(event.actorRole)}` : ''}
+                  </p>
+                  {event.changes.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {event.changes.map((change, i) => (
+                        <li key={i} className="text-2xs text-slate-600">
+                          <span className="text-slate-400">{change.label}:</span>{' '}
+                          <span className="line-through decoration-slate-300">{change.before}</span>
+                          {' → '}
+                          <span className="font-medium text-slate-800">{change.after}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div className="min-w-0 text-xs">
-                  <p className="text-xs font-medium text-slate-700">{item.label}</p>
-                  <p className="truncate text-2xs text-slate-400">{item.value}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
