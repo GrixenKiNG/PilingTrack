@@ -103,6 +103,11 @@ For everyday edits, skip the ceremony — just do the work (a one-line plan only
 - Fall back to `services/` only if cross-cutting
 - Never add to `core/` unless it's true infrastructure
 
+**Module vs Dictionary rule** (where does an entity belong?):
+- Table is `{ id, name, isActive }` referenced only by FK `onDelete: Restrict` → **dictionary** (a tab in `admin-dictionaries`; "what you pick in forms"). E.g. `PileGrade`, `DrillingType`, `DowntimeReason`.
+- Table has state / lifecycle / history / child rows → **operational module** (a screen on `components/piling/ops-shell`; "where work is decided & controlled"). E.g. `Site`, `Crew`, `Report`, `MaintenanceRecord`, `Inspection`.
+- A value that is a code `enum` (`EquipmentKind`, `MaintenanceType`, statuses, roles) → **stays in code**. "Move to dictionary" then means an enum→table migration (a feature, not cleanup) — don't do it without a proven business need. Full decision guide + enum traps: the `module-vs-dictionary` skill.
+
 ### API Routes
 
 **Always wrap with `withApi` or `withMutation`:**
