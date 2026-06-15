@@ -57,6 +57,16 @@ export interface UseReportFormReturn {
   loadSiteTree: (siteId: string) => void;
 }
 
+interface LoadedReportRow {
+  reportId?: string;
+  shiftStart?: string;
+  shiftEnd?: string;
+  equipmentId?: string;
+  piles?: { id: string; picketId?: string; pileGradeId: string; count: number }[];
+  drillings?: { id: string; picketId?: string; typeId: string; count?: number; metersPerUnit?: number; meters: number }[];
+  downtimes?: { id: string; reasonId: string; duration: number; comment?: string }[];
+}
+
 export function useReportForm(): UseReportFormReturn {
   const user = usePilingStore((s) => s.currentUser);
   const selectedSiteId = usePilingStore((s) => s.selectedSiteId);
@@ -146,19 +156,19 @@ export function useReportForm(): UseReportFormReturn {
           if (reportRes.ok) {
             const data = await reportRes.json();
             if (data.report) {
-              const r = data.report;
+              const r = data.report as LoadedReportRow;
               setReportId(r.reportId || '');
               if (r.shiftStart) setShiftStart(r.shiftStart);
               if (r.shiftEnd) setShiftEnd(r.shiftEnd);
               if (r.equipmentId) setSelectedEquipmentId(r.equipmentId);
-              if (r.piles?.length > 0) {
-                setPiles(r.piles.map((p: any) => ({ id: p.id, picketId: p.picketId || '', pileGradeId: p.pileGradeId, count: p.count })));
+              if (r.piles && r.piles.length > 0) {
+                setPiles(r.piles.map((p) => ({ id: p.id, picketId: p.picketId || '', pileGradeId: p.pileGradeId, count: p.count })));
               }
-              if (r.drillings?.length > 0) {
-                setDrillings(r.drillings.map((d: any) => ({ id: d.id, picketId: d.picketId || '', typeId: d.typeId, count: d.count || 1, metersPerUnit: d.metersPerUnit || 0, meters: d.meters })));
+              if (r.drillings && r.drillings.length > 0) {
+                setDrillings(r.drillings.map((d) => ({ id: d.id, picketId: d.picketId || '', typeId: d.typeId, count: d.count || 1, metersPerUnit: d.metersPerUnit || 0, meters: d.meters })));
               }
-              if (r.downtimes?.length > 0) {
-                setDowntimes(r.downtimes.map((dt: any) => ({ id: dt.id, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' })));
+              if (r.downtimes && r.downtimes.length > 0) {
+                setDowntimes(r.downtimes.map((dt) => ({ id: dt.id, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' })));
                 setShowDowntime(true);
               }
             }
@@ -272,6 +282,7 @@ export function useReportForm(): UseReportFormReturn {
   const handleSubmit = async () => {
     if (!selectedSiteId || !user) { toast.error('Выберите объект'); return; }
     if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
+    if (equipment.length > 0 && !selectedEquipmentId) { toast.error('Выберите установку'); return; }
     const finalReportId = reportId || crypto.randomUUID();
     setSubmitting(true);
     try {

@@ -54,7 +54,7 @@ export function PileSection({
               )}
               <button onClick={onToggleMode}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium min-w-[44px] min-h-[44px] flex items-center justify-center">
-                {quickMode ? 'Расширенный' : 'Простой'} режим
+                {quickMode ? 'Включить расширенный' : 'Включить простой'}
               </button>
             </div>
           </div>
