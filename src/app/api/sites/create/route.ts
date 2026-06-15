@@ -31,6 +31,7 @@ export const POST = withMutation(
         name: validation.data.name,
         pilePlans: body.pilePlans,
         drillingPlans: body.drillingPlans,
+        actorId: user!.id,
       });
 
       await invalidateSites();

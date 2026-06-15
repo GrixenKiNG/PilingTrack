@@ -52,6 +52,7 @@ export const PUT = withMutation(
         plannedDrilling: validated.data.plannedDrilling,
         pilePlans: validated.data.pilePlans,
         drillingPlans: validated.data.drillingPlans,
+        actorId: user!.id,
       });
     } else {
       // Use existing function for simple updates

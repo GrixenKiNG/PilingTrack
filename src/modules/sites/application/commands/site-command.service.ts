@@ -4,6 +4,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 import { SiteAggregate } from '../../domain';
 import { getSiteRepository } from '../../infrastructure';
 import { CreateSiteCommand, UpdateSiteCommand } from './site.command';
@@ -35,6 +36,9 @@ export async function updateSite(command: UpdateSiteCommand) {
   const aggregate = await repo.findById(command.siteId);
   if (!aggregate) throw new Error('Site not found');
 
+  const prev = aggregate.getState();
+  const before = { name: prev.name, plannedPiles: prev.plannedPiles, plannedDrilling: prev.plannedDrilling };
+
   aggregate.update({
     name: command.name,
     plannedPiles: command.plannedPiles,
@@ -43,6 +47,18 @@ export async function updateSite(command: UpdateSiteCommand) {
   }, command.userId);
 
   await repo.save(aggregate);
+
+  const next = aggregate.getState();
+  await recordAuditEvent({
+    action: 'site.updated',
+    scope: 'sites',
+    actorId: command.userId || null,
+    targetId: command.siteId,
+    metadata: {
+      before,
+      after: { name: next.name, plannedPiles: next.plannedPiles, plannedDrilling: next.plannedDrilling },
+    },
+  });
 
   return db.site.findUnique({
     where: { id: command.siteId },
@@ -81,6 +97,15 @@ export async function deactivateSite(siteId: string, userId?: string) {
     );
   }
 
+  const name = aggregate.getState().name;
   aggregate.deactivate(userId);
   await repo.save(aggregate);
+
+  await recordAuditEvent({
+    action: 'site.deactivated',
+    scope: 'sites',
+    actorId: userId || null,
+    targetId: siteId,
+    metadata: { name },
+  });
 }

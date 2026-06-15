@@ -5,6 +5,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 // ────────────────────────────────────────────
 // Plan normalization
@@ -62,6 +63,7 @@ export async function createSiteWithPlans(input: {
   name: string;
   pilePlans?: IncomingPilePlan[];
   drillingPlans?: IncomingDrillingPlan[];
+  actorId?: string;
 }) {
   if (!input.name?.trim()) {
     throw new ServiceError('Name required', 400);
@@ -69,8 +71,8 @@ export async function createSiteWithPlans(input: {
 
   const normalized = normalizeSitePlans(input);
 
-  return db.$transaction(async (tx) => {
-    const site = await tx.site.create({
+  const site = await db.$transaction(async (tx) => {
+    const created = await tx.site.create({
       data: {
         name: input.name.trim(),
         plannedPiles: normalized.plannedPiles,
@@ -81,7 +83,7 @@ export async function createSiteWithPlans(input: {
     for (const plan of normalized.pilePlans) {
       await tx.sitePilePlan.create({
         data: {
-          siteId: site.id,
+          siteId: created.id,
           pileGradeId: plan.pileGradeId,
           count: Number(plan.count) || 0,
           metersPerUnit: Number(plan.metersPerUnit) || 0,
@@ -92,7 +94,7 @@ export async function createSiteWithPlans(input: {
     for (const plan of normalized.drillingPlans) {
       await tx.siteDrillingPlan.create({
         data: {
-          siteId: site.id,
+          siteId: created.id,
           diameter: Number(plan.diameter) || 0,
           count: Number(plan.count) || 0,
           metersPerUnit: Number(plan.metersPerUnit) || 0,
@@ -100,8 +102,18 @@ export async function createSiteWithPlans(input: {
       });
     }
 
-    return site;
+    return created;
   });
+
+  await recordAuditEvent({
+    action: 'site.created',
+    scope: 'sites',
+    actorId: input.actorId || null,
+    targetId: site.id,
+    metadata: { name: site.name, plannedPiles: site.plannedPiles, plannedDrilling: site.plannedDrilling },
+  });
+
+  return site;
 }
 
 // ────────────────────────────────────────────
@@ -115,6 +127,7 @@ export async function updateSiteWithPlans(siteId: string, input: {
   completionDate?: Date | string;
   pilePlans?: IncomingPilePlan[];
   drillingPlans?: IncomingDrillingPlan[];
+  actorId?: string;
 }) {
   const existing = await db.site.findUnique({ where: { id: siteId } });
   if (!existing) {
@@ -132,7 +145,7 @@ export async function updateSiteWithPlans(siteId: string, input: {
       : new Date(input.completionDate)
     : undefined;
 
-  return db.$transaction(async (tx) => {
+  const updated = await db.$transaction(async (tx) => {
     // Update site fields
     await tx.site.update({
       where: { id: siteId },
@@ -180,6 +193,21 @@ export async function updateSiteWithPlans(siteId: string, input: {
       },
     });
   });
+
+  await recordAuditEvent({
+    action: 'site.updated',
+    scope: 'sites',
+    actorId: input.actorId || null,
+    targetId: siteId,
+    metadata: {
+      before: { name: existing.name, plannedPiles: existing.plannedPiles, plannedDrilling: existing.plannedDrilling },
+      after: updated
+        ? { name: updated.name, plannedPiles: updated.plannedPiles, plannedDrilling: updated.plannedDrilling }
+        : null,
+    },
+  });
+
+  return updated;
 }
 
 // ────────────────────────────────────────────

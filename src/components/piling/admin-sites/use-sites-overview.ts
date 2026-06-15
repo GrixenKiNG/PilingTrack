@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/api';
 
 // Shape returned by getSiteAnalytics() via GET /api/analytics/sites.
@@ -23,32 +23,28 @@ interface SiteAnalytics {
 interface CrewSummary {
   id: string;
   siteId: string;
-  equipmentId: string;
   equipmentName: string;
   isActive: boolean;
 }
 
-/** Combined per-site operational row consumed by the Objects screen. */
-export interface SiteOpsRow extends SiteAnalytics {
+/** Combined per-site operational row for the Objects dashboard. */
+export interface SiteOverviewRow extends SiteAnalytics {
   crewCount: number;
   rigNames: string[];
 }
 
-export interface SitesOpsData {
-  rows: SiteOpsRow[];
+export interface SitesOverview {
+  rows: SiteOverviewRow[];
   loading: boolean;
   error: string | null;
   reload: () => void;
 }
 
-export function useSitesOpsData(): SitesOpsData {
-  const [rows, setRows] = useState<SiteOpsRow[]>([]);
+export function useSitesOverview(): SitesOverview {
+  const [rows, setRows] = useState<SiteOverviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Bumping this re-runs the load effect (manual "Обновить").
   const [tick, setTick] = useState(0);
-
-  const reload = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,12 +57,8 @@ export function useSitesOpsData(): SitesOpsData {
           authFetch('/api/analytics/sites'),
           authFetch('/api/crews/all'),
         ]);
-        if (!analyticsRes.ok) {
-          throw new Error(`Аналитика объектов недоступна (${analyticsRes.status})`);
-        }
+        if (!analyticsRes.ok) throw new Error(`Аналитика объектов недоступна (${analyticsRes.status})`);
         const analytics: SiteAnalytics[] = (await analyticsRes.json()).analytics ?? [];
-
-        // Crews are best-effort enrichment — a failure here must not blank the screen.
         const crews: CrewSummary[] = crewsRes.ok ? ((await crewsRes.json()).data ?? []) : [];
 
         const bySite = new Map<string, { count: number; rigs: Set<string> }>();
@@ -78,7 +70,7 @@ export function useSitesOpsData(): SitesOpsData {
           bySite.set(crew.siteId, entry);
         }
 
-        const combined: SiteOpsRow[] = analytics.map((a) => {
+        const combined: SiteOverviewRow[] = analytics.map((a) => {
           const crew = bySite.get(a.siteId);
           return { ...a, crewCount: crew?.count ?? 0, rigNames: crew ? [...crew.rigs] : [] };
         });
@@ -96,5 +88,5 @@ export function useSitesOpsData(): SitesOpsData {
     };
   }, [tick]);
 
-  return { rows, loading, error, reload };
+  return { rows, loading, error, reload: () => setTick((t) => t + 1) };
 }

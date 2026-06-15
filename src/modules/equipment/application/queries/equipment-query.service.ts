@@ -163,7 +163,28 @@ export async function getMaintenanceById(id: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
   const record = await db.maintenanceRecord.findUnique({
     where: { id },
-    include: { equipment: { select: { id: true, name: true, model: true } } },
+    include: {
+      equipment: {
+        select: {
+          id: true,
+          name: true,
+          model: true,
+          engineHoursTotal: true,
+          nextMaintenanceAtHours: true,
+          nextMaintenanceDate: true,
+          crews: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              operator: { select: { id: true, name: true } },
+              site: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+    },
   });
   if (!record || record.tenantId !== tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
@@ -181,7 +202,28 @@ export async function listAllMaintenance(tenantId: string, filter: MaintenanceLi
       ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
       ...(filter.type ? { type: filter.type } : {}),
     },
-    include: { equipment: { select: { id: true, name: true, model: true } } },
+    include: {
+      equipment: {
+        select: {
+          id: true,
+          name: true,
+          model: true,
+          engineHoursTotal: true,
+          nextMaintenanceAtHours: true,
+          nextMaintenanceDate: true,
+          crews: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              operator: { select: { id: true, name: true } },
+              site: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+    },
     orderBy: [{ priority: 'desc' }, { scheduledAt: 'asc' }, { createdAt: 'desc' }],
     take: MAINTENANCE_LIST_LIMIT,
   });

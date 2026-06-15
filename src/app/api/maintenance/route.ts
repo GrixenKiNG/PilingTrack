@@ -18,7 +18,6 @@ export const GET = withApi(
     }
 
     const sp = request.nextUrl.searchParams;
-    // Invalid enum values (e.g. ?status=BOGUS) produce a Prisma where-clause that matches nothing — acceptable for P1a.
     const filter: MaintenanceListFilter = {
       status: (sp.get('status') as MaintenanceListFilter['status']) ?? undefined,
       priority: (sp.get('priority') as MaintenanceListFilter['priority']) ?? undefined,
