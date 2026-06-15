@@ -78,6 +78,7 @@ export function AdminDashboard() {
   const [fleet, setFleet] = useState<FleetSnapshot | null>(null);
   const [maint, setMaint] = useState<MaintRow[]>([]);
   const [recent, setRecent] = useState<RecentReport[]>([]);
+  const [stale, setStale] = useState({ fleet: false, maint: false, recent: false });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const showSkeleton = useMinSkeletonDuration(loading);
@@ -93,6 +94,7 @@ export function AdminDashboard() {
       ]);
       if (!aRes.ok) throw new Error('analytics');
       setAnalytics(((await aRes.json()).analytics ?? []) as SiteAnalyticsDTO[]);
+      setStale({ fleet: !fRes.ok, maint: !mRes.ok, recent: !rRes.ok });
       if (fRes.ok) setFleet((await fRes.json()) as FleetSnapshot);
       if (mRes.ok) setMaint(((await mRes.json()).records ?? []) as MaintRow[]);
       if (rRes.ok) setRecent(((await rRes.json()).reports ?? []) as RecentReport[]);
@@ -226,6 +228,13 @@ export function AdminDashboard() {
         <p className="mt-0.5 text-sm text-slate-500">Штаб диспетчера — куда вмешаться сегодня</p>
       </div>
 
+      {(stale.fleet || stale.maint || stale.recent) && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-700">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          Часть источников не ответила{stale.fleet ? ' · парк' : ''}{stale.maint ? ' · ТО' : ''}{stale.recent ? ' · отчёты' : ''} — сводка неполная.
+        </div>
+      )}
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Kpi label="отчёты">
@@ -280,7 +289,9 @@ export function AdminDashboard() {
         </Section>
 
         <Section icon={Truck} title="Установки — исключения">
-          {rigExceptions.length === 0 ? <Empty text="Все установки в работе" tone="success" /> : rigExceptions.map((r) => (
+          {rigExceptions.length === 0 ? (
+            (stale.fleet || stale.maint) ? <Empty text="Данные не загрузились" tone="warning" /> : <Empty text="Все установки в работе" tone="success" />
+          ) : rigExceptions.map((r) => (
             <div key={r.id} className="flex items-center gap-2.5 border-b border-slate-100 px-3 py-2.5 last:border-b-0">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-slate-900">{r.name}</div>
@@ -292,7 +303,9 @@ export function AdminDashboard() {
         </Section>
 
         <Section icon={AlertTriangle} title="Риски дня" count={risks.length} dominant>
-          {risks.length === 0 ? <Empty text="Рисков нет" tone="success" /> : risks.map((r) => {
+          {risks.length === 0 ? (
+            (stale.fleet || stale.maint || stale.recent) ? <Empty text="Часть данных не загрузилась" tone="warning" /> : <Empty text="Рисков нет" tone="success" />
+          ) : risks.map((r) => {
             const Icon = r.icon;
             return (
               <div key={r.id} className="flex items-start gap-2.5 border-b border-slate-100 px-3 py-2.5 last:border-b-0">
@@ -317,7 +330,9 @@ export function AdminDashboard() {
             Все отчёты
           </Link>
         </div>
-        {recent.length === 0 ? <Empty text="Отчётов пока нет" /> : recent.map((r) => (
+        {recent.length === 0 ? (
+          <Empty text={stale.recent ? 'Не удалось загрузить отчёты' : 'Отчётов пока нет'} tone={stale.recent ? 'warning' : 'muted'} />
+        ) : recent.map((r) => (
           <div key={r.id} className="flex items-center gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0">
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-slate-900">{r.siteName}</div>
