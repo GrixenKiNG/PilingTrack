@@ -110,6 +110,63 @@ export async function listReportsForReview(
   );
 }
 
+// ── Recent reports for the dispatcher dashboard evidence journal ──────────────
+export interface RecentReportRow {
+  id: string;
+  date: string;
+  siteName: string;
+  operatorName: string;
+  crewName: string | null;
+  status: string;
+  hasPhoto: boolean;
+  edited: boolean;
+  updatedAt: string;
+}
+
+export async function listRecentReportsForDashboard(
+  sessionUser: { tenantId?: string | null },
+  limit = 8,
+): Promise<RecentReportRow[]> {
+  const tenantId = sessionUser.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+
+  const reports = await db.report.findMany({
+    where: { tenantId },
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+    select: {
+      id: true, date: true, status: true, version: true, journalPhotoMediaId: true, updatedAt: true,
+      site: { select: { name: true } },
+      user: { select: { name: true } },
+      crew: { select: { name: true } },
+    },
+  });
+
+  const ids = reports.map((r) => r.id);
+  const counts = ids.length
+    ? await db.media.groupBy({
+        by: ['entityId'],
+        where: { entityType: 'report', entityId: { in: ids }, isDeleted: false, uploadStatus: 'completed' },
+        _count: true,
+      })
+    : [];
+  const withMedia = new Set(
+    counts.filter((c) => c.entityId != null && c._count > 0).map((c) => c.entityId as string),
+  );
+
+  return reports.map((r) => ({
+    id: r.id,
+    date: r.date,
+    siteName: r.site?.name ?? '—',
+    operatorName: r.user?.name ?? '—',
+    crewName: r.crew?.name ?? null,
+    status: r.status,
+    hasPhoto: r.journalPhotoMediaId != null || withMedia.has(r.id),
+    edited: r.version > 1,
+    updatedAt: r.updatedAt.toISOString(),
+  }));
+}
+
 export async function listReportsForUserScope(
   sessionUser: { id: string; role: string; tenantId?: string | null },
   requestedUserId?: string | null,

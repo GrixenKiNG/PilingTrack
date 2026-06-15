@@ -17,12 +17,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertTriangle, Building2, Clock, FileWarning,
+  AlertTriangle, Building2, CameraOff, Clock, FileText, FileWarning,
   PauseCircle, TrendingDown, Truck, Wrench, type LucideIcon,
 } from 'lucide-react';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
+import { getTodayInTimezone } from '@/lib/timezone';
 import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { SiteAnalyticsDTO } from '@/lib/types';
@@ -41,6 +42,10 @@ interface FleetSnapshot {
 interface MaintRow {
   id: string; equipmentId: string; type: string; status: string; scheduledAt: string | null;
   equipment: { id: string; name: string; model: string | null } | null;
+}
+interface RecentReport {
+  id: string; date: string; siteName: string; operatorName: string;
+  crewName: string | null; status: string; hasPhoto: boolean; edited: boolean; updatedAt: string;
 }
 
 const OPEN_STATUSES = new Set(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']);
@@ -72,6 +77,7 @@ export function AdminDashboard() {
   const [analytics, setAnalytics] = useState<SiteAnalyticsDTO[]>([]);
   const [fleet, setFleet] = useState<FleetSnapshot | null>(null);
   const [maint, setMaint] = useState<MaintRow[]>([]);
+  const [recent, setRecent] = useState<RecentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const showSkeleton = useMinSkeletonDuration(loading);
@@ -79,15 +85,17 @@ export function AdminDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true); setLoadError(null);
     try {
-      const [aRes, fRes, mRes] = await Promise.all([
+      const [aRes, fRes, mRes, rRes] = await Promise.all([
         authFetch('/api/analytics/sites'),
         authFetch('/api/monitoring/fleet'),
         authFetch('/api/maintenance'),
+        authFetch('/api/reports/recent'),
       ]);
       if (!aRes.ok) throw new Error('analytics');
       setAnalytics(((await aRes.json()).analytics ?? []) as SiteAnalyticsDTO[]);
       if (fRes.ok) setFleet((await fRes.json()) as FleetSnapshot);
       if (mRes.ok) setMaint(((await mRes.json()).records ?? []) as MaintRow[]);
+      if (rRes.ok) setRecent(((await rRes.json()).reports ?? []) as RecentReport[]);
     } catch {
       setLoadError('Не удалось загрузить сводку. Проверьте сеть и повторите.');
     } finally {
@@ -180,9 +188,14 @@ export function AdminDashboard() {
       if (dt >= 1) out.push({ id: `dt-${c.id}`, tone: 'warning', icon: PauseCircle,
         text: `${c.name} — простой ${formatNumber(dt)} ч`, hint: c.latestReport?.siteName || c.model });
     }
+    const today = getTodayInTimezone();
+    for (const r of recent) {
+      if (r.date === today && !r.hasPhoto) out.push({ id: `nophoto-${r.id}`, tone: 'warning', icon: CameraOff,
+        text: `${r.siteName} — отчёт без фото`, hint: 'нет доказательства работы' });
+    }
     const rank: Record<Tone, number> = { danger: 0, warning: 1, info: 2, success: 3, muted: 4 };
     return out.sort((a, b) => rank[a.tone] - rank[b.tone]);
-  }, [analytics, fleet, maintByRig]);
+  }, [analytics, fleet, maintByRig, recent]);
 
   if (showSkeleton) {
     return (
@@ -294,10 +307,33 @@ export function AdminDashboard() {
         </Section>
       </div>
 
-      <p className="text-2xs text-slate-400">
-        Доказательная база (фото, история правок отчётов) — следующий этап.{' '}
-        <Link href="/admin/reports" className="text-blue-600 hover:underline">Открыть отчёты</Link>
-      </p>
+      {/* Evidence journal */}
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-slate-700">
+          <FileText className="h-4 w-4" />
+          <span className="text-sm font-semibold">Журнал доказательств</span>
+          <span className="text-2xs text-slate-400">последние сменные отчёты</span>
+          <Link href="/admin/reports" className="ml-auto text-2xs font-medium text-blue-600 hover:underline">
+            Все отчёты
+          </Link>
+        </div>
+        {recent.length === 0 ? <Empty text="Отчётов пока нет" /> : recent.map((r) => (
+          <div key={r.id} className="flex items-center gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium text-slate-900">{r.siteName}</div>
+              <div className="truncate text-2xs text-slate-500">
+                {r.operatorName}{r.crewName ? ` · ${r.crewName}` : ''} · {r.date}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className={cn('rounded px-2 py-0.5 text-2xs font-medium', r.hasPhoto ? TONE_TAG.success : TONE_TAG.warning)}>
+                {r.hasPhoto ? 'фото' : 'нет фото'}
+              </span>
+              {r.edited && <span className={cn('rounded px-2 py-0.5 text-2xs font-medium', TONE_TAG.info)}>изменён</span>}
+            </div>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }

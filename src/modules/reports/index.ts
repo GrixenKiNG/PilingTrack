@@ -36,6 +36,7 @@ export {
   getEditableReport,
   getReportsByPeriod,
   listReportsForReview,
+  listRecentReportsForDashboard,
   listReportsForUserScope,
   exportReportsCsv,
   getDashboardStats,
