@@ -419,8 +419,9 @@ export function MaintenanceBoard() {
   return (
     <div className="grid min-h-[calc(100vh-1px)] w-full bg-slate-50/40 lg:grid-cols-[minmax(0,1fr)_420px]">
       <main className="min-w-0 space-y-3 px-4 py-4 lg:px-5">
-        <div className="flex flex-wrap items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-normal text-slate-950">ТО</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/admin/to" className="text-sm font-medium text-slate-500 hover:text-slate-700">← ТО</Link>
+          <h1 className="text-2xl font-bold tracking-normal text-slate-950">Наряды ТО</h1>
           <p className="text-sm text-slate-600">Техническая готовность установок, регламенты и замечания</p>
         </div>
 
