@@ -57,6 +57,7 @@ export const POST = withMutation(
       ...rest,
       password: password?.trim() || pin?.trim() || '',
       role: rest.role || 'OPERATOR',
+      tenantId: user!.tenantId,
     }, user!.id);
     return NextResponse.json({ user: createdUser }, { status: 201 });
   },

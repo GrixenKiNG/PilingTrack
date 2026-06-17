@@ -4,6 +4,7 @@ import { assertNotSelfAction } from '@/services/auth/authorization-service';
 import { hashPassword } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { parseCursorPagination, type CursorPaginationResult } from '@/lib/pagination-cursor';
+import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 
 function isUniqueConstraintError(message: string) {
   return message.includes('Unique') || message.includes('unique constraint');
@@ -37,16 +38,26 @@ export async function createUser(input: {
   name: string;
   role?: string;
   phone?: string;
+  tenantId?: string | null;
 }, actorUserId?: string | null) {
   if (!input.email || !input.name || !input.password) {
     throw new ServiceError('email, name, password required', 400);
   }
 
+  // User.tenantId is NOT NULL in the database. Inherit the creating admin's
+  // tenant, falling back to the configured default. Fail closed rather than
+  // insert a NULL (which surfaces as an opaque 500 — hit on prod 2026-06-17).
+  const tenantId = input.tenantId || resolveTenantContext().tenantId;
+  if (!tenantId) {
+    throw new ServiceError('tenantId is required to create a user', 400);
+  }
+
   try {
     const hashedPassword = await hashPassword(input.password);
-    
+
     const createdUser = await db.user.create({
       data: {
+        tenantId,
         email: input.email.trim().toLowerCase(),
         password: hashedPassword,
         name: input.name.trim(),
