@@ -34,6 +34,14 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { healthScoreColor } from '@/components/piling/inspections/inspection-labels';
+import {
+  type JournalRecord,
+  isInspectionRecord,
+  isOpenRecord,
+  computeToStats,
+  daysUntil,
+  dueText,
+} from './to-stats';
 
 type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 type JournalTab = 'all' | 'inspections' | 'repairs' | 'open';
@@ -49,17 +57,6 @@ interface EquipmentOption {
   nextMaintenanceDate?: string | null;
 }
 
-interface JournalRecord {
-  id: string;
-  type: string;
-  status: string;
-  title: string;
-  scheduledAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  engineHoursAtService: number | null;
-  inspection: { id: string; healthScore: number | null; status: string; level: string } | null;
-}
 
 const HAMMER_LABEL: Record<HammerKind, string> = {
   HYDRAULIC: 'Гидравлический',
@@ -109,8 +106,6 @@ const STATUS_STYLE: Record<string, string> = {
   CANCELLED: 'border-slate-200 bg-slate-50 text-slate-400',
 };
 
-const INSPECTION_TYPES = new Set(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'INSPECTION']);
-const OPEN_STATUSES = new Set(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']);
 const ALL = '__all__';
 
 const fmtDate = (value: string | null | undefined) => {
@@ -121,27 +116,6 @@ const fmtDate = (value: string | null | undefined) => {
 };
 
 const recordDate = (record: JournalRecord) => record.completedAt ?? record.scheduledAt ?? record.createdAt;
-const isInspectionRecord = (record: JournalRecord) => INSPECTION_TYPES.has(record.type);
-const isOpenRecord = (record: JournalRecord) => OPEN_STATUSES.has(record.status);
-
-const daysUntil = (value: string | null | undefined) => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  return Math.round((date.getTime() - today.getTime()) / 86_400_000);
-};
-
-const dueText = (value: string | null | undefined) => {
-  const days = daysUntil(value);
-  if (days == null) return 'срок не задан';
-  if (days < 0) return 'просрочено';
-  if (days === 0) return 'сегодня';
-  if (days === 1) return 'завтра';
-  return `через ${days} дн.`;
-};
 
 const scoreTone = (score: number | null | undefined) => {
   if (typeof score !== 'number') return 'text-slate-400';
@@ -206,18 +180,7 @@ export function ToModule() {
       : []
   ), [selected]);
 
-  const stats = useMemo(() => {
-    const inspections = records.filter(isInspectionRecord);
-    const repairs = records.filter((record) => !isInspectionRecord(record));
-    const open = records.filter(isOpenRecord);
-    const scores = inspections
-      .map((record) => record.inspection?.healthScore)
-      .filter((score): score is number => typeof score === 'number');
-    const averageScore = scores.length
-      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
-      : null;
-    return { inspections: inspections.length, repairs: repairs.length, open: open.length, averageScore };
-  }, [records]);
+  const stats = useMemo(() => computeToStats(records), [records]);
 
   const filteredRecords = useMemo(() => {
     const text = query.trim().toLowerCase();
