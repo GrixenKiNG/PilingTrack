@@ -29,6 +29,7 @@ import { formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
+import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
 import type { SiteAnalyticsDTO } from '@/lib/types';
 
 // ── Shapes of the read-only sources (decoupled, like maintenance-board) ──
@@ -194,36 +195,10 @@ export function AdminDashboard() {
 
   // Production numbers come from analytics (period-aware). Operational numbers
   // come from fleet/maintenance and are always "now".
-  const kpis = useMemo(() => {
-    const actualPiles = analytics.reduce((s, a) => s + a.actualPiles, 0);
-    const actualPileMeters = analytics.reduce((s, a) => s + a.actualPileMeters, 0);
-    const plannedPiles = analytics.reduce((s, a) => s + a.plannedPiles, 0);
-    const plannedPileMeters = analytics.reduce((s, a) => s + a.plannedPileMeters, 0);
-    const actualDrillingCount = analytics.reduce((s, a) => s + a.actualDrillingCount, 0);
-    const actualDrilling = analytics.reduce((s, a) => s + a.actualDrilling, 0);
-    const plannedDrillingCount = analytics.reduce((s, a) => s + a.plannedDrillingCount, 0);
-    const plannedDrilling = analytics.reduce((s, a) => s + a.plannedDrilling, 0);
-    const downtime = analytics.reduce((s, a) => s + (a.totalDowntime || 0), 0);
-    const reports = analytics.reduce((s, a) => s + a.totalReports, 0);
-    const sitesTotal = analytics.length;
-    const sitesActive = analytics.filter((a) => a.totalReports > 0).length;
-    const toRisk = [...maintByRig.values()].filter((v) => v.repair || v.overdue).length;
-    const activeToday = fleet?.totals.activeToday ?? 0;
-    const expected = fleet?.totals.expected ?? 0;
-    return {
-      shiftsDone: activeToday,
-      reportsExpected: activeToday + expected,
-      reports,
-      actualPiles, actualPileMeters, plannedPiles, plannedPileMeters,
-      actualDrillingCount, actualDrilling, plannedDrillingCount, plannedDrilling,
-      downtime,
-      sitesActive, sitesTotal,
-      rigsWorking: activeToday,
-      rigsTotal: fleet?.totals.totalEquipment ?? 0,
-      toRisk,
-      crews: fleet?.totals.crewsOnShiftToday ?? 0,
-    };
-  }, [analytics, fleet, maintByRig]);
+  const kpis = useMemo(
+    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig),
+    [analytics, fleet, maintByRig],
+  );
 
   // ── План-факт по объектам, отстающие сверху ─────────────────────────────────
   const sites = useMemo(
