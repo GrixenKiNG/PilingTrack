@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { formatRuDate, formatPersonName } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -110,12 +111,6 @@ const OPEN_STATUSES: MaintenanceStatus[] = ['PLANNED', 'ASSIGNED', 'IN_PROGRESS'
 const REPAIR_TYPES = new Set<MaintenanceType>(['REPAIR', 'FAULT']);
 const REGULAR_TYPES = new Set<MaintenanceType>(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'SCHEDULED']);
 
-const formatRuDate = (iso: string | null | undefined): string => {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
 
 const daysUntil = (iso: string | null | undefined): number | null => {
   if (!iso) return null;
@@ -190,21 +185,6 @@ const maintenanceCompletionPercent = (records: WorkOrderRow[]) => {
   return Math.round((done / planned.length) * 100);
 };
 
-const formatPersonName = (name: string | null | undefined): string => {
-  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '—';
-  if (parts.length === 1) return parts[0];
-
-  const patronymicPattern = /(вич|вна|ична|оглы|кызы)$/i;
-  const surnameFirst = parts.length >= 3 && patronymicPattern.test(parts[2]);
-  const surname = surnameFirst ? parts[0] : parts[parts.length - 1];
-  const initialsSource = surnameFirst ? parts.slice(1) : parts.slice(0, -1);
-  const initials = initialsSource
-    .filter(Boolean)
-    .map((part) => `${part[0].toUpperCase()}.`)
-    .join('');
-  return `${surname} ${initials}`.trim();
-};
 
 const crewForRecord = (
   record: WorkOrderRow,

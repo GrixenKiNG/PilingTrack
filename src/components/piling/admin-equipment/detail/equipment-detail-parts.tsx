@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { formatFixed } from '@/lib/format';
+import { formatFixed, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
 
 // --------------------------------------------------------------------------
@@ -334,9 +334,3 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
 // formatHours / formatRelative are canonical in @/lib/format; re-exported here
 // so the detail screen keeps importing them from one place.
 export { formatHours, formatRelative } from '@/lib/format';
-
-export function formatRuDate(ymd: string): string {
-  const [y, m, d] = ymd.split('-');
-  if (!y || !m || !d) return ymd;
-  return `${d}.${m}.${y}`;
-}

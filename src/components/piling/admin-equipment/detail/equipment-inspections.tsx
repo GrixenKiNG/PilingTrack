@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -26,11 +27,6 @@ interface InspectionRow {
   healthScore: number | null;
   status: InspectionStatus;
 }
-
-const formatRuDate = (iso: string): string => {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return y && m && d ? `${d}.${m}.${y}` : iso.slice(0, 10);
-};
 
 export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
   const [records, setRecords] = useState<InspectionRow[]>([]);

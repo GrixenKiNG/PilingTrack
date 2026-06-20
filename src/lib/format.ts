@@ -47,6 +47,39 @@ export function formatRelative(iso: string): string {
   return `${d} дн назад`;
 }
 
+/**
+ * Date string → "DD.MM.YYYY" (ru). Accepts a date-only `YYYY-MM-DD` or a full
+ * ISO timestamp (only the date part is used). Timezone-safe: it slices the date
+ * portion rather than going through `new Date()`, so an evening-UTC timestamp
+ * never shifts a day. null/undefined/empty/malformed → "—".
+ */
+export function formatRuDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const [y, m, d] = value.slice(0, 10).split('-');
+  return y && m && d ? `${d}.${m}.${y}` : '—';
+}
+
+/**
+ * Full name → "Фамилия И.О." Handles "Surname Name Patronymic" and the
+ * "Surname-first" order (detected by a patronymic suffix). One token → as-is;
+ * empty → "—".
+ */
+export function formatPersonName(name: string | null | undefined): string {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '—';
+  if (parts.length === 1) return parts[0];
+
+  const patronymicPattern = /(вич|вна|ична|оглы|кызы)$/i;
+  const surnameFirst = parts.length >= 3 && patronymicPattern.test(parts[2]);
+  const surname = surnameFirst ? parts[0] : parts[parts.length - 1];
+  const initialsSource = surnameFirst ? parts.slice(1) : parts.slice(0, -1);
+  const initials = initialsSource
+    .filter(Boolean)
+    .map((part) => `${part[0].toUpperCase()}.`)
+    .join('');
+  return `${surname} ${initials}`.trim();
+}
+
 export function pluralizeRu(
   count: number,
   forms: readonly [one: string, few: string, many: string]

@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { formatRuDate } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,11 +61,6 @@ const UNASSIGNED = '__none__';
 
 const numToStr = (v: number | string | null | undefined): string => (v != null && v !== '' ? String(v) : '');
 const toInputDate = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10) : '');
-const formatRuDate = (iso: string | null): string => {
-  if (!iso) return '—';
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return y && m && d ? `${d}.${m}.${y}` : '—';
-};
 
 interface QuickFields {
   assigneeId: string;

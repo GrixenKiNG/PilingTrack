@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { formatHours, formatFixed } from '@/lib/format';
+import { formatHours, formatFixed, formatRuDate } from '@/lib/format';
 
 type EquipmentStatus = 'active' | 'expected' | 'idle';
 
@@ -283,14 +283,3 @@ function RowKV({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ----------------------------------------------------------------------------
-// Formatters
-
-
-
-function formatRuDate(ymd: string): string {
-  // 'YYYY-MM-DD' → 'DD.MM.YYYY' without timezone shenanigans
-  const [y, m, d] = ymd.split('-');
-  if (!y || !m || !d) return ymd;
-  return `${d}.${m}.${y}`;
-}
