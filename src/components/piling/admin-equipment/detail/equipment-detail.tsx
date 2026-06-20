@@ -31,9 +31,10 @@ import { EquipmentPlaceholder } from '../equipment-placeholder';
 import {
   Section, KV, Metric, EmptyState, BackLink, TelematicsStatusBadge,
   HistoryTable, MaintenanceBlock, PassportGrid,
-  formatNumber, formatHours, formatRelative,
+  formatHours, formatRelative,
   type TimelineRow,
 } from './equipment-detail-parts';
+import { formatFixed } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 
 interface DetailsResponse {
@@ -169,7 +170,7 @@ function OverviewTiles({
         title="Текущее состояние"
         rows={[
           ['Статус', eq.isActive ? 'В работе' : 'Не активна'],
-          ['Моточасы', eq.engineHoursTotal != null ? `${formatNumber(Number(eq.engineHoursTotal), 0)} ч` : '—'],
+          ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} ч` : '—'],
           ['Телематика', devicesCount > 0 ? `${devicesCount} устройств` : 'не подключена'],
           ['Последний отчёт', timeline[0]?.date || '—'],
         ]}
@@ -177,8 +178,8 @@ function OverviewTiles({
       <OverviewTile
         title="Производительность за 30 дней"
         rows={[
-          ['Сваи', `${formatNumber(stats.piles, 0)} шт. / ${formatNumber(stats.pileMeters, 1)} м.п.`],
-          ['Бурение', `${formatNumber(stats.drillingCount, 0)} шт. / ${formatNumber(stats.drillingMeters, 1)} м`],
+          ['Сваи', `${formatFixed(stats.piles, 0)} шт. / ${formatFixed(stats.pileMeters, 1)} м.п.`],
+          ['Бурение', `${formatFixed(stats.drillingCount, 0)} шт. / ${formatFixed(stats.drillingMeters, 1)} м`],
           ['Простой', formatHours(stats.downtimeHours)],
           ['Отчёты', `${stats.reportCount}`],
         ]}
@@ -187,7 +188,7 @@ function OverviewTiles({
         title="ТО и обслуживание"
         rows={[
           ['Ближайшее ТО', eq.nextMaintenanceDate ? String(eq.nextMaintenanceDate).slice(0, 10) : '—'],
-          ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatNumber(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
+          ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
           ['Замечания', timeline.some((row) => row.downtimeHours && row.downtimeHours > 0) ? 'есть простой' : 'нет'],
         ]}
       />
@@ -373,8 +374,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Metric label="Отчётов (30д)" value={details.stats30d.reportCount} />
-                <Metric label="Сваи шт./м.п." value={`${formatNumber(details.stats30d.piles, 0)} / ${formatNumber(details.stats30d.pileMeters, 1)}`} />
-                <Metric label="Бурение шт./м" value={`${formatNumber(details.stats30d.drillingCount, 0)} / ${formatNumber(details.stats30d.drillingMeters, 1)}`} />
+                <Metric label="Сваи шт./м.п." value={`${formatFixed(details.stats30d.piles, 0)} / ${formatFixed(details.stats30d.pileMeters, 1)}`} />
+                <Metric label="Бурение шт./м" value={`${formatFixed(details.stats30d.drillingCount, 0)} / ${formatFixed(details.stats30d.drillingMeters, 1)}`} />
                 <Metric label="Простой" value={formatHours(details.stats30d.downtimeHours)} />
               </div>
             </div>
@@ -474,7 +475,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Metric label="Отчётов" value={details.stats30d.reportCount} />
           <Metric label="Свай" value={details.stats30d.piles} />
-          <Metric label="Бурение, м" value={formatNumber(details.stats30d.drillingMeters, 1)} />
+          <Metric label="Бурение, м" value={formatFixed(details.stats30d.drillingMeters, 1)} />
           <Metric label="Простой" value={formatHours(details.stats30d.downtimeHours)} />
         </div>
       </Section>

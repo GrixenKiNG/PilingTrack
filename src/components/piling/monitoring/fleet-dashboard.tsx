@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { formatHours } from '@/lib/format';
+import { formatHours, formatFixed } from '@/lib/format';
 
 type EquipmentStatus = 'active' | 'expected' | 'idle';
 
@@ -197,7 +197,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
 
       <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Metric label="Свай" value={snap.totals.pilesToday} />
-        <Metric label="Бурения, м" value={formatNumber(snap.totals.drillingToday, 1)} />
+        <Metric label="Бурения, м" value={formatFixed(snap.totals.drillingToday, 1)} />
         <Metric label="Простой" value={formatHours(snap.totals.downtimeHoursToday)} />
         <Metric label="Ждём отчёт" value={snap.totals.expected} muted />
       </dl>
@@ -256,7 +256,7 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
             {card.status === 'active' && card.todayTotals ? (
               <>
                 <RowKV label="Свай" value={String(card.todayTotals.piles)} />
-                <RowKV label="Бурение, м" value={formatNumber(card.todayTotals.drillingMeters, 1)} />
+                <RowKV label="Бурение, м" value={formatFixed(card.todayTotals.drillingMeters, 1)} />
                 {card.todayTotals.downtimeHours > 0 && (
                   <RowKV label="Простой" value={formatHours(card.todayTotals.downtimeHours)} />
                 )}
@@ -286,9 +286,6 @@ function RowKV({ label, value }: { label: string; value: string }) {
 // ----------------------------------------------------------------------------
 // Formatters
 
-function formatNumber(n: number, decimals = 0): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
 
 
 function formatRuDate(ymd: string): string {

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatFixed } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
 
 // --------------------------------------------------------------------------
@@ -167,7 +168,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
                 <td className="px-3 py-2">{row.operatorName ?? '—'}</td>
                 <td className="px-3 py-2 text-right font-mono">{row.piles ?? '—'}</td>
                 <td className="px-3 py-2 text-right font-mono">
-                  {row.drillingMeters != null ? formatNumber(row.drillingMeters, 1) : '—'}
+                  {row.drillingMeters != null ? formatFixed(row.drillingMeters, 1) : '—'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono">
                   {row.downtimeHours != null ? formatHours(row.downtimeHours) : '—'}
@@ -229,9 +230,9 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
             <span className="text-slate-600">Моточасы до ТО</span>
             <span className={cn('font-mono text-xs', txtColor(hoursStatus))}>
               {remainingHours! > 0
-                ? `осталось ${formatNumber(remainingHours!, 0)} ч`
-                : `просрочено на ${formatNumber(-remainingHours!, 0)} ч`}
-              <span className="text-slate-400"> · {formatNumber(hoursTotal!, 0)} / {formatNumber(nextHours!, 0)} ч</span>
+                ? `осталось ${formatFixed(remainingHours!, 0)} ч`
+                : `просрочено на ${formatFixed(-remainingHours!, 0)} ч`}
+              <span className="text-slate-400"> · {formatFixed(hoursTotal!, 0)} / {formatFixed(nextHours!, 0)} ч</span>
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded bg-slate-100">
@@ -270,7 +271,7 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
   };
   const pushNum = (label: string, value: unknown, suffix: string) => {
     if (value === null || value === undefined || value === '') return;
-    rows.push({ label, value: `${formatNumber(Number(value), 1)} ${suffix}` });
+    rows.push({ label, value: `${formatFixed(Number(value), 1)} ${suffix}` });
   };
   const pushInt = (label: string, value: unknown, suffix: string) => {
     if (value === null || value === undefined) return;
@@ -303,7 +304,7 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
   // C
   pushDate('Дата покупки', eq.purchaseDate);
   if (eq.purchasePrice) {
-    rows.push({ label: 'Стоимость покупки', value: `${formatNumber(Number(eq.purchasePrice), 2)} ₽` });
+    rows.push({ label: 'Стоимость покупки', value: `${formatFixed(Number(eq.purchasePrice), 2)} ₽` });
   }
   pushInt('Наработка моточасов', eq.engineHoursTotal, 'ч');
   pushInt('След. ТО по моточасам', eq.nextMaintenanceAtHours, 'ч');
@@ -333,12 +334,6 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
 // formatHours / formatRelative are canonical in @/lib/format; re-exported here
 // so the detail screen keeps importing them from one place.
 export { formatHours, formatRelative } from '@/lib/format';
-
-// NOTE: this formatNumber has fixed-decimals semantics (min=max=decimals),
-// different from @/lib/format's "up to N decimals" — kept local on purpose.
-export function formatNumber(n: number, decimals = 0): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
 
 export function formatRuDate(ymd: string): string {
   const [y, m, d] = ymd.split('-');

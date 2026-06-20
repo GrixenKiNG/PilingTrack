@@ -9,6 +9,16 @@ export function formatPercent(value: number, maxFractionDigits = 1): string {
   return `${formatNumber(value, maxFractionDigits)}%`;
 }
 
+/**
+ * Fixed decimal places (ru-RU), zero-padded: formatFixed(12, 1) → "12,0".
+ * Differs from formatNumber, which shows *up to* N decimals and drops
+ * trailing zeros: formatNumber(12, 1) → "12". Use formatFixed when a value
+ * must always render with the same precision (meters, prices, hours).
+ */
+export function formatFixed(n: number, decimals = 0): string {
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
 /** Decimal hours → "Ч ч М мин" (drops zero parts). */
 export function formatHours(hours: number): string {
   if (!hours || hours <= 0) return '0 ч';
