@@ -16,6 +16,26 @@ const APP_TITLE = 'PilingTrack';
 const APP_DESCRIPTION =
   'Платформа учёта и управления свайными работами: объекты, бригады, установки, отчёты и аналитика.';
 
+const DEV_PERFORMANCE_MEASURE_GUARD = `
+(() => {
+  if (window.__ptPerformanceMeasureGuard) return;
+  window.__ptPerformanceMeasureGuard = true;
+  const originalMeasure = performance.measure.bind(performance);
+  performance.measure = (name, startOrOptions, endMark) => {
+    if (
+      startOrOptions &&
+      typeof startOrOptions === 'object' &&
+      typeof startOrOptions.start === 'number' &&
+      typeof startOrOptions.end === 'number' &&
+      startOrOptions.end < startOrOptions.start
+    ) {
+      return originalMeasure(name, { ...startOrOptions, end: startOrOptions.start });
+    }
+    return originalMeasure(name, startOrOptions, endMark);
+  };
+})();
+`;
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -63,6 +83,13 @@ export default async function RootLayout({
 
   return (
     <html lang="ru" suppressHydrationWarning>
+      <head>
+        {process.env.NODE_ENV === 'development' && (
+          <script
+            dangerouslySetInnerHTML={{ __html: DEV_PERFORMANCE_MEASURE_GUARD }}
+          />
+        )}
+      </head>
       <body className="font-sans antialiased bg-background text-foreground">
         <ThemeProvider
           attribute="class"
