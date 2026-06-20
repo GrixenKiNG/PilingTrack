@@ -31,6 +31,7 @@ import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { cn } from '@/lib/utils';
 import { formatNumber, formatHours, pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
+import { getReportTotals, addTotals, shiftDurationHours, type ReportTotals } from './report-totals';
 import { useReportsData } from './use-reports-data';
 import { ReportFilters } from './report-filters';
 import { ReportDetailDialog } from './report-detail-dialog';
@@ -40,15 +41,6 @@ import { useReportHistory } from './use-report-history';
 import { statusLabel, type ReportHistory } from '@/services/reports/report-history';
 
 type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
-
-interface ReportTotals {
-  piles: number;
-  pileMeters: number;
-  drillingCount: number;
-  drillingMeters: number;
-  downtimeHours: number;
-  photoCount: number;
-}
 
 const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'all', label: 'Все' },
@@ -69,37 +61,6 @@ function shiftYmd(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function getPileLengthMeters(pileGradeName: string) {
-  const match = pileGradeName.match(/\d{3}/);
-  return match ? Number(match[0]) / 10 : 0;
-}
-
-function getReportTotals(report: ReportDTO): ReportTotals {
-  const piles = report.piles?.reduce((sum, pile) => sum + pile.count, 0) || 0;
-  const pileMeters = report.piles?.reduce(
-    (sum, pile) => sum + getPileLengthMeters(pile.pileGrade?.name || '') * pile.count,
-    0,
-  ) || 0;
-  const drillingCount = report.drillings?.reduce((sum, drilling) => sum + (drilling.count || 1), 0) || 0;
-  const drillingMeters = report.drillings?.reduce((sum, drilling) => sum + drilling.meters, 0) || 0;
-  const downtimeHours = report.downtimes?.reduce((sum, downtime) => sum + downtime.duration, 0) || 0;
-
-  return { piles, pileMeters, drillingCount, drillingMeters, downtimeHours, photoCount: 0 };
-}
-
-function addTotals(reports: ReportDTO[]): ReportTotals {
-  return reports.reduce<ReportTotals>((acc, report) => {
-    const totals = getReportTotals(report);
-    acc.piles += totals.piles;
-    acc.pileMeters += totals.pileMeters;
-    acc.drillingCount += totals.drillingCount;
-    acc.drillingMeters += totals.drillingMeters;
-    acc.downtimeHours += totals.downtimeHours;
-    acc.photoCount += totals.photoCount;
-    return acc;
-  }, { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0, photoCount: 0 });
 }
 
 function shortDate(ymd: string): string {
@@ -129,17 +90,6 @@ function roleLabel(role: string): string {
   if (role === 'DISPATCHER') return 'Диспетчер';
   if (role === 'ASSISTANT') return 'Помощник';
   return 'Оператор';
-}
-
-function shiftDurationHours(report: ReportDTO): number | null {
-  if (!report.shiftStart || !report.shiftEnd) return null;
-  const [startHour, startMinute] = report.shiftStart.split(':').map(Number);
-  const [endHour, endMinute] = report.shiftEnd.split(':').map(Number);
-  if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) return null;
-  const start = startHour * 60 + startMinute;
-  let end = endHour * 60 + endMinute;
-  if (end < start) end += 24 * 60;
-  return (end - start) / 60;
 }
 
 function formatPercentValue(value: number): string {
