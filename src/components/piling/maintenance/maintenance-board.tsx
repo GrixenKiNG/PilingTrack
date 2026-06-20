@@ -27,6 +27,19 @@ import {
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate, formatPersonName } from '@/lib/format';
+import {
+  type QuickFilter,
+  REPAIR_TYPES,
+  isOverdue,
+  hoursUntilMaintenance,
+  currentHours,
+  maintenanceInterval,
+  deadlineText,
+  quickFilterMatches,
+  splitSiteName,
+  visiblePageNumbers,
+  computeBoardStats,
+} from './work-order-logic';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -103,47 +116,8 @@ interface CrewAssignment {
 }
 
 type MaintenanceCrewView = EquipmentCrewSummary | CrewAssignment;
-type QuickFilter = 'all' | 'requires' | 'overdue' | 'repair' | 'unassigned' | 'issues';
-
 const ALL = '__all__';
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-const OPEN_STATUSES: MaintenanceStatus[] = ['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'];
-const REPAIR_TYPES = new Set<MaintenanceType>(['REPAIR', 'FAULT']);
-const REGULAR_TYPES = new Set<MaintenanceType>(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'SCHEDULED']);
-
-
-const daysUntil = (iso: string | null | undefined): number | null => {
-  if (!iso) return null;
-  const target = new Date(iso);
-  if (Number.isNaN(target.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
-};
-
-const isOpenRecord = (record: WorkOrderRow) => OPEN_STATUSES.includes(record.status);
-
-const isOverdue = (record: WorkOrderRow) => {
-  const days = daysUntil(record.scheduledAt);
-  return days != null && days < 0 && isOpenRecord(record);
-};
-
-const hoursUntilMaintenance = (record: WorkOrderRow): number | null => {
-  const total = record.equipment?.engineHoursTotal;
-  const next = record.equipment?.nextMaintenanceAtHours;
-  if (typeof total !== 'number' || typeof next !== 'number') return null;
-  return next - total;
-};
-
-const currentHours = (record: WorkOrderRow) => (
-  record.engineHoursAtService ?? record.equipment?.engineHoursTotal ?? null
-);
-
-const maintenanceInterval = (record: WorkOrderRow) => {
-  if (typeof record.equipment?.nextMaintenanceAtHours !== 'number') return null;
-  return record.equipment.nextMaintenanceAtHours;
-};
 
 const statusView = (record: WorkOrderRow) => {
   if (isOverdue(record)) return { label: 'Просрочено', className: 'bg-red-50 text-red-700 border-red-200' };
@@ -156,67 +130,12 @@ const statusView = (record: WorkOrderRow) => {
   return { label: 'Требует ТО', className: 'bg-orange-50 text-orange-700 border-orange-200' };
 };
 
-const deadlineText = (record: WorkOrderRow) => {
-  const days = daysUntil(record.scheduledAt);
-  if (days == null) return 'срок не задан';
-  if (days < 0) return 'просрочено';
-  if (days === 0) return 'сегодня';
-  if (days === 1) return 'завтра';
-  return `через ${days} дн.`;
-};
-
-const quickFilterMatches = (record: WorkOrderRow, filter: QuickFilter) => {
-  if (filter === 'all') return true;
-  if (filter === 'requires') return isOpenRecord(record);
-  if (filter === 'overdue') return isOverdue(record);
-  if (filter === 'repair') return REPAIR_TYPES.has(record.type) || record.status === 'ON_HOLD';
-  if (filter === 'unassigned') return !record.assigneeId && isOpenRecord(record);
-  return record.priority === 'HIGH' || record.priority === 'CRITICAL' || isOverdue(record) || Boolean(record.faultCause);
-};
-
-const uniqueEquipmentCount = (records: WorkOrderRow[]) => (
-  new Set(records.map((record) => record.equipmentId).filter(Boolean)).size
-);
-
-const maintenanceCompletionPercent = (records: WorkOrderRow[]) => {
-  const planned = records.filter((record) => record.status !== 'CANCELLED');
-  if (planned.length === 0) return 0;
-  const done = planned.filter((record) => record.status === 'DONE').length;
-  return Math.round((done / planned.length) * 100);
-};
-
-
 const crewForRecord = (
   record: WorkOrderRow,
   fallback: Map<string, CrewAssignment>,
 ): MaintenanceCrewView | null => (
   record.equipment?.crews?.[0] ?? fallback.get(record.equipmentId) ?? null
 );
-
-const splitSiteName = (name: string | null | undefined): { title: string; location: string | null } => {
-  const value = name?.trim();
-  if (!value) return { title: 'Без объекта', location: null };
-
-  const parenthesized = value.match(/^(.*?)\s*\((.*?)\)\s*$/);
-  if (parenthesized?.[1] && parenthesized[2]) {
-    return { title: parenthesized[1].trim(), location: parenthesized[2].trim() };
-  }
-
-  const [title, ...locationParts] = value.split(',').map((part) => part.trim()).filter(Boolean);
-  if (title && locationParts.length > 0) {
-    return { title, location: locationParts.join(', ') };
-  }
-
-  return { title: value, location: null };
-};
-
-const visiblePageNumbers = (current: number, total: number): number[] => {
-  const maxButtons = 5;
-  if (total <= maxButtons) return Array.from({ length: total }, (_, index) => index + 1);
-
-  const start = Math.max(1, Math.min(current - 2, total - maxButtons + 1));
-  return Array.from({ length: maxButtons }, (_, index) => start + index);
-};
 
 export function MaintenanceBoard() {
   const [records, setRecords] = useState<WorkOrderRow[]>([]);
@@ -333,17 +252,7 @@ export function MaintenanceBoard() {
     sites.map((site) => [site.id, site.name] as const)
   ), [sites]);
 
-  const stats = useMemo(() => {
-    const total = equipment.length;
-    const activeRecords = records.filter(isOpenRecord);
-    const requires = uniqueEquipmentCount(activeRecords.filter((record) => REGULAR_TYPES.has(record.type)));
-    const overdue = uniqueEquipmentCount(activeRecords.filter(isOverdue));
-    const inRepair = uniqueEquipmentCount(activeRecords.filter((record) => (
-      REPAIR_TYPES.has(record.type) || record.status === 'ON_HOLD'
-    )));
-    const readiness = maintenanceCompletionPercent(records);
-    return { equipment: total, open: requires, overdue, inRepair, readiness };
-  }, [equipment.length, records]);
+  const stats = useMemo(() => computeBoardStats(records, equipment.length), [equipment.length, records]);
 
   const setF = <K extends keyof MaintenanceFilter>(key: K, raw: string) =>
     setFilter((previous) => ({ ...previous, [key]: raw === ALL ? '' : raw }));

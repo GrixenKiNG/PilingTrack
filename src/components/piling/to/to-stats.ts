@@ -44,23 +44,6 @@ export function computeToStats(records: JournalRecord[]): ToStats {
   return { inspections: inspections.length, repairs: repairs.length, open: open.length, averageScore };
 }
 
-/** Whole days from `now` (midnight) to `value` (midnight); null if unparseable. */
-export function daysUntil(value: string | null | undefined, now: Date = new Date()): number | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  return Math.round((date.getTime() - today.getTime()) / 86_400_000);
-}
-
-/** Human due-date phrase in Russian ("просрочено" / "сегодня" / "через N дн."). */
-export function dueText(value: string | null | undefined, now: Date = new Date()): string {
-  const days = daysUntil(value, now);
-  if (days == null) return 'срок не задан';
-  if (days < 0) return 'просрочено';
-  if (days === 0) return 'сегодня';
-  if (days === 1) return 'завтра';
-  return `через ${days} дн.`;
-}
+// daysUntil / dueText are generic date helpers — canonical in @/lib/format.
+// Re-exported so to-module keeps a single import surface.
+export { daysUntil, dueText } from '@/lib/format';
