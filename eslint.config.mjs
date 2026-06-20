@@ -129,6 +129,8 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "scripts/**",
     "src/generated/**",
     "agents/**",
+    "design-previews/**",
+    ".external-tools/**",
     ".gitnexus/**",
     ".kilo/**",
     "zai-provider-extension/**",

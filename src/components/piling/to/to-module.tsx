@@ -39,7 +39,6 @@ import {
   isInspectionRecord,
   isOpenRecord,
   computeToStats,
-  daysUntil,
   dueText,
 } from './to-stats';
 
