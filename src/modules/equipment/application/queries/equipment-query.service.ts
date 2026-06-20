@@ -93,6 +93,8 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       id: true, reportId: true, date: true, shiftType: true, status: true,
       site: { select: { id: true, name: true } },
       user: { select: { id: true, name: true } },
+      piles: { select: { count: true, pileGrade: { select: { name: true } } } },
+      drillings: { select: { count: true, meters: true } },
       updatedAt: true,
     },
   });
@@ -103,6 +105,10 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       })
     : [];
   const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
+  const pileLengthFromName = (name: string) => {
+    const match = name.match(/\d{3}/);
+    return match ? Number(match[0]) / 10 : 0;
+  };
 
   const reports30d = allReports.filter((r) => r.date >= cutoff);
   const stats30d = reports30d.reduce(
@@ -110,11 +116,16 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       const a = analyticsByReport.get(r.reportId);
       if (!a) return acc;
       acc.piles += a.totalPiles;
+      acc.pileMeters += r.piles.reduce(
+        (sum, pile) => sum + pile.count * pileLengthFromName(pile.pileGrade?.name ?? ''),
+        0,
+      );
+      acc.drillingCount += r.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
       acc.drillingMeters += a.totalDrilling;
       acc.downtimeHours += a.totalDowntime;
       return acc;
     },
-    { piles: 0, drillingMeters: 0, downtimeHours: 0 }
+    { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 }
   );
 
   const timeline = allReports.map((r) => {

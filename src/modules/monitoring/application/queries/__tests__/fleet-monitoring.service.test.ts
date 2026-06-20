@@ -8,15 +8,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { equipmentFindMany, reportFindMany } = vi.hoisted(() => ({
+const { equipmentFindMany, reportFindMany, analyticsFindMany } = vi.hoisted(() => ({
   equipmentFindMany: vi.fn(),
   reportFindMany: vi.fn(),
+  analyticsFindMany: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     equipment: { findMany: equipmentFindMany },
     report: { findMany: reportFindMany },
+    reportAnalytics: { findMany: analyticsFindMany },
   },
 }));
 
@@ -26,9 +28,11 @@ describe('getFleetSnapshot — tenant isolation', () => {
   beforeEach(() => {
     equipmentFindMany.mockReset();
     reportFindMany.mockReset();
+    analyticsFindMany.mockReset();
     // Empty equipment → early return; we only assert the query's where clause.
     equipmentFindMany.mockResolvedValue([]);
     reportFindMany.mockResolvedValue([]);
+    analyticsFindMany.mockResolvedValue([]);
   });
 
   it('filters equipment by tenantId', async () => {
@@ -55,5 +59,61 @@ describe('getFleetSnapshot — tenant isolation', () => {
     await expect(getFleetSnapshot({ tenantId: '' })).rejects.toThrow(/tenantId/i);
 
     expect(equipmentFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('getFleetSnapshot — inventory fields and operators on shift', () => {
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
+
+  beforeEach(() => {
+    equipmentFindMany.mockReset();
+    reportFindMany.mockReset();
+    analyticsFindMany.mockReset();
+    analyticsFindMany.mockResolvedValue([]);
+  });
+
+  it('maps inventory fields onto the card and serializes the maintenance date', async () => {
+    const due = new Date('2026-07-01T00:00:00.000Z');
+    equipmentFindMany.mockResolvedValue([
+      {
+        id: 'eq-1', name: 'PVE 50PR', model: 'PVE', manufactureYear: 2019,
+        kind: 'PILE_DRIVER', inventoryNumber: 'ИНВ-1001', serialNumber: '50PR-1142',
+        engineHoursTotal: 8450, nextMaintenanceDate: due, nextMaintenanceAtHours: 9000,
+        crews: [],
+      },
+    ]);
+    reportFindMany.mockResolvedValue([]);
+
+    const snap = await getFleetSnapshot({ tenantId: 'orion' });
+    const card = snap.equipment[0];
+
+    expect(card.kind).toBe('PILE_DRIVER');
+    expect(card.inventoryNumber).toBe('ИНВ-1001');
+    expect(card.serialNumber).toBe('50PR-1142');
+    expect(card.engineHoursTotal).toBe(8450);
+    expect(card.nextMaintenanceDate).toBe(due.toISOString());
+    expect(card.nextMaintenanceAtHours).toBe(9000);
+    // No reports → idle, no today totals.
+    expect(card.status).toBe('idle');
+    expect(card.todayTotals).toBeNull();
+  });
+
+  it('counts distinct operators with a report today', async () => {
+    equipmentFindMany.mockResolvedValue([
+      {
+        id: 'eq-1', name: 'A', model: '', manufactureYear: null, kind: 'OTHER',
+        inventoryNumber: null, serialNumber: null, engineHoursTotal: null,
+        nextMaintenanceDate: null, nextMaintenanceAtHours: null, crews: [],
+      },
+    ]);
+    reportFindMany.mockResolvedValue([
+      { id: 'r1', reportId: 'R1', equipmentId: 'eq-1', crewId: 'c1', userId: 'u1', date: today, shiftType: 'DAY', updatedAt: new Date(), user: { name: 'Иванов' }, site: { name: 'Объект' } },
+      { id: 'r2', reportId: 'R2', equipmentId: 'eq-1', crewId: 'c1', userId: 'u2', date: today, shiftType: 'NIGHT', updatedAt: new Date(), user: { name: 'Петров' }, site: { name: 'Объект' } },
+      { id: 'r3', reportId: 'R3', equipmentId: 'eq-1', crewId: 'c1', userId: 'u1', date: today, shiftType: 'DAY', updatedAt: new Date(), user: { name: 'Иванов' }, site: { name: 'Объект' } },
+    ]);
+
+    const snap = await getFleetSnapshot({ tenantId: 'orion' });
+
+    expect(snap.totals.operatorsOnShiftToday).toBe(2);
   });
 });
