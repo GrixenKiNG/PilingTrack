@@ -113,12 +113,16 @@ export async function listReportsForReview(
 // ── Recent reports for the dispatcher dashboard evidence journal ──────────────
 export interface RecentReportRow {
   id: string;
+  reportId: string;
   date: string;
+  shiftType: string;
   siteName: string;
+  equipmentName: string;
   operatorName: string;
   crewName: string | null;
   status: string;
   hasPhoto: boolean;
+  photoCount: number;
   edited: boolean;
   updatedAt: string;
 }
@@ -135,8 +139,9 @@ export async function listRecentReportsForDashboard(
     orderBy: { updatedAt: 'desc' },
     take: limit,
     select: {
-      id: true, date: true, status: true, version: true, journalPhotoMediaId: true, updatedAt: true,
+      id: true, reportId: true, date: true, shiftType: true, status: true, version: true, journalPhotoMediaId: true, updatedAt: true,
       site: { select: { name: true } },
+      equipment: { select: { name: true } },
       user: { select: { name: true } },
       crew: { select: { name: true } },
     },
@@ -156,12 +161,16 @@ export async function listRecentReportsForDashboard(
 
   return reports.map((r) => ({
     id: r.id,
+    reportId: r.reportId,
     date: r.date,
+    shiftType: r.shiftType,
     siteName: r.site?.name ?? '—',
+    equipmentName: r.equipment?.name ?? '—',
     operatorName: r.user?.name ?? '—',
     crewName: r.crew?.name ?? null,
     status: r.status,
     hasPhoto: r.journalPhotoMediaId != null || withMedia.has(r.id),
+    photoCount: counts.find((c) => c.entityId === r.id)?._count ?? (r.journalPhotoMediaId ? 1 : 0),
     edited: r.version > 1,
     updatedAt: r.updatedAt.toISOString(),
   }));
