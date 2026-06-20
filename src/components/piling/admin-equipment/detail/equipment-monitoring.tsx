@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Cog, Droplets, Activity } from 'lucide-react';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { formatNum, formatRelative } from '@/lib/format';
 
 type Subsystem = 'engine' | 'hydraulics' | 'other';
 
@@ -325,18 +326,3 @@ function renderValue(value: number, unit: string | null, spec?: ParamSpec): { te
   return { text: formatNum(value), unit: unit ?? '' };
 }
 
-function formatNum(n: number | null): string {
-  if (n === null || n === undefined) return '—';
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-}
-
-function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const min = Math.round(ms / 60_000);
-  if (min < 1) return 'только что';
-  if (min < 60) return `${min} мин назад`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} ч назад`;
-  const d = Math.round(h / 24);
-  return `${d} дн назад`;
-}

@@ -29,7 +29,7 @@ import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { cn } from '@/lib/utils';
-import { formatNumber, pluralizeRu } from '@/lib/format';
+import { formatNumber, formatHours, pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { useReportsData } from './use-reports-data';
 import { ReportFilters } from './report-filters';
@@ -100,15 +100,6 @@ function addTotals(reports: ReportDTO[]): ReportTotals {
     acc.photoCount += totals.photoCount;
     return acc;
   }, { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0, photoCount: 0 });
-}
-
-function formatHours(hours: number): string {
-  if (!hours || hours <= 0) return '0 ч';
-  const whole = Math.floor(hours);
-  const mins = Math.round((hours - whole) * 60);
-  if (mins === 0) return `${whole} ч`;
-  if (whole === 0) return `${mins} мин`;
-  return `${whole} ч ${mins} мин`;
 }
 
 function shortDate(ymd: string): string {

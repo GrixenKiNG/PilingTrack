@@ -9,6 +9,34 @@ export function formatPercent(value: number, maxFractionDigits = 1): string {
   return `${formatNumber(value, maxFractionDigits)}%`;
 }
 
+/** Decimal hours → "Ч ч М мин" (drops zero parts). */
+export function formatHours(hours: number): string {
+  if (!hours || hours <= 0) return '0 ч';
+  const whole = Math.floor(hours);
+  const mins = Math.round((hours - whole) * 60);
+  if (mins === 0) return `${whole} ч`;
+  if (whole === 0) return `${mins} мин`;
+  return `${whole} ч ${mins} мин`;
+}
+
+/** Number with up to 2 decimals; null/undefined → "—". */
+export function formatNum(n: number | null): string {
+  if (n === null || n === undefined) return '—';
+  return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+}
+
+/** ISO timestamp → coarse Russian relative time ("5 мин назад"). */
+export function formatRelative(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return 'только что';
+  if (min < 60) return `${min} мин назад`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} ч назад`;
+  const d = Math.round(h / 24);
+  return `${d} дн назад`;
+}
+
 export function pluralizeRu(
   count: number,
   forms: readonly [one: string, few: string, many: string]

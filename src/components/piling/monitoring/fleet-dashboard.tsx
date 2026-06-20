@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatHours } from '@/lib/format';
 
 type EquipmentStatus = 'active' | 'expected' | 'idle';
 
@@ -289,14 +290,6 @@ function formatNumber(n: number, decimals = 0): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-function formatHours(hours: number): string {
-  if (!hours || hours <= 0) return '0 ч';
-  const whole = Math.floor(hours);
-  const mins = Math.round((hours - whole) * 60);
-  if (mins === 0) return `${whole} ч`;
-  if (whole === 0) return `${mins} мин`;
-  return `${whole} ч ${mins} мин`;
-}
 
 function formatRuDate(ymd: string): string {
   // 'YYYY-MM-DD' → 'DD.MM.YYYY' without timezone shenanigans

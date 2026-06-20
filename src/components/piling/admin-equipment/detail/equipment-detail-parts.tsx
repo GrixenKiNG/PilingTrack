@@ -330,32 +330,18 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
 // Formatters
 // --------------------------------------------------------------------------
 
+// formatHours / formatRelative are canonical in @/lib/format; re-exported here
+// so the detail screen keeps importing them from one place.
+export { formatHours, formatRelative } from '@/lib/format';
+
+// NOTE: this formatNumber has fixed-decimals semantics (min=max=decimals),
+// different from @/lib/format's "up to N decimals" — kept local on purpose.
 export function formatNumber(n: number, decimals = 0): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-
-export function formatHours(hours: number): string {
-  if (!hours || hours <= 0) return '0 ч';
-  const whole = Math.floor(hours);
-  const mins = Math.round((hours - whole) * 60);
-  if (mins === 0) return `${whole} ч`;
-  if (whole === 0) return `${mins} мин`;
-  return `${whole} ч ${mins} мин`;
 }
 
 export function formatRuDate(ymd: string): string {
   const [y, m, d] = ymd.split('-');
   if (!y || !m || !d) return ymd;
   return `${d}.${m}.${y}`;
-}
-
-export function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const min = Math.round(ms / 60_000);
-  if (min < 1) return 'только что';
-  if (min < 60) return `${min} мин назад`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} ч назад`;
-  const d = Math.round(h / 24);
-  return `${d} дн назад`;
 }
