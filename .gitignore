@@ -96,6 +96,7 @@ bun.lockb
 pnpm-lock.yaml
 yarn.lock
 .gitnexus
+graphify-out/
 tmp-screenshots/
 
 # Database dumps — may contain real PII / auth material.
