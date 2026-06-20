@@ -12,7 +12,7 @@ import { EquipmentViewToggle, type FleetView } from './equipment-view-toggle';
 import { EquipmentTile } from './equipment-tile';
 import { EquipmentTable } from './equipment-table';
 import { EquipmentDetail } from './detail/equipment-detail';
-import { KIND_LABEL } from './equipment-status';
+import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
 import { CreateEquipmentDialog } from './equipment-dialogs';
 
 export function AdminEquipment() {
@@ -45,33 +45,9 @@ export function AdminEquipment() {
 
   const cards = useMemo(() => snapshot?.equipment ?? [], [snapshot]);
 
-  const options = useMemo(() => {
-    const sites = new Set<string>();
-    const kinds = new Set<string>();
-    const crews = new Set<string>();
-    for (const c of cards) {
-      if (c.assignedSiteName) sites.add(c.assignedSiteName);
-      if (c.kind) kinds.add(c.kind);
-      if (c.assignedCrewName) crews.add(c.assignedCrewName);
-    }
-    return {
-      sites: [...sites].sort(),
-      kinds: [...kinds].sort().map((k) => ({ value: k, label: KIND_LABEL[k as keyof typeof KIND_LABEL] ?? k })),
-      crews: [...crews].sort(),
-    };
-  }, [cards]);
+  const options = useMemo(() => buildFleetFilterOptions(cards), [cards]);
 
-  const filtered = useMemo(
-    () =>
-      cards.filter((c) => {
-        if (filters.site && c.assignedSiteName !== filters.site) return false;
-        if (filters.kind && c.kind !== filters.kind) return false;
-        if (filters.status && c.status !== filters.status) return false;
-        if (filters.crew && c.assignedCrewName !== filters.crew) return false;
-        return true;
-      }),
-    [cards, filters],
-  );
+  const filtered = useMemo(() => applyFleetFilters(cards, filters), [cards, filters]);
 
   if (loading) {
     return (
