@@ -299,7 +299,6 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
 
   // Prisma's InputJsonValue/NullableJsonNullValueInput typing is too strict for
   // dynamic JSON metadata; values are already validated at the route boundary.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = await getDbClient();
   await db.telemetryRecord.createMany({ data: telemetryRecords as any });
 

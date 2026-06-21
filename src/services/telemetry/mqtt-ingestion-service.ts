@@ -121,7 +121,6 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
   }
 
   // Dynamic import to avoid requiring mqtt package when not used
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   let mqtt: any;
   try {
     // @ts-expect-error mqtt is optional — install with: npm install mqtt

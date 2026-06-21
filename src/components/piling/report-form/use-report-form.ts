@@ -200,7 +200,12 @@ export function useReportForm(): UseReportFormReturn {
   // Draft management — snapshot via ref so the interval isn't torn
   // down/recreated on every keystroke.
   const draftSnapshotRef = useRef({ piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId });
-  draftSnapshotRef.current = { piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId };
+  // Keep the snapshot fresh after each commit (not during render) so the
+  // 30s interval and beforeunload handlers read current values without being
+  // recreated on every keystroke.
+  useEffect(() => {
+    draftSnapshotRef.current = { piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId };
+  });
 
   useEffect(() => {
     if (!user || !selectedSiteId || !date) return;
@@ -239,6 +244,7 @@ export function useReportForm(): UseReportFormReturn {
         toast.info('Восстановлен черновик', { description: `Сохранён ${savedAt.toLocaleString('ru-RU')}` });
       }
     } catch { localStorage.removeItem(draftKey); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore runs once per (user, site, date); piles/drillings/downtimes are read only as an initial-empty guard and must not retrigger it
   }, [user, selectedSiteId, date]);
 
   // Helpers

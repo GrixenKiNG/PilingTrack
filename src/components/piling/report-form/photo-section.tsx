@@ -55,6 +55,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
 
   useEffect(() => {
     if (reportId) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is recreated each render; the thumbnail only needs to (re)load when reportId changes
   }, [reportId]);
 
   const handleFile = async (file: File) => {
