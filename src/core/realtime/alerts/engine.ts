@@ -141,6 +141,7 @@ async function notifyTelegram(
 
     const payload = event.payload as { severity?: string; message?: string };
     await telegramNotifier.sendAlert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
       severity: (payload.severity as any) || rule.severity,
       message: rule.message(event, ctx),
       siteId: ctx.siteId || undefined,

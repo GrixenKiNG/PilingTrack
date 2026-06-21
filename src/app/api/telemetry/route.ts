@@ -134,12 +134,14 @@ export const POST = withApi(async (request: NextRequest) => {
       const count = await ingestTelemetryBatch(
         validated.data.map((d) => ({
           ...d,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
           type: d.type as any,
           siteId: d.siteId ?? undefined,
           unit: d.unit ?? undefined,
           latitude: d.latitude ?? undefined,
           longitude: d.longitude ?? undefined,
           metadata: d.metadata ?? undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         })) as any
       );
       return NextResponse.json({
@@ -159,6 +161,7 @@ export const POST = withApi(async (request: NextRequest) => {
       );
     }
     const id = await ingestTelemetry({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: validated.data.type as any,
       equipmentId: validated.data.equipmentId,
       value: validated.data.value,
@@ -170,6 +173,7 @@ export const POST = withApi(async (request: NextRequest) => {
       timestamp: validated.data.timestamp
         ? new Date(validated.data.timestamp)
         : undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
     } as any);
 
     const isSampledOut = id.startsWith('sampled-out-');
@@ -234,6 +238,7 @@ export const GET = withApi(async (request: NextRequest) => {
       const { listAllEquipment } = await import('@/modules/equipment');
       // Page through accessible equipment — typically small for an operator.
       const owned = await listAllEquipment(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         { limit: 200, getNextCursor: () => null } as any,
         null,
         user!.id
@@ -287,11 +292,13 @@ export const GET = withApi(async (request: NextRequest) => {
     const records = await getTelemetryByRange({
       equipmentId,
       siteId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: type as any,
       from: new Date(from),
       to: new Date(to),
       limit,
       ...(allowedEquipmentIds && !equipmentId ? { equipmentIds: allowedEquipmentIds } : {}),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
     } as any);
 
     return NextResponse.json({ records });

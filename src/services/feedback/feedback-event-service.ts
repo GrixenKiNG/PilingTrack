@@ -103,6 +103,7 @@ export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
       actorRole: input.actor?.role || null,
       targetId: input.targetId || null,
       requestId: input.requestId || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
       metadata: (input.metadata as any) || undefined,
     },
   });

@@ -211,6 +211,7 @@ export async function upsertReportRaw(params: {
   shiftStart?: string | null;
   shiftEnd?: string | null;
   equipmentId?: string | null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
 }): Promise<any> {
   const start = Date.now();
 

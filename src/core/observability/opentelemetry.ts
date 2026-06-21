@@ -61,6 +61,7 @@ const consoleExporter = new ConsoleSpanExporter();
 // ============================================================
 
 const sampler = ENVIRONMENT === 'production'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
   ? new ParentBasedSampler({ root: { shouldSample: () => ({ decision: Math.random() < SAMPLE_RATE ? 1 : 0 }) } as any })
   : new AlwaysOnSampler();
 

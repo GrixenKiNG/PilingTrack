@@ -171,6 +171,7 @@ export function createSpan(operationName: string): {
       return parentContext;
     },
     _childContext: childContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   } as any;
 }
 

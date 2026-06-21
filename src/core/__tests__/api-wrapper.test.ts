@@ -88,6 +88,7 @@ describe('withApi', () => {
 
   it('should map Prisma P2025 to 404', async () => {
     const handler = withApi(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       const err = new Error('Record not found') as any;
       err.code = 'P2025';
       throw err;
@@ -101,6 +102,7 @@ describe('withApi', () => {
 
   it('should map Prisma P2002 to 409', async () => {
     const handler = withApi(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       const err = new Error('Unique constraint failed') as any;
       err.code = 'P2002';
       throw err;
@@ -115,6 +117,7 @@ describe('withApi', () => {
   it('should return 500 for unknown Prisma codes', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = withApi(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       const err = new Error('Unknown') as any;
       err.code = 'P9999';
       throw err;
@@ -203,6 +206,7 @@ describe('withMutation', () => {
       allowed: false,
       remaining: 0,
       retryAfter: 30,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     } as any);
     const handler = withMutation(async () => NextResponse.json({ ok: true }));
     const res = await handler(mockRequest());

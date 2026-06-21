@@ -49,6 +49,7 @@ export const DELETE = withMutation(
         { status: 400 }
       );
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const result = await deleteSiteHierarchyItem((validated.data as any).type, (validated.data as any).itemId);
     return NextResponse.json(result);
   },

@@ -85,6 +85,7 @@ export async function authenticateWS(req: IncomingMessage): Promise<WSAuthResult
 /**
  * Send auth error and close connection.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
 export function sendAuthError(ws: http.ServerResponse | any, code: number, message: string): void {
   try {
     ws.send(JSON.stringify({

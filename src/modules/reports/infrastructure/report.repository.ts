@@ -17,6 +17,7 @@ import { fromPrismaToState } from './report.prisma.mapper';
  * rolls back, these side-effects are rolled back too.
  */
 export interface SaveHooks {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
   onBeforeCommit?: (tx: any) => Promise<void>;
 }
 
@@ -69,6 +70,7 @@ export class PrismaReportRepository implements ReportRepository {
   async save(aggregate: ReportAggregate, hooks?: SaveHooks): Promise<void> {
     const state = aggregate.getState();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
       // Check if report exists by reportId first, then by the natural unique
       // (userId, siteId, date) tuple. Offline clients can generate a fresh
@@ -230,6 +232,7 @@ export class PrismaReportRepository implements ReportRepository {
             piles: state.piles,
             drillings: state.drillings,
             downtimes: state.downtimes,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
           } as any,
           actorId: state.lastEditedById || state.userId,
         },

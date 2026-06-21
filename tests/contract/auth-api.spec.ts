@@ -197,8 +197,11 @@ describe('contract — auth wrapper application', () => {
     const refreshModule = await import('@/app/api/auth/refresh/route');
     const logoutModule = await import('@/app/api/auth/logout/route');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     expect((meModule as any).runtime).toBe('nodejs');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     expect((refreshModule as any).runtime).toBe('nodejs');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     expect((logoutModule as any).runtime).toBe('nodejs');
   }, 30000);
 });

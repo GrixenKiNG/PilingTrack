@@ -72,10 +72,10 @@ function isRetryable(error: Error, retryableErrors: Set<string>): boolean {
   if (retryableErrors.has(error.name)) return true;
 
   // FetchError with isRetryable flag
-  if ('isRetryable' in error && (error as any).isRetryable === true) return true;
+  if ('isRetryable' in error && (error as { isRetryable?: boolean }).isRetryable === true) return true;
 
   // Prisma errors - extract code and validate type before checking
-  const code = (error as any)?.code;
+  const code = (error as { code?: unknown })?.code;
   if (typeof code === 'string' && retryableErrors.has(code)) return true;
 
   // Fetch/network errors

@@ -180,6 +180,7 @@ describe('ReplayBufferManager', () => {
 
     buffer.addMessage('client-1', msg);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     const clientBuffer = (buffer as any).buffers.get('client-1');
     expect(clientBuffer.messages).toHaveLength(1);
   });
@@ -217,6 +218,7 @@ describe('ReplayBufferManager', () => {
 
     buffer.ackMessage('client-1', 'msg-1');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     const clientBuffer = (buffer as any).buffers.get('client-1');
     expect(clientBuffer.lastAckedSeq).toBe(5);
     expect(clientBuffer.messages[0].acked).toBe(true);

@@ -16,6 +16,7 @@ export function toPrismaData(aggregate: CrewAggregate) {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma row shape boundary in a mapper
 export function fromPrismaToState(prismaCrew: any): CrewInfo {
   return {
     id: prismaCrew.id,
@@ -29,6 +30,7 @@ export function fromPrismaToState(prismaCrew: any): CrewInfo {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
 export function toOutboxData(event: any) {
   return {
     type: event.type,

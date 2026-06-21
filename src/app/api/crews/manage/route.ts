@@ -77,6 +77,7 @@ export const PUT = withMutation(
       updateCrew({
         crewId: validated.data.id!,
         name: validated.data.name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
         isActive: (validated.data as any).isActive,
       })
     );

@@ -18,7 +18,9 @@ export interface UpsertReportCommand {
 }
 
 export interface UpsertReportResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   report: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   events: readonly any[];
   _action: 'created' | 'updated';
 }

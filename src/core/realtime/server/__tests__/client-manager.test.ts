@@ -16,6 +16,7 @@ import { ClientManager } from '@/core/realtime/server/client-manager';
 // Mock WebSocket factory
 // ============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
 function createMockWs(): any {
   return {
     readyState: 1 /* WebSocket.OPEN */,

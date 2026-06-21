@@ -120,6 +120,7 @@ export function FleetDashboard() {
     ws.addEventListener('close', () => setConn('offline'));
     ws.addEventListener('error', () => setConn('offline'));
     ws.addEventListener('message', (ev) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       let msg: any;
       try {
         msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');

@@ -40,6 +40,7 @@ function getBackoffDelay(attempts: number): number {
  * Call this inside db.$transaction().
  */
 export async function saveToOutbox(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
   tx: any,
   events: ReportDomainEvent[]
 ): Promise<void> {
@@ -52,6 +53,7 @@ export async function saveToOutbox(
           type: event.type,
           aggregateId: event.aggregateId,
           aggregateType: event.aggregateType,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
           payload: event as any, // JSON
         },
       })
@@ -85,6 +87,7 @@ async function consumeOutboxEvents(
         { nextRetryAt: null },
         { nextRetryAt: { lte: now } },
       ],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     } as any,
     orderBy: { createdAt: 'asc' },
     take: BATCH_SIZE,
@@ -125,10 +128,12 @@ async function consumeOutboxEvents(
       // throwing P2025, which would otherwise land in the catch below and
       // re-schedule retry for an event that's already been processed.
       const claim = await db.outboxEvent.updateMany({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
         where: { id: outboxEvent.id, [consumerColumn]: false } as any,
         data: {
           [consumerColumn]: true,
           ...(consumerColumn === 'published' ? { publishedAt: new Date() } : {}),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
         } as any,
       });
 
@@ -162,6 +167,7 @@ async function consumeOutboxEvents(
             lastError: `Moved to DLQ: ${errorMessage.substring(0, 500)}`,
             [consumerColumn]: true,
             ...(consumerColumn === 'published' ? { publishedAt: new Date() } : {}),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
           } as any,
         });
       } else {

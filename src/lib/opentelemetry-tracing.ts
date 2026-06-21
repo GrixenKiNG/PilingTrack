@@ -233,7 +233,7 @@ export function clearSpanStore(maxAgeMs: number = 3600000) {
 }
 
 // Auto-cleanup old spans every 10 minutes
-if (typeof globalThis !== 'undefined' && !(globalThis as any).__tracingCleanupSet) {
+if (typeof globalThis !== 'undefined' && !(globalThis as typeof globalThis & { __tracingCleanupSet?: boolean }).__tracingCleanupSet) {
   setInterval(() => clearSpanStore(3600000), 10 * 60 * 1000);
-  (globalThis as any).__tracingCleanupSet = true;
+  (globalThis as typeof globalThis & { __tracingCleanupSet?: boolean }).__tracingCleanupSet = true;
 }

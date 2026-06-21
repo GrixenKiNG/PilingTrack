@@ -131,7 +131,9 @@ export async function startWSServer(): Promise<ServerHandle> {
               tenantId: auth.tenantId!,
               role: auth.role,
               siteIds: auth.siteIds,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
             }, channel as any)) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
               clients.subscribe(ws, channel as any);
               ws.send(JSON.stringify({
                 type: 'subscribed',
@@ -148,6 +150,7 @@ export async function startWSServer(): Promise<ServerHandle> {
           }
 
           case 'unsubscribe':
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
             clients.unsubscribe(ws, (msg.channel as string) as any);
             break;
 
@@ -274,6 +277,7 @@ export async function startWSServer(): Promise<ServerHandle> {
       const sent = clients.broadcast(messageWithSeq, channels);
 
       // Add to replay buffers for each client
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       for (const client of (clients as any).clients?.values?.() || []) {
         if (client.subscriptions) {
           const hasSubscription = channels.some((ch: string) => {

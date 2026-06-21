@@ -407,6 +407,7 @@ export class MediaService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     return media.map((m: any) => this.toMediaRecord(m));
   }
 
@@ -446,6 +447,7 @@ export class MediaService {
   /**
    * Convert DB model to public MediaRecord.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   private toMediaRecord(media: any): MediaRecord {
     return {
       id: media.id,

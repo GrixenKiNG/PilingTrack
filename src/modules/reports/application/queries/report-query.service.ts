@@ -99,6 +99,7 @@ export async function listReportsForReview(
   }
 
   return paginateQuery(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     (args) => db.report.findMany(args as any),
     { cursor: pagination?.cursor, limit: pagination?.limit ?? 25 },
     {
@@ -273,6 +274,7 @@ export async function exportReportsCsv(filters: {
       equipment: report.crew?.equipment?.name || '',
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const pileRows = report.piles.map((pile: any) => ({
       ...base,
       pileGrade: pile.pileGrade.name,
@@ -284,6 +286,7 @@ export async function exportReportsCsv(filters: {
       dtComment: '',
     }));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const drillingRows = report.drillings.map((drilling: any) => ({
       ...base,
       pileGrade: '',
@@ -295,6 +298,7 @@ export async function exportReportsCsv(filters: {
       dtComment: '',
     }));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtimeRows = report.downtimes.map((downtime: any) => ({
       ...base,
       pileGrade: '',

@@ -213,6 +213,7 @@ export async function deleteCrew(command: DeleteCrewCommand) {
 
   if (command.force) {
     // Force delete: delete linked reports first (bypasses domain for reports)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
       await tx.report.deleteMany({ where: { crewId: command.crewId } });
       await tx.crew.delete({ where: { id: command.crewId } });

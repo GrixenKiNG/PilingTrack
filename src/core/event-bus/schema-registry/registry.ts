@@ -89,7 +89,7 @@ export class SchemaRegistry {
       const error = new Error(
         `Event validation failed for ${key}: ${JSON.stringify(errors)}`
       );
-      (error as any).errors = errors;
+      (error as Error & { errors?: unknown }).errors = errors;
       throw error;
     }
 
@@ -140,9 +140,11 @@ export class SchemaRegistry {
     newSchema: object,
     mode: CompatibilityMode
   ): boolean {
-    const oldRequired = (oldSchema as any).required || [];
-    const newRequired = (newSchema as any).required || [];
+    const oldRequired = (oldSchema as { required?: string[] }).required || [];
+    const newRequired = (newSchema as { required?: string[] }).required || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const oldProps = (oldSchema as any).properties || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const newProps = (newSchema as any).properties || {};
 
     if (mode === 'BACKWARD' || mode === 'FULL') {

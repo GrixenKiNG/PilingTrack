@@ -112,6 +112,7 @@ export async function getCachedDictionary(type: 'pileGrade' | 'drillingType' | '
       const model = type === 'pileGrade' ? db.pileGrade :
                     type === 'drillingType' ? db.drillingType :
                     db.downtimeReason;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       return (model as any).findMany({
         where: { isActive: true },
         orderBy: { name: 'asc' },

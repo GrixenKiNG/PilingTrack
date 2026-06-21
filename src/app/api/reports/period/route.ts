@@ -86,6 +86,7 @@ export const GET = withApi(
 
     // PileWork has no metersPerUnit — it's stored per-site on SitePilePlan.
     const pileKeys = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     for (const r of reports as any[]) {
       for (const p of r.piles || []) pileKeys.add(`${r.siteId}|${p.pileGradeId}`);
     }

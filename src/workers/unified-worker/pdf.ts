@@ -26,6 +26,7 @@ export async function startPdf(): Promise<void> {
     const pdfWorker = new Worker(
       'pdf-generation',
       async (job: InstanceType<typeof Job>) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
         const data = job.data as Record<string, any>;
         const jobId = String(job.id);
 

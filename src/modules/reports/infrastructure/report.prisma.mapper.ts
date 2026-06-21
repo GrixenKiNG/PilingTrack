@@ -57,6 +57,7 @@ export function toPrismaCreateData(aggregate: ReportAggregate) {
 /**
  * Map Prisma model to aggregate state for reconstitution.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma row shape boundary in a mapper
 export function fromPrismaToState(prismaReport: any): Parameters<typeof ReportAggregate.reconstitute>[0] {
   return {
     id: prismaReport.id,
@@ -85,6 +86,7 @@ export function fromPrismaToState(prismaReport: any): Parameters<typeof ReportAg
 /**
  * Map domain event to outbox record data.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
 export function toOutboxData(event: any) {
   return {
     type: event.type,

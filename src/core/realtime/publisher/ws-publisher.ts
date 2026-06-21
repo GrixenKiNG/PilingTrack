@@ -50,6 +50,7 @@ export async function publishPendingEvents(): Promise<number> {
         await publishToRedis(CHANNEL_EVENTS, realtimeEvent);
 
         // Evaluate alert rules
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
         await evaluateAlert(realtimeEvent as any);
 
         // Mark as published (for WS delivery)

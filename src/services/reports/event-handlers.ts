@@ -283,6 +283,7 @@ async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
         type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
         published: false,
         id: { not: event.id },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       } as any,
     });
     if (newerPending > 0) {

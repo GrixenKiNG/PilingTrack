@@ -18,12 +18,15 @@ vi.mock('sonner', () => ({
 
 vi.mock('framer-motion', () => ({
   motion: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
 
 vi.mock('next/image', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   default: ({ alt, ...props }: any) => <img alt={alt} {...props} />,
 }));
 
@@ -37,16 +40,19 @@ vi.mock('lucide-react', () => ({
 }));
 
 vi.mock('@/components/ui/button', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   Button: ({ children, ...props }: any) => (
     <button {...props}>{children}</button>
   ),
 }));
 
 vi.mock('@/components/ui/input', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   Input: (props: any) => <input {...props} />,
 }));
 
 vi.mock('@/components/ui/label', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   Label: ({ children, ...props }: any) => (
     <label {...props}>{children}</label>
   ),
@@ -80,6 +86,7 @@ describe('LoginPage', () => {
 
   it('submits form with valid credentials', async () => {
     const mockUser = { id: '1', email: 'test@piling.ru', name: 'Test User', role: 'OPERATOR' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
@@ -87,6 +94,7 @@ describe('LoginPage', () => {
 
     const { usePilingStore } = await import('@/lib/store');
     const loginMock = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     (usePilingStore as any).mockImplementation(() => ({ login: loginMock }));
 
     render(<LoginPage />);
@@ -112,6 +120,7 @@ describe('LoginPage', () => {
 
   it('shows error on failed login', async () => {
     const { toast } = await import('sonner');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     (global.fetch as any).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ error: 'Неверные данные' }),
@@ -147,6 +156,7 @@ describe('LoginPage', () => {
   });
 
   it('disables submit button while loading', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     (global.fetch as any).mockImplementationOnce(
       () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, json: async () => ({ user: {} }) }), 100))
     );

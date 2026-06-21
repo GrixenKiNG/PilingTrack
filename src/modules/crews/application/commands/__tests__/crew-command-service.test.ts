@@ -57,6 +57,7 @@ const mockDb = {
   report: {
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   $transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => {
     return fn(mockDb);
   }),

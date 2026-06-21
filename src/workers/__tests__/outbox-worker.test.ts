@@ -310,6 +310,7 @@ describe('Outbox Publisher', () => {
       const events = [
         { type: 'report.created', aggregateId: 'r1', aggregateType: 'Report' },
         { type: 'report.updated', aggregateId: 'r1', aggregateType: 'Report' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       ] as any[];
 
       await saveToOutbox(mockTx, events);
