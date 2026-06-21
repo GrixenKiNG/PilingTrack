@@ -462,10 +462,10 @@ function JournalRow({ record }: { record: JournalRecord }) {
     <tr className="align-top hover:bg-orange-50/30">
       <td className="px-3 py-3 font-mono text-xs text-slate-700">
         <div>{fmtDate(recordDate(record))}</div>
-        <div className="mt-1 text-[11px] text-slate-400">{dueText(record.scheduledAt)}</div>
+        <div className="mt-1 text-2xs text-slate-400">{dueText(record.scheduledAt)}</div>
       </td>
       <td className="px-3 py-3">
-        <span className={cn('inline-flex rounded border px-2 py-1 text-[11px] font-semibold', TYPE_STYLE[record.type] ?? TYPE_STYLE.INSPECTION)}>
+        <span className={cn('inline-flex rounded border px-2 py-1 text-2xs font-semibold', TYPE_STYLE[record.type] ?? TYPE_STYLE.INSPECTION)}>
           {TYPE_LABEL[record.type] ?? record.type}
         </span>
       </td>
@@ -486,7 +486,7 @@ function JournalRow({ record }: { record: JournalRecord }) {
         </span>
       </td>
       <td className="px-3 py-3 text-right">
-        <span className={cn('inline-flex rounded border px-2 py-1 text-[11px] font-semibold', STATUS_STYLE[record.status] ?? STATUS_STYLE.PLANNED)}>
+        <span className={cn('inline-flex rounded border px-2 py-1 text-2xs font-semibold', STATUS_STYLE[record.status] ?? STATUS_STYLE.PLANNED)}>
           {STATUS_LABEL[record.status] ?? record.status}
         </span>
       </td>

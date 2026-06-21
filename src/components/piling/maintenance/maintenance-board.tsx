@@ -410,7 +410,7 @@ export function MaintenanceBoard() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1050px] border-collapse text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] text-slate-600">
+                <thead className="border-b border-slate-200 bg-slate-50 text-2xs text-slate-600">
                   <tr>
                     <th className="px-2.5 py-2 font-semibold">Установка</th>
                     <th className="px-2.5 py-2 font-semibold">Объект</th>
@@ -442,30 +442,30 @@ export function MaintenanceBoard() {
                       >
                         <td className="px-2.5 py-2.5">
                           <div className="font-semibold text-slate-900">{record.equipment?.name ?? '—'}</div>
-                          <div className="mt-1 text-[11px] text-slate-500">{record.equipment?.model ?? '№ не указан'}</div>
+                          <div className="mt-1 text-2xs text-slate-500">{record.equipment?.model ?? '№ не указан'}</div>
                         </td>
                         <td className="px-2.5 py-2.5">
                           <div className="font-medium text-slate-800">{site.title}</div>
-                          {site.location && <div className="mt-1 text-[11px] text-slate-500">{site.location}</div>}
+                          {site.location && <div className="mt-1 text-2xs text-slate-500">{site.location}</div>}
                         </td>
                         <td className="px-2.5 py-2.5">
                           <div className="max-w-32 truncate text-slate-700">{crew?.name ?? 'Без бригады'}</div>
                         </td>
                         <td className="px-2.5 py-2.5">
                           <div className="font-semibold text-slate-800">{TYPE_LABEL[record.type]}</div>
-                          <div className="mt-1 text-[11px] text-slate-500">{REGULAR_TYPES.has(record.type) ? 'регламентное' : 'ремонт'}</div>
+                          <div className="mt-1 text-2xs text-slate-500">{REGULAR_TYPES.has(record.type) ? 'регламентное' : 'ремонт'}</div>
                         </td>
                         <td className="px-2.5 py-2.5">
                           <div className={cn('font-mono font-semibold text-slate-800', isOverdue(record) && 'text-red-600')}>
                             {formatRuDate(record.scheduledAt)}
                           </div>
-                          <div className={cn('mt-1 text-[11px]', isOverdue(record) ? 'font-semibold text-red-600' : 'text-slate-500')}>
+                          <div className={cn('mt-1 text-2xs', isOverdue(record) ? 'font-semibold text-red-600' : 'text-slate-500')}>
                             {deadlineText(record)}
                           </div>
                         </td>
                         <td className="px-2.5 py-2.5">
                           <div className="font-mono font-semibold text-slate-800">{currentHours(record) ?? '—'} м/ч</div>
-                          <div className={cn('mt-1 text-[11px]', dueHours != null && dueHours <= 10 ? 'font-semibold text-orange-600' : 'text-slate-500')}>
+                          <div className={cn('mt-1 text-2xs', dueHours != null && dueHours <= 10 ? 'font-semibold text-orange-600' : 'text-slate-500')}>
                             {dueHours != null ? `${dueHours >= 0 ? '+' : ''}${dueHours} м/ч` : '—'}
                           </div>
                         </td>
@@ -473,7 +473,7 @@ export function MaintenanceBoard() {
                           <div className="max-w-32 truncate text-slate-700">{formatPersonName(crew?.operator?.name)}</div>
                         </td>
                         <td className="px-2.5 py-2.5">
-                          <span className={cn('inline-flex rounded border px-2 py-1 text-[11px] font-semibold', badge.className)}>
+                          <span className={cn('inline-flex rounded border px-2 py-1 text-2xs font-semibold', badge.className)}>
                             {badge.label}
                           </span>
                         </td>
@@ -794,7 +794,7 @@ function PanelSection({ title, children }: { title: string; children: React.Reac
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="text-2xs text-slate-500">{label}</div>
       <div className="mt-1 line-clamp-2 text-xs font-semibold text-slate-800">{value}</div>
     </div>
   );
@@ -803,7 +803,7 @@ function InfoCell({ label, value }: { label: string; value: string }) {
 function MetricLine({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className="text-2xs text-slate-500">{label}</div>
       <div className="mt-1 font-mono text-sm font-bold text-slate-900">{value}</div>
     </div>
   );
@@ -831,9 +831,9 @@ function TimelineLine({ tone, date, text, actor }: { tone: 'green' | 'orange'; d
   return (
     <div className="grid grid-cols-[12px_112px_1fr_88px] items-start gap-2">
       <span className={cn('mt-1.5 h-2 w-2 rounded-full', tone === 'green' ? 'bg-emerald-500' : 'bg-orange-500')} />
-      <span className="font-mono text-[11px] text-slate-500">{date}</span>
+      <span className="font-mono text-2xs text-slate-500">{date}</span>
       <span className="text-slate-700">{text}</span>
-      <span className="truncate text-right text-[11px] text-slate-500">{actor}</span>
+      <span className="truncate text-right text-2xs text-slate-500">{actor}</span>
     </div>
   );
 }
