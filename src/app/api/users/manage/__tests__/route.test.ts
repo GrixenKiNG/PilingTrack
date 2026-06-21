@@ -46,24 +46,47 @@ describe('PUT /api/users/manage', () => {
   });
 
   it('returns 400 when id is missing', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN' }, error: null });
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'tenant-a' }, error: null });
     const res = await PUT(req({ name: 'New' }));
     expect(res.status).toBe(400);
     expect(updateUserMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the authenticated admin has no tenant', async () => {
+    requireAuthMock.mockResolvedValue({
+      user: { id: 'a', role: 'ADMIN', tenantId: null },
+      error: null,
+    });
+
+    const res = await PUT(req({ id: 'u1', name: 'New' }));
+
+    expect(res.status).toBe(400);
+    expect(updateUserMock).not.toHaveBeenCalled();
+  });
+
   it('updates the user and returns the sanitised record with the actor id', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' }, error: null });
+    requireAuthMock.mockResolvedValue({
+      user: { id: 'admin-1', role: 'ADMIN', tenantId: 'tenant-a' },
+      error: null,
+    });
     updateUserMock.mockResolvedValue({
       id: 'u1', isActive: true, name: 'New', role: 'OPERATOR', phone: null,
     });
 
-    const res = await PUT(req({ id: 'u1', name: 'New', role: 'OPERATOR' }));
+    const res = await PUT(req({
+      id: 'u1',
+      name: 'New',
+      role: 'OPERATOR',
+      tenantId: 'tenant-b',
+    }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.user).toMatchObject({ id: 'u1', name: 'New', role: 'OPERATOR' });
-    // Second arg is the acting admin's id (audit trail).
-    expect(updateUserMock.mock.calls[0][1]).toBe('admin-1');
+    expect(updateUserMock).toHaveBeenCalledWith(
+      'tenant-a',
+      expect.not.objectContaining({ tenantId: expect.anything() }),
+      'admin-1'
+    );
   });
 });

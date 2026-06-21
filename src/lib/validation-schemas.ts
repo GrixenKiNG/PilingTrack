@@ -42,12 +42,11 @@ const userBaseSchema = z.object({
   role: z.enum(['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT']),
   pin: z
     .string()
-    .regex(/^\d+$/, 'PIN must be digits only')
-    .max(10)
+    .regex(/^\d{4,10}$/, 'PIN must contain 4 to 10 digits')
     .optional()
     .or(z.literal('')),
   phone: z.string().max(30).optional(),
-  password: z.string().min(1, 'Password is required').max(100).optional(),
+  password: z.string().min(8, 'Password must contain at least 8 characters').max(100).optional(),
   isActive: z.boolean().default(true),
 });
 

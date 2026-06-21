@@ -19,10 +19,14 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
+    const tenantId = user?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const role = request.nextUrl.searchParams.get('role');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const { listUsers } = await getUsersModule();
-    const users = await listUsers(role, pagination);
+    const users = await listUsers(tenantId, role, pagination);
     const nextCursor = pagination.getNextCursor(users);
     return NextResponse.json({ users, nextCursor });
   },
@@ -36,6 +40,10 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
+    const tenantId = user?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const body = await request.json();
 
     const validation = createUserSchema.safeParse(body);
@@ -61,8 +69,7 @@ export const POST = withMutation(
       ...rest,
       password: password?.trim() || pin?.trim() || '',
       role: rest.role || 'OPERATOR',
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      tenantId: user!.tenantId,
+      tenantId,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     }, user!.id);
     return NextResponse.json({ user: createdUser }, { status: 201 });
@@ -77,6 +84,10 @@ export const PUT = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
+    const tenantId = user?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const body = await request.json();
 
     const validation = updateUserSchema.safeParse(body);
@@ -89,7 +100,7 @@ export const PUT = withMutation(
 
     const { updateUser } = await getUsersModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const updatedUser = await updateUser(validation.data, user!.id);
+    const updatedUser = await updateUser(tenantId, validation.data, user!.id);
     return NextResponse.json({ user: updatedUser });
   },
   { domain: 'users' }
@@ -102,6 +113,10 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
+    const tenantId = user?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const body = await request.json();
 
     const validation = deleteIdSchema.safeParse(body);
@@ -114,7 +129,7 @@ export const DELETE = withMutation(
 
     const { deleteUser } = await getUsersModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const result = await deleteUser(user!.id, validation.data.id);
+    const result = await deleteUser(tenantId, user!.id, validation.data.id);
     return NextResponse.json(result);
   },
   { domain: 'users' }
