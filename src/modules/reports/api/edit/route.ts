@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getEditableReport } from '@/modules/reports';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export const runtime = 'nodejs';
 

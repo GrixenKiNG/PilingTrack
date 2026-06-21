@@ -3,7 +3,7 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { CrewAggregate } from '../../domain';
 import { getCrewRepository } from '../../infrastructure';

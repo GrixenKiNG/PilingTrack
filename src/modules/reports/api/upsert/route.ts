@@ -14,7 +14,7 @@ import {
   resolveReportUserId,
   upsertReport,
 } from '@/modules/reports';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 

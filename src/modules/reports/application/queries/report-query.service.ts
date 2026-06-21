@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { resolveUserScope } from '@/services/auth/authorization-service';
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';

@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export type EquipmentDocumentType =
   | 'PASSPORT' | 'OTS' | 'INSURANCE' | 'INSPECTION'

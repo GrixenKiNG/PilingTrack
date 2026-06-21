@@ -2,7 +2,7 @@
  * Equipment Command Service
  */
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { EquipmentAggregate } from '../../domain';
 import { getEquipmentRepository } from '../../infrastructure';
 import { CreateEquipmentCommand, UpdateEquipmentCommand } from './equipment.command';

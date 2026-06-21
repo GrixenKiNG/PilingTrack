@@ -1,5 +1,5 @@
 import { isPrivilegedRole } from '@/services/auth/authorization-service';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 interface ActorLike {
   id: string;

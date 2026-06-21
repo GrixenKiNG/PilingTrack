@@ -6,7 +6,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export type MaintenanceType = 'EO' | 'TO1' | 'TO2' | 'TO3' | 'SEASONAL' | 'REPAIR' | 'FAULT' | 'SCHEDULED' | 'INSPECTION';
 export type MaintenanceStatus = 'PLANNED' | 'ASSIGNED' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE' | 'CANCELLED';

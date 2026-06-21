@@ -3,7 +3,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { isPrivilegedRole } from '@/services/auth/authorization-service';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 

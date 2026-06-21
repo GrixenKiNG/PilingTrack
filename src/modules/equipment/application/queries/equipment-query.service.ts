@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '../commands/equipment-maintenance';
 

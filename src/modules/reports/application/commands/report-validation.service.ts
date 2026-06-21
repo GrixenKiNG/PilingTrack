@@ -5,7 +5,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export function validateDowntimeWithinShift(
   shiftStart?: string | null,

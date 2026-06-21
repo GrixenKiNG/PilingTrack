@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import type { AnswerType, BlockType, ChecklistLevel, HammerKind } from '@/generated/postgres-client';
 
 export interface TemplateItemInput {

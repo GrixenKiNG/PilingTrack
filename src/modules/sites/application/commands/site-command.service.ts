@@ -3,7 +3,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { SiteAggregate } from '../../domain';
 import { getSiteRepository } from '../../infrastructure';

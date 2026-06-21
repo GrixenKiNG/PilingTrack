@@ -5,7 +5,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export async function validateAgainstSitePlans(
   tx: ReturnType<typeof db.$transaction> extends (cb: (tx: infer T) => any) => any ? T : any,

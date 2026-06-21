@@ -27,7 +27,7 @@
 import { createHash, randomUUID } from 'crypto';
 import { db } from '@/lib/db';
 import { createSessionToken, SessionUser } from '@/services/auth/session-service';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 // ============================================================
 // Token Configuration

@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import type { ChecklistLevel } from '@/generated/postgres-client';
 
 export async function listTemplates(

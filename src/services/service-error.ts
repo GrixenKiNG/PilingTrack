@@ -1,9 +1,6 @@
-export class ServiceError extends Error {
-  status: number;
-
-  constructor(message: string, status = 400) {
-    super(message);
-    this.name = 'ServiceError';
-    this.status = status;
-  }
-}
+/**
+ * Re-export facade. The implementation moved to @/lib/service-error so that
+ * core/ and modules/ can import it without crossing layer boundaries. Existing
+ * services/ and app/ callers keep importing from here unchanged.
+ */
+export { ServiceError } from '@/lib/service-error';

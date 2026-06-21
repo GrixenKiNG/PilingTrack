@@ -19,7 +19,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/services/service-error', () => ({
+vi.mock('@/lib/service-error', () => ({
   ServiceError: class ServiceError extends Error {
     status: number;
     constructor(message: string, status: number) {

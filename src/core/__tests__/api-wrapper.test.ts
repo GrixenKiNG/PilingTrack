@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withApi, withMutation } from '../api-wrapper';
 
 // Mock ServiceError
-vi.mock('@/services/service-error', () => ({
+vi.mock('@/lib/service-error', () => ({
   ServiceError: class ServiceError extends Error {
     status: number;
     constructor(message: string, status: number) {
@@ -41,7 +41,7 @@ vi.mock('@/lib/rate-limiter', () => ({
   getRateLimitIdentifier: vi.fn(() => 'test-ip'),
 }));
 
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter } from '@/lib/rate-limiter';

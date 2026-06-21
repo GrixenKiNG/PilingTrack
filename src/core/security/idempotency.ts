@@ -23,7 +23,7 @@
 
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client/client';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { logger } from '@/lib/logger';
 
 // ============================================================
