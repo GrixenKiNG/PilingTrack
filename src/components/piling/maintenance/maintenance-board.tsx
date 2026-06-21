@@ -175,6 +175,7 @@ export function MaintenanceBoard() {
     }
   }, [filter]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -221,6 +222,7 @@ export function MaintenanceBoard() {
 
   useEffect(() => {
     if (shownRecords.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setSelectedId(null);
       return;
     }
@@ -238,10 +240,12 @@ export function MaintenanceBoard() {
   const pageNumbers = visiblePageNumbers(safePage, pageCount);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     setPage(1);
   }, [pageSize, quickFilter, equipmentFilterId, siteFilterId, filter.status, filter.priority, filter.type, filter.assigneeId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 

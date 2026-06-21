@@ -47,6 +47,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
 
   useEffect(() => {
     if (siteId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
       void loadAssignedUsers(siteId);
     }
   }, [loadAssignedUsers, siteId]);

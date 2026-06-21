@@ -91,6 +91,7 @@ export function FleetDashboard() {
 
   // Initial load
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void fetchSnapshot();
   }, [fetchSnapshot]);
 
@@ -102,6 +103,7 @@ export function FleetDashboard() {
     // in the console on every render.
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
     if (!wsUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setConn('offline');
       return;
     }

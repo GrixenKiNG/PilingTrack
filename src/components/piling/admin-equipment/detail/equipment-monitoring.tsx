@@ -172,6 +172,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
     }
   }, [equipmentId, from, to]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   // Records arrive oldest-first.

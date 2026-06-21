@@ -54,6 +54,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     if (reportId) refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is recreated each render; the thumbnail only needs to (re)load when reportId changes
   }, [reportId]);

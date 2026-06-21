@@ -103,6 +103,7 @@ export function AdminTelegram() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     loadData();
   }, [loadData]);
 

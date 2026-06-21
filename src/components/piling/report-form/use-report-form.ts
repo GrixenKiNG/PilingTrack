@@ -182,6 +182,7 @@ export function useReportForm(): UseReportFormReturn {
   }, [user, selectedSiteId, date]);
 
   // Init date
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
   useEffect(() => { if (!date) setDate(getTodayInTimezone()); }, [date]);
 
   // Load site tree
@@ -194,7 +195,9 @@ export function useReportForm(): UseReportFormReturn {
       .catch(() => toast.error('Не удалось загрузить план объекта'));
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
   useEffect(() => { loadSiteTree(selectedSiteId); }, [selectedSiteId, loadSiteTree]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { if (!date) return; loadData(); }, [date, loadData]);
 
   // Draft management — snapshot via ref so the interval isn't torn
@@ -232,6 +235,7 @@ export function useReportForm(): UseReportFormReturn {
       const savedAt = new Date(draft.savedAt);
       if ((Date.now() - savedAt.getTime()) / (1000 * 60 * 60) > 24) { localStorage.removeItem(draftKey); return; }
       if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
         if (draft.piles?.length) setPiles(draft.piles);
         if (draft.drillings?.length) setDrillings(draft.drillings);
         if (draft.downtimes?.length) { setDowntimes(draft.downtimes); setShowDowntime(true); }

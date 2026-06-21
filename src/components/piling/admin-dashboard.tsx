@@ -148,7 +148,9 @@ export function AdminDashboard() {
 
   const refreshAll = useCallback(() => { void loadAnalytics(); void loadOps(); }, [loadAnalytics, loadOps]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void loadAnalytics(); }, [loadAnalytics]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void loadOps(); }, [loadOps]);
 
   useEffect(() => {

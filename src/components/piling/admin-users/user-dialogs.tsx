@@ -59,6 +59,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setName('');
       setEmail('');
       setPassword('');
@@ -180,6 +181,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
 
   useEffect(() => {
     if (open && user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setName(user.name);
       setEmail(user.email);
       setRole(user.role);

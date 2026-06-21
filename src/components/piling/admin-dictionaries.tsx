@@ -61,6 +61,7 @@ export function AdminDictionaries() {
     }
   }, [filter]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void loadData(); }, [loadData]);
 
   const filtered = useCallback((kind: DictionaryKind) => {

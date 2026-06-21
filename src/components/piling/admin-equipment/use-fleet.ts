@@ -33,6 +33,7 @@ export function useFleet() {
 
   useEffect(() => {
     const abort = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     setLoading(true);
     fetchSnapshot(abort.signal);
     return () => abort.abort();

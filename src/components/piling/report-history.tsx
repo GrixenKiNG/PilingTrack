@@ -75,6 +75,7 @@ export function ReportHistory() {
   }, [user]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void loadData();
   }, [loadData]);
 
@@ -111,6 +112,7 @@ export function ReportHistory() {
     const match = reports.find((r) => r.id === reportId);
     if (match) {
       autoOpenedRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       void handleOpenDetail(match);
     }
   }, [loading, reports, searchParams, handleOpenDetail]);

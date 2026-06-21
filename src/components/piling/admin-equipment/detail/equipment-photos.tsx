@@ -70,6 +70,7 @@ export function EquipmentPhotos({ equipmentId }: Props) {
     }
   }, [equipmentId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void refresh(); }, [refresh]);
 
   const handleFile = async (file: File) => {

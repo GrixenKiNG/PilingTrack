@@ -55,6 +55,7 @@ export function InspectionsList() {
     }
   }, [levelFilter]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   return (

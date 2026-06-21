@@ -164,6 +164,7 @@ export function ToModule() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     if (equipmentId) void loadJournal(equipmentId);
   }, [equipmentId, loadJournal]);
 

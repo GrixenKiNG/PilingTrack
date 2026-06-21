@@ -84,6 +84,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   }, [templateId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     if (!isNew) void loadTemplate();
   }, [isNew, loadTemplate]);
 

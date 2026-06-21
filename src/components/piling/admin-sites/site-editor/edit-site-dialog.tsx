@@ -62,6 +62,7 @@ export function EditSiteDialog({
   useEffect(() => {
     if (!open || !site) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     setName(site.name);
     setActive(site.isActive);
     setPilePlans([]);

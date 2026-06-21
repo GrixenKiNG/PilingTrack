@@ -124,6 +124,7 @@ export function CrewFormDialog({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setOperatorId(editItem?.operatorId || '');
       setEquipmentId(editItem?.equipmentId || '');
       setSiteId(editItem?.siteId || '');

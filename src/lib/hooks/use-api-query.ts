@@ -109,6 +109,7 @@ export function useApiQuery<T = unknown>(
 
   useEffect(() => {
     mountedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     fetchData();
 
     return () => {

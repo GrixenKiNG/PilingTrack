@@ -37,6 +37,7 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (open) setState(EMPTY_EQUIPMENT_FORM);
   }, [open]);
 
@@ -100,6 +101,7 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (open) setState(equipmentToFormState(item as unknown as Record<string, unknown> | null));
   }, [open, item]);
 

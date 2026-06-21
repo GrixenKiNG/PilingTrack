@@ -245,6 +245,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
   }, [equipmentId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void refresh();
   }, [refresh]);
 
