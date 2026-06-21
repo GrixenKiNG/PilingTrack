@@ -57,7 +57,7 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 const TEST_EMAIL = __ENV.TEST_EMAIL || 'admin@piling.ru';
 const TEST_PASSWORD = __ENV.TEST_PASSWORD || 'admin123';
 
-let authToken = '';
+const authToken = '';
 
 // ============================================================
 // Setup — Login and get auth token
