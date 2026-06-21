@@ -16,6 +16,9 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
     "@typescript-eslint/no-non-null-assertion": "warn",
+    // Base no-redeclare flags TS function-overload signatures as redeclarations;
+    // the TS-aware rule understands declaration merging. Mirror the no-unused-vars setup.
+    "@typescript-eslint/no-redeclare": "warn",
     "@typescript-eslint/ban-ts-comment": "warn",
     "@typescript-eslint/prefer-as-const": "off",
     "@typescript-eslint/no-unused-disable-directive": "off",
@@ -44,7 +47,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-case-declarations": "off",
     "no-fallthrough": "off",
     "no-mixed-spaces-and-tabs": "off",
-    "no-redeclare": "warn",
+    "no-redeclare": "off",
     "no-undef": "off",
     "no-unreachable": "warn",
     "no-useless-escape": "warn",

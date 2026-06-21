@@ -50,7 +50,7 @@ describe('Circuit Breaker', () => {
 
     // Trigger OPEN
     for (let i = 0; i < 3; i++) {
-      try { await cb.execute(failingFn); } catch {}
+      try { await cb.execute(failingFn); } catch { /* ignore */ }
     }
 
     // Should throw CircuitOpenError
@@ -62,7 +62,7 @@ describe('Circuit Breaker', () => {
 
     // Trigger OPEN
     for (let i = 0; i < 3; i++) {
-      try { await cb.execute(failingFn); } catch {}
+      try { await cb.execute(failingFn); } catch { /* ignore */ }
     }
 
     expect(cb.getState().state).toBe('OPEN');
@@ -80,7 +80,7 @@ describe('Circuit Breaker', () => {
 
     // Trigger OPEN
     for (let i = 0; i < 3; i++) {
-      try { await cb.execute(failingFn); } catch {}
+      try { await cb.execute(failingFn); } catch { /* ignore */ }
     }
 
     // Advance to HALF_OPEN
@@ -99,7 +99,7 @@ describe('Circuit Breaker', () => {
 
     // Trigger OPEN
     for (let i = 0; i < 3; i++) {
-      try { await cb.execute(failingFn); } catch {}
+      try { await cb.execute(failingFn); } catch { /* ignore */ }
     }
 
     // Advance to HALF_OPEN
@@ -107,7 +107,7 @@ describe('Circuit Breaker', () => {
     expect(cb.getState().state).toBe('HALF_OPEN');
 
     // One failure in HALF_OPEN → reopen
-    try { await cb.execute(failingFn); } catch {}
+    try { await cb.execute(failingFn); } catch { /* ignore */ }
 
     expect(cb.getState().state).toBe('OPEN');
   });
@@ -117,7 +117,7 @@ describe('Circuit Breaker', () => {
 
     // Trigger OPEN (3 failures)
     for (let i = 0; i < 3; i++) {
-      try { await cb.execute(failingFn); } catch {}
+      try { await cb.execute(failingFn); } catch { /* ignore */ }
     }
 
     // First timeout: 1000ms
@@ -128,7 +128,7 @@ describe('Circuit Breaker', () => {
     expect(cb.getState().state).toBe('HALF_OPEN');
 
     // Failure in HALF_OPEN → reopen with 2x timeout
-    try { await cb.execute(failingFn); } catch {}
+    try { await cb.execute(failingFn); } catch { /* ignore */ }
     expect(cb.getState().state).toBe('OPEN');
 
     // Now timeout should be 2000ms
@@ -143,7 +143,7 @@ describe('Circuit Breaker', () => {
     const failingFn = vi.fn().mockRejectedValue(new Error('fail'));
 
     for (let i = 0; i < 3; i++) {
-      try { await cb.execute(failingFn); } catch {}
+      try { await cb.execute(failingFn); } catch { /* ignore */ }
     }
 
     cb.reset();

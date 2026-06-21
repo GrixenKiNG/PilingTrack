@@ -249,7 +249,7 @@ async function testOperatorFlow() {
             break;
           }
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
     await screenshot('16-operator-report-filled');
   }

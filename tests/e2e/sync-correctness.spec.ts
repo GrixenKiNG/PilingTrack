@@ -65,7 +65,7 @@ test.describe('Sync Correctness', () => {
             }
           }
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     // opIds should be unique (no duplicates in our tracking)

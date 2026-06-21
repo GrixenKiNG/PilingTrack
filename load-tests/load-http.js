@@ -178,7 +178,7 @@ export default function runScenario() {
       } else {
         conflictRate.add(false);
       }
-    } catch {}
+    } catch { /* ignore */ }
 
     syncErrorRate.add(!ok);
   });
