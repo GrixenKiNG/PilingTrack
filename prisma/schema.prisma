@@ -1345,6 +1345,7 @@ model RefreshToken {
   userId        String
   token         String   @unique // Hashed token
   family        String   // Token family for rotation detection
+  familyCreatedAt DateTime @default(now()) @db.Timestamptz(3) // Family birth time; carried forward on rotation to cap total family lifetime (REFRESH_TOKEN_FAMILY_TTL_DAYS)
   expiresAt     DateTime @db.Timestamptz(3)
   revoked       Boolean  @default(false)
   revokedAt     DateTime? @db.Timestamptz(3)
