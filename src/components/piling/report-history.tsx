@@ -14,7 +14,6 @@ import {
   CalendarDays,
   Eye,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
@@ -170,7 +169,7 @@ export function ReportHistory() {
     }
   };
 
-  const handlePreviewFromDetail = (reportId: string, reportDate: string) => {
+  const handlePreviewFromDetail = (reportId: string, _reportDate: string) => {
     if (!reportId) return;
     setPreviewReportId(reportId);
   };

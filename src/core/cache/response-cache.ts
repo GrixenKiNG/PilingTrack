@@ -187,7 +187,7 @@ export class ResponseCache {
   private async executeAndCache<T>(
     cacheKey: string,
     fetchFn: () => Promise<NextResponse<T>>,
-    ttl: number
+    _ttl: number
   ): Promise<NextResponse<T>> {
     const value = await fetchFn();
 

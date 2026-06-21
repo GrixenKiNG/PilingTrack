@@ -10,7 +10,7 @@
 
 import ws from 'k6/ws';
 import { check, sleep } from 'k6';
-import { Counter, Trend, Rate } from 'k6/metrics';
+import { Counter, Rate } from 'k6/metrics';
 
 const wsConnections = new Counter('ws_connections');
 const wsMessages = new Counter('ws_messages_received');
@@ -38,7 +38,6 @@ export const options = {
 const WS_URL = __ENV.WS_URL || 'ws://localhost:3001';
 
 export default function runScenario() {
-  const vuId = __VU;
   const url = `${WS_URL}`;
 
   const res = ws.connect(url, {}, function (socket) {
@@ -67,7 +66,7 @@ export default function runScenario() {
         if (msgCount % 10 === 0) {
           socket.send(JSON.stringify({ type: 'ping' }));
         }
-      } catch (e) {
+      } catch {
         // Non-JSON message — skip
       }
     });

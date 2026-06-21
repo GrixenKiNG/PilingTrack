@@ -120,7 +120,7 @@ export async function validateAgainstSitePlans(
   siteId: string,
   currentReportId: string | undefined,
   piles: Array<{ pileGradeId: string; count: number }>,
-  drillings: Array<{ typeId: string; count: number; meters: number }>
+  _drillings: Array<{ typeId: string; count: number; meters: number }>
 ): Promise<void> {
   if (!piles || piles.length === 0) return;
 

@@ -2,14 +2,14 @@
  * Error Boundary + Bulkhead — Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   classifyError,
   UserError,
   TimeoutError,
   withTimeout,
 } from '../api-error-boundary';
-import { Bulkhead, getBulkhead, BulkheadRejectError } from '../bulkhead';
+import { Bulkhead, getBulkhead } from '../bulkhead';
 
 // ============================================================
 // Error Classification Tests

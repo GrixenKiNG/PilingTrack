@@ -67,7 +67,6 @@ export function corsHandler(request: Request): Response | null {
   if (!origin) return null; // Not a CORS request
 
   const allowedOrigins = getAllowedOrigins();
-  const method = request.headers.get('access-control-request-method') || request.method;
 
   // Check if origin is allowed
   if (!isOriginAllowed(origin, allowedOrigins)) {

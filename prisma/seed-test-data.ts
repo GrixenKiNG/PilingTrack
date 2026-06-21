@@ -4,7 +4,6 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -55,7 +54,7 @@ async function main() {
 
   // 3. Create crew (бригада)
   console.log('\n👷 Creating crew...');
-  const adminUser = await prisma.user.findFirst({ where: { email: 'admin@piling.ru' } });
+  await prisma.user.findFirst({ where: { email: 'admin@piling.ru' } });
   const crew = await prisma.crew.upsert({
     where: { id: 'crew-test-1' },
     update: {},
@@ -131,7 +130,7 @@ async function main() {
   ];
 
   for (const report of reports) {
-    const reportRecord = await prisma.report.upsert({
+    await prisma.report.upsert({
       where: { id: `report-${report.date}` },
       update: {},
       create: {

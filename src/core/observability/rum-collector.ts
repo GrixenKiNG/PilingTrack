@@ -199,7 +199,7 @@ class RUMCollector {
           metrics: batch,
         }),
       });
-    } catch (error) {
+    } catch {
       // Failed to send — metrics lost (acceptable for RUM)
       logger.warn('rum: failed to flush metrics');
     }

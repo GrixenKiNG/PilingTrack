@@ -72,7 +72,7 @@ test.describe('Sync Correctness', () => {
     expect(opIds.size).toBeGreaterThan(0);
   });
 
-  test('maintains event ordering during sync', async ({ page, context }) => {
+  test('maintains event ordering during sync', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 

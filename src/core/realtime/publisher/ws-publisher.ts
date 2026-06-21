@@ -13,7 +13,6 @@
 
 import { db } from '@/lib/db';
 import { publishToRedis, CHANNEL_EVENTS } from '../redis/pubsub';
-import { toChannel } from '../types/events';
 import { evaluateAlert } from '../alerts/engine';
 import { logger } from '@/lib/logger';
 

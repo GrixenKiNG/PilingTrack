@@ -108,7 +108,6 @@ export const POST = withMutation(async (request: NextRequest) => {
 // ============================================================
 
 export const GET = withApi(async (request: NextRequest) => {
-  const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) return error;
 

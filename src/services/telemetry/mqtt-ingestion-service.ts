@@ -16,7 +16,6 @@
  */
 
 import { z } from 'zod';
-import { db } from '@/lib/db';
 import { ingestTelemetry } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
 

@@ -70,7 +70,7 @@ describe('MessageTracker', () => {
 
   it('tracks acked vs unacked messages', () => {
     const msg1 = tracker.createMessage(createEvent());
-    const msg2 = tracker.createMessage(createEvent());
+    tracker.createMessage(createEvent());
 
     tracker.ack(msg1.id);
 
@@ -97,8 +97,8 @@ describe('MessageTracker', () => {
     const msg1 = tracker.createMessage(createEvent());
     tracker.ack(msg1.id);
 
-    const msg2 = tracker.createMessage(createEvent());
-    const msg3 = tracker.createMessage(createEvent());
+    tracker.createMessage(createEvent());
+    tracker.createMessage(createEvent());
 
     const unacked = tracker.getUnackedMessages(msg1.seq);
 

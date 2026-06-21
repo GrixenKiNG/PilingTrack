@@ -26,15 +26,15 @@
 
 import { createHash, randomUUID } from 'crypto';
 import { db } from '@/lib/db';
-import { createSessionToken, verifySessionToken, SessionUser } from '@/services/auth/session-service';
+import { createSessionToken, SessionUser } from '@/services/auth/session-service';
 import { ServiceError } from '@/services/service-error';
 
 // ============================================================
 // Token Configuration
 // ============================================================
 
-const ACCESS_TOKEN_TTL_SECONDS = 12 * 60 * 60; // 12 hours (current session token)
 const REFRESH_TOKEN_TTL_DAYS = 30;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 90-day refresh-token family max-lifetime is defined but not yet enforced; tracked as a follow-up security task.
 const REFRESH_TOKEN_FAMILY_TTL_DAYS = 90; // Max family lifetime
 
 export interface TokenPair {

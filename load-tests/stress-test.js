@@ -27,7 +27,6 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 // ============================================================
 
 const apiLatency = new Trend('api_latency', true);
-const wsLatency = new Trend('ws_latency', true);
 const errorRate = new Rate('errors');
 const requestsPerSecond = new Counter('requests_total');
 
@@ -36,7 +35,6 @@ const requestsPerSecond = new Counter('requests_total');
 // ============================================================
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
-const WS_URL = __ENV.WS_URL || 'ws://localhost:3001';
 
 // ============================================================
 // Test Stages

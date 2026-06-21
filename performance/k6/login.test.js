@@ -106,7 +106,7 @@ export function handleSummary(data) {
 }
 
 function textSummary(data, options) {
-  const { indent = '', enableColors = true } = options;
+  const { indent = '' } = options;
   let output = '\nLogin Test Summary:\n';
   output += `${indent}Duration: ${data.state.testRunDurationMs / 1000}s\n`;
   output += `${indent}Iterations: ${data.metrics.iterations.values.count}\n`;

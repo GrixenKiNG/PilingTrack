@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SLOTracker, recordSLOApiRequest, getSLOStatus, calculateBurnRate, calculateErrorBudgetRemaining, BURN_RATE_WINDOWS } from '../slo-metrics';
+import { SLOTracker, calculateBurnRate, calculateErrorBudgetRemaining, BURN_RATE_WINDOWS } from '../slo-metrics';
 
 // Mock dependencies
 vi.mock('@/core/infrastructure/circuit-breakers', () => ({

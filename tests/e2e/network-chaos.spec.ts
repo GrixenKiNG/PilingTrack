@@ -101,7 +101,7 @@ test.describe('Network Chaos', () => {
   });
 
   test('handles request timeout', async ({ page, context }) => {
-    await context.route('**/api/sync/v2', async (route) => {
+    await context.route('**/api/sync/v2', async (_route) => {
       // Simulate timeout by never responding
       await new Promise(() => {}); // Never resolves
     });

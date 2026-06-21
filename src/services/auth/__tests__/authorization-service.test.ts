@@ -7,7 +7,6 @@ import {
   assertNotSelfAction,
   isPrivilegedRole,
   resolveUserScope,
-  type Ability,
 } from '../authorization-service';
 import { ServiceError } from '@/services/service-error';
 

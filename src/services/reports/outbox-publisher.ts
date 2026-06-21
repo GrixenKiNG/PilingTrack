@@ -268,7 +268,3 @@ export async function getOutboxStats(): Promise<{
 
   return { unpublished, failed, total };
 }
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

@@ -20,8 +20,8 @@
  *   Single report: 1 min
  */
 
-import { cacheAside, cacheAsideInvalidate, writeThrough, lowLatencyCache } from '@/lib/cache-strategies';
-import { recordCacheHit, recordCacheMiss, recordWrite, recordDeletion } from '@/lib/cache-metrics';
+import { cacheAside, cacheAsideInvalidate, writeThrough } from '@/lib/cache-strategies';
+import { recordDeletion } from '@/lib/cache-metrics';
 import { db } from '@/lib/db';
 
 // ============================================================

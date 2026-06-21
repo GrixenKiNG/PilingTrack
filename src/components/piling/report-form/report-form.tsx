@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useReportForm, type PileEntry, type DrillingEntry, type DowntimeEntry } from './use-report-form';
+import { useReportForm } from './use-report-form';
 import { ShiftInfo } from './shift-info';
 import { CascadingSelect } from './cascading-select';
 import { PileSection } from './pile-section';
@@ -59,14 +59,14 @@ export function ReportForm() {
   const {
     reportId,
     date, setDate, shiftStart, setShiftStart, shiftEnd, setShiftEnd,
-    sites, siteTree, setSiteTree, selectedSiteId, setSelectedSiteId,
+    sites, siteTree, selectedSiteId, setSelectedSiteId,
     pileGrades, drillingTypes, downtimeReasons, equipment,
     selectedEquipmentId, setSelectedEquipmentId,
     selectedFieldId, setSelectedFieldId, selectedClusterId, setSelectedClusterId,
     selectedPicketId, setSelectedPicketId,
-    piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
+    piles, drillings, downtimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
-    loading, loadError, reloadData, submitting, submittedAt, loadingReport,
+    loading, loadError, reloadData, submitting, submittedAt,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,

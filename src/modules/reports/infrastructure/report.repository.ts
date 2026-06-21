@@ -9,7 +9,7 @@
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { ReportAggregate } from '../domain';
-import { fromPrismaToState, toOutboxData } from './report.prisma.mapper';
+import { fromPrismaToState } from './report.prisma.mapper';
 
 /**
  * Hooks that run inside the save transaction. Used by callers (e.g. audit,
@@ -68,8 +68,6 @@ export class PrismaReportRepository implements ReportRepository {
    */
   async save(aggregate: ReportAggregate, hooks?: SaveHooks): Promise<void> {
     const state = aggregate.getState();
-    const pendingEvents = aggregate.getPendingEvents();
-    const isPostgres = process.env.DATABASE_PROVIDER === 'postgres';
 
     await db.$transaction(async (tx: any) => {
       // Check if report exists by reportId first, then by the natural unique

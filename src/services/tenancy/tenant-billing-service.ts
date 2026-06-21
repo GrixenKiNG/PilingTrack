@@ -152,7 +152,7 @@ export async function activateSubscription(tenantId: string, planId: string): Pr
   return tenant;
 }
 
-export async function cancelSubscription(tenantId: string, reason?: string): Promise<any> {
+export async function cancelSubscription(tenantId: string, _reason?: string): Promise<any> {
   const tenant = await db.tenant.update({
     where: { id: tenantId },
     data: {

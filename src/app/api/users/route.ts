@@ -44,7 +44,9 @@ export const POST = withMutation(
       );
     }
 
-    const { pin, password, isActive, ...rest } = validation.data;
+    // isActive is intentionally extracted to exclude it from `rest` (createUser
+    // does not accept it; new users default to active).
+    const { pin, password, isActive: _isActive, ...rest } = validation.data;
     if (!password?.trim() && !pin?.trim()) {
       return NextResponse.json(
         { error: 'password or pin is required' },

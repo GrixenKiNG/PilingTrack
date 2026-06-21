@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClientManager, WSClient } from '@/core/realtime/server/client-manager';
+import { ClientManager } from '@/core/realtime/server/client-manager';
 
 // ============================================================
 // Mock WebSocket factory
@@ -109,7 +109,7 @@ describe('ClientManager', () => {
 
     it('should remove internal mappings', () => {
       const ws = createMockWs();
-      const id = manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
+      manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
 
       manager.removeClient(ws);
 

@@ -18,12 +18,11 @@
  */
 
 import http from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 import { ClientManager } from './client-manager';
 import { canSubscribe, getDefaultChannels } from './channel-router';
 import { authenticateWS } from './auth';
 import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
-import { WSClientMessage } from '../types/events';
 import { logger } from '@/lib/logger';
 import { setWsConnectionCount, recordWorkerHeartbeat } from '@/core/observability/health-tracker';
 import {

@@ -20,11 +20,10 @@
  *   }
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 // W3C TraceContext header names
 const TRACEPARENT_HEADER = 'traceparent';
-const TRACESTATE_HEADER = 'tracestate';
 
 export interface Span {
   traceId: string;

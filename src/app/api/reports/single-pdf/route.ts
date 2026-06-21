@@ -103,14 +103,12 @@ export const POST = withMutation(async (request: NextRequest) => {
 // ============================================================
 
 export const GET = withApi(async (request: NextRequest) => {
-  const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
   const searchParams = request.nextUrl.searchParams;
   const reportId = searchParams.get('reportId');
   const sync = searchParams.get('sync');
-  const inline = searchParams.get('inline');
 
   // --- If reportId is provided, generate synchronously for preview/download ---
   if (reportId) {

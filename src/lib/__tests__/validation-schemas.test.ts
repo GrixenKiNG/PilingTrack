@@ -10,7 +10,6 @@ import {
   dictionaryItemSchema,
   telegramConfigSchema,
   paginationSchema,
-  pinAuthSchema,
 } from '../validation-schemas';
 
 describe('validation-schemas', () => {

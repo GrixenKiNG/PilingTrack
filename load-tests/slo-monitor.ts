@@ -119,7 +119,7 @@ async function probeHealth(baseUrl: string) {
 async function probeDbLatency(baseUrl: string) {
   const start = Date.now();
   try {
-    const res = await fetch(`${baseUrl}/api/dictionary/all`, {
+    await fetch(`${baseUrl}/api/dictionary/all`, {
       signal: AbortSignal.timeout(5000),
     });
     const latency = Date.now() - start;

@@ -103,7 +103,7 @@ describe('Crew Command Service', () => {
   // --------------------------------------------------------
   describe('createCrew', () => {
     it('should create a new crew with valid data', async () => {
-      const result = await createCrew({
+      await createCrew({
         name: 'Alpha Crew',
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
@@ -226,7 +226,7 @@ describe('Crew Command Service', () => {
       }, 'user-1');
       mockRepoFindById.mockResolvedValue(aggregate);
 
-      const result = await updateCrew({
+      await updateCrew({
         crewId: 'crew-1',
         name: 'New Name',
         userId: 'user-1',

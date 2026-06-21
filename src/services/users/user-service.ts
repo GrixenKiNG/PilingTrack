@@ -3,7 +3,7 @@ import { ServiceError } from '@/services/service-error';
 import { assertNotSelfAction } from '@/services/auth/authorization-service';
 import { hashPassword } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
-import { parseCursorPagination, type CursorPaginationResult } from '@/lib/pagination-cursor';
+import { type CursorPaginationResult } from '@/lib/pagination-cursor';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 
 function isUniqueConstraintError(message: string) {

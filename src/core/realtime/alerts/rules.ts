@@ -137,7 +137,7 @@ export const builtInRules: AlertRule[] = [
     name: 'Частые простои',
     description: 'Более 3 простоев в одном отчёте',
     severity: 'medium',
-    condition: (event, ctx) => false, // Requires aggregate check — skip for now
+    condition: (_event, _ctx) => false, // Requires aggregate check — skip for now
     message: () => '',
     cooldownMs: 60 * 60 * 1000,
     notify: ['websocket'],

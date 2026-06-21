@@ -188,8 +188,7 @@ describe('Report Command Service', () => {
         date: '2026-04-03',
       });
       // Manually set old updatedAt
-      const state = existingAggregate.getState();
-      (existingAggregate as any).state.updatedAt = oldDate.toISOString();
+        (existingAggregate as any).state.updatedAt = oldDate.toISOString();
 
       mockRepoFindById.mockResolvedValue(existingAggregate);
 

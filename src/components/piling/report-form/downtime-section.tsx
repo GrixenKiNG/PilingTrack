@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { formatNumber } from '@/lib/format';
 import type { DowntimeReasonDTO } from '@/lib/types';
 
 interface DowntimeSectionProps {

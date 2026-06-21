@@ -100,7 +100,7 @@ export async function warmCache(key: string, ttlSeconds: number, data: unknown):
 /**
  * Decorator for GET handlers — wraps response in cache.
  */
-export function cachedResponse<T>(
+export function cachedResponse(
   keyFn: (req: Request) => string,
   ttlSeconds: number
 ) {

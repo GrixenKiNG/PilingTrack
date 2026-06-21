@@ -18,15 +18,6 @@ const db = new PrismaClient({
 /**
  * Generate a random secure password.
  */
-function generatePassword(length = 16): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
-}
-
 /**
  * Prevent seeding in production environment.
  */

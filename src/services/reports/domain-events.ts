@@ -8,7 +8,6 @@
 
 import type {
   ReportDomainEvent as DomainEvent,
-  ReportDomainEventType as DomainEventType,
 } from '@/modules/reports/domain';
 import { normalizeReportDomainEventType } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';

@@ -9,7 +9,6 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 import { resolveUserScope } from '@/services/auth/authorization-service';
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
-import { calculatePeriodSummary } from '../commands';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 
 export const reportDetailInclude = {

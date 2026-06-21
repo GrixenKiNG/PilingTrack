@@ -145,7 +145,7 @@ export function AdminDictionaries() {
           </select>
         </div>
 
-        {KINDS.map(({ kind, title, placeholder }) => (
+        {KINDS.map(({ kind, title }) => (
           <TabsContent key={kind} value={kind}>
             <div className="mb-2 flex justify-end">
               <Button size="sm" className="bg-orange-500 text-white hover:bg-orange-600" onClick={() => setForm({ mode: 'create', kind, value: '' })}>

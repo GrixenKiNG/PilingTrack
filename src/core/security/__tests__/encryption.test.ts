@@ -12,7 +12,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 const KEY_A = '11'.repeat(32); // 64 hex chars = 32 bytes
 const KEY_B = '22'.repeat(32);
-const KEY_C = '33'.repeat(32);
 
 async function freshModule(env: Record<string, string | undefined>) {
   // Clear any prior keys.

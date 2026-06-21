@@ -123,7 +123,7 @@ test.describe('Conflict Resolution', () => {
     await page.waitForTimeout(5000);
 
     // Check if conflict resolution UI is available
-    const hasConflictUI = await page.getByTestId('conflict-resolution').isVisible()
+    const _hasConflictUI = await page.getByTestId('conflict-resolution').isVisible()
       .catch(() => false);
 
     // Either auto-resolved or showing merge UI

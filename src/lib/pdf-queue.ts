@@ -100,14 +100,6 @@ function getQueue(): Queue {
   return pdfQueueInstance;
 }
 
-function getQueueEvents(): QueueEvents {
-  if (!pdfQueueEventsInstance) {
-    const connection = createRedisConnection();
-    pdfQueueEventsInstance = new QueueEvents(QUEUE_NAME, { connection, prefix: 'pilingtrack' });
-  }
-  return pdfQueueEventsInstance;
-}
-
 // ============================================================
 // Job Data Types
 // ============================================================

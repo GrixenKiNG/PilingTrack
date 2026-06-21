@@ -10,7 +10,7 @@
 
 import http from 'k6/http';
 import { sleep, check, group } from 'k6';
-import { Rate, Trend } from 'k6/metrics';
+import { Rate } from 'k6/metrics';
 
 const syncErrorRate = new Rate('sync_error_rate');
 const pullErrorRate = new Rate('pull_sync_error_rate');

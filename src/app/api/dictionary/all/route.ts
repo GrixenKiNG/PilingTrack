@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { listActiveDictionaries } from '@/services/dictionaries/dictionary-service';
 import { getCachedAllDictionaries } from '@/lib/cached-queries';
 import { withApi } from '@/core/api-wrapper';
 

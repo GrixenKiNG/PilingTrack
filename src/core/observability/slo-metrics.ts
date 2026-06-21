@@ -93,7 +93,7 @@ export interface BurnRateAlert {
 export function calculateBurnRate(
   errorRate: number,
   sloTarget: number,
-  windowMinutes: number
+  _windowMinutes: number
 ): number {
   const allowedErrorRate = 100 - sloTarget; // e.g., 0.1% for 99.9% SLO
   if (allowedErrorRate === 0) return errorRate > 0 ? Infinity : 0;

@@ -8,7 +8,7 @@
  */
 
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
-import { emitDomainEvent, on } from '@/services/reports/domain-events';
+import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
 
 // ============================================================

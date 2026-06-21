@@ -124,7 +124,7 @@ export default function runScenario() {
         socket.send(JSON.stringify({ type: 'ping' }));
       });
 
-      socket.on('message', (msg) => {
+      socket.on('message', (_msg) => {
         wsMessages.add(1);
       });
 

@@ -42,7 +42,7 @@ describe('paginateQuery', () => {
     const items = Array.from({ length: 60 }, (_, i) => ({ id: `item-${i + 1}` }));
     const mockQuery = createMockQuery(items);
 
-    const result = await paginateQuery(
+    await paginateQuery(
       mockQuery,
       { cursor: 'item-25', limit: 25 },
       { where: {} }

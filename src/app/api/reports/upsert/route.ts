@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
-import { ServiceError } from '@/services/service-error';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { withMutation } from '@/core/api-wrapper';

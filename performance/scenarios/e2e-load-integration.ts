@@ -11,7 +11,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { spawn, execSync } from 'child_process';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -95,9 +95,7 @@ test.describe('E2E + Load Integration', () => {
       env: { ...process.env, BASE_URL },
     });
 
-    let k6Output = '';
     k6Process.stdout?.on('data', (data) => {
-      k6Output += data.toString();
       console.log(`   [k6] ${data.toString().trim()}`);
     });
 

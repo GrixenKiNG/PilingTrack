@@ -7,8 +7,6 @@ import {
   TrendingUp,
   Users,
   HardHat,
-  Drill,
-  Clock,
   Loader2,
 } from 'lucide-react';
 import {

@@ -77,8 +77,7 @@ async function setup() {
   // Suppress Next.js dev overlay
   await context.addInitScript(() => {
     // Monkey-patch to hide the dev overlay
-    const origError = console.error;
-    window.__hideNextjsOverlay = true;
+      window.__hideNextjsOverlay = true;
   });
 }
 
