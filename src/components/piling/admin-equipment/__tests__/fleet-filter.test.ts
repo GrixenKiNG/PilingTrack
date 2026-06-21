@@ -3,15 +3,37 @@ import { buildFleetFilterOptions, applyFleetFilters } from '../fleet-filter';
 import type { FleetCard } from '../fleet-types';
 import type { FleetFilterState } from '../equipment-filters';
 
-const EMPTY_FILTERS: FleetFilterState = { site: '', kind: '', status: '', crew: '' };
+const EMPTY_FILTERS: FleetFilterState = {
+  site: '',
+  kind: '',
+  status: '',
+  equipmentStatus: '',
+  reportStatus: '',
+  crew: '',
+};
 
 function card(over: Partial<FleetCard>): FleetCard {
   return {
-    id: 'x', name: 'X', model: 'M', manufactureYear: null, kind: 'PILE_DRIVER',
-    inventoryNumber: null, serialNumber: null, engineHoursTotal: null,
-    nextMaintenanceDate: null, nextMaintenanceAtHours: null,
-    assignedSiteName: null, assignedOperatorName: null, assignedCrewName: null,
-    status: 'idle', todaysReports: 0, todayTotals: null, latestReport: null,
+    id: 'x',
+    name: 'X',
+    model: 'M',
+    manufactureYear: null,
+    kind: 'PILE_DRIVER',
+    inventoryNumber: null,
+    serialNumber: null,
+    engineHoursTotal: null,
+    nextMaintenanceDate: null,
+    nextMaintenanceAtHours: null,
+    assignedSiteName: null,
+    assignedOperatorName: null,
+    assignedCrewName: null,
+    status: 'idle',
+    reportStatus: 'missing',
+    equipmentStatus: 'idle',
+    todaysReports: 0,
+    todayTotals: null,
+    downtimeReason: null,
+    latestReport: null,
     ...over,
   };
 }
@@ -40,9 +62,33 @@ describe('buildFleetFilterOptions', () => {
 
 describe('applyFleetFilters', () => {
   const fleet = [
-    card({ id: 'a', assignedSiteName: 'Объект А', kind: 'PILE_DRIVER', status: 'active', assignedCrewName: 'Бр-1' }),
-    card({ id: 'b', assignedSiteName: 'Объект Б', kind: 'DRILLING_RIG', status: 'idle', assignedCrewName: 'Бр-2' }),
-    card({ id: 'c', assignedSiteName: 'Объект А', kind: 'DRILLING_RIG', status: 'active', assignedCrewName: 'Бр-2' }),
+    card({
+      id: 'a',
+      assignedSiteName: 'Объект А',
+      kind: 'PILE_DRIVER',
+      status: 'active',
+      reportStatus: 'has_report',
+      equipmentStatus: 'working',
+      assignedCrewName: 'Бр-1',
+    }),
+    card({
+      id: 'b',
+      assignedSiteName: 'Объект Б',
+      kind: 'DRILLING_RIG',
+      status: 'idle',
+      reportStatus: 'missing',
+      equipmentStatus: 'idle',
+      assignedCrewName: 'Бр-2',
+    }),
+    card({
+      id: 'c',
+      assignedSiteName: 'Объект А',
+      kind: 'DRILLING_RIG',
+      status: 'active',
+      reportStatus: 'has_report',
+      equipmentStatus: 'repair',
+      assignedCrewName: 'Бр-2',
+    }),
   ];
 
   it('empty filters return every card', () => {
@@ -52,6 +98,8 @@ describe('applyFleetFilters', () => {
   it('filters by a single dimension', () => {
     expect(applyFleetFilters(fleet, { ...EMPTY_FILTERS, status: 'active' }).map((c) => c.id)).toEqual(['a', 'c']);
     expect(applyFleetFilters(fleet, { ...EMPTY_FILTERS, kind: 'DRILLING_RIG' }).map((c) => c.id)).toEqual(['b', 'c']);
+    expect(applyFleetFilters(fleet, { ...EMPTY_FILTERS, equipmentStatus: 'repair' }).map((c) => c.id)).toEqual(['c']);
+    expect(applyFleetFilters(fleet, { ...EMPTY_FILTERS, reportStatus: 'missing' }).map((c) => c.id)).toEqual(['b']);
   });
 
   it('combines filters with AND', () => {

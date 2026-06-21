@@ -35,7 +35,16 @@ export function applyFleetFilters(cards: FleetCard[], filters: FleetFilterState)
   return cards.filter((c) => {
     if (filters.site && c.assignedSiteName !== filters.site) return false;
     if (filters.kind && c.kind !== filters.kind) return false;
-    if (filters.status && c.status !== filters.status) return false;
+    if (filters.equipmentStatus && c.equipmentStatus !== filters.equipmentStatus) return false;
+    if (filters.reportStatus && c.reportStatus !== filters.reportStatus) return false;
+    if (
+      filters.status &&
+      c.status !== filters.status &&
+      c.equipmentStatus !== filters.status &&
+      c.reportStatus !== filters.status
+    ) {
+      return false;
+    }
     if (filters.crew && c.assignedCrewName !== filters.crew) return false;
     return true;
   });

@@ -83,11 +83,11 @@ export function AdminEquipment() {
   return (
     <div className="p-4 lg:p-6">
       <div
-        style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
+        style={{ '--panel-w': `${view === 'table' ? Math.min(panelWidth, 440) : panelWidth}px` } as React.CSSProperties}
         className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
       >
         {/* Left: fleet list */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
@@ -103,7 +103,7 @@ export function AdminEquipment() {
             </div>
           </div>
 
-          <EquipmentStatsBar totals={snapshot.totals} />
+          <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <EquipmentFilters

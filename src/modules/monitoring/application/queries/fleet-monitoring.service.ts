@@ -26,6 +26,8 @@ const EXPECTED_WINDOW_DAYS = 2;
 const FLEET_TZ = 'Europe/Moscow'; // single-tenant prod runs on MSK time
 
 export type EquipmentStatus = 'active' | 'expected' | 'idle';
+export type ReportStatus = 'has_report' | 'expected' | 'missing';
+export type EquipmentOperationalStatus = 'working' | 'repair' | 'idle';
 
 export interface FleetCard {
   id: string;
@@ -43,7 +45,10 @@ export interface FleetCard {
   assignedSiteName: string | null;
   assignedOperatorName: string | null;
   assignedCrewName: string | null;
+  /** Legacy report-presence status. Kept for /monitoring and existing cards. */
   status: EquipmentStatus;
+  reportStatus: ReportStatus;
+  equipmentStatus: EquipmentOperationalStatus;
   todaysReports: number;
   todayTotals: {
     piles: number;
@@ -52,6 +57,7 @@ export interface FleetCard {
     drillingMeters: number;
     downtimeHours: number;
   } | null;
+  downtimeReason: string | null;
   latestReport: {
     date: string;
     siteName: string | null;
@@ -139,6 +145,15 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
           site: { select: { name: true } },
         },
       },
+      maintenanceRecords: {
+        where: {
+          status: 'IN_PROGRESS',
+          type: { in: ['REPAIR', 'FAULT'] },
+        },
+        take: 1,
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true },
+      },
     },
   });
 
@@ -174,6 +189,13 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       updatedAt: true,
       piles: { select: { count: true, pileGrade: { select: { name: true } } } },
       drillings: { select: { count: true, meters: true } },
+      downtimes: {
+        select: {
+          duration: true,
+          comment: true,
+          reason: { select: { name: true } },
+        },
+      },
       user: { select: { name: true } },
       site: { select: { name: true } },
     },
@@ -214,10 +236,14 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
 
     const status: EquipmentStatus =
       todays.length > 0 ? 'active' : hasExpected ? 'expected' : 'idle';
+    const reportStatus: ReportStatus =
+      status === 'active' ? 'has_report' : status === 'expected' ? 'expected' : 'missing';
 
     let todayTotals: FleetCard['todayTotals'] = null;
+    let downtimeReason: string | null = null;
     if (todays.length > 0) {
       todayTotals = { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 };
+      const downtimeByReason = new Map<string, { duration: number; comment: string | null }>();
       for (const r of todays) {
         const a = analyticsByReport.get(r.reportId);
         if (!a) continue;
@@ -229,11 +255,30 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
         todayTotals.drillingCount += r.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
         todayTotals.drillingMeters += a.totalDrilling;
         todayTotals.downtimeHours += a.totalDowntime;
+        for (const downtime of r.downtimes ?? []) {
+          const reasonName = downtime.reason?.name ?? 'Причина не указана';
+          const current = downtimeByReason.get(reasonName) ?? { duration: 0, comment: null };
+          current.duration += downtime.duration ?? 0;
+          current.comment = current.comment || downtime.comment || null;
+          downtimeByReason.set(reasonName, current);
+        }
+      }
+      const topDowntime = [...downtimeByReason.entries()].sort((a, b) => b[1].duration - a[1].duration)[0];
+      if (topDowntime) {
+        downtimeReason = topDowntime[1].comment
+          ? `${topDowntime[0]}: ${topDowntime[1].comment}`
+          : topDowntime[0];
       }
     }
 
     const latest = eqReports[0] ?? null;
     const activeCrew = eq.crews[0] ?? null;
+    const hasActiveRepair = (eq.maintenanceRecords ?? []).length > 0;
+    const equipmentStatus: EquipmentOperationalStatus = hasActiveRepair
+      ? 'repair'
+      : status === 'active'
+        ? 'working'
+        : 'idle';
     return {
       id: eq.id,
       name: eq.name,
@@ -249,8 +294,11 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       assignedOperatorName: activeCrew?.operator?.name ?? null,
       assignedCrewName: activeCrew?.name ?? null,
       status,
+      reportStatus,
+      equipmentStatus,
       todaysReports: todays.length,
       todayTotals,
+      downtimeReason,
       latestReport: latest
         ? {
             date: latest.date,

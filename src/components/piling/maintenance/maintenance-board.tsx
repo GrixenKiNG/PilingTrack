@@ -30,6 +30,7 @@ import { formatRuDate, formatPersonName } from '@/lib/format';
 import {
   type QuickFilter,
   REPAIR_TYPES,
+  REGULAR_TYPES,
   isOverdue,
   hoursUntilMaintenance,
   currentHours,

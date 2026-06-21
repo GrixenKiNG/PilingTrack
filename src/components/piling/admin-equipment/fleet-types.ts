@@ -7,6 +7,8 @@
  */
 
 export type EquipmentStatus = 'active' | 'expected' | 'idle';
+export type ReportStatus = 'has_report' | 'expected' | 'missing';
+export type EquipmentOperationalStatus = 'working' | 'repair' | 'idle';
 
 export type EquipmentKindDTO =
   | 'PILE_DRIVER'
@@ -29,7 +31,10 @@ export interface FleetCard {
   assignedSiteName: string | null;
   assignedOperatorName: string | null;
   assignedCrewName: string | null;
+  /** Legacy report-presence status. Prefer reportStatus/equipmentStatus in new UI. */
   status: EquipmentStatus;
+  reportStatus: ReportStatus;
+  equipmentStatus: EquipmentOperationalStatus;
   todaysReports: number;
   todayTotals: {
     piles: number;
@@ -38,6 +43,7 @@ export interface FleetCard {
     drillingMeters: number;
     downtimeHours: number;
   } | null;
+  downtimeReason: string | null;
   latestReport: {
     date: string;
     siteName: string | null;

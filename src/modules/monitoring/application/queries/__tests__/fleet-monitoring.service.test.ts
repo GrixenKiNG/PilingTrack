@@ -116,4 +116,94 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
 
     expect(snap.totals.operatorsOnShiftToday).toBe(2);
   });
+
+  it('builds a production FleetCard with assignment, work totals, statuses, and downtime reason', async () => {
+    equipmentFindMany.mockResolvedValue([
+      {
+        id: 'eq-1',
+        name: 'LRH-100 №2',
+        model: 'LRH-100',
+        manufactureYear: 2022,
+        kind: 'PILE_DRIVER',
+        inventoryNumber: 'PT-LRH-002',
+        serialNumber: '18-07',
+        engineHoursTotal: 1248,
+        nextMaintenanceDate: null,
+        nextMaintenanceAtHours: 1300,
+        crews: [
+          {
+            name: 'Бригада Андреева',
+            operator: { name: 'Иван Петров' },
+            site: { name: 'ЖК Северный' },
+          },
+        ],
+        maintenanceRecords: [],
+      },
+    ]);
+    reportFindMany.mockResolvedValue([
+      {
+        id: 'r1',
+        reportId: 'R-1248',
+        equipmentId: 'eq-1',
+        crewId: 'crew-1',
+        userId: 'op-1',
+        date: today,
+        shiftType: 'DAY',
+        updatedAt: new Date('2026-06-20T08:12:00.000Z'),
+        piles: [{ count: 18, pileGrade: { name: 'Свая 070' } }],
+        drillings: [{ count: 6, meters: 42 }],
+        downtimes: [
+          { duration: 1.5, comment: 'ожидание бетона', reason: { name: 'Ожидание' } },
+          { duration: 0.5, comment: null, reason: { name: 'Перестановка' } },
+        ],
+        user: { name: 'Иван Петров' },
+        site: { name: 'ЖК Северный' },
+      },
+    ]);
+    analyticsFindMany.mockResolvedValue([
+      { reportId: 'R-1248', totalPiles: 18, totalDrilling: 42, totalDowntime: 2 },
+    ]);
+
+    const snap = await getFleetSnapshot({ tenantId: 'orion' });
+    const card = snap.equipment[0];
+
+    expect(card.assignedSiteName).toBe('ЖК Северный');
+    expect(card.assignedCrewName).toBe('Бригада Андреева');
+    expect(card.assignedOperatorName).toBe('Иван Петров');
+    expect(card.reportStatus).toBe('has_report');
+    expect(card.equipmentStatus).toBe('working');
+    expect(card.todayTotals).toEqual({
+      piles: 18,
+      pileMeters: 126,
+      drillingCount: 6,
+      drillingMeters: 42,
+      downtimeHours: 2,
+    });
+    expect(card.downtimeReason).toBe('Ожидание: ожидание бетона');
+  });
+
+  it('marks equipment as repair when an active repair maintenance record exists', async () => {
+    equipmentFindMany.mockResolvedValue([
+      {
+        id: 'eq-1',
+        name: 'Bauer BG 24',
+        model: 'BG 24',
+        manufactureYear: null,
+        kind: 'DRILLING_RIG',
+        inventoryNumber: null,
+        serialNumber: null,
+        engineHoursTotal: null,
+        nextMaintenanceDate: null,
+        nextMaintenanceAtHours: null,
+        crews: [],
+        maintenanceRecords: [{ id: 'mr-1' }],
+      },
+    ]);
+    reportFindMany.mockResolvedValue([]);
+
+    const snap = await getFleetSnapshot({ tenantId: 'orion' });
+
+    expect(snap.equipment[0].equipmentStatus).toBe('repair');
+    expect(snap.equipment[0].reportStatus).toBe('missing');
+  });
 });

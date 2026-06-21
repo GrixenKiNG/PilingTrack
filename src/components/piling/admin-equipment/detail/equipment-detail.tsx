@@ -84,13 +84,15 @@ const KIND_BADGE_STYLE: Record<EquipmentKindDTO, string> = {
 };
 
 type TabKey =
-  | 'overview' | 'work' | 'maintenance'
+  | 'overview' | 'work' | 'passport' | 'assignment' | 'maintenance'
   | 'documents' | 'photos' | 'history'
   | 'telemetry' | 'checklists' | 'errors';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview', label: 'Обзор' },
   { key: 'work', label: 'Работа' },
+  { key: 'passport', label: 'Паспорт' },
+  { key: 'assignment', label: 'Закрепление' },
   { key: 'maintenance', label: 'ТО' },
   { key: 'documents', label: 'Документы' },
   { key: 'photos', label: 'Фото' },
@@ -324,13 +326,13 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       <div className="space-y-4">
         {header}
 
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
+        <div className="grid grid-cols-4 border-b border-slate-200">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                '-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-xs font-medium transition-colors',
+                '-mb-px min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors',
                 tab === t.key
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700',
@@ -403,6 +405,28 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                 </div>
               ) : (
                 <EquipmentPlaceholder label="Телеметрия (топливо, давление, GPS)" hint="ждёт датчик" />
+              )}
+            </div>
+          )}
+
+          {tab === 'passport' && <PassportGrid eq={eq} />}
+
+          {tab === 'assignment' && (
+            <div className="space-y-4">
+              {details.crew ? (
+                <section className="rounded-lg border border-slate-200 bg-white p-3">
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Текущее закрепление</h3>
+                  <dl className="grid grid-cols-1 gap-3 text-sm">
+                    <KV label="Объект" value={details.crew.site.name} />
+                    <KV label="Бригада" value={details.crew.name || '—'} />
+                    <KV label="Оператор" value={details.crew.operator.name} />
+                    {details.crew.assistants.length > 0 && (
+                      <KV label="Помощники" value={details.crew.assistants.map((a) => a.name).join(', ')} full />
+                    )}
+                  </dl>
+                </section>
+              ) : (
+                <EmptyState message="Установка не закреплена за активной бригадой." />
               )}
             </div>
           )}
