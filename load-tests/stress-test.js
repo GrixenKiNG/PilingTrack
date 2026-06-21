@@ -113,7 +113,7 @@ export function setup() {
 // Main VU Loop
 // ============================================================
 
-export default function (data) {
+export default function runScenario(data) {
   const token = data.authToken;
 
   group('API: Read Operations', () => {

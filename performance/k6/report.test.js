@@ -124,7 +124,7 @@ function generateReportPayload() {
   };
 }
 
-export default function (data) {
+export default function runScenario(data) {
   const token = data.authToken;
   const headers = {
     'Content-Type': 'application/json',

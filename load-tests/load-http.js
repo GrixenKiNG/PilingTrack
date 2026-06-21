@@ -140,7 +140,7 @@ function generateSyncV2Request(vuId, iteration) {
 // Main scenario
 // ============================================================
 
-export default function () {
+export default function runScenario() {
   const vuId = __VU;
   const iteration = __ITER;
 

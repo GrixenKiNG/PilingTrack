@@ -88,7 +88,7 @@ export function setup() {
 // VU Execution
 // ============================================================
 
-export default function (data) {
+export default function runScenario(data) {
   const { token } = data;
   if (!token) {
     console.error('No auth token, skipping');

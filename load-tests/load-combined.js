@@ -77,7 +77,7 @@ function generateReportPayload(vuId, iteration) {
   };
 }
 
-export default function () {
+export default function runScenario() {
   const vuId = __VU;
   const iteration = __ITER;
   const headers = {

@@ -52,7 +52,7 @@ export function setup() {
   return { authToken };
 }
 
-export default function (data) {
+export default function runScenario(data) {
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${data.authToken}`,

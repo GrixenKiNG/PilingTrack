@@ -46,7 +46,7 @@ export function setup() {
   return { token: JSON.parse(loginRes.body).accessToken || '' };
 }
 
-export default function (data) {
+export default function runScenario(data) {
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${data.token}`,

@@ -52,7 +52,7 @@ export function setup() {
   return { startTime: Date.now() };
 }
 
-export default function () {
+export default function runScenario() {
   const creds = CREDENTIALS[Math.floor(Math.random() * CREDENTIALS.length)];
 
   group('Login', () => {

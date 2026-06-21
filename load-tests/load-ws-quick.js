@@ -37,7 +37,7 @@ export const options = {
 
 const WS_URL = __ENV.WS_URL || 'ws://localhost:3001';
 
-export default function () {
+export default function runScenario() {
   const vuId = __VU;
   const url = `${WS_URL}`;
 

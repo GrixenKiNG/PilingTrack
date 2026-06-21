@@ -60,7 +60,7 @@ const USER_ID_BASE = `user-${Date.now()}`;
 // Main scenario
 // ============================================================
 
-export default function () {
+export default function runScenario() {
   const vuId = __VU;
   const userId = `${USER_ID_BASE}-${vuId}`;
 
