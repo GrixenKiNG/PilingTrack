@@ -14,6 +14,7 @@
  */
 
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { ReportDomainEvent } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 import { moveToDlq } from '@/core/outbox/dead-letter-queue';

@@ -26,6 +26,7 @@
 
 import { createHash, randomUUID } from 'crypto';
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { createSessionToken, SessionUser } from '@/services/auth/session-service';
 import { ServiceError } from '@/lib/service-error';
 

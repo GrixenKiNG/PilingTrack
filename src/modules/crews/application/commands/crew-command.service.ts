@@ -4,6 +4,7 @@
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { CrewAggregate } from '../../domain';
 import { getCrewRepository } from '../../infrastructure';

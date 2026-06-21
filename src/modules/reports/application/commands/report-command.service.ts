@@ -18,6 +18,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {
   assertUserAssignedToSite,
   resolveAccessibleUserId,
@@ -27,6 +28,7 @@ import { ReportAggregate } from '../../domain';
 import { getReportRepository } from '../../infrastructure';
 import { UpsertReportCommand, UpsertReportResult } from './upsert-report.command';
 import { validateReportInput, validateAgainstSitePlans } from './report-validation.service';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {
   writeReportAuditRow,
   recordPostCommitAuditEvent,

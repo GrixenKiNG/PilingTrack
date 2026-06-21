@@ -7,7 +7,9 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveUserScope } from '@/services/auth/authorization-service';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 

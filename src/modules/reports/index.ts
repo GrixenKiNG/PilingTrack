@@ -61,6 +61,7 @@ export type { DashboardData } from './application';
 // 2026-05-21, the modern wrapper at ./application/event-bus was deleted).
 // Kept for backward compatibility with any caller importing through
 // the @/modules/reports barrel.
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export { on, emitDomainEvent, getRegisteredEventTypes } from '@/services/reports/domain-events';
 
 // Projections

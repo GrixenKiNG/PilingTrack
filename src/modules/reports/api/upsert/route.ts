@@ -16,6 +16,7 @@ import {
 } from '@/modules/reports';
 import { ServiceError } from '@/lib/service-error';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 
 export const runtime = 'nodejs';

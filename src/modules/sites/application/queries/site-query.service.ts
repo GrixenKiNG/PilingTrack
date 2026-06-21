@@ -3,7 +3,9 @@
  */
 
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { assertCanAccessSite } from '@/services/auth/resource-access-service';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 

@@ -8,6 +8,7 @@
 import * as http from 'http';
 import { IncomingMessage } from 'http';
 import { parse as parseCookie } from 'cookie';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { SESSION_COOKIE_NAME, verifySessionToken } from '@/services/auth/session-service';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';

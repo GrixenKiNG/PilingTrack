@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { assertCan } from '@/services/auth/authorization-service';
 import { getReportsByPeriod } from '@/modules/reports';
 import { ServiceError } from '@/lib/service-error';

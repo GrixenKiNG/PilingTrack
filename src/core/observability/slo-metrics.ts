@@ -20,6 +20,7 @@
 import { logger } from '@/lib/logger';
 import { getCircuitBreakerHealth } from '@/core/infrastructure/circuit-breakers';
 import { getDlqStats } from '@/core/outbox/dead-letter-queue';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { getOutboxStats } from '@/services/reports/outbox-publisher';
 
 // ============================================================
