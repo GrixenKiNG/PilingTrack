@@ -10,17 +10,6 @@ interface OperatorUser {
   name: string;
 }
 
-interface PeriodSummary {
-  totalPiles: number;
-  totalPileMeters?: number;
-  totalDrillingCount?: number;
-  totalDrilling: number;
-  totalDowntime: number;
-  reportCount: number;
-  uniqueSites?: number;
-  uniqueOperators?: number;
-}
-
 export interface UseReportsDataReturn {
   reports: ReportDTO[];
   sites: SiteFlatDTO[];
@@ -38,13 +27,11 @@ export interface UseReportsDataReturn {
   periodTo: string;
   setPeriodTo: (v: string) => void;
   periodActive: boolean;
-  periodSummary: PeriodSummary | null;
   loading: boolean;
   /** Set when the reports request fails (HTTP error or network). Lets the UI
    *  show a real error state instead of a silently-empty list — see the
    *  2026-05-30 incident where a failing query rendered as "no reports". */
   error: string | null;
-  loadingSites: boolean;
   loadingReferenceData: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -71,10 +58,8 @@ export function useReportsData(): UseReportsDataReturn {
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
   const [periodActive, setPeriodActive] = useState(false);
-  const [periodSummary, setPeriodSummary] = useState<PeriodSummary | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [loadingSites, setLoadingSites] = useState(false);
   const [loadingReferenceData, setLoadingReferenceData] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -92,7 +77,6 @@ export function useReportsData(): UseReportsDataReturn {
     let isMounted = true;
 
     const loadSitesAndOperators = async () => {
-      setLoadingSites(true);
       try {
         const [sitesRes, operatorsRes, equipmentRes] = await Promise.all([
           authFetch('/api/sites/all', { signal: abortController.signal }),
@@ -116,8 +100,6 @@ export function useReportsData(): UseReportsDataReturn {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
           /* ignore */
         }
-      } finally {
-        if (isMounted) setLoadingSites(false);
       }
     };
 
@@ -197,11 +179,6 @@ export function useReportsData(): UseReportsDataReturn {
           setReports(reportsArray);
           setHasMore(!periodActive && Boolean(data.hasMore));
           setNextCursor(!periodActive ? data.nextCursor ?? null : null);
-          if (periodActive) {
-            setPeriodSummary(data.summary || null);
-          } else {
-            setPeriodSummary(null);
-          }
         } else {
           // HTTP error (e.g. 500): fetch resolves with res.ok=false and does
           // NOT throw, so without this branch the list would render empty as
@@ -282,7 +259,6 @@ export function useReportsData(): UseReportsDataReturn {
     setPeriodFrom('');
     setPeriodTo('');
     setPeriodActive(false);
-    setPeriodSummary(null);
   };
 
   return {
@@ -290,7 +266,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, loadingMore, hasMore, error,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

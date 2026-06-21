@@ -19,7 +19,7 @@ const NOW = new Date('2026-06-20T12:00:00'); // local noon → day math is timez
 
 function wo(over: Partial<WorkOrderLike>): WorkOrderLike {
   return {
-    status: 'PLANNED', type: 'TO1', priority: 'MEDIUM',
+    status: 'PLANNED', type: 'TO1', priority: 'NORMAL',
     scheduledAt: null, assigneeId: null, faultCause: null,
     equipmentId: 'e1', engineHoursAtService: null,
     equipment: { engineHoursTotal: null, nextMaintenanceAtHours: null },
@@ -87,7 +87,7 @@ describe('quickFilterMatches', () => {
   it('issues → high/critical priority, overdue, or has a fault cause', () => {
     expect(quickFilterMatches(wo({ priority: 'CRITICAL' }), 'issues', NOW)).toBe(true);
     expect(quickFilterMatches(wo({ faultCause: 'утечка масла' }), 'issues', NOW)).toBe(true);
-    expect(quickFilterMatches(wo({ priority: 'MEDIUM' }), 'issues', NOW)).toBe(false);
+    expect(quickFilterMatches(wo({ priority: 'NORMAL' }), 'issues', NOW)).toBe(false);
   });
 });
 

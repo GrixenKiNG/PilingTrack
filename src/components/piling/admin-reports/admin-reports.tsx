@@ -102,11 +102,10 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, loadingMore, hasMore, error,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   } = useReportsData();
 
-  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [detailReport, setDetailReport] = useState<ReportDTO | null>(null);
   const [previewReport, setPreviewReport] = useState<ReportDTO | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -116,19 +115,16 @@ export function AdminReports() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   const [photoReportIds, setPhotoReportIds] = useState<Record<string, boolean>>({});
-  const reportHistory = useReportHistory(previewReport?.reportId);
+  // The preview pane shows the user-selected report, falling back to the first
+  // one when nothing is selected (so it's never empty while reports exist).
+  const effectivePreview = previewReport ?? reports[0] ?? null;
+  const reportHistory = useReportHistory(effectivePreview?.reportId);
 
   useEffect(() => {
     if (showCreateDialog) {
       void loadReferenceData();
     }
   }, [showCreateDialog, loadReferenceData]);
-
-  useEffect(() => {
-    if (!previewReport && reports.length > 0) {
-      setPreviewReport(reports[0]);
-    }
-  }, [previewReport, reports]);
 
   useEffect(() => {
     const missing = reports
@@ -177,7 +173,7 @@ export function AdminReports() {
         const msg = await res.text().catch(() => '');
         throw new Error(`Ошибка удаления (${res.status}): ${msg.slice(0, 200)}`);
       }
-      if (previewReport?.reportId === report.reportId) setPreviewReport(null);
+      if (effectivePreview?.reportId === report.reportId) setPreviewReport(null);
       await loadReports();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
@@ -189,36 +185,6 @@ export function AdminReports() {
   const handlePreviewPdf = (report: ReportDTO) => {
     if (!report.reportId) return;
     setPreviewReportId(report.reportId);
-  };
-
-  const handleExportPdf = async () => {
-    if (!periodFrom || !periodTo) return;
-    setGeneratingPdf(true);
-    try {
-      const { authFetch } = await import('@/lib/api');
-      const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo, inline: '1' });
-      if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
-      if (filterUserId !== 'all') params.set('userId', filterUserId);
-      const res = await authFetch(`/api/reports/pdf?${params}`);
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        throw new Error(`Ошибка генерации PDF (${res.status}): ${msg.slice(0, 200)}`);
-      }
-      const blob = await res.blob();
-      if (blob.size === 0 || blob.type.indexOf('pdf') === -1) {
-        throw new Error('Сервер вернул пустой или неверный PDF');
-      }
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        alert('Разрешите всплывающие окна, чтобы открыть PDF для печати.');
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Не удалось сформировать PDF');
-    } finally {
-      setGeneratingPdf(false);
-    }
   };
 
   const filteredReports = useMemo(() => {
@@ -372,7 +338,7 @@ export function AdminReports() {
                       <EvidenceReportRow
                         key={report.id}
                         report={report}
-                        active={previewReport?.reportId === report.reportId}
+                        active={effectivePreview?.reportId === report.reportId}
                         deleting={deletingId === report.reportId}
                         formatLastEditor={formatLastEditor}
                         onSelect={setPreviewReport}
@@ -402,7 +368,7 @@ export function AdminReports() {
           </div>
 
           <ReportEvidencePreview
-            report={previewReport}
+            report={effectivePreview}
             history={reportHistory}
             formatDate={formatDate}
             onClose={() => setPreviewReport(null)}
