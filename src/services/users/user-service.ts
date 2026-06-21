@@ -4,7 +4,11 @@ import { assertNotSelfAction } from '@/services/auth/authorization-service';
 import { hashPassword } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
-import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
+
+function requireTenantId(tenantId: string | null | undefined): string {
+  if (!tenantId) throw new ServiceError('Tenant context missing', 400);
+  return tenantId;
+}
 
 function isUniqueConstraintError(message: string) {
   return message.includes('Unique') || message.includes('unique constraint');
@@ -20,10 +24,11 @@ export async function listAssignableUsers(tenantId: string) {
 }
 
 export async function listUsers(
+  tenantId: string,
   role?: string | null,
   pagination?: CursorPaginationResult
 ) {
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { tenantId: requireTenantId(tenantId) };
   if (role) {
     where.role = role;
   }
@@ -53,13 +58,7 @@ export async function createUser(input: {
     throw new ServiceError('email, name, password required', 400);
   }
 
-  // User.tenantId is NOT NULL in the database. Inherit the creating admin's
-  // tenant, falling back to the configured default. Fail closed rather than
-  // insert a NULL (which surfaces as an opaque 500 — hit on prod 2026-06-17).
-  const tenantId = input.tenantId || resolveTenantContext().tenantId;
-  if (!tenantId) {
-    throw new ServiceError('tenantId is required to create a user', 400);
-  }
+  const tenantId = requireTenantId(input.tenantId);
 
   try {
     const hashedPassword = await hashPassword(input.password);
@@ -98,7 +97,7 @@ export async function createUser(input: {
   }
 }
 
-export async function updateUser(input: {
+export interface UpdateUserInput {
   id: string;
   name?: string;
   email?: string;
@@ -106,7 +105,14 @@ export async function updateUser(input: {
   role?: string;
   isActive?: boolean;
   password?: string;
-}, actorUserId?: string | null) {
+}
+
+export async function updateUser(
+  tenantId: string,
+  input: UpdateUserInput,
+  actorUserId?: string | null
+) {
+  const scopedTenantId = requireTenantId(tenantId);
   if (!input.id) {
     throw new ServiceError('id required', 400);
   }
@@ -120,13 +126,16 @@ export async function updateUser(input: {
   if (input.password) data.password = await hashPassword(input.password);
 
   try {
-    const previousUser = await db.user.findUnique({
-      where: { id: input.id },
+    const previousUser = await db.user.findFirst({
+      where: { id: input.id, tenantId: scopedTenantId },
       select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
     });
+    if (!previousUser) {
+      throw new ServiceError('User not found', 404);
+    }
 
     const updatedUser = await db.user.update({
-      where: { id: input.id },
+      where: { id: input.id, tenantId: scopedTenantId },
       data,
       select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
     });
@@ -155,20 +164,23 @@ export async function updateUser(input: {
   }
 }
 
-export async function deleteUser(actorUserId: string, targetUserId: string) {
+export async function deleteUser(tenantId: string, actorUserId: string, targetUserId: string) {
+  const scopedTenantId = requireTenantId(tenantId);
   if (!targetUserId) {
     throw new ServiceError('id required', 400);
   }
 
   assertNotSelfAction(actorUserId, targetUserId, 'Cannot delete yourself');
 
-  const user = await db.user.findUnique({ where: { id: targetUserId } });
+  const user = await db.user.findFirst({
+    where: { id: targetUserId, tenantId: scopedTenantId },
+  });
   if (!user) {
     throw new ServiceError('User not found', 404);
   }
 
   try {
-    await db.user.delete({ where: { id: targetUserId } });
+    await db.user.delete({ where: { id: targetUserId, tenantId: scopedTenantId } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to delete not found')) {

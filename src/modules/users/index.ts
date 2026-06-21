@@ -13,3 +13,4 @@ export {
   updateUser,
   deleteUser,
 } from '@/services/users/user-service';
+export type { UpdateUserInput } from '@/services/users/user-service';
