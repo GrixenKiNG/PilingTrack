@@ -49,13 +49,13 @@ export function EquipmentTable({
           <tr>
             <th className={th} onClick={() => toggle('name')}>Установка ↕</th>
             <th className={staticTh}>Объект</th>
-            <th className={staticTh}>Бригада</th>
-            <th className={staticTh}>Оператор</th>
+            <th className={staticTh}><StackedHeader words={['Бригада']} /></th>
+            <th className={staticTh}><StackedHeader words={['Оператор']} /></th>
             <th className={th} onClick={() => toggle('equipmentStatus')}>Статус техники ↕</th>
-            <th className={th} onClick={() => toggle('reportStatus')}>Статус отчёта ↕</th>
-            <th className="break-words px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500">Сваи шт./м.п.</th>
-            <th className="break-words px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500">Бурение шт./м</th>
-            <th className="break-words px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500">Простой дн. / причина</th>
+            <th className={th} onClick={() => toggle('reportStatus')}><StackedHeader words={['Статус', 'отчёта', '↕']} /></th>
+            <th className="px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Сваи', 'шт./м.п.']} align="right" /></th>
+            <th className="px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Бурение', 'шт./м']} align="right" /></th>
+            <th className="px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Простой', 'дн.', 'причина']} /></th>
             <th className={th} onClick={() => toggle('engineHoursTotal')}>Моточасы ↕</th>
             <th className={staticTh}>ТО</th>
           </tr>
@@ -82,28 +82,28 @@ export function EquipmentTable({
                   </div>
                 </td>
                 <td className="break-words text-slate-600">{c.assignedSiteName ?? '—'}</td>
-                <td className="break-words text-slate-600">{c.assignedCrewName ?? '—'}</td>
-                <td className="break-words text-slate-600">{c.assignedOperatorName ?? '—'}</td>
+                <td className="text-slate-600"><WordStack value={c.assignedCrewName} /></td>
+                <td className="text-slate-600"><WordStack value={c.assignedOperatorName} /></td>
                 <td>
                   <span className={cn('inline-block max-w-full truncate rounded border px-1 py-0.5 text-3xs font-medium', equipmentStatus.badge)}>
                     {equipmentStatus.label}
                   </span>
                 </td>
                 <td>
-                  <span className={cn('inline-block max-w-full truncate rounded border px-1 py-0.5 text-3xs font-medium', reportStatus.badge)}>
-                    {reportStatus.label}
+                  <span className={cn('inline-block max-w-full rounded border px-1 py-0.5 text-3xs font-medium leading-tight', reportStatus.badge)}>
+                    <WordStack value={reportStatus.label} />
                   </span>
                 </td>
-                <td className="break-words text-right font-mono leading-tight text-slate-800">
-                  {t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'}
+                <td className="text-right font-mono leading-tight text-slate-800">
+                  {t ? <CompactMetric first={`${formatNum(t.piles)} шт.`} second={`${formatNum(t.pileMeters, 1)} м.п.`} /> : '—'}
                 </td>
-                <td className="break-words text-right font-mono leading-tight text-slate-800">
-                  {t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'}
+                <td className="text-right font-mono leading-tight text-slate-800">
+                  {t ? <CompactMetric first={`${formatNum(t.drillingCount)} шт.`} second={`${formatNum(t.drillingMeters, 1)} м`} /> : '—'}
                 </td>
                 <td>
-                  <div className="font-mono text-slate-800">{t ? downtimeDays(t.downtimeHours) : '—'}</div>
-                  <div className="max-w-[180px] truncate text-xs text-slate-500" title={c.downtimeReason ?? ''}>
-                    {c.downtimeReason ?? '—'}
+                  <div className="font-mono text-slate-800">{t ? `${downtimeDays(t.downtimeHours)} дн.` : '—'}</div>
+                  <div className="text-3xs leading-tight text-slate-500" title={c.downtimeReason ?? ''}>
+                    <WordStack value={c.downtimeReason} />
                   </div>
                 </td>
                 <td className="truncate font-mono text-slate-700">{c.engineHoursTotal?.toLocaleString('ru') ?? '—'}</td>
@@ -122,5 +122,31 @@ export function EquipmentTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function StackedHeader({ words, align = 'left' }: { words: string[]; align?: 'left' | 'right' }) {
+  return (
+    <span className={cn('flex flex-col gap-0.5', align === 'right' ? 'items-end' : 'items-start')}>
+      {words.map((word) => <span key={word}>{word}</span>)}
+    </span>
+  );
+}
+
+function WordStack({ value }: { value: string | null | undefined }) {
+  if (!value) return <span>—</span>;
+  return (
+    <span className="flex min-w-0 flex-col leading-tight">
+      {value.split(/\s+/).map((word, index) => <span key={`${word}-${index}`} className="break-words">{word}</span>)}
+    </span>
+  );
+}
+
+function CompactMetric({ first, second }: { first: string; second: string }) {
+  return (
+    <span className="flex flex-col whitespace-nowrap">
+      <span>{first}</span>
+      <span>{second}</span>
+    </span>
   );
 }

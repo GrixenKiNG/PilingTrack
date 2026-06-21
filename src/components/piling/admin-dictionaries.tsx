@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Clock, Drill, HardHat, Loader2, Pencil, Plus, RotateCcw, Settings, Trash2, Archive, Search } from 'lucide-react';
+import { Clock, Drill, HardHat, Loader2, Pencil, Plus, RotateCcw, Ruler, Settings, Trash2, Archive, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,18 @@ interface RegistryItem {
   updatedAt: string;
   reportCount: number;
   planCount: number;
+  lengthMm?: number | null; // pileGrade only
 }
 
 interface FormState { mode: 'create' | 'rename'; kind: DictionaryKind; id?: string; value: string }
+interface LengthForm { id: string; name: string; value: string } // value in metres
+
+/** "30 м" / "9.5 м" / "—" from millimetres. */
+function lengthLabel(lengthMm?: number | null): string {
+  if (lengthMm == null) return '—';
+  const m = lengthMm / 1000;
+  return `${Number.isInteger(m) ? m : m.toFixed(1)} м`;
+}
 
 const KINDS: Array<{ kind: DictionaryKind; title: string; icon: typeof HardHat; placeholder: string }> = [
   { kind: 'pileGrade', title: 'Сваи', icon: HardHat, placeholder: 'Новая марка, например С120-30' },
@@ -46,6 +55,7 @@ export function AdminDictionaries() {
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: DictionaryKind; item: RegistryItem } | null>(null);
+  const [lengthForm, setLengthForm] = useState<LengthForm | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -99,6 +109,31 @@ export function AdminDictionaries() {
       await loadData();
     } catch {
       toast.error('Не удалось изменить статус');
+    }
+  };
+
+  const saveLength = async () => {
+    if (!lengthForm) return;
+    const raw = lengthForm.value.trim().replace(',', '.');
+    let lengthMm: number | null;
+    if (raw === '') {
+      lengthMm = null; // clears the length (= unknown)
+    } else {
+      const metres = Number(raw);
+      if (!Number.isFinite(metres) || metres < 0) { toast.error('Введите длину в метрах'); return; }
+      lengthMm = Math.round(metres * 1000);
+    }
+    setSaving(true);
+    try {
+      const res = await authFetch('/api/dictionary/manage', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'pileGrade', id: lengthForm.id, lengthMm }) });
+      if (!res.ok) throw new Error();
+      toast.success('Длина сохранена');
+      setLengthForm(null);
+      await loadData();
+    } catch {
+      toast.error('Не удалось сохранить длину');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -159,6 +194,7 @@ export function AdminDictionaries() {
                   <thead>
                     <tr className="border-b text-left text-xs text-slate-500">
                       <th className="p-2.5 font-medium">Название</th>
+                      {kind === 'pileGrade' && <th className="p-2.5 font-medium">Длина</th>}
                       <th className="p-2.5 font-medium">Статус</th>
                       <th className="p-2.5 font-medium">Используется</th>
                       <th className="p-2.5 font-medium">Обновлено</th>
@@ -167,12 +203,15 @@ export function AdminDictionaries() {
                   </thead>
                   <tbody>
                     {filtered(kind).length === 0 ? (
-                      <tr><td colSpan={5} className="py-6 text-center text-xs text-slate-400">{title}: ничего не найдено</td></tr>
+                      <tr><td colSpan={kind === 'pileGrade' ? 6 : 5} className="py-6 text-center text-xs text-slate-400">{title}: ничего не найдено</td></tr>
                     ) : filtered(kind).map((item) => {
                       const usage = usageLabel(item);
                       return (
                         <tr key={item.id} className="border-b last:border-0 hover:bg-slate-50">
                           <td className={`p-2.5 font-medium ${item.isActive ? 'text-slate-800' : 'text-slate-400'}`}>{item.name}</td>
+                          {kind === 'pileGrade' && (
+                            <td className={`p-2.5 ${item.lengthMm == null ? 'text-amber-600' : 'text-slate-600'}`}>{lengthLabel(item.lengthMm)}</td>
+                          )}
                           <td className="p-2.5">
                             <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-3xs">{item.isActive ? 'Активен' : 'Архив'}</Badge>
                           </td>
@@ -181,6 +220,9 @@ export function AdminDictionaries() {
                           <td className="p-2.5">
                             <div className="flex justify-end gap-1">
                               <button onClick={() => setForm({ mode: 'rename', kind, id: item.id, value: item.name })} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Переименовать"><Pencil className="h-3.5 w-3.5" /></button>
+                              {kind === 'pileGrade' && (
+                                <button onClick={() => setLengthForm({ id: item.id, name: item.name, value: item.lengthMm == null ? '' : String(item.lengthMm / 1000) })} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Длина сваи"><Ruler className="h-3.5 w-3.5" /></button>
+                              )}
                               {item.isActive ? (
                                 <button onClick={() => setStatus(kind, item, false)} className="flex h-7 items-center gap-1 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100" title="Архивировать"><Archive className="h-3.5 w-3.5" />Архив</button>
                               ) : (
@@ -212,6 +254,18 @@ export function AdminDictionaries() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setForm(null)}>Отмена</Button>
             <Button onClick={submitForm} disabled={saving || !form?.value.trim()} className="bg-orange-500 text-white hover:bg-orange-600">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Сохранить'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={lengthForm !== null} onOpenChange={(open) => !open && setLengthForm(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Длина сваи — {lengthForm?.name}</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-500">Длина одной сваи этой марки в метрах. Используется для расчёта м.п. на дашборде, в отчётах и PDF. Пусто — длина не задана (считается как 0).</p>
+          <Input value={lengthForm?.value ?? ''} onChange={(e) => setLengthForm((f) => f && { ...f, value: e.target.value })} placeholder="например 30" inputMode="decimal" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') void saveLength(); }} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLengthForm(null)}>Отмена</Button>
+            <Button onClick={saveLength} disabled={saving} className="bg-orange-500 text-white hover:bg-orange-600">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Сохранить'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

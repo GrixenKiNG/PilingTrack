@@ -7,6 +7,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { pileLengthMeters } from '@/lib/pile-length';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveUserScope } from '@/services/auth/authorization-service';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
@@ -198,7 +199,7 @@ export async function listReportsForUserScope(
     where,
     include: {
       site: { select: { name: true } },
-      piles: { select: { count: true, pileGrade: { select: { name: true } } } },
+      piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
       drillings: { select: { count: true, meters: true } },
       downtimes: { select: { duration: true } },
     },
@@ -208,11 +209,6 @@ export async function listReportsForUserScope(
     skip: cursor ? 1 : 0,
   });
 
-  const pileLengthFromName = (name: string) => {
-    const m = name.match(/\d{3}/);
-    return m ? Number(m[0]) / 10 : 0;
-  };
-
   return reports.map((report) => ({
     id: report.id,
     siteId: report.siteId,
@@ -221,8 +217,8 @@ export async function listReportsForUserScope(
     status: report.status,
     totalPiles: report.piles.reduce((sum: number, pile: { count: number }) => sum + pile.count, 0),
     totalPileMeters: report.piles.reduce(
-      (sum: number, pile: { count: number; pileGrade: { name: string } }) =>
-        sum + pile.count * pileLengthFromName(pile.pileGrade?.name || ''),
+      (sum: number, pile: { count: number; pileGrade: { lengthMm: number | null } }) =>
+        sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
       0,
     ),
     totalDrillingCount: report.drillings.reduce(

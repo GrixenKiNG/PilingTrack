@@ -36,7 +36,7 @@ export interface RawReportRow {
   updatedAt: Date;
   crew: { name?: string } | null;
   equipment: { name?: string } | null;
-  piles: Array<{ id: string; count: number; pileGradeId: string; pileGrade?: { name: string } }> | null;
+  piles: Array<{ id: string; count: number; pileGradeId: string; pileGrade?: { name: string; lengthMm?: number | null } }> | null;
   drillings: Array<{ id: string; count: number; metersPerUnit: number; meters: number; typeId: string; type?: { name: string } }> | null;
   downtimes: Array<{ id: string; duration: number; reasonId: string; comment: string | null }> | null;
 }
@@ -76,7 +76,7 @@ export async function getReportsByPeriodRaw(
           assistants: { select: { name: true } },
         },
       },
-      piles: { select: { id: true, count: true, pileGradeId: true, pileGrade: { select: { name: true } } } },
+      piles: { select: { id: true, count: true, pileGradeId: true, pileGrade: { select: { name: true, lengthMm: true } } } },
       drillings: { select: { id: true, count: true, metersPerUnit: true, meters: true, typeId: true, type: { select: { name: true } } } },
       downtimes: { select: { id: true, duration: true, reasonId: true, comment: true, reason: { select: { name: true } } } },
     },

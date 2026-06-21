@@ -148,6 +148,8 @@ export interface PileGradeDTO {
   id: string;
   name: string;
   isActive: boolean;
+  /** Pile length in millimetres; null = unknown. Source of truth for м.п. (see lib/pile-length). */
+  lengthMm?: number | null;
 }
 
 export interface DrillingTypeDTO {

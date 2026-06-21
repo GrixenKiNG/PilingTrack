@@ -5,6 +5,7 @@
  * the screen. Presentation (formatting, labels) stays in the component.
  */
 import type { ReportDTO } from '@/lib/types';
+import { pileLengthMeters } from '@/lib/pile-length';
 
 export interface ReportTotals {
   piles: number;
@@ -15,17 +16,11 @@ export interface ReportTotals {
   photoCount: number;
 }
 
-/** Pile length in metres parsed from a grade name (first 3-digit run = decimetres). */
-export function getPileLengthMeters(pileGradeName: string): number {
-  const match = pileGradeName.match(/\d{3}/);
-  return match ? Number(match[0]) / 10 : 0;
-}
-
 /** Totals for one report (photoCount is filled in elsewhere, starts at 0). */
 export function getReportTotals(report: ReportDTO): ReportTotals {
   const piles = report.piles?.reduce((sum, pile) => sum + pile.count, 0) || 0;
   const pileMeters = report.piles?.reduce(
-    (sum, pile) => sum + getPileLengthMeters(pile.pileGrade?.name || '') * pile.count,
+    (sum, pile) => sum + pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }) * pile.count,
     0,
   ) || 0;
   const drillingCount = report.drillings?.reduce((sum, drilling) => sum + (drilling.count || 1), 0) || 0;

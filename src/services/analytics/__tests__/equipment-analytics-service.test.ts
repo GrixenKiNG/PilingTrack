@@ -57,3 +57,30 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
     expect(queryRaw).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Regression: pile metres (м.п.) per rig must come from PileGrade.lengthMm —
+ * the single source of truth (src/lib/pile-length.ts) — not from
+ * SitePilePlan.metersPerUnit (a planning figure with known-unreliable values)
+ * or a 3-digit regex on the grade name. Otherwise this screen's м.п. drifts
+ * from the report/PDF/dashboard, which already compute via pileLengthMeters().
+ */
+describe('getEquipmentAnalytics — pile meters source', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    groupBy.mockReset();
+    queryRaw.mockResolvedValue([]);
+    groupBy.mockResolvedValue([]);
+  });
+
+  it('computes pile meters from PileGrade.lengthMm, not the site plan or the grade name', async () => {
+    await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    const [strings] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    expect(sql).toContain('"lengthMm"');
+    expect(sql).not.toContain('metersPerUnit');
+    expect(sql).not.toContain('SitePilePlan');
+  });
+});

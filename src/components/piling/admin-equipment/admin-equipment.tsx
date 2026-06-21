@@ -83,7 +83,7 @@ export function AdminEquipment() {
   return (
     <div className="p-4 lg:p-6">
       <div
-        style={{ '--panel-w': `${view === 'table' ? Math.min(panelWidth, 440) : panelWidth}px` } as React.CSSProperties}
+        style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
         className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
       >
         {/* Left: fleet list */}

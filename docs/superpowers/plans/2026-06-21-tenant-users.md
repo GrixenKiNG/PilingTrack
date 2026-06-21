@@ -2,6 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> ## ⚠️ Revision 2026-06-21 (council review — read before executing)
+>
+> **Split this plan by value-now vs second-tenant-prep.** Today `MULTI_TENANT_MODE=single`, one tenant `orion`, so pure tenant-scoping has no current exploit payoff — but several tasks are valuable regardless of tenancy. Recommended split:
+>
+> **Do now (single-tenant value, low risk):**
+> - **Task 3 — `sessionVersion` session revocation.** Real gap today: blocking a user or changing their password/PIN does NOT invalidate already-issued JWTs (they live until expiry). This closes it. Highest-value item in the plan.
+> - **Task 2 — password ≥8 / PIN 4–10 validation.** Server currently accepts 1-char credentials. Cheap hardening.
+> - **Tasks 4–6 — operational user DTO + filters + UI** (assignments, activity). UX value now.
+> - **Task 1 — tenant-scoping `listUsers`/`updateUser`/`deleteUser`.** `listUsers` is currently **unscoped** (`where = {}`) — a latent cross-tenant leak the moment a 2nd tenant exists. Adding `where: { tenantId }` is behaviour-neutral in single-tenant, so it is safe defence-in-depth to land now.
+>
+> **Gate to second-tenant onboarding (bundle with audit P1 tenant/RLS):**
+> - The product question behind it. This plan states "**`SUPER_ADMIN` не вводится**" — that directly contradicts release-audit P1 (`docs/qa-council/2026-06-21-release-audit.md`), which requires a platform-admin role before any public multi-tenant. For a strictly single-tenant install, no `SUPER_ADMIN` is fine; before a 2nd tenant, this must be revisited. Don't bake "no SUPER_ADMIN ever" into the model.
+>
+> **Corrections to specific tasks:**
+> 1. **Task 1 — `createUser` is already tenant-aware** (fixed 2026-06-17: inherits the admin's tenant, fails closed on null — see `user-service.ts`). Do not regress that. The work is on `listUsers`/`updateUser`/`deleteUser`, which are still tenant-unscoped.
+> 2. **Task 3 migration** adds `User.sessionVersion Int NOT NULL DEFAULT 0` — confirmed the column does not exist yet, so this is correct. Remember the prod-deploy migrate-rebuild gotcha (`docker compose build migrate`).
+> 3. **Testing:** any tenant-isolation claim needs a real-Postgres test (two tenants), not the current mocked integration setup.
+
 **Goal:** Ограничить управление пользователями организацией текущего администратора и превратить список учётных записей в оперативный модуль с назначениями, активностью и безопасным жизненным циклом.
 
 **Architecture:** API получает tenant исключительно из authenticated session и передаёт его в service-layer. Query возвращает tenant-scoped `OperationalUserDTO`; security-sensitive mutations повышают `sessionVersion`, из-за чего ранее выданные JWT перестают проходить проверку. UI остаётся в `ops-shell`, а фильтрация и правая панель выделяются в небольшие тестируемые компоненты.
@@ -97,7 +115,7 @@ const target = await db.user.findFirst({
 if (!target) throw new ServiceError('User not found', 404);
 ```
 
-Make list `where` start as `{ tenantId }`. Remove the default-tenant fallback from `createUser`; the caller must provide a non-empty authenticated tenant.
+Make list `where` start as `{ tenantId }`. **Caution (corrected 2026-06-21):** `createUser` already inherits the admin's tenant and falls back to the configured default, failing closed on null — this was the 2026-06-17 fix for a prod 500. Do **not** strip that fallback wholesale; in single-tenant the default *is* the authenticated tenant. Tighten only so that an authenticated tenant is preferred and a null result still throws 400.
 
 - [ ] **Step 4: Verify GREEN**
 

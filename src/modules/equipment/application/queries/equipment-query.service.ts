@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '../commands/equipment-maintenance';
 
@@ -93,7 +94,7 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       id: true, reportId: true, date: true, shiftType: true, status: true,
       site: { select: { id: true, name: true } },
       user: { select: { id: true, name: true } },
-      piles: { select: { count: true, pileGrade: { select: { name: true } } } },
+      piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
       drillings: { select: { count: true, meters: true } },
       updatedAt: true,
     },
@@ -105,10 +106,6 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       })
     : [];
   const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
-  const pileLengthFromName = (name: string) => {
-    const match = name.match(/\d{3}/);
-    return match ? Number(match[0]) / 10 : 0;
-  };
 
   const reports30d = allReports.filter((r) => r.date >= cutoff);
   const stats30d = reports30d.reduce(
@@ -117,7 +114,7 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       if (!a) return acc;
       acc.piles += a.totalPiles;
       acc.pileMeters += r.piles.reduce(
-        (sum, pile) => sum + pile.count * pileLengthFromName(pile.pileGrade?.name ?? ''),
+        (sum, pile) => sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
         0,
       );
       acc.drillingCount += r.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);

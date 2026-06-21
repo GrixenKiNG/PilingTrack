@@ -1,28 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import type { ReportDTO } from '@/lib/types';
-import { getPileLengthMeters, getReportTotals, addTotals, shiftDurationHours } from '../report-totals';
+import { getReportTotals, addTotals, shiftDurationHours } from '../report-totals';
 
 // The four functions only read piles/drillings/downtimes/shiftStart/shiftEnd, so
-// a minimal partial cast is enough to exercise them.
+// a minimal partial cast is enough to exercise them. Pile length now comes from
+// the stored PileGrade.lengthMm (millimetres), not from parsing the grade name.
 function report(over: Partial<ReportDTO>): ReportDTO {
   return { piles: [], drillings: [], downtimes: [], shiftStart: null, shiftEnd: null, ...over } as unknown as ReportDTO;
 }
 
-describe('getPileLengthMeters', () => {
-  it('reads the first 3-digit run as decimetres', () => {
-    expect(getPileLengthMeters('С-300')).toBe(30);
-    expect(getPileLengthMeters('Свая 450 мм')).toBe(45);
-  });
-  it('returns 0 when there is no 3-digit run', () => {
-    expect(getPileLengthMeters('С-12')).toBe(0);
-    expect(getPileLengthMeters('')).toBe(0);
-  });
-});
-
 describe('getReportTotals', () => {
   it('sums piles/metres/drilling/downtime for one report', () => {
     const t = getReportTotals(report({
-      piles: [{ count: 2, pileGrade: { name: 'С-300' } }, { count: 3, pileGrade: { name: 'С-100' } }] as ReportDTO['piles'],
+      piles: [{ count: 2, pileGrade: { lengthMm: 30000 } }, { count: 3, pileGrade: { lengthMm: 10000 } }] as ReportDTO['piles'],
       drillings: [{ count: 4, meters: 12 }, { count: 0, meters: 5 }] as ReportDTO['drillings'],
       downtimes: [{ duration: 1.5 }, { duration: 0.5 }] as ReportDTO['downtimes'],
     }));
@@ -44,7 +34,7 @@ describe('getReportTotals', () => {
 describe('addTotals', () => {
   it('sums totals across reports', () => {
     const r = report({
-      piles: [{ count: 1, pileGrade: { name: 'С-300' } }] as ReportDTO['piles'],
+      piles: [{ count: 1, pileGrade: { lengthMm: 30000 } }] as ReportDTO['piles'],
       downtimes: [{ duration: 2 }] as ReportDTO['downtimes'],
     });
     const sum = addTotals([r, r, r]);

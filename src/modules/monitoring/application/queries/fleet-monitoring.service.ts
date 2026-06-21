@@ -19,6 +19,7 @@
  */
 
 import { db } from '@/lib/db';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { EquipmentKind } from '@/generated/postgres-client';
 
 const RECENT_WINDOW_DAYS = 7;
@@ -187,7 +188,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       date: true,
       shiftType: true,
       updatedAt: true,
-      piles: { select: { count: true, pileGrade: { select: { name: true } } } },
+      piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
       drillings: { select: { count: true, meters: true } },
       downtimes: {
         select: {
@@ -211,10 +212,6 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       })
     : [];
   const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
-  const pileLengthFromName = (name: string) => {
-    const match = name.match(/\d{3}/);
-    return match ? Number(match[0]) / 10 : 0;
-  };
 
   // Group reports per equipment (already sorted by date desc).
   const reportsByEquipment = new Map<string, typeof reports>();
@@ -249,7 +246,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
         if (!a) continue;
         todayTotals.piles += a.totalPiles;
         todayTotals.pileMeters += r.piles.reduce(
-          (sum, pile) => sum + pile.count * pileLengthFromName(pile.pileGrade?.name ?? ''),
+          (sum, pile) => sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
           0,
         );
         todayTotals.drillingCount += r.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);

@@ -37,7 +37,7 @@ interface EquipmentRow {
   pileMeters: number;
   drillingCount: number;
   drillingMeters: number;
-  downtimeMinutes: number;
+  downtimeHours: number;
   fuelLiters: number;
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
@@ -56,12 +56,12 @@ interface AnalyticsResult {
     pileMeters: number;
     drillingCount: number;
     drillingMeters: number;
-    downtimeMinutes: number;
+    downtimeHours: number;
     fuelLiters: number;
     maintenanceDueCount: number;
   };
   equipment: EquipmentRow[];
-  downtimePareto: Array<{ reasonId: string; reasonName: string; minutes: number; pct: number }>;
+  downtimePareto: Array<{ reasonId: string; reasonName: string; hours: number; pct: number }>;
 }
 
 function todayYmd(): string {
@@ -74,7 +74,7 @@ function shiftYmd(days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-type SortKey = 'name' | 'piles' | 'drillingMeters' | 'reportCount' | 'activeDays' | 'downtimeMinutes' | 'fuelLiters';
+type SortKey = 'name' | 'piles' | 'drillingMeters' | 'reportCount' | 'activeDays' | 'downtimeHours' | 'fuelLiters';
 
 export function EquipmentAnalytics() {
   const router = useRouter();
@@ -183,7 +183,7 @@ function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
     { label: 'Установки', icon: Gauge, value: `${fleet.activeCount} / ${fleet.totalEquipment}`, detail: 'в работе / всего' },
     { label: 'Сваи', icon: HardHat, value: `${fmt(fleet.piles)} шт`, detail: `${fmt(fleet.pileMeters)} м.п.` },
     { label: 'Бурение', icon: Drill, value: `${fmt(fleet.drillingCount)} шт`, detail: `${fmt(fleet.drillingMeters)} м.п.` },
-    { label: 'Простой', icon: Clock, value: fmtHours(fleet.downtimeMinutes), detail: 'суммарно' },
+    { label: 'Простой', icon: Clock, value: fmtHours(fleet.downtimeHours), detail: 'суммарно' },
     { label: 'Топливо', icon: Fuel, value: fleet.fuelLiters > 0 ? `${fmt(fleet.fuelLiters)} л` : '—', detail: fleet.fuelLiters > 0 ? 'расход за период' : 'нужна телеметрия' },
     { label: 'ТО', icon: Wrench, value: String(fleet.maintenanceDueCount), detail: 'скоро / просрочено', alert: fleet.maintenanceDueCount > 0 },
   ];
@@ -213,7 +213,7 @@ const FLEET_COLUMNS: FleetColumn[] = [
   { k: 'drillingMeters', label: 'Бурение', right: true },
   { k: 'reportCount', label: 'Отчётов', right: true },
   { k: 'activeDays', label: 'Утилизация', right: true },
-  { k: 'downtimeMinutes', label: 'Простой', right: true },
+  { k: 'downtimeHours', label: 'Простой', right: true },
   { k: 'fuelLiters', label: 'Топливо', right: true },
 ];
 
@@ -290,7 +290,7 @@ function FleetTable({
                 <Stat label="Бурение" value={`${fmt(r.drillingCount)} шт`} sub={`${fmt(r.drillingMeters)} м`} />
                 <Stat label="Отчётов" value={String(r.reportCount)} />
                 <Stat label="Утилизация" value={`${Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%`} sub={`${r.activeDays}/${periodDays} дн`} />
-                <Stat label="Простой" value={fmtHours(r.downtimeMinutes)} />
+                <Stat label="Простой" value={fmtHours(r.downtimeHours)} />
                 <Stat label="Топливо" value={r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'} />
               </dl>
             </button>
@@ -323,7 +323,7 @@ function FleetTable({
                 {Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%
                 <span className="text-2xs text-slate-400"> ({r.activeDays}/{periodDays} дн)</span>
               </td>
-              <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeMinutes)}</td>
+              <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeHours)}</td>
               <td className="px-3 py-2 text-right font-mono">{r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'}</td>
               <td className="px-3 py-2 text-right">
                 {r.maintenanceDue
@@ -360,7 +360,7 @@ function DowntimePareto({ rows }: { rows: AnalyticsResult['downtimePareto'] }) {
       </div>
     );
   }
-  const max = Math.max(...rows.map((r) => r.minutes), 1);
+  const max = Math.max(...rows.map((r) => r.hours), 1);
   return (
     <div>
       <h2 className="mb-2 text-sm font-semibold text-slate-700">Простои по причинам</h2>
@@ -369,10 +369,10 @@ function DowntimePareto({ rows }: { rows: AnalyticsResult['downtimePareto'] }) {
           <div key={r.reasonId}>
             <div className="mb-0.5 flex items-baseline justify-between gap-2 text-sm">
               <span className="truncate text-slate-700">{r.reasonName}</span>
-              <span className="font-mono text-xs text-slate-500">{fmtHours(r.minutes)} · {r.pct}%</span>
+              <span className="font-mono text-xs text-slate-500">{fmtHours(r.hours)} · {r.pct}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded bg-slate-100">
-              <div className="h-full rounded bg-amber-400" style={{ width: `${(r.minutes / max) * 100}%` }} />
+              <div className="h-full rounded bg-amber-400" style={{ width: `${(r.hours / max) * 100}%` }} />
             </div>
           </div>
         ))}

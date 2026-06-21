@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import {
   createDictionaryItem, deleteDictionaryItem, archiveDictionaryItem,
-  restoreDictionaryItem, renameDictionaryItem, listDictionaries, getDictionaryUsage,
+  restoreDictionaryItem, renameDictionaryItem, setPileGradeLength,
+  listDictionaries, getDictionaryUsage,
   type DictFilter, type UsageMap,
 } from '@/services/dictionaries/dictionary-service';
 import { withApi, withMutation } from '@/core/api-wrapper';
@@ -18,7 +19,12 @@ const patchSchema = z.object({
   type: typeEnum, id: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
   isActive: z.boolean().optional(),
-}).refine((v) => v.name !== undefined || v.isActive !== undefined, { message: 'name or isActive required' });
+  // Pile length in millimetres; null clears it. Only valid for pileGrade.
+  lengthMm: z.number().int().min(0).max(1_000_000).nullable().optional(),
+}).refine(
+  (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined,
+  { message: 'name, isActive or lengthMm required' },
+);
 
 function withUsage<T extends { id: string }>(items: T[], usage: UsageMap) {
   return items.map((it) => ({ ...it, reportCount: usage[it.id]?.reportCount ?? 0, planCount: usage[it.id]?.planCount ?? 0 }));
@@ -64,10 +70,14 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   const validated = patchSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
 
-  const { type, id, name, isActive } = validated.data;
+  const { type, id, name, isActive, lengthMm } = validated.data;
+  if (lengthMm !== undefined && type !== 'pileGrade') {
+    return NextResponse.json({ error: 'lengthMm valid only for pileGrade' }, { status: 400 });
+  }
   if (name !== undefined) await renameDictionaryItem(type, id, name);
   if (isActive === true) await restoreDictionaryItem(type, id);
   if (isActive === false) await archiveDictionaryItem(type, id);
+  if (lengthMm !== undefined) await setPileGradeLength(id, lengthMm);
   return NextResponse.json({ success: true });
 }, { domain: 'dictionary' });
 

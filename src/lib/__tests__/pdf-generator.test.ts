@@ -23,7 +23,7 @@ describe('pdf-generator', () => {
       equipmentName: 'LRH 100',
       user: { name: 'Иван Иванов' },
       site: { name: 'Объект 1' },
-      piles: [{ pileGrade: { name: 'Свая 300' }, count: 3, metersPerUnit: 12 }],
+      piles: [{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }],
       drillings: [{ type: { name: 'Лидерное' }, count: 1, metersPerUnit: 12, meters: 12 }],
       downtimes: [{ reason: { name: 'Погода' }, duration: 2, comment: 'Дождь' }],
     });
@@ -53,7 +53,7 @@ describe('pdf-generator', () => {
           equipmentName: 'LRH 100',
           user: { name: 'Иван Иванов' },
           site: { name: 'Объект 1' },
-          piles: [{ pileGrade: { name: 'Свая 300' }, count: 3, metersPerUnit: 12 }],
+          piles: [{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }],
           drillings: [{ type: { name: 'Лидерное' }, count: 1, meters: 12 }],
           downtimes: [{ reason: { name: 'Погода' }, duration: 2 }],
         },

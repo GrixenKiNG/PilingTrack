@@ -150,7 +150,7 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
         date: today,
         shiftType: 'DAY',
         updatedAt: new Date('2026-06-20T08:12:00.000Z'),
-        piles: [{ count: 18, pileGrade: { name: 'Свая 070' } }],
+        piles: [{ count: 18, pileGrade: { name: 'Свая 070', lengthMm: 7000 } }],
         drillings: [{ count: 6, meters: 42 }],
         downtimes: [
           { duration: 1.5, comment: 'ожидание бетона', reason: { name: 'Ожидание' } },

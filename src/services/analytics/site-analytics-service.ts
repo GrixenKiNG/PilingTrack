@@ -104,19 +104,10 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       SELECT
         r."siteId",
         SUM(pw.count)::int AS total_piles,
-        SUM(
-          pw.count * COALESCE(
-            NULLIF(spp."metersPerUnit", 0),
-            substring(pg.name from '[0-9]{3}')::float / 10,
-            0
-          )
-        )::float AS total_pile_meters
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
       FROM "Report" r
       JOIN "PileWork" pw ON pw."reportId" = r.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      LEFT JOIN "SitePilePlan" spp
-        ON spp."siteId" = r."siteId"
-       AND spp."pileGradeId" = pw."pileGradeId"
       WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo}
       GROUP BY r."siteId"
     ) p ON p."siteId" = s.id

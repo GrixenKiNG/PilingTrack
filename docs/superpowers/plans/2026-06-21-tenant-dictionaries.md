@@ -2,9 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> ## ⚠️ Revision 2026-06-21 (council review — read before executing)
+>
+> This plan was written **before** the pile-length integrity fix shipped on `chore/project-skills`. Reconcile before running any task:
+>
+> 1. **Pile length is already done, differently.** Production code now uses `PileGrade.lengthMm Int?` (nullable, millimetres) with a single resolver `pileLengthMeters` in `src/lib/pile-length.ts`, applied in all seven KPI paths. **Do NOT introduce `lengthMeters Float`** — that would create a second, conflicting source. Tasks 1 & 7 below are rewritten/retired accordingly.
+> 2. **Decision (2026-06-21): pile length comes from the grade everywhere.** `SitePilePlan.metersPerUnit` is a *planning* figure and is **not** a length source — local data proved it unreliable (a plan of 123 m/pile for a 12 m grade). The only remaining code step is to drop the plan-as-length override still living in the period summary + PDF and compute from `lengthMm` there too (see **Task 7'**). After that, simplify `pileLengthMeters` to take only `gradeLengthMm`.
+> 3. **Column name bug:** the schema column is `SitePilePlan.metersPerUnit`, not `metersPerPile` (Task 2 step 3). And **never seed grade length from the plan** — it imports the bad data. Seed from the name parser once (already done for existing grades) or from explicit template lengths for new tenants.
+> 4. **Sequencing / product gate:** tenant-*owned* dictionaries is preparation for a **second tenant**. Today `MULTI_TENANT_MODE=single`, one tenant `orion`, so the tenant-ownership migration (Tasks 1–6) carries real prod-data-remap risk with **no current isolation payoff**. Per product direction it is legitimate roadmap work but should be **gated to when the second tenant is actually onboarded**, and bundled with the audit's tenant-isolation / RLS fail-closed work (`docs/qa-council/2026-06-21-release-audit.md` P1). Do not run the remap on single-tenant prod just to "get ahead".
+> 5. **Testing:** the data remap (Task 2) MUST have a real-Postgres integration test (two tenants), not a mocked one — current integration tests mock the DB.
+>
+> **Recommended order:** do **Task 7'** (small, now) → defer Tasks 1–6 + 8–9 until second-tenant onboarding.
+
 **Goal:** Создать независимые справочники каждой организации, безопасно перенести существующие связи и защитить исторические отчёты от изменения значения через rename/delete.
 
-**Architecture:** Справочники получают обязательный `tenantId`; все API и queries используют tenant authenticated session. Неизменяемый TypeScript-каталог системных шаблонов копируется при создании tenant. Использованные значения только архивируются, а расчёт свайных метров переходит на `PileGrade.lengthMeters`.
+**Architecture:** Справочники получают обязательный `tenantId`; все API и queries используют tenant authenticated session. Неизменяемый TypeScript-каталог системных шаблонов копируется при создании tenant. Использованные значения только архивируются. Расчёт свайных метров **уже** переведён на `PileGrade.lengthMm` (мм, nullable) через `pileLengthMeters` — см. Revision выше; `lengthMeters Float` из исходного плана не вводить.
 
 **Tech Stack:** Next.js 16, TypeScript 6, Prisma 7/PostgreSQL, Zod 4, Vitest 4, Playwright.
 
@@ -14,7 +26,7 @@
 - Системные шаблоны используются только при первоначальном заполнении.
 - Использованное значение нельзя переименовать или удалить.
 - Cross-tenant lookup возвращает `404`.
-- Метры свай считаются по `lengthMeters`, а не по regex имени.
+- Метры свай считаются по `PileGrade.lengthMm` (мм), а не по regex имени и не по плану. (Done; остаётся Task 7'.)
 - Миграция fail-closed при неоднозначной связи и проверяет контрольные количества.
 
 ---
@@ -31,8 +43,8 @@
 - `src/app/api/dictionary/manage/route.ts` — admin registry.
 - `src/lib/cached-queries.ts` — tenant cache key/invalidation.
 - `src/components/piling/admin-dictionaries.tsx` — structured registry UI.
-- `src/lib/pile-length.ts` — one normalized pile-meter calculation.
-- report/dashboard/fleet query files — consume `lengthMeters`.
+- `src/lib/pile-length.ts` — one normalized pile-meter calculation (shipped: `pileLengthMeters`).
+- report/dashboard/fleet query files — consume `PileGrade.lengthMm`.
 
 ### Task 1: Schema and relational contract
 
@@ -42,13 +54,13 @@
 - Create: `tests/integration/tenant-dictionaries-schema.spec.ts`
 
 **Interfaces:**
-- Produces: `PileGrade.tenantId`, `code`, `lengthMeters`, `sectionOrDiameter`, `notes`.
+- Produces: `PileGrade.tenantId`, `code`, `sectionOrDiameter`, `notes`. (`lengthMm` already exists — do not add `lengthMeters`.)
 - Produces: `DrillingType.tenantId`, `DowntimeReason.tenantId`.
 - Produces: unique tenant/name indexes and Tenant relations.
 
 - [ ] **Step 1: Write failing schema assertions**
 
-Read `schema.prisma` and assert every dictionary model contains `tenantId String`, `tenant Tenant`, `@@index([tenantId])`, and a tenant-scoped unique constraint. Assert `PileGrade` contains `lengthMeters Float`.
+Read `schema.prisma` and assert every dictionary model contains `tenantId String`, `tenant Tenant`, `@@index([tenantId])`, and a tenant-scoped unique constraint. (Length is already covered by the existing `PileGrade.lengthMm Int?` — do not assert `lengthMeters`.)
 
 - [ ] **Step 2: Verify RED**
 
@@ -68,11 +80,10 @@ normalizedName    String
 @@index([tenantId, isActive])
 ```
 
-For `PileGrade` additionally:
+For `PileGrade` additionally (note: `lengthMm Int?` already exists — do not re-add length):
 
 ```prisma
 code              String
-lengthMeters      Float
 sectionOrDiameter String?
 notes             String @default("")
 ```
@@ -122,13 +133,9 @@ Expected: FAIL before remap SQL exists.
 
 Create tenant copies with a temporary mapping table keyed by `(old_id, tenant_id)`. Resolve tenant through `Report.tenantId` for work rows and `Site.tenantId` for plans. Abort with `RAISE EXCEPTION` when tenant is null or conflicting.
 
-Populate `lengthMeters` in this priority:
+**Length:** `PileGrade.lengthMm` already exists and is backfilled for the current (single) tenant. Carry it over to each per-tenant copy as-is. Do **NOT** seed length from `SitePilePlan` — its `metersPerUnit` (note: the column is `metersPerUnit`, not `metersPerPile`) contains bad data (e.g. 123 m/pile) and is not a length source. For grades that still have `lengthMm = NULL`, leave NULL (= 0 m, surfaced for admin correction) rather than guessing.
 
-1. unique non-zero `SitePilePlan.metersPerPile` for the tenant/grade;
-2. unambiguous existing grade parser result;
-3. abort and print the grade id/name for manual correction.
-
-Update all four FK tables, compare counts, then set columns NOT NULL and remove obsolete global rows.
+Update all four FK tables, compare counts, then set tenant columns NOT NULL and remove obsolete global rows.
 
 - [ ] **Step 4: Add read-only verification script**
 
@@ -283,39 +290,39 @@ git add src/app/api/dictionary
 git commit -m "fix(dictionaries): bind APIs to authenticated tenant"
 ```
 
-### Task 7: Replace name-derived pile length
+### Task 7: Replace name-derived pile length — ✅ DONE (2026-06-21, branch `chore/project-skills`)
+
+Shipped already, differently from the original draft:
+- `PileGrade.lengthMm Int?` + migration `20260621010000_pile_grade_length_mm` with behaviour-preserving backfill.
+- Single resolver `pileLengthMeters({ planMetersPerUnit?, gradeLengthMm? })` in `src/lib/pile-length.ts` + `lengthMmFromGradeName` (seed-only).
+- All seven KPI paths converted (fleet, report-query, equipment-query, report-totals, period route, single-pdf, period-pdf).
+- Tests: `src/lib/__tests__/pile-length.test.ts`, `src/lib/__tests__/pile-meters-invariant.test.ts`, plus updated report-totals / period-summary / fleet fixtures. Admin can edit length per grade in `admin-dictionaries.tsx`.
+
+The original interface name `calculatePileMeters(... lengthMeters ...)` does **not** exist — use `pileLengthMeters(... gradeLengthMm ...)`.
+
+### Task 7': Make pile length come from the grade everywhere — ✅ DONE (2026-06-21)
+
+**Decision 2026-06-21:** plan is not a length source; `lengthMm` is authoritative on every screen. Shipped:
+- `pileLengthMeters` simplified to `{ gradeLengthMm }` only (plan branch removed).
+- `computePeriodSummary` lost its `plans` param + `PilePlanInput`; period route no longer queries `SitePilePlan`.
+- single-pdf / period-pdf compute from `lengthMm` only.
+- Data fix migration `20260621020000_fix_site_pile_plan_meters` aligned the 3 bad `metersPerUnit` rows to grade length first.
+- Tests updated (period-summary, period route, pile-meters-invariant, pile-length, pdf-generator); full gate green (1145 unit, lint, migrations).
+- ⚠️ Deploy: TWO new migrations now (`20260621010000` + `20260621020000`) → `docker compose build migrate app workers`.
 
 **Files:**
-- Create: `src/lib/pile-length.ts`
-- Create: `src/lib/__tests__/pile-length.test.ts`
-- Modify: `src/modules/monitoring/application/queries/fleet-monitoring.service.ts`
-- Modify: `src/modules/reports/application/queries/report-query.service.ts`
-- Modify: `src/app/api/reports/period/route.ts`
-- Modify: `src/components/piling/admin-reports/report-totals.ts`
-- Modify related tests in the same directories.
+- Modify: `src/lib/pile-length.ts` — drop the `planMetersPerUnit` branch; `pileLengthMeters` takes only `{ gradeLengthMm }`.
+- Modify: `src/app/api/reports/period/route.ts` — remove the `SitePilePlan` load + `plans` param from `computePeriodSummary`; compute from `lengthMm` only.
+- Modify: `src/lib/pdf-generator/single-pdf.ts`, `src/lib/pdf-generator/period-pdf.ts` — drop the `metersPerUnit` override; use `lengthMm` only.
+- Modify tests: `src/app/api/reports/period/__tests__/period-summary.test.ts` (remove the plan-override assertions), `src/lib/__tests__/pile-meters-invariant.test.ts` (drop the plan-override case), `src/lib/__tests__/pdf-generator.test.ts` (give fixtures `pileGrade.lengthMm` instead of `metersPerUnit`).
 
-**Interfaces:**
-- Produces: `calculatePileMeters(rows: Array<{ count: number; pileGrade: { lengthMeters: number } | null }>): number`.
+- [ ] **Step 1:** Update the invariant test so period/PDF/report/fleet all read `lengthMm` and agree; no plan override anywhere.
+- [ ] **Step 2: RED** — `npx vitest run src/app/api/reports/period src/lib/__tests__/pile-meters-invariant.test.ts src/lib/__tests__/pdf-generator.test.ts`.
+- [ ] **Step 3:** Simplify resolver + remove plan loading; keep `SitePilePlan` only for planning/count, never length.
+- [ ] **Step 4: GREEN + full gate** — `npm run lint && npm run test:unit`.
+- [ ] **Step 5:** Note for deploy — this **changes displayed period/PDF м.п.** for sites whose plan differed from the grade length (3 grades in current data, incl. the bogus 123 m). Communicate before deploying.
 
-- [ ] **Step 1: Write failing invariant tests**
-
-Assert a grade name can change without changing meters; missing/non-positive length produces explicit data error rather than `0`; dashboard/report/fleet totals match for the same fixture.
-
-- [ ] **Step 2: Verify RED**
-
-Run related report/fleet tests; expected FAIL because current code parses names.
-
-- [ ] **Step 3: Implement shared calculation and select lengthMeters**
-
-Replace every regex/name fallback in production KPI paths with structured length. Keep a migration-only parser outside runtime code.
-
-- [ ] **Step 4: Verify GREEN and commit**
-
-```bash
-npx vitest run src/lib/__tests__/pile-length.test.ts src/modules/monitoring src/modules/reports src/app/api/reports/period src/components/piling/admin-reports
-git add src/lib/pile-length.ts src/modules/monitoring src/modules/reports src/app/api/reports/period src/components/piling/admin-reports
-git commit -m "fix(analytics): calculate pile meters from structured length"
-```
+> Note: the 3 bad `SitePilePlan.metersPerUnit` rows (123 vs 12, 12 vs 11, 15 vs 10) become irrelevant to KPI once length stops reading the plan, but should still be cleaned for planning accuracy.
 
 ### Task 8: Dictionary registry UI
 

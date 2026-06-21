@@ -23,7 +23,7 @@ interface EquipmentRow {
   pileMeters: number;
   drillingCount: number;
   drillingMeters: number;
-  downtimeMinutes: number;
+  downtimeHours: number;
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
   nextMaintenanceDate: Date | null;
@@ -32,7 +32,7 @@ interface EquipmentRow {
 interface ParetoRow {
   reasonId: string;
   reasonName: string;
-  minutes: number;
+  hours: number;
 }
 
 export interface EquipmentAnalyticsParams {
@@ -99,7 +99,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       COALESCE(p.total_pile_meters, 0)::float AS "pileMeters",
       COALESCE(d.total_count, 0)::int        AS "drillingCount",
       COALESCE(d.total_meters, 0)::float     AS "drillingMeters",
-      COALESCE(dt.total_duration, 0)::float  AS "downtimeMinutes"
+      COALESCE(dt.total_duration, 0)::float  AS "downtimeHours"
     FROM "Equipment" e
     LEFT JOIN (
       SELECT rep."equipmentId", COUNT(*)::int AS report_count, COUNT(DISTINCT rep.date)::int AS active_days
@@ -109,18 +109,10 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       SELECT
         rep."equipmentId",
         SUM(pw.count)::int AS total_piles,
-        SUM(
-          pw.count * COALESCE(
-            NULLIF(spp."metersPerUnit", 0),
-            substring(pg.name from '[0-9]{3}')::float / 10,
-            0
-          )
-        )::float AS total_pile_meters
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
       FROM rep
       JOIN "PileWork" pw ON pw."reportId" = rep.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      LEFT JOIN "SitePilePlan" spp
-        ON spp."siteId" = rep."siteId" AND spp."pileGradeId" = pw."pileGradeId"
       GROUP BY rep."equipmentId"
     ) p ON p."equipmentId" = e.id
     LEFT JOIN (
@@ -148,12 +140,12 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
-    SELECT rd."reasonId" AS "reasonId", dr.name AS "reasonName", SUM(rd.duration)::float AS "minutes"
+    SELECT rd."reasonId" AS "reasonId", dr.name AS "reasonName", SUM(rd.duration)::float AS "hours"
     FROM rep
     JOIN "ReportDowntime" rd ON rd."reportId" = rep.id
     JOIN "DowntimeReason" dr ON dr.id = rd."reasonId"
     GROUP BY rd."reasonId", dr.name
-    ORDER BY "minutes" DESC
+    ORDER BY "hours" DESC
   `;
 
   // Fuel from telematics cumulative counter (max − min per rig over the range).
@@ -188,7 +180,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       pileMeters: round1(row.pileMeters),
       drillingCount: row.drillingCount,
       drillingMeters: round1(row.drillingMeters),
-      downtimeMinutes: round1(row.downtimeMinutes),
+      downtimeHours: round1(row.downtimeHours),
       fuelLiters: round1(fuelByEquipment.get(row.equipmentId) ?? 0),
       engineHoursTotal: row.engineHoursTotal,
       nextMaintenanceAtHours: row.nextMaintenanceAtHours,
@@ -206,17 +198,17 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     pileMeters: round1(equipment.reduce((s, e) => s + e.pileMeters, 0)),
     drillingCount: equipment.reduce((s, e) => s + e.drillingCount, 0),
     drillingMeters: round1(equipment.reduce((s, e) => s + e.drillingMeters, 0)),
-    downtimeMinutes: round1(equipment.reduce((s, e) => s + e.downtimeMinutes, 0)),
+    downtimeHours: round1(equipment.reduce((s, e) => s + e.downtimeHours, 0)),
     fuelLiters: round1(equipment.reduce((s, e) => s + e.fuelLiters, 0)),
     maintenanceDueCount: equipment.filter((e) => e.maintenanceDue).length,
   };
 
-  const totalDowntime = pareto.reduce((s, r) => s + r.minutes, 0);
+  const totalDowntime = pareto.reduce((s, r) => s + r.hours, 0);
   const downtimePareto = pareto.map((r) => ({
     reasonId: r.reasonId,
     reasonName: r.reasonName,
-    minutes: round1(r.minutes),
-    pct: totalDowntime > 0 ? Math.round((r.minutes / totalDowntime) * 100) : 0,
+    hours: round1(r.hours),
+    pct: totalDowntime > 0 ? Math.round((r.hours / totalDowntime) * 100) : 0,
   }));
 
   return { dateFrom, dateTo, periodDays, fleet, equipment, downtimePareto };

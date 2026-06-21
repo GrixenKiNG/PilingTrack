@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
+import { lengthMmFromGradeName } from '@/lib/pile-length';
 
 export type DictType = 'pileGrade' | 'drillingType' | 'downtimeReason';
 export type DictFilter = 'active' | 'archived' | 'all';
@@ -38,7 +39,11 @@ export async function createDictionaryItem(type: string, name: string) {
   }
 
   if (type === 'pileGrade') {
-    return db.pileGrade.create({ data: { name: name.trim() } });
+    const trimmed = name.trim();
+    // Seed the stored length from the name once (e.g. "С300" -> 30000 mm);
+    // admins can correct it afterwards via setPileGradeLength. null when the
+    // name has no parseable length — never a silently-wrong default.
+    return db.pileGrade.create({ data: { name: trimmed, lengthMm: lengthMmFromGradeName(trimmed) } });
   }
 
   if (type === 'drillingType') {
@@ -122,6 +127,16 @@ async function setActive(type: DictType, id: string, isActive: boolean) {
 
 export function archiveDictionaryItem(type: DictType, id: string) { return setActive(type, id, false); }
 export function restoreDictionaryItem(type: DictType, id: string) { return setActive(type, id, true); }
+
+/** Set the stored pile length (mm) for a grade. null = unknown. */
+export async function setPileGradeLength(id: string, lengthMm: number | null) {
+  if (lengthMm !== null && (!Number.isInteger(lengthMm) || lengthMm < 0)) {
+    throw new ServiceError('Длина должна быть неотрицательным целым числом (мм)', 400);
+  }
+  const item = await db.pileGrade.findUnique({ where: { id } });
+  if (!item) throw new ServiceError('Элемент не найден', 404);
+  return db.pileGrade.update({ where: { id }, data: { lengthMm } });
+}
 
 export async function renameDictionaryItem(type: DictType, id: string, name: string) {
   const trimmed = name?.trim();

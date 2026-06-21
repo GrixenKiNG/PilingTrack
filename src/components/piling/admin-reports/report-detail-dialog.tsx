@@ -11,6 +11,7 @@ import {
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import type { ReportDTO } from '@/lib/types';
 import { pluralizeRu } from '@/lib/format';
+import { pileLengthMeters } from '@/lib/pile-length';
 
 interface ReportDetailDialogProps {
   report: ReportDTO | null;
@@ -22,11 +23,6 @@ interface ReportDetailDialogProps {
 
 function formatRecordCount(count: number) {
   return `${count} ${pluralizeRu(count, ['запись', 'записи', 'записей'])}`;
-}
-
-function getPileLengthMeters(pileGradeName: string) {
-  const match = pileGradeName.match(/\d{3}/);
-  return match ? Number(match[0]) / 10 : 0;
 }
 
 export function ReportDetailDialog({
@@ -77,14 +73,14 @@ export function ReportDetailDialog({
                           <span>{p.pileGrade?.name || '—'}</span>
                           {p.pileGrade?.name && (
                             <p className="text-3xs text-slate-500">
-                              {getPileLengthMeters(p.pileGrade.name).toFixed(1)} м × {p.count} шт. = {(getPileLengthMeters(p.pileGrade.name) * p.count).toFixed(1)} м.п.
+                              {pileLengthMeters({ gradeLengthMm: p.pileGrade.lengthMm }).toFixed(1)} м × {p.count} шт. = {(pileLengthMeters({ gradeLengthMm: p.pileGrade.lengthMm }) * p.count).toFixed(1)} м.п.
                             </p>
                           )}
                         </div>
                         <span className="text-right font-mono font-semibold">
                           <span className="block">{p.count} шт.</span>
                           <span className="block text-xs text-slate-500">
-                            {p.pileGrade?.name ? (getPileLengthMeters(p.pileGrade.name) * p.count).toFixed(1) : '0.0'} м.п.
+                            {(pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }) * p.count).toFixed(1)} м.п.
                           </span>
                         </span>
                       </div>

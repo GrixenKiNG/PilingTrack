@@ -1107,6 +1107,10 @@ model PileGrade {
   id        String  @id @default(cuid())
   name      String
   isActive  Boolean @default(true)
+  // Pile length in millimetres. Single source of truth for м.п. KPI — replaces
+  // parsing the length out of `name`. null = unknown (counts as 0 m), matching
+  // the old behaviour for names with no parseable length.
+  lengthMm  Int?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
