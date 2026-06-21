@@ -110,3 +110,6 @@ scripts/prod-dump.sql.gz
 
 # Brainstorming visual-companion mockups (local only)
 .superpowers/
+
+# Isolated feature worktrees
+.worktrees/
