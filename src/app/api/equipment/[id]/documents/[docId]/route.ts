@@ -28,9 +28,11 @@ export const PUT = withMutation(
   async (request: NextRequest, { params }: { params: Promise<{ id: string; docId: string }> }) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
 
     const { id, docId } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
@@ -56,9 +58,11 @@ export const DELETE = withMutation(
   async (request: NextRequest, { params }: { params: Promise<{ id: string; docId: string }> }) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
 
     const { id, docId } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     try {
       await deleteEquipmentDocument(id, docId, { tenantId });

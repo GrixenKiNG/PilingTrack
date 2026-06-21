@@ -17,6 +17,7 @@ export const GET = withApi(
     if (error) return error;
 
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const site = await getSiteWithHierarchy(user!, id);
     if (!site) throw new ServiceError('Site not found', 404);
     return NextResponse.json({ site });
@@ -29,6 +30,7 @@ export const PUT = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage');
     const { id } = await params;
     const body = await request.json();
@@ -52,6 +54,7 @@ export const PUT = withMutation(
         plannedDrilling: validated.data.plannedDrilling,
         pilePlans: validated.data.pilePlans,
         drillingPlans: validated.data.drillingPlans,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         actorId: user!.id,
       });
     } else {
@@ -61,6 +64,7 @@ export const PUT = withMutation(
         name: validated.data.name,
         plannedPiles: validated.data.plannedPiles,
         plannedDrilling: validated.data.plannedDrilling,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         userId: user!.id,
       });
     }
@@ -76,8 +80,10 @@ export const DELETE = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage');
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await deactivateSite(id, user!.id);
     await invalidateSites();
     return NextResponse.json({ ok: true, siteId: id });

@@ -20,12 +20,14 @@ export const DELETE = withMutation(
     if (media.isDeleted) return NextResponse.json({ ok: true });
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCanAccessMedia(user!, media);
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await getMediaService().softDelete(id, user!.id);
     return NextResponse.json({ ok: true });
   },

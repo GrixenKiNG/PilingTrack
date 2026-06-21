@@ -142,6 +142,7 @@ describe('WebSocket Authentication', () => {
       const result = await authenticateWS(req);
 
       expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(result!.userId).toBe('user-2');
       expect(mocks.verifySessionToken).toHaveBeenCalledWith('my-api-token');
     });

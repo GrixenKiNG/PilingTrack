@@ -131,7 +131,9 @@ describe('validateCsrfToken — rejection cases', () => {
       makeRequest({ headerToken: 'abc' }),
     );
     expect(result).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(result!.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await result!.json();
     expect(body.error).toMatch(/cookie/i);
   });
@@ -141,7 +143,9 @@ describe('validateCsrfToken — rejection cases', () => {
       makeRequest({ cookieToken: 'abc' }),
     );
     expect(result).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(result!.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await result!.json();
     expect(body.error).toMatch(/header/i);
   });
@@ -154,7 +158,9 @@ describe('validateCsrfToken — rejection cases', () => {
       }),
     );
     expect(result).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(result!.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await result!.json();
     expect(body.error).toMatch(/mismatch/i);
   });

@@ -212,8 +212,11 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
     return <EmptyState message="Данные ТО не заполнены. Откройте «Редактировать» и укажите наработку и следующее ТО." />;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const remainingHours = hasHours ? nextHours! - hoursTotal! : null;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const hoursPct = hasHours && nextHours! > 0 ? Math.min(100, Math.max(0, (hoursTotal! / nextHours!) * 100)) : 0;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const daysLeft = hasDate ? Math.round((new Date(nextDateStr!).getTime() - Date.now()) / 86_400_000) : null;
 
   const hoursStatus = remainingHours == null ? 'ok' : remainingHours <= 0 ? 'alarm' : remainingHours <= 50 ? 'warn' : 'ok';
@@ -229,10 +232,10 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
             <span className="text-slate-600">Моточасы до ТО</span>
             <span className={cn('font-mono text-xs', txtColor(hoursStatus))}>
-              {remainingHours! > 0
-                ? `осталось ${formatFixed(remainingHours!, 0)} ч`
-                : `просрочено на ${formatFixed(-remainingHours!, 0)} ч`}
-              <span className="text-slate-400"> · {formatFixed(hoursTotal!, 0)} / {formatFixed(nextHours!, 0)} ч</span>
+              {(remainingHours ?? 0) > 0
+                ? `осталось ${formatFixed(remainingHours ?? 0, 0)} ч`
+                : `просрочено на ${formatFixed(-(remainingHours ?? 0), 0)} ч`}
+              <span className="text-slate-400"> · {formatFixed(hoursTotal ?? 0, 0)} / {formatFixed(nextHours ?? 0, 0)} ч</span>
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded bg-slate-100">
@@ -245,7 +248,7 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span className="text-slate-600">Следующее ТО по дате</span>
           <span className={cn('font-mono text-xs', txtColor(dateStatus))}>
-            {formatRuDate(nextDateStr!.slice(0, 10))}
+            {formatRuDate((nextDateStr ?? '').slice(0, 10))}
             {daysLeft != null && (
               <span> · {daysLeft < 0 ? `просрочено на ${-daysLeft} дн` : daysLeft === 0 ? 'сегодня' : `через ${daysLeft} дн`}</span>
             )}

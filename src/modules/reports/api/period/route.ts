@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.read_all');
     const dateFrom = request.nextUrl.searchParams.get('dateFrom');
     const dateTo = request.nextUrl.searchParams.get('dateTo');

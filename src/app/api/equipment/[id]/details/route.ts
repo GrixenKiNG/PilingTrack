@@ -24,9 +24,11 @@ export const GET = withApi(
     // The detail page is admin/dispatcher tooling — gate behind the
     // same permission as equipment.manage so operators can't browse
     // tech specs of rigs they're not on.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
 
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const details = await getEquipmentDetails(id, tenantId);
     return NextResponse.json(details);

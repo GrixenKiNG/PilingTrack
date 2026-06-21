@@ -40,10 +40,12 @@ export function on(eventType: string, handler: EventHandler) {
   if (!handlers.has(normalizedEventType)) {
     handlers.set(normalizedEventType, new Set());
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   handlers.get(normalizedEventType)!.add(handler);
   if (shouldLogHandlerRegistration()) {
     logger.debug('Event handler registered', {
       eventType: normalizedEventType,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       totalHandlers: handlers.get(normalizedEventType)!.size,
     });
   }

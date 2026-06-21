@@ -23,8 +23,10 @@ export const GET = withApi(
     if (error) return error;
 
     const operatorUserId =
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       user!.role === 'OPERATOR' || user!.role === 'ASSISTANT' ? user!.id : null;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });

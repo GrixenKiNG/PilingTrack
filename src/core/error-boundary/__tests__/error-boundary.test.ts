@@ -116,6 +116,7 @@ describe('Bulkhead', () => {
     await expect(bulkhead.execute(async () => 'third')).rejects.toThrow();
 
     // Clean up
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     resolveFirst!('first');
     await firstPromise;
     await secondPromise;
@@ -157,6 +158,7 @@ describe('Bulkhead', () => {
     const secondPromise = bulkhead.execute(async () => 'queued-result');
 
     // Release the first request
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     resolveFirst!('first');
     await firstPromise;
 

@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
         title: 'Отчёт не сохранён',
         message: 'Проверка данных отчёта завершилась ошибкой валидации.',
         audience: 'OPERATIONS',
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         actor: { id: user!.id, name: user!.name, role: user!.role },
         requestId,
         metadata: {
@@ -65,14 +66,17 @@ export async function POST(request: NextRequest) {
     }
 
     const validatedDto = validation.data;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const requestedUserId = validatedDto.userId ?? user!.id;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCanActForUser(user!, requestedUserId);
 
     const result = await upsertReport(
       {
         reportId: validatedDto.reportId || validatedDto.id || crypto.randomUUID(),
         siteId: validatedDto.siteId,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         userId: resolveReportUserId(user!, requestedUserId),
         date: validatedDto.date,
         shiftType: validatedDto.shiftType,
@@ -83,6 +87,7 @@ export async function POST(request: NextRequest) {
         drillings: validatedDto.drillings,
         downtimes: validatedDto.downtimes,
       },
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       { enforceEditWindow: true, actor: user! }
     );
 
@@ -96,6 +101,7 @@ export async function POST(request: NextRequest) {
           ? 'Производственный отчёт был успешно обновлён.'
           : 'Новый производственный отчёт был успешно сохранён.',
       audience: 'OPERATIONS',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       actor: { id: user!.id, name: user!.name, role: user!.role },
       targetId: result.report.reportId,
       requestId,
@@ -115,6 +121,7 @@ export async function POST(request: NextRequest) {
         title: 'Ошибка сохранения отчёта',
         message: caughtError.message,
         audience: 'OPERATIONS',
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         actor: { id: user!.id, name: user!.name, role: user!.role },
         requestId,
       });
@@ -133,6 +140,7 @@ export async function POST(request: NextRequest) {
       title: 'Внутренняя ошибка сохранения отчёта',
       message,
       audience: 'OPERATIONS',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       actor: { id: user!.id, name: user!.name, role: user!.role },
       requestId,
     });

@@ -27,6 +27,7 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
 
   // Admin-only — health status reveals infrastructure details
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'system.read');
 
   const searchParams = request.nextUrl.searchParams;

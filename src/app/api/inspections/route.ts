@@ -29,8 +29,11 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const operatorUserId = user!.role === 'OPERATOR' ? user!.id : null;
     const equipmentId = request.nextUrl.searchParams.get('equipmentId') ?? undefined;
     const level = request.nextUrl.searchParams.get('level') ?? undefined;
@@ -44,7 +47,9 @@ export const POST = withMutation(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const body = await request.json();
@@ -59,7 +64,9 @@ export const POST = withMutation(
     }
     try {
       const inspection = isBlockStart
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         ? await startToInspection(parsed.data as z.infer<typeof blockStartSchema>, { tenantId, userId: user!.id })
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         : await startInspection(parsed.data as z.infer<typeof legacyStartSchema>, { tenantId, userId: user!.id });
       return NextResponse.json({ inspection }, { status: 201 });
     } catch (err) {

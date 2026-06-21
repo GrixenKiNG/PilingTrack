@@ -15,6 +15,7 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.read_all');
     const siteId = request.nextUrl.searchParams.get('siteId');
     const userId = request.nextUrl.searchParams.get('userId');
@@ -22,6 +23,7 @@ export const GET = withApi(
     const limitParam = Number(request.nextUrl.searchParams.get('limit') || 25);
     const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 100) : 25;
     const { listReportsForReview } = await getReportsModule();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const paginated = await listReportsForReview(user!, siteId, { cursor, limit }, userId);
     return NextResponse.json({ reports: paginated.data, hasMore: paginated.hasMore, nextCursor: paginated.nextCursor });
   },

@@ -13,6 +13,7 @@ export const GET = withApi(
     if (error) return error;
 
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const equipment = await getEquipmentByIdOrThrow(id, tenantId);
     return NextResponse.json({ equipment });
@@ -25,8 +26,10 @@ export const PUT = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const body = await request.json();
 
@@ -44,6 +47,7 @@ export const PUT = withMutation(
       model: validation.data.model,
       qty: validation.data.qty,
       description: validation.data.description,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
       tenantId,
     });
@@ -61,8 +65,10 @@ export const DELETE = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const result = await deleteEquipment(id, tenantId);
     return NextResponse.json(result);

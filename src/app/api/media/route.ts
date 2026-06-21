@@ -27,18 +27,21 @@ export const POST = withMutation(async (request: NextRequest) => {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await assertCanAccessMediaEntity(user!, body.entityType, body.entityId);
   } catch (err) {
     if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
   const result = await getMediaService().getPresignedUrl({
     fileName: body.fileName,
     contentType: body.contentType,
     fileSize: body.fileSize,
     tenantId,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     userId: user!.id,
     entityType: body.entityType,
     entityId: body.entityId,
@@ -61,12 +64,14 @@ export const GET = withApi(async (request: NextRequest) => {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await assertCanAccessMediaEntity(user!, entityType, entityId);
   } catch (err) {
     if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
   const media = await getMediaService().listByEntity(entityType, entityId, tenantId);
 

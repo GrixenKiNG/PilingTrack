@@ -78,6 +78,7 @@ export const POST = withApi(async (request: NextRequest) => {
 
   try {
     // Only ADMIN, DISPATCHER, and OPERATOR can submit telemetry
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     if (!['ADMIN', 'DISPATCHER', 'OPERATOR'].includes(user!.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

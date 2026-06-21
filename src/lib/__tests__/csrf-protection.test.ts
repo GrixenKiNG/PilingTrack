@@ -76,6 +76,7 @@ describe('withCsrf — gating', () => {
     // CSRF entirely. This test catches that.
     const res = withCsrf(makeRequest({ path: '/api/reports/upsert', method: 'POST' }));
     expect(res).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(res!.status).toBe(403);
   });
 
@@ -113,6 +114,7 @@ describe('withCsrf — Sec-Fetch-Site', () => {
       }),
     );
     expect(res?.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/sec-fetch-site/i);
   });
@@ -147,6 +149,7 @@ describe('withCsrf — Origin', () => {
       makeRequest({ origin: 'https://evil.example', host: 'app.orionpiling.ru' }),
     );
     expect(res?.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/origin mismatch/i);
   });
@@ -154,6 +157,7 @@ describe('withCsrf — Origin', () => {
   it('rejects an unparseable Origin', async () => {
     const res = withCsrf(makeRequest({ origin: 'not-a-url' }));
     expect(res?.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/invalid origin/i);
   });
@@ -179,6 +183,7 @@ describe('withCsrf — Referer fallback', () => {
       makeRequest({ referer: 'https://evil.example/page', host: 'app.orionpiling.ru' }),
     );
     expect(res?.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/referer mismatch/i);
   });
@@ -204,6 +209,7 @@ describe('withCsrf — no headers at all', () => {
     // Likely curl / a bot / a forged request from a non-browser context.
     const res = withCsrf(makeRequest({ method: 'POST' }));
     expect(res?.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/missing origin/i);
   });

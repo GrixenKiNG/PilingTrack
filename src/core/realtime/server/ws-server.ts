@@ -128,6 +128,7 @@ export async function startWSServer(): Promise<ServerHandle> {
             const channel = msg.channel as string;
             if (canSubscribe({
               userId: auth.userId,
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
               tenantId: auth.tenantId!,
               role: auth.role,
               siteIds: auth.siteIds,

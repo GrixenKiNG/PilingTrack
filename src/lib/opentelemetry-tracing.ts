@@ -111,6 +111,7 @@ export function startSpan(
 
   // Store span
   if (!spanStore.has(traceId)) spanStore.set(traceId, []);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   spanStore.get(traceId)!.push(span);
 
   return {

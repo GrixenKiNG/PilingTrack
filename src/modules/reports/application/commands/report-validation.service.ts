@@ -109,6 +109,7 @@ export function validateReportInput(input: {
   downtimes?: Array<{ reasonId: string; duration: number }>;
 }) {
   validateReportRequiredFields(input);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   validateReportDateNotInFuture(input.date!);
   validatePileEntries(input.piles);
   validateDrillingEntries(input.drillings);

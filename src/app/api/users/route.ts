@@ -17,6 +17,7 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
     const role = request.nextUrl.searchParams.get('role');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
@@ -33,6 +34,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
     const body = await request.json();
 
@@ -59,7 +61,9 @@ export const POST = withMutation(
       ...rest,
       password: password?.trim() || pin?.trim() || '',
       role: rest.role || 'OPERATOR',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       tenantId: user!.tenantId,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     }, user!.id);
     return NextResponse.json({ user: createdUser }, { status: 201 });
   },
@@ -71,6 +75,7 @@ export const PUT = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
     const body = await request.json();
 
@@ -83,6 +88,7 @@ export const PUT = withMutation(
     }
 
     const { updateUser } = await getUsersModule();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const updatedUser = await updateUser(validation.data, user!.id);
     return NextResponse.json({ user: updatedUser });
   },
@@ -94,6 +100,7 @@ export const DELETE = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
     const body = await request.json();
 
@@ -106,6 +113,7 @@ export const DELETE = withMutation(
     }
 
     const { deleteUser } = await getUsersModule();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const result = await deleteUser(user!.id, validation.data.id);
     return NextResponse.json(result);
   },

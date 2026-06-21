@@ -140,6 +140,7 @@ export class Bulkhead {
     if (this.queue.length === 0) return;
     if (this.activeCount >= this.config.maxConcurrency) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
     const next = this.queue.shift()!;
     clearTimeout(next.timeoutId);
 
@@ -186,6 +187,7 @@ export class Bulkhead {
     });
 
     const result = await Promise.race([promise, timeoutPromise]);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
     clearTimeout(timeoutId!);
     return result;
   }
@@ -238,6 +240,7 @@ export function getBulkhead(domain: string): Bulkhead {
     logger.info('Bulkhead created', { domainName: domain, maxConcurrency: config.maxConcurrency, timeoutMs: config.timeoutMs });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   return bulkheads.get(domain)!;
 }
 

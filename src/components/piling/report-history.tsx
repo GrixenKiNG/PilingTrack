@@ -328,6 +328,7 @@ export function ReportHistory() {
                   <div className="text-base font-semibold">Отчёт от {formatDate(selectedReport.date)}</div>
                 </DialogHeader>
                 <button
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
                   onClick={() => handlePreviewFromDetail(selectedReport.reportId!, selectedReport.date)}
                   className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
                 >

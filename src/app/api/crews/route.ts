@@ -18,6 +18,7 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.read');
     const siteId = request.nextUrl.searchParams.get('siteId');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
@@ -34,6 +35,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.manage');
     const body = await request.json();
 
@@ -52,6 +54,7 @@ export const POST = withMutation(
       equipmentId: validation.data.equipmentId,
       siteId: validation.data.siteId,
       assistantNames: validation.data.assistantNames || [],
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
     });
 

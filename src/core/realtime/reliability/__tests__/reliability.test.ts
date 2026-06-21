@@ -90,6 +90,7 @@ describe('MessageTracker', () => {
     const result = tracker.nack(msg.id, 'parse_error');
 
     expect(result).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(result!.retries).toBe(1);
   });
 

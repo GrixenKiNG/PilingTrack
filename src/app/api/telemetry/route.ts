@@ -102,6 +102,7 @@ export const POST = withApi(async (request: NextRequest) => {
   if (error) return error;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const roleCheck = assertAnyRole(user!, ['ADMIN', 'DISPATCHER', 'OPERATOR']);
     if (roleCheck) return roleCheck;
 
@@ -214,6 +215,7 @@ export const GET = withApi(async (request: NextRequest) => {
 
     // Stats endpoint is admin-only — keep behind analytics.read.
     if (action === 'stats') {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCan(user!, 'analytics.read');
       const ingestStats = getIngestStats();
       const samplingConfig = getSamplingConfig();
@@ -232,6 +234,7 @@ export const GET = withApi(async (request: NextRequest) => {
     //   crew-assigned to. We resolve the equipment ids up front and pass
     //   them as an explicit filter — never trust the client to scope itself.
     // - DISPATCHER / ADMIN keep the existing analytics.read gate.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const role = user!.role;
     let allowedEquipmentIds: string[] | null = null;
     if (role === 'OPERATOR' || role === 'ASSISTANT') {
@@ -241,6 +244,7 @@ export const GET = withApi(async (request: NextRequest) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         { limit: 200, getNextCursor: () => null } as any,
         null,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         user!.id
       );
       allowedEquipmentIds = (owned as Array<{ id: string }>).map((e) => e.id);
@@ -248,6 +252,7 @@ export const GET = withApi(async (request: NextRequest) => {
         return NextResponse.json({ records: [] });
       }
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCan(user!, 'analytics.read');
     }
 

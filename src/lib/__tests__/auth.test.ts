@@ -74,6 +74,7 @@ describe('requireAuth', () => {
 
     expect(result.user).toBeNull();
     expect(result.error?.status).toBe(401);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await result.error!.json();
     expect(body).toMatchObject({
       error: 'Session is invalid',

@@ -18,6 +18,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.legacy_manage');
     let body;
     try {
@@ -56,6 +57,7 @@ export const PUT = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.legacy_manage');
     let body;
     try {
@@ -75,6 +77,7 @@ export const PUT = withMutation(
     const { updateCrew } = await getCrewsModule();
     const crew = await withDbProtection(async () =>
       updateCrew({
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guaranteed present by the validation schema checked above
         crewId: validated.data.id!,
         name: validated.data.name,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
@@ -94,6 +97,7 @@ export const DELETE = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.legacy_manage');
     let body;
     try {

@@ -27,6 +27,7 @@ function withUsage<T extends { id: string }>(items: T[], usage: UsageMap) {
 export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
 
   const filterParam = request.nextUrl.searchParams.get('filter');
@@ -47,6 +48,7 @@ export const GET = withApi(async (request: NextRequest) => {
 export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
   const validated = createSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
@@ -57,6 +59,7 @@ export const POST = withMutation(async (request: NextRequest) => {
 export const PATCH = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
   const validated = patchSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
@@ -71,6 +74,7 @@ export const PATCH = withMutation(async (request: NextRequest) => {
 export const DELETE = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
   const validated = deleteSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });

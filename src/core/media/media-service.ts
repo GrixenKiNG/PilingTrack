@@ -271,6 +271,7 @@ export class MediaService {
         await s3CircuitBreaker.execute(async () => {
           const putCommand = new PutObjectCommand({
             Bucket: this.config.bucket,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
             Key: thumbnailKey!,
             Body: thumbBuffer,
             ContentType: 'image/jpeg',
@@ -493,8 +494,11 @@ export function getMediaService(): MediaService {
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
       cdnBaseUrl: process.env.CDN_BASE_URL || undefined,
       maxFileSize: parseInt(process.env.MEDIA_MAX_FILE_SIZE || '10485760', 10),
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       allowedContentTypes: DEFAULT_CONFIG.allowedContentTypes!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       thumbnailWidth: DEFAULT_CONFIG.thumbnailWidth!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       urlExpiresIn: DEFAULT_CONFIG.urlExpiresIn!,
     };
 

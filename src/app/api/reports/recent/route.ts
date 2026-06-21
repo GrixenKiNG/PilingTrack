@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.read_all');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const reports = await listRecentReportsForDashboard(user!);
     return NextResponse.json({ reports });
   } catch (caughtError) {

@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const requestedUserId = request.nextUrl.searchParams.get('userId');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const reports = await listReportsForUserScope(user!, requestedUserId);
     return NextResponse.json({ reports });
   } catch (caughtError) {

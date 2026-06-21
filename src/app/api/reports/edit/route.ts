@@ -20,6 +20,7 @@ export const GET = withApi(
     const date = searchParams.get('date');
 
     const { getEditableReport } = await getReportQueryService();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const report = await getEditableReport(user!, requestedUserId, siteId, date);
     return NextResponse.json({ report: report || null });
   },

@@ -14,7 +14,9 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
@@ -41,6 +43,7 @@ export const POST = withMutation(
         model: validation.data.model,
         qty: validation.data.qty,
         description: validation.data.description,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         userId: user!.id,
         tenantId,
       })
@@ -56,7 +59,9 @@ export const PUT = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
 
     let body;
@@ -74,6 +79,7 @@ export const PUT = withMutation(
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guaranteed present by the validation schema checked above
     const equipmentId = validation.data.id!;
     await withDbProtection(async () =>
       updateEquipment({
@@ -82,6 +88,7 @@ export const PUT = withMutation(
         model: validation.data.model || undefined,
         qty: validation.data.qty,
         description: validation.data.description || undefined,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         userId: user!.id,
         tenantId,
       })
@@ -97,7 +104,9 @@ export const DELETE = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'equipment.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
 
     let body;

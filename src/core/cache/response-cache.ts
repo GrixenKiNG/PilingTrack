@@ -341,6 +341,7 @@ export function getResponseCache(domain: string, config?: Partial<CacheConfig>):
   if (!caches.has(domain)) {
     caches.set(domain, new ResponseCache(config));
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   return caches.get(domain)!;
 }
 

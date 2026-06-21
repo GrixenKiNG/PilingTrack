@@ -81,6 +81,7 @@ describe('listAllMaintenance', () => {
     findManyRecMock.mockResolvedValue([]);
     const { listAllMaintenance } = await import('../equipment-query.service');
     await listAllMaintenance('orion');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const arg = findManyRecMock.mock.calls.at(-1)![0];
     expect(arg.where).toEqual({ tenantId: 'orion' });
   });
@@ -89,6 +90,7 @@ describe('listAllMaintenance', () => {
     findManyRecMock.mockResolvedValue([]);
     const { listAllMaintenance } = await import('../equipment-query.service');
     await listAllMaintenance('orion', { priority: 'HIGH', assigneeId: 'usr_3' });
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const arg = findManyRecMock.mock.calls.at(-1)![0];
     expect(arg.where.priority).toBe('HIGH');
     expect(arg.where.assigneeId).toBe('usr_3');

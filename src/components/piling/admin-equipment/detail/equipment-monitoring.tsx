@@ -271,7 +271,7 @@ function MachineStateBadge({ rec, loading }: { rec: TelemetryRecord | null; load
       ) : state ? (
         <>
           <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium', state.cls)}>{state.label}</span>
-          <span className="text-3xs text-slate-400">{formatRelative(rec!.timestamp)}</span>
+          <span className="text-3xs text-slate-400">{rec && formatRelative(rec.timestamp)}</span>
         </>
       ) : (
         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-sm text-slate-400">Нет данных</span>

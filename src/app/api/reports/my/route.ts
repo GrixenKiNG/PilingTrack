@@ -18,6 +18,7 @@ export const GET = withApi(
     const requestedUserId = request.nextUrl.searchParams.get('userId');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const { listReportsForUserScope } = await getReportsModule();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const reports = await listReportsForUserScope(user!, requestedUserId, pagination);
     const nextCursor = pagination.getNextCursor(reports);
     return NextResponse.json({ data: reports, reports, nextCursor });

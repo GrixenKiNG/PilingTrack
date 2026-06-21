@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const siteId = searchParams.get('siteId');
     const date = searchParams.get('date');
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const report = await getEditableReport(user!, requestedUserId, siteId, date);
     return NextResponse.json({ report: report || null });
   } catch (caughtError) {

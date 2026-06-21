@@ -119,6 +119,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
     ]);
 
     if (command.operatorId && !operator) throw new ServiceError('Operator not found', 404);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
     if (command.operatorId && operator!.role !== 'OPERATOR') throw new ServiceError('User must have OPERATOR role', 400);
     
     // Check if new operator is already assigned to another crew

@@ -298,6 +298,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
 
   // Opportunistic upgrade: ensure stored values use bcrypt + have pinLookup
   // backfilled so the next login takes the O(1) fast path.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const needsBcryptUpgrade = !matchedUser.pin!.startsWith(PIN_HASH_PREFIX);
   const needsLookupBackfill = !matchedUser.pinLookup;
   if (needsBcryptUpgrade || needsLookupBackfill) {

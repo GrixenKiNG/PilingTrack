@@ -131,6 +131,7 @@ export function activeKeyVersion(): string {
  */
 export function encrypt(plaintext: string): string {
   const reg = loadKeyRegistry();
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const key = reg.byVersion.get(reg.active)!;
   const iv = randomBytes(IV_LENGTH);
 

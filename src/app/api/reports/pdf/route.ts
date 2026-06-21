@@ -22,6 +22,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (error) return error;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.read_all');
 
     const body = await request.json();
@@ -48,6 +49,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       dateTo,
       siteId: siteId || '',
       type: 'period',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
       reports: pdfData.reports,
       totalPiles: pdfData.totalPiles,
@@ -118,11 +120,13 @@ export const GET = withApi(async (request: NextRequest) => {
 
   // --- Auto-sync if dateFrom/dateTo are provided ---
   if (dateFrom && dateTo) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     return handleSyncGeneration(request, user!);
   }
 
   // --- Explicit sync mode ---
   if (sync === '1') {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     return handleSyncGeneration(request, user!);
   }
 

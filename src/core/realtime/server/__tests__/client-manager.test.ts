@@ -296,6 +296,7 @@ describe('ClientManager', () => {
       manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
 
       const client = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       const before = client!.lastPingAt;
 
       // Small delay to ensure different timestamp
@@ -305,7 +306,9 @@ describe('ClientManager', () => {
       manager.recordPong(ws);
 
       const updated = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(updated!.lastPingAt).toBe(later);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(updated!.lastPingAt).toBeGreaterThan(before);
 
       vi.restoreAllMocks();
