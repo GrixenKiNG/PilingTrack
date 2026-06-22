@@ -8,6 +8,7 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import { ServiceError } from '@/lib/service-error';
 import { ReportAggregate } from '../domain';
 import { fromPrismaToState } from './report.prisma.mapper';
 
@@ -19,6 +20,13 @@ import { fromPrismaToState } from './report.prisma.mapper';
 export interface SaveHooks {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
   onBeforeCommit?: (tx: any) => Promise<void>;
+  /**
+   * Optimistic-concurrency check. When set, the save reads the stored row's
+   * version INSIDE the transaction and throws 409 if it differs — catching
+   * the case where two clients both loaded the same version and raced to
+   * save (last-write-wins would silently drop one edit). Undefined → skip.
+   */
+  expectedVersion?: number;
 }
 
 /**
@@ -79,7 +87,7 @@ export class PrismaReportRepository implements ReportRepository {
       // a retry to the UPDATE path instead of crashing.
       let existing = await tx.report.findUnique({
         where: { reportId: state.reportId },
-        select: { id: true },
+        select: { id: true, version: true },
       });
 
       if (!existing) {
@@ -91,8 +99,23 @@ export class PrismaReportRepository implements ReportRepository {
               date: state.date,
             },
           },
-          select: { id: true },
+          select: { id: true, version: true },
         });
+      }
+
+      // Optimistic-concurrency guard (race-free: the version is read in the
+      // same tx that writes). If the caller passed the version it edited and
+      // the stored row has moved on, abort so the loser can reload instead of
+      // silently overwriting the winner's edit.
+      if (
+        hooks?.expectedVersion !== undefined &&
+        existing &&
+        existing.version !== hooks.expectedVersion
+      ) {
+        throw new ServiceError(
+          'Отчёт был изменён другим пользователем. Обновите страницу и сохраните заново.',
+          409
+        );
       }
 
       if (existing) {
@@ -210,10 +233,8 @@ export class PrismaReportRepository implements ReportRepository {
       // === REPORT VERSION SNAPSHOT ===
       // Create an immutable snapshot of the full report state.
       // Used for audit, rollback, and conflict resolution.
-      const existingVersion = existing
-        ? await tx.report.findUnique({ where: { reportId: state.reportId }, select: { version: true } })
-        : null;
-      const newVersion = (existingVersion?.version || 0) + 1;
+      // Reuse the version already read above (same tx) — no extra round-trip.
+      const newVersion = (existing?.version || 0) + 1;
 
       // Update report version (if existing)
       if (existing) {

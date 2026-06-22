@@ -59,6 +59,7 @@ export interface UseReportFormReturn {
 
 interface LoadedReportRow {
   reportId?: string;
+  version?: number;
   shiftStart?: string;
   shiftEnd?: string;
   equipmentId?: string;
@@ -97,6 +98,10 @@ export function useReportForm(): UseReportFormReturn {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Version of the loaded report, sent back on submit so the server can reject
+  // a stale edit (409) instead of silently overwriting a concurrent save.
+  // undefined when creating a brand-new report (no row to conflict with).
+  const [baseVersion, setBaseVersion] = useState<number | undefined>(undefined);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [showDowntime, setShowDowntime] = useState(false);
@@ -158,6 +163,7 @@ export function useReportForm(): UseReportFormReturn {
             if (data.report) {
               const r = data.report as LoadedReportRow;
               setReportId(r.reportId || '');
+              setBaseVersion(typeof r.version === 'number' ? r.version : undefined);
               if (r.shiftStart) setShiftStart(r.shiftStart);
               if (r.shiftEnd) setShiftEnd(r.shiftEnd);
               if (r.equipmentId) setSelectedEquipmentId(r.equipmentId);
@@ -298,6 +304,7 @@ export function useReportForm(): UseReportFormReturn {
     try {
       const payload: CreateReportPayload = {
         reportId: finalReportId, userId: user.id, siteId: selectedSiteId, date, shiftStart, shiftEnd,
+        version: baseVersion,
         equipmentId: selectedEquipmentId || undefined,
         piles: piles.map((p) => ({ picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
         drillings: drillings.map((d) => ({ picketId: d.picketId || undefined, typeId: d.typeId, count: d.count, metersPerUnit: d.metersPerUnit, meters: d.meters })),
@@ -305,6 +312,14 @@ export function useReportForm(): UseReportFormReturn {
       };
       const res = await authFetch('/api/reports/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json().catch(() => null);
+      if (res.status === 409) {
+        // Someone saved this report after we loaded it. Don't overwrite their
+        // edit — tell the operator and reload so they see the current data.
+        toast.error(result?.error || 'Отчёт был изменён другим пользователем. Данные обновлены.');
+        hapticError();
+        loadData();
+        return;
+      }
       if (!res.ok) throw new Error(result?.error || 'Ошибка отправки отчёта');
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });

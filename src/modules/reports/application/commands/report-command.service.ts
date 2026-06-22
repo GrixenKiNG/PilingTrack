@@ -203,6 +203,7 @@ export async function upsertReport(
     onBeforeCommit: async (tx) => {
       await writeReportAuditRow(auditRecord, tx);
     },
+    expectedVersion: input.expectedVersion,
   });
 
   // Phase 5.5: Post-commit audit side effects (structured logger + feedback

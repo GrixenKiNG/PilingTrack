@@ -172,6 +172,8 @@ export interface CreateReportPayload {
   reportId: string;
   userId: string;
   siteId: string;
+  /** Version the client loaded; sent back for optimistic-concurrency (409 on conflict). */
+  version?: number;
   date: string; // YYYY-MM-DD
   shiftStart?: string;
   shiftEnd?: string;
@@ -204,6 +206,8 @@ export interface ReportDTO {
   shiftStart: string | null;
   shiftEnd: string | null;
   status: ReportStatus;
+  /** Optimistic-concurrency token round-tripped to upsert; absent on legacy rows. */
+  version?: number;
   lastEditedById: string | null;
   lastEditedByName: string | null;
   lastEditedByRole: string | null;

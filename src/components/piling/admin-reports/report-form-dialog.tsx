@@ -167,6 +167,9 @@ export function ReportFormDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reportId, userId: formUserId, siteId: formSiteId, date: formDate,
+          // Optimistic-concurrency token: reject (409) if the report advanced
+          // since it was loaded into the dialog. Undefined when creating new.
+          version: editReport?.version,
           shiftStart: formShiftStart, shiftEnd: formShiftEnd,
           equipmentId: formEquipmentId || undefined,
           piles: formPiles.map((p) => ({ pileGradeId: p.pileGradeId, count: p.count })),

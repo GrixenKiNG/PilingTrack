@@ -214,6 +214,11 @@ export const reportUpsertSchema = z.object({
   shiftStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   shiftEnd: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   status: z.enum(['draft', 'submitted']).default('draft'),
+  // Optimistic-concurrency token: the report version the client based its
+  // edit on. When present, the save fails with 409 if the stored row has
+  // advanced (someone else saved meanwhile). Absent → no check (offline /
+  // legacy clients keep last-write-wins, no false conflicts).
+  version: z.number().int().nonnegative().optional(),
   piles: z.array(z.object({
     pileGradeId: internalIdSchema,
     count: z.number().int().min(1, 'Count must be at least 1'),

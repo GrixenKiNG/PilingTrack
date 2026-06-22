@@ -38,6 +38,7 @@ export const POST = withMutation(
         siteId: dto.siteId,
         userId: dto.userId,
         tenantId,
+        expectedVersion: validated.data.version,
         date: dto.date,
         shiftType: dto.shiftType,
         shiftStart: dto.shiftStart,

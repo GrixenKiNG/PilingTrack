@@ -5,7 +5,9 @@
  * - domain/   : Aggregates, value objects, domain events
  * - application/ : Commands, queries, services, event handlers, projections
  * - infrastructure/ : Repositories, Prisma mappers
- * - api/ : Next.js route handlers
+ *
+ * HTTP route handlers live under src/app/api/reports/** and import from this
+ * barrel — there is intentionally no api/ folder here.
  */
 
 // Domain

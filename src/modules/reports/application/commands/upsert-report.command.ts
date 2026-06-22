@@ -7,6 +7,12 @@ export interface UpsertReportCommand {
   siteId: string;
   userId: string;
   tenantId?: string;
+  /**
+   * Optimistic-concurrency token: the version the client loaded and edited.
+   * When set, the repository rejects the save with 409 if the stored row has
+   * since advanced. Undefined → no check (last-write-wins, offline-safe).
+   */
+  expectedVersion?: number;
   date: string;
   shiftType?: 'DAY' | 'NIGHT';
   shiftStart?: string | null;
