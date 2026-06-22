@@ -49,6 +49,12 @@ interface ReportState {
   userId: string;
   siteId: string;
   tenantId?: string;
+  /**
+   * Crew the operator belonged to when the report was created. Frozen at
+   * creation (point-in-time provenance) — crew reassignments do not rewrite
+   * historical reports. Null when the operator had no crew at the time.
+   */
+  crewId?: string | null;
   date: string;
   shiftType: ShiftType;
   shiftStart?: string | null;
@@ -95,6 +101,7 @@ export class ReportAggregate {
     userId: string;
     siteId: string;
     tenantId?: string;
+    crewId?: string | null;
     date: string;
     shiftType?: ShiftType;
     shiftStart?: string | null;
@@ -108,6 +115,7 @@ export class ReportAggregate {
       userId: params.userId,
       siteId: params.siteId,
       tenantId: params.tenantId,
+      crewId: params.crewId,
       date: params.date,
       shiftType: params.shiftType || 'DAY',
       shiftStart: params.shiftStart,
@@ -309,6 +317,7 @@ export class ReportAggregate {
       userId: this.state.userId,
       siteId: this.state.siteId,
       tenantId: this.state.tenantId,
+      crewId: this.state.crewId,
       date: this.state.date,
       shiftType: this.state.shiftType,
       shiftStart: this.state.shiftStart,

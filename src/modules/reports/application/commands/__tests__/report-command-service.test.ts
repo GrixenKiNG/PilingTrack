@@ -53,6 +53,10 @@ const mockDb = {
     findUnique: vi.fn().mockResolvedValue(mockReport),
     findMany: vi.fn().mockResolvedValue([]),
   },
+  crew: {
+    // Operator's crew is resolved on the report CREATE path to freeze crewId.
+    findUnique: vi.fn().mockResolvedValue(null),
+  },
   sitePilePlan: {
     findMany: vi.fn().mockResolvedValue([]),
   },

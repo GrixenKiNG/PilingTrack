@@ -142,11 +142,21 @@ export async function upsertReport(
       downtimes: [],
     });
   } else {
+    // Provenance: freeze the operator's crew onto the report at creation time.
+    // Crew.operatorId is @unique, so an operator maps to at most one crew; the
+    // link is point-in-time and is not rewritten when the report is later
+    // edited or the crew is reassigned. Null when the operator has no crew.
+    const operatorCrew = await db.crew.findUnique({
+      where: { operatorId: input.userId },
+      select: { id: true },
+    });
+
     aggregate = ReportAggregate.create({
       reportId: input.reportId,
       userId: input.userId,
       siteId: input.siteId,
       tenantId: input.tenantId,
+      crewId: operatorCrew?.id ?? null,
       date: input.date,
       shiftType: input.shiftType,
       shiftStart: input.shiftStart,
