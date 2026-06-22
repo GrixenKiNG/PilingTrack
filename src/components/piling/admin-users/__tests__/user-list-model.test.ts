@@ -24,6 +24,7 @@ function user(
       siteName: 'ВСМЖ',
     },
     reportCount: 1,
+    canHardDelete: false,
     lastReportAt: '2026-06-20T00:00:00.000Z',
     lastLoginAt: '2026-06-21T00:00:00.000Z',
     lastActivityAt: '2026-06-21T00:00:00.000Z',

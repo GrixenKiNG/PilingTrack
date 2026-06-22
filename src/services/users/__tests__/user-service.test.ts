@@ -113,7 +113,7 @@ describe('listUsers', () => {
         equipment: { name: 'LRH-100' },
         site: { name: 'ВСМЖ' },
       },
-      _count: { reports: 4 },
+      _count: { reports: 4, sites: 1 },
       reports: [{ updatedAt: new Date('2026-06-20T10:00:00.000Z') }],
     }]);
     findManyFeedbackEventMock.mockResolvedValue([
@@ -133,6 +133,7 @@ describe('listUsers', () => {
         siteName: 'ВСМЖ',
       },
       reportCount: 4,
+      canHardDelete: false,
       lastReportAt: '2026-06-20T10:00:00.000Z',
       lastLoginAt: '2026-06-21T11:00:00.000Z',
       lastActivityAt: '2026-06-21T11:00:00.000Z',
@@ -281,14 +282,30 @@ describe('deleteUser', () => {
   it('deletes only an unused user owned by the tenant', async () => {
     await expect(deleteUser('tenant-a', 'admin-a', 'user-b'))
       .rejects.toMatchObject({ status: 404 });
-    expect(findFirstUserMock).toHaveBeenCalledWith({
+    expect(findFirstUserMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'user-b', tenantId: 'tenant-a' },
+    }));
+    expect(deleteUserMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects hard delete when the user has operational links', async () => {
+    findFirstUserMock.mockResolvedValue({
+      ...existingUser,
+      crew: null,
+      _count: { reports: 1, sites: 0 },
     });
+
+    await expect(deleteUser('tenant-a', 'admin-a', 'user-b'))
+      .rejects.toMatchObject({ status: 409 });
     expect(deleteUserMock).not.toHaveBeenCalled();
   });
 
   it('keeps the tenant scope in the successful delete mutation', async () => {
-    findFirstUserMock.mockResolvedValue(existingUser);
+    findFirstUserMock.mockResolvedValue({
+      ...existingUser,
+      crew: null,
+      _count: { reports: 0, sites: 0 },
+    });
 
     await deleteUser('tenant-a', 'admin-a', 'user-b');
 

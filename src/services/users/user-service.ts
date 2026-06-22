@@ -60,7 +60,7 @@ export async function listUsers(
           site: { select: { name: true } },
         },
       },
-      _count: { select: { reports: true } },
+      _count: { select: { reports: true, sites: true } },
       reports: {
         orderBy: { updatedAt: 'desc' },
         take: 1,
@@ -123,6 +123,7 @@ export async function listUsers(
           }
         : null,
       reportCount: user._count.reports,
+      canHardDelete: user._count.reports === 0 && user._count.sites === 0 && user.crew === null,
       lastReportAt: lastReport?.toISOString() ?? null,
       lastLoginAt: lastLogin?.toISOString() ?? null,
       lastActivityAt: latestActivity?.at.toISOString() ?? null,
@@ -272,9 +273,19 @@ export async function deleteUser(tenantId: string, actorUserId: string, targetUs
 
   const user = await db.user.findFirst({
     where: { id: targetUserId, tenantId: scopedTenantId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      crew: { select: { id: true } },
+      _count: { select: { reports: true, sites: true } },
+    },
   });
   if (!user) {
     throw new ServiceError('User not found', 404);
+  }
+  if (user.crew || user._count.reports > 0 || user._count.sites > 0) {
+    throw new ServiceError('Cannot delete user with reports or assignments; block the user instead', 409);
   }
 
   try {

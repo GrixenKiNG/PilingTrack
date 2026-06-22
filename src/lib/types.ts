@@ -80,6 +80,7 @@ export interface OperationalUserDTO extends UserDTO {
     siteName: string | null;
   } | null;
   reportCount: number;
+  canHardDelete: boolean;
   lastReportAt: string | null;
   lastLoginAt: string | null;
   lastActivityAt: string | null;
