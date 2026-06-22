@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
+import { invalidateDictionaries } from '@/lib/cached-queries';
 import { assertCan } from '@/services/auth/authorization-service';
 import {
   createDictionaryItem, deleteDictionaryItem, archiveDictionaryItem,
@@ -13,7 +14,14 @@ import { withApi, withMutation } from '@/core/api-wrapper';
 export const runtime = 'nodejs';
 
 const typeEnum = z.enum(['pileGrade', 'drillingType', 'downtimeReason']);
-const createSchema = z.object({ type: typeEnum, name: z.string().min(1).max(100) });
+const createSchema = z.object({
+  type: typeEnum,
+  name: z.string().min(1).max(100),
+  code: z.string().max(100).optional(),
+  lengthMm: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  sectionOrDiameter: z.string().max(100).nullable().optional(),
+  notes: z.string().max(500).optional(),
+});
 const deleteSchema = z.object({ type: typeEnum, id: z.string().min(1) });
 const patchSchema = z.object({
   type: typeEnum, id: z.string().min(1),
@@ -35,13 +43,15 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
+  if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
+  const tenantId = user.tenantId;
 
   const filterParam = request.nextUrl.searchParams.get('filter');
   const filter: DictFilter = filterParam === 'archived' || filterParam === 'all' ? filterParam : 'active';
 
   const [{ pileGrades, drillingTypes, downtimeReasons }, usage] = await Promise.all([
-    listDictionaries(filter),
-    getDictionaryUsage(),
+    listDictionaries(tenantId, filter),
+    getDictionaryUsage(tenantId),
   ]);
 
   return NextResponse.json({
@@ -56,9 +66,13 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
+  if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
+  const context = { tenantId: user.tenantId, actorId: user.id };
   const validated = createSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
-  const item = await createDictionaryItem(validated.data.type, validated.data.name);
+  const { type, ...input } = validated.data;
+  const item = await createDictionaryItem(context, type, input);
+  await invalidateDictionaries(context.tenantId);
   return NextResponse.json({ item });
 }, { domain: 'dictionary' });
 
@@ -67,6 +81,8 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
+  if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
+  const context = { tenantId: user.tenantId, actorId: user.id };
   const validated = patchSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
 
@@ -74,10 +90,11 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   if (lengthMm !== undefined && type !== 'pileGrade') {
     return NextResponse.json({ error: 'lengthMm valid only for pileGrade' }, { status: 400 });
   }
-  if (name !== undefined) await renameDictionaryItem(type, id, name);
-  if (isActive === true) await restoreDictionaryItem(type, id);
-  if (isActive === false) await archiveDictionaryItem(type, id);
-  if (lengthMm !== undefined) await setPileGradeLength(id, lengthMm);
+  if (name !== undefined) await renameDictionaryItem(context, type, id, name);
+  if (isActive === true) await restoreDictionaryItem(context, type, id);
+  if (isActive === false) await archiveDictionaryItem(context, type, id);
+  if (lengthMm !== undefined) await setPileGradeLength(context, id, lengthMm);
+  await invalidateDictionaries(context.tenantId);
   return NextResponse.json({ success: true });
 }, { domain: 'dictionary' });
 
@@ -86,8 +103,11 @@ export const DELETE = withMutation(async (request: NextRequest) => {
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'dictionary.manage');
+  if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
+  const context = { tenantId: user.tenantId, actorId: user.id };
   const validated = deleteSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
-  const result = await deleteDictionaryItem(validated.data.type, validated.data.id);
+  const result = await deleteDictionaryItem(context, validated.data.type, validated.data.id);
+  await invalidateDictionaries(context.tenantId);
   return NextResponse.json(result);
 }, { domain: 'dictionary' });

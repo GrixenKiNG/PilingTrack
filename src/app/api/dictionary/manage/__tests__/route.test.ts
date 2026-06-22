@@ -11,16 +11,19 @@ const { requireAuthMock, svc } = vi.hoisted(() => ({
     restoreDictionaryItem: vi.fn(),
     renameDictionaryItem: vi.fn(),
     deleteDictionaryItem: vi.fn(),
+    setPileGradeLength: vi.fn(),
   },
 }));
+const invalidateDictionaries = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/dictionaries/dictionary-service', () => svc);
+vi.mock('@/lib/cached-queries', () => ({ invalidateDictionaries }));
 
-import { GET, PATCH, DELETE } from '../route';
+import { GET, POST, PATCH, DELETE } from '../route';
 
-const admin = { user: { id: 'a', role: 'ADMIN' }, error: null };
+const admin = { user: { id: 'a', role: 'ADMIN', tenantId: 'tenant-a' }, error: null };
 function req(method: string, body?: unknown, qs = ''): NextRequest {
   return new NextRequest(`http://localhost/api/dictionary/manage${qs}`, {
     method,
@@ -37,6 +40,12 @@ describe('dictionary/manage route', () => {
     expect((await GET(req('GET', undefined, '?filter=all'))).status).toBe(403);
   });
 
+  it('GET fails closed when the admin has no tenant', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: null }, error: null });
+    expect((await GET(req('GET'))).status).toBe(400);
+    expect(svc.listDictionaries).not.toHaveBeenCalled();
+  });
+
   it('GET returns items merged with usage counts', async () => {
     requireAuthMock.mockResolvedValue(admin);
     svc.listDictionaries.mockResolvedValue({
@@ -50,7 +59,20 @@ describe('dictionary/manage route', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.pileGrades[0]).toMatchObject({ id: 'g1', reportCount: 42, planCount: 0 });
-    expect(svc.listDictionaries).toHaveBeenCalledWith('active');
+    expect(svc.listDictionaries).toHaveBeenCalledWith('tenant-a', 'active');
+    expect(svc.getDictionaryUsage).toHaveBeenCalledWith('tenant-a');
+  });
+
+  it('POST creates an item only inside the authenticated tenant', async () => {
+    requireAuthMock.mockResolvedValue(admin);
+    svc.createDictionaryItem.mockResolvedValue({ id: 'g1' });
+    const res = await POST(req('POST', {
+      type: 'pileGrade', name: 'СВ 120-35', code: 'СВ120', lengthMm: 12000,
+    }));
+    expect(res.status).toBe(200);
+    expect(svc.createDictionaryItem).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'pileGrade', {
+      name: 'СВ 120-35', code: 'СВ120', lengthMm: 12000,
+    });
   });
 
   it('PATCH renames when name is present', async () => {
@@ -58,14 +80,14 @@ describe('dictionary/manage route', () => {
     svc.renameDictionaryItem.mockResolvedValue({ id: 'g1', name: 'X' });
     const res = await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1', name: 'X' }));
     expect(res.status).toBe(200);
-    expect(svc.renameDictionaryItem).toHaveBeenCalledWith('pileGrade', 'g1', 'X');
+    expect(svc.renameDictionaryItem).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'pileGrade', 'g1', 'X');
   });
 
   it('PATCH archives when isActive=false', async () => {
     requireAuthMock.mockResolvedValue(admin);
     svc.archiveDictionaryItem.mockResolvedValue({ id: 'g1' });
     await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1', isActive: false }));
-    expect(svc.archiveDictionaryItem).toHaveBeenCalledWith('pileGrade', 'g1');
+    expect(svc.archiveDictionaryItem).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'pileGrade', 'g1');
   });
 
   it('PATCH returns 400 with neither name nor isActive', async () => {
@@ -84,5 +106,6 @@ describe('dictionary/manage route', () => {
     requireAuthMock.mockResolvedValue(admin);
     svc.deleteDictionaryItem.mockResolvedValue({ success: true });
     expect((await DELETE(req('DELETE', { type: 'pileGrade', id: 'g1' }))).status).toBe(200);
+    expect(svc.deleteDictionaryItem).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'pileGrade', 'g1');
   });
 });
