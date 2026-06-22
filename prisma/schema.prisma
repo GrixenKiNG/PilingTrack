@@ -89,6 +89,7 @@ model User {
   phone      String   @default("")
   role       String   @default("OPERATOR")
   isActive   Boolean  @default(true)
+  sessionVersion Int  @default(0)
   timezone   String   @default("Europe/Moscow")
 
   createdAt  DateTime @default(now()) @db.Timestamptz(3)

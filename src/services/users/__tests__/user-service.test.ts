@@ -167,6 +167,26 @@ describe('updateUser', () => {
     }));
   });
 
+  it('increments the session version when blocking a user', async () => {
+    findFirstUserMock.mockResolvedValue(existingUser);
+
+    await updateUser('tenant-a', { id: 'user-b', isActive: false }, 'admin-a');
+
+    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ sessionVersion: { increment: 1 } }),
+    }));
+  });
+
+  it('increments the session version when changing a password', async () => {
+    findFirstUserMock.mockResolvedValue(existingUser);
+
+    await updateUser('tenant-a', { id: 'user-b', password: 'password8' }, 'admin-a');
+
+    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ sessionVersion: { increment: 1 } }),
+    }));
+  });
+
   it('fails closed when tenant context is missing', async () => {
     await expect(updateUser('', { id: 'user-b', name: 'X' }, 'admin-a'))
       .rejects.toMatchObject({ status: 400 });
@@ -183,6 +203,7 @@ describe('updateUser', () => {
       data: expect.objectContaining({
         pin: 'pin-hash',
         pinLookup: 'lookup-5678',
+        sessionVersion: { increment: 1 },
       }),
     }));
   });

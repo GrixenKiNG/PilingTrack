@@ -134,6 +134,9 @@ export async function updateUser(
     data.pin = await hashPin(input.pin);
     data.pinLookup = computePinLookup(input.pin);
   }
+  if (input.isActive === false || input.password || input.pin) {
+    data.sessionVersion = { increment: 1 };
+  }
 
   try {
     const previousUser = await db.user.findFirst({
