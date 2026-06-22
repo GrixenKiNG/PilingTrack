@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import type { Prisma } from '@/generated/postgres-client/client';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import {
   composeChecklist, selectBlocks, requiredBlockTypes, type CandidateBlock,

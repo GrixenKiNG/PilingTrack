@@ -10,12 +10,13 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClientManager, WSClient } from '@/core/realtime/server/client-manager';
+import { ClientManager } from '@/core/realtime/server/client-manager';
 
 // ============================================================
 // Mock WebSocket factory
 // ============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
 function createMockWs(): any {
   return {
     readyState: 1 /* WebSocket.OPEN */,
@@ -109,7 +110,7 @@ describe('ClientManager', () => {
 
     it('should remove internal mappings', () => {
       const ws = createMockWs();
-      const id = manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
+      manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
 
       manager.removeClient(ws);
 
@@ -295,6 +296,7 @@ describe('ClientManager', () => {
       manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
 
       const client = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       const before = client!.lastPingAt;
 
       // Small delay to ensure different timestamp
@@ -304,7 +306,9 @@ describe('ClientManager', () => {
       manager.recordPong(ws);
 
       const updated = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(updated!.lastPingAt).toBe(later);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(updated!.lastPingAt).toBeGreaterThan(before);
 
       vi.restoreAllMocks();

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '../commands/equipment-maintenance';
 
@@ -93,6 +94,8 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       id: true, reportId: true, date: true, shiftType: true, status: true,
       site: { select: { id: true, name: true } },
       user: { select: { id: true, name: true } },
+      piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
+      drillings: { select: { count: true, meters: true } },
       updatedAt: true,
     },
   });
@@ -110,11 +113,16 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       const a = analyticsByReport.get(r.reportId);
       if (!a) return acc;
       acc.piles += a.totalPiles;
+      acc.pileMeters += r.piles.reduce(
+        (sum, pile) => sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
+        0,
+      );
+      acc.drillingCount += r.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
       acc.drillingMeters += a.totalDrilling;
       acc.downtimeHours += a.totalDowntime;
       return acc;
     },
-    { piles: 0, drillingMeters: 0, downtimeHours: 0 }
+    { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 }
   );
 
   const timeline = allReports.map((r) => {
@@ -163,7 +171,28 @@ export async function getMaintenanceById(id: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
   const record = await db.maintenanceRecord.findUnique({
     where: { id },
-    include: { equipment: { select: { id: true, name: true, model: true } } },
+    include: {
+      equipment: {
+        select: {
+          id: true,
+          name: true,
+          model: true,
+          engineHoursTotal: true,
+          nextMaintenanceAtHours: true,
+          nextMaintenanceDate: true,
+          crews: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              operator: { select: { id: true, name: true } },
+              site: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+    },
   });
   if (!record || record.tenantId !== tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
@@ -181,7 +210,28 @@ export async function listAllMaintenance(tenantId: string, filter: MaintenanceLi
       ...(filter.assigneeId ? { assigneeId: filter.assigneeId } : {}),
       ...(filter.type ? { type: filter.type } : {}),
     },
-    include: { equipment: { select: { id: true, name: true, model: true } } },
+    include: {
+      equipment: {
+        select: {
+          id: true,
+          name: true,
+          model: true,
+          engineHoursTotal: true,
+          nextMaintenanceAtHours: true,
+          nextMaintenanceDate: true,
+          crews: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              operator: { select: { id: true, name: true } },
+              site: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+    },
     orderBy: [{ priority: 'desc' }, { scheduledAt: 'asc' }, { createdAt: 'desc' }],
     take: MAINTENANCE_LIST_LIMIT,
   });

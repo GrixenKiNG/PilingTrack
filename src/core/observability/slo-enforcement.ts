@@ -308,6 +308,7 @@ export function createSLO(domain: string, config: Omit<SLOConfig, 'domain'>): SL
   if (!sloTrackers.has(domain)) {
     sloTrackers.set(domain, new SLOTracker({ ...config, domain }));
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   return sloTrackers.get(domain)!;
 }
 

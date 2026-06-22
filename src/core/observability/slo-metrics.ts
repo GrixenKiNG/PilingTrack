@@ -20,6 +20,7 @@
 import { logger } from '@/lib/logger';
 import { getCircuitBreakerHealth } from '@/core/infrastructure/circuit-breakers';
 import { getDlqStats } from '@/core/outbox/dead-letter-queue';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { getOutboxStats } from '@/services/reports/outbox-publisher';
 
 // ============================================================
@@ -93,7 +94,7 @@ export interface BurnRateAlert {
 export function calculateBurnRate(
   errorRate: number,
   sloTarget: number,
-  windowMinutes: number
+  _windowMinutes: number
 ): number {
   const allowedErrorRate = 100 - sloTarget; // e.g., 0.1% for 99.9% SLO
   if (allowedErrorRate === 0) return errorRate > 0 ? Infinity : 0;

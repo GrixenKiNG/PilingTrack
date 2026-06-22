@@ -10,7 +10,7 @@ import { getReadiness } from '@/core/observability/health-checks';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const readiness = await getReadiness();
   const status = readiness.status === 'ready' ? 200 : 503;
   return NextResponse.json(readiness, { status });

@@ -10,7 +10,6 @@
  * For multi-instance, switch to Redis-based counter.
  */
 
-import { logger } from '@/lib/logger';
 
 interface ErrorRecord {
   domain: string;

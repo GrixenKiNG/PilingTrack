@@ -44,6 +44,7 @@ export async function moveToDlq(
       data: {
         eventType,
         aggregateId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
         payload: payload as any,
         errorMessage: errorMessage.substring(0, 2000),
         attempts,
@@ -96,6 +97,7 @@ export async function retryDlqEntry(id: string): Promise<boolean> {
         type: entry.eventType,
         aggregateId: entry.aggregateId ?? 'unknown',
         aggregateType: 'Report',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
         payload: entry.payload as any,
         attempts: 0,
         published: false,

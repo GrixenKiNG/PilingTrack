@@ -5,9 +5,10 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export async function validateAgainstSitePlans(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
   tx: ReturnType<typeof db.$transaction> extends (cb: (tx: infer T) => any) => any ? T : any,
   siteId: string,
   piles: Array<{ pileGradeId: string; count: number }>,

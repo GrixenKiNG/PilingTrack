@@ -18,12 +18,11 @@
  */
 
 import http from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
 import { ClientManager } from './client-manager';
 import { canSubscribe, getDefaultChannels } from './channel-router';
 import { authenticateWS } from './auth';
 import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
-import { WSClientMessage } from '../types/events';
 import { logger } from '@/lib/logger';
 import { setWsConnectionCount, recordWorkerHeartbeat } from '@/core/observability/health-tracker';
 import {
@@ -129,10 +128,13 @@ export async function startWSServer(): Promise<ServerHandle> {
             const channel = msg.channel as string;
             if (canSubscribe({
               userId: auth.userId,
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
               tenantId: auth.tenantId!,
               role: auth.role,
               siteIds: auth.siteIds,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
             }, channel as any)) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
               clients.subscribe(ws, channel as any);
               ws.send(JSON.stringify({
                 type: 'subscribed',
@@ -149,6 +151,7 @@ export async function startWSServer(): Promise<ServerHandle> {
           }
 
           case 'unsubscribe':
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
             clients.unsubscribe(ws, (msg.channel as string) as any);
             break;
 
@@ -275,6 +278,7 @@ export async function startWSServer(): Promise<ServerHandle> {
       const sent = clients.broadcast(messageWithSeq, channels);
 
       // Add to replay buffers for each client
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       for (const client of (clients as any).clients?.values?.() || []) {
         if (client.subscriptions) {
           const hasSubscription = channels.some((ch: string) => {

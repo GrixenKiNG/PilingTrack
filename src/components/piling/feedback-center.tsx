@@ -187,6 +187,7 @@ export function FeedbackCenter() {
     }
 
     isMountedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void loadFeedback({ includeHealth: true });
 
     const getIntervalMs = () => {
@@ -226,6 +227,7 @@ export function FeedbackCenter() {
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void loadFeedback({ includeHealth: true, silent: true });
 
     let cancelled = false;

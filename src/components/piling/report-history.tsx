@@ -14,7 +14,6 @@ import {
   CalendarDays,
   Eye,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
@@ -76,6 +75,7 @@ export function ReportHistory() {
   }, [user]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void loadData();
   }, [loadData]);
 
@@ -112,6 +112,7 @@ export function ReportHistory() {
     const match = reports.find((r) => r.id === reportId);
     if (match) {
       autoOpenedRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       void handleOpenDetail(match);
     }
   }, [loading, reports, searchParams, handleOpenDetail]);
@@ -170,7 +171,7 @@ export function ReportHistory() {
     }
   };
 
-  const handlePreviewFromDetail = (reportId: string, reportDate: string) => {
+  const handlePreviewFromDetail = (reportId: string, _reportDate: string) => {
     if (!reportId) return;
     setPreviewReportId(reportId);
   };
@@ -327,6 +328,7 @@ export function ReportHistory() {
                   <div className="text-base font-semibold">Отчёт от {formatDate(selectedReport.date)}</div>
                 </DialogHeader>
                 <button
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
                   onClick={() => handlePreviewFromDetail(selectedReport.reportId!, selectedReport.date)}
                   className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
                 >

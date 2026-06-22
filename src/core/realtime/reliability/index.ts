@@ -27,7 +27,6 @@
  *   Client → Server: { type: 'replay', fromSeq: 30 }  (after reconnect)
  */
 
-import WebSocket from 'ws';
 import { RealtimeEvent } from '@/core/realtime/types/events';
 import { logger } from '@/lib/logger';
 

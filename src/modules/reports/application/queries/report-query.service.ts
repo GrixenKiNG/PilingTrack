@@ -6,10 +6,12 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
+import { pileLengthMeters } from '@/lib/pile-length';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveUserScope } from '@/services/auth/authorization-service';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
-import { calculatePeriodSummary } from '../commands';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 
 export const reportDetailInclude = {
@@ -100,6 +102,7 @@ export async function listReportsForReview(
   }
 
   return paginateQuery(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     (args) => db.report.findMany(args as any),
     { cursor: pagination?.cursor, limit: pagination?.limit ?? 25 },
     {
@@ -108,6 +111,72 @@ export async function listReportsForReview(
       orderBy: { date: 'desc' },
     }
   );
+}
+
+// ── Recent reports for the dispatcher dashboard evidence journal ──────────────
+export interface RecentReportRow {
+  id: string;
+  reportId: string;
+  date: string;
+  shiftType: string;
+  siteName: string;
+  equipmentName: string;
+  operatorName: string;
+  crewName: string | null;
+  status: string;
+  hasPhoto: boolean;
+  photoCount: number;
+  edited: boolean;
+  updatedAt: string;
+}
+
+export async function listRecentReportsForDashboard(
+  sessionUser: { tenantId?: string | null },
+  limit = 8,
+): Promise<RecentReportRow[]> {
+  const tenantId = sessionUser.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+
+  const reports = await db.report.findMany({
+    where: { tenantId },
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+    select: {
+      id: true, reportId: true, date: true, shiftType: true, status: true, version: true, journalPhotoMediaId: true, updatedAt: true,
+      site: { select: { name: true } },
+      equipment: { select: { name: true } },
+      user: { select: { name: true } },
+      crew: { select: { name: true } },
+    },
+  });
+
+  const ids = reports.map((r) => r.id);
+  const counts = ids.length
+    ? await db.media.groupBy({
+        by: ['entityId'],
+        where: { entityType: 'report', entityId: { in: ids }, isDeleted: false, uploadStatus: 'completed' },
+        _count: true,
+      })
+    : [];
+  const withMedia = new Set(
+    counts.filter((c) => c.entityId != null && c._count > 0).map((c) => c.entityId as string),
+  );
+
+  return reports.map((r) => ({
+    id: r.id,
+    reportId: r.reportId,
+    date: r.date,
+    shiftType: r.shiftType,
+    siteName: r.site?.name ?? '—',
+    equipmentName: r.equipment?.name ?? '—',
+    operatorName: r.user?.name ?? '—',
+    crewName: r.crew?.name ?? null,
+    status: r.status,
+    hasPhoto: r.journalPhotoMediaId != null || withMedia.has(r.id),
+    photoCount: counts.find((c) => c.entityId === r.id)?._count ?? (r.journalPhotoMediaId ? 1 : 0),
+    edited: r.version > 1,
+    updatedAt: r.updatedAt.toISOString(),
+  }));
 }
 
 export async function listReportsForUserScope(
@@ -130,7 +199,7 @@ export async function listReportsForUserScope(
     where,
     include: {
       site: { select: { name: true } },
-      piles: { select: { count: true, pileGrade: { select: { name: true } } } },
+      piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
       drillings: { select: { count: true, meters: true } },
       downtimes: { select: { duration: true } },
     },
@@ -140,11 +209,6 @@ export async function listReportsForUserScope(
     skip: cursor ? 1 : 0,
   });
 
-  const pileLengthFromName = (name: string) => {
-    const m = name.match(/\d{3}/);
-    return m ? Number(m[0]) / 10 : 0;
-  };
-
   return reports.map((report) => ({
     id: report.id,
     siteId: report.siteId,
@@ -153,8 +217,8 @@ export async function listReportsForUserScope(
     status: report.status,
     totalPiles: report.piles.reduce((sum: number, pile: { count: number }) => sum + pile.count, 0),
     totalPileMeters: report.piles.reduce(
-      (sum: number, pile: { count: number; pileGrade: { name: string } }) =>
-        sum + pile.count * pileLengthFromName(pile.pileGrade?.name || ''),
+      (sum: number, pile: { count: number; pileGrade: { lengthMm: number | null } }) =>
+        sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
       0,
     ),
     totalDrillingCount: report.drillings.reduce(
@@ -208,6 +272,7 @@ export async function exportReportsCsv(filters: {
       equipment: report.crew?.equipment?.name || '',
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const pileRows = report.piles.map((pile: any) => ({
       ...base,
       pileGrade: pile.pileGrade.name,
@@ -219,6 +284,7 @@ export async function exportReportsCsv(filters: {
       dtComment: '',
     }));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const drillingRows = report.drillings.map((drilling: any) => ({
       ...base,
       pileGrade: '',
@@ -230,6 +296,7 @@ export async function exportReportsCsv(filters: {
       dtComment: '',
     }));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtimeRows = report.downtimes.map((downtime: any) => ({
       ...base,
       pileGrade: '',

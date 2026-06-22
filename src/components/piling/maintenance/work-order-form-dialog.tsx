@@ -25,7 +25,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  TYPE_LABEL, STATUS_LABEL, PRIORITY_LABEL,
+  TYPE_LABEL, STATUS_LABEL, PRIORITY_LABEL, MAINTENANCE_TYPE_OPTIONS,
   type MaintenanceType, type MaintenanceStatus, type MaintenancePriority,
 } from './maintenance-labels';
 
@@ -36,6 +36,7 @@ export interface WorkOrderFormValues {
   title: string;
   description: string;
   faultCause: string;
+  workDone: string;
   partsUsedText: string;
   assigneeId: string;            // '' = не назначен
   scheduledAt: string;
@@ -58,12 +59,13 @@ interface WorkOrderFormDialogProps {
 const UNASSIGNED = '__none__';
 
 const EMPTY_FORM: WorkOrderFormValues = {
-  type: 'SCHEDULED',
+  type: 'TO1',
   status: 'PLANNED',
   priority: 'NORMAL',
   title: '',
   description: '',
   faultCause: '',
+  workDone: '',
   partsUsedText: '',
   assigneeId: '',
   scheduledAt: '',
@@ -126,6 +128,7 @@ export function WorkOrderFormDialog({
             title: record.title ?? '',
             description: record.description ?? '',
             faultCause: record.faultCause ?? '',
+            workDone: record.workDone ?? '',
             partsUsedText: record.partsUsedText ?? '',
             assigneeId: record.assigneeId ?? '',
             scheduledAt: toInputDate(record.scheduledAt),
@@ -150,6 +153,7 @@ export function WorkOrderFormDialog({
     }
   }, [equipmentId, editingId, initial]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { if (open) void prepare(); }, [open, prepare]);
 
   const submit = async () => {
@@ -171,6 +175,7 @@ export function WorkOrderFormDialog({
         title: form.title.trim(),
         description: form.description.trim(),
         faultCause: form.faultCause.trim() || null,
+        workDone: form.workDone.trim() || null,
         partsUsedText: form.partsUsedText.trim() || null,
         assigneeId: form.assigneeId || null,
         scheduledAt: form.scheduledAt || null,
@@ -233,7 +238,7 @@ export function WorkOrderFormDialog({
                 <Select value={form.type} onValueChange={(v) => set('type', v as MaintenanceType)}>
                   <SelectTrigger id="wo-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(TYPE_LABEL) as MaintenanceType[]).map((k) => (
+                    {MAINTENANCE_TYPE_OPTIONS.map((k) => (
                       <SelectItem key={k} value={k}>{TYPE_LABEL[k]}</SelectItem>
                     ))}
                   </SelectContent>
@@ -328,6 +333,12 @@ export function WorkOrderFormDialog({
               <Label htmlFor="wo-fault">Причина неисправности</Label>
               <Textarea id="wo-fault" rows={2} value={form.faultCause}
                 onChange={(e) => set('faultCause', e.target.value)} />
+            </div>
+
+            <div>
+              <Label htmlFor="wo-work">Выполненные работы</Label>
+              <Textarea id="wo-work" rows={2} value={form.workDone}
+                onChange={(e) => set('workDone', e.target.value)} />
             </div>
 
             <div>

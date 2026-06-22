@@ -16,7 +16,7 @@
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Counter, Gauge, Trend } from 'k6/metrics';
+import { Counter, Trend } from 'k6/metrics';
 
 // ============================================================
 // Custom Metrics
@@ -57,7 +57,6 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 const TEST_EMAIL = __ENV.TEST_EMAIL || 'admin@piling.ru';
 const TEST_PASSWORD = __ENV.TEST_PASSWORD || 'admin123';
 
-let authToken = '';
 
 // ============================================================
 // Setup — Login and get auth token
@@ -88,7 +87,7 @@ export function setup() {
 // VU Execution
 // ============================================================
 
-export default function (data) {
+export default function runScenario(data) {
   const { token } = data;
   if (!token) {
     console.error('No auth token, skipping');
@@ -181,7 +180,7 @@ function testRateLimiting(token) {
 // Teardown — Cleanup
 // ============================================================
 
-export function teardown(data) {
+export function teardown(_data) {
   console.log('🏁 Chaos test completed');
   console.log(`  Circuit breaker opens: ${circuitBreakerOpens.sum}`);
   console.log(`  Graceful degradations: ${gracefulDegradation.sum}`);

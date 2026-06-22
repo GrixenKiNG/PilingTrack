@@ -54,15 +54,12 @@ export const options = {
 
 const WS_URL = __ENV.WS_URL || 'ws://localhost:3001';
 const TENANT_ID = __ENV.TENANT_ID || 'default';
-const USER_ID_BASE = `user-${Date.now()}`;
 
 // ============================================================
 // Main scenario
 // ============================================================
 
-export default function () {
-  const vuId = __VU;
-  const userId = `${USER_ID_BASE}-${vuId}`;
+export default function runScenario() {
 
   // Build URL with auth query params (adjust to your auth method)
   // If using cookie/session — k6 handles it via http.cookies
@@ -111,7 +108,7 @@ export default function () {
           const deliveryLatency = Date.now() - data.ts;
           wsMessageLatency.add(deliveryLatency);
         }
-      } catch (e) {
+      } catch {
         // Binary or non-JSON message — skip
       }
 
@@ -125,7 +122,7 @@ export default function () {
       // Connection closed — will be reconnected by k6 VU loop
     });
 
-    socket.on('error', (err) => {
+    socket.on('error', (_err) => {
       // Error logged by k6
     });
 

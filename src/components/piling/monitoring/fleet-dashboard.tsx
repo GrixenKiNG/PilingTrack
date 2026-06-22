@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatHours, formatFixed, formatRuDate } from '@/lib/format';
 
 type EquipmentStatus = 'active' | 'expected' | 'idle';
 
@@ -90,6 +91,7 @@ export function FleetDashboard() {
 
   // Initial load
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void fetchSnapshot();
   }, [fetchSnapshot]);
 
@@ -101,6 +103,7 @@ export function FleetDashboard() {
     // in the console on every render.
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
     if (!wsUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setConn('offline');
       return;
     }
@@ -117,6 +120,7 @@ export function FleetDashboard() {
     ws.addEventListener('close', () => setConn('offline'));
     ws.addEventListener('error', () => setConn('offline'));
     ws.addEventListener('message', (ev) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       let msg: any;
       try {
         msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
@@ -196,7 +200,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
 
       <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Metric label="Свай" value={snap.totals.pilesToday} />
-        <Metric label="Бурения, м" value={formatNumber(snap.totals.drillingToday, 1)} />
+        <Metric label="Бурения, м" value={formatFixed(snap.totals.drillingToday, 1)} />
         <Metric label="Простой" value={formatHours(snap.totals.downtimeHoursToday)} />
         <Metric label="Ждём отчёт" value={snap.totals.expected} muted />
       </dl>
@@ -255,7 +259,7 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
             {card.status === 'active' && card.todayTotals ? (
               <>
                 <RowKV label="Свай" value={String(card.todayTotals.piles)} />
-                <RowKV label="Бурение, м" value={formatNumber(card.todayTotals.drillingMeters, 1)} />
+                <RowKV label="Бурение, м" value={formatFixed(card.todayTotals.drillingMeters, 1)} />
                 {card.todayTotals.downtimeHours > 0 && (
                   <RowKV label="Простой" value={formatHours(card.todayTotals.downtimeHours)} />
                 )}
@@ -282,25 +286,3 @@ function RowKV({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ----------------------------------------------------------------------------
-// Formatters
-
-function formatNumber(n: number, decimals = 0): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-
-function formatHours(hours: number): string {
-  if (!hours || hours <= 0) return '0 ч';
-  const whole = Math.floor(hours);
-  const mins = Math.round((hours - whole) * 60);
-  if (mins === 0) return `${whole} ч`;
-  if (whole === 0) return `${mins} мин`;
-  return `${whole} ч ${mins} мин`;
-}
-
-function formatRuDate(ymd: string): string {
-  // 'YYYY-MM-DD' → 'DD.MM.YYYY' without timezone shenanigans
-  const [y, m, d] = ymd.split('-');
-  if (!y || !m || !d) return ymd;
-  return `${d}.${m}.${y}`;
-}

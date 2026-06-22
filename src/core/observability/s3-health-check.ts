@@ -40,6 +40,7 @@ export async function getS3ClientForHealth(): Promise<boolean> {
 
   try {
     await s3.send(new ListObjectsV2Command({
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: env var is validated at startup (validate-env)
       Bucket: process.env.S3_BUCKET!,
       MaxKeys: 1,
     }));

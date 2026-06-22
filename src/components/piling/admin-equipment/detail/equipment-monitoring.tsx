@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Cog, Droplets, Activity } from 'lucide-react';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { formatNum, formatRelative } from '@/lib/format';
 
 type Subsystem = 'engine' | 'hydraulics' | 'other';
 
@@ -171,6 +172,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
     }
   }, [equipmentId, from, to]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   // Records arrive oldest-first.
@@ -269,7 +271,7 @@ function MachineStateBadge({ rec, loading }: { rec: TelemetryRecord | null; load
       ) : state ? (
         <>
           <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium', state.cls)}>{state.label}</span>
-          <span className="text-3xs text-slate-400">{formatRelative(rec!.timestamp)}</span>
+          <span className="text-3xs text-slate-400">{rec && formatRelative(rec.timestamp)}</span>
         </>
       ) : (
         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-sm text-slate-400">Нет данных</span>
@@ -325,18 +327,3 @@ function renderValue(value: number, unit: string | null, spec?: ParamSpec): { te
   return { text: formatNum(value), unit: unit ?? '' };
 }
 
-function formatNum(n: number | null): string {
-  if (n === null || n === undefined) return '—';
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-}
-
-function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const min = Math.round(ms / 60_000);
-  if (min < 1) return 'только что';
-  if (min < 60) return `${min} мин назад`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} ч назад`;
-  const d = Math.round(h / 24);
-  return `${d} дн назад`;
-}

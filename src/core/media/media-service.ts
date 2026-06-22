@@ -33,10 +33,10 @@
  *   await service.confirmUpload(mediaId);
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '@/lib/logger';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { s3CircuitBreaker } from '@/core/infrastructure/circuit-breakers';
 import crypto from 'crypto';
 
@@ -271,6 +271,7 @@ export class MediaService {
         await s3CircuitBreaker.execute(async () => {
           const putCommand = new PutObjectCommand({
             Bucket: this.config.bucket,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
             Key: thumbnailKey!,
             Body: thumbBuffer,
             ContentType: 'image/jpeg',
@@ -407,6 +408,7 @@ export class MediaService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     return media.map((m: any) => this.toMediaRecord(m));
   }
 
@@ -446,6 +448,7 @@ export class MediaService {
   /**
    * Convert DB model to public MediaRecord.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   private toMediaRecord(media: any): MediaRecord {
     return {
       id: media.id,
@@ -491,8 +494,11 @@ export function getMediaService(): MediaService {
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
       cdnBaseUrl: process.env.CDN_BASE_URL || undefined,
       maxFileSize: parseInt(process.env.MEDIA_MAX_FILE_SIZE || '10485760', 10),
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       allowedContentTypes: DEFAULT_CONFIG.allowedContentTypes!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       thumbnailWidth: DEFAULT_CONFIG.thumbnailWidth!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       urlExpiresIn: DEFAULT_CONFIG.urlExpiresIn!,
     };
 

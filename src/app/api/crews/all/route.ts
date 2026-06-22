@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { listCrewSummaries } from '@/modules/crews';
 import { getCachedCrewsAll } from '@/lib/cached-queries';
 import { withApi } from '@/core/api-wrapper';
 
@@ -19,11 +18,14 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.legacy_manage');
     let crews: CrewSummary[] = await getCachedCrewsAll() as CrewSummary[];
 
     // Tenant isolation: non-ADMIN/DISPATCHER users see only their tenant's crews
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     if (user!.tenantId && user!.role !== 'ADMIN' && user!.role !== 'DISPATCHER') {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       crews = crews.filter((c) => c.site?.tenantId === user!.tenantId);
     }
 

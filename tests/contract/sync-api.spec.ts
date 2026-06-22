@@ -11,7 +11,7 @@
  * Run: npx vitest run tests/contract/sync-api.spec.ts
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Mock the sync API responses
 const mockSyncResponse = {

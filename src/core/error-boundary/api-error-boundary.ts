@@ -76,7 +76,7 @@ export function classifyError(
   userId?: string,
   tenantId?: string
 ): ErrorContext {
-  const traceId = (global as any).__traceId || 'unknown';
+  const traceId = (globalThis as typeof globalThis & { __traceId?: string }).__traceId || 'unknown';
 
   // Circuit breaker open → downstream_error
   if (error instanceof CircuitOpenError) {
@@ -269,7 +269,7 @@ export function withErrorBoundary<T>(
   options: ErrorBoundaryOptions
 ): Promise<NextResponse> {
   const opts: Required<ErrorBoundaryOptions> = { ...DEFAULT_OPTIONS, ...options };
-  const traceId = (global as any).__traceId || crypto.randomUUID();
+  const traceId = (globalThis as typeof globalThis & { __traceId?: string }).__traceId || crypto.randomUUID();
   const userId = opts.getUserId?.(request);
   const tenantId = opts.getTenantId?.(request);
   const cacheKey = opts.getCacheKey?.(request);

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { createHash } from 'crypto';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 import { getResponseCache } from '@/core/cache';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { readSessionToken } from '@/services/auth/session-service';
 
 export interface ApiWrapperOptions {

@@ -142,7 +142,9 @@ describe('withIdempotency — replay cases', () => {
     const result = await withIdempotency(makeRequest({ key: 'op-1' }));
 
     expect(result).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(result!.status).toBe(201);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await result!.json();
     expect(body).toEqual({ reportId: 'rep-1', _action: 'created' });
     expect(mocks.create).not.toHaveBeenCalled(); // no new row written
@@ -173,6 +175,7 @@ describe('withIdempotency — replay cases', () => {
     const result = await withIdempotency(makeRequest({ key: 'op-3' }));
 
     expect(result?.status).toBe(409);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await result!.json();
     expect(body).toMatchObject({
       error: expect.stringMatching(/in progress/i),

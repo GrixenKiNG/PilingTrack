@@ -18,6 +18,7 @@ export class PrismaCrewRepository implements CrewRepository {
     const pendingEvents = aggregate.getPendingEvents();
 
     // Transactional outbox: crew data + outbox events in one transaction
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
       await tx.crew.upsert({
         where: { id: state.id },
@@ -38,6 +39,7 @@ export class PrismaCrewRepository implements CrewRepository {
             type: data.type,
             aggregateId: data.aggregateId,
             aggregateType: data.aggregateType,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
             payload: data.payload as any,
           };
         });

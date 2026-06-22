@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
+import { pileLengthMeters } from '@/lib/pile-length';
 
 interface OperatorUser { id: string; name: string; }
 
@@ -93,10 +94,8 @@ export function ReportFormDialog({
   const getDrillTypeName = (id: string) => drillingTypes.find((t) => t.id === id)?.name || id;
   const getDtReasonName = (id: string) => downtimeReasons.find((r) => r.id === id)?.name || id;
 
-  const getPileLengthMeters = (pileGradeId: string) => {
-    const match = getPileGradeName(pileGradeId).match(/\d{3}/);
-    return match ? Number(match[0]) / 10 : 0;
-  };
+  const getPileLengthMeters = (pileGradeId: string) =>
+    pileLengthMeters({ gradeLengthMm: pileGrades.find((g) => g.id === pileGradeId)?.lengthMm });
 
   const getPileMeters = (pileGradeId: string, count: number) =>
     Number((getPileLengthMeters(pileGradeId) * count).toFixed(1));
@@ -168,6 +167,9 @@ export function ReportFormDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reportId, userId: formUserId, siteId: formSiteId, date: formDate,
+          // Optimistic-concurrency token: reject (409) if the report advanced
+          // since it was loaded into the dialog. Undefined when creating new.
+          version: editReport?.version,
           shiftStart: formShiftStart, shiftEnd: formShiftEnd,
           equipmentId: formEquipmentId || undefined,
           piles: formPiles.map((p) => ({ pileGradeId: p.pileGradeId, count: p.count })),

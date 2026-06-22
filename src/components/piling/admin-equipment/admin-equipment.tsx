@@ -1,107 +1,187 @@
 'use client';
 
-import { useState } from 'react';
-import { Wrench, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Wrench, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { EquipmentDTO } from '@/lib/types';
+import { useFleet } from './use-fleet';
 import { useEquipmentList } from './use-equipment-list';
-import { EquipmentRow } from './equipment-row';
-import {
-  CreateEquipmentDialog,
-  EditEquipmentDialog,
-  DeleteEquipmentDialog,
-} from './equipment-dialogs';
+import { EquipmentStatsBar } from './equipment-stats-bar';
+import { EquipmentFilters, EMPTY_FILTERS, type FleetFilterState } from './equipment-filters';
+import { EquipmentViewToggle, type FleetView } from './equipment-view-toggle';
+import { EquipmentTile } from './equipment-tile';
+import { EquipmentTable } from './equipment-table';
+import { EquipmentDetail } from './detail/equipment-detail';
+import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
+import { CreateEquipmentDialog } from './equipment-dialogs';
 
 export function AdminEquipment() {
-  const {
-    equipment,
-    crewsByEquipment,
-    loading,
-    togglingId,
-    create,
-    update,
-    remove,
-    toggleActive,
-  } = useEquipmentList();
+  const { snapshot, loading, error, refetch } = useFleet();
+  // Display + KPI come from the single snapshot source; create still posts to
+  // /api/equipment (edit lives inside the embedded full card).
+  const { create } = useEquipmentList();
 
+  const [filters, setFilters] = useState<FleetFilterState>(EMPTY_FILTERS);
+  const [view, setView] = useState<FleetView>('tiles');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [editItem, setEditItem] = useState<EquipmentDTO | null>(null);
-  const [deleteItem, setDeleteItem] = useState<EquipmentDTO | null>(null);
+  const [panelWidth, setPanelWidth] = useState(520);
+
+  // Drag the panel's left edge to widen it leftward (clamped).
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      setPanelWidth(Math.min(900, Math.max(360, startW + (startX - ev.clientX))));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const cards = useMemo(() => snapshot?.equipment ?? [], [snapshot]);
+
+  const options = useMemo(() => buildFleetFilterOptions(cards), [cards]);
+
+  const filtered = useMemo(() => applyFleetFilters(cards, filters), [cards, filters]);
 
   if (loading) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <Skeleton className="h-8 w-48" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 w-full" />
-        ))}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-44 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !snapshot) {
+    return (
+      <div className="p-4 lg:p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+          Не удалось загрузить парк техники{error ? `: ${error}` : ''}.
+          <button onClick={refetch} className="ml-2 underline">
+            Повторить
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 p-4 lg:p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-orange-500" />
-          Установки
-          <Badge variant="secondary" className="ml-2 font-mono text-xs">
-            {equipment.length}
-          </Badge>
-        </h1>
-        <Button
-          onClick={() => setShowCreate(true)}
-          className="bg-orange-500 hover:bg-orange-600 text-white"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Добавить
-        </Button>
-      </div>
+    <div className="p-4 lg:p-6">
+      <div
+        style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
+        className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
+      >
+        {/* Left: fleet list */}
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+                <Wrench className="h-5 w-5 text-orange-500" />
+                Установки
+              </h1>
+              <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
+                <Plus className="mr-1 h-4 w-4" /> Добавить
+              </Button>
+            </div>
+          </div>
 
-      {equipment.length === 0 ? (
-        <div className="text-center py-16">
-          <Wrench className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Нет установок</p>
-          <p className="text-xs text-slate-400 mt-1">
-            Добавьте первую установку для начала работы
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {equipment.map((item, index) => (
-            <EquipmentRow
-              key={item.id}
-              item={item}
-              index={index}
-              crewCount={crewsByEquipment[item.id] || 0}
-              togglingId={togglingId}
-              onEdit={setEditItem}
-              onToggle={toggleActive}
-              onDelete={setDeleteItem}
+          <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <EquipmentFilters
+              sites={options.sites}
+              kinds={options.kinds}
+              crews={options.crews}
+              value={filters}
+              onChange={setFilters}
             />
-          ))}
+            <EquipmentViewToggle view={view} onChange={setView} />
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="py-16 text-center">
+              <Wrench className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+              <p className="text-sm text-slate-500">
+                {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
+              </p>
+              {cards.length > 0 && (
+                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 text-xs text-blue-600 underline">
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          ) : view === 'tiles' ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filtered.map((c) => (
+                <EquipmentTile key={c.id} card={c} selected={c.id === selectedId} onSelect={setSelectedId} />
+              ))}
+            </div>
+          ) : (
+            <EquipmentTable cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+          )}
         </div>
-      )}
+
+        {/* Right: persistent, resizable detail column = full card with tabs (no economics) */}
+        <aside className="relative">
+          {/* drag handle — widen the panel leftward */}
+          <div
+            onMouseDown={startResize}
+            title="Потяните, чтобы изменить ширину"
+            className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize lg:block"
+          >
+            <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+          </div>
+
+          <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            {selectedId ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="mb-2 flex justify-end">
+                  <button
+                    onClick={() => setSelectedId(null)}
+                    aria-label="Закрыть карточку"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <EquipmentDetail equipmentId={selectedId} embedded />
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+                <Wrench className="mb-3 h-10 w-10 text-slate-300" />
+                <p className="text-sm text-slate-500">Выберите установку</p>
+                <p className="mt-1 text-xs text-slate-400">Карточка откроется здесь, в этом же окне</p>
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
 
       <CreateEquipmentDialog
         open={showCreate}
         onOpenChange={setShowCreate}
-        onSubmit={create}
-      />
-      <EditEquipmentDialog
-        open={editItem !== null}
-        item={editItem}
-        onOpenChange={(open) => !open && setEditItem(null)}
-        onSubmit={update}
-      />
-      <DeleteEquipmentDialog
-        open={deleteItem !== null}
-        item={deleteItem}
-        crewCount={deleteItem ? crewsByEquipment[deleteItem.id] || 0 : 0}
-        onOpenChange={(open) => !open && setDeleteItem(null)}
-        onConfirm={remove}
+        onSubmit={async (payload) => {
+          await create(payload);
+          refetch();
+        }}
       />
     </div>
   );

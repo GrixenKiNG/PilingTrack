@@ -16,6 +16,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.manage_all');
     const dto = await request.json();
     const validated = reportAdminUpsertSchema.safeParse(dto);
@@ -29,6 +30,7 @@ export const POST = withMutation(
     // Same tenantId-from-session fix as in the operator route — admin
     // edits were also writing NULL tenantId, hiding the edited report
     // from the tenant-scoped history view.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || undefined;
     const result = await upsertReport(
       {
@@ -36,6 +38,7 @@ export const POST = withMutation(
         siteId: dto.siteId,
         userId: dto.userId,
         tenantId,
+        expectedVersion: validated.data.version,
         date: dto.date,
         shiftType: dto.shiftType,
         shiftStart: dto.shiftStart,
@@ -45,6 +48,7 @@ export const POST = withMutation(
         drillings: dto.drillings,
         downtimes: dto.downtimes,
       },
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       { enforceEditWindow: false, actor: user! }
     );
 

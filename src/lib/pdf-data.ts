@@ -23,7 +23,7 @@ interface SingleReportContextReport {
     assistants: { name: string }[];
     equipment: { name: string } | null;
   } | null;
-  piles: { pileGrade: { name: string }; count: number; metersPerUnit?: number }[];
+  piles: { pileGrade: { name: string; lengthMm?: number | null }; count: number; metersPerUnit?: number }[];
   drillings: { type: { name: string }; count?: number; metersPerUnit?: number; meters: number }[];
   downtimes: { reason: { name: string }; duration: number; comment: string | null }[];
 }

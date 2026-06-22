@@ -23,22 +23,12 @@
 
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client/client';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 import { logger } from '@/lib/logger';
 
 // ============================================================
 // Idempotency Store (Prisma-backed)
 // ============================================================
-
-interface IdempotencyRecord {
-  key: string;
-  scope: string;
-  status: 'processing' | 'completed' | 'failed';
-  result?: unknown;
-  error?: string;
-  expiresAt: Date;
-  createdAt: Date;
-}
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -59,7 +49,7 @@ export async function acquireIdempotencyKey(
 }> {
   // Try to create a new record
   try {
-    const record = await db.idempotencyKey.create({
+    await db.idempotencyKey.create({
       data: {
         key,
         scope,

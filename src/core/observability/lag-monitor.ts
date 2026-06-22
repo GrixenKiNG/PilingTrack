@@ -81,8 +81,6 @@ const DEFAULT_CONFIG: LagMonitorConfig = {
 
 let monitorStarted = false;
 let lastKnownMetrics: LagMetrics | null = null;
-let lastPublishedCount = 0;
-let lastPublishedAt = Date.now();
 let config: LagMonitorConfig;
 
 async function getDbClient() {

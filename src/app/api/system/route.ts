@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -14,6 +14,7 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
 
     return createJsonResponse(

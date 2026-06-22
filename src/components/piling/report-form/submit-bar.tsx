@@ -1,7 +1,6 @@
 'use client';
 
-import { ArrowLeft, Send, AlertTriangle, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Send, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,7 +22,6 @@ export function SubmitBar({
   totalPiles, totalPileMeters, totalDrillingCount, totalMeters, totalDowntime, hasDowntime,
   selectedSiteId, hasEntries, submitting, onSubmit,
 }: SubmitBarProps) {
-  const router = useRouter();
   const showHint = !submitting && (!selectedSiteId || !hasEntries);
 
   return (

@@ -11,7 +11,7 @@
  */
 
 import http from 'k6/http';
-import { check, sleep, group } from 'k6';
+import { sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 const spikeLatency = new Trend('spike_latency', true);
@@ -54,7 +54,7 @@ export function setup() {
   return { authToken };
 }
 
-export default function (data) {
+export default function runScenario(data) {
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${data.authToken}`,

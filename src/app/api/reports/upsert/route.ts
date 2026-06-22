@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
-import { ServiceError } from '@/services/service-error';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { withMutation } from '@/core/api-wrapper';
@@ -31,6 +30,7 @@ export const POST = withMutation(
         title: 'Отчёт не сохранён',
         message: 'Проверка данных отчёта завершилась ошибкой валидации.',
         audience: 'OPERATIONS',
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         actor: { id: user!.id, name: user!.name, role: user!.role },
         requestId,
         metadata: {
@@ -49,9 +49,11 @@ export const POST = withMutation(
     }
 
     const validatedDto = validation.data;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const requestedUserId = validatedDto.userId ?? user!.id;
 
     const { assertCanActForUser, resolveReportUserId, upsertReport } = await getReportCommandService();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCanActForUser(user!, requestedUserId);
 
     // Single-tenant prod was leaving every new Report.tenantId as NULL
@@ -59,14 +61,17 @@ export const POST = withMutation(
     // analytics queries then filter by tenantId=orion and silently
     // hide those reports (operator sees "no history", admin period
     // filter shows zeros). Resolve it once here.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || null;
 
     const result = await upsertReport(
       {
         reportId: validatedDto.reportId || validatedDto.id || crypto.randomUUID(),
         siteId: validatedDto.siteId,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         userId: resolveReportUserId(user!, requestedUserId),
         tenantId: tenantId || undefined,
+        expectedVersion: validatedDto.version,
         date: validatedDto.date,
         shiftType: validatedDto.shiftType,
         shiftStart: validatedDto.shiftStart,
@@ -76,6 +81,7 @@ export const POST = withMutation(
         drillings: validatedDto.drillings,
         downtimes: validatedDto.downtimes,
       },
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       { enforceEditWindow: true, actor: user! }
     );
 
@@ -89,6 +95,7 @@ export const POST = withMutation(
           ? 'Производственный отчёт был успешно обновлён.'
           : 'Новый производственный отчёт был успешно сохранён.',
       audience: 'OPERATIONS',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       actor: { id: user!.id, name: user!.name, role: user!.role },
       targetId: result.report.reportId,
       requestId,

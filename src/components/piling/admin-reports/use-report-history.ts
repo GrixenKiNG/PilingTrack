@@ -14,6 +14,7 @@ export function useReportHistory(reportId: string | null | undefined): UseReport
   const [state, setState] = useState<UseReportHistoryState>({ data: null, loading: false, error: false });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (!reportId) { setState({ data: null, loading: false, error: false }); return; }
     const controller = new AbortController();
     setState({ data: null, loading: true, error: false });

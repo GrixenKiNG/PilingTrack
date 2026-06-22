@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -25,7 +24,7 @@ interface UserAssignmentDialogProps {
   users: { id: string; email: string; name: string; role: string; isActive: boolean }[];
 }
 
-export function UserAssignmentDialog({ siteId, onOpenChange, loadingUsers, users }: UserAssignmentDialogProps) {
+export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssignmentDialogProps) {
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
   const [loadingAssign, setLoadingAssign] = useState(false);
 
@@ -48,6 +47,7 @@ export function UserAssignmentDialog({ siteId, onOpenChange, loadingUsers, users
 
   useEffect(() => {
     if (siteId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
       void loadAssignedUsers(siteId);
     }
   }, [loadAssignedUsers, siteId]);

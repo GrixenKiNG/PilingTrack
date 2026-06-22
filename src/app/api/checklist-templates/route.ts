@@ -40,7 +40,9 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const level = request.nextUrl.searchParams.get('level') as never;
     const templates = await listTemplates(tenantId, level ? { level } : {});
@@ -53,7 +55,9 @@ export const POST = withMutation(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const parsed = createSchema.safeParse(await request.json());
@@ -64,6 +68,7 @@ export const POST = withMutation(
       );
     }
     try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const template = await createTemplate(parsed.data, { tenantId, createdById: user!.id });
       return NextResponse.json({ template }, { status: 201 });
     } catch (err) {

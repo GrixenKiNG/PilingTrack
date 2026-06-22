@@ -5,7 +5,7 @@
  */
 
 import { db } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 export function validateDowntimeWithinShift(
   shiftStart?: string | null,
@@ -109,6 +109,7 @@ export function validateReportInput(input: {
   downtimes?: Array<{ reasonId: string; duration: number }>;
 }) {
   validateReportRequiredFields(input);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   validateReportDateNotInFuture(input.date!);
   validatePileEntries(input.piles);
   validateDrillingEntries(input.drillings);
@@ -120,7 +121,7 @@ export async function validateAgainstSitePlans(
   siteId: string,
   currentReportId: string | undefined,
   piles: Array<{ pileGradeId: string; count: number }>,
-  drillings: Array<{ typeId: string; count: number; meters: number }>
+  _drillings: Array<{ typeId: string; count: number; meters: number }>
 ): Promise<void> {
   if (!piles || piles.length === 0) return;
 

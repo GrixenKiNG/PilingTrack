@@ -18,10 +18,12 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.read');
     const { id } = await params;
     const { getCrewById } = await getCrewsModule();
     const crew = await getCrewById(id);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await ensureTenantAccess(user!, crew.site?.tenantId ?? null, 'Crew');
     return NextResponse.json({ crew });
   },
@@ -33,6 +35,7 @@ export const PUT = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.manage');
     const { id } = await params;
     const body = await request.json();
@@ -52,6 +55,7 @@ export const PUT = withMutation(
       siteId: validated.data.siteId,
       assistantNames: validated.data.assistantNames,
       isActive: validated.data.isActive,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
     });
 
@@ -67,6 +71,7 @@ export const DELETE = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.manage');
     const { id } = await params;
     const { deleteCrew } = await getCrewsModule();

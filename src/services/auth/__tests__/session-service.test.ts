@@ -19,6 +19,7 @@ const mockUser = {
   name: 'Test User',
   role: 'OPERATOR',
   tenantId: null,
+  sessionVersion: 0,
 };
 
 describe('session-service', () => {
@@ -64,6 +65,7 @@ describe('session-service', () => {
       const token = await createSessionToken(mockUser);
       const parts = token.split('.');
       // Decode payload (base64url)
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       const payload = JSON.parse(Buffer.from(parts[1]!.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
 
       expect(payload.sub).toBe('user-1');
@@ -74,6 +76,12 @@ describe('session-service', () => {
       expect(payload.v).toBe(1);
       expect(payload.exp).toBeGreaterThan(payload.iat);
     });
+
+    it('writes the current session version into the token', async () => {
+      const token = await createSessionToken({ ...mockUser, sessionVersion: 3 });
+
+      expect((await verifyTokenSignature(token))?.sv).toBe(3);
+    });
   });
 
   describe('verifySessionToken', () => {
@@ -82,7 +90,9 @@ describe('session-service', () => {
       const result = await verifySessionToken(token);
 
       expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(result!.sub).toBe('user-1');
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(result!.email).toBe('test@piling.ru');
     });
 
@@ -90,6 +100,7 @@ describe('session-service', () => {
       const token = await createSessionToken(mockUser);
       const parts = token.split('.');
       // Tamper with payload
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       const tamperedPayload = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(parts[1]!.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()), role: 'ADMIN' }))
         .toString('base64')
         .replace(/\+/g, '-')
@@ -155,8 +166,11 @@ describe('session-service', () => {
 
       const cookie = response.cookies.get(SESSION_COOKIE_NAME);
       expect(cookie).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(cookie!.value).toBe('some-token');
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(cookie!.httpOnly).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(cookie!.sameSite).toBe('lax');
     });
   });
@@ -227,7 +241,9 @@ describe('session-service', () => {
         const payload = await verifyTokenSignature(token);
         await revokeSessionToken(token);
 
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
         const storedExp = store.entries.get(payload!.jti!);
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
         expect(storedExp).toBe(payload!.exp);
       } finally {
         restore();
@@ -246,7 +262,9 @@ describe('session-service', () => {
       clearSessionCookie(response);
 
       const cookie = response.cookies.get(SESSION_COOKIE_NAME);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(cookie!.value).toBe('');
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(cookie!.maxAge).toBe(0);
     });
   });

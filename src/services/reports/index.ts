@@ -13,17 +13,20 @@
 // Commands (write operations) — delegates to DDD module
 // ============================================================
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export {
   upsertReport,
   assertCanActForUser,
   resolveReportUserId,
 } from '@/modules/reports/application/commands/report-command.service';
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export {
   validateReportInput,
   validateAgainstSitePlans,
 } from '@/modules/reports/application/commands/report-validation.service';
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export type {
   UpsertReportCommand,
   UpsertReportResult,
@@ -33,6 +36,7 @@ export type {
 // Queries (read operations) — delegates to DDD module
 // ============================================================
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export {
   listReportsForUserScope,
   listReportsForReview,
@@ -42,6 +46,7 @@ export {
 // Repository — single write path
 // ============================================================
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export {
   getReportRepository,
 } from '@/modules/reports/infrastructure/report.repository';
@@ -50,10 +55,12 @@ export {
 // Domain — aggregate and events
 // ============================================================
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export {
   ReportAggregate,
 } from '@/modules/reports/domain/report.aggregate';
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export type {
   PileWorkEntry,
   DrillingEntry,
@@ -62,6 +69,7 @@ export type {
   ShiftType,
 } from '@/modules/reports/domain/report.aggregate';
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export type {
   ReportDomainEvent,
   ReportDomainEventType,

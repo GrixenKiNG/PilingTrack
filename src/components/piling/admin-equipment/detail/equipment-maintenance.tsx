@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Pencil, Trash2, Plus, Wrench, Loader2, CheckCircle2, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -62,6 +63,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
     }
   }, [equipmentId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -199,11 +201,6 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   );
 }
 
-function formatRuDate(ymd: string): string {
-  const [y, m, d] = ymd.split('-');
-  if (!y || !m || !d) return ymd;
-  return `${d}.${m}.${y}`;
-}
 
 function formatCost(v: string | number): string {
   const n = typeof v === 'number' ? v : Number(v);

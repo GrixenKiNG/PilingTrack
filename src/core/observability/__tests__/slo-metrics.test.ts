@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SLOTracker, recordSLOApiRequest, getSLOStatus, calculateBurnRate, calculateErrorBudgetRemaining, BURN_RATE_WINDOWS } from '../slo-metrics';
+import { SLOTracker, calculateBurnRate, calculateErrorBudgetRemaining, BURN_RATE_WINDOWS } from '../slo-metrics';
 
 // Mock dependencies
 vi.mock('@/core/infrastructure/circuit-breakers', () => ({
@@ -41,7 +41,9 @@ describe('SLO Tracker', () => {
     const availabilitySLO = status.slo.find(s => s.name === 'api_availability');
 
     expect(availabilitySLO).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(availabilitySLO!.current).toBe(100);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(availabilitySLO!.status).toBe('meeting');
   });
 
@@ -58,8 +60,10 @@ describe('SLO Tracker', () => {
     const availabilitySLO = status.slo.find(s => s.name === 'api_availability');
 
     expect(availabilitySLO).toBeDefined();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(availabilitySLO!.current).toBeCloseTo(99.0, 0);
     // 99.0% < 99.5% warning threshold → breached
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(availabilitySLO!.status).toBe('breached');
   });
 

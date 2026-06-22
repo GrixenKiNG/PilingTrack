@@ -17,8 +17,10 @@ export const GET = withApi(
 
     const operatorId = request.nextUrl.searchParams.get('operatorId');
     const { getCrewForOperator } = await getCrewsModule();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const crew = await getCrewForOperator(user!, operatorId);
     if (crew) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       await ensureTenantAccess(user!, crew.tenantId, 'Crew');
     }
     return NextResponse.json({ crew });

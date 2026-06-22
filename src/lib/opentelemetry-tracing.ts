@@ -20,11 +20,10 @@
  *   }
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 // W3C TraceContext header names
 const TRACEPARENT_HEADER = 'traceparent';
-const TRACESTATE_HEADER = 'tracestate';
 
 export interface Span {
   traceId: string;
@@ -112,6 +111,7 @@ export function startSpan(
 
   // Store span
   if (!spanStore.has(traceId)) spanStore.set(traceId, []);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   spanStore.get(traceId)!.push(span);
 
   return {
@@ -234,7 +234,7 @@ export function clearSpanStore(maxAgeMs: number = 3600000) {
 }
 
 // Auto-cleanup old spans every 10 minutes
-if (typeof globalThis !== 'undefined' && !(globalThis as any).__tracingCleanupSet) {
+if (typeof globalThis !== 'undefined' && !(globalThis as typeof globalThis & { __tracingCleanupSet?: boolean }).__tracingCleanupSet) {
   setInterval(() => clearSpanStore(3600000), 10 * 60 * 1000);
-  (globalThis as any).__tracingCleanupSet = true;
+  (globalThis as typeof globalThis & { __tracingCleanupSet?: boolean }).__tracingCleanupSet = true;
 }

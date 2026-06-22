@@ -11,6 +11,7 @@
 
 import { randomBytes } from 'crypto';
 import { db } from '@/lib/db';
+import { initializeTenantDictionaries } from '@/services/dictionaries/tenant-dictionary-initializer';
 import { ServiceError } from '@/services/service-error';
 
 // ============================================================
@@ -76,6 +77,7 @@ export async function createTenant(params: {
   billingEmail?: string;
   plan?: string;
   trialDays?: number;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 }): Promise<{ tenant: any }> {
   const plan = PLANS[params.plan || 'free'];
   const now = new Date();
@@ -83,22 +85,26 @@ export async function createTenant(params: {
     ? new Date(now.getTime() + params.trialDays * 24 * 60 * 60 * 1000)
     : null;
 
-  const tenant = await db.tenant.create({
-    data: {
-      slug: params.slug,
-      name: params.name,
-      billingEmail: params.billingEmail || null,
-      plan: params.plan || 'free',
-      monthlyFee: plan.monthlyFee,
-      maxUsers: plan.maxUsers,
-      subscriptionStatus: params.trialDays ? 'trial' : 'inactive',
-      trialEndsAt,
-    },
-  });
+  return db.$transaction(async (tx) => {
+    const tenant = await tx.tenant.create({
+      data: {
+        slug: params.slug,
+        name: params.name,
+        billingEmail: params.billingEmail || null,
+        plan: params.plan || 'free',
+        monthlyFee: plan.monthlyFee,
+        maxUsers: plan.maxUsers,
+        subscriptionStatus: params.trialDays ? 'trial' : 'inactive',
+        trialEndsAt,
+      },
+    });
 
-  return { tenant };
+    await initializeTenantDictionaries(tx, tenant.id);
+    return { tenant };
+  });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 export async function getTenant(tenantId: string): Promise<any> {
   const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
@@ -112,6 +118,7 @@ export async function getTenant(tenantId: string): Promise<any> {
   return tenant;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 export async function getTenantBySlug(slug: string): Promise<any> {
   const tenant = await db.tenant.findUnique({
     where: { slug },
@@ -128,6 +135,7 @@ export async function getTenantBySlug(slug: string): Promise<any> {
 // Subscription Management
 // ============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 export async function activateSubscription(tenantId: string, planId: string): Promise<any> {
   const plan = PLANS[planId];
   if (!plan) {
@@ -152,7 +160,8 @@ export async function activateSubscription(tenantId: string, planId: string): Pr
   return tenant;
 }
 
-export async function cancelSubscription(tenantId: string, reason?: string): Promise<any> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
+export async function cancelSubscription(tenantId: string, _reason?: string): Promise<any> {
   const tenant = await db.tenant.update({
     where: { id: tenantId },
     data: {
@@ -168,6 +177,7 @@ export async function cancelSubscription(tenantId: string, reason?: string): Pro
 // Invoice Management
 // ============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 async function generateInvoice(tenantId: string, amount: number): Promise<any> {
   const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return null;
@@ -192,6 +202,7 @@ async function generateInvoice(tenantId: string, amount: number): Promise<any> {
   });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 export async function markInvoicePaid(invoiceId: string): Promise<any> {
   return await db.tenantInvoice.update({
     where: { id: invoiceId },
@@ -202,6 +213,7 @@ export async function markInvoicePaid(invoiceId: string): Promise<any> {
   });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
 export async function getTenantInvoices(tenantId: string): Promise<any[]> {
   return await db.tenantInvoice.findMany({
     where: { tenantId },
@@ -298,11 +310,13 @@ export async function updateTenantUsage(tenantId: string): Promise<void> {
 // ============================================================
 
 export async function getTenantDashboardStats(tenantId: string): Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
   tenant: any;
   userCount: number;
   siteCount: number;
   reportCount: number;
   currentMonthReports: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out
   invoices: any[];
 }> {
   const tenant = await db.tenant.findUnique({

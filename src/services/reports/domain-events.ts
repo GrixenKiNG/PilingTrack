@@ -6,10 +6,11 @@
  * the request, then persisted to outbox for reliable async processing.
  */
 
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import type {
   ReportDomainEvent as DomainEvent,
-  ReportDomainEventType as DomainEventType,
 } from '@/modules/reports/domain';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { normalizeReportDomainEventType } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 
@@ -20,6 +21,7 @@ function shouldLogHandlerRegistration(): boolean {
 // Re-export for convenience — aliased from the report domain types so
 // existing call sites that import `DomainEvent` from this module keep
 // working unchanged.
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 export type {
   ReportDomainEvent as DomainEvent,
   ReportDomainEventType as DomainEventType,
@@ -41,10 +43,12 @@ export function on(eventType: string, handler: EventHandler) {
   if (!handlers.has(normalizedEventType)) {
     handlers.set(normalizedEventType, new Set());
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   handlers.get(normalizedEventType)!.add(handler);
   if (shouldLogHandlerRegistration()) {
     logger.debug('Event handler registered', {
       eventType: normalizedEventType,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       totalHandlers: handlers.get(normalizedEventType)!.size,
     });
   }

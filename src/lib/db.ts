@@ -16,6 +16,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 // Fire-and-forget so this file can be compiled to CJS (workers via tsx)
 // where top-level await is not supported.
 if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- @ts-ignore (not -expect-error) is intentional: in worker/CJS builds 'server-only' may be absent (a real TS error), but it's installed under Next.js (no error), so @ts-expect-error would itself fail.
   // @ts-ignore - server-only not available in all contexts
   import('server-only').catch(() => {
     // Ignore: running in worker context where server-only isn't installed

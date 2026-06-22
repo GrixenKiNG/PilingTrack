@@ -8,7 +8,7 @@ import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
 
-const typeEnum = z.enum(['SCHEDULED', 'REPAIR', 'FAULT', 'INSPECTION']);
+const typeEnum = z.enum(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'REPAIR', 'FAULT', 'SCHEDULED', 'INSPECTION']);
 const statusEnum = z.enum(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'DONE', 'CANCELLED']);
 const priorityEnum = z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']);
 
@@ -29,6 +29,7 @@ const updateSchema = z.object({
   laborHours: z.preprocess(emptyToUndef, z.coerce.number().min(0)).optional().nullable(),
   assigneeId: z.string().optional().nullable(),
   faultCause: z.string().max(2000).optional().nullable(),
+  workDone: z.string().max(4000).optional().nullable(),
   partsUsedText: z.string().max(2000).optional().nullable(),
 });
 
@@ -36,9 +37,11 @@ export const PUT = withMutation(
   async (request: NextRequest, { params }: { params: Promise<{ id: string; recordId: string }> }) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
 
     const { id, recordId } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const body = await request.json();
     const parsed = updateSchema.safeParse(body);
@@ -50,6 +53,7 @@ export const PUT = withMutation(
     }
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const record = await updateMaintenance(id, recordId, parsed.data, { tenantId, userId: user!.id });
       return NextResponse.json({ record });
     } catch (err) {
@@ -64,9 +68,11 @@ export const DELETE = withMutation(
   async (request: NextRequest, { params }: { params: Promise<{ id: string; recordId: string }> }) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
 
     const { id, recordId } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     try {
       await deleteMaintenance(id, recordId, { tenantId });

@@ -7,8 +7,9 @@
  * These are registered once on server startup.
  */
 
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
-import { emitDomainEvent, on } from '@/services/reports/domain-events';
+import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
 
 // ============================================================
@@ -283,6 +284,7 @@ async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
         type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
         published: false,
         id: { not: event.id },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       } as any,
     });
     if (newerPending > 0) {

@@ -25,6 +25,7 @@ export const GET = withApi(
     if (media.uploadStatus !== 'completed') return NextResponse.json({ error: 'Upload not completed' }, { status: 409 });
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCanAccessMedia(user!, media);
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

@@ -19,7 +19,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/services/service-error', () => ({
+vi.mock('@/lib/service-error', () => ({
   ServiceError: class ServiceError extends Error {
     status: number;
     constructor(message: string, status: number) {
@@ -124,7 +124,9 @@ describe('normalizeSitePlans', () => {
 
   it('should handle non-array input gracefully', () => {
     const result = normalizeSitePlans({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       pilePlans: 'not-an-array' as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       drillingPlans: null as any,
     });
     expect(result.pilePlans).toEqual([]);

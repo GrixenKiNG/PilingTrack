@@ -1,16 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   loginSchema,
+  pinAuthSchema,
   createSiteSchema,
   createEquipmentSchema,
   createCrewSchema,
   updateCrewSchema,
   reportUpsertSchema,
   createUserSchema,
+  updateUserSchema,
   dictionaryItemSchema,
   telegramConfigSchema,
   paginationSchema,
-  pinAuthSchema,
 } from '../validation-schemas';
 
 describe('validation-schemas', () => {
@@ -33,6 +34,16 @@ describe('validation-schemas', () => {
     it('rejects missing fields', () => {
       const result = loginSchema.safeParse({});
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('pinAuthSchema', () => {
+    it.each(['123', '12345678901', '12a4'])('rejects invalid PIN %s', (pin) => {
+      expect(pinAuthSchema.safeParse({ pin }).success).toBe(false);
+    });
+
+    it.each(['1234', '1234567890'])('accepts PIN %s', (pin) => {
+      expect(pinAuthSchema.safeParse({ pin }).success).toBe(true);
     });
   });
 
@@ -85,6 +96,28 @@ describe('validation-schemas', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it('rejects a password that becomes shorter than 8 characters after trimming', () => {
+      const result = createUserSchema.safeParse({
+        email: 'user@piling.ru',
+        name: 'Test User',
+        role: 'OPERATOR',
+        password: '1234567 ',
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('updateUserSchema', () => {
+    it('does not inject isActive into a partial credential update', () => {
+      const result = updateUserSchema.safeParse({ id: 'user-1', pin: '5678' });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual({ id: 'user-1', pin: '5678' });
+      }
+    });
   });
 
   describe('createSiteSchema', () => {
@@ -95,6 +128,7 @@ describe('validation-schemas', () => {
 
     it('defaults status to active', () => {
       const result = createSiteSchema.safeParse({ name: 'Test Site' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.status).toBe('active');
     });
 
@@ -117,11 +151,13 @@ describe('validation-schemas', () => {
 
     it('defaults qty to 1', () => {
       const result = createEquipmentSchema.safeParse({ name: 'Excavator' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.qty).toBe(1);
     });
 
     it('defaults isActive to true', () => {
       const result = createEquipmentSchema.safeParse({ name: 'Excavator' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.isActive).toBe(true);
     });
 
@@ -147,6 +183,7 @@ describe('validation-schemas', () => {
         equipmentId: 'eq-1',
         siteId: 'site-1',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.assistantNames).toEqual([]);
     });
 
@@ -164,6 +201,7 @@ describe('validation-schemas', () => {
       const result = updateCrewSchema.safeParse({ name: 'Updated Crew' });
 
       expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data).toEqual({ name: 'Updated Crew' });
     });
 
@@ -188,6 +226,7 @@ describe('validation-schemas', () => {
         siteId: 'site-1',
         date: '2026-04-05',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.shiftType).toBe('DAY');
     });
 
@@ -196,6 +235,7 @@ describe('validation-schemas', () => {
         siteId: 'site-1',
         date: '2026-04-05',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.status).toBe('draft');
     });
 
@@ -248,12 +288,15 @@ describe('validation-schemas', () => {
     it('coerces string numbers', () => {
       const result = paginationSchema.safeParse({ page: '2', limit: '10' });
       expect(result.success).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.page).toBe(2);
     });
 
     it('defaults page to 1 and limit to 50', () => {
       const result = paginationSchema.safeParse({});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.page).toBe(1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.limit).toBe(50);
     });
 
@@ -284,6 +327,7 @@ describe('validation-schemas', () => {
         botToken: '123456:ABC-DEF',
         chatId: '-1001234567890',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.enabled).toBe(true);
     });
 
@@ -311,6 +355,7 @@ describe('validation-schemas', () => {
         type: 'PileGrade',
         name: 'Grade A',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect((result as any).data.isActive).toBe(true);
     });
   });

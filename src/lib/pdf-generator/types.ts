@@ -23,7 +23,7 @@ export interface SingleReportData {
   equipmentName: string;
   user: { name: string } | null;
   site: { name: string } | null;
-  piles: { pileGrade: { name: string }; count: number; metersPerUnit?: number }[];
+  piles: { pileGrade: { name: string; lengthMm?: number | null }; count: number; metersPerUnit?: number }[];
   drillings: { type: { name: string }; count?: number; metersPerUnit?: number; meters: number }[];
   downtimes: { reason: { name: string }; duration: number; comment: string | null }[];
 }
@@ -50,7 +50,7 @@ export interface PeriodReportRow {
   equipmentName?: string | null;
   user?: { name?: string | null } | null;
   site?: { name?: string | null } | null;
-  piles?: Array<{ pileGrade?: { name?: string | null } | null; count?: number | null; metersPerUnit?: number | null }> | null;
+  piles?: Array<{ pileGrade?: { name?: string | null; lengthMm?: number | null } | null; count?: number | null; metersPerUnit?: number | null }> | null;
   drillings?: Array<{ type?: { name?: string | null } | null; count?: number | null; meters?: number | null }> | null;
   downtimes?: Array<{ reason?: { name?: string | null } | null; duration?: number | null; comment?: string | null }> | null;
 }

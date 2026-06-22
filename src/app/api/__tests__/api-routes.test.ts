@@ -83,6 +83,7 @@ describe('Authorization Service', () => {
     ];
 
     for (const ability of abilities) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       expect(can({ role: 'ADMIN' }, ability as any)).toBe(true);
     }
   });

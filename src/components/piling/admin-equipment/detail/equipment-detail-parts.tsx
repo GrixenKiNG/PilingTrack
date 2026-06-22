@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
 
 // --------------------------------------------------------------------------
@@ -167,7 +168,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
                 <td className="px-3 py-2">{row.operatorName ?? '—'}</td>
                 <td className="px-3 py-2 text-right font-mono">{row.piles ?? '—'}</td>
                 <td className="px-3 py-2 text-right font-mono">
-                  {row.drillingMeters != null ? formatNumber(row.drillingMeters, 1) : '—'}
+                  {row.drillingMeters != null ? formatFixed(row.drillingMeters, 1) : '—'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono">
                   {row.downtimeHours != null ? formatHours(row.downtimeHours) : '—'}
@@ -211,8 +212,11 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
     return <EmptyState message="Данные ТО не заполнены. Откройте «Редактировать» и укажите наработку и следующее ТО." />;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const remainingHours = hasHours ? nextHours! - hoursTotal! : null;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const hoursPct = hasHours && nextHours! > 0 ? Math.min(100, Math.max(0, (hoursTotal! / nextHours!) * 100)) : 0;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const daysLeft = hasDate ? Math.round((new Date(nextDateStr!).getTime() - Date.now()) / 86_400_000) : null;
 
   const hoursStatus = remainingHours == null ? 'ok' : remainingHours <= 0 ? 'alarm' : remainingHours <= 50 ? 'warn' : 'ok';
@@ -228,10 +232,10 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
             <span className="text-slate-600">Моточасы до ТО</span>
             <span className={cn('font-mono text-xs', txtColor(hoursStatus))}>
-              {remainingHours! > 0
-                ? `осталось ${formatNumber(remainingHours!, 0)} ч`
-                : `просрочено на ${formatNumber(-remainingHours!, 0)} ч`}
-              <span className="text-slate-400"> · {formatNumber(hoursTotal!, 0)} / {formatNumber(nextHours!, 0)} ч</span>
+              {(remainingHours ?? 0) > 0
+                ? `осталось ${formatFixed(remainingHours ?? 0, 0)} ч`
+                : `просрочено на ${formatFixed(-(remainingHours ?? 0), 0)} ч`}
+              <span className="text-slate-400"> · {formatFixed(hoursTotal ?? 0, 0)} / {formatFixed(nextHours ?? 0, 0)} ч</span>
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded bg-slate-100">
@@ -244,7 +248,7 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span className="text-slate-600">Следующее ТО по дате</span>
           <span className={cn('font-mono text-xs', txtColor(dateStatus))}>
-            {formatRuDate(nextDateStr!.slice(0, 10))}
+            {formatRuDate((nextDateStr ?? '').slice(0, 10))}
             {daysLeft != null && (
               <span> · {daysLeft < 0 ? `просрочено на ${-daysLeft} дн` : daysLeft === 0 ? 'сегодня' : `через ${daysLeft} дн`}</span>
             )}
@@ -270,7 +274,7 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
   };
   const pushNum = (label: string, value: unknown, suffix: string) => {
     if (value === null || value === undefined || value === '') return;
-    rows.push({ label, value: `${formatNumber(Number(value), 1)} ${suffix}` });
+    rows.push({ label, value: `${formatFixed(Number(value), 1)} ${suffix}` });
   };
   const pushInt = (label: string, value: unknown, suffix: string) => {
     if (value === null || value === undefined) return;
@@ -303,7 +307,7 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
   // C
   pushDate('Дата покупки', eq.purchaseDate);
   if (eq.purchasePrice) {
-    rows.push({ label: 'Стоимость покупки', value: `${formatNumber(Number(eq.purchasePrice), 2)} ₽` });
+    rows.push({ label: 'Стоимость покупки', value: `${formatFixed(Number(eq.purchasePrice), 2)} ₽` });
   }
   pushInt('Наработка моточасов', eq.engineHoursTotal, 'ч');
   pushInt('След. ТО по моточасам', eq.nextMaintenanceAtHours, 'ч');
@@ -330,32 +334,6 @@ export function PassportGrid({ eq }: { eq: EquipmentDTO & Record<string, unknown
 // Formatters
 // --------------------------------------------------------------------------
 
-export function formatNumber(n: number, decimals = 0): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-
-export function formatHours(hours: number): string {
-  if (!hours || hours <= 0) return '0 ч';
-  const whole = Math.floor(hours);
-  const mins = Math.round((hours - whole) * 60);
-  if (mins === 0) return `${whole} ч`;
-  if (whole === 0) return `${mins} мин`;
-  return `${whole} ч ${mins} мин`;
-}
-
-export function formatRuDate(ymd: string): string {
-  const [y, m, d] = ymd.split('-');
-  if (!y || !m || !d) return ymd;
-  return `${d}.${m}.${y}`;
-}
-
-export function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const min = Math.round(ms / 60_000);
-  if (min < 1) return 'только что';
-  if (min < 60) return `${min} мин назад`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} ч назад`;
-  const d = Math.round(h / 24);
-  return `${d} дн назад`;
-}
+// formatHours / formatRelative are canonical in @/lib/format; re-exported here
+// so the detail screen keeps importing them from one place.
+export { formatHours, formatRelative };

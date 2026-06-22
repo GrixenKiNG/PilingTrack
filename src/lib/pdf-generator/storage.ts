@@ -35,7 +35,9 @@ export async function readPdfResult(jobId: string): Promise<Buffer> {
       region: process.env.S3_REGION || 'auto',
       endpoint: process.env.S3_ENDPOINT,
       credentials: {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: env var is validated at startup (validate-env)
         accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: env var is validated at startup (validate-env)
         secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
       },
       forcePathStyle: !!process.env.S3_ENDPOINT,

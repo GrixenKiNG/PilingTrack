@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { UserDTO, UserRole } from '@/lib/types';
+import type { OperationalUserDTO, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import type { CreateUserInput, UpdateUserInput } from './use-users-list';
 
@@ -52,16 +52,21 @@ interface CreateProps {
 export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [role, setRole] = useState<UserRole>('OPERATOR');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setName('');
       setEmail('');
+      setPhone('');
       setPassword('');
+      setPin('');
       setRole('OPERATOR');
       setErrors({});
     }
@@ -72,8 +77,9 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
     if (!name.trim()) next.name = 'Имя обязательно';
     if (!email.trim()) next.email = 'Email обязателен';
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = 'Некорректный email';
-    if (!password) next.password = 'Пароль обязателен';
-    else if (password.length < 4) next.password = 'Минимум 4 символа';
+    if (!password && !pin) next.password = 'Укажите пароль или PIN';
+    else if (password && password.trim().length < 8) next.password = 'Минимум 8 символов';
+    if (pin && !/^\d{4,10}$/.test(pin)) next.pin = 'PIN должен содержать 4–10 цифр';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -82,7 +88,14 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
 
     setSubmitting(true);
     try {
-      await onSubmit({ name: name.trim(), email: email.trim(), password, role });
+      await onSubmit({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password || undefined,
+        pin: pin || undefined,
+        role,
+      });
       onOpenChange(false);
       toast.success('Пользователь создан');
     } catch (err: unknown) {
@@ -124,6 +137,12 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
             placeholder="ivan@piling.ru"
           />
           <FormField
+            label="Телефон"
+            value={phone}
+            onChange={setPhone}
+            placeholder="+7 999 000-00-00"
+          />
+          <FormField
             label="Пароль"
             type="password"
             value={password}
@@ -132,7 +151,19 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setPassword(v);
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
-            placeholder="Минимум 4 символа"
+            placeholder="Минимум 8 символов"
+          />
+          <FormField
+            label="PIN"
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            error={errors.pin}
+            onChange={(value) => {
+              setPin(value);
+              setErrors((prev) => ({ ...prev, pin: '' }));
+            }}
+            placeholder="4–10 цифр"
           />
           <div className="space-y-1.5">
             <Label>Роль</Label>
@@ -165,7 +196,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
 
 interface EditProps {
   open: boolean;
-  user: UserDTO | null;
+  user: OperationalUserDTO | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: UpdateUserInput) => Promise<void>;
 }
@@ -173,17 +204,22 @@ interface EditProps {
 export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [role, setRole] = useState<UserRole>('OPERATOR');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open && user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setName(user.name);
       setEmail(user.email);
+      setPhone(user.phone);
       setRole(user.role);
       setPassword('');
+      setPin('');
       setErrors({});
     }
   }, [open, user]);
@@ -194,7 +230,8 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
     if (!name.trim()) next.name = 'Имя обязательно';
     if (!email.trim()) next.email = 'Email обязателен';
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = 'Некорректный email';
-    if (password && password.length < 4) next.password = 'Минимум 4 символа';
+    if (password && password.trim().length < 8) next.password = 'Минимум 8 символов';
+    if (pin && !/^\d{4,10}$/.test(pin)) next.pin = 'PIN должен содержать 4–10 цифр';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -207,8 +244,10 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
         id: user.id,
         name: name.trim(),
         email: email.trim(),
+        phone: phone.trim(),
         role,
         password: password || undefined,
+        pin: pin || undefined,
       });
       onOpenChange(false);
       toast.success('Пользователь обновлён');
@@ -249,6 +288,11 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
             }}
           />
           <FormField
+            label="Телефон"
+            value={phone}
+            onChange={setPhone}
+          />
+          <FormField
             label="Новый пароль (оставьте пустым, чтобы не менять)"
             type="password"
             value={password}
@@ -258,6 +302,18 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
             placeholder="••••••••"
+          />
+          <FormField
+            label="Новый PIN (оставьте пустым, чтобы не менять)"
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            error={errors.pin}
+            onChange={(value) => {
+              setPin(value);
+              setErrors((prev) => ({ ...prev, pin: '' }));
+            }}
+            placeholder="4–10 цифр"
           />
           <div className="space-y-1.5">
             <Label>Роль</Label>
@@ -297,7 +353,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
 
 interface DeleteProps {
   open: boolean;
-  user: UserDTO | null;
+  user: OperationalUserDTO | null;
   onOpenChange: (open: boolean) => void;
   onConfirm: (id: string) => Promise<void>;
 }
@@ -348,17 +404,19 @@ interface FormFieldProps {
   label: string;
   value: string;
   type?: 'text' | 'email' | 'password';
+  inputMode?: 'text' | 'numeric' | 'email';
   error?: string;
   placeholder?: string;
   onChange: (value: string) => void;
 }
 
-function FormField({ label, value, type = 'text', error, placeholder, onChange }: FormFieldProps) {
+function FormField({ label, value, type = 'text', inputMode, error, placeholder, onChange }: FormFieldProps) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input
         type={type}
+        inputMode={inputMode}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

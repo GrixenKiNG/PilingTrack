@@ -16,7 +16,7 @@
  * matching X-Proxy-Secret header.
  */
 
-export default {
+const worker = {
   async fetch(request, env) {
     if (env && env.SHARED_SECRET) {
       const provided = request.headers.get('x-proxy-secret');
@@ -56,3 +56,5 @@ export default {
     }
   },
 };
+
+export default worker;

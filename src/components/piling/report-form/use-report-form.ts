@@ -57,6 +57,17 @@ export interface UseReportFormReturn {
   loadSiteTree: (siteId: string) => void;
 }
 
+interface LoadedReportRow {
+  reportId?: string;
+  version?: number;
+  shiftStart?: string;
+  shiftEnd?: string;
+  equipmentId?: string;
+  piles?: { id: string; picketId?: string; pileGradeId: string; count: number }[];
+  drillings?: { id: string; picketId?: string; typeId: string; count?: number; metersPerUnit?: number; meters: number }[];
+  downtimes?: { id: string; reasonId: string; duration: number; comment?: string }[];
+}
+
 export function useReportForm(): UseReportFormReturn {
   const user = usePilingStore((s) => s.currentUser);
   const selectedSiteId = usePilingStore((s) => s.selectedSiteId);
@@ -87,6 +98,10 @@ export function useReportForm(): UseReportFormReturn {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Version of the loaded report, sent back on submit so the server can reject
+  // a stale edit (409) instead of silently overwriting a concurrent save.
+  // undefined when creating a brand-new report (no row to conflict with).
+  const [baseVersion, setBaseVersion] = useState<number | undefined>(undefined);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [showDowntime, setShowDowntime] = useState(false);
@@ -146,19 +161,20 @@ export function useReportForm(): UseReportFormReturn {
           if (reportRes.ok) {
             const data = await reportRes.json();
             if (data.report) {
-              const r = data.report;
+              const r = data.report as LoadedReportRow;
               setReportId(r.reportId || '');
+              setBaseVersion(typeof r.version === 'number' ? r.version : undefined);
               if (r.shiftStart) setShiftStart(r.shiftStart);
               if (r.shiftEnd) setShiftEnd(r.shiftEnd);
               if (r.equipmentId) setSelectedEquipmentId(r.equipmentId);
-              if (r.piles?.length > 0) {
-                setPiles(r.piles.map((p: any) => ({ id: p.id, picketId: p.picketId || '', pileGradeId: p.pileGradeId, count: p.count })));
+              if (r.piles && r.piles.length > 0) {
+                setPiles(r.piles.map((p) => ({ id: p.id, picketId: p.picketId || '', pileGradeId: p.pileGradeId, count: p.count })));
               }
-              if (r.drillings?.length > 0) {
-                setDrillings(r.drillings.map((d: any) => ({ id: d.id, picketId: d.picketId || '', typeId: d.typeId, count: d.count || 1, metersPerUnit: d.metersPerUnit || 0, meters: d.meters })));
+              if (r.drillings && r.drillings.length > 0) {
+                setDrillings(r.drillings.map((d) => ({ id: d.id, picketId: d.picketId || '', typeId: d.typeId, count: d.count || 1, metersPerUnit: d.metersPerUnit || 0, meters: d.meters })));
               }
-              if (r.downtimes?.length > 0) {
-                setDowntimes(r.downtimes.map((dt: any) => ({ id: dt.id, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' })));
+              if (r.downtimes && r.downtimes.length > 0) {
+                setDowntimes(r.downtimes.map((dt) => ({ id: dt.id, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' })));
                 setShowDowntime(true);
               }
             }
@@ -172,6 +188,7 @@ export function useReportForm(): UseReportFormReturn {
   }, [user, selectedSiteId, date]);
 
   // Init date
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
   useEffect(() => { if (!date) setDate(getTodayInTimezone()); }, [date]);
 
   // Load site tree
@@ -184,13 +201,20 @@ export function useReportForm(): UseReportFormReturn {
       .catch(() => toast.error('Не удалось загрузить план объекта'));
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
   useEffect(() => { loadSiteTree(selectedSiteId); }, [selectedSiteId, loadSiteTree]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { if (!date) return; loadData(); }, [date, loadData]);
 
   // Draft management — snapshot via ref so the interval isn't torn
   // down/recreated on every keystroke.
   const draftSnapshotRef = useRef({ piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId });
-  draftSnapshotRef.current = { piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId };
+  // Keep the snapshot fresh after each commit (not during render) so the
+  // 30s interval and beforeunload handlers read current values without being
+  // recreated on every keystroke.
+  useEffect(() => {
+    draftSnapshotRef.current = { piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId };
+  });
 
   useEffect(() => {
     if (!user || !selectedSiteId || !date) return;
@@ -217,6 +241,7 @@ export function useReportForm(): UseReportFormReturn {
       const savedAt = new Date(draft.savedAt);
       if ((Date.now() - savedAt.getTime()) / (1000 * 60 * 60) > 24) { localStorage.removeItem(draftKey); return; }
       if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
         if (draft.piles?.length) setPiles(draft.piles);
         if (draft.drillings?.length) setDrillings(draft.drillings);
         if (draft.downtimes?.length) { setDowntimes(draft.downtimes); setShowDowntime(true); }
@@ -229,6 +254,7 @@ export function useReportForm(): UseReportFormReturn {
         toast.info('Восстановлен черновик', { description: `Сохранён ${savedAt.toLocaleString('ru-RU')}` });
       }
     } catch { localStorage.removeItem(draftKey); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore runs once per (user, site, date); piles/drillings/downtimes are read only as an initial-empty guard and must not retrigger it
   }, [user, selectedSiteId, date]);
 
   // Helpers
@@ -272,11 +298,13 @@ export function useReportForm(): UseReportFormReturn {
   const handleSubmit = async () => {
     if (!selectedSiteId || !user) { toast.error('Выберите объект'); return; }
     if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
+    if (equipment.length > 0 && !selectedEquipmentId) { toast.error('Выберите установку'); return; }
     const finalReportId = reportId || crypto.randomUUID();
     setSubmitting(true);
     try {
       const payload: CreateReportPayload = {
         reportId: finalReportId, userId: user.id, siteId: selectedSiteId, date, shiftStart, shiftEnd,
+        version: baseVersion,
         equipmentId: selectedEquipmentId || undefined,
         piles: piles.map((p) => ({ picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
         drillings: drillings.map((d) => ({ picketId: d.picketId || undefined, typeId: d.typeId, count: d.count, metersPerUnit: d.metersPerUnit, meters: d.meters })),
@@ -284,6 +312,14 @@ export function useReportForm(): UseReportFormReturn {
       };
       const res = await authFetch('/api/reports/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json().catch(() => null);
+      if (res.status === 409) {
+        // Someone saved this report after we loaded it. Don't overwrite their
+        // edit — tell the operator and reload so they see the current data.
+        toast.error(result?.error || 'Отчёт был изменён другим пользователем. Данные обновлены.');
+        hapticError();
+        loadData();
+        return;
+      }
       if (!res.ok) throw new Error(result?.error || 'Ошибка отправки отчёта');
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });

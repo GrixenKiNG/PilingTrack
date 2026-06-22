@@ -11,7 +11,9 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const equipmentId = request.nextUrl.searchParams.get('equipmentId');
     if (!equipmentId) return NextResponse.json({ error: 'equipmentId required' }, { status: 400 });

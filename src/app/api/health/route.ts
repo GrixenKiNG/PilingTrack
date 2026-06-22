@@ -10,7 +10,7 @@ import { getHealth } from '@/core/observability/health-checks';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const health = await getHealth();
 
   const statusMap: Record<string, number> = {

@@ -96,6 +96,7 @@ bun.lockb
 pnpm-lock.yaml
 yarn.lock
 .gitnexus
+graphify-out/
 tmp-screenshots/
 
 # Database dumps — may contain real PII / auth material.
@@ -109,3 +110,6 @@ scripts/prod-dump.sql.gz
 
 # Brainstorming visual-companion mockups (local only)
 .superpowers/
+
+# Isolated feature worktrees
+.worktrees/

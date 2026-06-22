@@ -39,6 +39,7 @@ interface RouteCtx {
 export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'equipment.manage');
 
   const { id: equipmentId } = await ctx.params;
@@ -56,7 +57,9 @@ export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => 
     name: parsed.data.name,
     equipmentId,
     siteId: parsed.data.siteId ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     tenantId: user!.tenantId,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     createdById: user!.id,
   });
 
@@ -67,6 +70,7 @@ export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => 
 export const GET = withApi(async (request: NextRequest, ctx: RouteCtx) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'equipment.manage');
 
   const { id: equipmentId } = await ctx.params;
@@ -93,6 +97,7 @@ export const GET = withApi(async (request: NextRequest, ctx: RouteCtx) => {
 export const DELETE = withMutation(async (request: NextRequest, ctx: RouteCtx) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'equipment.manage');
 
   const { id: equipmentId } = await ctx.params;

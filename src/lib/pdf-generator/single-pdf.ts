@@ -16,18 +16,13 @@ import {
   statusLabel,
 } from './format';
 import { renderPdf } from './render';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { SingleReportData } from './types';
 
 export async function generateSinglePdf(data: SingleReportData): Promise<Buffer> {
   return renderPdf((doc) => {
-    const pileLengthFromName = (name: string) => {
-      const m = name.match(/\d{3}/);
-      return m ? Number(m[0]) / 10 : 0;
-    };
-    const pileMetersOf = (pile: { pileGrade?: { name: string }; metersPerUnit?: number }) =>
-      pile.metersPerUnit && pile.metersPerUnit > 0
-        ? pile.metersPerUnit
-        : pileLengthFromName(pile.pileGrade?.name || '');
+    const pileMetersOf = (pile: { pileGrade?: { lengthMm?: number | null } }) =>
+      pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm });
     const totalPiles = data.piles.reduce((sum, pile) => sum + (pile.count || 0), 0);
     const totalPileMeters = data.piles.reduce(
       (sum, pile) => sum + (pile.count || 0) * pileMetersOf(pile),

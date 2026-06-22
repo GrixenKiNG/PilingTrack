@@ -5,6 +5,7 @@
  * Future: Move to full DDD structure (domain/application/infrastructure).
  */
 
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export {
   listAssignableUsers,
   listUsers,
@@ -12,3 +13,5 @@ export {
   updateUser,
   deleteUser,
 } from '@/services/users/user-service';
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade during the services-to-modules migration
+export type { UpdateUserInput } from '@/services/users/user-service';

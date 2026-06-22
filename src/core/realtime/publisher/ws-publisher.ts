@@ -13,7 +13,6 @@
 
 import { db } from '@/lib/db';
 import { publishToRedis, CHANNEL_EVENTS } from '../redis/pubsub';
-import { toChannel } from '../types/events';
 import { evaluateAlert } from '../alerts/engine';
 import { logger } from '@/lib/logger';
 
@@ -51,6 +50,7 @@ export async function publishPendingEvents(): Promise<number> {
         await publishToRedis(CHANNEL_EVENTS, realtimeEvent);
 
         // Evaluate alert rules
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
         await evaluateAlert(realtimeEvent as any);
 
         // Mark as published (for WS delivery)

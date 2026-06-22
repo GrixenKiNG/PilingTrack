@@ -5,14 +5,24 @@ interface SiteAnalyticsRow {
   siteName: string;
   plannedPiles: number;
   plannedPileMeters: number;
-  plannedDrilling: number;
   plannedDrillingCount: number;
   actualPiles: number;
   actualPileMeters: number;
-  actualDrilling: number;
   actualDrillingCount: number;
+  plannedDrilling: number;
+  actualDrilling: number;
   totalDowntime: number;
   totalReports: number;
+}
+
+export interface SiteAnalyticsOptions {
+  /** Tenant scope — required for multi-tenant safety (fail closed). */
+  tenantId: string;
+  /** Inclusive 'YYYY-MM-DD'. When both bounds set, actuals are limited to the period. */
+  dateFrom?: string;
+  dateTo?: string;
+  /** Restrict to a single site. */
+  siteId?: string;
 }
 
 /**
@@ -25,8 +35,31 @@ interface SiteAnalyticsRow {
  *
  * Each child sum is computed in its own subquery (joined LEFT) to avoid the
  * Cartesian explosion that a flat multi-LEFT-JOIN would produce.
+ *
+ * Plans (`plannedPiles`/`plannedDrilling`) are the whole-site targets and are
+ * never sliced by the period — only the *actuals* (work done) are. When no
+ * period is given the actuals cover all time (previous behaviour preserved).
  */
-export async function getSiteAnalytics() {
+export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
+  // Fail closed on a missing tenant — never return every tenant's rows.
+  if (!opts.tenantId) {
+    throw new Error('getSiteAnalytics: tenantId is required');
+  }
+
+  const { tenantId } = opts;
+  // Date is stored as 'YYYY-MM-DD' string, so plain string range comparison
+  // works (lexicographic == chronological), same as the fleet service.
+  //
+  // We interpolate only *scalar* params (never nested Prisma.sql fragments):
+  // nested fragments mis-number positional params under Turbopack — the $4 bug
+  // that broke /api/reports/pdf in 2026-04 (see raw-queries.test.ts). When no
+  // period is given we use wide sentinel bounds so the actuals cover all time,
+  // and siteId is a nullable scalar matched with IS NULL OR (a UI filter, not a
+  // tenant boundary — tenant isolation stays strict equality below).
+  const dateFrom = opts.dateFrom ?? '0000-01-01';
+  const dateTo = opts.dateTo ?? '9999-12-31';
+  const siteId = opts.siteId ?? null;
+
   const rows = await db.$queryRaw<SiteAnalyticsRow[]>`
     SELECT
       s.id                                  AS "siteId",
@@ -64,25 +97,18 @@ export async function getSiteAnalytics() {
     LEFT JOIN (
       SELECT r."siteId", COUNT(*)::int AS report_count
       FROM "Report" r
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo}
       GROUP BY r."siteId"
     ) rc ON rc."siteId" = s.id
     LEFT JOIN (
       SELECT
         r."siteId",
         SUM(pw.count)::int AS total_piles,
-        SUM(
-          pw.count * COALESCE(
-            NULLIF(spp."metersPerUnit", 0),
-            substring(pg.name from '[0-9]{3}')::float / 10,
-            0
-          )
-        )::float AS total_pile_meters
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
       FROM "Report" r
       JOIN "PileWork" pw ON pw."reportId" = r.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      LEFT JOIN "SitePilePlan" spp
-        ON spp."siteId" = r."siteId"
-       AND spp."pileGradeId" = pw."pileGradeId"
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo}
       GROUP BY r."siteId"
     ) p ON p."siteId" = s.id
     LEFT JOIN (
@@ -92,15 +118,19 @@ export async function getSiteAnalytics() {
         SUM(ld.count)::int AS total_count
       FROM "Report" r
       JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo}
       GROUP BY r."siteId"
     ) d ON d."siteId" = s.id
     LEFT JOIN (
       SELECT r."siteId", SUM(rd.duration)::float AS total_duration
       FROM "Report" r
       JOIN "ReportDowntime" rd ON rd."reportId" = r.id
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo}
       GROUP BY r."siteId"
     ) dt ON dt."siteId" = s.id
     WHERE s."isActive" = true
+      AND s."tenantId" = ${tenantId}
+      AND (${siteId}::text IS NULL OR s.id = ${siteId})
     ORDER BY s.name ASC
   `;
 
@@ -108,13 +138,13 @@ export async function getSiteAnalytics() {
     siteId: row.siteId,
     siteName: row.siteName,
     plannedPiles: row.plannedPiles,
-    plannedPileMeters: parseFloat(row.plannedPileMeters.toFixed(1)),
     actualPiles: row.actualPiles,
+    plannedPileMeters: parseFloat(row.plannedPileMeters.toFixed(1)),
     actualPileMeters: parseFloat(row.actualPileMeters.toFixed(1)),
-    plannedDrilling: row.plannedDrilling,
     plannedDrillingCount: row.plannedDrillingCount,
-    actualDrilling: parseFloat(row.actualDrilling.toFixed(1)),
     actualDrillingCount: row.actualDrillingCount,
+    plannedDrilling: row.plannedDrilling,
+    actualDrilling: parseFloat(row.actualDrilling.toFixed(1)),
     pileProgress:
       row.plannedPiles > 0 ? Math.min(100, (row.actualPiles / row.plannedPiles) * 100) : 0,
     drillingProgress:

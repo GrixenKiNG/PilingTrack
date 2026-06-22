@@ -13,6 +13,7 @@ export interface SessionUser {
   name: string;
   role: string;
   tenantId: string | null;
+  sessionVersion: number;
 }
 
 interface SessionPayload extends JWTPayload {
@@ -22,6 +23,7 @@ interface SessionPayload extends JWTPayload {
   role: string;
   type: 'session';
   v: 1;
+  sv: number;
   jti?: string;
 }
 
@@ -157,6 +159,7 @@ export async function createSessionToken(user: SessionUser) {
     email: user.email,
     name: user.name,
     role: user.role,
+    sv: user.sessionVersion,
     type: 'session',
     v: 1,
   })

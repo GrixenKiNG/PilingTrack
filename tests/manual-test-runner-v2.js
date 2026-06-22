@@ -21,7 +21,7 @@ function log(step, status, detail = '') {
 
 async function screenshot(name) {
   const path = `C:\\PillingR\\my-project\\test-screenshots\\${name}.png`;
-  try { await page.screenshot({ path, fullPage: true }); } catch {}
+  try { await page.screenshot({ path, fullPage: true }); } catch { /* ignore */ }
 }
 
 async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -38,7 +38,7 @@ async function apiCall(cookies, method, path, body = null) {
     const r = await fetch(BASE + path, opts);
     const text = await r.text();
     let json = null;
-    try { json = JSON.parse(text); } catch {}
+    try { json = JSON.parse(text); } catch { /* ignore */ }
     return { status: r.status, json, text: text.substring(0, 300), ok: r.ok };
   } catch (e) {
     return { status: 0, error: e.message, json: null, text: e.message, ok: false };
@@ -58,7 +58,7 @@ async function dismissDevOverlay() {
       }
       return true;
     }
-  } catch {}
+  } catch { /* ignore */ }
   return false;
 }
 
@@ -77,8 +77,7 @@ async function setup() {
   // Suppress Next.js dev overlay
   await context.addInitScript(() => {
     // Monkey-patch to hide the dev overlay
-    const origError = console.error;
-    window.__hideNextjsOverlay = true;
+      window.__hideNextjsOverlay = true;
   });
 }
 

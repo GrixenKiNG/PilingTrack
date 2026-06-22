@@ -25,6 +25,7 @@ export function useMinSkeletonDuration(loading: boolean, minMs: number = DEFAULT
   useEffect(() => {
     if (loading) {
       if (startedAtRef.current === null) startedAtRef.current = Date.now();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
       setHeld(true);
       return;
     }

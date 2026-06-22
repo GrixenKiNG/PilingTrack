@@ -46,7 +46,7 @@ const BULLMQ_PREFIX = 'pilingtrack';
 // ============================================================
 
 async function processPdfJob(job: Job<PdfJobData, PdfJobResult>): Promise<PdfJobResult> {
-  const { type, dateFrom, dateTo, siteId, reportId, userId } = job.data;
+  const { type, userId } = job.data;
   const jobId = job.id as string;
 
   logger.info(`[PDF Worker] Processing job ${jobId}: type=${type}, userId=${userId}`);

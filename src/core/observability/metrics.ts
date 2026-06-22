@@ -43,6 +43,7 @@ function getOrCreateMetric(
   if (!metrics.has(name)) {
     metrics.set(name, { name, help, type, samples: [] });
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   return metrics.get(name)!;
 }
 

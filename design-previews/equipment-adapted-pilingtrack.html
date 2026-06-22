@@ -1,0 +1,1181 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PilingTrack - Установки / адаптация</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --line: #dce4ef;
+      --line-soft: #edf2f7;
+      --text: #10233f;
+      --muted: #65748b;
+      --nav: #061827;
+      --nav-2: #0b2538;
+      --primary: #ff6a00;
+      --primary-dark: #e85f00;
+      --blue: #1267ff;
+      --green: #079455;
+      --amber: #f59e0b;
+      --red: #ef2f2f;
+      --slate: #64748b;
+      --shadow: 0 12px 32px rgba(15, 35, 62, .08);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, select, input {
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 210px minmax(760px, 1fr) 460px;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 18px 12px;
+      background: linear-gradient(180deg, var(--nav), var(--nav-2));
+      color: #dbe8f5;
+    }
+
+    .logo {
+      height: 44px;
+      padding: 0 8px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .logo-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: conic-gradient(from 210deg, var(--primary) 0 45%, #fff 45% 58%, var(--blue) 58% 100%);
+      display: grid;
+      place-items: center;
+      color: var(--nav);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .logo b:last-child { color: var(--primary); }
+
+    .nav {
+      display: grid;
+      gap: 5px;
+      margin-top: 18px;
+    }
+
+    .nav a {
+      min-height: 42px;
+      border-radius: 7px;
+      color: #dbe8f5;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 11px;
+      font-size: 14px;
+    }
+
+    .nav a.active {
+      color: #fff;
+      background: linear-gradient(90deg, var(--primary), #ff7d1f);
+      box-shadow: 0 10px 24px rgba(255, 106, 0, .28);
+    }
+
+    .nav i {
+      width: 22px;
+      height: 22px;
+      border: 1.6px solid currentColor;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-style: normal;
+      font-size: 11px;
+    }
+
+    .user {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,.12);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #dbe8f5;
+      color: var(--nav);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+
+    .main {
+      padding: 18px;
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto auto auto 1fr;
+      gap: 12px;
+    }
+
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.15;
+    }
+
+    .sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .actions, .filters, .view-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 0 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn:hover { border-color: #b8c7da; }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn.primary:hover { background: var(--primary-dark); }
+    .btn.icon { width: 36px; padding: 0; }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(118px, 1fr));
+      gap: 10px;
+    }
+
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      min-height: 86px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .kpi-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .kpi-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      border: 1.8px solid currentColor;
+      font-size: 13px;
+    }
+
+    .kpi strong {
+      font-size: 24px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi small {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .bar {
+      height: 5px;
+      border-radius: 99px;
+      background: #e6edf5;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      width: var(--w);
+      border-radius: inherit;
+      background: var(--c);
+    }
+
+    .filter-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 4px;
+    }
+
+    label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    select, input {
+      height: 34px;
+      min-width: 132px;
+      border: 1px solid var(--line);
+      background: var(--surface-soft);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 0 10px;
+    }
+
+    .view-toggle {
+      border: 1px solid var(--line);
+      background: var(--surface-soft);
+      border-radius: 7px;
+      padding: 3px;
+    }
+
+    .view-toggle button {
+      height: 28px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .view-toggle button.active {
+      background: #fff;
+      color: var(--blue);
+      box-shadow: 0 2px 8px rgba(15, 35, 62, .08);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(270px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .card.selected {
+      border-color: #ffb174;
+      box-shadow: 0 0 0 2px rgba(255,106,0,.14), var(--shadow);
+    }
+
+    .stripe {
+      height: 5px;
+      background: var(--tone);
+    }
+
+    .card-body {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 94px 1fr;
+      gap: 12px;
+    }
+
+    .machine-visual {
+      height: 112px;
+      border-radius: 7px;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(145deg, rgba(6,24,39,.9), rgba(18,103,255,.52)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, transparent 2px 18px);
+    }
+
+    .rig::before {
+      content: "";
+      position: absolute;
+      left: 43px;
+      bottom: 24px;
+      width: 7px;
+      height: 82px;
+      border-radius: 3px;
+      background: #e5eefb;
+      transform: rotate(-7deg);
+      transform-origin: bottom;
+    }
+
+    .rig::after {
+      content: "";
+      position: absolute;
+      left: 15px;
+      bottom: 18px;
+      width: 64px;
+      height: 17px;
+      border-radius: 12px;
+      background: #0f172a;
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.15);
+    }
+
+    .card h3 {
+      margin: 0 0 2px;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .type {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .head-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--tone);
+      background: var(--tone-bg);
+      border: 1px solid color-mix(in srgb, var(--tone) 28%, white);
+      white-space: nowrap;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      margin-top: 10px;
+    }
+
+    .meta b {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .meta span {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card-metrics {
+      border-top: 1px solid var(--line-soft);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .metric {
+      min-height: 56px;
+      border-right: 1px solid var(--line-soft);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .metric:last-child { border-right: 0; }
+    .metric strong { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+    .metric small { color: var(--muted); font-size: 10px; }
+
+    .table-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      background: var(--surface-soft);
+      font-size: 11px;
+    }
+
+    .detail {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-width: 0;
+    }
+
+    .detail-head {
+      min-height: 76px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .detail h2 {
+      margin: 0 0 4px;
+      font-size: 20px;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    .tabs button {
+      height: 42px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tabs button.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: #fff8f2;
+    }
+
+    .detail-body {
+      padding: 14px;
+      overflow: auto;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .hero-photo {
+      height: 150px;
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(145deg, rgba(6,24,39,.92), rgba(255,106,0,.32)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, transparent 2px 22px);
+    }
+
+    .overview-hero {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(90deg, rgba(6,24,39,.88), rgba(6,24,39,.5), rgba(18,103,255,.18)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, transparent 2px 22px);
+      overflow: hidden;
+      position: relative;
+      min-height: 168px;
+      color: #fff;
+    }
+
+    .overview-hero::before {
+      content: "";
+      position: absolute;
+      right: 76px;
+      bottom: 38px;
+      width: 8px;
+      height: 118px;
+      border-radius: 3px;
+      background: #e5eefb;
+      transform: rotate(-7deg);
+      transform-origin: bottom;
+    }
+
+    .overview-hero::after {
+      content: "";
+      position: absolute;
+      right: 30px;
+      bottom: 28px;
+      width: 132px;
+      height: 24px;
+      border-radius: 99px;
+      background: #0f172a;
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.16);
+    }
+
+    .brand-passport {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      align-content: end;
+      max-width: 70%;
+    }
+
+    .brand-passport h3 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+      color: #fff;
+    }
+
+    .brand-passport p {
+      margin: 0;
+      color: rgba(255,255,255,.8);
+      font-size: 12px;
+    }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .section h4 {
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      font-size: 13px;
+    }
+
+    .section-body {
+      padding: 10px 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .overview-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .overview-card h4 {
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      background: var(--surface-soft);
+      font-size: 13px;
+    }
+
+    .overview-card .section-body {
+      padding: 8px 12px;
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .fact {
+      background: var(--surface-soft);
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      padding: 9px;
+      min-height: 56px;
+    }
+
+    .fact small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .fact strong {
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+      border-bottom: 1px dashed var(--line);
+      padding: 7px 0;
+    }
+
+    .line:last-child { border-bottom: 0; }
+    .line span { color: var(--muted); }
+    .line b { text-align: right; }
+
+    .thumbs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .thumb {
+      aspect-ratio: 1.2;
+      border-radius: 7px;
+      background:
+        linear-gradient(145deg, rgba(6,24,39,.88), rgba(100,116,139,.35)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 2px, transparent 2px 16px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .thumb::after {
+      content: "";
+      position: absolute;
+      left: 30%;
+      bottom: 18%;
+      width: 38%;
+      height: 14%;
+      border-radius: 99px;
+      background: #101827;
+      box-shadow: 0 -22px 0 -7px #e5eefb;
+    }
+
+    .event {
+      display: grid;
+      grid-template-columns: 10px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 4px;
+      background: var(--green);
+    }
+
+    .dot.amber { background: var(--amber); }
+    .dot.red { background: var(--red); }
+
+    .detail-actions {
+      padding: 12px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .muted { color: var(--muted); }
+    .green { color: var(--green); }
+    .blue { color: var(--blue); }
+    .amber { color: var(--amber); }
+    .red { color: var(--red); }
+
+    @media (max-width: 1320px) {
+      .app { grid-template-columns: 76px minmax(0, 1fr); }
+      .sidebar { width: 76px; }
+      .logo b, .nav span, .user { display: none; }
+      .detail { display: none; }
+      .kpis { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .sidebar { display: none; }
+      .main { padding: 12px; }
+      .header, .filter-panel { display: grid; }
+      .kpis, .cards { grid-template-columns: 1fr; }
+      .actions { justify-content: stretch; }
+      .btn { flex: 1; }
+      th:nth-child(n+5), td:nth-child(n+5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo"><div class="logo-mark">P</div><b>Piling</b><b>Track</b></div>
+      <nav class="nav">
+        <a href="#"><i>□</i><span>Дашборд</span></a>
+        <a href="#"><i>⌂</i><span>Мониторинг</span></a>
+        <a href="#"><i>▤</i><span>Объекты</span></a>
+        <a class="active" href="#"><i>▥</i><span>Установки</span></a>
+        <a href="#"><i>👥</i><span>Бригады</span></a>
+        <a href="#"><i>⌘</i><span>ТО</span></a>
+        <a href="#"><i>▧</i><span>Отчёты</span></a>
+        <a href="#"><i>☷</i><span>Справочники</span></a>
+      </nav>
+      <div class="user"><div class="avatar">ДП</div><div><b>Дмитрий Петров</b><br><span class="muted">Диспетчер</span></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="header">
+        <div>
+          <h1>Установки</h1>
+          <div class="sub">Центр управления парком техники · состояние, смена, ТО, документы и история</div>
+        </div>
+        <div class="actions">
+          <button class="btn primary">+ Добавить</button>
+        </div>
+      </header>
+
+      <section class="kpis">
+        <article class="kpi"><div class="kpi-top"><span>Всего</span><span class="kpi-icon blue">▥</span></div><strong>18</strong><small>установок в парке</small><div class="bar"><span style="--w:100%;--c:var(--blue)"></span></div></article>
+        <article class="kpi"><div class="kpi-top"><span>В работе</span><span class="kpi-icon green">✓</span></div><strong>12</strong><small>есть отчёт/смена</small><div class="bar"><span style="--w:67%;--c:var(--green)"></span></div></article>
+        <article class="kpi"><div class="kpi-top"><span>Ожидаем</span><span class="kpi-icon amber">!</span></div><strong>3</strong><small>нет отчёта сегодня</small><div class="bar"><span style="--w:17%;--c:var(--amber)"></span></div></article>
+        <article class="kpi"><div class="kpi-top"><span>Простой</span><span class="kpi-icon amber">⌛</span></div><strong>2</strong><small>дольше нормы</small><div class="bar"><span style="--w:12%;--c:var(--amber)"></span></div></article>
+        <article class="kpi"><div class="kpi-top"><span>ТО</span><span class="kpi-icon red">⌘</span></div><strong>4</strong><small>требуют внимания</small><div class="bar"><span style="--w:22%;--c:var(--red)"></span></div></article>
+        <article class="kpi"><div class="kpi-top"><span>Офлайн</span><span class="kpi-icon slate">×</span></div><strong>1</strong><small>нет связи</small><div class="bar"><span style="--w:6%;--c:var(--slate)"></span></div></article>
+      </section>
+
+      <section class="filter-panel">
+        <div class="filters">
+          <div class="field"><label>Объект</label><select><option>Все объекты</option><option>ЖК Северный</option><option>ВСМЖ</option></select></div>
+          <div class="field"><label>Тип</label><select><option>Все типы</option><option>Сваебойная</option><option>Буровая</option></select></div>
+          <div class="field"><label>Статус</label><select><option>Все статусы</option><option>В работе</option><option>Ожидаем отчёт</option><option>В ремонте</option></select></div>
+          <div class="field"><label>Бригада</label><select><option>Все бригады</option><option>Бригада Андреева</option><option>Бригада Краснова</option></select></div>
+        </div>
+        <div class="view-toggle" aria-label="Режим просмотра">
+          <button id="viewCards" class="active" onclick="switchView('cards')">Плитки</button>
+          <button id="viewTable" onclick="switchView('table')">Таблица</button>
+        </div>
+      </section>
+
+      <section id="cards" class="cards"></section>
+      <section id="tablePanel" class="table-panel"></section>
+    </main>
+
+    <aside class="detail">
+      <div class="detail-head">
+        <div>
+          <h2 id="detailTitle">LRH-100 №2</h2>
+          <div id="detailSub" class="muted">Liebherr LRH-100 · № 18-07</div>
+        </div>
+        <span id="detailBadge" class="badge" style="--tone:var(--green);--tone-bg:#e8f8f0">● В работе</span>
+      </div>
+      <div id="tabs" class="tabs"></div>
+      <div id="detailBody" class="detail-body"></div>
+      <div class="detail-actions">
+        <button class="btn primary">Открыть карточку</button>
+        <button class="btn">Создать ТО</button>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const machines = [
+      {
+        name: 'LRH-100 №2',
+        model: 'Liebherr LRH-100',
+        inv: '№ 18-07',
+        kind: 'Сваебойная установка',
+        status: 'В работе',
+        tone: 'green',
+        site: 'ЖК Северный',
+        location: 'Секция 2',
+        crew: 'Бригада Андреева',
+        operator: 'Иван Петров',
+        hours: '1 248 м/ч',
+        shift: 'День, активна',
+        piles: '18 шт. / 126 м.п.',
+        drilling: '6 шт. / 42 м',
+        downtime: '0 дн.',
+        to: 'через 42 м/ч',
+        latest: '13.06.2026 17:34',
+        warnings: ['давление гидравлики', 'ТО через 42 м/ч'],
+      },
+      {
+        name: 'КБУРГ-16.02 №1',
+        model: 'КБУРГ-16.02',
+        inv: '№ KB-16-01',
+        kind: 'Бурильно-крановая',
+        status: 'Требует ТО',
+        tone: 'red',
+        site: 'ВСМЖ',
+        location: 'г. Великий Новгород',
+        crew: 'Бригада Краснова',
+        operator: 'Алексей Кузнецов',
+        hours: '2 180 м/ч',
+        shift: 'День',
+        piles: '0 шт. / 0 м.п.',
+        drilling: '4 шт. / 56 м',
+        downtime: '1 дн.',
+        to: 'просрочено 8 м/ч',
+        latest: '13.06.2026 16:58',
+        warnings: ['масло', 'фильтр гидравлики'],
+      },
+      {
+        name: 'Soilmec SR-45',
+        model: 'Soilmec SR-45',
+        inv: '№ SR-45-10',
+        kind: 'Буровая установка',
+        status: 'В работе',
+        tone: 'green',
+        site: 'ЖК Парк-Сити',
+        location: 'Корпус 1',
+        crew: 'Бригада Смирнова',
+        operator: 'Андрей Смирнов',
+        hours: '1 318 м/ч',
+        shift: 'День, активна',
+        piles: '0 шт. / 0 м.п.',
+        drilling: '5 шт. / 68 м',
+        downtime: '0 дн.',
+        to: 'через 210 м/ч',
+        latest: '13.06.2026 17:10',
+        warnings: [],
+      },
+      {
+        name: 'Bauer BG 24',
+        model: 'Bauer BG 24',
+        inv: '№ BG24-03',
+        kind: 'Буровая установка',
+        status: 'В ремонте',
+        tone: 'blue',
+        site: 'МФК Нева Тауэрс',
+        location: 'Башня А',
+        crew: 'Бригада Волкова',
+        operator: '—',
+        hours: '952 м/ч',
+        shift: 'нет смены',
+        piles: '0 шт. / 0 м.п.',
+        drilling: '0 шт. / 0 м',
+        downtime: '3 дн.',
+        to: 'после ремонта',
+        latest: '12.06.2026 09:30',
+        warnings: ['ремонт гидравлики'],
+      },
+      {
+        name: 'PVE 50PR',
+        model: 'PVE 50PR',
+        inv: '№ 50PR-02',
+        kind: 'Сваебойная установка',
+        status: 'Ожидаем отчёт',
+        tone: 'amber',
+        site: 'ЖК Лесной',
+        location: 'Секция 1',
+        crew: 'Бригада Герасимова',
+        operator: 'Сергей Волков',
+        hours: '8 450 м/ч',
+        shift: 'День',
+        piles: '14 шт. / 98 м.п.',
+        drilling: '0 шт. / 0 м',
+        downtime: '1 дн.',
+        to: 'через 120 м/ч',
+        latest: '12.06.2026 18:04',
+        warnings: ['нет отчёта сегодня'],
+      },
+      {
+        name: 'Koperink SD-20',
+        model: 'Koperink SD-20',
+        inv: '№ SD20-08',
+        kind: 'Буровая установка',
+        status: 'Офлайн',
+        tone: 'slate',
+        site: 'ВСМЖ',
+        location: 'г. Великий Новгород',
+        crew: 'Бригада Митрофанова',
+        operator: '—',
+        hours: '420 м/ч',
+        shift: 'нет данных',
+        piles: '0 шт. / 0 м.п.',
+        drilling: '0 шт. / 0 м',
+        downtime: '4 дн.',
+        to: 'через 90 м/ч',
+        latest: '11.06.2026 08:44',
+        warnings: ['нет связи 2ч 10м'],
+      },
+    ];
+
+    const tones = {
+      green: ['var(--green)', '#e8f8f0'],
+      amber: ['var(--amber)', '#fff7e3'],
+      red: ['var(--red)', '#fff0f0'],
+      blue: ['var(--blue)', '#edf4ff'],
+      slate: ['var(--slate)', '#f1f4f8'],
+    };
+
+    const tabs = ['Обзор', 'Работа', 'ТО', 'Документы', 'Фото', 'История'];
+    let selected = 0;
+    let activeTab = 'Обзор';
+
+    function renderCards() {
+      const root = document.getElementById('cards');
+      root.innerHTML = machines.map((m, index) => {
+        const [tone, bg] = tones[m.tone];
+        const warningLabel = m.status === 'В работе' ? 'В работе' : m.status === 'Требует ТО' ? 'Требует ТО' : 'Не активна';
+        return `
+          <article class="card ${index === selected ? 'selected' : ''}" onclick="selectMachine(${index})">
+            <div class="stripe" style="--tone:${tone}"></div>
+            <div class="card-body">
+              <div class="machine-visual rig"></div>
+              <div>
+                <div class="head-row">
+                  <div><h3>${m.name}</h3><div class="type">${m.kind} · ${m.inv}</div></div>
+                  <span class="badge" style="--tone:${tone};--tone-bg:${bg}">● ${m.status}</span>
+                </div>
+                <div class="meta-grid">
+                  <div class="meta"><b>Объект</b><span>${m.site}</span></div>
+                  <div class="meta"><b>Бригада</b><span>${m.crew}</span></div>
+                  <div class="meta"><b>Оператор</b><span>${m.operator}</span></div>
+                  <div class="meta"><b>ТО</b><span>${m.to}</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="card-metrics">
+              <div class="metric"><strong>${m.piles}</strong><small>сваи шт./м.п.</small></div>
+              <div class="metric"><strong>${m.drilling}</strong><small>бурение шт./м</small></div>
+              <div class="metric"><strong>${m.downtime}</strong><small>простой</small></div>
+              <div class="metric"><strong>${warningLabel}</strong><small>предупреждение</small></div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function renderTable() {
+      const root = document.getElementById('tablePanel');
+      root.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Установка</th><th>Объект</th><th>Бригада</th><th>Статус</th><th>Моточасы</th><th>ТО</th><th>Оператор</th><th>Последний отчёт</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${machines.map((m, i) => {
+              const [tone, bg] = tones[m.tone];
+              return `<tr onclick="selectMachine(${i})"><td><b>${m.name}</b><br><span class="muted">${m.inv}</span></td><td>${m.site}<br><span class="muted">${m.location}</span></td><td>${m.crew}</td><td><span class="badge" style="--tone:${tone};--tone-bg:${bg}">● ${m.status}</span></td><td>${m.hours}</td><td>${m.to}</td><td>${m.operator}</td><td>${m.latest}</td></tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function renderTabs() {
+      document.getElementById('tabs').innerHTML = tabs.map(t => `<button class="${t === activeTab ? 'active' : ''}" onclick="setTab('${t}')">${t}</button>`).join('');
+    }
+
+    function renderDetail() {
+      const m = machines[selected];
+      const [tone, bg] = tones[m.tone];
+      document.getElementById('detailTitle').textContent = m.name;
+      document.getElementById('detailSub').textContent = `${m.model} · ${m.inv}`;
+      const badge = document.getElementById('detailBadge');
+      badge.textContent = `● ${m.status}`;
+      badge.setAttribute('style', `--tone:${tone};--tone-bg:${bg}`);
+      renderTabs();
+
+      const body = document.getElementById('detailBody');
+      if (activeTab === 'Обзор') {
+        body.innerHTML = `
+          <div class="overview-hero">
+            <div class="brand-passport">
+              <div>
+                <h3>${m.name === 'LRH-100 №2' ? 'PVE 50PR' : m.model}</h3>
+                <p>${m.kind} · ${m.inv} · ${m.site}</p>
+              </div>
+              <span class="badge" style="--tone:${tone};--tone-bg:${bg}">● ${m.status}</span>
+            </div>
+          </div>
+          <div class="overview-grid">
+            <section class="overview-card">
+              <h4>1. Основная информация</h4>
+              <div class="section-body">
+                <div class="line"><span>Тип техники</span><b>${m.kind}</b></div>
+                <div class="line"><span>Модель</span><b>${m.model}</b></div>
+                <div class="line"><span>Инв. номер</span><b>${m.name === 'LRH-100 №2' ? 'PT-PVE-50PR-001' : m.inv}</b></div>
+                <div class="line"><span>Объект</span><b>${m.site}</b></div>
+                <div class="line"><span>Оператор</span><b>${m.name === 'LRH-100 №2' ? 'Иванов А.С.' : m.operator}</b></div>
+                <div class="line"><span>Бригада</span><b>${m.name === 'LRH-100 №2' ? 'Бригада 1' : m.crew}</b></div>
+              </div>
+            </section>
+
+            <section class="overview-card">
+              <h4>2. Текущее состояние</h4>
+              <div class="section-body">
+                <div class="line"><span>Статус</span><b>${m.status}</b></div>
+              </div>
+            </section>
+
+            <section class="overview-card">
+              <h4>3. Производительность сегодня</h4>
+              <div class="section-body">
+                <div class="line"><span>Сваи</span><b>${m.name === 'LRH-100 №2' ? '18 шт. / 126 м.п.' : m.piles}</b></div>
+                <div class="line"><span>Пробурено</span><b>${m.name === 'LRH-100 №2' ? '6 шт. / 42 м' : m.drilling}</b></div>
+                <div class="line"><span>Средняя выработка свай</span><b>18,5 м.п.</b></div>
+                <div class="line"><span>Средняя выработка бурения</span><b>18,5 м.п.</b></div>
+                <div class="line"><span>Эффективность</span><b>92%</b></div>
+              </div>
+            </section>
+
+            <section class="overview-card">
+              <h4>4. ТО и обслуживание</h4>
+              <div class="section-body">
+                <div class="line"><span>Ближайшее ТО</span><b>${m.name === 'LRH-100 №2' ? 'через 42 ч' : m.to}</b></div>
+                <div class="line"><span>Вид ТО</span><b>ТО-500</b></div>
+                <div class="line"><span>Последнее ТО</span><b>8 ч назад</b></div>
+                <div class="line"><span>Замечания</span><b>${m.name === 'LRH-100 №2' ? 'нет' : (m.warnings.length ? m.warnings.join(', ') : 'нет')}</b></div>
+              </div>
+            </section>
+          </div>`;
+      } else if (activeTab === 'Работа') {
+        body.innerHTML = `
+          <section class="section"><h4>Смена сегодня</h4><div class="section-body facts">
+            <div class="fact"><small>Сваи</small><strong>${m.piles}</strong></div>
+            <div class="fact"><small>Бурение</small><strong>${m.drilling}</strong></div>
+            <div class="fact"><small>Простой</small><strong>${m.downtime}</strong></div>
+            <div class="fact"><small>Отчёт</small><strong>${m.latest}</strong></div>
+          </div></section>
+          <section class="section"><h4>План-факт</h4><div class="section-body">
+            <div class="line"><span>План свай</span><b>20 шт. / 140 м.п.</b></div>
+            <div class="bar"><span style="--w:90%;--c:var(--green)"></span></div>
+            <div class="line"><span>План бурения</span><b>4 шт. / 56 м</b></div>
+            <div class="bar"><span style="--w:75%;--c:var(--blue)"></span></div>
+          </div></section>`;
+      } else if (activeTab === 'ТО') {
+        body.innerHTML = `
+          <section class="section"><h4>Техническое обслуживание</h4><div class="section-body">
+            <div class="line"><span>Следующее ТО</span><b>${m.to}</b></div>
+            <div class="line"><span>Тип</span><b>ТО-250</b></div>
+            <div class="line"><span>Ответственный</span><b>Орлов М.С.</b></div>
+            <div class="line"><span>Последнее ТО</span><b>28.05.2026</b></div>
+          </div></section>
+          <section class="section"><h4>Замечания</h4><div class="section-body">
+            <div class="event"><span class="dot amber"></span><div>Проверить гидролинию</div><span class="muted">13.06</span></div>
+            <div class="event"><span class="dot red"></span><div>Заменить фильтр гидравлики</div><span class="muted">13.06</span></div>
+          </div></section>`;
+      } else if (activeTab === 'Документы') {
+        body.innerHTML = `
+          <section class="section"><h4>Документы установки</h4><div class="section-body">
+            <div class="line"><span>Паспорт установки</span><b>PDF · актуален</b></div>
+            <div class="line"><span>Руководство по эксплуатации</span><b>PDF</b></div>
+            <div class="line"><span>Сервисные акты</span><b>4 файла</b></div>
+            <div class="line"><span>Страхование / регистрация</span><b>до 31.12.2026</b></div>
+          </div></section>`;
+      } else if (activeTab === 'Фото') {
+        body.innerHTML = `
+          <section class="section"><h4>Фото установки и смены</h4><div class="section-body">
+            <div class="thumbs"><div class="thumb"></div><div class="thumb"></div><div class="thumb"></div><div class="thumb"></div></div>
+            <div class="line"><span>Фото за последнюю смену</span><b>12</b></div>
+            <div class="line"><span>Фото дефектов</span><b>${m.warnings.length}</b></div>
+          </div></section>`;
+      } else {
+        body.innerHTML = `
+          <section class="section"><h4>История событий</h4><div class="section-body">
+            <div class="event"><span class="dot"></span><div>Смена открыта оператором</div><span class="muted">07:00</span></div>
+            <div class="event"><span class="dot amber"></span><div>Добавлено замечание по установке</div><span class="muted">11:24</span></div>
+            <div class="event"><span class="dot"></span><div>Отчёт принят диспетчером</div><span class="muted">17:34</span></div>
+            <div class="event"><span class="dot"></span><div>PDF сформирован</div><span class="muted">17:36</span></div>
+          </div></section>`;
+      }
+    }
+
+    function selectMachine(index) {
+      selected = index;
+      renderCards();
+      renderDetail();
+    }
+
+    function setTab(tab) {
+      activeTab = tab;
+      renderDetail();
+    }
+
+    function switchView(view) {
+      const showCards = view === 'cards';
+      document.getElementById('cards').style.display = showCards ? 'grid' : 'none';
+      document.getElementById('tablePanel').style.display = showCards ? 'none' : 'block';
+      document.getElementById('viewCards').classList.toggle('active', showCards);
+      document.getElementById('viewTable').classList.toggle('active', !showCards);
+    }
+
+    renderCards();
+    renderTable();
+    renderDetail();
+  </script>
+</body>
+</html>

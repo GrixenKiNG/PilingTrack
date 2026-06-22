@@ -50,7 +50,6 @@ async function testAdminFlow(page: Page) {
 
   // 2. Test Admin Dashboard
   try {
-    const pageTitle = await page.title();
     const hasMetrics = await page.locator('[data-testid="metric-card"]').count();
     const hasQuickLinks = await page.locator('[data-testid="quick-link"]').count();
 
@@ -340,7 +339,7 @@ async function main() {
     console.log(`\nTotal: ${results.length} tests`);
 
     // Save results to file
-    const reportContent = `# PilingTrack E2E Testing Report
+    const _reportContent = `# PilingTrack E2E Testing Report
 Generated: ${new Date().toISOString()}
 
 ## Summary

@@ -12,7 +12,6 @@
  */
 
 import { db } from '@/lib/db';
-import { Prisma } from '@/generated/postgres-client/client';
 
 export interface AuditLogEntry {
   entity: string;
@@ -41,7 +40,9 @@ export async function recordAuditLog(entry: AuditLogEntry): Promise<void> {
       entity: entry.entity,
       action: entry.action,
       entityId: entry.entityId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       before: entry.before as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       after: entry.after as any,
       userId: entry.userId || null,
       userName: entry.userName || null,

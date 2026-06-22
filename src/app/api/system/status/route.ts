@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { checkSystemStatus, getFreshStatus, getCurrentStatus } from '@/core/observability/health-tracker';
+import { getFreshStatus, getCurrentStatus } from '@/core/observability/health-tracker';
 import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
@@ -27,6 +27,7 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
 
   // Admin-only — health status reveals infrastructure details
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'system.read');
 
   const searchParams = request.nextUrl.searchParams;

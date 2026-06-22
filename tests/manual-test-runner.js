@@ -224,7 +224,7 @@ async function testOperatorFlow() {
   
   // Try to fill report form
   // Look for site/object selector
-  const siteSelect = page.locator('select, [role="combobox"], [data-testid="site-select"]').first();
+  const _siteSelect = page.locator('select, [role="combobox"], [data-testid="site-select"]').first();
   const formFields = page.locator('input, select, textarea');
   const fieldCount = await formFields.count();
   log('Report Form Fields', fieldCount > 0 ? 'PASS' : 'WARN', `${fieldCount} form fields found`);
@@ -249,7 +249,7 @@ async function testOperatorFlow() {
             break;
           }
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
     await screenshot('16-operator-report-filled');
   }

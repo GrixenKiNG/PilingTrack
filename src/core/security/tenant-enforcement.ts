@@ -21,7 +21,7 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
 
 // ============================================================
 // Tenant Context

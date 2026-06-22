@@ -102,6 +102,7 @@ export const POST = withApi(async (request: NextRequest) => {
   if (error) return error;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const roleCheck = assertAnyRole(user!, ['ADMIN', 'DISPATCHER', 'OPERATOR']);
     if (roleCheck) return roleCheck;
 
@@ -134,12 +135,14 @@ export const POST = withApi(async (request: NextRequest) => {
       const count = await ingestTelemetryBatch(
         validated.data.map((d) => ({
           ...d,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
           type: d.type as any,
           siteId: d.siteId ?? undefined,
           unit: d.unit ?? undefined,
           latitude: d.latitude ?? undefined,
           longitude: d.longitude ?? undefined,
           metadata: d.metadata ?? undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         })) as any
       );
       return NextResponse.json({
@@ -159,6 +162,7 @@ export const POST = withApi(async (request: NextRequest) => {
       );
     }
     const id = await ingestTelemetry({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: validated.data.type as any,
       equipmentId: validated.data.equipmentId,
       value: validated.data.value,
@@ -170,6 +174,7 @@ export const POST = withApi(async (request: NextRequest) => {
       timestamp: validated.data.timestamp
         ? new Date(validated.data.timestamp)
         : undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
     } as any);
 
     const isSampledOut = id.startsWith('sampled-out-');
@@ -210,6 +215,7 @@ export const GET = withApi(async (request: NextRequest) => {
 
     // Stats endpoint is admin-only — keep behind analytics.read.
     if (action === 'stats') {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCan(user!, 'analytics.read');
       const ingestStats = getIngestStats();
       const samplingConfig = getSamplingConfig();
@@ -228,14 +234,17 @@ export const GET = withApi(async (request: NextRequest) => {
     //   crew-assigned to. We resolve the equipment ids up front and pass
     //   them as an explicit filter — never trust the client to scope itself.
     // - DISPATCHER / ADMIN keep the existing analytics.read gate.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const role = user!.role;
     let allowedEquipmentIds: string[] | null = null;
     if (role === 'OPERATOR' || role === 'ASSISTANT') {
       const { listAllEquipment } = await import('@/modules/equipment');
       // Page through accessible equipment — typically small for an operator.
       const owned = await listAllEquipment(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         { limit: 200, getNextCursor: () => null } as any,
         null,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         user!.id
       );
       allowedEquipmentIds = (owned as Array<{ id: string }>).map((e) => e.id);
@@ -243,6 +252,7 @@ export const GET = withApi(async (request: NextRequest) => {
         return NextResponse.json({ records: [] });
       }
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCan(user!, 'analytics.read');
     }
 
@@ -287,11 +297,13 @@ export const GET = withApi(async (request: NextRequest) => {
     const records = await getTelemetryByRange({
       equipmentId,
       siteId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: type as any,
       from: new Date(from),
       to: new Date(to),
       limit,
       ...(allowedEquipmentIds && !equipmentId ? { equipmentIds: allowedEquipmentIds } : {}),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
     } as any);
 
     return NextResponse.json({ records });

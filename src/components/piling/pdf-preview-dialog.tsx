@@ -25,6 +25,7 @@ export function PdfPreviewDialog({
   }, [reportId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (open && previewUrl) setLoading(true);
     else setLoading(false);
   }, [open, previewUrl]);

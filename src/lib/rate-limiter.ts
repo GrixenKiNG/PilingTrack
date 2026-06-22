@@ -339,6 +339,7 @@ class RateLimiter {
         const counterKey = `rl:${identifier}`;
         const blockKey = `rl:blocked:${identifier}`;
 
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
         const [counterRaw, blockedRaw] = await this.redis!.mget(counterKey, blockKey);
         const attempts = counterRaw ? parseInt(counterRaw, 10) : 0;
         const now = Date.now();

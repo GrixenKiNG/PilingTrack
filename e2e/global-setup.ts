@@ -12,7 +12,7 @@ import * as path from 'path';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const AUTH_DIR = path.join(__dirname, '.auth');
 
-async function globalSetup(config: FullConfig) {
+async function globalSetup(_config: FullConfig) {
   console.log('🔐 Global Setup: Authenticating users...');
 
   // Ensure auth directory exists

@@ -32,6 +32,7 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = searchParams.get('tenantId') || user!.tenantId;
 
   if (!tenantId) {
@@ -55,6 +56,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   if (user!.role !== 'ADMIN') {
     return createJsonResponse({ error: 'Admin access required' }, { status: 403 }, requestId);
   }

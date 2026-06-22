@@ -17,6 +17,7 @@ export const GET = withApi(
     if (error) return error;
 
     const requestedUserId = request.nextUrl.searchParams.get('userId');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const userId = resolveAccessibleUserId(sessionUser!, requestedUserId, 'reports.read_cross_user');
     const db = await getDbClient();
 

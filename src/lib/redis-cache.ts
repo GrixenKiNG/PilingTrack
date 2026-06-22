@@ -26,6 +26,7 @@
 // Guard against client-side imports (Next.js only, not Node.js workers).
 // Fire-and-forget so this file compiles to CJS in worker contexts (tsx).
 if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge') {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- @ts-ignore (not -expect-error) is intentional: in worker/CJS builds 'server-only' may be absent (a real TS error), but it's installed under Next.js (no error), so @ts-expect-error would itself fail.
   // @ts-ignore - server-only not available in all contexts
   import('server-only').catch(() => {
     // Ignore: running in worker context where server-only isn't installed

@@ -26,16 +26,16 @@
 
 import { createHash, randomUUID } from 'crypto';
 import { db } from '@/lib/db';
-import { createSessionToken, verifySessionToken, SessionUser } from '@/services/auth/session-service';
-import { ServiceError } from '@/services/service-error';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
+import { createSessionToken, SessionUser } from '@/services/auth/session-service';
+import { ServiceError } from '@/lib/service-error';
 
 // ============================================================
 // Token Configuration
 // ============================================================
 
-const ACCESS_TOKEN_TTL_SECONDS = 12 * 60 * 60; // 12 hours (current session token)
 const REFRESH_TOKEN_TTL_DAYS = 30;
-const REFRESH_TOKEN_FAMILY_TTL_DAYS = 90; // Max family lifetime
+const REFRESH_TOKEN_FAMILY_TTL_DAYS = 90; // Max family lifetime (capped across rotations)
 
 export interface TokenPair {
   accessToken: string;
@@ -151,6 +151,27 @@ export async function rotateRefreshToken(
     throw new ServiceError('Refresh token expired', 401);
   }
 
+  // Enforce the family max-lifetime. The per-token 30d TTL above only caps a
+  // single token; without this, a rotated chain (each link a fresh 30d token)
+  // would live forever. familyCreatedAt is the family's birth time, carried
+  // forward unchanged on every rotation, so the family ages out at 90d no
+  // matter how many times it rotates.
+  const familyExpiresAt = new Date(existingToken.familyCreatedAt);
+  familyExpiresAt.setDate(familyExpiresAt.getDate() + REFRESH_TOKEN_FAMILY_TTL_DAYS);
+  if (familyExpiresAt < new Date()) {
+    // Revoke the whole family so no sibling token survives the cap.
+    await db.refreshToken.updateMany({
+      where: { family: existingToken.family },
+      data: {
+        revoked: true,
+        revokedAt: new Date(),
+        revokedReason: 'Family max lifetime exceeded — re-authentication required',
+      },
+    });
+
+    throw new ServiceError('Session lifetime exceeded — please re-authenticate', 401);
+  }
+
   // Check for concurrent reuse (different token hash, same family, not yet revoked)
   const concurrentTokens = await db.refreshToken.findMany({
     where: {
@@ -191,7 +212,15 @@ export async function rotateRefreshToken(
   // Fetch user for new access token
   const user = await db.user.findUnique({
     where: { id: existingToken.userId },
-    select: { id: true, email: true, name: true, role: true, isActive: true, tenantId: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      tenantId: true,
+      sessionVersion: true,
+    },
   });
 
   if (!user || !user.isActive) {
@@ -209,6 +238,9 @@ export async function rotateRefreshToken(
       userId: user.id,
       token: hashedNewToken,
       family: existingToken.family,
+      // Carry the family's birth time forward unchanged so rotation cannot
+      // extend the 90-day family max-lifetime.
+      familyCreatedAt: existingToken.familyCreatedAt,
       expiresAt,
       ipAddress: ipAddress || null,
       userAgent: userAgent || null,
@@ -221,6 +253,7 @@ export async function rotateRefreshToken(
     name: user.name,
     role: user.role,
     tenantId: user.tenantId,
+    sessionVersion: user.sessionVersion,
   };
 
   const accessToken = await createSessionToken(sessionUser);

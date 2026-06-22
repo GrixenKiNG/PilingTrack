@@ -9,6 +9,7 @@ import {
 import { formatMeters, formatNumber, formatRuDate } from './format';
 import { toPeriodReportRow } from './period-row';
 import { renderPdf } from './render';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { PeriodPdfData } from './types';
 
 export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
@@ -19,19 +20,10 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
         sum + (report.drillings || []).reduce((inner, drilling) => inner + (drilling.count || 1), 0),
       0
     );
-    const pileLengthFromName = (name: string) => {
-      const m = name.match(/\d{3}/);
-      return m ? Number(m[0]) / 10 : 0;
-    };
     const totalPileMeters = reports.reduce(
       (sum, report) =>
         sum + (report.piles || []).reduce(
-          (inner, pile) => {
-            const mpu = pile.metersPerUnit && pile.metersPerUnit > 0
-              ? pile.metersPerUnit
-              : pileLengthFromName(pile.pileGrade?.name || '');
-            return inner + (pile.count || 0) * mpu;
-          },
+          (inner, pile) => inner + (pile.count || 0) * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
           0,
         ),
       0,

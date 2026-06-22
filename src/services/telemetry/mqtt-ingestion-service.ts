@@ -16,7 +16,6 @@
  */
 
 import { z } from 'zod';
-import { db } from '@/lib/db';
 import { ingestTelemetry } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
 
@@ -93,6 +92,7 @@ async function handleTelemetryMessage(topic: string, payload: Buffer): Promise<v
 
   try {
     await ingestTelemetry({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: message.type as any,
       equipmentId,
       siteId: (message.metadata?.siteId as string) ?? undefined,
@@ -122,7 +122,7 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
   }
 
   // Dynamic import to avoid requiring mqtt package when not used
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
   let mqtt: any;
   try {
     // @ts-expect-error mqtt is optional — install with: npm install mqtt
@@ -185,6 +185,7 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
 export async function stopMqttIngestion(): Promise<void> {
   if (!mqttClient) return;
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
   const client = mqttClient as any;
   await new Promise<void>((resolve) => {
     client.end(() => resolve());

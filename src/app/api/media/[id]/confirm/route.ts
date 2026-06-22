@@ -19,6 +19,7 @@ export const POST = withMutation(
     if (!media) return NextResponse.json({ error: 'Media not found' }, { status: 404 });
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCanAccessMedia(user!, media);
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

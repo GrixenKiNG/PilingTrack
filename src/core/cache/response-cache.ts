@@ -187,7 +187,7 @@ export class ResponseCache {
   private async executeAndCache<T>(
     cacheKey: string,
     fetchFn: () => Promise<NextResponse<T>>,
-    ttl: number
+    _ttl: number
   ): Promise<NextResponse<T>> {
     const value = await fetchFn();
 
@@ -197,6 +197,7 @@ export class ResponseCache {
     }
 
     this.cache.set(cacheKey, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       value: cloneResponse(value) as any,
       createdAt: Date.now(),
       lastAccessedAt: Date.now(),
@@ -340,6 +341,7 @@ export function getResponseCache(domain: string, config?: Partial<CacheConfig>):
   if (!caches.has(domain)) {
     caches.set(domain, new ResponseCache(config));
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   return caches.get(domain)!;
 }
 

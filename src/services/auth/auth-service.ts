@@ -150,6 +150,7 @@ function toSessionUser(user: {
   name: string;
   role: string;
   tenantId: string | null;
+  sessionVersion: number;
 }): SessionUser {
   return {
     id: user.id,
@@ -157,6 +158,7 @@ function toSessionUser(user: {
     name: user.name,
     role: user.role,
     tenantId: user.tenantId,
+    sessionVersion: user.sessionVersion,
   };
 }
 
@@ -177,6 +179,7 @@ export async function authenticateUserByEmailPassword(email: string, password: s
       role: true,
       isActive: true,
       tenantId: true,
+      sessionVersion: true,
     },
   });
 
@@ -231,6 +234,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     role: string;
     isActive: boolean;
     tenantId: string | null;
+    sessionVersion: number;
   } | null = null;
 
   const indexedCandidate = await db.user.findUnique({
@@ -245,6 +249,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
       role: true,
       isActive: true,
       tenantId: true,
+      sessionVersion: true,
     },
   }).catch(() => null);
 
@@ -276,6 +281,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
         role: true,
         isActive: true,
         tenantId: true,
+        sessionVersion: true,
       },
     });
 
@@ -298,6 +304,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
 
   // Opportunistic upgrade: ensure stored values use bcrypt + have pinLookup
   // backfilled so the next login takes the O(1) fast path.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const needsBcryptUpgrade = !matchedUser.pin!.startsWith(PIN_HASH_PREFIX);
   const needsLookupBackfill = !matchedUser.pinLookup;
   if (needsBcryptUpgrade || needsLookupBackfill) {

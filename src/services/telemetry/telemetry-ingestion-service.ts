@@ -77,7 +77,7 @@ const DEFAULT_SAMPLING_CONFIG: SamplingConfig = {
 const MAX_INGEST_RATE = 1000; // max records per second
 let ingestCountWindow = 0;
 let ingestWindowStart = Date.now();
-let currentSamplingConfig: SamplingConfig = { ...DEFAULT_SAMPLING_CONFIG };
+const currentSamplingConfig: SamplingConfig = { ...DEFAULT_SAMPLING_CONFIG };
 
 /**
  * Check if ingestion is within the rate limit.

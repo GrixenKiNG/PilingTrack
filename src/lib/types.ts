@@ -69,6 +69,24 @@ export interface UserDTO {
   isActive: boolean;
 }
 
+export interface OperationalUserDTO extends UserDTO {
+  phone: string;
+  createdAt: string;
+  assignedSites: Array<{ id: string; name: string }>;
+  activeCrew: {
+    id: string;
+    name: string;
+    equipmentName: string | null;
+    siteName: string | null;
+  } | null;
+  reportCount: number;
+  canHardDelete: boolean;
+  lastReportAt: string | null;
+  lastLoginAt: string | null;
+  lastActivityAt: string | null;
+  lastActivitySource: 'login' | 'report' | 'profile' | null;
+}
+
 export interface CreateUserPayload {
   email: string;
   password: string;
@@ -148,6 +166,8 @@ export interface PileGradeDTO {
   id: string;
   name: string;
   isActive: boolean;
+  /** Pile length in millimetres; null = unknown. Source of truth for м.п. (see lib/pile-length). */
+  lengthMm?: number | null;
 }
 
 export interface DrillingTypeDTO {
@@ -170,6 +190,8 @@ export interface CreateReportPayload {
   reportId: string;
   userId: string;
   siteId: string;
+  /** Version the client loaded; sent back for optimistic-concurrency (409 on conflict). */
+  version?: number;
   date: string; // YYYY-MM-DD
   shiftStart?: string;
   shiftEnd?: string;
@@ -202,6 +224,8 @@ export interface ReportDTO {
   shiftStart: string | null;
   shiftEnd: string | null;
   status: ReportStatus;
+  /** Optimistic-concurrency token round-tripped to upsert; absent on legacy rows. */
+  version?: number;
   lastEditedById: string | null;
   lastEditedByName: string | null;
   lastEditedByRole: string | null;

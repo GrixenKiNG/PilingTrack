@@ -29,8 +29,9 @@ import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { cn } from '@/lib/utils';
-import { formatNumber, pluralizeRu } from '@/lib/format';
+import { formatNumber, formatHours, pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
+import { getReportTotals, addTotals, shiftDurationHours, type ReportTotals } from './report-totals';
 import { useReportsData } from './use-reports-data';
 import { ReportFilters } from './report-filters';
 import { ReportDetailDialog } from './report-detail-dialog';
@@ -40,15 +41,6 @@ import { useReportHistory } from './use-report-history';
 import { statusLabel, type ReportHistory } from '@/services/reports/report-history';
 
 type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
-
-interface ReportTotals {
-  piles: number;
-  pileMeters: number;
-  drillingCount: number;
-  drillingMeters: number;
-  downtimeHours: number;
-  photoCount: number;
-}
 
 const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'all', label: 'Все' },
@@ -69,46 +61,6 @@ function shiftYmd(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function getPileLengthMeters(pileGradeName: string) {
-  const match = pileGradeName.match(/\d{3}/);
-  return match ? Number(match[0]) / 10 : 0;
-}
-
-function getReportTotals(report: ReportDTO): ReportTotals {
-  const piles = report.piles?.reduce((sum, pile) => sum + pile.count, 0) || 0;
-  const pileMeters = report.piles?.reduce(
-    (sum, pile) => sum + getPileLengthMeters(pile.pileGrade?.name || '') * pile.count,
-    0,
-  ) || 0;
-  const drillingCount = report.drillings?.reduce((sum, drilling) => sum + (drilling.count || 1), 0) || 0;
-  const drillingMeters = report.drillings?.reduce((sum, drilling) => sum + drilling.meters, 0) || 0;
-  const downtimeHours = report.downtimes?.reduce((sum, downtime) => sum + downtime.duration, 0) || 0;
-
-  return { piles, pileMeters, drillingCount, drillingMeters, downtimeHours, photoCount: 0 };
-}
-
-function addTotals(reports: ReportDTO[]): ReportTotals {
-  return reports.reduce<ReportTotals>((acc, report) => {
-    const totals = getReportTotals(report);
-    acc.piles += totals.piles;
-    acc.pileMeters += totals.pileMeters;
-    acc.drillingCount += totals.drillingCount;
-    acc.drillingMeters += totals.drillingMeters;
-    acc.downtimeHours += totals.downtimeHours;
-    acc.photoCount += totals.photoCount;
-    return acc;
-  }, { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0, photoCount: 0 });
-}
-
-function formatHours(hours: number): string {
-  if (!hours || hours <= 0) return '0 ч';
-  const whole = Math.floor(hours);
-  const mins = Math.round((hours - whole) * 60);
-  if (mins === 0) return `${whole} ч`;
-  if (whole === 0) return `${mins} мин`;
-  return `${whole} ч ${mins} мин`;
 }
 
 function shortDate(ymd: string): string {
@@ -140,17 +92,6 @@ function roleLabel(role: string): string {
   return 'Оператор';
 }
 
-function shiftDurationHours(report: ReportDTO): number | null {
-  if (!report.shiftStart || !report.shiftEnd) return null;
-  const [startHour, startMinute] = report.shiftStart.split(':').map(Number);
-  const [endHour, endMinute] = report.shiftEnd.split(':').map(Number);
-  if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) return null;
-  const start = startHour * 60 + startMinute;
-  let end = endHour * 60 + endMinute;
-  if (end < start) end += 24 * 60;
-  return (end - start) / 60;
-}
-
 function formatPercentValue(value: number): string {
   return `${Math.max(0, Math.min(100, Math.round(value)))}%`;
 }
@@ -161,11 +102,10 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, periodSummary, loading, loadingSites, loadingReferenceData, loadingMore, hasMore, error,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   } = useReportsData();
 
-  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [detailReport, setDetailReport] = useState<ReportDTO | null>(null);
   const [previewReport, setPreviewReport] = useState<ReportDTO | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -175,19 +115,16 @@ export function AdminReports() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   const [photoReportIds, setPhotoReportIds] = useState<Record<string, boolean>>({});
-  const reportHistory = useReportHistory(previewReport?.reportId);
+  // The preview pane shows the user-selected report, falling back to the first
+  // one when nothing is selected (so it's never empty while reports exist).
+  const effectivePreview = previewReport ?? reports[0] ?? null;
+  const reportHistory = useReportHistory(effectivePreview?.reportId);
 
   useEffect(() => {
     if (showCreateDialog) {
       void loadReferenceData();
     }
   }, [showCreateDialog, loadReferenceData]);
-
-  useEffect(() => {
-    if (!previewReport && reports.length > 0) {
-      setPreviewReport(reports[0]);
-    }
-  }, [previewReport, reports]);
 
   useEffect(() => {
     const missing = reports
@@ -236,7 +173,7 @@ export function AdminReports() {
         const msg = await res.text().catch(() => '');
         throw new Error(`Ошибка удаления (${res.status}): ${msg.slice(0, 200)}`);
       }
-      if (previewReport?.reportId === report.reportId) setPreviewReport(null);
+      if (effectivePreview?.reportId === report.reportId) setPreviewReport(null);
       await loadReports();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
@@ -248,36 +185,6 @@ export function AdminReports() {
   const handlePreviewPdf = (report: ReportDTO) => {
     if (!report.reportId) return;
     setPreviewReportId(report.reportId);
-  };
-
-  const handleExportPdf = async () => {
-    if (!periodFrom || !periodTo) return;
-    setGeneratingPdf(true);
-    try {
-      const { authFetch } = await import('@/lib/api');
-      const params = new URLSearchParams({ dateFrom: periodFrom, dateTo: periodTo, inline: '1' });
-      if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
-      if (filterUserId !== 'all') params.set('userId', filterUserId);
-      const res = await authFetch(`/api/reports/pdf?${params}`);
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        throw new Error(`Ошибка генерации PDF (${res.status}): ${msg.slice(0, 200)}`);
-      }
-      const blob = await res.blob();
-      if (blob.size === 0 || blob.type.indexOf('pdf') === -1) {
-        throw new Error('Сервер вернул пустой или неверный PDF');
-      }
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        alert('Разрешите всплывающие окна, чтобы открыть PDF для печати.');
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Не удалось сформировать PDF');
-    } finally {
-      setGeneratingPdf(false);
-    }
   };
 
   const filteredReports = useMemo(() => {
@@ -431,7 +338,7 @@ export function AdminReports() {
                       <EvidenceReportRow
                         key={report.id}
                         report={report}
-                        active={previewReport?.reportId === report.reportId}
+                        active={effectivePreview?.reportId === report.reportId}
                         deleting={deletingId === report.reportId}
                         formatLastEditor={formatLastEditor}
                         onSelect={setPreviewReport}
@@ -461,7 +368,7 @@ export function AdminReports() {
           </div>
 
           <ReportEvidencePreview
-            report={previewReport}
+            report={effectivePreview}
             history={reportHistory}
             formatDate={formatDate}
             onClose={() => setPreviewReport(null)}

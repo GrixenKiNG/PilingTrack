@@ -77,7 +77,7 @@ function generateReportPayload(vuId, iteration) {
   };
 }
 
-export default function () {
+export default function runScenario() {
   const vuId = __VU;
   const iteration = __ITER;
   const headers = {
@@ -124,7 +124,7 @@ export default function () {
         socket.send(JSON.stringify({ type: 'ping' }));
       });
 
-      socket.on('message', (msg) => {
+      socket.on('message', (_msg) => {
         wsMessages.add(1);
       });
 

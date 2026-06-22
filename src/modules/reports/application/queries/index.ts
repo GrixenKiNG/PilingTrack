@@ -2,11 +2,13 @@ export {
   getEditableReport,
   getReportsByPeriod,
   listReportsForReview,
+  listRecentReportsForDashboard,
   listReportsForUserScope,
   exportReportsCsv,
   getDashboardStats,
   reportDetailInclude,
 } from './report-query.service';
+export type { RecentReportRow } from './report-query.service';
 
 export {
   getReportStats,

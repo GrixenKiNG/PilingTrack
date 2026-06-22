@@ -17,6 +17,7 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'dlq.manage');
 
     const status = request.nextUrl.searchParams.get('status') ?? 'pending';
@@ -64,6 +65,7 @@ export const POST = withMutation(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'dlq.manage');
 
     const body = await request.json();

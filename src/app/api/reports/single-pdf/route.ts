@@ -34,7 +34,9 @@ export const POST = withMutation(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await ensureTenantAccess(user!, context.report.tenantId, 'report');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCanAccessReportOwner(user!, context.report.userId, 'reports.read_cross_user');
 
     const jobId = await enqueuePdfGeneration({
@@ -43,6 +45,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       siteId: context.report.siteId || '',
       type: 'single',
       reportId,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
       report: context.pdfData,
     });
@@ -103,22 +106,22 @@ export const POST = withMutation(async (request: NextRequest) => {
 // ============================================================
 
 export const GET = withApi(async (request: NextRequest) => {
-  const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
   const searchParams = request.nextUrl.searchParams;
   const reportId = searchParams.get('reportId');
   const sync = searchParams.get('sync');
-  const inline = searchParams.get('inline');
 
   // --- If reportId is provided, generate synchronously for preview/download ---
   if (reportId) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     return handleSyncGeneration(request, user!);
   }
 
   // --- Explicit sync fallback ---
   if (sync === '1') {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     return handleSyncGeneration(request, user!);
   }
 
@@ -163,7 +166,9 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await ensureTenantAccess(user!, context.report.tenantId, 'report');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCanAccessReportOwner(user!, context.report.userId, 'reports.read_cross_user');
 
     const pdfBuffer = await generateSinglePdf(context.pdfData);

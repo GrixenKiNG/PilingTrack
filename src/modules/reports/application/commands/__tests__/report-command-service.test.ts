@@ -25,6 +25,7 @@ import type { UpsertReportCommand } from '../upsert-report.command';
 // Mock authorization
 vi.mock('@/services/auth/resource-access-service', () => ({
   assertUserAssignedToSite: vi.fn().mockResolvedValue(undefined),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   resolveAccessibleUserId: vi.fn((_session: any, requested: string | null | undefined) => requested || 'user-1'),
   assertCanManageUserScope: vi.fn(),
 }));
@@ -188,8 +189,8 @@ describe('Report Command Service', () => {
         date: '2026-04-03',
       });
       // Manually set old updatedAt
-      const state = existingAggregate.getState();
-      (existingAggregate as any).state.updatedAt = oldDate.toISOString();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
+        (existingAggregate as any).state.updatedAt = oldDate.toISOString();
 
       mockRepoFindById.mockResolvedValue(existingAggregate);
 
@@ -217,6 +218,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-03',
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
       (existingAggregate as any).state.updatedAt = oldDate.toISOString();
 
       mockRepoFindById.mockResolvedValue(existingAggregate);
@@ -303,6 +305,42 @@ describe('Report Command Service', () => {
     it('should not throw for valid user scope', () => {
       const sessionUser = { id: 'admin-1', role: 'ADMIN' };
       expect(() => assertCanActForUser(sessionUser, 'user-2')).not.toThrow();
+    });
+  });
+
+  describe('tenant + concurrency wiring', () => {
+    it('persists tenantId from the command onto the created aggregate', async () => {
+      const input: UpsertReportCommand = {
+        reportId: 'report-tenant',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        tenantId: 'orion',
+        piles: [{ pileGradeId: 'grade-1', count: 2 }],
+      };
+
+      await upsertReport(input);
+
+      const savedAggregate = mockRepoSave.mock.calls[0][0] as ReportAggregate;
+      expect(savedAggregate.getState().tenantId).toBe('orion');
+    });
+
+    it('forwards expectedVersion to the repository save options', async () => {
+      const input: UpsertReportCommand = {
+        reportId: 'report-v',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        expectedVersion: 7,
+        piles: [{ pileGradeId: 'grade-1', count: 1 }],
+      };
+
+      await upsertReport(input);
+
+      expect(mockRepoSave).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ expectedVersion: 7 }),
+      );
     });
   });
 });

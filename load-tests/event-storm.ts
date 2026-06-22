@@ -216,7 +216,7 @@ async function runStorm() {
       for (let i = 0; i < events.length; i++) {
         stats.recordPublish();
       }
-    } catch (err) {
+    } catch {
       const count = Math.min(batchSize, 10);
       for (let i = 0; i < count; i++) {
         stats.recordError();

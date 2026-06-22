@@ -50,8 +50,11 @@ export function timezoneDateToUtc(localDate: string, timezone: string = DEFAULT_
   
   // Use the parts to construct the date in the timezone
   const parts = formatter.formatToParts(new Date(year, month - 1, day, 12, 0, 0));
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const tzYear = parseInt(parts.find(p => p.type === 'year')!.value);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const tzMonth = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const tzDay = parseInt(parts.find(p => p.type === 'day')!.value);
   
   // Create a date assuming the local timezone, then get UTC equivalent

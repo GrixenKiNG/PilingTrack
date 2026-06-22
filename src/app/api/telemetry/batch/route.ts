@@ -78,6 +78,7 @@ export const POST = withApi(async (request: NextRequest) => {
 
   try {
     // Only ADMIN, DISPATCHER, and OPERATOR can submit telemetry
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     if (!['ADMIN', 'DISPATCHER', 'OPERATOR'].includes(user!.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -117,12 +118,14 @@ export const POST = withApi(async (request: NextRequest) => {
     const count = await ingestTelemetryBatch(
       validated.data.map((d) => ({
         ...d,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         type: d.type as any,
         siteId: d.siteId ?? undefined,
         unit: d.unit ?? undefined,
         latitude: d.latitude ?? undefined,
         longitude: d.longitude ?? undefined,
         metadata: d.metadata ?? undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       })) as any
     );
 

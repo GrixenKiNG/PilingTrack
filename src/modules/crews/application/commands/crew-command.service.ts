@@ -3,11 +3,24 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
-import { ServiceError } from '@/services/service-error';
+import { ServiceError } from '@/lib/service-error';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
+import { recordAuditEvent } from '@/services/audit/audit-service';
 import { CrewAggregate } from '../../domain';
 import { getCrewRepository } from '../../infrastructure';
 import { CreateCrewCommand, UpdateCrewCommand, DeleteCrewCommand } from './crew.command';
 import { logger } from '@/lib/logger';
+
+// Fields tracked in the crew assignment history (scope 'crews').
+function crewAuditSnapshot(state: { name: string; operatorId: string; equipmentId: string; siteId: string; isActive: boolean }) {
+  return {
+    name: state.name,
+    operatorId: state.operatorId,
+    equipmentId: state.equipmentId,
+    siteId: state.siteId,
+    isActive: state.isActive,
+  };
+}
 
 export async function createCrew(command: CreateCrewCommand) {
   // Validate required fields before creating aggregate
@@ -73,10 +86,20 @@ export async function createCrew(command: CreateCrewCommand) {
     throw new ServiceError('Failed to create crew', 500);
   }
 
-  return db.crew.findUnique({
+  const created = await db.crew.findUnique({
     where: { id: aggregate.getState().id },
     include: { operator: true, equipment: true, site: true, assistants: true },
   });
+
+  await recordAuditEvent({
+    action: 'crew.created',
+    scope: 'crews',
+    actorId: command.userId || null,
+    targetId: aggregate.getState().id,
+    metadata: crewAuditSnapshot(aggregate.getState()),
+  });
+
+  return created;
 }
 
 export async function updateCrew(command: UpdateCrewCommand) {
@@ -85,6 +108,8 @@ export async function updateCrew(command: UpdateCrewCommand) {
   if (!aggregate) {
     throw new ServiceError('Crew not found', 404);
   }
+
+  const before = crewAuditSnapshot(aggregate.getState());
 
   // Validate dependencies if operator/equipment/site are being changed
   if (command.operatorId || command.equipmentId || command.siteId) {
@@ -95,6 +120,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
     ]);
 
     if (command.operatorId && !operator) throw new ServiceError('Operator not found', 404);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
     if (command.operatorId && operator!.role !== 'OPERATOR') throw new ServiceError('User must have OPERATOR role', 400);
     
     // Check if new operator is already assigned to another crew
@@ -158,10 +184,20 @@ export async function updateCrew(command: UpdateCrewCommand) {
     }
   }
 
-  return db.crew.findUnique({
+  const updated = await db.crew.findUnique({
     where: { id: command.crewId },
     include: { operator: true, equipment: true, site: true, assistants: true },
   });
+
+  await recordAuditEvent({
+    action: 'crew.updated',
+    scope: 'crews',
+    actorId: command.userId || null,
+    targetId: command.crewId,
+    metadata: { before, after: crewAuditSnapshot(aggregate.getState()) },
+  });
+
+  return updated;
 }
 
 export async function deleteCrew(command: DeleteCrewCommand) {
@@ -175,18 +211,36 @@ export async function deleteCrew(command: DeleteCrewCommand) {
     throw new ServiceError('Crew is already deactivated', 400);
   }
 
+  const snapshot = crewAuditSnapshot(aggregate.getState());
+
   if (command.force) {
     // Force delete: delete linked reports first (bypasses domain for reports)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
       await tx.report.deleteMany({ where: { crewId: command.crewId } });
       await tx.crew.delete({ where: { id: command.crewId } });
     }, DEFAULT_TX_OPTIONS);
+    await recordAuditEvent({
+      action: 'crew.deleted',
+      scope: 'crews',
+      actorId: command.userId || null,
+      targetId: command.crewId,
+      metadata: { ...snapshot, force: true },
+    });
     return { success: true, deletedReports: true };
   }
 
   // Soft delete via domain — deactivate instead of hard delete
   aggregate.deactivate(command.userId);
   await repo.save(aggregate);
+
+  await recordAuditEvent({
+    action: 'crew.deleted',
+    scope: 'crews',
+    actorId: command.userId || null,
+    targetId: command.crewId,
+    metadata: { ...snapshot, force: false, deactivated: true },
+  });
 
   return { success: true, deactivated: true };
 }
@@ -196,6 +250,15 @@ export async function assignCrewToSite(crewId: string, siteId: string, userId?: 
   const aggregate = await repo.findById(crewId);
   if (!aggregate) throw new ServiceError('Crew not found', 404);
 
+  const fromSiteId = aggregate.getState().siteId;
   aggregate.assignToSite(siteId, userId);
   await repo.save(aggregate);
+
+  await recordAuditEvent({
+    action: 'crew.updated',
+    scope: 'crews',
+    actorId: userId || null,
+    targetId: crewId,
+    metadata: { before: { siteId: fromSiteId }, after: { siteId } },
+  });
 }

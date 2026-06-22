@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Plus, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -32,11 +33,6 @@ interface InspectionRow {
 }
 
 const ALL = '__all__';
-
-const formatRuDate = (iso: string): string => {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return y && m && d ? `${d}.${m}.${y}` : iso.slice(0, 10);
-};
 
 export function InspectionsList() {
   const [records, setRecords] = useState<InspectionRow[]>([]);
@@ -59,6 +55,7 @@ export function InspectionsList() {
     }
   }, [levelFilter]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   return (

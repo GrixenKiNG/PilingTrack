@@ -103,6 +103,7 @@ class RUMCollector {
    * Record network metrics.
    */
   recordNetwork(): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const connection = (navigator as any).connection;
     if (!connection) return;
 
@@ -199,7 +200,7 @@ class RUMCollector {
           metrics: batch,
         }),
       });
-    } catch (error) {
+    } catch {
       // Failed to send — metrics lost (acceptable for RUM)
       logger.warn('rum: failed to flush metrics');
     }
@@ -217,6 +218,7 @@ class RUMCollector {
       this.recordNetwork();
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const connection = (navigator as any).connection;
     if (connection) {
       connection.addEventListener('change', () => {
@@ -312,6 +314,7 @@ export function recordOfflineRUM(durationMs: number, reportsCreated: number): vo
  * Helper to record error with network context.
  */
 export function recordErrorRUM(error: Error): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   const connection = (navigator as any).connection;
   const networkType = connection?.effectiveType || 'unknown';
   rumCollector.recordError(error, networkType);

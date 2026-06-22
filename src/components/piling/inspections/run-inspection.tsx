@@ -121,6 +121,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
     }
   }, [inspectionId, currentUser]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   const setAnswer = (itemId: string, patch: Partial<ItemAnswer>) => {

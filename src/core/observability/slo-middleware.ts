@@ -24,7 +24,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSLO, getSLO } from './slo-enforcement';
 import { errorTracker } from './error-tracker';
-import { logger } from '@/lib/logger';
 
 // ============================================================
 // Domain Extraction from Route Path

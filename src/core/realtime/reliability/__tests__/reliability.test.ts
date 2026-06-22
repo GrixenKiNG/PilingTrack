@@ -70,7 +70,7 @@ describe('MessageTracker', () => {
 
   it('tracks acked vs unacked messages', () => {
     const msg1 = tracker.createMessage(createEvent());
-    const msg2 = tracker.createMessage(createEvent());
+    tracker.createMessage(createEvent());
 
     tracker.ack(msg1.id);
 
@@ -90,6 +90,7 @@ describe('MessageTracker', () => {
     const result = tracker.nack(msg.id, 'parse_error');
 
     expect(result).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     expect(result!.retries).toBe(1);
   });
 
@@ -97,8 +98,8 @@ describe('MessageTracker', () => {
     const msg1 = tracker.createMessage(createEvent());
     tracker.ack(msg1.id);
 
-    const msg2 = tracker.createMessage(createEvent());
-    const msg3 = tracker.createMessage(createEvent());
+    tracker.createMessage(createEvent());
+    tracker.createMessage(createEvent());
 
     const unacked = tracker.getUnackedMessages(msg1.seq);
 
@@ -180,6 +181,7 @@ describe('ReplayBufferManager', () => {
 
     buffer.addMessage('client-1', msg);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     const clientBuffer = (buffer as any).buffers.get('client-1');
     expect(clientBuffer.messages).toHaveLength(1);
   });
@@ -217,6 +219,7 @@ describe('ReplayBufferManager', () => {
 
     buffer.ackMessage('client-1', 'msg-1');
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
     const clientBuffer = (buffer as any).buffers.get('client-1');
     expect(clientBuffer.lastAckedSeq).toBe(5);
     expect(clientBuffer.messages[0].acked).toBe(true);

@@ -103,6 +103,17 @@ For everyday edits, skip the ceremony — just do the work (a one-line plan only
 - Fall back to `services/` only if cross-cutting
 - Never add to `core/` unless it's true infrastructure
 
+**Where to write new domain code (the modules↔services migration is half-done):**
+The `services/ → modules/` migration was started and parked mid-way. Don't start a separate refactor to "finish" it — finish each domain *opportunistically*, the next time you're already editing it.
+- `reports/` is the **fully-migrated reference**: real logic lives in `modules/reports/` (`domain/application/commands/queries/infrastructure`). New report code goes there.
+- `users`, `analytics`, `telemetry`, `system`: `modules/<x>/index.ts` is a **re-export facade only** — the real code still lives in `src/services/<x>/`. For these, add new logic to `services/<x>/` and export it through the facade. Only relocate into a full `modules/<x>/` DDD layout when you're already substantially reworking that domain (mirror the `reports/` shape).
+- Rule of thumb: **import from `@/modules/<x>`** (the public boundary) regardless of where the implementation currently sits, so callers don't churn when a domain finishes migrating.
+
+**Module vs Dictionary rule** (where does an entity belong?):
+- Table is `{ id, name, isActive }` referenced only by FK `onDelete: Restrict` → **dictionary** (a tab in `admin-dictionaries`; "what you pick in forms"). E.g. `PileGrade`, `DrillingType`, `DowntimeReason`.
+- Table has state / lifecycle / history / child rows → **operational module** (a screen on `components/piling/ops-shell`; "where work is decided & controlled"). E.g. `Site`, `Crew`, `Report`, `MaintenanceRecord`, `Inspection`.
+- A value that is a code `enum` (`EquipmentKind`, `MaintenanceType`, statuses, roles) → **stays in code**. "Move to dictionary" then means an enum→table migration (a feature, not cleanup) — don't do it without a proven business need. Full decision guide + enum traps: the `module-vs-dictionary` skill.
+
 ### API Routes
 
 **Always wrap with `withApi` or `withMutation`:**
@@ -214,24 +225,24 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (11718 symbols, 21213 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (8971 symbols, 19897 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "chore/april-accumulated-work"})`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER edit a function, class, or method without first running `impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
 
 ## Resources
 

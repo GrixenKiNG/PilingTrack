@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { Pencil, Trash2, Plus, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -292,8 +293,3 @@ function ExpiresIndicator({ iso }: { iso: string }) {
   return <span>до {formatRuDate(iso.slice(0, 10))}</span>;
 }
 
-function formatRuDate(ymd: string): string {
-  const [y, m, d] = ymd.split('-');
-  if (!y || !m || !d) return ymd;
-  return `${d}.${m}.${y}`;
-}

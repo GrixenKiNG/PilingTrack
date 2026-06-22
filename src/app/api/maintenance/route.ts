@@ -10,15 +10,16 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
 
     const sp = request.nextUrl.searchParams;
-    // Invalid enum values (e.g. ?status=BOGUS) produce a Prisma where-clause that matches nothing — acceptable for P1a.
     const filter: MaintenanceListFilter = {
       status: (sp.get('status') as MaintenanceListFilter['status']) ?? undefined,
       priority: (sp.get('priority') as MaintenanceListFilter['priority']) ?? undefined,
