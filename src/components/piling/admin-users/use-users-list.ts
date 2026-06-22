@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
-import type { UserDTO, UserRole } from '@/lib/types';
+import type { OperationalUserDTO, UserRole } from '@/lib/types';
 
 export interface CreateUserInput {
   name: string;
   email: string;
-  password: string;
+  phone?: string;
+  password?: string;
+  pin?: string;
   role: UserRole;
 }
 
@@ -16,8 +18,34 @@ export interface UpdateUserInput {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: UserRole;
   password?: string;
+  pin?: string;
+}
+
+function isOperationalUser(value: unknown): value is OperationalUserDTO {
+  if (!value || typeof value !== 'object') return false;
+  const user = value as Partial<OperationalUserDTO>;
+  return typeof user.id === 'string'
+    && typeof user.name === 'string'
+    && typeof user.email === 'string'
+    && typeof user.phone === 'string'
+    && Array.isArray(user.assignedSites)
+    && typeof user.reportCount === 'number'
+    && typeof user.canHardDelete === 'boolean';
+}
+
+function parseUsersPage(value: unknown): { users: OperationalUserDTO[]; nextCursor: string | null } {
+  if (!value || typeof value !== 'object') throw new Error('Некорректный ответ сервера');
+  const page = value as { users?: unknown; nextCursor?: unknown };
+  if (!Array.isArray(page.users) || !page.users.every(isOperationalUser)) {
+    throw new Error('Некорректные данные пользователей');
+  }
+  return {
+    users: page.users,
+    nextCursor: typeof page.nextCursor === 'string' ? page.nextCursor : null,
+  };
 }
 
 /**
@@ -25,28 +53,32 @@ export interface UpdateUserInput {
  * stays focused on layout, dialog visibility, and filter state.
  */
 export function useUsersList() {
-  const [users, setUsers] = useState<UserDTO[]>([]);
+  const [users, setUsers] = useState<OperationalUserDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await authFetch('/api/users');
       if (!res.ok) {
         throw new Error('Ошибка загрузки пользователей');
       }
-      const data = await res.json();
-      let collected: UserDTO[] = data.users || [];
-      let cursor: string | null = data.nextCursor || null;
+      const data = parseUsersPage(await res.json());
+      let collected = data.users;
+      let cursor = data.nextCursor;
       while (cursor) {
         const next = await authFetch(`/api/users?cursor=${cursor}`);
-        if (!next.ok) break;
-        const nextData = await next.json();
-        collected = collected.concat(nextData.users || []);
-        cursor = nextData.nextCursor || null;
+        if (!next.ok) throw new Error('Ошибка загрузки следующей страницы');
+        const nextData = parseUsersPage(await next.json());
+        collected = collected.concat(nextData.users);
+        cursor = nextData.nextCursor;
       }
       setUsers(collected);
-    } catch {
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Ошибка загрузки пользователей';
+      setError(message);
       toast.error('Ошибка загрузки пользователей');
     } finally {
       setLoading(false);
@@ -68,8 +100,7 @@ export function useUsersList() {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Ошибка создания');
     }
-    const data = await res.json();
-    setUsers((prev) => [...prev, data.user]);
+    await load();
   };
 
   const update = async (input: UpdateUserInput) => {
@@ -78,9 +109,13 @@ export function useUsersList() {
       name: input.name,
       email: input.email,
       role: input.role,
+      phone: input.phone,
     };
     if (input.password) {
       body.password = input.password;
+    }
+    if (input.pin) {
+      body.pin = input.pin;
     }
     const res = await authFetch('/api/users', {
       method: 'PUT',
@@ -91,8 +126,7 @@ export function useUsersList() {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Ошибка сохранения');
     }
-    const data = await res.json();
-    setUsers((prev) => prev.map((u) => (u.id === input.id ? data.user : u)));
+    await load();
   };
 
   const remove = async (id: string) => {
@@ -108,7 +142,7 @@ export function useUsersList() {
     setUsers((prev) => prev.filter((u) => u.id !== id));
   };
 
-  const toggleActive = async (user: UserDTO) => {
+  const toggleActive = async (user: OperationalUserDTO) => {
     try {
       const res = await authFetch('/api/users', {
         method: 'PUT',
@@ -116,14 +150,12 @@ export function useUsersList() {
         body: JSON.stringify({ id: user.id, isActive: !user.isActive }),
       });
       if (!res.ok) throw new Error();
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, isActive: !u.isActive } : u))
-      );
+      await load();
       toast.success(user.isActive ? 'Пользователь деактивирован' : 'Пользователь активирован');
     } catch {
       toast.error('Ошибка изменения статуса');
     }
   };
 
-  return { users, loading, create, update, remove, toggleActive };
+  return { users, loading, error, retry: load, create, update, remove, toggleActive };
 }
