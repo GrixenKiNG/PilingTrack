@@ -50,6 +50,7 @@ export const PUT = withMutation(
       phone: validatedData.phone,
       email: validatedData.email,
       password: validatedData.password,
+      pin: validatedData.pin,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     }, user!.id);
 

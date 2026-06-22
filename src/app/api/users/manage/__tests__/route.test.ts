@@ -89,4 +89,23 @@ describe('PUT /api/users/manage', () => {
       'admin-1'
     );
   });
+
+  it('passes a valid PIN to the user service', async () => {
+    requireAuthMock.mockResolvedValue({
+      user: { id: 'admin-1', role: 'ADMIN', tenantId: 'tenant-a' },
+      error: null,
+    });
+    updateUserMock.mockResolvedValue({
+      id: 'u1', isActive: true, name: 'User', role: 'OPERATOR', phone: null,
+    });
+
+    const res = await PUT(req({ id: 'u1', pin: '5678' }));
+
+    expect(res.status).toBe(200);
+    expect(updateUserMock).toHaveBeenCalledWith(
+      'tenant-a',
+      expect.objectContaining({ id: 'u1', pin: '5678' }),
+      'admin-1'
+    );
+  });
 });

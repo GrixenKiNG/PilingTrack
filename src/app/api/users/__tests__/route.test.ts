@@ -34,6 +34,14 @@ function req(method: string, body?: unknown): NextRequest {
   });
 }
 
+function invalidJsonReq(method: string): NextRequest {
+  return new NextRequest('http://localhost/api/users', {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: '{',
+  });
+}
+
 const authenticatedAdmin = {
   id: 'admin-a',
   role: 'ADMIN',
@@ -109,7 +117,7 @@ describe('/api/users tenant boundary', () => {
     expect(deleteUserMock).toHaveBeenCalledWith('tenant-a', 'admin-a', 'user-a');
   });
 
-  it.each(['1234567', 'x'.repeat(101)])(
+  it.each(['1234567', '1234567 ', 'x'.repeat(101)])(
     'rejects an out-of-range password',
     async (password) => {
       const response = await POST(req('POST', { ...validCreateBody(), password }));
@@ -118,6 +126,37 @@ describe('/api/users tenant boundary', () => {
       expect(createUserMock).not.toHaveBeenCalled();
     }
   );
+
+  it('passes a valid PIN to the user service without treating it as a password', async () => {
+    const { password: _password, ...body } = validCreateBody();
+
+    const response = await POST(req('POST', { ...body, pin: '1234' }));
+
+    expect(response.status).toBe(201);
+    expect(createUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({ pin: '1234', password: undefined, tenantId: 'tenant-a' }),
+      'admin-a'
+    );
+  });
+
+  it('passes a valid PIN through the update endpoint', async () => {
+    const response = await PUT(req('PUT', { id: 'user-a', pin: '5678' }));
+
+    expect(response.status).toBe(200);
+    expect(updateUserMock).toHaveBeenCalledWith(
+      'tenant-a',
+      expect.objectContaining({ id: 'user-a', pin: '5678' }),
+      'admin-a'
+    );
+  });
+
+  it.each([
+    ['POST', () => POST(invalidJsonReq('POST'))],
+    ['PUT', () => PUT(invalidJsonReq('PUT'))],
+    ['DELETE', () => DELETE(invalidJsonReq('DELETE'))],
+  ])('returns 400 for invalid JSON in %s', async (_method, call) => {
+    expect((await call()).status).toBe(400);
+  });
 
   it.each(['123', '12345678901', '12a4'])(
     'rejects a PIN that is not 4 to 10 digits',

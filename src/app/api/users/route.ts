@@ -44,7 +44,12 @@ export const POST = withMutation(
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
     const validation = createUserSchema.safeParse(body);
     if (!validation.success) {
@@ -67,7 +72,8 @@ export const POST = withMutation(
     const { createUser } = await getUsersModule();
     const createdUser = await createUser({
       ...rest,
-      password: password?.trim() || pin?.trim() || '',
+      password,
+      pin,
       role: rest.role || 'OPERATOR',
       tenantId,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
@@ -88,7 +94,12 @@ export const PUT = withMutation(
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
     const validation = updateUserSchema.safeParse(body);
     if (!validation.success) {
@@ -117,7 +128,12 @@ export const DELETE = withMutation(
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
     const validation = deleteIdSchema.safeParse(body);
     if (!validation.success) {

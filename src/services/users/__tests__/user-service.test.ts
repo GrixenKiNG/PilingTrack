@@ -25,7 +25,11 @@ vi.mock('@/lib/db', () => ({
     },
   },
 }));
-vi.mock('@/services/auth/auth-service', () => ({ hashPassword: vi.fn(async () => 'hashed') }));
+vi.mock('@/services/auth/auth-service', () => ({
+  computePinLookup: vi.fn((pin: string) => `lookup-${pin}`),
+  hashPassword: vi.fn(async () => 'password-hash'),
+  hashPin: vi.fn(async () => 'pin-hash'),
+}));
 vi.mock('@/services/auth/authorization-service', () => ({
   assertNotSelfAction: vi.fn(),
 }));
@@ -118,6 +122,21 @@ describe('createUser', () => {
 
     process.env.DEFAULT_TENANT_ID = prev;
   });
+
+  it('stores a PIN-only credential in the PIN columns', async () => {
+    await createUser(
+      { email: 'a@b.ru', pin: '1234', name: 'A', role: 'OPERATOR', tenantId: 'orion' },
+      'admin-1'
+    );
+
+    expect(createUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        password: '',
+        pin: 'pin-hash',
+        pinLookup: 'lookup-1234',
+      }),
+    }));
+  });
 });
 
 describe('updateUser', () => {
@@ -153,6 +172,19 @@ describe('updateUser', () => {
       .rejects.toMatchObject({ status: 400 });
     expect(findFirstUserMock).not.toHaveBeenCalled();
     expect(updateUserMock).not.toHaveBeenCalled();
+  });
+
+  it('stores a changed PIN in the PIN columns', async () => {
+    findFirstUserMock.mockResolvedValue(existingUser);
+
+    await updateUser('tenant-a', { id: 'user-b', pin: '5678' }, 'admin-a');
+
+    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        pin: 'pin-hash',
+        pinLookup: 'lookup-5678',
+      }),
+    }));
   });
 });
 
