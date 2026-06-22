@@ -6,18 +6,28 @@ import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { CrewAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.mapper';
 
+/**
+ * Hooks that run inside the save transaction. Callers that MUST persist
+ * atomically with the crew (e.g. crew assistants) pass onBeforeCommit — if the
+ * tx rolls back, those side-effects roll back too. Mirrors the report repo.
+ */
+export interface CrewSaveHooks {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
+  onBeforeCommit?: (tx: any) => Promise<void>;
+}
+
 export interface CrewRepository {
-  save(aggregate: CrewAggregate): Promise<void>;
+  save(aggregate: CrewAggregate, hooks?: CrewSaveHooks): Promise<void>;
   findById(id: string): Promise<CrewAggregate | null>;
 }
 
 export class PrismaCrewRepository implements CrewRepository {
-  async save(aggregate: CrewAggregate): Promise<void> {
+  async save(aggregate: CrewAggregate, hooks?: CrewSaveHooks): Promise<void> {
     const state = aggregate.getState();
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
 
-    // Transactional outbox: crew data + outbox events in one transaction
+    // Transactional outbox: crew data + outbox events + caller hooks in one tx
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
       await tx.crew.upsert({
@@ -44,6 +54,13 @@ export class PrismaCrewRepository implements CrewRepository {
           };
         });
         await tx.outboxEvent.createMany({ data: outboxRecords });
+      }
+
+      // Caller-provided in-tx side effects (e.g. crew assistants). Runs LAST so
+      // it observes the persisted crew, but still inside the tx — if it throws,
+      // the crew row and outbox events are rolled back together.
+      if (hooks?.onBeforeCommit) {
+        await hooks.onBeforeCommit(tx);
       }
     }, DEFAULT_TX_OPTIONS);
 

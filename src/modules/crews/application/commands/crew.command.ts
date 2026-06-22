@@ -21,5 +21,4 @@ export interface UpdateCrewCommand {
 export interface DeleteCrewCommand {
   crewId: string;
   userId?: string;
-  force?: boolean; // if true, delete linked reports too
 }

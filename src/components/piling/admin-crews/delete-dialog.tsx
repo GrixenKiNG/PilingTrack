@@ -25,16 +25,17 @@ export function DeleteDialog({ open, onClose, crewName, deleting, onConfirm }: D
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="h-4 w-4" />Удалить бригаду?
+            <AlertTriangle className="h-4 w-4" />Деактивировать бригаду?
           </DialogTitle>
           <DialogDescription>
-            Вы уверены, что хотите удалить бригаду «{crewName}»? Это действие нельзя отменить.
+            Бригада «{crewName}» будет переведена в неактивные. Её отчёты сохранятся,
+            а саму бригаду можно будет снова активировать позже.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={deleting}>Отмена</Button>
           <Button onClick={onConfirm} disabled={deleting} className="bg-red-600 text-white hover:bg-red-700">
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Удалить'}
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Деактивировать'}
           </Button>
         </DialogFooter>
       </DialogContent>

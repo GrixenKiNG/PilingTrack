@@ -2,7 +2,7 @@
  * Crew Command Service
  */
 
-import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { recordAuditEvent } from '@/services/audit/audit-service';
@@ -12,14 +12,48 @@ import { CreateCrewCommand, UpdateCrewCommand, DeleteCrewCommand } from './crew.
 import { logger } from '@/lib/logger';
 
 // Fields tracked in the crew assignment history (scope 'crews').
-function crewAuditSnapshot(state: { name: string; operatorId: string; equipmentId: string; siteId: string; isActive: boolean }) {
+function crewAuditSnapshot(
+  state: { name: string; operatorId: string; equipmentId: string; siteId: string; isActive: boolean },
+  assistantNames?: string[],
+) {
   return {
     name: state.name,
     operatorId: state.operatorId,
     equipmentId: state.equipmentId,
     siteId: state.siteId,
     isActive: state.isActive,
+    ...(assistantNames !== undefined ? { assistants: assistantNames } : {}),
   };
+}
+
+// One installation = one active crew. Without a shift model (day/night crews
+// on the same rig), assigning a rig already on another active crew is a data
+// integrity error. Only checked when the rig is newly assigned, so re-saving an
+// existing crew never trips on its own assignment. `excludeCrewId` skips self.
+async function assertEquipmentNotDoubleBooked(equipmentId: string, excludeCrewId?: string) {
+  const conflict = await db.crew.findFirst({
+    where: { equipmentId, isActive: true, ...(excludeCrewId ? { id: { not: excludeCrewId } } : {}) },
+    select: { id: true, name: true },
+  });
+  if (conflict) {
+    throw new ServiceError(`Установка уже закреплена за активной бригадой «${conflict.name}»`, 409);
+  }
+}
+
+// Tenant integrity: a crew may only be assembled from parts of one tenant.
+// Closes the cross-tenant composition vector (operator/equipment/site with
+// mismatched tenants). No-op under a single tenant. The site is the tenant
+// anchor (Crew has no tenantId column — its tenant IS the site's).
+function assertSameTenant(
+  parts: { operatorTenantId?: string | null; equipmentTenantId?: string | null; siteTenantId?: string | null },
+) {
+  const { operatorTenantId, equipmentTenantId, siteTenantId } = parts;
+  if (equipmentTenantId !== undefined && equipmentTenantId !== siteTenantId) {
+    throw new ServiceError('Установка принадлежит другому арендатору', 400);
+  }
+  if (operatorTenantId !== undefined && operatorTenantId !== siteTenantId) {
+    throw new ServiceError('Оператор принадлежит другому арендатору', 400);
+  }
 }
 
 export async function createCrew(command: CreateCrewCommand) {
@@ -51,6 +85,14 @@ export async function createCrew(command: CreateCrewCommand) {
   if (!equipment) throw new ServiceError('Equipment not found', 404);
   if (!site) throw new ServiceError('Site not found', 404);
 
+  // Tenant integrity + one-rig-one-crew, before we create anything.
+  assertSameTenant({
+    operatorTenantId: operator.tenantId,
+    equipmentTenantId: equipment.tenantId,
+    siteTenantId: site.tenantId,
+  });
+  await assertEquipmentNotDoubleBooked(command.equipmentId);
+
   const aggregate = CrewAggregate.create({
     name,
     operatorId: command.operatorId,
@@ -58,23 +100,23 @@ export async function createCrew(command: CreateCrewCommand) {
     siteId: command.siteId,
   }, command.userId);
 
-  try {
-    await getCrewRepository().save(aggregate);
+  const assistantNames = (command.assistantNames ?? [])
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
 
-    // Create crew assistants after crew is created
-    if (command.assistantNames && command.assistantNames.length > 0) {
-      const assistantData = command.assistantNames
-        .filter((name) => name.trim().length > 0)
-        .map((name) => ({
-          crewId: aggregate.getState().id,
-          name: name.trim(),
-        }));
-      
-      if (assistantData.length > 0) {
-        await db.crewAssistant.createMany({ data: assistantData });
-      }
-    }
+  try {
+    // Crew + outbox + assistants persist atomically (one transaction).
+    await getCrewRepository().save(aggregate, {
+      onBeforeCommit: async (tx) => {
+        if (assistantNames.length > 0) {
+          await tx.crewAssistant.createMany({
+            data: assistantNames.map((name) => ({ crewId: aggregate.getState().id, name })),
+          });
+        }
+      },
+    });
   } catch (error) {
+    if (error instanceof ServiceError) throw error;
     const message = error instanceof Error ? error.message : 'Unknown error';
     if (message.includes('UNIQUE') || message.includes('unique')) {
       throw new ServiceError('Crew with this operator already exists', 409);
@@ -96,7 +138,7 @@ export async function createCrew(command: CreateCrewCommand) {
     scope: 'crews',
     actorId: command.userId || null,
     targetId: aggregate.getState().id,
-    metadata: crewAuditSnapshot(aggregate.getState()),
+    metadata: crewAuditSnapshot(aggregate.getState(), assistantNames),
   });
 
   return created;
@@ -109,7 +151,10 @@ export async function updateCrew(command: UpdateCrewCommand) {
     throw new ServiceError('Crew not found', 404);
   }
 
-  const before = crewAuditSnapshot(aggregate.getState());
+  const beforeAssistants = (
+    await db.crewAssistant.findMany({ where: { crewId: command.crewId }, select: { name: true } })
+  ).map((a) => a.name);
+  const before = crewAuditSnapshot(aggregate.getState(), beforeAssistants);
 
   // Validate dependencies if operator/equipment/site are being changed
   if (command.operatorId || command.equipmentId || command.siteId) {
@@ -135,6 +180,27 @@ export async function updateCrew(command: UpdateCrewCommand) {
 
     if (command.equipmentId && !equipment) throw new ServiceError('Equipment not found', 404);
     if (command.siteId && !site) throw new ServiceError('Site not found', 404);
+
+    // Tenant integrity of the resulting crew: the effective trio (current
+    // values overridden by any provided changes) must share one tenant.
+    const current = await db.crew.findUnique({
+      where: { id: command.crewId },
+      select: {
+        operator: { select: { tenantId: true } },
+        equipment: { select: { tenantId: true } },
+        site: { select: { tenantId: true } },
+      },
+    });
+    assertSameTenant({
+      operatorTenantId: operator ? operator.tenantId : current?.operator.tenantId ?? null,
+      equipmentTenantId: equipment ? equipment.tenantId : current?.equipment.tenantId ?? null,
+      siteTenantId: site ? site.tenantId : current?.site.tenantId ?? null,
+    });
+
+    // One-rig-one-crew, only when the rig actually changes.
+    if (command.equipmentId && command.equipmentId !== aggregate.getState().equipmentId) {
+      await assertEquipmentNotDoubleBooked(command.equipmentId, command.crewId);
+    }
   }
 
   // Update crew fields
@@ -162,27 +228,23 @@ export async function updateCrew(command: UpdateCrewCommand) {
     }
   }
 
-  await repo.save(aggregate);
+  // Crew fields + assistant roster persist atomically (one transaction).
+  const newAssistantNames = command.assistantNames !== undefined
+    ? command.assistantNames.map((name) => name.trim()).filter((name) => name.length > 0)
+    : undefined;
 
-  // Update crew assistants if provided
-  if (command.assistantNames !== undefined) {
-    // Delete existing assistants
-    await db.crewAssistant.deleteMany({ where: { crewId: command.crewId } });
-    
-    // Create new assistants
-    if (command.assistantNames.length > 0) {
-      const assistantData = command.assistantNames
-        .filter((name) => name.trim().length > 0)
-        .map((name) => ({
-          crewId: command.crewId,
-          name: name.trim(),
-        }));
-      
-      if (assistantData.length > 0) {
-        await db.crewAssistant.createMany({ data: assistantData });
+  await repo.save(aggregate, {
+    onBeforeCommit: async (tx) => {
+      if (newAssistantNames !== undefined) {
+        await tx.crewAssistant.deleteMany({ where: { crewId: command.crewId } });
+        if (newAssistantNames.length > 0) {
+          await tx.crewAssistant.createMany({
+            data: newAssistantNames.map((name) => ({ crewId: command.crewId, name })),
+          });
+        }
       }
-    }
-  }
+    },
+  });
 
   const updated = await db.crew.findUnique({
     where: { id: command.crewId },
@@ -194,7 +256,10 @@ export async function updateCrew(command: UpdateCrewCommand) {
     scope: 'crews',
     actorId: command.userId || null,
     targetId: command.crewId,
-    metadata: { before, after: crewAuditSnapshot(aggregate.getState()) },
+    metadata: {
+      before,
+      after: crewAuditSnapshot(aggregate.getState(), newAssistantNames ?? beforeAssistants),
+    },
   });
 
   return updated;
@@ -211,26 +276,13 @@ export async function deleteCrew(command: DeleteCrewCommand) {
     throw new ServiceError('Crew is already deactivated', 400);
   }
 
-  const snapshot = crewAuditSnapshot(aggregate.getState());
+  const assistantNames = (
+    await db.crewAssistant.findMany({ where: { crewId: command.crewId }, select: { name: true } })
+  ).map((a) => a.name);
+  const snapshot = crewAuditSnapshot(aggregate.getState(), assistantNames);
 
-  if (command.force) {
-    // Force delete: delete linked reports first (bypasses domain for reports)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
-    await db.$transaction(async (tx: any) => {
-      await tx.report.deleteMany({ where: { crewId: command.crewId } });
-      await tx.crew.delete({ where: { id: command.crewId } });
-    }, DEFAULT_TX_OPTIONS);
-    await recordAuditEvent({
-      action: 'crew.deleted',
-      scope: 'crews',
-      actorId: command.userId || null,
-      targetId: command.crewId,
-      metadata: { ...snapshot, force: true },
-    });
-    return { success: true, deletedReports: true };
-  }
-
-  // Soft delete via domain — deactivate instead of hard delete
+  // Soft delete via domain — deactivate, never hard-delete. Reports stay
+  // intact (they are the product's evidence trail). Reactivation is possible.
   aggregate.deactivate(command.userId);
   await repo.save(aggregate);
 
@@ -239,7 +291,7 @@ export async function deleteCrew(command: DeleteCrewCommand) {
     scope: 'crews',
     actorId: command.userId || null,
     targetId: command.crewId,
-    metadata: { ...snapshot, force: false, deactivated: true },
+    metadata: { ...snapshot, deactivated: true },
   });
 
   return { success: true, deactivated: true };

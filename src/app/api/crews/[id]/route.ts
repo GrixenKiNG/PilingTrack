@@ -75,7 +75,8 @@ export const DELETE = withMutation(
     assertCan(user!, 'crews.manage');
     const { id } = await params;
     const { deleteCrew } = await getCrewsModule();
-    const result = await deleteCrew({ crewId: id });
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const result = await deleteCrew({ crewId: id, userId: user!.id });
 
     invalidateCrewsCache();
 

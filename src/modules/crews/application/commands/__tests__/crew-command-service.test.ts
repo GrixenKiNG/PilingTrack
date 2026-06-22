@@ -49,10 +49,16 @@ const mockDb = {
   },
   crew: {
     findUnique: vi.fn().mockResolvedValue(null),
+    findFirst: vi.fn().mockResolvedValue(null),
     upsert: vi.fn().mockResolvedValue(mockCrew),
     update: vi.fn().mockResolvedValue(mockCrew),
     delete: vi.fn().mockResolvedValue(mockCrew),
     findMany: vi.fn().mockResolvedValue([]),
+  },
+  crewAssistant: {
+    findMany: vi.fn().mockResolvedValue([]),
+    createMany: vi.fn().mockResolvedValue({ count: 0 }),
+    deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
   },
   report: {
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -94,6 +100,8 @@ describe('Crew Command Service', () => {
     vi.clearAllMocks();
     mockRepoFindById.mockResolvedValue(null);
     mockDb.crew.findUnique.mockResolvedValue(null);
+    mockDb.crew.findFirst.mockResolvedValue(null);
+    mockDb.crewAssistant.findMany.mockResolvedValue([]);
     mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'OPERATOR' });
     mockDb.equipment.findUnique.mockResolvedValue({ id: 'equip-1' });
     mockDb.site.findUnique.mockResolvedValue({ id: 'site-1' });
@@ -333,7 +341,7 @@ describe('Crew Command Service', () => {
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
 
-    it('should force delete crew with reports when force=true', async () => {
+    it('soft delete must never hard-delete the crew reports', async () => {
       const aggregate = CrewAggregate.create({
         name: 'Test Crew',
         operatorId: 'operator-1',
@@ -342,13 +350,11 @@ describe('Crew Command Service', () => {
       }, 'user-1');
       mockRepoFindById.mockResolvedValue(aggregate);
 
-      const result = await deleteCrew({
-        crewId: 'crew-1',
-        force: true,
-      });
+      await deleteCrew({ crewId: 'crew-1', userId: 'user-1' });
 
-      expect(result).toEqual({ success: true, deletedReports: true });
-      expect(mockDb.$transaction).toHaveBeenCalled();
+      // The destructive force path (deleteMany reports + crew.delete) is gone.
+      expect(mockDb.report.deleteMany).not.toHaveBeenCalled();
+      expect(mockDb.crew.delete).not.toHaveBeenCalled();
     });
   });
 
