@@ -179,6 +179,7 @@ export const createCrewSchema = z.object({
   equipmentId: internalIdSchema,
   siteId: internalIdSchema,
   assistantNames: crewAssistantNamesSchema.default([]),
+  assistantUserIds: z.array(internalIdSchema).max(20).optional(),
   assistantsCount: z.number().int().min(0).max(20).default(0),
   isActive: z.boolean().optional().default(true),
 });
@@ -189,6 +190,7 @@ export const updateCrewSchema = z.object({
   equipmentId: internalIdSchema.optional(),
   siteId: internalIdSchema.optional(),
   assistantNames: crewAssistantNamesSchema.optional(),
+  assistantUserIds: z.array(internalIdSchema).max(20).optional(),
   assistantsCount: z.number().int().min(0).max(20).optional(),
   isActive: z.boolean().optional(),
 });

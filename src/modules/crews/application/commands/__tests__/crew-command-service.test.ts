@@ -40,6 +40,7 @@ const mockCrew = {
 const mockDb = {
   user: {
     findUnique: vi.fn().mockResolvedValue({ id: 'operator-1', role: 'OPERATOR' }),
+    findMany: vi.fn().mockResolvedValue([]),
   },
   equipment: {
     findUnique: vi.fn().mockResolvedValue({ id: 'equip-1', name: 'Test Equipment' }),
@@ -78,8 +79,15 @@ vi.mock('@/lib/db', () => ({
   DEFAULT_TX_OPTIONS: { timeout: 10000, maxWait: 5000 },
 }));
 
-// Mock repository — wraps mockDb
-const mockRepoSave = vi.fn().mockResolvedValue(undefined);
+// Mock repository — wraps mockDb. Invokes the in-tx onBeforeCommit hook (with
+// mockDb as the tx client) so assistant persistence inside the hook is exercised.
+const mockRepoSave = vi.fn(async (
+  _aggregate: unknown,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: tx client is the mock db
+  hooks?: { onBeforeCommit?: (tx: any) => Promise<void> },
+) => {
+  if (hooks?.onBeforeCommit) await hooks.onBeforeCommit(mockDb);
+});
 const mockRepoFindById = vi.fn().mockResolvedValue(null);
 
 const mockRepo: CrewRepository = {
@@ -102,7 +110,9 @@ describe('Crew Command Service', () => {
     mockDb.crew.findUnique.mockResolvedValue(null);
     mockDb.crew.findFirst.mockResolvedValue(null);
     mockDb.crewAssistant.findMany.mockResolvedValue([]);
+    mockDb.crewAssistant.createMany.mockResolvedValue({ count: 0 });
     mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'OPERATOR' });
+    mockDb.user.findMany.mockResolvedValue([]);
     mockDb.equipment.findUnique.mockResolvedValue({ id: 'equip-1' });
     mockDb.site.findUnique.mockResolvedValue({ id: 'site-1' });
   });
@@ -219,6 +229,44 @@ describe('Crew Command Service', () => {
       });
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
+    });
+
+    it('links assistants by userId and snapshots their names', async () => {
+      // tenantId omitted (undefined) to match the default site mock's tenant.
+      mockDb.user.findMany.mockResolvedValue([
+        { id: 'asst-1', name: 'Иван' },
+        { id: 'asst-2', name: 'Пётр' },
+      ]);
+
+      await createCrew({
+        name: 'Alpha',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+        assistantUserIds: ['asst-1', 'asst-2'],
+      });
+
+      expect(mockDb.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: ['asst-1', 'asst-2'] }, role: 'ASSISTANT' } }),
+      );
+      expect(mockDb.crewAssistant.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({ userId: 'asst-1', name: 'Иван' }),
+          expect.objectContaining({ userId: 'asst-2', name: 'Пётр' }),
+        ],
+      });
+    });
+
+    it('rejects assistantUserIds that are missing or not ASSISTANT users', async () => {
+      mockDb.user.findMany.mockResolvedValue([{ id: 'asst-1', name: 'Иван' }]);
+
+      await expect(createCrew({
+        name: 'Alpha',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+        assistantUserIds: ['asst-1', 'ghost'],
+      })).rejects.toThrow('ASSISTANT');
     });
   });
 

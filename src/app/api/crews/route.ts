@@ -56,6 +56,7 @@ export const POST = withMutation(
       equipmentId: validation.data.equipmentId,
       siteId: validation.data.siteId,
       assistantNames: validation.data.assistantNames || [],
+      assistantUserIds: validation.data.assistantUserIds,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
     });

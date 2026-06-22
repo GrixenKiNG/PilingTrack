@@ -25,6 +25,7 @@ export interface UseCrewsDataReturn {
     equipmentId: string;
     siteId: string;
     name?: string;
+    assistantUserIds?: string[];
     assistantNames?: string[];
   }) => Promise<CrewDTO>;
   updateCrew: (id: string, data: {
@@ -32,6 +33,7 @@ export interface UseCrewsDataReturn {
     equipmentId: string;
     siteId: string;
     name?: string;
+    assistantUserIds?: string[];
     assistantNames?: string[];
     isActive: boolean;
   }) => Promise<CrewDTO>;
@@ -195,6 +197,7 @@ export function useCrewsData(): UseCrewsDataReturn {
     equipmentId: string;
     siteId: string;
     name?: string;
+    assistantUserIds?: string[];
     assistantNames?: string[];
   }) => {
     const res = await authFetch('/api/crews', {
@@ -217,6 +220,7 @@ export function useCrewsData(): UseCrewsDataReturn {
     equipmentId: string;
     siteId: string;
     name?: string;
+    assistantUserIds?: string[];
     assistantNames?: string[];
     isActive: boolean;
   }) => {

@@ -140,7 +140,7 @@ export function AdminCrews() {
     },
   ];
 
-  const handleCreate = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantNames?: string[] }) => {
+  const handleCreate = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantUserIds?: string[]; assistantNames?: string[] }) => {
     if (getAssignedOperatorIds().has(data.operatorId)) {
       toast.error(`Оператор ${users.find((u) => u.id === data.operatorId)?.name || ''} уже назначен в другую бригаду`);
       return;
@@ -155,7 +155,7 @@ export function AdminCrews() {
     finally { setSubmitting(false); }
   };
 
-  const handleEdit = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantNames?: string[]; isActive: boolean }) => {
+  const handleEdit = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantUserIds?: string[]; assistantNames?: string[]; isActive: boolean }) => {
     if (!editItem) return;
     if (getAssignedOperatorIds(editItem.id).has(data.operatorId)) {
       toast.error(`Оператор ${users.find((u) => u.id === data.operatorId)?.name || ''} уже назначен в другую бригаду`);

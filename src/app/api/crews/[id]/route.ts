@@ -54,6 +54,7 @@ export const PUT = withMutation(
       equipmentId: validated.data.equipmentId,
       siteId: validated.data.siteId,
       assistantNames: validated.data.assistantNames,
+      assistantUserIds: validated.data.assistantUserIds,
       isActive: validated.data.isActive,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,

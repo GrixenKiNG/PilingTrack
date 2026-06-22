@@ -102,6 +102,7 @@ model User {
   reports    Report[]
   sites      UserSiteAssignment[]
   crew       Crew?    @relation("CrewOperator")
+  crewAssistantOf CrewAssistant[] @relation("CrewAssistantUser")
   feedbackReads FeedbackEventRead[]
 
   @@index([email])
@@ -706,12 +707,18 @@ model CrewAssistant {
   id        String   @id @default(cuid())
   crewId    String
   crew      Crew     @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  // Optional link to the ASSISTANT user. `name` is kept as a point-in-time
+  // snapshot so history survives even if the user is later renamed or deleted
+  // (onDelete: SetNull nulls the link but preserves the row + name).
+  userId    String?
+  user      User?    @relation("CrewAssistantUser", fields: [userId], references: [id], onDelete: SetNull)
   name      String
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([crewId])
+  @@index([userId])
 }
 
 // ============================================================

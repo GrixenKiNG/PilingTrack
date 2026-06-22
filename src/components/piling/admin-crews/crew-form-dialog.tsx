@@ -47,6 +47,7 @@ interface CrewFormDialogProps {
     equipmentId: string;
     siteId: string;
     name?: string;
+    assistantUserIds: string[];
     assistantNames?: string[];
     isActive: boolean;
   }) => Promise<void>;
@@ -116,8 +117,8 @@ export function CrewFormDialog({
   const [equipmentId, setEquipmentId] = useState(editItem?.equipmentId || '');
   const [siteId, setSiteId] = useState(editItem?.siteId || '');
   const [name, setName] = useState(editItem?.name || '');
-  const [assistantNames, setAssistantNames] = useState<string[]>(
-    editItem?.assistants?.map(assistant => assistant.name) || [],
+  const [assistantUserIds, setAssistantUserIds] = useState<string[]>(
+    editItem?.assistants?.map(a => a.userId).filter((id): id is string => !!id) || [],
   );
   const [active, setActive] = useState(editItem?.isActive ?? true);
   const [showAssistantDialog, setShowAssistantDialog] = useState(false);
@@ -129,7 +130,7 @@ export function CrewFormDialog({
       setEquipmentId(editItem?.equipmentId || '');
       setSiteId(editItem?.siteId || '');
       setName(editItem?.name || '');
-      setAssistantNames(editItem?.assistants?.map(assistant => assistant.name) || []);
+      setAssistantUserIds(editItem?.assistants?.map(a => a.userId).filter((id): id is string => !!id) || []);
       setActive(editItem?.isActive ?? true);
       setShowAssistantDialog(false);
     } else if (document.activeElement instanceof HTMLElement) {
@@ -140,6 +141,12 @@ export function CrewFormDialog({
   const availableOps = operators.filter(
     operator => !assignedOperatorIds.has(operator.id) || operator.id === editItem?.operatorId,
   );
+
+  // Selected assistants are tracked by user id; resolve display names from the
+  // assistant user list (also sent as a back-compat snapshot).
+  const selectedAssistantNames = assistantUserIds
+    .map(id => assistants.find(user => user.id === id)?.name)
+    .filter((assistantName): assistantName is string => Boolean(assistantName));
 
   const handleSubmit = async () => {
     if (!operatorId || !equipmentId || !siteId) {
@@ -152,7 +159,8 @@ export function CrewFormDialog({
       equipmentId,
       siteId,
       name: name.trim() || undefined,
-      assistantNames,
+      assistantUserIds,
+      assistantNames: selectedAssistantNames,
       isActive: mode === 'edit' ? active : true,
     });
   };
@@ -265,7 +273,7 @@ export function CrewFormDialog({
 
               <AssistantSelector
                 label="Помощники"
-                names={assistantNames}
+                names={selectedAssistantNames}
                 onOpen={() => setShowAssistantDialog(true)}
               />
 
@@ -306,14 +314,14 @@ export function CrewFormDialog({
         open={showAssistantDialog}
         onClose={() => setShowAssistantDialog(false)}
         assistantUsers={assistants}
-        selectedNames={assistantNames}
-        onToggleName={(selectedName) => setAssistantNames(prev => (
-          prev.includes(selectedName)
-            ? prev.filter(nameItem => nameItem !== selectedName)
-            : [...prev, selectedName]
+        selectedIds={assistantUserIds}
+        onToggleId={(selectedId) => setAssistantUserIds(prev => (
+          prev.includes(selectedId)
+            ? prev.filter(idItem => idItem !== selectedId)
+            : [...prev, selectedId]
         ))}
-        onRemoveName={(removedName) => setAssistantNames(prev => (
-          prev.filter(nameItem => nameItem !== removedName)
+        onRemoveId={(removedId) => setAssistantUserIds(prev => (
+          prev.filter(idItem => idItem !== removedId)
         ))}
         onConfirm={() => setShowAssistantDialog(false)}
       />
@@ -325,17 +333,17 @@ function AssistantSelectorModal({
   open,
   onClose,
   assistantUsers,
-  selectedNames,
-  onToggleName,
-  onRemoveName,
+  selectedIds,
+  onToggleId,
+  onRemoveId,
   onConfirm,
 }: {
   open: boolean;
   onClose: () => void;
   assistantUsers: UserDTO[];
-  selectedNames: string[];
-  onToggleName: (name: string) => void;
-  onRemoveName: (name: string) => void;
+  selectedIds: string[];
+  onToggleId: (id: string) => void;
+  onRemoveId: (id: string) => void;
   onConfirm: () => void;
 }) {
   const [search, setSearch] = useState('');
@@ -380,8 +388,8 @@ function AssistantSelectorModal({
                 className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-slate-50"
               >
                 <Checkbox
-                  checked={selectedNames.includes(user.name)}
-                  onCheckedChange={() => onToggleName(user.name)}
+                  checked={selectedIds.includes(user.id)}
+                  onCheckedChange={() => onToggleId(user.id)}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{user.name}</p>
@@ -397,17 +405,17 @@ function AssistantSelectorModal({
             )}
           </div>
 
-          {selectedNames.length > 0 && (
+          {selectedIds.length > 0 && (
             <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-              {selectedNames.map(name => (
+              {selectedIds.map(id => (
                 <span
-                  key={name}
+                  key={id}
                   className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
                 >
-                  {name}
+                  {assistantUsers.find(user => user.id === id)?.name ?? id}
                   <button
                     type="button"
-                    onClick={() => onRemoveName(name)}
+                    onClick={() => onRemoveId(id)}
                     className="rounded p-0.5 text-amber-500 transition-colors hover:bg-amber-100 hover:text-amber-700"
                   >
                     <svg
@@ -430,7 +438,7 @@ function AssistantSelectorModal({
           )}
 
           <p className="text-xs text-slate-400">
-            {selectedNames.length} помощник(ов) выбрано
+            {selectedIds.length} помощник(ов) выбрано
           </p>
         </div>
 

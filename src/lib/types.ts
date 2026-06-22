@@ -388,6 +388,7 @@ export interface CrewAssistantDTO {
   id: string;
   crewId: string;
   name: string;
+  userId?: string | null;
 }
 
 export interface CrewDTO {

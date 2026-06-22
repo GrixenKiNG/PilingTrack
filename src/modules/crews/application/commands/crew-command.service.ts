@@ -56,6 +56,36 @@ function assertSameTenant(
   }
 }
 
+// Resolve the assistant roster to persist. Preferred path: ASSISTANT user ids
+// — each is validated (exists, ASSISTANT role, same tenant as the crew) and the
+// display name is snapshotted from the user. Falls back to legacy free-text
+// names (no user link) when only assistantNames is supplied.
+async function buildAssistantRows(
+  command: { assistantUserIds?: string[]; assistantNames?: string[] },
+  siteTenantId: string | null | undefined,
+): Promise<Array<{ userId: string | null; name: string }>> {
+  if (command.assistantUserIds && command.assistantUserIds.length > 0) {
+    const ids = [...new Set(command.assistantUserIds)];
+    const users = await db.user.findMany({
+      where: { id: { in: ids }, role: 'ASSISTANT' },
+      select: { id: true, name: true, tenantId: true },
+    });
+    if (users.length !== ids.length) {
+      throw new ServiceError('Некоторые помощники не найдены или не являются пользователями с ролью ASSISTANT', 400);
+    }
+    for (const u of users) {
+      if (u.tenantId !== siteTenantId) {
+        throw new ServiceError('Помощник принадлежит другому арендатору', 400);
+      }
+    }
+    return users.map((u) => ({ userId: u.id, name: u.name }));
+  }
+  return (command.assistantNames ?? [])
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0)
+    .map((name) => ({ userId: null, name }));
+}
+
 export async function createCrew(command: CreateCrewCommand) {
   // Validate required fields before creating aggregate
   if (!command.operatorId || !command.equipmentId || !command.siteId) {
@@ -100,17 +130,15 @@ export async function createCrew(command: CreateCrewCommand) {
     siteId: command.siteId,
   }, command.userId);
 
-  const assistantNames = (command.assistantNames ?? [])
-    .map((name) => name.trim())
-    .filter((name) => name.length > 0);
+  const assistantRows = await buildAssistantRows(command, site.tenantId);
 
   try {
     // Crew + outbox + assistants persist atomically (one transaction).
     await getCrewRepository().save(aggregate, {
       onBeforeCommit: async (tx) => {
-        if (assistantNames.length > 0) {
+        if (assistantRows.length > 0) {
           await tx.crewAssistant.createMany({
-            data: assistantNames.map((name) => ({ crewId: aggregate.getState().id, name })),
+            data: assistantRows.map((row) => ({ crewId: aggregate.getState().id, ...row })),
           });
         }
       },
@@ -138,7 +166,7 @@ export async function createCrew(command: CreateCrewCommand) {
     scope: 'crews',
     actorId: command.userId || null,
     targetId: aggregate.getState().id,
-    metadata: crewAuditSnapshot(aggregate.getState(), assistantNames),
+    metadata: crewAuditSnapshot(aggregate.getState(), assistantRows.map((r) => r.name)),
   });
 
   return created;
@@ -229,17 +257,25 @@ export async function updateCrew(command: UpdateCrewCommand) {
   }
 
   // Crew fields + assistant roster persist atomically (one transaction).
-  const newAssistantNames = command.assistantNames !== undefined
-    ? command.assistantNames.map((name) => name.trim()).filter((name) => name.length > 0)
-    : undefined;
+  const rosterProvided = command.assistantUserIds !== undefined || command.assistantNames !== undefined;
+  let newAssistantRows: Array<{ userId: string | null; name: string }> | undefined;
+  if (rosterProvided) {
+    const siteTenantId = command.siteId
+      ? (await db.site.findUnique({ where: { id: command.siteId }, select: { tenantId: true } }))?.tenantId ?? null
+      : (await db.crew.findUnique({
+          where: { id: command.crewId },
+          select: { site: { select: { tenantId: true } } },
+        }))?.site.tenantId ?? null;
+    newAssistantRows = await buildAssistantRows(command, siteTenantId);
+  }
 
   await repo.save(aggregate, {
     onBeforeCommit: async (tx) => {
-      if (newAssistantNames !== undefined) {
+      if (newAssistantRows !== undefined) {
         await tx.crewAssistant.deleteMany({ where: { crewId: command.crewId } });
-        if (newAssistantNames.length > 0) {
+        if (newAssistantRows.length > 0) {
           await tx.crewAssistant.createMany({
-            data: newAssistantNames.map((name) => ({ crewId: command.crewId, name })),
+            data: newAssistantRows.map((row) => ({ crewId: command.crewId, ...row })),
           });
         }
       }
@@ -258,7 +294,10 @@ export async function updateCrew(command: UpdateCrewCommand) {
     targetId: command.crewId,
     metadata: {
       before,
-      after: crewAuditSnapshot(aggregate.getState(), newAssistantNames ?? beforeAssistants),
+      after: crewAuditSnapshot(
+        aggregate.getState(),
+        newAssistantRows ? newAssistantRows.map((r) => r.name) : beforeAssistants,
+      ),
     },
   });
 

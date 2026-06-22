@@ -21,7 +21,7 @@ export async function getAccessibleCrews(tenantId: string, siteId?: string, pagi
       operator: { select: { id: true, name: true, role: true } },
       equipment: { select: { id: true, name: true } },
       site: { select: { id: true, name: true } },
-      assistants: { select: { id: true, name: true } },
+      assistants: { select: { id: true, name: true, userId: true } },
     },
     orderBy: { name: 'asc' },
     cursor: cursor ? { id: cursor } : undefined,
@@ -37,7 +37,7 @@ export async function getCrewById(crewId: string) {
       operator: { select: { id: true, name: true, email: true, role: true } },
       equipment: { select: { id: true, name: true, model: true } },
       site: { select: { id: true, name: true, tenantId: true } },
-      assistants: { select: { id: true, name: true } },
+      assistants: { select: { id: true, name: true, userId: true } },
     },
   });
 
@@ -93,21 +93,28 @@ export async function getCrewForOperator(
   sessionUser: { id: string; role: string },
   requestedOperatorId?: string | null
 ) {
-  const operatorId = isPrivilegedRole(sessionUser.role)
+  const lookupUserId = isPrivilegedRole(sessionUser.role)
     ? requestedOperatorId || sessionUser.id
     : sessionUser.id;
 
-  if (!operatorId) {
+  if (!lookupUserId) {
     throw new ServiceError('operatorId required', 400);
   }
 
-  const crew = await db.crew.findUnique({
-    where: { operatorId },
+  // A user reaches "their" crew either as the operator or as a linked
+  // assistant (ASSISTANT users have no operator row), so match both.
+  const crew = await db.crew.findFirst({
+    where: {
+      OR: [
+        { operatorId: lookupUserId },
+        { assistants: { some: { userId: lookupUserId } } },
+      ],
+    },
     include: {
       operator: { select: { name: true } },
       equipment: { select: { name: true } },
       site: { select: { name: true, tenantId: true } },
-      assistants: { select: { id: true, crewId: true, name: true }, orderBy: { createdAt: 'asc' } },
+      assistants: { select: { id: true, crewId: true, name: true, userId: true }, orderBy: { createdAt: 'asc' } },
     },
   });
 
