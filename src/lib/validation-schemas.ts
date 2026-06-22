@@ -320,24 +320,6 @@ export const equipmentIdSchema = z.object({
 });
 
 // ============================================================
-// Crew manage schemas (POST/PUT/DELETE)
-// ============================================================
-
-export const crewManageSchema = z.object({
-  id: internalIdSchema.optional(),
-  name: z.string().min(1, 'Crew name is required').max(200),
-  operatorId: internalIdSchema.optional().or(z.literal('')),
-  equipmentId: internalIdSchema.optional().or(z.literal('')),
-  siteId: internalIdSchema.optional().or(z.literal('')),
-  assistantNames: z.array(z.string().max(200)).max(20).default([]),
-  assistantsCount: z.coerce.number().int().min(0).max(20).default(0),
-});
-
-export const crewIdSchema = z.object({
-  id: internalIdSchema,
-});
-
-// ============================================================
 // Dictionary manage schemas
 // ============================================================
 
@@ -428,7 +410,6 @@ export type UpdateSiteInput = z.infer<typeof updateSiteSchema>;
 export type CreateEquipmentInput = z.infer<typeof createEquipmentSchema>;
 export type EquipmentManageInput = z.infer<typeof equipmentManageSchema>;
 export type CreateCrewInput = z.infer<typeof createCrewSchema>;
-export type CrewManageInput = z.infer<typeof crewManageSchema>;
 export type ReportUpsertInput = z.infer<typeof reportUpsertSchema>;
 export type ReportAdminUpsertInput = z.infer<typeof reportAdminUpsertSchema>;
 export type ReportQueryInput = z.infer<typeof reportQuerySchema>;

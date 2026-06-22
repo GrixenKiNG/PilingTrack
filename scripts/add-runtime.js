@@ -11,7 +11,6 @@ const routes = [
   'src/app/api/crews/route.ts',
   'src/app/api/crews/[id]/route.ts',
   'src/app/api/crews/all/route.ts',
-  'src/app/api/crews/manage/route.ts',
   'src/app/api/crews/my/route.ts',
   'src/app/api/dictionary/all/route.ts',
   'src/app/api/dictionary/manage/route.ts',
