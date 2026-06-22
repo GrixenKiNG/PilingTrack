@@ -5,17 +5,22 @@ const {
   deleteUserMock,
   findFirstUserMock,
   findManyUserMock,
+  findManyFeedbackEventMock,
   updateUserMock,
 } = vi.hoisted(() => ({
   createUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
   findFirstUserMock: vi.fn(),
   findManyUserMock: vi.fn(),
+  findManyFeedbackEventMock: vi.fn(),
   updateUserMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
+    feedbackEvent: {
+      findMany: findManyFeedbackEventMock,
+    },
     user: {
       create: createUserMock,
       delete: deleteUserMock,
@@ -74,6 +79,8 @@ describe('listUsers', () => {
   beforeEach(() => {
     findManyUserMock.mockReset();
     findManyUserMock.mockResolvedValue([]);
+    findManyFeedbackEventMock.mockReset();
+    findManyFeedbackEventMock.mockResolvedValue([]);
   });
 
   it('lists only users in the requested tenant', async () => {
@@ -86,6 +93,60 @@ describe('listUsers', () => {
   it('fails closed when tenant context is missing', async () => {
     await expect(listUsers('', null)).rejects.toMatchObject({ status: 400 });
     expect(findManyUserMock).not.toHaveBeenCalled();
+  });
+
+  it('maps assignments, active crew and the newest real activity without N+1 queries', async () => {
+    findManyUserMock.mockResolvedValue([{
+      id: 'user-a',
+      email: 'operator@example.test',
+      name: 'Operator',
+      phone: '+70000000000',
+      role: 'OPERATOR',
+      isActive: true,
+      createdAt: new Date('2026-06-01T08:00:00.000Z'),
+      updatedAt: new Date('2026-06-02T09:00:00.000Z'),
+      sites: [{ site: { id: 'site-a', name: 'ВСМЖ' } }],
+      crew: {
+        id: 'crew-a',
+        name: 'Экипаж',
+        isActive: true,
+        equipment: { name: 'LRH-100' },
+        site: { name: 'ВСМЖ' },
+      },
+      _count: { reports: 4 },
+      reports: [{ updatedAt: new Date('2026-06-20T10:00:00.000Z') }],
+    }]);
+    findManyFeedbackEventMock.mockResolvedValue([
+      { actorId: 'user-a', createdAt: new Date('2026-06-21T11:00:00.000Z') },
+      { actorId: 'user-a', createdAt: new Date('2026-06-19T11:00:00.000Z') },
+    ]);
+
+    const result = await listUsers('tenant-a', null);
+
+    expect(result).toEqual([expect.objectContaining({
+      id: 'user-a',
+      assignedSites: [{ id: 'site-a', name: 'ВСМЖ' }],
+      activeCrew: {
+        id: 'crew-a',
+        name: 'Экипаж',
+        equipmentName: 'LRH-100',
+        siteName: 'ВСМЖ',
+      },
+      reportCount: 4,
+      lastReportAt: '2026-06-20T10:00:00.000Z',
+      lastLoginAt: '2026-06-21T11:00:00.000Z',
+      lastActivityAt: '2026-06-21T11:00:00.000Z',
+      lastActivitySource: 'login',
+    })]);
+    expect(findManyFeedbackEventMock).toHaveBeenCalledTimes(1);
+    expect(findManyFeedbackEventMock).toHaveBeenCalledWith({
+      where: {
+        action: 'auth.login.succeeded',
+        actorId: { in: ['user-a'] },
+      },
+      select: { actorId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
   });
 });
 

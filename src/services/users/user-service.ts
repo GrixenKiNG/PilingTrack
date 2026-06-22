@@ -4,6 +4,7 @@ import { assertNotSelfAction } from '@/services/auth/authorization-service';
 import { computePinLookup, hashPassword, hashPin } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
+import type { OperationalUserDTO, UserRole } from '@/lib/types';
 
 function requireTenantId(tenantId: string | null | undefined): string {
   if (!tenantId) throw new ServiceError('Tenant context missing', 400);
@@ -27,7 +28,7 @@ export async function listUsers(
   tenantId: string,
   role?: string | null,
   pagination?: CursorPaginationResult
-) {
+): Promise<OperationalUserDTO[]> {
   const where: Record<string, unknown> = { tenantId: requireTenantId(tenantId) };
   if (role) {
     where.role = role;
@@ -36,13 +37,97 @@ export async function listUsers(
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
 
-  return db.user.findMany({
+  const users = await db.user.findMany({
     where,
-    select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      phone: true,
+      role: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      sites: {
+        select: { site: { select: { id: true, name: true } } },
+      },
+      crew: {
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          equipment: { select: { name: true } },
+          site: { select: { name: true } },
+        },
+      },
+      _count: { select: { reports: true } },
+      reports: {
+        orderBy: { updatedAt: 'desc' },
+        take: 1,
+        select: { updatedAt: true },
+      },
+    },
     orderBy: { name: 'asc' },
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,
+  });
+
+  const userIds = users.map((user) => user.id);
+  const loginEvents = userIds.length > 0
+    ? await db.feedbackEvent.findMany({
+        where: {
+          action: 'auth.login.succeeded',
+          actorId: { in: userIds },
+        },
+        select: { actorId: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
+
+  const lastLoginByUserId = new Map<string, Date>();
+  for (const event of loginEvents) {
+    if (event.actorId && !lastLoginByUserId.has(event.actorId)) {
+      lastLoginByUserId.set(event.actorId, event.createdAt);
+    }
+  }
+
+  return users.map((user) => {
+    const lastLogin = lastLoginByUserId.get(user.id) ?? null;
+    const lastReport = user.reports[0]?.updatedAt ?? null;
+    const activities = [
+      { source: 'login' as const, at: lastLogin },
+      { source: 'report' as const, at: lastReport },
+      { source: 'profile' as const, at: user.updatedAt },
+    ].filter((activity): activity is { source: 'login' | 'report' | 'profile'; at: Date } =>
+      activity.at !== null
+    );
+    const latestActivity = activities.sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null;
+    const activeCrew = user.crew?.isActive ? user.crew : null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      role: user.role as UserRole,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+      assignedSites: user.sites.map(({ site }) => site),
+      activeCrew: activeCrew
+        ? {
+            id: activeCrew.id,
+            name: activeCrew.name,
+            equipmentName: activeCrew.equipment?.name ?? null,
+            siteName: activeCrew.site?.name ?? null,
+          }
+        : null,
+      reportCount: user._count.reports,
+      lastReportAt: lastReport?.toISOString() ?? null,
+      lastLoginAt: lastLogin?.toISOString() ?? null,
+      lastActivityAt: latestActivity?.at.toISOString() ?? null,
+      lastActivitySource: latestActivity?.source ?? null,
+    };
   });
 }
 
