@@ -8,12 +8,15 @@ import { ServiceError } from '@/lib/service-error';
 import { isPrivilegedRole } from '@/services/auth/authorization-service';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 
-export async function getAccessibleCrews(siteId?: string, pagination?: CursorPaginationResult) {
+export async function getAccessibleCrews(tenantId: string, siteId?: string, pagination?: CursorPaginationResult) {
+  // Fail-closed (IDOR guard): Crew has no tenantId column; its tenant is the
+  // owning site's. Scope every list to the caller's tenant via site.tenantId.
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
 
   return db.crew.findMany({
-    where: siteId ? { siteId } : {},
+    where: { site: { tenantId }, ...(siteId ? { siteId } : {}) },
     include: {
       operator: { select: { id: true, name: true, role: true } },
       equipment: { select: { id: true, name: true } },

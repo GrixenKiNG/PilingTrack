@@ -20,10 +20,12 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.read');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const siteId = request.nextUrl.searchParams.get('siteId');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const { getAccessibleCrews } = await getCrewsModule();
-    const crews = await getAccessibleCrews(siteId || undefined, pagination);
+    const crews = await getAccessibleCrews(tenantId, siteId || undefined, pagination);
     const nextCursor = pagination.getNextCursor(crews);
     return NextResponse.json({ data: crews, nextCursor });
   },
