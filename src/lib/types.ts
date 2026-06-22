@@ -69,6 +69,24 @@ export interface UserDTO {
   isActive: boolean;
 }
 
+export interface OperationalUserDTO extends UserDTO {
+  phone: string;
+  createdAt: string;
+  assignedSites: Array<{ id: string; name: string }>;
+  activeCrew: {
+    id: string;
+    name: string;
+    equipmentName: string | null;
+    siteName: string | null;
+  } | null;
+  reportCount: number;
+  canHardDelete: boolean;
+  lastReportAt: string | null;
+  lastLoginAt: string | null;
+  lastActivityAt: string | null;
+  lastActivitySource: 'login' | 'report' | 'profile' | null;
+}
+
 export interface CreateUserPayload {
   email: string;
   password: string;

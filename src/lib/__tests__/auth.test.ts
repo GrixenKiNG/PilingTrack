@@ -52,6 +52,7 @@ describe('requireAuth', () => {
       phone: '+70000000000',
       isActive: true,
       tenantId: null,
+      sessionVersion: 0,
     });
 
     const { requireAuth } = await import('../auth');
@@ -64,6 +65,31 @@ describe('requireAuth', () => {
     expect(first.user).toEqual(second.user);
     expect(mocks.verifySessionToken).toHaveBeenCalledTimes(1);
     expect(mocks.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 401 when the token session version is stale', async () => {
+    mocks.verifySessionToken.mockResolvedValue({
+      sub: 'user-stale',
+      sv: 2,
+      type: 'session',
+      v: 1,
+    });
+    mocks.findUnique.mockResolvedValue({
+      id: 'user-stale',
+      email: 'operator@piling.ru',
+      name: 'Operator',
+      role: 'OPERATOR',
+      phone: '+70000000000',
+      isActive: true,
+      tenantId: 'tenant-a',
+      sessionVersion: 3,
+    });
+
+    const { requireAuth } = await import('../auth');
+    const result = await requireAuth(createRequest());
+
+    expect(result.user).toBeNull();
+    expect(result.error?.status).toBe(401);
   });
 
   it('returns 401 when the session token is invalid', async () => {

@@ -212,7 +212,15 @@ export async function rotateRefreshToken(
   // Fetch user for new access token
   const user = await db.user.findUnique({
     where: { id: existingToken.userId },
-    select: { id: true, email: true, name: true, role: true, isActive: true, tenantId: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      tenantId: true,
+      sessionVersion: true,
+    },
   });
 
   if (!user || !user.isActive) {
@@ -245,6 +253,7 @@ export async function rotateRefreshToken(
     name: user.name,
     role: user.role,
     tenantId: user.tenantId,
+    sessionVersion: user.sessionVersion,
   };
 
   const accessToken = await createSessionToken(sessionUser);

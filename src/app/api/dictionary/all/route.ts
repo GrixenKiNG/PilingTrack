@@ -8,11 +8,14 @@ export const runtime = 'nodejs';
 
 export const GET = withApi(
   async (request: NextRequest) => {
-    const { error } = await requireAuth(request);
+    const { user, error } = await requireAuth(request);
     if (error) return error;
 
-    const data = await getCachedAllDictionaries();
+    if (!user?.tenantId) {
+      return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
+    }
+    const data = await getCachedAllDictionaries(user.tenantId);
     return NextResponse.json(data);
   },
-  { domain: 'dictionary', cache: true, cacheTTL: 120_000 }
+  { domain: 'dictionary', cache: false }
 );

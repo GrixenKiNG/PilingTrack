@@ -18,6 +18,10 @@ export const PUT = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'users.manage');
+    const tenantId = user?.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     let body;
     try {
       body = await request.json();
@@ -38,7 +42,7 @@ export const PUT = withMutation(
     const validatedData = validation.data;
     const { updateUser } = await getUsersModule();
 
-    const updated = await updateUser({
+    const updated = await updateUser(tenantId, {
       id: validatedData.id,
       isActive: validatedData.isActive,
       name: validatedData.name,
@@ -46,6 +50,7 @@ export const PUT = withMutation(
       phone: validatedData.phone,
       email: validatedData.email,
       password: validatedData.password,
+      pin: validatedData.pin,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     }, user!.id);
 

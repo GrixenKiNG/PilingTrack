@@ -11,6 +11,7 @@
 
 import { randomBytes } from 'crypto';
 import { db } from '@/lib/db';
+import { initializeTenantDictionaries } from '@/services/dictionaries/tenant-dictionary-initializer';
 import { ServiceError } from '@/services/service-error';
 
 // ============================================================
@@ -84,20 +85,23 @@ export async function createTenant(params: {
     ? new Date(now.getTime() + params.trialDays * 24 * 60 * 60 * 1000)
     : null;
 
-  const tenant = await db.tenant.create({
-    data: {
-      slug: params.slug,
-      name: params.name,
-      billingEmail: params.billingEmail || null,
-      plan: params.plan || 'free',
-      monthlyFee: plan.monthlyFee,
-      maxUsers: plan.maxUsers,
-      subscriptionStatus: params.trialDays ? 'trial' : 'inactive',
-      trialEndsAt,
-    },
-  });
+  return db.$transaction(async (tx) => {
+    const tenant = await tx.tenant.create({
+      data: {
+        slug: params.slug,
+        name: params.name,
+        billingEmail: params.billingEmail || null,
+        plan: params.plan || 'free',
+        monthlyFee: plan.monthlyFee,
+        maxUsers: plan.maxUsers,
+        subscriptionStatus: params.trialDays ? 'trial' : 'inactive',
+        trialEndsAt,
+      },
+    });
 
-  return { tenant };
+    await initializeTenantDictionaries(tx, tenant.id);
+    return { tenant };
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- parked billing module returns raw Prisma rows; typed when the domain is built out

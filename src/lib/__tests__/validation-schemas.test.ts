@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   loginSchema,
+  pinAuthSchema,
   createSiteSchema,
   createEquipmentSchema,
   createCrewSchema,
   updateCrewSchema,
   reportUpsertSchema,
   createUserSchema,
+  updateUserSchema,
   dictionaryItemSchema,
   telegramConfigSchema,
   paginationSchema,
@@ -32,6 +34,16 @@ describe('validation-schemas', () => {
     it('rejects missing fields', () => {
       const result = loginSchema.safeParse({});
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('pinAuthSchema', () => {
+    it.each(['123', '12345678901', '12a4'])('rejects invalid PIN %s', (pin) => {
+      expect(pinAuthSchema.safeParse({ pin }).success).toBe(false);
+    });
+
+    it.each(['1234', '1234567890'])('accepts PIN %s', (pin) => {
+      expect(pinAuthSchema.safeParse({ pin }).success).toBe(true);
     });
   });
 
@@ -83,6 +95,28 @@ describe('validation-schemas', () => {
         pin: 'abc123',
       });
       expect(result.success).toBe(false);
+    });
+
+    it('rejects a password that becomes shorter than 8 characters after trimming', () => {
+      const result = createUserSchema.safeParse({
+        email: 'user@piling.ru',
+        name: 'Test User',
+        role: 'OPERATOR',
+        password: '1234567 ',
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('updateUserSchema', () => {
+    it('does not inject isActive into a partial credential update', () => {
+      const result = updateUserSchema.safeParse({ id: 'user-1', pin: '5678' });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual({ id: 'user-1', pin: '5678' });
+      }
     });
   });
 

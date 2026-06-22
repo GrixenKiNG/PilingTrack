@@ -1,6 +1,7 @@
 import { PrismaClient } from '../src/generated/postgres-client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashSync } from 'bcryptjs';
+import { initializeTenantDictionaries } from '../src/services/dictionaries/tenant-dictionary-initializer';
 
 // Prisma 7 requires an adapter when driverAdapters is set in the schema.
 // Without this, `new PrismaClient()` throws and the migrate container had
@@ -188,52 +189,10 @@ async function seed() {
 
   console.log(`Users: ${[admin, dispatcher, operator1, operator2, assistant].length}`);
 
-  const pileGrades = [
-    'СВ 120-35',
-    'СВ 150-50',
-    'СВ 200-60',
-    'СВ 300-80',
-    'СВ 400-100',
-  ];
-
-  for (const name of pileGrades) {
-    await db.pileGrade.upsert({
-      where: { id: `pg-${name}` },
-      update: { name, isActive: true },
-      create: { id: `pg-${name}`, name, isActive: true },
-    });
-  }
-
-  const drillingTypes = [
-    'Лидерное бурение d=150мм',
-    'Лидерное бурение d=200мм',
-    'Расширение скважины',
-  ];
-
-  for (const name of drillingTypes) {
-    await db.drillingType.upsert({
-      where: { id: `dt-${name}` },
-      update: { name, isActive: true },
-      create: { id: `dt-${name}`, name, isActive: true },
-    });
-  }
-
-  const downtimeReasons = [
-    'Переезд установки',
-    'Плохие погодные условия',
-    'Отсутствие свай на складе',
-    'Ремонт установки',
-    'Ожидание техники',
-    'Прочее',
-  ];
-
-  for (const name of downtimeReasons) {
-    await db.downtimeReason.upsert({
-      where: { id: `dr-${name}` },
-      update: { name, isActive: true },
-      create: { id: `dr-${name}`, name, isActive: true },
-    });
-  }
+  await initializeTenantDictionaries(
+    db,
+    process.env.DEFAULT_TENANT_ID ?? 'orion'
+  );
 
   console.log('Dictionaries seeded');
 

@@ -29,7 +29,7 @@ export const loginSchema = z.object({
 });
 
 export const pinAuthSchema = z.object({
-  pin: z.string().regex(/^\d+$/, 'PIN must be digits only').min(1).max(10),
+  pin: z.string().regex(/^\d{4,10}$/, 'PIN must contain 4 to 10 digits'),
 });
 
 // ============================================================
@@ -42,16 +42,16 @@ const userBaseSchema = z.object({
   role: z.enum(['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT']),
   pin: z
     .string()
-    .regex(/^\d+$/, 'PIN must be digits only')
-    .max(10)
+    .regex(/^\d{4,10}$/, 'PIN must contain 4 to 10 digits')
     .optional()
     .or(z.literal('')),
   phone: z.string().max(30).optional(),
-  password: z.string().min(1, 'Password is required').max(100).optional(),
-  isActive: z.boolean().default(true),
+  password: z.string().trim().min(8, 'Password must contain at least 8 characters').max(100).optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const createUserSchema = userBaseSchema
+  .extend({ isActive: z.boolean().default(true) })
   .refine((value) => Boolean(value.password?.trim() || value.pin?.trim()), {
     message: 'Password or PIN is required',
     path: ['password'],

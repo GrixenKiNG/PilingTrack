@@ -41,6 +41,9 @@ model Tenant {
   sites       Site[]
   invoices    TenantInvoice[]
   telematicsDevices TelematicsDevice[]
+  pileGrades         PileGrade[]
+  drillingTypes      DrillingType[]
+  downtimeReasons    DowntimeReason[]
 
   @@index([slug])
   @@index([isActive])
@@ -89,6 +92,7 @@ model User {
   phone      String   @default("")
   role       String   @default("OPERATOR")
   isActive   Boolean  @default(true)
+  sessionVersion Int  @default(0)
   timezone   String   @default("Europe/Moscow")
 
   createdAt  DateTime @default(now()) @db.Timestamptz(3)
@@ -1104,9 +1108,15 @@ model ReportDowntime {
 // ============================================================
 
 model PileGrade {
-  id        String  @id @default(cuid())
-  name      String
-  isActive  Boolean @default(true)
+  id                String  @id @default(cuid())
+  tenantId          String
+  tenant            Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  normalizedName    String
+  code              String  @default("")
+  sectionOrDiameter String?
+  notes             String  @default("")
+  isActive          Boolean @default(true)
   // Pile length in millimetres. Single source of truth for м.п. KPI — replaces
   // parsing the length out of `name`. null = unknown (counts as 0 m), matching
   // the old behaviour for names with no parseable length.
@@ -1117,28 +1127,43 @@ model PileGrade {
 
   piles     PileWork[]
   plans     SitePilePlan[]
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive])
 }
 
 model DrillingType {
-  id        String  @id @default(cuid())
-  name      String
-  isActive  Boolean @default(true)
+  id             String  @id @default(cuid())
+  tenantId       String
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  isActive       Boolean @default(true)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   drillings LeaderDrilling[]
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive])
 }
 
 model DowntimeReason {
-  id        String  @id @default(cuid())
-  name      String
-  isActive  Boolean @default(true)
+  id             String  @id @default(cuid())
+  tenantId       String
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  isActive       Boolean @default(true)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   downtimes ReportDowntime[]
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive])
 }
 
 // ============================================================

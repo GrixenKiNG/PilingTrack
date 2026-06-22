@@ -105,16 +105,19 @@ export async function getCachedCrewsAll() {
 // Dictionary
 // ============================================================
 
-export async function getCachedDictionary(type: 'pileGrade' | 'drillingType' | 'downtimeReason') {
+export async function getCachedDictionary(
+  tenantId: string,
+  type: 'pileGrade' | 'drillingType' | 'downtimeReason'
+) {
   return cacheAside(
-    `dictionary:${type}`,
+    `dictionary:${tenantId}:${type}`,
     () => {
       const model = type === 'pileGrade' ? db.pileGrade :
                     type === 'drillingType' ? db.drillingType :
                     db.downtimeReason;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       return (model as any).findMany({
-        where: { isActive: true },
+          where: { tenantId, isActive: true },
         orderBy: { name: 'asc' },
       });
     },
@@ -122,14 +125,14 @@ export async function getCachedDictionary(type: 'pileGrade' | 'drillingType' | '
   );
 }
 
-export async function getCachedAllDictionaries() {
+export async function getCachedAllDictionaries(tenantId: string) {
   return cacheAside(
-    'dictionary:all',
+    `dictionary:${tenantId}:all`,
     async () => {
       const [pileGrades, drillingTypes, downtimeReasons] = await Promise.all([
-        db.pileGrade.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
-        db.drillingType.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
-        db.downtimeReason.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+        db.pileGrade.findMany({ where: { tenantId, isActive: true }, orderBy: { name: 'asc' } }),
+        db.drillingType.findMany({ where: { tenantId, isActive: true }, orderBy: { name: 'asc' } }),
+        db.downtimeReason.findMany({ where: { tenantId, isActive: true }, orderBy: { name: 'asc' } }),
       ]);
       return { pileGrades, drillingTypes, downtimeReasons };
     },
@@ -213,8 +216,8 @@ export async function invalidateCrews(): Promise<void> {
   recordDeletion();
 }
 
-export async function invalidateDictionaries(): Promise<void> {
-  await cacheAsideInvalidate('dictionary:all');
+export async function invalidateDictionaries(tenantId: string): Promise<void> {
+  await cacheAsideInvalidate(`dictionary:${tenantId}:all`);
   recordDeletion();
 }
 

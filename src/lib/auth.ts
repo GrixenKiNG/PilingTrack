@@ -75,10 +75,19 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
 
     const user = await db.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, name: true, role: true, phone: true, isActive: true, tenantId: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        isActive: true,
+        tenantId: true,
+        sessionVersion: true,
+      },
     });
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || (payload.sv ?? 0) !== user.sessionVersion) {
       authUserCache.delete(token);
       return { payloadValid: true, user: null };
     }

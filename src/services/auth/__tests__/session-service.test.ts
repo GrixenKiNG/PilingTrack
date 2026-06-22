@@ -19,6 +19,7 @@ const mockUser = {
   name: 'Test User',
   role: 'OPERATOR',
   tenantId: null,
+  sessionVersion: 0,
 };
 
 describe('session-service', () => {
@@ -74,6 +75,12 @@ describe('session-service', () => {
       expect(payload.type).toBe('session');
       expect(payload.v).toBe(1);
       expect(payload.exp).toBeGreaterThan(payload.iat);
+    });
+
+    it('writes the current session version into the token', async () => {
+      const token = await createSessionToken({ ...mockUser, sessionVersion: 3 });
+
+      expect((await verifyTokenSignature(token))?.sv).toBe(3);
     });
   });
 

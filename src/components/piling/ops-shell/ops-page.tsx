@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 /**
  * Two-column operational screen layout: a flexible main column and a fixed-width
@@ -12,14 +13,21 @@ export function OpsPage({
   header,
   aside,
   children,
+  layout = 'default',
 }: {
   header: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
+  layout?: 'default' | 'wideMain';
 }) {
   return (
     <div className="min-h-full bg-slate-50/60 p-4 lg:p-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px] 2xl:grid-cols-[minmax(0,1fr)_560px]">
+      <div className={cn(
+        'grid gap-4',
+        layout === 'wideMain'
+          ? '2xl:grid-cols-[minmax(0,1fr)_560px]'
+          : 'xl:grid-cols-[minmax(0,1fr)_520px] 2xl:grid-cols-[minmax(0,1fr)_560px]'
+      )}>
         <div className="min-w-0 space-y-4">
           {header}
           {children}
