@@ -75,6 +75,14 @@ describe('dictionary/manage route', () => {
     });
   });
 
+  it('POST rejects a pile grade without a positive explicit length', async () => {
+    requireAuthMock.mockResolvedValue(admin);
+
+    expect((await POST(req('POST', { type: 'pileGrade', name: 'СВ 120-35' }))).status).toBe(400);
+    expect((await POST(req('POST', { type: 'pileGrade', name: 'СВ 120-35', lengthMm: 0 }))).status).toBe(400);
+    expect(svc.createDictionaryItem).not.toHaveBeenCalled();
+  });
+
   it('PATCH renames when name is present', async () => {
     requireAuthMock.mockResolvedValue(admin);
     svc.renameDictionaryItem.mockResolvedValue({ id: 'g1', name: 'X' });

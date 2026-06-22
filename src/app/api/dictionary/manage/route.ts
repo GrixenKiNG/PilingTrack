@@ -21,6 +21,14 @@ const createSchema = z.object({
   lengthMm: z.number().int().min(0).max(1_000_000).nullable().optional(),
   sectionOrDiameter: z.string().max(100).nullable().optional(),
   notes: z.string().max(500).optional(),
+}).superRefine((value, context) => {
+  if (value.type === 'pileGrade' && (!value.lengthMm || value.lengthMm <= 0)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['lengthMm'],
+      message: 'Для марки сваи требуется положительная длина в миллиметрах',
+    });
+  }
 });
 const deleteSchema = z.object({ type: typeEnum, id: z.string().min(1) });
 const patchSchema = z.object({

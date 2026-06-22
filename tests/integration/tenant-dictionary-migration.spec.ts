@@ -60,7 +60,9 @@ describe.runIf(Boolean(connectionString))('tenant dictionary migration on Postgr
 
       INSERT INTO "PileGrade" ("id", "name", "lengthMm") VALUES ('grade-global', 'С120.30-8', 12000);
       INSERT INTO "DrillingType" ("id", "name") VALUES ('drill-global', 'Лидерное бурение');
-      INSERT INTO "DowntimeReason" ("id", "name") VALUES ('reason-global', 'Ожидание бетона');
+      INSERT INTO "DowntimeReason" ("id", "name", "isActive") VALUES
+        ('reason-global', 'Ожидание бетона', TRUE),
+        ('reason-global-duplicate', 'Ожидание бетона', FALSE);
 
       INSERT INTO "PileWork" ("id", "reportId", "pileGradeId") VALUES
         ('pile-a', 'report-a', 'grade-global'),
@@ -70,7 +72,8 @@ describe.runIf(Boolean(connectionString))('tenant dictionary migration on Postgr
         ('drill-b', 'report-b', 'drill-global');
       INSERT INTO "ReportDowntime" ("id", "reportId", "reasonId") VALUES
         ('down-a', 'report-a', 'reason-global'),
-        ('down-b', 'report-b', 'reason-global');
+        ('down-b', 'report-b', 'reason-global'),
+        ('down-a-duplicate', 'report-a', 'reason-global-duplicate');
       INSERT INTO "SitePilePlan" ("id", "siteId", "pileGradeId") VALUES
         ('plan-a', 'site-a', 'grade-global'),
         ('plan-b', 'site-b', 'grade-global');
@@ -78,6 +81,7 @@ describe.runIf(Boolean(connectionString))('tenant dictionary migration on Postgr
   });
 
   afterAll(async () => {
+    await client.query('ROLLBACK');
     await client.query('SET search_path TO public');
     await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     await client.end();
@@ -97,6 +101,14 @@ describe.runIf(Boolean(connectionString))('tenant dictionary migration on Postgr
     expect(grades.rows.map((row) => row.lengthMm)).toEqual([12000, 12000]);
     expect(new Set(grades.rows.map((row) => row.id)).size).toBe(2);
     expect(grades.rows.every((row) => row.normalizedName === 'с120.30-8')).toBe(true);
+
+    const reasons = await client.query<{ tenantId: string; isActive: boolean }>(
+      'SELECT "tenantId", "isActive" FROM "DowntimeReason" ORDER BY "tenantId"'
+    );
+    expect(reasons.rows).toEqual([
+      { tenantId: 'tenant-a', isActive: true },
+      { tenantId: 'tenant-b', isActive: true },
+    ]);
 
     const linkCheck = await client.query<{
       pileLinks: number;
@@ -138,7 +150,7 @@ describe.runIf(Boolean(connectionString))('tenant dictionary migration on Postgr
     expect(linkCheck.rows[0]).toEqual({
       pileLinks: 2,
       drillLinks: 2,
-      downtimeLinks: 2,
+      downtimeLinks: 3,
       planLinks: 2,
       mismatches: 0,
     });
@@ -150,7 +162,7 @@ describe.runIf(Boolean(connectionString))('tenant dictionary migration on Postgr
       crossTenantLinks: 0,
       pileWorkLinks: 2,
       drillingLinks: 2,
-      downtimeLinks: 2,
+      downtimeLinks: 3,
       planLinks: 2,
     });
   });

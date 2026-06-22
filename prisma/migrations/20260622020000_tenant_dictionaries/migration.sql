@@ -71,21 +71,15 @@ BEGIN
     RAISE EXCEPTION 'Tenant dictionary migration: report dictionary link has no tenant';
   END IF;
 
+  -- Normalized duplicates are collapsed: every old id is mapped to the same
+  -- tenant-owned row below. Active wins over archived; conflicting pile length
+  -- still aborts because it would change production totals.
   IF EXISTS (
     SELECT 1 FROM "PileGrade"
     WHERE "tenantId" IS NULL
     GROUP BY regexp_replace(lower(btrim("name")), E'\\s+', ' ', 'g')
     HAVING COUNT(*) > 1
-  ) OR EXISTS (
-    SELECT 1 FROM "DrillingType"
-    WHERE "tenantId" IS NULL
-    GROUP BY regexp_replace(lower(btrim("name")), E'\\s+', ' ', 'g')
-    HAVING COUNT(*) > 1
-  ) OR EXISTS (
-    SELECT 1 FROM "DowntimeReason"
-    WHERE "tenantId" IS NULL
-    GROUP BY regexp_replace(lower(btrim("name")), E'\\s+', ' ', 'g')
-    HAVING COUNT(*) > 1
+      AND COUNT(DISTINCT COALESCE("lengthMm", -1)) > 1
   ) THEN
     RAISE EXCEPTION 'Tenant dictionary migration: duplicate normalized dictionary names require manual resolution';
   END IF;
@@ -101,34 +95,40 @@ SELECT
 CREATE TEMP TABLE "_pile_grade_map" (
   "oldId" TEXT NOT NULL,
   "tenantId" TEXT NOT NULL,
-  "newId" TEXT NOT NULL PRIMARY KEY,
+  "newId" TEXT NOT NULL,
   UNIQUE ("oldId", "tenantId")
 );
 CREATE TEMP TABLE "_drilling_type_map" (
   "oldId" TEXT NOT NULL,
   "tenantId" TEXT NOT NULL,
-  "newId" TEXT NOT NULL PRIMARY KEY,
+  "newId" TEXT NOT NULL,
   UNIQUE ("oldId", "tenantId")
 );
 CREATE TEMP TABLE "_downtime_reason_map" (
   "oldId" TEXT NOT NULL,
   "tenantId" TEXT NOT NULL,
-  "newId" TEXT NOT NULL PRIMARY KEY,
+  "newId" TEXT NOT NULL,
   UNIQUE ("oldId", "tenantId")
 );
 
 INSERT INTO "_pile_grade_map" ("oldId", "tenantId", "newId")
-SELECT pg."id", t."id", 'pg_' || md5(pg."id" || ':' || t."id")
+SELECT pg."id", t."id", 'pg_' || md5(
+  regexp_replace(lower(btrim(pg."name")), E'\\s+', ' ', 'g') || ':' || t."id"
+)
 FROM "PileGrade" pg CROSS JOIN "Tenant" t
 WHERE pg."tenantId" IS NULL;
 
 INSERT INTO "_drilling_type_map" ("oldId", "tenantId", "newId")
-SELECT dt."id", t."id", 'dt_' || md5(dt."id" || ':' || t."id")
+SELECT dt."id", t."id", 'dt_' || md5(
+  regexp_replace(lower(btrim(dt."name")), E'\\s+', ' ', 'g') || ':' || t."id"
+)
 FROM "DrillingType" dt CROSS JOIN "Tenant" t
 WHERE dt."tenantId" IS NULL;
 
 INSERT INTO "_downtime_reason_map" ("oldId", "tenantId", "newId")
-SELECT dr."id", t."id", 'dr_' || md5(dr."id" || ':' || t."id")
+SELECT dr."id", t."id", 'dr_' || md5(
+  regexp_replace(lower(btrim(dr."name")), E'\\s+', ' ', 'g') || ':' || t."id"
+)
 FROM "DowntimeReason" dr CROSS JOIN "Tenant" t
 WHERE dr."tenantId" IS NULL;
 
@@ -136,7 +136,7 @@ INSERT INTO "PileGrade" (
   "id", "tenantId", "name", "normalizedName", "code", "sectionOrDiameter",
   "notes", "isActive", "lengthMm", "createdAt", "updatedAt"
 )
-SELECT
+SELECT DISTINCT ON (m."newId")
   m."newId",
   m."tenantId",
   pg."name",
@@ -149,12 +149,13 @@ SELECT
   pg."createdAt",
   pg."updatedAt"
 FROM "_pile_grade_map" m
-JOIN "PileGrade" pg ON pg."id" = m."oldId";
+JOIN "PileGrade" pg ON pg."id" = m."oldId"
+ORDER BY m."newId", pg."isActive" DESC, m."oldId";
 
 INSERT INTO "DrillingType" (
   "id", "tenantId", "name", "normalizedName", "isActive", "createdAt", "updatedAt"
 )
-SELECT
+SELECT DISTINCT ON (m."newId")
   m."newId",
   m."tenantId",
   dt."name",
@@ -163,12 +164,13 @@ SELECT
   dt."createdAt",
   dt."updatedAt"
 FROM "_drilling_type_map" m
-JOIN "DrillingType" dt ON dt."id" = m."oldId";
+JOIN "DrillingType" dt ON dt."id" = m."oldId"
+ORDER BY m."newId", dt."isActive" DESC, m."oldId";
 
 INSERT INTO "DowntimeReason" (
   "id", "tenantId", "name", "normalizedName", "isActive", "createdAt", "updatedAt"
 )
-SELECT
+SELECT DISTINCT ON (m."newId")
   m."newId",
   m."tenantId",
   dr."name",
@@ -177,7 +179,8 @@ SELECT
   dr."createdAt",
   dr."updatedAt"
 FROM "_downtime_reason_map" m
-JOIN "DowntimeReason" dr ON dr."id" = m."oldId";
+JOIN "DowntimeReason" dr ON dr."id" = m."oldId"
+ORDER BY m."newId", dr."isActive" DESC, m."oldId";
 
 UPDATE "PileWork" pw
 SET "pileGradeId" = m."newId"
