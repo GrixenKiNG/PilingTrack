@@ -91,6 +91,7 @@ export async function listAllSitesForAdmin(tenantId: string, includeInactive = t
       isActive: true,
       plannedPiles: true,
       plannedDrilling: true,
+      completionDate: true,
       _count: {
         select: {
           pilePlans: true,

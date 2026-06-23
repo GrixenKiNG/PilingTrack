@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus } from 'lucide-react';
+import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus, CheckCircle2 } from 'lucide-react';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -69,7 +69,7 @@ function pct(value: number): string {
 
 // Build the minimal SiteListItem the edit/delete dialogs expect from a row.
 function toListItem(row: SiteOverviewRow): SiteListItem {
-  return { id: row.siteId, name: row.siteName, isActive: row.isActive, plannedPiles: row.plannedPiles, plannedDrilling: row.plannedDrilling };
+  return { id: row.siteId, name: row.siteName, isActive: row.isActive, plannedPiles: row.plannedPiles, plannedDrilling: row.plannedDrilling, completionDate: row.completionDate };
 }
 
 export function AdminSites() {
@@ -105,8 +105,8 @@ export function AdminSites() {
   const allRows = useMemo(() => {
     const operational = new Map(rows.map((row) => [row.siteId, row]));
     return sites.map((site): SiteOverviewRow => operational.has(site.id)
-      ? { ...operational.get(site.id)!, siteName: site.name, isActive: site.isActive }
-      : { siteId: site.id, siteName: site.name, isActive: site.isActive,
+      ? { ...operational.get(site.id)!, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate }
+      : { siteId: site.id, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate,
           plannedPiles: site.plannedPiles, plannedPileMeters: 0, actualPiles: 0, actualPileMeters: 0,
           plannedDrilling: site.plannedDrilling, actualDrilling: 0, pileProgress: 0, drillingProgress: 0,
           totalReports: 0, totalDowntime: 0, crewCount: 0, rigNames: [] });
@@ -179,7 +179,12 @@ export function AdminSites() {
       width: 'minmax(180px,1.6fr)',
       cell: (r) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-slate-950">{r.siteName}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate font-medium text-slate-950">{r.siteName}</span>
+            {r.completionDate ? (
+              <span className="shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-2xs font-medium text-green-700">Выполнен</span>
+            ) : null}
+          </div>
           <div className="mt-0.5 truncate text-2xs text-slate-400">
             {r.crewCount} {pluralizeRu(r.crewCount, ['бригада', 'бригады', 'бригад'])}
             {r.rigNames.length > 0 ? ` · ${r.rigNames.join(', ')}` : ''}
@@ -257,10 +262,13 @@ export function AdminSites() {
           ? (
             <SiteDetail
               row={active}
-              tree={siteTree[active.siteId]}
+              togglingId={mutations.togglingId}
               onEdit={() => setEditSite(toListItem(active))}
               onDelete={() => setDeleteSite(toListItem(active))}
               onAssign={() => setAssignSiteId(active.siteId)}
+              onToggleCompleted={() => mutations.handleSetCompleted(toListItem(active), !active.completionDate)}
+              onToggleActive={() => mutations.handleToggleActive(toListItem(active))}
+              tree={siteTree[active.siteId]}
               onAddHierarchy={(type, siteId, parentId) => { setAddType(type); setAddSiteId(siteId); setAddParentId(parentId); setShowAdd(true); }}
               onDeleteHierarchy={async (siteId, type, itemId) => { await mutations.handleDeleteHierarchy(siteId, type, itemId); await refreshTree(siteId); }}
             />
@@ -311,6 +319,11 @@ export function AdminSites() {
           const ok = await mutations.handleConfirmDelete(deleteSite.id);
           if (ok) { setDeleteSite(null); setActiveId(null); reload(); }
         }}
+        onDeactivate={async () => {
+          if (!deleteSite) return;
+          await mutations.handleToggleActive(deleteSite);
+          setDeleteSite(null);
+        }}
       />
 
       <AddHierarchyDialog
@@ -338,24 +351,30 @@ export function AdminSites() {
 }
 
 function SiteDetail({
-  row, tree, onEdit, onDelete, onAssign, onAddHierarchy, onDeleteHierarchy,
+  row, togglingId, tree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
 }: {
   row: SiteOverviewRow;
+  togglingId: string | null;
   tree?: SiteFullData;
   onEdit: () => void;
   onDelete: () => void;
   onAssign: () => void;
+  onToggleCompleted: () => void;
+  onToggleActive: () => void;
   onAddHierarchy: (type: 'field' | 'cluster' | 'picket', siteId: string, parentId: string) => void;
   onDeleteHierarchy: (siteId: string, type: string, itemId: string) => void;
 }) {
   const risk = siteRisk(row);
   const history = useEntityHistory('sites', row.siteId);
+  const completed = Boolean(row.completionDate);
   return (
     <OpsDetailPanel title={row.siteName} subtitle={`Объект · ${row.totalReports} ${pluralizeRu(row.totalReports, ['отчёт', 'отчёта', 'отчётов'])}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
         <Button size="sm" variant="outline" onClick={onAssign} className="h-8 text-xs"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
-        <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-red-600 hover:bg-red-50"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
+        <Button size="sm" variant="outline" onClick={onToggleCompleted} className="h-8 text-xs"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
+        <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-8 text-xs">{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
+        <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-red-600 hover:bg-red-50"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
       </div>
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-slate-200 bg-slate-50">

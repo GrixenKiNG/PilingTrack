@@ -88,7 +88,10 @@ export const createSiteSchema = z.object({
   })).max(100).default([]).optional(),
 });
 
-export const updateSiteSchema = createSiteSchema.partial().extend({ isActive: z.boolean().optional() });
+export const updateSiteSchema = createSiteSchema.partial().extend({
+  isActive: z.boolean().optional(),
+  completed: z.boolean().optional(),
+});
 
 export const siteHierarchySchema = z.object({
   fieldName: z.string().min(1).max(200),

@@ -148,25 +148,48 @@ export function useSiteMutations({
     }
   };
 
+  // Permanent delete. The server refuses (409) for sites with crews or reports;
+  // its message is surfaced so the user can deactivate instead.
   const handleConfirmDelete = async (siteId: string) => {
     try {
       const res = await authFetch(`/api/sites/${siteId}`, { method: 'DELETE' });
       if (!res.ok) {
-        toast.error(await extractApiError(res, 'Ошибка деактивации объекта'));
+        toast.error(await extractApiError(res, 'Не удалось удалить объект'));
         return false;
       }
-      setSites((prev) => prev.map((s) => s.id === siteId ? { ...s, isActive: false } : s));
+      setSites((prev) => prev.filter((s) => s.id !== siteId));
       setSiteTree((prev) => {
         const next = { ...prev };
         delete next[siteId];
         return next;
       });
       setExpandedSiteId((prev) => (prev === siteId ? null : prev));
-      toast.success('Объект деактивирован');
+      toast.success('Объект удалён');
       return true;
     } catch {
-      toast.error('Ошибка деактивации объекта');
+      toast.error('Не удалось удалить объект');
       return false;
+    }
+  };
+
+  const handleSetCompleted = async (site: SiteListItem, completed: boolean) => {
+    try {
+      const res = await authFetch(`/api/sites/${site.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed }),
+      });
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Ошибка'));
+        return;
+      }
+      const data = await res.json();
+      setSites((prev) =>
+        prev.map((s) => (s.id === site.id ? { ...s, completionDate: data.site?.completionDate ?? null } : s))
+      );
+      toast.success(completed ? 'Объект отмечен «Выполнен»' : 'Отметка «Выполнен» снята');
+    } catch {
+      toast.error('Ошибка');
     }
   };
 
@@ -242,6 +265,7 @@ export function useSiteMutations({
     handleCreateSite,
     handleSaveEdit,
     handleConfirmDelete,
+    handleSetCompleted,
     handleToggleActive,
     handleAddHierarchy,
     handleDeleteHierarchy,

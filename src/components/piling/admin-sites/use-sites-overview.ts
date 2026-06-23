@@ -30,6 +30,7 @@ interface CrewSummary {
 /** Combined per-site operational row for the Objects dashboard. */
 export interface SiteOverviewRow extends SiteAnalytics {
   isActive: boolean;
+  completionDate?: string | null;
   crewCount: number;
   rigNames: string[];
 }

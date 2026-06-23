@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
-import { getSiteWithHierarchy, updateSite, activateSite, deactivateSite } from '@/modules/sites';
-import { updateSiteWithPlans } from '@/modules/sites/application/commands';
+import { getSiteWithHierarchy, updateSite, activateSite, deactivateSite, hardDeleteSite } from '@/modules/sites';
+import { updateSiteWithPlans, setSiteCompleted } from '@/modules/sites/application/commands';
 import { updateSiteSchema } from '@/lib/validation-schemas';
 import { invalidateSites } from '@/lib/cached-queries';
 import { withApi, withMutation } from '@/core/api-wrapper';
@@ -74,7 +74,12 @@ export const PUT = withMutation(
       else await deactivateSite(id, commandContext);
       site = await getSiteWithHierarchy(user!, tenantId, id);
     }
-    
+
+    if (validated.data.completed !== undefined) {
+      await setSiteCompleted(id, validated.data.completed, commandContext);
+      site = await getSiteWithHierarchy(user!, tenantId, id);
+    }
+
     await invalidateSites(tenantId);
     return NextResponse.json({ site });
   },
@@ -91,8 +96,10 @@ export const DELETE = withMutation(
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
+    // Permanent delete — only succeeds for erroneously created sites (0 crews,
+    // 0 reports). Worked sites must be deactivated via PUT { isActive: false }.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    await deactivateSite(id, { tenantId, actorId: user!.id });
+    await hardDeleteSite(id, { tenantId, actorId: user!.id });
     await invalidateSites(tenantId);
     return NextResponse.json({ ok: true, siteId: id });
   },

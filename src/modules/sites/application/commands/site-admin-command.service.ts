@@ -230,6 +230,69 @@ export async function updateSiteWithPlans(siteId: string, input: {
 }
 
 // ────────────────────────────────────────────
+// Permanent delete (erroneously created sites only)
+// ────────────────────────────────────────────
+
+/**
+ * Hard-delete a site that was created by mistake. Allowed ONLY when the site has
+ * no crews and no reports (no execution). Cascades remove setup data only
+ * (plans, hierarchy, user assignments). Worked sites must be deactivated instead.
+ */
+export async function hardDeleteSite(siteId: string, ctx: SiteCommandContext) {
+  const site = await requireTenantSite(siteId, ctx.tenantId);
+
+  const [crewCount, reportCount] = await Promise.all([
+    db.crew.count({ where: { siteId } }),
+    db.report.count({ where: { siteId } }),
+  ]);
+  if (crewCount > 0 || reportCount > 0) {
+    throw new ServiceError(
+      `Нельзя удалить: ${crewCount} бригад, ${reportCount} отчётов. Деактивируйте объект.`,
+      409,
+    );
+  }
+
+  await db.site.delete({ where: { id: siteId } });
+
+  await recordAuditEvent({
+    action: 'site.deleted',
+    scope: 'sites',
+    actorId: ctx.actorId,
+    targetId: siteId,
+    metadata: { tenantId: ctx.tenantId, name: site.name },
+  });
+
+  return { success: true };
+}
+
+// ────────────────────────────────────────────
+// Completion mark (orthogonal to active/inactive)
+// ────────────────────────────────────────────
+
+/**
+ * Mark a site completed (or clear the mark). Completion is just a
+ * `completionDate` flag — it does NOT deactivate the site.
+ */
+export async function setSiteCompleted(siteId: string, completed: boolean, ctx: SiteCommandContext) {
+  const site = await requireTenantSite(siteId, ctx.tenantId);
+
+  await db.site.update({
+    where: { id: siteId },
+    data: { completionDate: completed ? new Date() : null },
+  });
+
+  await recordAuditEvent({
+    action: completed ? 'site.completed' : 'site.completion_cleared',
+    scope: 'sites',
+    actorId: ctx.actorId,
+    targetId: siteId,
+    metadata: { tenantId: ctx.tenantId, name: site.name },
+  });
+
+  return { success: true };
+}
+
+// ────────────────────────────────────────────
 // User–Site assignments
 // ────────────────────────────────────────────
 

@@ -104,6 +104,7 @@ export interface SiteDTO {
   isActive: boolean;
   plannedPiles: number;
   plannedDrilling: number;
+  completionDate?: string | null;
 }
 
 export interface SiteWithTreeDTO extends SiteDTO {

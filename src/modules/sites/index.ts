@@ -15,6 +15,8 @@ export {
   activateSite,
   deactivateSite,
   createSiteWithPlans,
+  hardDeleteSite,
+  setSiteCompleted,
   assignUserToSite,
   unassignUserFromSite,
   createSiteHierarchyItem,

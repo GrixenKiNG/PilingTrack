@@ -13,9 +13,11 @@ vi.mock('@/lib/db', () => ({
     pileField: { create: vi.fn(), delete: vi.fn() },
     cluster: { create: vi.fn(), delete: vi.fn() },
     picket: { create: vi.fn(), delete: vi.fn() },
-    site: { create: vi.fn() },
+    site: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
     sitePilePlan: { create: vi.fn() },
     siteDrillingPlan: { create: vi.fn() },
+    crew: { count: vi.fn() },
+    report: { count: vi.fn() },
   },
 }));
 
@@ -36,7 +38,9 @@ import {
   unassignUserFromSite,
   createSiteHierarchyItem,
   deleteSiteHierarchyItem,
+  hardDeleteSite,
 } from '../site-admin-command.service';
+import { db } from '@/lib/db';
 
 const ctx = { tenantId: 't1', actorId: 'a1' };
 
@@ -195,6 +199,17 @@ describe('createSiteHierarchyItem', () => {
     await expect(
       createSiteHierarchyItem({ siteId: 's-1', type: 'unknown', name: 'X' }, ctx)
     ).rejects.toThrow('Invalid type');
+  });
+});
+
+describe('hardDeleteSite — irreversible-delete safety guard', () => {
+  it('refuses (409) to delete a site that still has crews or reports, and never calls delete', async () => {
+    vi.mocked(db.site.findFirst).mockResolvedValue({ id: 's1', tenantId: 't1' } as never);
+    vi.mocked(db.crew.count).mockResolvedValue(2);
+    vi.mocked(db.report.count).mockResolvedValue(0);
+
+    await expect(hardDeleteSite('s1', ctx)).rejects.toThrow(/Нельзя удалить/);
+    expect(db.site.delete).not.toHaveBeenCalled();
   });
 });
 
