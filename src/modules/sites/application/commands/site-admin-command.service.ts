@@ -99,25 +99,25 @@ export async function createSiteWithPlans(input: {
       },
     });
 
-    for (const plan of normalized.pilePlans) {
-      await tx.sitePilePlan.create({
-        data: {
+    if (normalized.pilePlans.length > 0) {
+      await tx.sitePilePlan.createMany({
+        data: normalized.pilePlans.map((plan) => ({
           siteId: created.id,
           pileGradeId: plan.pileGradeId,
           count: Number(plan.count) || 0,
           metersPerUnit: Number(plan.metersPerUnit) || 0,
-        },
+        })),
       });
     }
 
-    for (const plan of normalized.drillingPlans) {
-      await tx.siteDrillingPlan.create({
-        data: {
+    if (normalized.drillingPlans.length > 0) {
+      await tx.siteDrillingPlan.createMany({
+        data: normalized.drillingPlans.map((plan) => ({
           siteId: created.id,
           diameter: Number(plan.diameter) || 0,
           count: Number(plan.count) || 0,
           metersPerUnit: Number(plan.metersPerUnit) || 0,
-        },
+        })),
       });
     }
 
@@ -179,27 +179,27 @@ export async function updateSiteWithPlans(siteId: string, input: {
     if (hasPilePlans) await tx.sitePilePlan.deleteMany({ where: { siteId } });
     if (hasDrillingPlans) await tx.siteDrillingPlan.deleteMany({ where: { siteId } });
 
-    // Create new pile plans
-    for (const plan of hasPilePlans ? normalized.pilePlans : []) {
-      await tx.sitePilePlan.create({
-        data: {
+    // Create new pile plans (batched)
+    if (hasPilePlans && normalized.pilePlans.length > 0) {
+      await tx.sitePilePlan.createMany({
+        data: normalized.pilePlans.map((plan) => ({
           siteId,
           pileGradeId: plan.pileGradeId,
           count: Number(plan.count) || 0,
           metersPerUnit: Number(plan.metersPerUnit) || 0,
-        },
+        })),
       });
     }
 
-    // Create new drilling plans
-    for (const plan of hasDrillingPlans ? normalized.drillingPlans : []) {
-      await tx.siteDrillingPlan.create({
-        data: {
+    // Create new drilling plans (batched)
+    if (hasDrillingPlans && normalized.drillingPlans.length > 0) {
+      await tx.siteDrillingPlan.createMany({
+        data: normalized.drillingPlans.map((plan) => ({
           siteId,
           diameter: Number(plan.diameter) || 0,
           count: Number(plan.count) || 0,
           metersPerUnit: Number(plan.metersPerUnit) || 0,
-        },
+        })),
       });
     }
 

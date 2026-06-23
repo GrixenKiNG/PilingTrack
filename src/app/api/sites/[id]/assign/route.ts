@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { assignUserToSite, unassignUserFromSite } from '@/modules/sites';
 import { siteAssignSchema } from '@/lib/validation-schemas';
+import { invalidateSites } from '@/lib/cached-queries';
 import { withMutation } from '@/core/api-wrapper';
 
 
@@ -24,6 +25,7 @@ export const POST = withMutation(
       return NextResponse.json({ error: 'Validation failed', details: validated.error.flatten() }, { status: 400 });
     }
     const assignment = await assignUserToSite(id, validated.data.userId, { tenantId, actorId: user!.id });
+    await invalidateSites(tenantId);
     return NextResponse.json({ assignment });
   },
   { domain: 'sites' }
@@ -41,6 +43,7 @@ export const DELETE = withMutation(
     const { id } = await params;
     const userId = request.nextUrl.searchParams.get('userId');
     const result = await unassignUserFromSite(id, userId || '', { tenantId, actorId: user!.id });
+    await invalidateSites(tenantId);
     return NextResponse.json(result);
   },
   { domain: 'sites' }

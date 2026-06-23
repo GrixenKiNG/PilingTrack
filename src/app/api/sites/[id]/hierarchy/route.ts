@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createSiteHierarchyItem, deleteSiteHierarchyItem } from '@/modules/sites';
 import { siteHierarchyItemSchema, siteHierarchyDeleteSchema } from '@/lib/validation-schemas';
+import { invalidateSites } from '@/lib/cached-queries';
 import { withMutation } from '@/core/api-wrapper';
 
 
@@ -32,6 +33,7 @@ export const POST = withMutation(
       name: validated.data.name,
       parentId: validated.data.parentId,
     }, { tenantId, actorId: user!.id });
+    await invalidateSites(tenantId);
     return NextResponse.json({ item });
   },
   { domain: 'sites' }
@@ -56,6 +58,7 @@ export const DELETE = withMutation(
       );
     }
     const result = await deleteSiteHierarchyItem(id, validated.data.type, validated.data.itemId, { tenantId, actorId: user!.id });
+    await invalidateSites(tenantId);
     return NextResponse.json(result);
   },
   { domain: 'sites' }
