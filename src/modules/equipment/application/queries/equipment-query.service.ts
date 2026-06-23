@@ -129,7 +129,8 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
     const a = analyticsByReport.get(r.reportId);
     return {
       reportId: r.reportId, date: r.date, shiftType: r.shiftType, status: r.status,
-      siteName: r.site?.name ?? null, operatorName: r.user?.name ?? null,
+      siteName: r.site?.name ?? null,
+      operatorId: r.user?.id ?? null, operatorName: r.user?.name ?? null,
       updatedAt: r.updatedAt.toISOString(),
       piles: a?.totalPiles ?? null, drillingMeters: a?.totalDrilling ?? null,
       downtimeHours: a?.totalDowntime ?? null,

@@ -30,7 +30,7 @@ import { EquipmentReportExport } from './equipment-report-export';
 import { EquipmentPlaceholder } from '../equipment-placeholder';
 import {
   Section, KV, Metric, EmptyState, BackLink, TelematicsStatusBadge,
-  HistoryTable, MaintenanceBlock, PassportGrid,
+  HistoryTable, OperatorRotationCard, MaintenanceBlock, PassportGrid,
   formatHours, formatRelative,
   type TimelineRow,
 } from './equipment-detail-parts';
@@ -447,7 +447,10 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
 
           {tab === 'history' &&
             (details.timeline.length > 0 ? (
-              <HistoryTable rows={details.timeline} />
+              <div className="space-y-4">
+                <OperatorRotationCard rows={details.timeline} />
+                <HistoryTable rows={details.timeline} />
+              </div>
             ) : (
               <EmptyState message="Отчётов по этой установке пока нет." />
             ))}
@@ -503,6 +506,15 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           <Metric label="Бурение, м" value={formatFixed(details.stats30d.drillingMeters, 1)} />
           <Metric label="Простой" value={formatHours(details.stats30d.downtimeHours)} />
         </div>
+      </Section>
+
+      {/* Operator rotation */}
+      <Section icon={Users} title="Ротация машинистов">
+        {details.timeline.length > 0 ? (
+          <OperatorRotationCard rows={details.timeline} />
+        ) : (
+          <EmptyState message="Отчётов по этой установке пока нет." />
+        )}
       </Section>
 
       {/* Full work history */}

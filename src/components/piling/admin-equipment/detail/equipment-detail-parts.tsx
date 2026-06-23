@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
+import { computeOperatorRotation } from './operator-rotation';
 
 // --------------------------------------------------------------------------
 // Generic layout pieces
@@ -113,6 +114,7 @@ export interface TimelineRow {
   shiftType: string;
   status: string;
   siteName: string | null;
+  operatorId: string | null;
   operatorName: string | null;
   updatedAt: string;
   piles: number | null;
@@ -187,6 +189,50 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
           {open ? 'Свернуть' : `Показать всю историю (${rows.length})`}
         </button>
       )}
+    </div>
+  );
+}
+
+// Operator rotation: the rig's report stream collapsed into operator runs,
+// with substitutions (operator changes) marked. Derived from the same timeline.
+export function OperatorRotationCard({ rows }: { rows: TimelineRow[] }) {
+  const segments = computeOperatorRotation(rows);
+  if (segments.length === 0) {
+    return <p className="text-sm text-slate-500">Нет данных о ротации машинистов.</p>;
+  }
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <tr>
+            <th className="px-3 py-2">Машинист</th>
+            <th className="px-3 py-2">Период</th>
+            <th className="px-3 py-2 text-right">Смен</th>
+            <th className="px-3 py-2">Объект</th>
+          </tr>
+        </thead>
+        <tbody>
+          {segments.map((s, i) => (
+            <tr key={`${s.operatorId ?? 'none'}-${s.startDate}-${i}`} className="border-t hover:bg-slate-50/50">
+              <td className="px-3 py-2">
+                <span className="inline-flex items-center gap-1.5">
+                  {s.isSubstitution && (
+                    <span title="подмена" className="text-amber-600">⇄</span>
+                  )}
+                  {s.operatorName ?? '—'}
+                </span>
+              </td>
+              <td className="px-3 py-2 font-mono text-slate-600">
+                {s.startDate === s.endDate
+                  ? formatRuDate(s.startDate)
+                  : `${formatRuDate(s.startDate)} – ${formatRuDate(s.endDate)}`}
+              </td>
+              <td className="px-3 py-2 text-right font-mono">{s.shiftCount}</td>
+              <td className="px-3 py-2 text-slate-600">{s.siteNames.join(', ') || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
