@@ -33,7 +33,7 @@ function del(qs = ''): NextRequest {
   return new NextRequest(`http://localhost/api/sites/site1/assign${qs ? `?${qs}` : ''}`, { method: 'DELETE' });
 }
 const ctx = () => ({ params: Promise.resolve({ id: 'site1' }) });
-const admin = { user: { id: 'a', role: 'ADMIN' }, error: null };
+const admin = { user: { id: 'a', role: 'ADMIN', tenantId: 'tenant-a' }, error: null };
 
 describe('POST /api/sites/[id]/assign', () => {
   beforeEach(() => {
@@ -60,7 +60,7 @@ describe('POST /api/sites/[id]/assign', () => {
     const res = await POST(post({ userId: 'u1', siteId: 'site1' }), ctx());
     expect(res.status).toBe(200);
     expect((await res.json()).assignment).toEqual({ id: 'asg-1' });
-    expect(assignMock).toHaveBeenCalledWith('site1', 'u1');
+    expect(assignMock).toHaveBeenCalledWith('site1', 'u1', { tenantId: 'tenant-a', actorId: 'a' });
   });
 });
 
@@ -83,6 +83,6 @@ describe('DELETE /api/sites/[id]/assign', () => {
     const res = await DELETE(del('userId=u9'), ctx());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ removed: true });
-    expect(unassignMock).toHaveBeenCalledWith('site1', 'u9');
+    expect(unassignMock).toHaveBeenCalledWith('site1', 'u9', { tenantId: 'tenant-a', actorId: 'a' });
   });
 });

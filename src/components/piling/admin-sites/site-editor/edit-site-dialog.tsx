@@ -56,6 +56,8 @@ export function EditSiteDialog({
   const [pilePlans, setPilePlans] = useState<PilePlanRow[]>([]);
   const [drillingPlans, setDrillingPlans] = useState<DrillingPlanRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [retryKey, setRetryKey] = useState(0);
 
   // Hydrate plans from API when dialog opens — they are not part of the
   // SiteListItem and need a separate fetch keyed off the site id.
@@ -67,38 +69,36 @@ export function EditSiteDialog({
     setActive(site.isActive);
     setPilePlans([]);
     setDrillingPlans([]);
+    setDetailState('loading');
 
     authFetch(`/api/sites/${site.id}`)
       .then(async (res) => {
-        if (!res.ok) return;
+        if (!res.ok) throw new Error('Failed to load site plans');
         const data = await res.json();
         const fullSite = data.site as {
           pilePlans?: SitePilePlanDTO[];
           drillingPlans?: SiteDrillingPlanDTO[];
         };
-        if (fullSite.pilePlans?.length) {
-          setPilePlans(
-            fullSite.pilePlans.map((p) => ({
+        setPilePlans(
+          (fullSite.pilePlans ?? []).map((p) => ({
               tempId: p.id,
               pileGradeId: p.pileGradeId,
               count: p.count,
               metersPerUnit: p.metersPerUnit,
             }))
-          );
-        }
-        if (fullSite.drillingPlans?.length) {
-          setDrillingPlans(
-            fullSite.drillingPlans.map((p) => ({
+        );
+        setDrillingPlans(
+          (fullSite.drillingPlans ?? []).map((p) => ({
               tempId: p.id,
               diameter: p.diameter,
               count: p.count,
               metersPerUnit: p.metersPerUnit,
             }))
-          );
-        }
+        );
+        setDetailState('ready');
       })
-      .catch(() => {});
-  }, [open, site]);
+      .catch(() => setDetailState('error'));
+  }, [open, site, retryKey]);
 
   const submit = async () => {
     if (!site || !name.trim()) {
@@ -120,12 +120,17 @@ export function EditSiteDialog({
           <DialogTitle>Редактировать объект</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] pr-2">
-          {loadingPileGrades ? (
+          {loadingPileGrades || detailState === 'loading' ? (
             <div className="space-y-3 pb-2">
               <Skeleton className="h-11 w-full" />
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />
+            </div>
+          ) : detailState === 'error' ? (
+            <div className="space-y-3 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p>Не удалось загрузить планы объекта</p>
+              <Button type="button" variant="outline" onClick={() => setRetryKey((value) => value + 1)}>Повторить</Button>
             </div>
           ) : (
             <div className="space-y-4 pb-2">
@@ -179,7 +184,7 @@ export function EditSiteDialog({
           </Button>
           <Button
             onClick={submit}
-            disabled={saving || loadingPileGrades || !name.trim()}
+            disabled={saving || loadingPileGrades || detailState !== 'ready' || !name.trim()}
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Сохранить'}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { getCachedSitesAll } from '@/lib/cached-queries';
+import { listAllSitesForAdmin } from '@/modules/sites';
 import { withApi } from '@/core/api-wrapper';
 
 
@@ -14,7 +14,8 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.read_all');
-    const sites = await getCachedSitesAll();
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const sites = await listAllSitesForAdmin(tenantId, true);
     return NextResponse.json({ sites });
   },
   { domain: 'sites', cache: true, cacheTTL: 30_000 }

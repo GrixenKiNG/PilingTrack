@@ -25,7 +25,6 @@ export type { CreateSiteCommand, UpdateSiteCommand } from './application/command
 export {
   getAccessibleSites,
   getSiteWithHierarchy,
-  listAllSites,
   listAllSitesForAdmin,
 } from './application/queries';
 

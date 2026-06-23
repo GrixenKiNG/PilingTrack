@@ -8,7 +8,7 @@ import { ServiceError } from '@/lib/service-error';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { SiteAggregate } from '../../domain';
 import { getSiteRepository } from '../../infrastructure';
-import { CreateSiteCommand, UpdateSiteCommand } from './site.command';
+import { CreateSiteCommand, UpdateSiteCommand, SiteCommandContext } from './site.command';
 
 export async function createSite(command: CreateSiteCommand) {
   const aggregate = SiteAggregate.create({
@@ -32,10 +32,11 @@ export async function createSite(command: CreateSiteCommand) {
   });
 }
 
-export async function updateSite(command: UpdateSiteCommand) {
+export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandContext) {
+  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const repo = getSiteRepository();
-  const aggregate = await repo.findById(command.siteId);
-  if (!aggregate) throw new Error('Site not found');
+  const aggregate = await repo.findById(command.siteId, ctx.tenantId);
+  if (!aggregate) throw new ServiceError('Site not found', 404);
 
   const prev = aggregate.getState();
   const before = { name: prev.name, plannedPiles: prev.plannedPiles, plannedDrilling: prev.plannedDrilling };
@@ -45,7 +46,7 @@ export async function updateSite(command: UpdateSiteCommand) {
     plannedPiles: command.plannedPiles,
     plannedDrilling: command.plannedDrilling,
     completionDate: command.completionDate,
-  }, command.userId);
+  }, ctx.actorId);
 
   await repo.save(aggregate);
 
@@ -53,7 +54,7 @@ export async function updateSite(command: UpdateSiteCommand) {
   await recordAuditEvent({
     action: 'site.updated',
     scope: 'sites',
-    actorId: command.userId || null,
+    actorId: ctx.actorId,
     targetId: command.siteId,
     metadata: {
       before,
@@ -71,19 +72,28 @@ export async function updateSite(command: UpdateSiteCommand) {
   });
 }
 
-export async function activateSite(siteId: string, userId?: string) {
+export async function activateSite(siteId: string, ctx: SiteCommandContext) {
   const repo = getSiteRepository();
-  const aggregate = await repo.findById(siteId);
-  if (!aggregate) throw new Error('Site not found');
+  const aggregate = await repo.findById(siteId, ctx.tenantId);
+  if (!aggregate) throw new ServiceError('Site not found', 404);
 
-  aggregate.activate(userId);
+  // Already active — no-op. The edit form always sends `isActive`, so without
+  // this guard every save would emit a phantom `site.activated` audit entry.
+  if (aggregate.getState().isActive) return;
+
+  aggregate.activate(ctx.actorId);
   await repo.save(aggregate);
+  await recordAuditEvent({ action: 'site.activated', scope: 'sites', actorId: ctx.actorId, targetId: siteId,
+    metadata: { tenantId: ctx.tenantId, name: aggregate.getState().name } });
 }
 
-export async function deactivateSite(siteId: string, userId?: string) {
+export async function deactivateSite(siteId: string, ctx: SiteCommandContext) {
   const repo = getSiteRepository();
-  const aggregate = await repo.findById(siteId);
+  const aggregate = await repo.findById(siteId, ctx.tenantId);
   if (!aggregate) throw new ServiceError('Site not found', 404);
+
+  // Already inactive — no-op (skip the draft guard, write, and audit entry).
+  if (!aggregate.getState().isActive) return;
 
   // Block deactivation while non-terminal work exists on this site.
   // 'draft' = in-progress reports; deactivating would orphan operator work.
@@ -99,14 +109,14 @@ export async function deactivateSite(siteId: string, userId?: string) {
   }
 
   const name = aggregate.getState().name;
-  aggregate.deactivate(userId);
+  aggregate.deactivate(ctx.actorId);
   await repo.save(aggregate);
 
   await recordAuditEvent({
     action: 'site.deactivated',
     scope: 'sites',
-    actorId: userId || null,
+    actorId: ctx.actorId,
     targetId: siteId,
-    metadata: { name },
+    metadata: { tenantId: ctx.tenantId, name },
   });
 }

@@ -17,6 +17,8 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
     const body = await request.json();
     const validation = createSiteSchema.safeParse(body);
@@ -30,13 +32,11 @@ export const POST = withMutation(
     return await withDbProtection(async () => {
       const site = await createSiteWithPlans({
         name: validation.data.name,
-        pilePlans: body.pilePlans,
-        drillingPlans: body.drillingPlans,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-        actorId: user!.id,
-      });
+        pilePlans: validation.data.pilePlans,
+        drillingPlans: validation.data.drillingPlans,
+      }, { tenantId, actorId: user!.id });
 
-      await invalidateSites();
+      await invalidateSites(tenantId);
 
       return NextResponse.json({ site }, { status: 201 });
     });

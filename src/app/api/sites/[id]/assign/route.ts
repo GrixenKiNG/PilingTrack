@@ -15,13 +15,15 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.assign_users');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
     const validated = siteAssignSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json({ error: 'Validation failed', details: validated.error.flatten() }, { status: 400 });
     }
-    const assignment = await assignUserToSite(id, validated.data.userId);
+    const assignment = await assignUserToSite(id, validated.data.userId, { tenantId, actorId: user!.id });
     return NextResponse.json({ assignment });
   },
   { domain: 'sites' }
@@ -34,9 +36,11 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.assign_users');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const userId = request.nextUrl.searchParams.get('userId');
-    const result = await unassignUserFromSite(id, userId || '');
+    const result = await unassignUserFromSite(id, userId || '', { tenantId, actorId: user!.id });
     return NextResponse.json(result);
   },
   { domain: 'sites' }

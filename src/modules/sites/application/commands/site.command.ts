@@ -19,3 +19,8 @@ export interface UpdateSiteCommand {
   completionDate?: string | null;
   userId?: string;
 }
+
+export interface SiteCommandContext {
+  tenantId: string;
+  actorId: string;
+}

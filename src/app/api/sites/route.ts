@@ -14,9 +14,10 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const sessionUser = user!;
+    const tenantId = sessionUser.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const requestedUserId = request.nextUrl.searchParams.get('userId');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
-    const sites = await getAccessibleSites(sessionUser, requestedUserId, pagination);
+    const sites = await getAccessibleSites(sessionUser, tenantId, requestedUserId, pagination);
     const nextCursor = pagination.getNextCursor(sites);
     return NextResponse.json({ data: sites, sites, nextCursor });
   },

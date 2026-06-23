@@ -15,6 +15,8 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage_hierarchy');
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
     const validated = siteHierarchyItemSchema.safeParse(body);
@@ -29,7 +31,7 @@ export const POST = withMutation(
       type: validated.data.type,
       name: validated.data.name,
       parentId: validated.data.parentId,
-    });
+    }, { tenantId, actorId: user!.id });
     return NextResponse.json({ item });
   },
   { domain: 'sites' }
@@ -42,7 +44,9 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage_hierarchy');
-    await params;
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    const { id } = await params;
     const body = await request.json();
     const validated = siteHierarchyDeleteSchema.safeParse(body);
     if (!validated.success) {
@@ -51,8 +55,7 @@ export const DELETE = withMutation(
         { status: 400 }
       );
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const result = await deleteSiteHierarchyItem((validated.data as any).type, (validated.data as any).itemId);
+    const result = await deleteSiteHierarchyItem(id, validated.data.type, validated.data.itemId, { tenantId, actorId: user!.id });
     return NextResponse.json(result);
   },
   { domain: 'sites' }

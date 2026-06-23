@@ -3,6 +3,7 @@
  */
 
 import { db } from '@/lib/db';
+import { ServiceError } from '@/lib/service-error';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
@@ -34,16 +35,18 @@ const siteDetailInclude = {
 
 export async function getAccessibleSites(
   sessionUser: { id: string; role: string },
+  tenantId: string,
   requestedUserId?: string | null,
   pagination?: CursorPaginationResult
 ) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
 
   // ADMIN and DISPATCHER can see all active sites
   if (sessionUser.role === 'ADMIN' || sessionUser.role === 'DISPATCHER') {
     return db.site.findMany({
-      where: { isActive: true },
+      where: { tenantId, isActive: true },
       select: { id: true, name: true, plannedPiles: true, plannedDrilling: true },
       orderBy: { name: 'asc' },
       cursor: cursor ? { id: cursor } : undefined,
@@ -55,7 +58,7 @@ export async function getAccessibleSites(
   const targetUserId = resolveAccessibleUserId(sessionUser, requestedUserId, 'reports.read_cross_user');
 
   return db.site.findMany({
-    where: { isActive: true, users: { some: { userId: targetUserId } } },
+    where: { tenantId, isActive: true, users: { some: { userId: targetUserId } } },
     select: { id: true, name: true, plannedPiles: true, plannedDrilling: true },
     orderBy: { name: 'asc' },
     cursor: cursor ? { id: cursor } : undefined,
@@ -66,26 +69,22 @@ export async function getAccessibleSites(
 
 export async function getSiteWithHierarchy(
   sessionUser: { id: string; role: string },
+  tenantId: string,
   siteId: string
 ) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
   await assertCanAccessSite(sessionUser, siteId, 'sites.read_all');
 
-  return db.site.findUnique({
-    where: { id: siteId },
+  return db.site.findFirst({
+    where: { id: siteId, tenantId },
     include: siteDetailInclude,
   });
 }
 
-export async function listAllSites() {
+export async function listAllSitesForAdmin(tenantId: string, includeInactive = true) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
   return db.site.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true, plannedPiles: true, plannedDrilling: true, status: true },
-    orderBy: { name: 'asc' },
-  });
-}
-
-export async function listAllSitesForAdmin() {
-  return db.site.findMany({
+    where: { tenantId, ...(includeInactive ? {} : { isActive: true }) },
     select: {
       id: true,
       name: true,

@@ -3,14 +3,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { SiteListItem } from '../types';
 
 interface DeleteSiteDialogProps {
@@ -20,51 +13,30 @@ interface DeleteSiteDialogProps {
   onConfirm: () => Promise<void>;
 }
 
-export function DeleteSiteDialog({
-  site,
-  open,
-  onOpenChange,
-  onConfirm,
-}: DeleteSiteDialogProps) {
+export function DeleteSiteDialog({ site, open, onOpenChange, onConfirm }: DeleteSiteDialogProps) {
   const [deleting, setDeleting] = useState(false);
-
   const submit = async () => {
     setDeleting(true);
-    try {
-      await onConfirm();
-    } finally {
-      setDeleting(false);
-    }
+    try { await onConfirm(); } finally { setDeleting(false); }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-red-600">Удалить объект?</DialogTitle>
+          <DialogTitle className="text-amber-700">Деактивировать объект?</DialogTitle>
           <DialogDescription>
-            Объект «{site?.name}» будет удалён вместе со всеми отчётами, иерархией,
-            планами и назначениями. Это действие нельзя отменить.
+            Объект «{site?.name}» станет неактивным. Отчёты, иерархия, планы и назначения сохранятся.
           </DialogDescription>
         </DialogHeader>
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-red-700">
-            Все отчёты, планы свай и бурения, привязанные к этому объекту, будут
-            безвозвратно удалены.
-          </p>
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <p className="text-xs text-amber-800">Объект можно будет снова активировать.</p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Отмена
-          </Button>
-          <Button
-            onClick={submit}
-            disabled={deleting}
-            variant="destructive"
-            className="bg-red-500 hover:bg-red-600 text-white"
-          >
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Удалить навсегда'}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          <Button onClick={submit} disabled={deleting} variant="destructive">
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Деактивировать'}
           </Button>
         </DialogFooter>
       </DialogContent>

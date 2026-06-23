@@ -29,6 +29,7 @@ interface CrewSummary {
 
 /** Combined per-site operational row for the Objects dashboard. */
 export interface SiteOverviewRow extends SiteAnalytics {
+  isActive: boolean;
   crewCount: number;
   rigNames: string[];
 }
@@ -72,7 +73,7 @@ export function useSitesOverview(): SitesOverview {
 
         const combined: SiteOverviewRow[] = analytics.map((a) => {
           const crew = bySite.get(a.siteId);
-          return { ...a, crewCount: crew?.count ?? 0, rigNames: crew ? [...crew.rigs] : [] };
+          return { ...a, isActive: true, crewCount: crew?.count ?? 0, rigNames: crew ? [...crew.rigs] : [] };
         });
 
         if (!cancelled) setRows(combined);

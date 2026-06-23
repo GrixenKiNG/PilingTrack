@@ -47,11 +47,11 @@ const TTL = {
  * legitimately need more must paginate explicitly via a separate endpoint. */
 export const SITES_ALL_MAX = 500;
 
-export async function getCachedSitesAll() {
+export async function getCachedSitesAll(tenantId: string) {
   return cacheAside(
-    'sites:all',
+    `sites:${tenantId}:all`,
     () => db.site.findMany({
-      where: { isActive: true },
+      where: { tenantId, isActive: true },
       orderBy: { name: 'asc' },
       take: SITES_ALL_MAX,
     }),
@@ -59,11 +59,11 @@ export async function getCachedSitesAll() {
   );
 }
 
-export async function getCachedSite(id: string) {
+export async function getCachedSite(id: string, tenantId: string) {
   return cacheAside(
-    `sites:${id}`,
-    () => db.site.findUnique({
-      where: { id },
+    `sites:${tenantId}:${id}`,
+    () => db.site.findFirst({
+      where: { id, tenantId },
       include: {
         fields: {
           take: 50,
@@ -206,8 +206,8 @@ export async function getCachedEquipmentAll() {
 // Cache Invalidation — Call after mutations
 // ============================================================
 
-export async function invalidateSites(): Promise<void> {
-  await cacheAsideInvalidate('sites:all');
+export async function invalidateSites(tenantId: string): Promise<void> {
+  await cacheAsideInvalidate(`sites:${tenantId}:all`);
   recordDeletion();
 }
 

@@ -39,9 +39,11 @@ import { useSitesData } from './use-sites-data';
 import { useSitesOverview, type SiteOverviewRow } from './use-sites-overview';
 import type { SiteFullData, SiteListItem } from './types';
 
-type QuickKey = 'all' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
+type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 
 const QUICK_FILTERS: OpsQuickFilter<QuickKey>[] = [
+  { key: 'active', label: 'Активные' },
+  { key: 'inactive', label: 'Неактивные' },
   { key: 'all', label: 'Все' },
   { key: 'behind', label: 'Отставание' },
   { key: 'noCrew', label: 'Без бригад' },
@@ -52,6 +54,7 @@ const QUICK_FILTERS: OpsQuickFilter<QuickKey>[] = [
 function siteRisk(row: SiteOverviewRow) {
   return resolveRisk(
     [
+      [!row.isActive, 'critical', 'Неактивен'],
       [row.totalReports === 0, 'critical', 'Нет отчётов'],
       [row.plannedPiles > 0 && row.pileProgress < 60, 'warn', 'Отставание'],
       [row.crewCount === 0, 'warn', 'Без бригад'],
@@ -66,12 +69,12 @@ function pct(value: number): string {
 
 // Build the minimal SiteListItem the edit/delete dialogs expect from a row.
 function toListItem(row: SiteOverviewRow): SiteListItem {
-  return { id: row.siteId, name: row.siteName, isActive: true, plannedPiles: row.plannedPiles, plannedDrilling: row.plannedDrilling };
+  return { id: row.siteId, name: row.siteName, isActive: row.isActive, plannedPiles: row.plannedPiles, plannedDrilling: row.plannedDrilling };
 }
 
 export function AdminSites() {
   const { rows, loading, error, reload } = useSitesOverview();
-  const { users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
+  const { sites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
 
   const [quick, setQuick] = useState<QuickKey>('all');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -99,15 +102,27 @@ export function AdminSites() {
     if (assignSiteId) void loadUsers();
   }, [assignSiteId, loadUsers]);
 
+  const allRows = useMemo(() => {
+    const operational = new Map(rows.map((row) => [row.siteId, row]));
+    return sites.map((site): SiteOverviewRow => operational.has(site.id)
+      ? { ...operational.get(site.id)!, siteName: site.name, isActive: site.isActive }
+      : { siteId: site.id, siteName: site.name, isActive: site.isActive,
+          plannedPiles: site.plannedPiles, plannedPileMeters: 0, actualPiles: 0, actualPileMeters: 0,
+          plannedDrilling: site.plannedDrilling, actualDrilling: 0, pileProgress: 0, drillingProgress: 0,
+          totalReports: 0, totalDowntime: 0, crewCount: 0, rigNames: [] });
+  }, [rows, sites]);
+
   const filtered = useMemo(() => {
-    return rows.filter((r) => {
+    return allRows.filter((r) => {
+      if (quick === 'active') return r.isActive;
+      if (quick === 'inactive') return !r.isActive;
       if (quick === 'behind') return r.plannedPiles > 0 && r.pileProgress < 60;
       if (quick === 'noCrew') return r.crewCount === 0;
       if (quick === 'noReports') return r.totalReports === 0;
       if (quick === 'downtime') return r.totalDowntime > 0;
       return true;
     });
-  }, [rows, quick]);
+  }, [allRows, quick]);
 
   const active = useMemo(
     () => filtered.find((r) => r.siteId === activeId) ?? filtered[0] ?? null,
@@ -149,13 +164,13 @@ export function AdminSites() {
     const behind = rows.filter((r) => r.plannedPiles > 0 && r.pileProgress < 60).length;
     const noCrew = rows.filter((r) => r.crewCount === 0).length;
     return [
-      { label: 'Объекты', value: String(rows.length), detail: 'активные', icon: MapPin, tone: 'slate' },
+      { label: 'Объекты', value: String(allRows.length), detail: `${allRows.filter((row) => row.isActive).length} активных`, icon: MapPin, tone: 'slate' },
       { label: 'Отставание', value: String(behind), detail: '< 60% плана', icon: AlertTriangle, tone: behind > 0 ? 'amber' : 'slate' },
       { label: 'Без бригад', value: String(noCrew), detail: 'не назначены', icon: Users, tone: noCrew > 0 ? 'red' : 'slate' },
       { label: 'Сваи факт', value: formatNumber(piles), detail: 'шт. суммарно', icon: HardHat, tone: 'orange' },
       { label: 'Метры факт', value: formatNumber(meters), detail: 'м.п. суммарно', icon: Drill, tone: 'blue' },
     ];
-  }, [rows]);
+  }, [rows, allRows]);
 
   const columns: OpsColumn<SiteOverviewRow>[] = [
     {
@@ -253,7 +268,7 @@ export function AdminSites() {
           : <OpsDetailEmpty message="Выберите объект, чтобы увидеть план/факт, иерархию и историю." />}
       >
         <OpsKpiBar items={kpis} />
-        <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${rows.length}`} />
+        <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${allRows.length}`} />
         <OpsTable
           columns={columns}
           rows={filtered}

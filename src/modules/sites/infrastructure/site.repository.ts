@@ -8,7 +8,7 @@ import { toPrismaData, fromPrismaToState, toOutboxData } from './site.prisma.map
 
 export interface SiteRepository {
   save(aggregate: SiteAggregate): Promise<void>;
-  findById(id: string): Promise<SiteAggregate | null>;
+  findById(id: string, tenantId: string): Promise<SiteAggregate | null>;
 }
 
 export class PrismaSiteRepository implements SiteRepository {
@@ -17,37 +17,23 @@ export class PrismaSiteRepository implements SiteRepository {
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
 
-    await db.site.upsert({
-      where: { id: state.id },
-      create: persistenceData,
-      update: {
-        name: persistenceData.name,
-        status: persistenceData.status,
-        plannedPiles: persistenceData.plannedPiles,
-        plannedDrilling: persistenceData.plannedDrilling,
-        completionDate: persistenceData.completionDate,
-        isActive: persistenceData.isActive,
-      },
+    await db.$transaction(async (tx) => {
+      await tx.site.upsert({
+        where: { id: state.id }, create: persistenceData,
+        update: { name: persistenceData.name, status: persistenceData.status,
+          plannedPiles: persistenceData.plannedPiles, plannedDrilling: persistenceData.plannedDrilling,
+          completionDate: persistenceData.completionDate, isActive: persistenceData.isActive },
+      });
+      if (pendingEvents.length > 0) {
+        await tx.outboxEvent.createMany({ data: pendingEvents.map(toOutboxData) });
+      }
     });
-
-    // Save events to outbox
-    if (pendingEvents.length > 0) {
-      await Promise.all(
-        pendingEvents.map((event) =>
-          db.outboxEvent.create({
-            data: toOutboxData(event),
-          })
-        )
-      );
-    }
 
     aggregate.clearPendingEvents();
   }
 
-  async findById(id: string): Promise<SiteAggregate | null> {
-    const prismaSite = await db.site.findUnique({
-      where: { id },
-    });
+  async findById(id: string, tenantId: string): Promise<SiteAggregate | null> {
+    const prismaSite = await db.site.findFirst({ where: { id, tenantId } });
 
     if (!prismaSite) return null;
 

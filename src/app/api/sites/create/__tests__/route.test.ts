@@ -54,7 +54,7 @@ describe('POST /api/sites/create', () => {
   });
 
   it('returns 400 when the body fails validation (missing name)', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN' }, error: null });
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'tenant-a' }, error: null });
     const res = await POST(req({}));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('Validation failed');
@@ -62,13 +62,23 @@ describe('POST /api/sites/create', () => {
   });
 
   it('creates the site (201) and invalidates the cache', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN' }, error: null });
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'tenant-a' }, error: null });
     createSiteMock.mockResolvedValue({ id: 's1', name: 'Site A' });
 
     const res = await POST(req({ name: 'Site A' }));
     expect(res.status).toBe(201);
     expect((await res.json()).site).toEqual({ id: 's1', name: 'Site A' });
-    expect(createSiteMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'Site A' }));
+    expect(createSiteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Site A' }),
+      { tenantId: 'tenant-a', actorId: 'a' },
+    );
     expect(invalidateMock).toHaveBeenCalled();
+  });
+
+  it('fails closed when tenant context is missing', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: null }, error: null });
+    const res = await POST(req({ name: 'Site A' }));
+    expect(res.status).toBe(400);
+    expect(createSiteMock).not.toHaveBeenCalled();
   });
 });

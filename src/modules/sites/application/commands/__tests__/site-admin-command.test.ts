@@ -38,6 +38,8 @@ import {
   deleteSiteHierarchyItem,
 } from '../site-admin-command.service';
 
+const ctx = { tenantId: 't1', actorId: 'a1' };
+
 describe('normalizeSitePlans', () => {
   it('should return empty arrays when no plans provided', () => {
     const result = normalizeSitePlans({});
@@ -136,76 +138,76 @@ describe('normalizeSitePlans', () => {
 
 describe('createSiteWithPlans', () => {
   it('should throw when name is empty', async () => {
-    await expect(createSiteWithPlans({ name: '' })).rejects.toThrow('Name required');
+    await expect(createSiteWithPlans({ name: '' }, { tenantId: 't1', actorId: 'a1' })).rejects.toThrow('Name required');
   });
 
   it('should throw when name is whitespace', async () => {
-    await expect(createSiteWithPlans({ name: '   ' })).rejects.toThrow('Name required');
+    await expect(createSiteWithPlans({ name: '   ' }, { tenantId: 't1', actorId: 'a1' })).rejects.toThrow('Name required');
   });
 });
 
 describe('assignUserToSite', () => {
   it('should throw when siteId is empty', async () => {
-    await expect(assignUserToSite('', 'user-1')).rejects.toThrow('userId and siteId required');
+    await expect(assignUserToSite('', 'user-1', ctx)).rejects.toThrow('userId and siteId required');
   });
 
   it('should throw when userId is empty', async () => {
-    await expect(assignUserToSite('site-1', '')).rejects.toThrow('userId and siteId required');
+    await expect(assignUserToSite('site-1', '', ctx)).rejects.toThrow('userId and siteId required');
   });
 });
 
 describe('unassignUserFromSite', () => {
   it('should throw when siteId is empty', async () => {
-    await expect(unassignUserFromSite('', 'user-1')).rejects.toThrow('userId and siteId required');
+    await expect(unassignUserFromSite('', 'user-1', ctx)).rejects.toThrow('userId and siteId required');
   });
 
   it('should throw when userId is empty', async () => {
-    await expect(unassignUserFromSite('site-1', '')).rejects.toThrow('userId and siteId required');
+    await expect(unassignUserFromSite('site-1', '', ctx)).rejects.toThrow('userId and siteId required');
   });
 });
 
 describe('createSiteHierarchyItem', () => {
   it('should throw when type is empty', async () => {
     await expect(
-      createSiteHierarchyItem({ siteId: 's-1', type: '', name: 'Field A' })
+      createSiteHierarchyItem({ siteId: 's-1', type: '', name: 'Field A' }, ctx)
     ).rejects.toThrow('Type and name required');
   });
 
   it('should throw when name is empty', async () => {
     await expect(
-      createSiteHierarchyItem({ siteId: 's-1', type: 'field', name: '' })
+      createSiteHierarchyItem({ siteId: 's-1', type: 'field', name: '' }, ctx)
     ).rejects.toThrow('Type and name required');
   });
 
   it('should throw when cluster has no parentId', async () => {
     await expect(
-      createSiteHierarchyItem({ siteId: 's-1', type: 'cluster', name: 'Cluster A' })
+      createSiteHierarchyItem({ siteId: 's-1', type: 'cluster', name: 'Cluster A' }, ctx)
     ).rejects.toThrow('parentId required');
   });
 
   it('should throw when picket has no parentId', async () => {
     await expect(
-      createSiteHierarchyItem({ siteId: 's-1', type: 'picket', name: 'Picket 1' })
+      createSiteHierarchyItem({ siteId: 's-1', type: 'picket', name: 'Picket 1' }, ctx)
     ).rejects.toThrow('parentId required');
   });
 
   it('should throw for invalid type', async () => {
     await expect(
-      createSiteHierarchyItem({ siteId: 's-1', type: 'unknown', name: 'X' })
+      createSiteHierarchyItem({ siteId: 's-1', type: 'unknown', name: 'X' }, ctx)
     ).rejects.toThrow('Invalid type');
   });
 });
 
 describe('deleteSiteHierarchyItem', () => {
   it('should throw when type is empty', async () => {
-    await expect(deleteSiteHierarchyItem('', 'item-1')).rejects.toThrow('Type and itemId required');
+    await expect(deleteSiteHierarchyItem('s1', '', 'item-1', ctx)).rejects.toThrow('Type and itemId required');
   });
 
   it('should throw when itemId is empty', async () => {
-    await expect(deleteSiteHierarchyItem('field', '')).rejects.toThrow('Type and itemId required');
+    await expect(deleteSiteHierarchyItem('s1', 'field', '', ctx)).rejects.toThrow('Type and itemId required');
   });
 
   it('should throw for invalid type', async () => {
-    await expect(deleteSiteHierarchyItem('unknown', 'item-1')).rejects.toThrow('Invalid type');
+    await expect(deleteSiteHierarchyItem('s1', 'unknown', 'item-1', ctx)).rejects.toThrow('Invalid type');
   });
 });

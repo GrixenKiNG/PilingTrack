@@ -16,6 +16,17 @@ interface Options {
   setExpandedSiteId: Dispatch<SetStateAction<string | null>>;
 }
 
+/** Read the server's `{ error }` message from a failed response, falling back when absent/unparseable. */
+export async function extractApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    const message = (body as { error?: unknown })?.error;
+    return typeof message === 'string' && message ? message : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * All mutations on the sites list — create / edit / delete / toggle active /
  * hierarchy add+remove. Returns handlers + transient toggling state.
@@ -140,18 +151,21 @@ export function useSiteMutations({
   const handleConfirmDelete = async (siteId: string) => {
     try {
       const res = await authFetch(`/api/sites/${siteId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Ошибка удаления');
-      setSites((prev) => prev.filter((s) => s.id !== siteId));
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Ошибка деактивации объекта'));
+        return false;
+      }
+      setSites((prev) => prev.map((s) => s.id === siteId ? { ...s, isActive: false } : s));
       setSiteTree((prev) => {
         const next = { ...prev };
         delete next[siteId];
         return next;
       });
       setExpandedSiteId((prev) => (prev === siteId ? null : prev));
-      toast.success('Объект удалён');
+      toast.success('Объект деактивирован');
       return true;
     } catch {
-      toast.error('Ошибка удаления объекта');
+      toast.error('Ошибка деактивации объекта');
       return false;
     }
   };
@@ -164,7 +178,10 @@ export function useSiteMutations({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !site.isActive }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Ошибка'));
+        return;
+      }
       const data = await res.json();
       setSites((prev) => prev.map((s) => (s.id === site.id ? data.site : s)));
       toast.success(site.isActive ? 'Объект деактивирован' : 'Объект активирован');
