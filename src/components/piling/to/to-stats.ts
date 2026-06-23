@@ -47,3 +47,59 @@ export function computeToStats(records: JournalRecord[]): ToStats {
 // daysUntil / dueText are generic date helpers — canonical in @/lib/format.
 // Re-exported so to-module keeps a single import surface.
 export { daysUntil, dueText } from '@/lib/format';
+
+/** Minimal equipment shape needed to judge maintenance overdue-ness. */
+export interface MaintenanceCandidate {
+  id: string;
+  name: string;
+  engineHoursTotal?: number | null;
+  nextMaintenanceAtHours?: number | null;
+  nextMaintenanceDate?: string | null;
+}
+
+export interface OverdueMaintenance {
+  id: string;
+  name: string;
+  /** Why it is overdue: past planned date, past engine-hour threshold, or both. */
+  reason: 'date' | 'hours' | 'both';
+  /** Whole days past the planned date (>=0), or null when not date-overdue. */
+  overdueDays: number | null;
+  /** Engine hours past the threshold (>0), or null when not hours-overdue. */
+  overdueHours: number | null;
+}
+
+/**
+ * Read-model: equipment whose maintenance is overdue, derived purely from the
+ * already-loaded equipment list — no new query, no schema. Overdue by planned
+ * date and/or engine-hour threshold. `now` is injected for testability.
+ * Sorted most-overdue first.
+ */
+export function findOverdueMaintenance(
+  equipment: MaintenanceCandidate[],
+  now: Date = new Date(),
+): OverdueMaintenance[] {
+  const nowMs = now.getTime();
+  const result: OverdueMaintenance[] = [];
+  for (const e of equipment) {
+    const dateMs = e.nextMaintenanceDate != null ? new Date(e.nextMaintenanceDate).getTime() : null;
+    const byDate = dateMs != null && dateMs < nowMs;
+    const byHours =
+      e.nextMaintenanceAtHours != null &&
+      e.engineHoursTotal != null &&
+      e.engineHoursTotal >= e.nextMaintenanceAtHours;
+    if (!byDate && !byHours) continue;
+    result.push({
+      id: e.id,
+      name: e.name,
+      reason: byDate && byHours ? 'both' : byDate ? 'date' : 'hours',
+      overdueDays: byDate && dateMs != null ? Math.floor((nowMs - dateMs) / 86_400_000) : null,
+      overdueHours:
+        byHours && e.engineHoursTotal != null && e.nextMaintenanceAtHours != null
+          ? e.engineHoursTotal - e.nextMaintenanceAtHours
+          : null,
+    });
+  }
+  return result.sort(
+    (a, b) => (b.overdueDays ?? 0) - (a.overdueDays ?? 0) || (b.overdueHours ?? 0) - (a.overdueHours ?? 0),
+  );
+}

@@ -36,11 +36,21 @@ import { cn } from '@/lib/utils';
 import { healthScoreColor } from '@/components/piling/inspections/inspection-labels';
 import {
   type JournalRecord,
+  type OverdueMaintenance,
   isInspectionRecord,
   isOpenRecord,
   computeToStats,
+  findOverdueMaintenance,
   dueText,
 } from './to-stats';
+
+/** Presentation for an overdue-ТО exception chip (logic stays in to-stats). */
+function overdueLabel(item: OverdueMaintenance): string {
+  const parts: string[] = [];
+  if (item.overdueDays != null) parts.push(`просрочка ${item.overdueDays} дн.`);
+  if (item.overdueHours != null) parts.push(`+${item.overdueHours} м/ч сверх порога`);
+  return parts.join(' · ');
+}
 
 type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 type JournalTab = 'all' | 'inspections' | 'repairs' | 'open';
@@ -181,6 +191,7 @@ export function ToModule() {
   ), [selected]);
 
   const stats = useMemo(() => computeToStats(records), [records]);
+  const overdue = useMemo(() => findOverdueMaintenance(equipment), [equipment]);
 
   const filteredRecords = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -200,13 +211,38 @@ export function ToModule() {
 
   return (
     <div className="min-h-[calc(100vh-1px)] bg-slate-50/60 px-4 py-4 lg:px-5">
+      {overdue.length > 0 && (
+        <div className="mx-auto mb-4 w-full max-w-[1500px]">
+          <section className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <h2 className="text-sm font-bold text-amber-900">
+                Исключения · ТО просрочено ({overdue.length})
+              </h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {overdue.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setEquipmentId(item.id)}
+                  className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-left text-xs hover:border-amber-500"
+                >
+                  <span className="font-semibold text-slate-900">{item.name}</span>
+                  <span className="ml-1.5 text-amber-700">{overdueLabel(item)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
       <div className="mx-auto grid w-full max-w-[1500px] gap-4 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
         <aside className="space-y-3">
           <section className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-normal text-slate-950">ТО</h1>
-                <p className="text-xs text-slate-500">единый журнал по установке</p>
+                <h1 className="text-2xl font-bold tracking-normal text-slate-950">Техготовность</h1>
+                <p className="text-xs text-slate-500">наряды, осмотры и журнал по установке</p>
               </div>
               <SlidersHorizontal className="h-5 w-5 text-orange-500" />
             </div>

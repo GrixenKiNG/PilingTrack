@@ -3,6 +3,7 @@ import {
   isInspectionRecord,
   isOpenRecord,
   computeToStats,
+  findOverdueMaintenance,
   daysUntil,
   dueText,
   type JournalRecord,
@@ -79,5 +80,50 @@ describe('daysUntil / dueText', () => {
     const now = new Date('2026-06-20T12:00:00');
     daysUntil('2026-07-01T06:00:00', now);
     expect(now.getTime()).toBe(new Date('2026-06-20T12:00:00').getTime());
+  });
+});
+
+describe('findOverdueMaintenance', () => {
+  const NOW = new Date('2026-06-20T12:00:00.000Z');
+
+  it('flags equipment overdue by planned date', () => {
+    const out = findOverdueMaintenance(
+      [{ id: 'a', name: 'Копёр-1', nextMaintenanceDate: '2026-06-10T00:00:00.000Z' }],
+      NOW,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'a', reason: 'date', overdueDays: 10, overdueHours: null });
+  });
+
+  it('flags equipment overdue by engine-hour threshold', () => {
+    const out = findOverdueMaintenance(
+      [{ id: 'b', name: 'Копёр-2', engineHoursTotal: 520, nextMaintenanceAtHours: 500 }],
+      NOW,
+    );
+    expect(out[0]).toMatchObject({ id: 'b', reason: 'hours', overdueDays: null, overdueHours: 20 });
+  });
+
+  it('marks reason "both" and excludes not-yet-due equipment', () => {
+    const out = findOverdueMaintenance(
+      [
+        { id: 'c', name: 'оба', engineHoursTotal: 600, nextMaintenanceAtHours: 500, nextMaintenanceDate: '2026-06-01T00:00:00.000Z' },
+        { id: 'd', name: 'в норме', engineHoursTotal: 100, nextMaintenanceAtHours: 500, nextMaintenanceDate: '2026-12-01T00:00:00.000Z' },
+        { id: 'e', name: 'без порогов' },
+      ],
+      NOW,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'c', reason: 'both' });
+  });
+
+  it('sorts most-overdue (by days) first', () => {
+    const out = findOverdueMaintenance(
+      [
+        { id: 'small', name: 's', nextMaintenanceDate: '2026-06-19T00:00:00.000Z' },
+        { id: 'big', name: 'b', nextMaintenanceDate: '2026-05-20T00:00:00.000Z' },
+      ],
+      NOW,
+    );
+    expect(out.map((o) => o.id)).toEqual(['big', 'small']);
   });
 });
