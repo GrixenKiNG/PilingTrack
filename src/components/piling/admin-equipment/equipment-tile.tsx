@@ -30,7 +30,7 @@ export function EquipmentTile({
   const st = STATUS_META[card.status];
   const flag = getMaintenanceFlag(card);
   const t = card.todayTotals;
-  const stateLabel = flag ? 'Требует ТО' : card.status === 'active' ? 'В работе' : 'Не активна';
+  const stateLabel = flag ? 'Плановое ТО' : card.status === 'active' ? 'В работе' : 'Не активна';
   const stateClass = flag
     ? 'border-amber-200 bg-amber-50 text-amber-700'
     : card.status === 'active'

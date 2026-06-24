@@ -5,6 +5,8 @@
  * in the component.
  */
 
+import { checkMaintenanceDue } from '@/lib/maintenance-due';
+
 export interface JournalRecord {
   id: string;
   type: string;
@@ -78,25 +80,17 @@ export function findOverdueMaintenance(
   equipment: MaintenanceCandidate[],
   now: Date = new Date(),
 ): OverdueMaintenance[] {
-  const nowMs = now.getTime();
   const result: OverdueMaintenance[] = [];
   for (const e of equipment) {
-    const dateMs = e.nextMaintenanceDate != null ? new Date(e.nextMaintenanceDate).getTime() : null;
-    const byDate = dateMs != null && dateMs < nowMs;
-    const byHours =
-      e.nextMaintenanceAtHours != null &&
-      e.engineHoursTotal != null &&
-      e.engineHoursTotal >= e.nextMaintenanceAtHours;
-    if (!byDate && !byHours) continue;
+    const due = checkMaintenanceDue(e, now);
+    if (!due.overdue) continue;
     result.push({
       id: e.id,
       name: e.name,
-      reason: byDate && byHours ? 'both' : byDate ? 'date' : 'hours',
-      overdueDays: byDate && dateMs != null ? Math.floor((nowMs - dateMs) / 86_400_000) : null,
-      overdueHours:
-        byHours && e.engineHoursTotal != null && e.nextMaintenanceAtHours != null
-          ? e.engineHoursTotal - e.nextMaintenanceAtHours
-          : null,
+      // checkMaintenanceDue only sets reason to null when !overdue, which is excluded above.
+      reason: due.reason as 'date' | 'hours' | 'both',
+      overdueDays: due.overdueDays,
+      overdueHours: due.overdueHours,
     });
   }
   return result.sort(
