@@ -87,8 +87,21 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - /opt/pilingtrack/wal-archive:/var/lib/postgresql/wal-archive
-    # Override the base command to enable archive_mode. Keep all the
-    # tuning parameters from base in sync — if base changes, mirror here.
+    # Override the base command. Keep all the tuning parameters from base in
+    # sync — if base changes, mirror here.
+    #
+    # WAL archiving (PITR) is DISABLED — see incident 2026-06-24. The old
+    # archive_command `test ! -f dest && cp %p dest` returns exit 1 whenever
+    # the destination already exists (e.g. a leftover 0-byte segment), which
+    # Postgres treats as an archive FAILURE: it then refuses to recycle ANY
+    # WAL, accumulating it forever (9.6 GB built up over 4 weeks and filled
+    # the 30 GB disk → DB crash → site down). Weekly basebackups + the 3-day
+    # local backup remain the recovery path.
+    #
+    # To re-enable PITR later: set archive_mode=on AND use the no-clobber form
+    # below (cp -n returns 0 when the file already exists, so a stale segment
+    # can't wedge the archiver). Then resize the disk first — replaying 9.6 GB
+    # of pending WAL into wal-archive needs the headroom.
     command: >
       postgres
       -c max_connections=200
@@ -99,8 +112,8 @@ services:
       -c wal_buffers=16MB
       -c default_statistics_target=100
       -c wal_level=replica
-      -c archive_mode=on
-      -c archive_command='test ! -f /var/lib/postgresql/wal-archive/%f && cp %p /var/lib/postgresql/wal-archive/%f'
+      -c archive_mode=off
+      -c archive_command='cp -n %p /var/lib/postgresql/wal-archive/%f'
       -c archive_timeout=3600
     deploy:
       resources:
