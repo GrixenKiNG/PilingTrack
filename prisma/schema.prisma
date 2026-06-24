@@ -178,6 +178,7 @@ model Equipment {
   documents               EquipmentDocument[]
   maintenanceRecords      MaintenanceRecord[]
   inspections             Inspection[]
+  meterReadings           MeterReading[]
 
   @@index([tenantId])
   @@index([isActive])
@@ -309,6 +310,35 @@ enum MaintenancePriority {
   NORMAL
   HIGH
   CRITICAL
+}
+
+// ============================================================
+// METER READINGS — журнал показаний наработки (моточасы)
+// Источник истины наработки — история показаний, а не одно поле.
+// Equipment.engineHoursTotal остаётся денормализованным кэшем
+// «последнего показания» (обновляется командой на каждое новое).
+// Фаза телеметрии пишет сюда с source=TELEMETRY без изменения модели.
+// ============================================================
+model MeterReading {
+  id           String     @id @default(cuid())
+  tenantId     String
+  equipmentId  String
+  recordedAt   DateTime   @db.Timestamptz(3)   // когда снято показание
+  engineHours  Int                              // моточасы на момент снятия
+  source       MeterSource @default(MANUAL)
+  recordedById String?                          // кто внёс (User.id), без relation — как createdById
+  note         String      @default("")
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+
+  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([equipmentId, recordedAt])
+}
+
+enum MeterSource {
+  MANUAL
+  TELEMETRY
 }
 
 // ============================================================

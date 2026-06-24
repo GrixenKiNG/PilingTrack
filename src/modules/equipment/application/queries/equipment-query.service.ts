@@ -161,6 +161,15 @@ export async function listMaintenance(equipmentId: string, tenantId: string) {
   });
 }
 
+export async function listMeterReadings(equipmentId: string, tenantId: string, limit = 50) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  return db.meterReading.findMany({
+    where: { equipmentId, tenantId },
+    orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
+    take: limit,
+  });
+}
+
 export interface MaintenanceListFilter {
   status?: MaintenanceStatus;
   priority?: MaintenancePriority;

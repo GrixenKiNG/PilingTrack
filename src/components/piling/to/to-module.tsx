@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { healthScoreColor } from '@/components/piling/inspections/inspection-labels';
+import { MeterReadingsPanel } from './meter-readings-panel';
 import {
   type JournalRecord,
   type OverdueMaintenance,
@@ -143,24 +144,24 @@ export function ToModule() {
   const [loadingEq, setLoadingEq] = useState(true);
   const [loadingJournal, setLoadingJournal] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await authFetch('/api/equipment?limit=100');
-        if (!res.ok) throw new Error('equipment');
-        const list = ((await res.json()).data ?? []) as EquipmentOption[];
-        if (!active) return;
-        setEquipment(list);
-        if (list.length) setEquipmentId((previous) => previous || list[0].id);
-      } catch {
-        if (active) toast.error('Не удалось загрузить установки');
-      } finally {
-        if (active) setLoadingEq(false);
-      }
-    })();
-    return () => { active = false; };
+  const loadEquipment = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/equipment?limit=100');
+      if (!res.ok) throw new Error('equipment');
+      const list = ((await res.json()).data ?? []) as EquipmentOption[];
+      setEquipment(list);
+      if (list.length) setEquipmentId((previous) => previous || list[0].id);
+    } catch {
+      toast.error('Не удалось загрузить установки');
+    } finally {
+      setLoadingEq(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads equipment on mount; the async loader sets state
+    void loadEquipment();
+  }, [loadEquipment]);
 
   const loadJournal = useCallback(async (eqId: string) => {
     setLoadingJournal(true);
@@ -429,6 +430,17 @@ export function ToModule() {
               <EmptyBlock label="Выберите установку" />
             )}
           </section>
+
+          {selected && (
+            <MeterReadingsPanel
+              equipmentId={selected.id}
+              onChanged={(latestHours) =>
+                setEquipment((prev) =>
+                  prev.map((e) => (e.id === selected.id ? { ...e, engineHoursTotal: latestHours } : e)),
+                )
+              }
+            />
+          )}
 
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <h3 className="mb-3 text-sm font-bold text-slate-900">Сборка чек-листа</h3>
