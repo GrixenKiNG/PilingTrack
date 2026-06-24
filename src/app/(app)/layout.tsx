@@ -41,9 +41,11 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
     { label: 'Техготовность', href: '/admin/to' },
     { label: 'Бригады', href: '/admin/crews' },
     { label: 'Отчёты', href: '/admin/reports' },
+    { label: 'Аналитика', href: '/admin/analytics' },
     { label: 'Справочники', href: '/admin/dictionaries' },
     { label: 'Пользователи', href: '/admin/users' },
     { label: 'Telegram', href: '/admin/telegram' },
+    { label: 'DLQ', href: '/admin/dlq' },
   ],
   DISPATCHER: [
     { label: 'Дашборд', href: '/admin' },
@@ -53,6 +55,7 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
     { label: 'Техготовность', href: '/admin/to' },
     { label: 'Бригады', href: '/admin/crews' },
     { label: 'Отчёты', href: '/admin/reports' },
+    { label: 'Аналитика', href: '/admin/analytics' },
     { label: 'Справочники', href: '/admin/dictionaries' },
   ],
 };
