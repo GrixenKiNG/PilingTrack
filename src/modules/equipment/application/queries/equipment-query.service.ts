@@ -262,7 +262,10 @@ export async function listAllEquipment(
 
   return db.equipment.findMany({
     where,
-    select: { id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true },
+    select: {
+      id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true,
+      engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true,
+    },
     orderBy: { name: 'asc' },
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
