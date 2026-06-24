@@ -184,7 +184,7 @@ docker compose -f docker-compose.observability.yml up -d
 
 ## 10. Откат / disaster recovery
 
-См. отдельный документ `docs/DISASTER-RECOVERY-PLAN.md`. Резюме:
+См. отдельный документ `docs/archive/DISASTER-RECOVERY-PLAN.md` (архив, апрель 2026). Резюме:
 
 1. Сохранить дамп Postgres (см. п.6).
 2. Сохранить `.env.production` (с **тем же `ENCRYPTION_KEY`**).

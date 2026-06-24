@@ -233,10 +233,9 @@ Offline-first — не фича, а baseline.
 
 ## 📚 Дополнительная документация
 
-- [TEST-ARCHITECTURE.md](docs/TEST-ARCHITECTURE.md) — Тестовая архитектура
-- [FAILURE-DESIGN-DOCUMENT.md](docs/FAILURE-DESIGN-DOCUMENT.md) — 15 failure scenarios
-- [DEVICE-MATRIX.md](docs/DEVICE-MATRIX.md) — Device testing strategy
-- [KUBERNETES-DEPLOYMENT.md](docs/KUBERNETES-DEPLOYMENT.md) — K8s deployment guide
+- [TEST-ARCHITECTURE.md](docs/archive/TEST-ARCHITECTURE.md) — Тестовая архитектура (архив, апрель 2026)
+- [FAILURE-DESIGN-DOCUMENT.md](docs/archive/FAILURE-DESIGN-DOCUMENT.md) — 15 failure scenarios (архив, апрель 2026)
+- [DEVICE-MATRIX.md](docs/archive/DEVICE-MATRIX.md) — Device testing strategy (архив, апрель 2026)
 - [ADR Index](docs/adr/) — Архитектурные решения
 
 ---

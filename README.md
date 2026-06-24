@@ -148,9 +148,8 @@ git config core.hooksPath .githooks
 - [Ротация ключа шифрования](docs/encryption-key-rotation.md)
 - [Бриф для дизайнера](docs/design-brief.md)
 - [ADR index](docs/adr/README.md)
-- [Disaster Recovery Plan](docs/DISASTER-RECOVERY-PLAN.md)
-- [Kubernetes Deployment](docs/KUBERNETES-DEPLOYMENT.md)
-- [Test Architecture](docs/TEST-ARCHITECTURE.md)
+- [Disaster Recovery Plan](docs/archive/DISASTER-RECOVERY-PLAN.md) (архив, апрель 2026)
+- [Test Architecture](docs/archive/TEST-ARCHITECTURE.md) (архив, апрель 2026)
 
 ## Известные предупреждения зависимостей
 
