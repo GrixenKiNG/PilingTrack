@@ -4,6 +4,7 @@ import {
   isOpenRecord,
   computeToStats,
   findOverdueMaintenance,
+  findUncrewedEquipment,
   daysUntil,
   dueText,
   type JournalRecord,
@@ -125,5 +126,16 @@ describe('findOverdueMaintenance', () => {
       NOW,
     );
     expect(out.map((o) => o.id)).toEqual(['big', 'small']);
+  });
+});
+
+describe('findUncrewedEquipment', () => {
+  it('flags active equipment with no crew', () => {
+    const out = findUncrewedEquipment([
+      { id: 'a', name: 'Копёр-1', isActive: true, crewCount: 0 },
+      { id: 'b', name: 'Копёр-2', isActive: true, crewCount: 1 },
+      { id: 'c', name: 'Копёр-3 (списан)', isActive: false, crewCount: 0 },
+    ]);
+    expect(out.map((o) => o.id)).toEqual(['a']);
   });
 });

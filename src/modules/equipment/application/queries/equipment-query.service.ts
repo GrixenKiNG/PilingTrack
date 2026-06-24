@@ -260,15 +260,17 @@ export async function listAllEquipment(
     };
   }
 
-  return db.equipment.findMany({
+  const list = await db.equipment.findMany({
     where,
     select: {
       id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true,
       engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true,
+      crews: { where: { isActive: true }, select: { id: true } },
     },
     orderBy: { name: 'asc' },
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,
   });
+  return list.map(({ crews, ...eq }) => ({ ...eq, crewCount: crews.length }));
 }

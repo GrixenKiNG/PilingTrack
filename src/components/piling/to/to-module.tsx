@@ -41,6 +41,7 @@ import {
   isOpenRecord,
   computeToStats,
   findOverdueMaintenance,
+  findUncrewedEquipment,
   dueText,
 } from './to-stats';
 
@@ -64,6 +65,8 @@ interface EquipmentOption {
   engineHoursTotal?: number | null;
   nextMaintenanceAtHours?: number | null;
   nextMaintenanceDate?: string | null;
+  isActive: boolean;
+  crewCount: number;
 }
 
 
@@ -192,6 +195,7 @@ export function ToModule() {
 
   const stats = useMemo(() => computeToStats(records), [records]);
   const overdue = useMemo(() => findOverdueMaintenance(equipment), [equipment]);
+  const uncrewed = useMemo(() => findUncrewedEquipment(equipment), [equipment]);
 
   const filteredRecords = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -230,6 +234,30 @@ export function ToModule() {
                 >
                   <span className="font-semibold text-slate-900">{item.name}</span>
                   <span className="ml-1.5 text-amber-700">{overdueLabel(item)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+      {uncrewed.length > 0 && (
+        <div className="mx-auto mb-4 w-full max-w-[1500px]">
+          <section className="rounded-lg border border-slate-300 bg-slate-100 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-slate-500" />
+              <h2 className="text-sm font-bold text-slate-700">
+                Исключения · без бригады ({uncrewed.length})
+              </h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {uncrewed.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setEquipmentId(item.id)}
+                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-left text-xs hover:border-slate-500"
+                >
+                  <span className="font-semibold text-slate-900">{item.name}</span>
                 </button>
               ))}
             </div>

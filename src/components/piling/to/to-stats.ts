@@ -103,3 +103,19 @@ export function findOverdueMaintenance(
     (a, b) => (b.overdueDays ?? 0) - (a.overdueDays ?? 0) || (b.overdueHours ?? 0) - (a.overdueHours ?? 0),
   );
 }
+
+/** Minimal equipment shape needed to judge crew coverage. */
+export interface CrewCandidate {
+  id: string;
+  name: string;
+  isActive: boolean;
+  crewCount: number;
+}
+
+/**
+ * Read-model: active equipment with no active crew assigned — derived purely
+ * from the already-loaded equipment list. No new query, no schema.
+ */
+export function findUncrewedEquipment(equipment: CrewCandidate[]): CrewCandidate[] {
+  return equipment.filter((e) => e.isActive && e.crewCount === 0);
+}
