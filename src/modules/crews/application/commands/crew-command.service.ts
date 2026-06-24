@@ -250,6 +250,10 @@ export async function updateCrew(command: UpdateCrewCommand) {
 
   if (command.isActive !== undefined && command.isActive !== aggregate.getState().isActive) {
     if (command.isActive) {
+      // Reactivation can re-introduce the one-rig-one-crew conflict even when
+      // equipmentId itself isn't changing (the equipmentId-changed branch above
+      // only checks when the rig changes, not when isActive flips).
+      await assertEquipmentNotDoubleBooked(aggregate.getState().equipmentId, command.crewId);
       aggregate.reactivate(command.userId);
     } else {
       aggregate.deactivate(command.userId);
