@@ -8,6 +8,7 @@ import {
   Users,
   HardHat,
   Loader2,
+  Wrench,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -50,13 +51,27 @@ interface Site {
   name: string;
 }
 
+interface FleetKpiData {
+  mtbfHours: number | null;
+  mttrHours: number | null;
+  availability: number | null;
+  failureCount: number;
+  downtimeHours: number;
+  pmCompliance: number | null;
+  pmPlanned: number;
+  pmClosed: number;
+  totalCost: number;
+  topProblemRigs: { equipmentId: string; equipmentName: string; failures: number; cost: number }[];
+}
+
 const TABS = [
   { key: 'operators' as const, label: 'Операторы', icon: Users },
   { key: 'trends' as const, label: 'Тренды по объектам', icon: TrendingUp },
+  { key: 'kpi' as const, label: 'Надёжность ТО', icon: Wrench },
 ];
 
 export function AdminAnalytics() {
-  const [tab, setTab] = useState<'operators' | 'trends'>('operators');
+  const [tab, setTab] = useState<'operators' | 'trends' | 'kpi'>('operators');
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState<string>('all');
 
@@ -69,6 +84,7 @@ export function AdminAnalytics() {
 
   const [operatorSummary, setOperatorSummary] = useState<OperatorRow[]>([]);
   const [trendRows, setTrendRows] = useState<WeeklyTrendRow[]>([]);
+  const [kpi, setKpi] = useState<FleetKpiData | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Load sites once
@@ -114,11 +130,25 @@ export function AdminAnalytics() {
     } catch { toast.error('Ошибка'); } finally { setLoading(false); }
   }, [siteId]);
 
+  const loadKpi = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` });
+      const res = await authFetch(`/api/maintenance/kpi?${params}`);
+      if (res.ok) {
+        setKpi((await res.json()).kpi as FleetKpiData);
+      } else {
+        toast.error('Ошибка загрузки KPI');
+      }
+    } catch { toast.error('Ошибка'); } finally { setLoading(false); }
+  }, [dateFrom, dateTo]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     if (tab === 'operators') void loadOperators();
-    else void loadTrends();
-  }, [tab, loadOperators, loadTrends]);
+    else if (tab === 'trends') void loadTrends();
+    else void loadKpi();
+  }, [tab, loadOperators, loadTrends, loadKpi]);
 
   const operatorChartData = useMemo(
     () => operatorSummary.slice(0, 10).map((o) => ({
@@ -200,7 +230,7 @@ export function AdminAnalytics() {
                 ))}
               </select>
             </div>
-            {tab === 'operators' && (
+            {(tab === 'operators' || tab === 'kpi') && (
               <>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">С</label>
@@ -212,7 +242,7 @@ export function AdminAnalytics() {
                   <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                     className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
                 </div>
-                <Button size="sm" onClick={loadOperators} disabled={loading}>
+                <Button size="sm" onClick={tab === 'kpi' ? loadKpi : loadOperators} disabled={loading}>
                   {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Применить'}
                 </Button>
               </>
@@ -319,7 +349,77 @@ export function AdminAnalytics() {
           )}
         </>
       )}
+
+      {tab === 'kpi' && (
+        <>
+          {loading ? (
+            <Skeleton className="h-80 w-full" />
+          ) : !kpi ? (
+            <EmptyState text="Нет данных ТО за период." />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <KpiCard label="Готовность парка" value={kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—'} hint="доля времени без ремонтов" />
+                <KpiCard label="MTBF" value={fmtHours(kpi.mtbfHours)} hint="наработка между отказами" />
+                <KpiCard label="MTTR" value={fmtHours(kpi.mttrHours)} hint="среднее время ремонта" />
+                <KpiCard label="Выполнение ППР" value={kpi.pmCompliance != null ? `${(kpi.pmCompliance * 100).toFixed(0)}%` : '—'} hint={`${kpi.pmClosed} из ${kpi.pmPlanned} закрыто`} />
+                <KpiCard label="Отказы за период" value={String(kpi.failureCount)} hint="ремонты + неисправности" />
+                <KpiCard label="Простой по ремонтам" value={fmtHours(kpi.downtimeHours)} hint="суммарно" />
+                <KpiCard label="Затраты на ТО" value={`${kpi.totalCost.toLocaleString('ru')} ₽`} hint="за период" />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Топ проблемных установок</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {kpi.topProblemRigs.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-4 text-center">Отказов за период не зафиксировано.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-slate-500 border-b">
+                          <th className="py-2">Установка</th>
+                          <th className="py-2 text-right">Отказов</th>
+                          <th className="py-2 text-right">Затраты, ₽</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kpi.topProblemRigs.map((r) => (
+                          <tr key={r.equipmentId} className="border-b last:border-0">
+                            <td className="py-2 font-medium text-slate-800">{r.equipmentName}</td>
+                            <td className="py-2 text-right font-mono">{r.failures}</td>
+                            <td className="py-2 text-right font-mono">{r.cost.toLocaleString('ru')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+function fmtHours(h: number | null): string {
+  if (h == null) return '—';
+  if (h >= 48) return `${(h / 24).toFixed(1)} дн.`;
+  return `${h.toFixed(1)} ч`;
+}
+
+function KpiCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="text-xs text-slate-500">{label}</div>
+        <div className="mt-1 text-xl font-bold text-slate-900">{value}</div>
+        <div className="mt-0.5 text-2xs text-slate-400">{hint}</div>
+      </CardContent>
+    </Card>
   );
 }
 

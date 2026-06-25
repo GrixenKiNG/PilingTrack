@@ -171,6 +171,43 @@ export async function listMeterReadings(equipmentId: string, tenantId: string, l
 }
 
 /**
+ * Maintenance records + fleet size for fleet KPI (MTBF/MTTR/availability) over a
+ * period. Records are scoped by tenant; the period filters on createdAt so it
+ * captures every work order opened in the window. Pure aggregation is in
+ * lib/fleet-kpi.ts.
+ */
+export async function getFleetKpiData(tenantId: string, from: Date, to: Date) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  const [records, equipmentCount] = await Promise.all([
+    db.maintenanceRecord.findMany({
+      where: { tenantId, createdAt: { gte: from, lte: to } },
+      select: {
+        equipmentId: true,
+        type: true,
+        status: true,
+        startedAt: true,
+        completedAt: true,
+        cost: true,
+        equipment: { select: { name: true } },
+      },
+    }),
+    db.equipment.count({ where: { tenantId, isActive: true } }),
+  ]);
+  return {
+    records: records.map((r) => ({
+      equipmentId: r.equipmentId,
+      equipmentName: r.equipment?.name ?? '—',
+      type: r.type as string,
+      status: r.status as string,
+      startedAt: r.startedAt,
+      completedAt: r.completedAt,
+      cost: r.cost != null ? Number(r.cost) : null,
+    })),
+    equipmentCount,
+  };
+}
+
+/**
  * PM plans for a tenant (optionally one rig), each with the equipment name and
  * its latest meter reading so callers can compute due status via evaluatePlanDue.
  */

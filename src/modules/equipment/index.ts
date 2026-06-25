@@ -16,6 +16,6 @@ export type { MaintenancePlanInput } from './application/commands/maintenance-pl
 export { runPmScheduler, evaluatePlanDue } from './application/commands/pm-scheduler';
 export type { PmTriggerType, PmDueStatus, PlanForEval, PlanDueResult, PmSchedulerResult } from './application/commands/pm-scheduler';
 export type { CreateEquipmentCommand, UpdateEquipmentCommand } from './application/commands/equipment.command';
-export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, getMaintenanceById, listAllEquipment, listAllMaintenance, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance, listMeterReadings, listMaintenancePlans } from './application/queries/equipment-query.service';
+export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, getMaintenanceById, listAllEquipment, listAllMaintenance, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance, listMeterReadings, listMaintenancePlans, getFleetKpiData } from './application/queries/equipment-query.service';
 export type { MaintenanceListFilter } from './application/queries/equipment-query.service';
 export { getEquipmentRepository } from './infrastructure/equipment.repository';
