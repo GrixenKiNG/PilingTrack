@@ -94,6 +94,8 @@ export async function startPdf(): Promise<void> {
       logger.error('PDF job failed', {
         jobId: job?.id ?? 'unknown',
         error: error.message,
+        name: error.name,
+        stack: error.stack,
       });
       // Per-job failure is expected; only record the last error, do not flip worker health.
       state.error = error.message;
@@ -102,6 +104,8 @@ export async function startPdf(): Promise<void> {
     pdfWorker.on('error', (error) => {
       logger.error('PDF worker error', {
         error: error.message,
+        name: error.name,
+        stack: error.stack,
       });
       setError(state, error);
     });
