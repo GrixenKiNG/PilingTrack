@@ -81,6 +81,10 @@ function formatEventDate(value: string) {
 
 export function FeedbackCenter() {
   const user = usePilingStore((state) => state.currentUser);
+  // Operators/assistants get a plain notifications feed; the platform-health
+  // card, requestId lines and the "контур обратной связи" framing are ops/dev
+  // detail that only confuses a field user (and /api/ready is admin-facing).
+  const isPrivileged = user?.role === 'ADMIN' || user?.role === 'DISPATCHER';
   const localFeedbackEvents = usePilingStore((state) => state.localFeedbackEvents);
   const dismissLocalFeedbackEvent = usePilingStore((state) => state.dismissLocalFeedbackEvent);
   const clearLocalFeedbackEvents = usePilingStore((state) => state.clearLocalFeedbackEvents);
@@ -108,6 +112,7 @@ export function FeedbackCenter() {
     const silent = options?.silent ?? false;
     const shouldLoadHealth =
       includeHealth &&
+      (user.role === 'ADMIN' || user.role === 'DISPATCHER') &&
       (healthFetchedAtRef.current === 0 || Date.now() - healthFetchedAtRef.current >= HEALTH_REFRESH_INTERVAL_MS);
 
     inFlightRef.current = true;
@@ -288,9 +293,11 @@ export function FeedbackCenter() {
         <SheetHeader className="border-b px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <SheetTitle className="text-left">Контур обратной связи</SheetTitle>
+              <SheetTitle className="text-left">{isPrivileged ? 'Контур обратной связи' : 'Уведомления'}</SheetTitle>
               <p className="mt-1 text-xs text-slate-500">
-                События, ошибки, подтверждения операций и эксплуатационные сигналы.
+                {isPrivileged
+                  ? 'События, ошибки, подтверждения операций и эксплуатационные сигналы.'
+                  : 'Ваши отчёты, входы в систему и важные сообщения.'}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -303,16 +310,18 @@ export function FeedbackCenter() {
         </SheetHeader>
 
         <div className="space-y-4 p-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border bg-slate-50 p-3">
-              <p className="text-xs text-slate-500">Состояние платформы</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {health?.ready ? 'Система готова' : 'Проверка состояния'}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                База: {health?.database?.ok ? 'ok' : 'unknown'} / Сессии: {health?.session?.configured ? 'ok' : 'not set'}
-              </p>
-            </div>
+          <div className={`grid gap-3 ${isPrivileged ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {isPrivileged && (
+              <div className="rounded-xl border bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">Состояние платформы</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {health?.ready ? 'Система готова' : 'Проверка состояния'}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  База: {health?.database?.ok ? 'ok' : 'unknown'} / Сессии: {health?.session?.configured ? 'ok' : 'not set'}
+                </p>
+              </div>
+            )}
             <div className="rounded-xl border bg-slate-50 p-3">
               <p className="text-xs text-slate-500">Активные сигналы</p>
               <p className="mt-1 text-sm font-semibold text-slate-900">{warningCount}</p>
@@ -385,7 +394,7 @@ export function FeedbackCenter() {
                           <p className="mt-1 text-sm text-slate-600">{event.message}</p>
                           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-slate-500">
                             <span>{formatEventDate(event.createdAt)}</span>
-                            {event.requestId && <span>requestId: {event.requestId}</span>}
+                            {isPrivileged && event.requestId && <span>requestId: {event.requestId}</span>}
                             {event.actorName && <span>Инициатор: {event.actorName}</span>}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">

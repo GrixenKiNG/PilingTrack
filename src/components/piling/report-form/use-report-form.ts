@@ -7,6 +7,7 @@ import { authFetch } from '@/lib/api';
 import { pushClientFeedback } from '@/lib/client-feedback';
 import { hapticClick, hapticSuccess, hapticError } from '@/lib/haptic-feedback';
 import { getTodayInTimezone } from '@/lib/timezone';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { SiteWithTreeDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO, CreateReportPayload } from '@/lib/types';
 
 export interface PileEntry { id: string; picketId: string; pileGradeId: string; count: number; }
@@ -107,21 +108,15 @@ export function useReportForm(): UseReportFormReturn {
   const [showDowntime, setShowDowntime] = useState(false);
   const [quickMode, setQuickMode] = useState(true);
 
-  function parsePileLengthFromGradeName(name: string): number | null {
-    const normalized = name.replace(',', '.');
-    const match = normalized.match(/(\d{1,2})(?:\.\d+)?(?:\s*x\s*\d+(?:\.\d+)?)?$/i)
-      || normalized.match(/(\d{1,2})\.\d+/);
-    if (!match) return null;
-    const value = Number(match[1]);
-    return Number.isFinite(value) ? value : null;
-  }
-
+  // Length per pile comes from the grade's stored `lengthMm` via the single
+  // resolver in lib/pile-length — the same source the server, history, dashboard
+  // and PDF use. We must NOT re-parse it from the grade name here (that drifted:
+  // "С 100-35" was read as 35 m instead of 10 m) nor fall back to
+  // SitePilePlan.metersPerUnit, which is a planning figure, not a length.
   const getPileMetersPerUnit = useCallback((pileGradeId: string) => {
-    const gradeName = pileGrades.find((g) => g.id === pileGradeId)?.name || '';
-    const parsedLength = parsePileLengthFromGradeName(gradeName);
-    if (parsedLength !== null) return parsedLength;
-    return siteTree?.pilePlans?.find((plan) => plan.pileGradeId === pileGradeId)?.metersPerUnit || 0;
-  }, [pileGrades, siteTree]);
+    const grade = pileGrades.find((g) => g.id === pileGradeId);
+    return pileLengthMeters({ gradeLengthMm: grade?.lengthMm });
+  }, [pileGrades]);
 
   // Load data
   const loadData = useCallback(async () => {
