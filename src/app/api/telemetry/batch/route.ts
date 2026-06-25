@@ -115,6 +115,29 @@ export const POST = withApi(async (request: NextRequest) => {
       );
     }
 
+    // Tenant ownership (IDOR guard, fail-closed): equipmentId comes from the
+    // request body, so verify every referenced rig belongs to the caller's
+    // tenant before writing — otherwise a logged-in user could push telemetry
+    // against another tenant's equipment. Telemetry has no tenantId column;
+    // the tenant anchor is the equipment's.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
+    const requestedIds = [...new Set(validated.data.map((r) => r.equipmentId))];
+    const { db } = await import('@/lib/db');
+    const owned = await db.equipment.findMany({
+      where: { id: { in: requestedIds }, tenantId },
+      select: { id: true },
+    });
+    if (owned.length !== requestedIds.length) {
+      return NextResponse.json(
+        { error: 'One or more equipment ids are not in your tenant' },
+        { status: 403 }
+      );
+    }
+
     const count = await ingestTelemetryBatch(
       validated.data.map((d) => ({
         ...d,
