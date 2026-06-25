@@ -179,6 +179,7 @@ model Equipment {
   maintenanceRecords      MaintenanceRecord[]
   inspections             Inspection[]
   meterReadings           MeterReading[]
+  maintenancePlans        MaintenancePlan[]
 
   @@index([tenantId])
   @@index([isActive])
@@ -339,6 +340,43 @@ model MeterReading {
 enum MeterSource {
   MANUAL
   TELEMETRY
+}
+
+// ============================================================
+// MAINTENANCE PLANS — регламенты планового ТО (PM scheduler, P3)
+// Правило «через сколько моточасов / дней снова делать ТО». Воркер
+// ежедневно считает срок из последнего MeterReading (HOURS) или
+// lastDoneAt+intervalDays (CALENDAR) и, попав в окно leadTimeDays,
+// создаёт наряд (MaintenanceRecord, status=PLANNED), дедуп по открытым
+// нарядам этой установки. Замыкание цикла: закрытие планового наряда
+// обновляет lastDoneHours/lastDoneAt у правила.
+// ============================================================
+model MaintenancePlan {
+  id            String          @id @default(cuid())
+  tenantId      String
+  equipmentId   String
+  title         String
+  type          MaintenanceType @default(TO1)  // тип наряда, который порождает правило
+  triggerType   PmTriggerType
+  intervalHours Int?                            // для HOURS
+  intervalDays  Int?                            // для CALENDAR
+  leadTimeDays  Int             @default(7)     // за сколько дней предупреждать/создавать наряд
+  lastDoneHours Int?                            // моточасы последнего выполнения
+  lastDoneAt    DateTime?       @db.Timestamptz(3) // дата последнего выполнения
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime        @updatedAt      @db.Timestamptz(3)
+
+  equipment     Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([equipmentId])
+  @@index([isActive])
+}
+
+enum PmTriggerType {
+  HOURS
+  CALENDAR
 }
 
 // ============================================================

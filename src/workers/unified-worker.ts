@@ -22,10 +22,12 @@ import { startHealthServer } from './unified-worker/health-server';
 import { startOutbox } from './unified-worker/outbox';
 import { startPdf } from './unified-worker/pdf';
 import { startProjection } from './unified-worker/projection';
+import { startPmScheduler } from './unified-worker/pm-scheduler';
 import { workerStates } from './unified-worker/state';
 
 let isShuttingDown = false;
 let healthServer: http.Server | null = null;
+let stopPmScheduler: (() => void) | null = null;
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
@@ -51,6 +53,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
     });
 
   await Promise.all(stops);
+
+  if (stopPmScheduler) {
+    stopPmScheduler();
+    stopPmScheduler = null;
+  }
 
   if (healthServer) {
     await new Promise<void>((resolve) => {
@@ -91,6 +98,11 @@ async function main(): Promise<void> {
   }
 
   await Promise.all(startups);
+
+  // PM scheduler tick — idempotent daily job, no leader election needed.
+  if (process.env.PM_SCHEDULER_ENABLED !== 'false') {
+    stopPmScheduler = startPmScheduler();
+  }
 
   logger.info('Unified Worker Service ready');
 

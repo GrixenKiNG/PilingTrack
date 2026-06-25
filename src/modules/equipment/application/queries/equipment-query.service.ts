@@ -170,6 +170,32 @@ export async function listMeterReadings(equipmentId: string, tenantId: string, l
   });
 }
 
+/**
+ * PM plans for a tenant (optionally one rig), each with the equipment name and
+ * its latest meter reading so callers can compute due status via evaluatePlanDue.
+ */
+export async function listMaintenancePlans(tenantId: string, equipmentId?: string) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  return db.maintenancePlan.findMany({
+    where: { tenantId, ...(equipmentId ? { equipmentId } : {}) },
+    orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+    include: {
+      equipment: {
+        select: {
+          id: true,
+          name: true,
+          engineHoursTotal: true,
+          meterReadings: {
+            orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
+            take: 1,
+            select: { engineHours: true },
+          },
+        },
+      },
+    },
+  });
+}
+
 export interface MaintenanceListFilter {
   status?: MaintenanceStatus;
   priority?: MaintenancePriority;

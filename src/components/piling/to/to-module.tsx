@@ -35,6 +35,7 @@ import {
 import { cn } from '@/lib/utils';
 import { healthScoreColor } from '@/components/piling/inspections/inspection-labels';
 import { MeterReadingsPanel } from './meter-readings-panel';
+import { MaintenancePlansPanel } from './maintenance-plans-panel';
 import {
   type JournalRecord,
   type OverdueMaintenance,
@@ -441,6 +442,8 @@ export function ToModule() {
               }
             />
           )}
+
+          {selected && <MaintenancePlansPanel equipmentId={selected.id} />}
 
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <h3 className="mb-3 text-sm font-bold text-slate-900">Сборка чек-листа</h3>
