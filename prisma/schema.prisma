@@ -79,7 +79,7 @@ model TenantInvoice {
 
 model User {
   id         String   @id @default(cuid())
-  tenantId   String?
+  tenantId   String
   email      String   @unique
   password   String   @default("")
   // Stores the bcrypt(PIN) — used for the final verify step.
