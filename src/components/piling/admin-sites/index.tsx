@@ -204,7 +204,7 @@ export function AdminSites() {
         </div>
       ),
     },
-    { key: 'progress', header: 'Прогресс', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm font-semibold tabular-nums text-slate-700">{pct(r.pileProgress)}</span> },
+    { key: 'progress', header: 'Прогресс', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm font-semibold tabular-nums text-slate-700">{r.plannedPiles > 0 ? pct(r.pileProgress) : '—'}</span> },
     { key: 'reports', header: 'Отчёты', width: '80px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-slate-700">{r.totalReports}</span> },
     { key: 'downtime', header: 'Простой', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-slate-700">{r.totalDowntime > 0 ? `${formatNumber(r.totalDowntime)} ч` : '—'}</span> },
     {
@@ -389,8 +389,8 @@ function SiteDetail({
 
       <div className="rounded-md border border-slate-200 p-2.5">
         <h3 className="mb-1.5 text-xs font-semibold text-slate-900">Прогресс</h3>
-        <LabeledProgress label="Сваи" pct={row.pileProgress} tone="orange" />
-        <LabeledProgress label="Бурение" pct={row.drillingProgress} tone="blue" />
+        <LabeledProgress label="Сваи" pct={row.pileProgress} planned={row.plannedPiles} tone="orange" />
+        <LabeledProgress label="Бурение" pct={row.drillingProgress} planned={row.plannedDrilling} tone="blue" />
       </div>
 
       <div className="rounded-md border border-slate-200 p-2.5">
@@ -413,14 +413,16 @@ function ProgressBar({ pct: value, tone }: { pct: number; tone: 'orange' | 'blue
   );
 }
 
-function LabeledProgress({ label, pct: value, tone }: { label: string; pct: number; tone: 'orange' | 'blue' }) {
+function LabeledProgress({ label, pct: value, planned, tone }: { label: string; pct: number; planned?: number; tone: 'orange' | 'blue' }) {
+  // No plan set → percent is meaningless; show "—" instead of a misleading 0%.
+  const noPlan = planned !== undefined && planned <= 0;
   return (
     <div className="mb-1.5 last:mb-0">
       <div className="mb-0.5 flex items-center justify-between text-2xs">
         <span className="text-slate-600">{label}</span>
-        <span className="font-mono text-slate-500">{pct(value)}</span>
+        <span className="font-mono text-slate-500">{noPlan ? 'план не задан' : pct(value)}</span>
       </div>
-      <ProgressBar pct={value} tone={tone} />
+      <ProgressBar pct={noPlan ? 0 : value} tone={tone} />
     </div>
   );
 }

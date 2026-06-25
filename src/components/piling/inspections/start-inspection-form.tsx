@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Layers, Hammer, RotateCw, ShoppingCart, Copy } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,12 +51,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function StartInspectionForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [templates, setTemplates] = useState<TemplateLite[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [equipmentId, setEquipmentId] = useState('');
+  // Preselect the установка when arriving from an equipment's ТО page
+  // (/inspections/new?equipmentId=…) so the admin doesn't have to pick it again.
+  const [equipmentId, setEquipmentId] = useState(() => searchParams.get('equipmentId') ?? '');
   const [level, setLevel] = useState<InspectionLevel>('EO');
   const [inspectionDate, setInspectionDate] = useState(today());
   const [shift, setShift] = useState('');

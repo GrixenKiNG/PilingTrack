@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutGrid, List, Map } from 'lucide-react';
+import { LayoutGrid, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type FleetView = 'tiles' | 'table';
@@ -31,13 +31,6 @@ export function EquipmentViewToggle({
         )}
       >
         <List className="h-3.5 w-3.5" /> Таблица
-      </button>
-      <button
-        disabled
-        title="Появится с телеметрией (GPS)"
-        className="flex cursor-not-allowed items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-300"
-      >
-        <Map className="h-3.5 w-3.5" /> Карта
       </button>
     </div>
   );
