@@ -1,16 +1,13 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { setTimeout: delay } = require('node:timers/promises');
 const { hashSync } = require('bcryptjs');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const projectRoot = process.cwd();
-const sourceDbPath = path.join(projectRoot, 'db', 'custom.db');
-const tempDbName = `smoke-${Date.now()}.db`;
-const tempDbPath = path.join(projectRoot, 'db', tempDbName);
-const tempDatabaseUrl = `file:${tempDbPath.replace(/\\/g, '/')}`;
 const baseUrl = 'http://127.0.0.1:3101';
+const connectionString = process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;
 
 function getSetCookieValues(headers) {
   if (typeof headers.getSetCookie === 'function') {
@@ -72,16 +69,26 @@ async function waitForServer() {
   throw new Error('Standalone server did not become ready in time');
 }
 
-async function createFixtures(databaseUrl) {
-  process.env.DATABASE_URL = databaseUrl;
+function getPrismaClient() {
+  const { PrismaClient } = require(path.join(projectRoot, 'src', 'generated', 'postgres-client'));
+  const { PrismaPg } = require('@prisma/adapter-pg');
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString }), log: ['error'] });
+}
 
-  const { PrismaClient } = require('@prisma/client');
-  const prisma = new PrismaClient({ log: ['error'] });
+async function createFixtures() {
+  const prisma = getPrismaClient();
   const suffix = Date.now().toString();
 
   try {
+    const tenant = await prisma.tenant.findFirst();
+    if (!tenant) {
+      throw new Error('No Tenant row found — smoke test requires at least one Tenant in the target database.');
+    }
+    const tenantId = tenant.id;
+
     const admin = await prisma.user.create({
       data: {
+        tenantId,
         email: `smoke-admin-${suffix}@example.com`,
         password: hashSync('AdminPass123!', 10),
         name: 'Smoke Admin',
@@ -93,6 +100,7 @@ async function createFixtures(databaseUrl) {
 
     const operator = await prisma.user.create({
       data: {
+        tenantId,
         email: `smoke-operator-${suffix}@example.com`,
         password: hashSync('OperatorPass123!', 10),
         name: 'Smoke Operator',
@@ -104,6 +112,7 @@ async function createFixtures(databaseUrl) {
 
     const foreignOperator = await prisma.user.create({
       data: {
+        tenantId,
         email: `smoke-foreign-${suffix}@example.com`,
         password: hashSync('ForeignPass123!', 10),
         name: 'Smoke Foreign Operator',
@@ -115,6 +124,7 @@ async function createFixtures(databaseUrl) {
 
     const site = await prisma.site.create({
       data: {
+        tenantId,
         name: `Smoke Site ${suffix}`,
         plannedPiles: 1,
         plannedDrilling: 0,
@@ -139,6 +149,7 @@ async function createFixtures(databaseUrl) {
 
     const foreignReport = await prisma.report.create({
       data: {
+        tenantId,
         reportId: `smoke-report-${suffix}`,
         userId: foreignOperator.id,
         siteId: site.id,
@@ -151,6 +162,8 @@ async function createFixtures(databaseUrl) {
     return {
       admin,
       operator,
+      foreignOperator,
+      site,
       foreignReport,
     };
   } finally {
@@ -158,23 +171,36 @@ async function createFixtures(databaseUrl) {
   }
 }
 
+async function cleanupFixtures(fixtures) {
+  const prisma = getPrismaClient();
+
+  try {
+    // Deleting the users/site cascades the report and assignment rows
+    // (onDelete: Cascade on Report.user/site and UserSiteAssignment.user/site).
+    await prisma.user.deleteMany({
+      where: { id: { in: [fixtures.admin.id, fixtures.operator.id, fixtures.foreignOperator.id] } },
+    });
+    await prisma.site.delete({ where: { id: fixtures.site.id } });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 async function main() {
-  if (!fs.existsSync(sourceDbPath)) {
-    throw new Error(`Source database not found: ${sourceDbPath}`);
+  if (!connectionString) {
+    throw new Error('DATABASE_URL_POSTGRES (or DATABASE_URL) is required to run the smoke test.');
   }
 
-  fs.copyFileSync(sourceDbPath, tempDbPath);
-
-  const fixtures = await createFixtures(tempDatabaseUrl);
+  const fixtures = await createFixtures();
   const server = spawn('node', ['.next/standalone/server.js'], {
     cwd: projectRoot,
     env: {
       ...process.env,
       NODE_ENV: 'production',
       PORT: '3101',
-      DATABASE_PROVIDER: 'sqlite',
-      DATABASE_URL: tempDatabaseUrl,
-      SESSION_SECRET: 'smoke-test-session-secret',
+      DATABASE_PROVIDER: 'postgres',
+      DATABASE_URL_POSTGRES: connectionString,
+      SESSION_SECRET: 'smoke-test-session-secret-minimum-32-characters',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -238,7 +264,7 @@ async function main() {
       headers: { cookie: adminJar.header() },
     });
     assert.equal(result.response.status, 200, 'Admin must access /api/system');
-    assert.equal(result.body.diagnostics.databaseProvider, 'sqlite', 'Diagnostics must expose runtime provider');
+    assert.equal(result.body.diagnostics.databaseProvider, 'postgres', 'Diagnostics must expose runtime provider');
     assert.equal(
       result.body.requestId,
       result.response.headers.get('x-request-id'),
@@ -272,7 +298,9 @@ async function main() {
 
     result = await request('/api/auth/logout', {
       method: 'POST',
-      headers: { cookie: adminJar.header() },
+      // Same-origin CSRF check (src/lib/csrf-protection.ts) rejects mutations
+      // with no Origin/Referer/Sec-Fetch-Site — a plain Node fetch sends none.
+      headers: { cookie: adminJar.header(), 'sec-fetch-site': 'same-origin' },
     });
     assert.equal(result.response.status, 200, 'Logout must succeed');
     adminJar.apply(result.response.headers);
@@ -296,8 +324,10 @@ async function main() {
     }
 
     try {
-      fs.unlinkSync(tempDbPath);
-    } catch {}
+      await cleanupFixtures(fixtures);
+    } catch (cleanupError) {
+      console.error('Fixture cleanup failed:', cleanupError instanceof Error ? cleanupError.message : cleanupError);
+    }
   }
 }
 

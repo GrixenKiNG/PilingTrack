@@ -88,6 +88,8 @@ async function seed() {
   assertNotProduction();
   console.log('Seeding database...');
 
+  const tenantId = process.env.DEFAULT_TENANT_ID ?? 'orion';
+
   // Use fixed passwords for testing
   const adminPassword = 'admin123';
   const dispatcherPassword = 'dispatch123';
@@ -111,6 +113,7 @@ async function seed() {
       password: hashPassword(adminPassword),
     },
     create: {
+      tenantId,
       email: 'admin@piling.ru',
       password: hashPassword(adminPassword),
       name: 'Администратор',
@@ -128,6 +131,7 @@ async function seed() {
       password: hashPassword(dispatcherPassword),
     },
     create: {
+      tenantId,
       email: 'dispatch@piling.ru',
       password: hashPassword(dispatcherPassword),
       name: 'Петрова Д.В.',
@@ -145,6 +149,7 @@ async function seed() {
       password: hashPassword(operator1Password),
     },
     create: {
+      tenantId,
       email: 'operator@piling.ru',
       password: hashPassword(operator1Password),
       name: 'Иванов И.П.',
@@ -162,6 +167,7 @@ async function seed() {
       password: hashPassword(operator2Password),
     },
     create: {
+      tenantId,
       email: 'sas02@rambler.ru',
       password: hashPassword(operator2Password),
       name: 'Герасимов Сергей',
@@ -179,6 +185,7 @@ async function seed() {
       password: hashPassword(assistantPassword),
     },
     create: {
+      tenantId,
       email: 'helper@piling.ru',
       password: hashPassword(assistantPassword),
       name: 'Сидоров К.А.',
