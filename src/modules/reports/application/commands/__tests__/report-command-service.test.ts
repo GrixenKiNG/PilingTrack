@@ -131,7 +131,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-05',
         piles: [{ pileGradeId: 'grade-1', count: 1 }],
-        downtimes: [{ reasonId: 'reason-1', duration: 60 }],
+        downtimes: [{ reasonId: 'reason-1', duration: 8 }],
       };
 
       const result = await upsertReport(input);

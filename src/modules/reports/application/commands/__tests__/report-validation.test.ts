@@ -124,9 +124,13 @@ describe('Report Validation', () => {
   });
 
   describe('validateDowntimeEntries', () => {
-    it('should pass with valid downtimes', () => {
+    it('should pass with valid downtimes (hours, fractional allowed)', () => {
       expect(() =>
-        validateDowntimeEntries([{ reasonId: 'r1', duration: 60 }])
+        validateDowntimeEntries([{ reasonId: 'r1', duration: 8 }])
+      ).not.toThrow();
+      // 0.5h must be accepted — the unit is hours and the column is Float.
+      expect(() =>
+        validateDowntimeEntries([{ reasonId: 'r1', duration: 0.5 }])
       ).not.toThrow();
     });
 
@@ -136,10 +140,10 @@ describe('Report Validation', () => {
       ).toThrow('Длительность простоя не может быть отрицательной');
     });
 
-    it('should throw for duration > 1440', () => {
+    it('should throw for duration > 24 hours', () => {
       expect(() =>
-        validateDowntimeEntries([{ reasonId: 'r1', duration: 1441 }])
-      ).toThrow('Длительность простоя не может превышать 1440');
+        validateDowntimeEntries([{ reasonId: 'r1', duration: 25 }])
+      ).toThrow('Длительность простоя не может превышать 24 часа');
     });
   });
 
