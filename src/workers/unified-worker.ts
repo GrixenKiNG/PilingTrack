@@ -23,11 +23,13 @@ import { startOutbox } from './unified-worker/outbox';
 import { startPdf } from './unified-worker/pdf';
 import { startProjection } from './unified-worker/projection';
 import { startPmScheduler } from './unified-worker/pm-scheduler';
+import { startProjectionRebuildScheduler } from './unified-worker/projection-rebuild-scheduler';
 import { workerStates } from './unified-worker/state';
 
 let isShuttingDown = false;
 let healthServer: http.Server | null = null;
 let stopPmScheduler: (() => void) | null = null;
+let stopProjectionRebuild: (() => void) | null = null;
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
@@ -57,6 +59,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
   if (stopPmScheduler) {
     stopPmScheduler();
     stopPmScheduler = null;
+  }
+
+  if (stopProjectionRebuild) {
+    stopProjectionRebuild();
+    stopProjectionRebuild = null;
   }
 
   if (healthServer) {
@@ -102,6 +109,12 @@ async function main(): Promise<void> {
   // PM scheduler tick — idempotent daily job, no leader election needed.
   if (process.env.PM_SCHEDULER_ENABLED !== 'false') {
     stopPmScheduler = startPmScheduler();
+  }
+
+  // Projection rebuild safety-net — keeps analytics read-models fresh after a
+  // dump restore / worker lag. Idempotent full recompute, no leader election.
+  if (process.env.PROJECTION_REBUILD_ENABLED !== 'false') {
+    stopProjectionRebuild = startProjectionRebuildScheduler();
   }
 
   logger.info('Unified Worker Service ready');
