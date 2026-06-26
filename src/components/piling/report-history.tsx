@@ -39,6 +39,9 @@ export function ReportHistory() {
   const [selectedReport, setSelectedReport] = useState<ReportDTO | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
+  // Cursor pagination: /api/reports/my returns 50 at a time + a nextCursor.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -55,6 +58,7 @@ export function ReportHistory() {
       if (reportsRes.ok) {
         const data = await reportsRes.json();
         setReports(data.data || data.reports || []);
+        setNextCursor(data.nextCursor ?? null);
       } else {
         // HTTP error does NOT throw — without this the list would render
         // empty as if the operator had no reports.
@@ -78,6 +82,26 @@ export function ReportHistory() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
     void loadData();
   }, [loadData]);
+
+  const loadMore = useCallback(async () => {
+    if (!user || !nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await authFetch(`/api/reports/my?userId=${user.id}&cursor=${encodeURIComponent(nextCursor)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const more: ReportListItemDTO[] = data.data || data.reports || [];
+        setReports((prev) => [...prev, ...more]);
+        setNextCursor(data.nextCursor ?? null);
+      } else {
+        toast.error('Не удалось загрузить ещё');
+      }
+    } catch {
+      toast.error('Не удалось загрузить ещё');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [user, nextCursor, loadingMore]);
 
   const handleOpenDetail = useCallback(async (report: ReportListItemDTO) => {
     setSelectedReport(null);
@@ -300,6 +324,17 @@ export function ReportHistory() {
               </Card>
             </motion.div>
           ))}
+
+          {nextCursor && (
+            <button
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="w-full h-11 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loadingMore ? 'Загрузка…' : 'Показать ещё'}
+            </button>
+          )}
         </div>
       )}
 

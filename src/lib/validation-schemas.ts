@@ -239,7 +239,10 @@ export const reportUpsertSchema = z.object({
   })).max(100).default([]),
   downtimes: z.array(z.object({
     reasonId: internalIdSchema,
-    duration: z.number().int().min(0).max(1440),
+    // Downtime is measured in HOURS (the server compares the total to the shift
+    // length in hours). Fractional allowed (UI uses a 0.5h step); the column is
+    // Float. Cap at 24h — a single downtime can't exceed a day.
+    duration: z.number().min(0).max(24),
     comment: z.string().max(1000).optional(),
   })).max(50).default([]),
   comment: z.string().max(2000).optional(),

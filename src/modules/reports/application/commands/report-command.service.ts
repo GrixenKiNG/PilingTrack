@@ -27,7 +27,7 @@ import {
 import { ReportAggregate } from '../../domain';
 import { getReportRepository } from '../../infrastructure';
 import { UpsertReportCommand, UpsertReportResult } from './upsert-report.command';
-import { validateReportInput, validateAgainstSitePlans } from './report-validation.service';
+import { validateReportInput, validateAgainstSitePlans, validatePicketsBelongToSite } from './report-validation.service';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {
   writeReportAuditRow,
@@ -96,6 +96,12 @@ export async function upsertReport(
     input.piles || [],
     (input.drillings || []).map(d => ({ typeId: d.typeId, count: d.count || 1, meters: d.meters }))
   );
+
+  // Pickets referenced by piles/drillings must belong to this site.
+  await validatePicketsBelongToSite(input.siteId, [
+    ...(input.piles || []),
+    ...(input.drillings || []),
+  ]);
 
   const repo = getReportRepository();
 

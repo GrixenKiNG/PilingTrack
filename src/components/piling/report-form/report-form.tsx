@@ -86,6 +86,11 @@ export function ReportForm() {
 
   const handleSiteChange = (val: string) => {
     setSelectedSiteId(val);
+    // Reset the picket hierarchy — a field/cluster/picket from the previous site
+    // must not carry into a report for the new site.
+    setSelectedFieldId('');
+    setSelectedClusterId('');
+    setSelectedPicketId('');
     loadSiteTree(val);
   };
 

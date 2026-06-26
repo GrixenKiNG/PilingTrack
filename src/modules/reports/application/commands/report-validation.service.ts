@@ -91,8 +91,8 @@ export function validateDowntimeEntries(
     if (dt.duration < 0) {
       throw new ServiceError(`Длительность простоя не может быть отрицательной`, 400);
     }
-    if (dt.duration > 1440) {
-      throw new ServiceError(`Длительность простоя не может превышать 1440 минут (24ч)`, 400);
+    if (dt.duration > 24) {
+      throw new ServiceError(`Длительность простоя не может превышать 24 часа`, 400);
     }
   }
 }
@@ -115,6 +115,33 @@ export function validateReportInput(input: {
   validateDrillingEntries(input.drillings);
   validateDowntimeEntries(input.downtimes);
   validateDowntimeWithinShift(input.shiftStart, input.shiftEnd, input.downtimes);
+}
+
+/**
+ * Every picketId referenced by a pile/drilling row must belong to the report's
+ * site (Picket → Cluster → PileField → Site). Without this, a stale picket from
+ * a previously-selected site could be saved against the new site and pollute
+ * per-picket production stats.
+ */
+export async function validatePicketsBelongToSite(
+  siteId: string,
+  rows: Array<{ picketId?: string | null }>
+): Promise<void> {
+  const picketIds = [...new Set(rows.map((r) => r.picketId).filter((id): id is string => !!id))];
+  if (picketIds.length === 0) return;
+
+  const pickets = await db.picket.findMany({
+    where: { id: { in: picketIds } },
+    select: { id: true, cluster: { select: { field: { select: { siteId: true } } } } },
+  });
+
+  const bySite = new Map(pickets.map((p) => [p.id, p.cluster.field.siteId]));
+  for (const picketId of picketIds) {
+    const owner = bySite.get(picketId);
+    if (owner !== siteId) {
+      throw new ServiceError('Пикет не принадлежит выбранному объекту', 400);
+    }
+  }
 }
 
 export async function validateAgainstSitePlans(
