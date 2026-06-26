@@ -31,9 +31,11 @@ export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
-  const { searchParams } = new URL(request.url);
+  // tenantId always comes from the session, never the query string — a
+  // query override would let any authenticated user read another tenant's
+  // billing/dashboard stats (IDOR).
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  const tenantId = searchParams.get('tenantId') || user!.tenantId;
+  const tenantId = user!.tenantId;
 
   if (!tenantId) {
     return createJsonResponse({ error: 'tenantId required' }, { status: 400 }, requestId);
@@ -62,7 +64,12 @@ export const POST = withMutation(async (request: NextRequest) => {
   }
 
   const body = await request.json();
-  const { tenantId, action, planId } = body;
+  const { action, planId } = body;
+  // tenantId from the session, not the body — ADMIN is tenant-scoped in this
+  // app, not a platform-wide role; a body override would let one tenant's
+  // admin activate/cancel another tenant's subscription (IDOR).
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+  const tenantId = user!.tenantId;
 
   if (!tenantId) {
     return createJsonResponse({ error: 'tenantId required' }, { status: 400 }, requestId);

@@ -4,13 +4,15 @@ import { ServiceError } from '@/services/service-error';
 import { assertCanAccessReportOwner, ensureTenantAccess } from '@/services/auth/resource-access-service';
 import { generateSinglePdf } from '@/lib/pdf-generator';
 import { loadSingleReportPdfContext } from '@/lib/pdf-data';
-import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-queue';
+import { enqueuePdfGeneration, getPdfJobStatus, getPdfJobOwnerId, downloadPdf } from '@/lib/pdf-queue';
 import { getRequestId } from '@/lib/request-context';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { logger } from '@/lib/logger';
 import { withApi, withMutation } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ============================================================
 // POST — Enqueue async single PDF generation (default)
@@ -134,6 +136,18 @@ export const GET = withApi(async (request: NextRequest) => {
       { error: 'jobId required for async mode. Use POST to enqueue.' },
       { status: 400 }
     );
+  }
+
+  if (!UUID_RE.test(jobId)) {
+    return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+  }
+
+  // A single-report PDF belongs to the operator who triggered it — only
+  // they (or someone with reports.read_cross_user) may poll/download it.
+  const ownerId = await getPdfJobOwnerId(jobId);
+  if (ownerId) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    assertCanAccessReportOwner(user!, ownerId, 'reports.read_cross_user');
   }
 
   if (action === 'status') {

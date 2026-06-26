@@ -12,6 +12,8 @@ import { withApi, withMutation } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ============================================================
 // POST — Enqueue async PDF generation (default)
 // ============================================================
@@ -140,6 +142,17 @@ export const GET = withApi(async (request: NextRequest) => {
       { status: 400 }
     );
   }
+
+  // jobId is a UUID we generate ourselves at enqueue time — reject anything
+  // else outright. Closes both enumeration (BullMQ's old default jobId was
+  // a small sequential int) and path traversal (jobId flows into a file
+  // path / S3 key in pdf-generator/storage.ts).
+  if (!UUID_RE.test(jobId)) {
+    return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+  assertCan(user!, 'reports.read_all');
 
   if (action === 'status') {
     return handleJobStatus(jobId);

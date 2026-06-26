@@ -14,6 +14,7 @@
  *   const pdfBuffer = await downloadPdf(jobId);
  */
 
+import { randomUUID } from 'crypto';
 import { Queue, Job, QueueEvents } from 'bullmq';
 import { Redis } from 'ioredis';
 import { readPdfResult } from '@/lib/pdf-generator';
@@ -160,14 +161,26 @@ export async function enqueuePdfGeneration(jobData: PdfJobData): Promise<string 
 
   try {
     const queue = getQueue();
+    // Explicit UUID jobId — BullMQ's auto-generated default is a small
+    // sequential integer, which makes status/download trivially enumerable.
     const job = await queue.add(QUEUE_NAME, jobData, {
-      jobId: undefined,
+      jobId: randomUUID(),
     });
     return job.id as string;
   } catch (err) {
     logger.error('PDF Queue: failed to enqueue job', err);
     return null;
   }
+}
+
+/**
+ * Resolve who enqueued a job — for ownership checks before exposing its
+ * status/result to a different caller. Returns null if the job doesn't
+ * exist (e.g. expired past the TTL).
+ */
+export async function getPdfJobOwnerId(jobId: string): Promise<string | null> {
+  const job = await Job.fromId(getQueue(), jobId);
+  return job?.data?.userId ?? null;
 }
 
 /**
