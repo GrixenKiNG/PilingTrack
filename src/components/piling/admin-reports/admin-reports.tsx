@@ -458,20 +458,13 @@ function EvidenceSummary({ reportCount, totals, photoCount }: { reportCount: num
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       {items.map((item) => (
-        <div key={item.label} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div key={item.label} className="kpi-animated rounded-lg border p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-slate-500">{item.label}</span>
-            <item.icon className={cn(
-              'h-4 w-4',
-              item.tone === 'orange' && 'text-orange-500',
-              item.tone === 'blue' && 'text-blue-500',
-              item.tone === 'amber' && 'text-amber-500',
-              item.tone === 'emerald' && 'text-emerald-500',
-              item.tone === 'slate' && 'text-slate-400',
-            )} />
+            <span className="text-xs font-medium text-white/80">{item.label}</span>
+            <item.icon className="h-4 w-4 text-white/90" />
           </div>
-          <p className="font-mono text-xl font-bold tabular-nums text-slate-950">{item.value}</p>
-          <p className="mt-0.5 text-3xs text-slate-400">{item.detail}</p>
+          <p className="font-mono text-xl font-bold tabular-nums text-white">{item.value}</p>
+          <p className="mt-0.5 text-3xs text-white/70">{item.detail}</p>
         </div>
       ))}
     </div>

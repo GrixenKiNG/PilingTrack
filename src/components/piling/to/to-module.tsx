@@ -497,19 +497,16 @@ function KpiCard({
   value: string | number;
   tone?: 'blue' | 'amber' | 'red' | 'green';
 }) {
-  const toneClass = {
-    blue: 'text-blue-600',
-    amber: 'text-orange-500',
-    red: 'text-red-500',
-    green: 'text-emerald-600',
-  }[tone];
+  // tone retained for call-site clarity; all KPI tiles use the shared animated
+  // gradient (.kpi-animated) for a consistent look.
+  void tone;
 
   return (
-    <div className="flex h-[74px] items-center gap-3 rounded-lg border border-slate-200 bg-white px-4">
-      <Icon className={cn('h-7 w-7 shrink-0', toneClass)} strokeWidth={1.8} />
+    <div className="kpi-animated flex h-[74px] items-center gap-3 rounded-lg border px-4">
+      <Icon className="h-7 w-7 shrink-0 text-white/90" strokeWidth={1.8} />
       <div>
-        <div className="font-mono text-2xl font-bold text-slate-950">{value}</div>
-        <div className="text-xs text-slate-500">{label}</div>
+        <div className="font-mono text-2xl font-bold text-white">{value}</div>
+        <div className="text-xs text-white/80">{label}</div>
       </div>
     </div>
   );

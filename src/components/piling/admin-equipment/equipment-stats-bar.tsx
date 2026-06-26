@@ -1,6 +1,5 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import type { FleetCard, FleetSnapshot } from './fleet-types';
 import { getMaintenanceFlag } from './equipment-maintenance-flag';
 
@@ -28,9 +27,9 @@ export function EquipmentStatsBar({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {metrics.map((metric) => (
-        <div key={metric.label} className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="text-xs text-slate-500">{metric.label}</div>
-          <div className={cn('mt-1 text-2xl font-bold', metric.tone ?? 'text-slate-900')}>
+        <div key={metric.label} className="kpi-animated rounded-xl border p-4">
+          <div className="text-xs text-white/80">{metric.label}</div>
+          <div className="mt-1 text-2xl font-bold text-white">
             {metric.value}
           </div>
         </div>

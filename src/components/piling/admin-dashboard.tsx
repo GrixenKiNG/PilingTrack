@@ -426,48 +426,29 @@ export function AdminDashboard() {
 }
 
 type KpiTone = 'blue' | 'emerald' | 'teal' | 'amber' | 'violet' | 'red';
-const KPI_CARD: Record<KpiTone, string> = {
-  blue: 'bg-blue-50 border-blue-200', emerald: 'bg-emerald-50 border-emerald-200',
-  teal: 'bg-teal-50 border-teal-200', amber: 'bg-amber-50 border-amber-200',
-  violet: 'bg-violet-50 border-violet-200', red: 'bg-red-50 border-red-200',
-};
-const KPI_ICON: Record<KpiTone, string> = {
-  blue: 'bg-blue-100 text-blue-700', emerald: 'bg-emerald-100 text-emerald-700',
-  teal: 'bg-teal-100 text-teal-700', amber: 'bg-amber-100 text-amber-700',
-  violet: 'bg-violet-100 text-violet-700', red: 'bg-red-100 text-red-700',
-};
-const KPI_VALUE: Record<KpiTone, string> = {
-  blue: 'text-blue-900', emerald: 'text-emerald-900', teal: 'text-teal-900',
-  amber: 'text-amber-900', violet: 'text-violet-900', red: 'text-red-900',
-};
-const KPI_LABEL: Record<KpiTone, string> = {
-  blue: 'text-blue-700', emerald: 'text-emerald-700', teal: 'text-teal-700',
-  amber: 'text-amber-700', violet: 'text-violet-700', red: 'text-red-700',
-};
-const KPI_BAR: Record<KpiTone, string> = {
-  blue: 'bg-blue-500', emerald: 'bg-emerald-500', teal: 'bg-teal-500',
-  amber: 'bg-amber-500', violet: 'bg-violet-500', red: 'bg-red-500',
-};
 
-function KpiTile({ icon: Icon, tone, label, value, sub, progress }: {
+// All KPI tiles share the animated cycling gradient (see .kpi-animated in
+// globals.css) for a lively, consistent look matching the operator CTA. `tone`
+// is retained on the props for call-site clarity but no longer drives colour.
+function KpiTile({ icon: Icon, label, value, sub, progress }: {
   icon: LucideIcon; tone: KpiTone; label: string; value: ReactNode; sub?: string; progress?: number;
 }) {
   return (
-    <div className={cn('min-w-0 rounded-xl border px-4 py-4 shadow-sm', KPI_CARD[tone])}>
+    <div className="kpi-animated min-w-0 rounded-xl border px-4 py-4 shadow-sm">
       <div className="flex items-start gap-3.5">
-        <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-lg', KPI_ICON[tone])}>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white">
           <Icon className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className={cn('text-xs font-medium', KPI_LABEL[tone])}>{label}</div>
-          <div className={cn('mt-1 truncate font-mono text-xl font-semibold leading-tight 2xl:text-2xl', KPI_VALUE[tone])}>{value}</div>
-          {sub && <div className={cn('mt-1 truncate text-xs', KPI_LABEL[tone])}>{sub}</div>}
+          <div className="text-xs font-medium text-white/80">{label}</div>
+          <div className="mt-1 truncate font-mono text-xl font-semibold leading-tight text-white 2xl:text-2xl">{value}</div>
+          {sub && <div className="mt-1 truncate text-xs text-white/70">{sub}</div>}
           {progress != null && (
             <div className="mt-3 flex items-center gap-2">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/70">
-                <div className={cn('h-full rounded-full', KPI_BAR[tone])} style={{ width: `${clampPct(progress)}%` }} />
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/30">
+                <div className="h-full rounded-full bg-white" style={{ width: `${clampPct(progress)}%` }} />
               </div>
-              <span className={cn('font-mono text-xs', KPI_LABEL[tone])}>{Math.round(clampPct(progress))}%</span>
+              <span className="font-mono text-xs text-white/90">{Math.round(clampPct(progress))}%</span>
             </div>
           )}
         </div>
