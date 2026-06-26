@@ -42,11 +42,31 @@ jobs:
         env:
           SERVICES: ${{ inputs.services }}
         run: |
-          ssh -i ~/.ssh/id user1@87.242.102.125 \
-            "cd /opt/pilingtrack \
-             && git pull origin main \
-             && docker compose build $SERVICES \
-             && docker compose up -d $SERVICES"
+          # $SERVICES expands here (runner); \$VARS evaluate on the prod host.
+          ssh -i ~/.ssh/id user1@87.242.102.125 "
+            set -e
+            cd /opt/pilingtrack
+            BEFORE=\$(git rev-parse HEAD)
+            git pull origin main
+            SVCS=\"$SERVICES\"
+            # A new Prisma migration means the 'migrate' image must be rebuilt
+            # too — it bakes prisma/migrations at build time, so building only
+            # app/workers would run 'migrate deploy' on a stale image and
+            # silently skip the migration (runbook 008). Auto-include it.
+            if git diff --name-only --diff-filter=A \"\$BEFORE\"..HEAD -- 'prisma/migrations/**' | grep -q .; then
+              echo '>> New migration detected — adding migrate to the build set'
+              SVCS=\"migrate \$SVCS\"
+            fi
+            df -h /
+            # Build sequentially with a prune between — a parallel build fills
+            # the 30 GB VPS disk to 100% (reference_prod_deploy_disk).
+            for s in \$SVCS; do
+              echo \">> Building \$s\"
+              docker compose build \"\$s\"
+              docker builder prune -f || true
+            done
+            docker compose up -d \$SVCS
+          "
 
       - name: Verify health
         run: |
