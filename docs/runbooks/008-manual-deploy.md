@@ -30,6 +30,10 @@ docker image prune -af     # frees more if old images linger
 # 2. Pull
 git pull origin main
 git log -1 --oneline       # confirm expected HEAD
+
+# 3. Export the commit so /api/health reports it (see Dockerfile ARG
+# APP_VERSION) instead of the static package.json version.
+export APP_VERSION=$(git rev-parse --short HEAD)
 ```
 
 ## Deploy

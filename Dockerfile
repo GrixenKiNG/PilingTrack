@@ -70,6 +70,12 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# Build-time git ref, passed in via `docker compose build --build-arg
+# APP_VERSION=$(git rev-parse --short HEAD)` (see deploy runbook). Lets
+# /api/health report which commit is actually running, instead of the
+# static package.json version that doesn't change per-deploy.
+ARG APP_VERSION=unknown
+ENV APP_VERSION=$APP_VERSION
 ENV NODE_ENV=production
 ENV PORT=3000
 # Next.js standalone server defaults to binding the container hostname only.

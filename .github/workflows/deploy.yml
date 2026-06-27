@@ -48,6 +48,7 @@ jobs:
             cd /opt/pilingtrack
             BEFORE=\$(git rev-parse HEAD)
             git pull origin main
+            export APP_VERSION=\$(git rev-parse --short HEAD)
             SVCS=\"$SERVICES\"
             # A new Prisma migration means the 'migrate' image must be rebuilt
             # too — it bakes prisma/migrations at build time, so building only

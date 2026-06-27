@@ -59,6 +59,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
+      args:
+        APP_VERSION: ${APP_VERSION:-unknown}
     container_name: pilingtrack-app
     restart: unless-stopped
     ports:
