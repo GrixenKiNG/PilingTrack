@@ -31,39 +31,37 @@ Defaults: nightly 03:30 (±10 min jitter), 30-day retention, dumps in
 
 ## Off-site copy (Cloudflare R2)
 
-Every nightly dump is also pushed to a Cloudflare R2 bucket via `rclone`,
-so a VPS-level disaster (datacenter incident, account suspension, disk
+Every nightly dump is also pushed to Cloudflare R2 via `rclone`, so a
+VPS-level disaster (datacenter incident, account suspension, disk
 corruption beyond the LVM layer) doesn't take the backups down with it.
 A failed off-site push only logs a warning — it never fails the local
 backup job.
 
-**One-time setup:**
+**No separate setup needed** — this reuses the same R2 credentials the
+app already uses for photo storage (`S3_ENDPOINT`/`S3_BUCKET`/
+`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` in `/opt/pilingtrack/.env`,
+bucket `pilingtrack`). Dumps land under `db-backups/` in that same
+bucket, next to the `media/` prefix the app writes photos to. Confirmed
+2026-06-27 that the existing token can write there (it's scoped to the
+bucket, not account-admin, so rclone needs `--s3-no-check-bucket` —
+already set in the script).
 
-1. Cloudflare dashboard → R2 → create a bucket, e.g. `pilingtrack-backups`.
-2. R2 → Manage API tokens → create a token scoped to that bucket with
-   Object Read & Write permission. Note the **Access Key ID**, **Secret
-   Access Key**, and your **Account ID** (shown on the R2 overview page).
-3. Install rclone on the VPS (one time):
-   ```bash
-   ssh -i ~/.ssh/orionpiling user1@87.242.102.125
-   curl https://rclone.org/install.sh | sudo bash
-   ```
-4. Add the credentials to `/opt/pilingtrack/.env` (same file the backup
-   timer already reads — see `deploy/systemd/pilingtrack-backup.service`):
-   ```bash
-   R2_BUCKET=pilingtrack-backups
-   R2_ACCOUNT_ID=<your Cloudflare account id>
-   R2_ACCESS_KEY_ID=<access key id>
-   R2_SECRET_ACCESS_KEY=<secret access key>
-   ```
-5. Test it manually:
-   ```bash
-   cd /opt/pilingtrack
-   ENV_FILE=.env BACKUP_DIR=/var/backups/pilingtrack bash scripts/backup-postgres.sh
-   ```
-   Look for `✓ Off-site copy OK: R2:pilingtrack-backups/...` in the output.
-   If `R2_BUCKET` is unset the script logs "Off-site copy skipped" and
-   exits 0 — that's the safe default until the four env vars above exist.
+**One-time setup (just install rclone):**
+
+```bash
+ssh -i ~/.ssh/orionpiling user1@87.242.102.125
+curl https://rclone.org/install.sh | sudo bash
+```
+
+Then test it manually:
+```bash
+cd /opt/pilingtrack
+ENV_FILE=.env BACKUP_DIR=/var/backups/pilingtrack bash scripts/backup-postgres.sh
+```
+Look for `✓ Off-site copy OK: R2:pilingtrack/db-backups/...` in the output.
+If any of the four `S3_*` vars are missing from `.env`, the script logs
+"Off-site copy skipped" and exits 0 — but on this VPS they're already
+set (the app needs them for photos), so the only missing piece is rclone.
 
 ---
 
@@ -75,8 +73,8 @@ journalctl -u pilingtrack-backup.service --since "yesterday" | tail -20
 ```
 
 A dump for *today* should exist, log line `✓ Backup complete: <size>`
-must be present, followed by `✓ Off-site copy OK: ...` (once R2 is
-configured — see "Off-site copy" above). A `WARNING: off-site copy to
+must be present, followed by `✓ Off-site copy OK: ...` (once rclone is
+installed — see "Off-site copy" above). A `WARNING: off-site copy to
 R2 failed` line means the local dump is fine but R2 needs attention.
 
 ---

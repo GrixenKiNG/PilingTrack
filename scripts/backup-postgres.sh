@@ -60,27 +60,36 @@ find "$BACKUP_DIR" -name "${POSTGRES_DB}-*.sql.gz" -mtime "+${RETENTION_DAYS}" -
 
 echo "✓ Backup complete: $(du -h "$OUT" | cut -f1)"
 
-# Optional off-site copy to Cloudflare R2 (S3-compatible) via rclone.
-# Configure by adding R2_BUCKET, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
-# R2_SECRET_ACCESS_KEY to $ENV_FILE. See docs/runbooks/006-postgres-backup-restore.md.
-# A failed off-site copy is a warning, not a hard failure — the local dump
-# already succeeded and that's what matters for the exit code.
-R2_BUCKET="$(grep -E '^R2_BUCKET=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
-if [ -z "$R2_BUCKET" ]; then
-  echo "Off-site copy skipped (R2_BUCKET not set in $ENV_FILE)"
+# Optional off-site copy via rclone, reusing the SAME S3-compatible
+# credentials the app already uses for photo storage (S3_BUCKET/
+# S3_ENDPOINT/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY in $ENV_FILE —
+# Cloudflare R2 in prod, bucket "pilingtrack"). No separate backup
+# credentials needed. Dumps land under db-backups/, alongside the
+# media/ prefix the app already writes to. A failed off-site copy is
+# a warning, not a hard failure — the local dump already succeeded
+# and that's what matters for the exit code.
+S3_ENDPOINT_VAL="$(grep -E '^S3_ENDPOINT=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+S3_BUCKET_VAL="$(grep -E '^S3_BUCKET=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+S3_ACCESS_KEY_ID_VAL="$(grep -E '^S3_ACCESS_KEY_ID=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+S3_SECRET_ACCESS_KEY_VAL="$(grep -E '^S3_SECRET_ACCESS_KEY=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+if [ -z "$S3_ENDPOINT_VAL" ] || [ -z "$S3_BUCKET_VAL" ] || [ -z "$S3_ACCESS_KEY_ID_VAL" ] || [ -z "$S3_SECRET_ACCESS_KEY_VAL" ]; then
+  echo "Off-site copy skipped (S3_ENDPOINT/S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY not all set in $ENV_FILE)"
 elif ! command -v rclone &> /dev/null; then
-  echo "WARNING: R2_BUCKET is set but rclone is not installed — off-site copy skipped" >&2
+  echo "WARNING: S3 storage is configured but rclone is not installed — off-site copy skipped" >&2
 else
-  R2_ACCOUNT_ID="$(grep -E '^R2_ACCOUNT_ID=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
   export RCLONE_CONFIG_R2_TYPE=s3
   export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
-  export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$(grep -E '^R2_ACCESS_KEY_ID=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
-  export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$(grep -E '^R2_SECRET_ACCESS_KEY=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
-  export RCLONE_CONFIG_R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+  export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID_VAL"
+  export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY_VAL"
+  export RCLONE_CONFIG_R2_ENDPOINT="$S3_ENDPOINT_VAL"
   export RCLONE_CONFIG_R2_REGION=auto
+  # The token is scoped to this one bucket (no bucket-admin rights), so
+  # skip rclone's HeadBucket/exists check — it 403s otherwise and every
+  # copy fails. Confirmed against prod's actual token 2026-06-27.
+  export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
 
-  if rclone copy "$OUT" "R2:${R2_BUCKET}/"; then
-    echo "✓ Off-site copy OK: R2:${R2_BUCKET}/$(basename "$OUT")"
+  if rclone copy "$OUT" "R2:${S3_BUCKET_VAL}/db-backups/"; then
+    echo "✓ Off-site copy OK: R2:${S3_BUCKET_VAL}/db-backups/$(basename "$OUT")"
   else
     echo "WARNING: off-site copy to R2 failed — local backup is still intact" >&2
   fi
