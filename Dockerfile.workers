@@ -44,7 +44,7 @@ RUN npx prisma generate --schema prisma/schema.prisma
 RUN npm run build
 
 # Prune dev dependencies
-RUN npm prune --production
+RUN npm prune --omit=dev
 
 # ============================================================
 # Stage 3: Worker Runner

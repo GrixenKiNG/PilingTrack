@@ -47,7 +47,7 @@ RUN npx esbuild src/core/realtime/server/index.ts \
 # Drop dev dependencies (esbuild/next/typescript/etc. were only needed for the
 # build above). The compiled bundle requires only the --external prod packages
 # at runtime, so the runner can ship the pruned tree instead of the full one.
-RUN npm prune --production
+RUN npm prune --omit=dev
 
 # Stage 3: Production — Minimal image with compiled JS
 FROM node:22-alpine AS runner
