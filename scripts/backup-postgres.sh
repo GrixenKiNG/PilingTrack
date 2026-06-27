@@ -58,7 +58,30 @@ fi
 # Retention sweep.
 find "$BACKUP_DIR" -name "${POSTGRES_DB}-*.sql.gz" -mtime "+${RETENTION_DAYS}" -delete
 
-# Optional: send to remote storage. Uncomment + tune as needed.
-# rclone copy "$OUT" remote:pilingtrack-backups/
-
 echo "✓ Backup complete: $(du -h "$OUT" | cut -f1)"
+
+# Optional off-site copy to Cloudflare R2 (S3-compatible) via rclone.
+# Configure by adding R2_BUCKET, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
+# R2_SECRET_ACCESS_KEY to $ENV_FILE. See docs/runbooks/006-postgres-backup-restore.md.
+# A failed off-site copy is a warning, not a hard failure — the local dump
+# already succeeded and that's what matters for the exit code.
+R2_BUCKET="$(grep -E '^R2_BUCKET=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+if [ -z "$R2_BUCKET" ]; then
+  echo "Off-site copy skipped (R2_BUCKET not set in $ENV_FILE)"
+elif ! command -v rclone &> /dev/null; then
+  echo "WARNING: R2_BUCKET is set but rclone is not installed — off-site copy skipped" >&2
+else
+  R2_ACCOUNT_ID="$(grep -E '^R2_ACCOUNT_ID=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+  export RCLONE_CONFIG_R2_TYPE=s3
+  export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+  export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$(grep -E '^R2_ACCESS_KEY_ID=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+  export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$(grep -E '^R2_SECRET_ACCESS_KEY=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+  export RCLONE_CONFIG_R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+  export RCLONE_CONFIG_R2_REGION=auto
+
+  if rclone copy "$OUT" "R2:${R2_BUCKET}/"; then
+    echo "✓ Off-site copy OK: R2:${R2_BUCKET}/$(basename "$OUT")"
+  else
+    echo "WARNING: off-site copy to R2 failed — local backup is still intact" >&2
+  fi
+fi

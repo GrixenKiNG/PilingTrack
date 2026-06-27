@@ -27,11 +27,43 @@ systemctl list-timers pilingtrack-backup.timer
 Defaults: nightly 03:30 (±10 min jitter), 30-day retention, dumps in
 `/var/backups/pilingtrack/pilingtrack-YYYYMMDD-HHMMSS.sql.gz`.
 
-> **Off-site copy is NOT configured.** Dumps live on the same VPS as
-> the database — if the VPS itself is lost (datacenter incident,
-> account suspension, disk corruption beyond the LVM layer), the
-> backups go with it. Wire `rclone` to an external bucket via the
-> commented hook in `scripts/backup-postgres.sh:62` when this matters.
+---
+
+## Off-site copy (Cloudflare R2)
+
+Every nightly dump is also pushed to a Cloudflare R2 bucket via `rclone`,
+so a VPS-level disaster (datacenter incident, account suspension, disk
+corruption beyond the LVM layer) doesn't take the backups down with it.
+A failed off-site push only logs a warning — it never fails the local
+backup job.
+
+**One-time setup:**
+
+1. Cloudflare dashboard → R2 → create a bucket, e.g. `pilingtrack-backups`.
+2. R2 → Manage API tokens → create a token scoped to that bucket with
+   Object Read & Write permission. Note the **Access Key ID**, **Secret
+   Access Key**, and your **Account ID** (shown on the R2 overview page).
+3. Install rclone on the VPS (one time):
+   ```bash
+   ssh -i ~/.ssh/orionpiling user1@87.242.102.125
+   curl https://rclone.org/install.sh | sudo bash
+   ```
+4. Add the credentials to `/opt/pilingtrack/.env` (same file the backup
+   timer already reads — see `deploy/systemd/pilingtrack-backup.service`):
+   ```bash
+   R2_BUCKET=pilingtrack-backups
+   R2_ACCOUNT_ID=<your Cloudflare account id>
+   R2_ACCESS_KEY_ID=<access key id>
+   R2_SECRET_ACCESS_KEY=<secret access key>
+   ```
+5. Test it manually:
+   ```bash
+   cd /opt/pilingtrack
+   ENV_FILE=.env BACKUP_DIR=/var/backups/pilingtrack bash scripts/backup-postgres.sh
+   ```
+   Look for `✓ Off-site copy OK: R2:pilingtrack-backups/...` in the output.
+   If `R2_BUCKET` is unset the script logs "Off-site copy skipped" and
+   exits 0 — that's the safe default until the four env vars above exist.
 
 ---
 
@@ -43,7 +75,9 @@ journalctl -u pilingtrack-backup.service --since "yesterday" | tail -20
 ```
 
 A dump for *today* should exist, log line `✓ Backup complete: <size>`
-must be present.
+must be present, followed by `✓ Off-site copy OK: ...` (once R2 is
+configured — see "Off-site copy" above). A `WARNING: off-site copy to
+R2 failed` line means the local dump is fine but R2 needs attention.
 
 ---
 
