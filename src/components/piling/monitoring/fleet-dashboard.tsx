@@ -4,10 +4,13 @@
  * FleetDashboard — live equipment status grid.
  *
  * Data:
- *   1. on mount, fetch /api/monitoring/fleet for the initial snapshot.
+ *   1. on mount, fetch /api/monitoring/fleet for the initial snapshot
+ *      (allowed to hit the 30s response cache — fine for first paint).
  *   2. open the existing app WS connection; when a `report.*` event
  *      lands for an equipment we already know, refetch (cheap — single
- *      query, debounced).
+ *      query, debounced) with a cache-busting `_ts` param — otherwise a
+ *      WS push could land inside the 30s server cache window and the
+ *      "live" refetch would silently return stale data.
  *
  * No optimistic patching from the WS event payload itself — the
  * `report.created/updated/submitted` events carry only event-local
@@ -16,23 +19,29 @@
  * less code and avoids drift between WS state and server state.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatHours, formatFixed, formatRuDate } from '@/lib/format';
+import { authFetch } from '@/lib/api';
+import { formatHours, formatFixed, formatRelative, formatRuDate } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
+import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 
 type EquipmentStatus = 'active' | 'expected' | 'idle';
+type SortBy = 'status' | 'name' | 'lastReport';
 
 interface FleetCard {
   id: string;
   name: string;
   model: string;
   manufactureYear: number | null;
+  assignedSiteId: string | null;
+  assignedSiteName: string | null;
   status: EquipmentStatus;
   todaysReports: number;
-  todayTotals: { piles: number; drillingMeters: number; downtimeHours: number } | null;
+  todayTotals: { piles: number; pileMeters: number; drillingMeters: number; downtimeHours: number } | null;
   latestReport: {
     date: string;
     siteName: string | null;
@@ -53,22 +62,50 @@ interface FleetSnapshot {
     pilesToday: number;
     drillingToday: number;
     downtimeHoursToday: number;
+    crewsOnShiftToday: number;
+    operatorsOnShiftToday: number;
   };
   equipment: FleetCard[];
 }
 
 type Connection = 'connecting' | 'live' | 'offline';
 
+const STATUS_RANK: Record<EquipmentStatus, number> = { active: 0, expected: 1, idle: 2 };
+const MAX_RECONNECT_DELAY_MS = 30_000;
+
+function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
+  const sorted = [...cards];
+  if (sortBy === 'name') {
+    sorted.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  } else if (sortBy === 'lastReport') {
+    sorted.sort((a, b) => {
+      const at = a.latestReport?.updatedAt ?? '';
+      const bt = b.latestReport?.updatedAt ?? '';
+      return bt.localeCompare(at); // most recent first, no-report cards last
+    });
+  } else {
+    sorted.sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || a.name.localeCompare(b.name, 'ru'));
+  }
+  return sorted;
+}
+
 export function FleetDashboard() {
   const [snap, setSnap] = useState<FleetSnapshot | null>(null);
   const [conn, setConn] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
+  const [siteFilter, setSiteFilter] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('status');
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttempt = useRef(0);
 
-  const fetchSnapshot = useCallback(async () => {
+  const fetchSnapshot = useCallback(async (opts?: { bust?: boolean }) => {
     try {
-      const res = await fetch('/api/monitoring/fleet', { credentials: 'include' });
+      const url = opts?.bust
+        ? `/api/monitoring/fleet?_ts=${Date.now()}`
+        : '/api/monitoring/fleet';
+      const res = await authFetch(url);
       if (!res.ok) {
         setError(`Сервер вернул ${res.status}`);
         return;
@@ -86,7 +123,7 @@ export function FleetDashboard() {
   const scheduleRefetch = useCallback(() => {
     if (refetchTimer.current) clearTimeout(refetchTimer.current);
     refetchTimer.current = setTimeout(() => {
-      void fetchSnapshot();
+      void fetchSnapshot({ bust: true });
     }, 500);
   }, [fetchSnapshot]);
 
@@ -96,7 +133,9 @@ export function FleetDashboard() {
     void fetchSnapshot();
   }, [fetchSnapshot]);
 
-  // WebSocket subscription
+  // WebSocket subscription with exponential backoff reconnect — mobile
+  // dispatchers switching WiFi <-> 4G would otherwise go "offline" forever
+  // the first time the connection drops.
   useEffect(() => {
     // Explicit opt-in: only connect when NEXT_PUBLIC_WS_URL is set and non-empty.
     // Locally we don't run the ws server most of the time; falling back to the
@@ -108,37 +147,78 @@ export function FleetDashboard() {
       setConn('offline');
       return;
     }
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-    } catch {
-      setConn('offline');
-      return;
-    }
-    wsRef.current = ws;
 
-    ws.addEventListener('open', () => setConn('live'));
-    ws.addEventListener('close', () => setConn('offline'));
-    ws.addEventListener('error', () => setConn('offline'));
-    ws.addEventListener('message', (ev) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-      let msg: any;
+    let cancelled = false;
+
+    const connect = () => {
+      if (cancelled) return;
+      let ws: WebSocket;
       try {
-        msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
+        ws = new WebSocket(wsUrl);
       } catch {
+        setConn('offline');
         return;
       }
-      const eventType: string | undefined = msg?.type === 'event' ? msg?.event?.type : msg?.type;
-      if (typeof eventType === 'string' && eventType.startsWith('report.')) {
-        scheduleRefetch();
-      }
-    });
+      wsRef.current = ws;
+      setConn('connecting');
+
+      ws.addEventListener('open', () => {
+        reconnectAttempt.current = 0;
+        setConn('live');
+      });
+      ws.addEventListener('close', () => {
+        setConn('offline');
+        if (cancelled) return;
+        const delay = Math.min(1000 * 2 ** reconnectAttempt.current, MAX_RECONNECT_DELAY_MS);
+        reconnectAttempt.current += 1;
+        reconnectTimer.current = setTimeout(connect, delay);
+      });
+      ws.addEventListener('error', () => setConn('offline'));
+      ws.addEventListener('message', (ev) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+        let msg: any;
+        try {
+          msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
+        } catch {
+          return;
+        }
+        const eventType: string | undefined = msg?.type === 'event' ? msg?.event?.type : msg?.type;
+        if (typeof eventType === 'string' && eventType.startsWith('report.')) {
+          scheduleRefetch();
+        }
+      });
+    };
+
+    connect();
 
     return () => {
-      ws.close();
+      cancelled = true;
+      wsRef.current?.close();
       if (refetchTimer.current) clearTimeout(refetchTimer.current);
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
     };
   }, [scheduleRefetch]);
+
+  const siteOptions = useMemo(() => {
+    if (!snap) return [];
+    const seen = new Map<string, string>();
+    for (const c of snap.equipment) {
+      if (c.assignedSiteId && !seen.has(c.assignedSiteId)) {
+        seen.set(c.assignedSiteId, c.assignedSiteName ?? c.assignedSiteId);
+      }
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1], 'ru'));
+  }, [snap]);
+
+  const visibleCards = useMemo(() => {
+    if (!snap) return [];
+    const filtered = siteFilter
+      ? snap.equipment.filter((c) => c.assignedSiteId === siteFilter)
+      : snap.equipment;
+    return sortCards(filtered, sortBy);
+  }, [snap, siteFilter, sortBy]);
+
+  const showSkeleton = useMinSkeletonDuration(!snap && !error);
 
   // ---------------------------------------------------------------
   // Render
@@ -154,28 +234,66 @@ export function FleetDashboard() {
     );
   }
 
-  if (!snap) {
-    return <div className="p-6 text-sm text-muted-foreground">Загрузка…</div>;
+  if (showSkeleton || !snap) {
+    return (
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-36 w-full rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <StatusBar snap={snap} conn={conn} />
 
+      {snap.equipment.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {siteOptions.length > 1 && (
+            <select
+              className={selectCls}
+              value={siteFilter}
+              onChange={(e) => setSiteFilter(e.target.value)}
+            >
+              <option value="">Все объекты</option>
+              {siteOptions.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+          )}
+          <select
+            className={selectCls}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+          >
+            <option value="status">Сначала активные</option>
+            <option value="name">По названию</option>
+            <option value="lastReport">По последнему отчёту</option>
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-        {snap.equipment.map((card) => (
+        {visibleCards.map((card) => (
           <EquipmentCardView key={card.id} card={card} />
         ))}
       </div>
 
-      {snap.equipment.length === 0 && (
+      {visibleCards.length === 0 && (
         <div className="rounded-xl border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-          Нет доступной техники.
+          {siteFilter ? 'Нет техники на этом объекте.' : 'Нет доступной техники.'}
         </div>
       )}
     </div>
   );
 }
+
+const selectCls =
+  'rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15';
 
 // ----------------------------------------------------------------------------
 
@@ -189,21 +307,26 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
             {snap.totals.activeToday} <span className="text-muted-foreground">из {snap.totals.totalEquipment} в работе</span>
           </div>
         </div>
-        <div className={cn(
-          'rounded-full px-2.5 py-1 text-3xs uppercase tracking-wide',
-          conn === 'live' && 'bg-emerald-100 text-emerald-700',
-          conn === 'connecting' && 'bg-amber-100 text-amber-700',
-          conn === 'offline' && 'bg-rose-100 text-rose-700',
-        )}>
-          {conn === 'live' ? 'live' : conn === 'connecting' ? '…' : 'offline'}
+        <div className="flex flex-col items-end gap-1">
+          <div className={cn(
+            'rounded-full px-2.5 py-1 text-3xs uppercase tracking-wide',
+            conn === 'live' && 'bg-emerald-100 text-emerald-700',
+            conn === 'connecting' && 'bg-amber-100 text-amber-700',
+            conn === 'offline' && 'bg-rose-100 text-rose-700',
+          )}>
+            {conn === 'live' ? 'live' : conn === 'connecting' ? '…' : 'offline'}
+          </div>
+          <div className="text-3xs text-muted-foreground">обновлено {formatRelative(snap.asOf)}</div>
         </div>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <dl className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <Metric label="Свай" value={snap.totals.pilesToday} />
         <Metric label="Бурения, м" value={formatFixed(snap.totals.drillingToday, 1)} />
         <Metric label="Простой" value={formatHours(snap.totals.downtimeHoursToday)} />
         <Metric label="Ждём отчёт" value={snap.totals.expected} muted />
+        <Metric label="Бригад на смене" value={snap.totals.crewsOnShiftToday} muted />
+        <Metric label="Операторов на смене" value={snap.totals.operatorsOnShiftToday} muted />
       </dl>
     </div>
   );
@@ -261,7 +384,7 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
             <RowKV label="Оператор" value={card.latestReport.operatorName ?? '—'} />
             {card.status === 'active' && card.todayTotals ? (
               <>
-                <RowKV label="Свай" value={String(card.todayTotals.piles)} />
+                <RowKV label="Свай" value={`${card.todayTotals.piles} (${formatFixed(card.todayTotals.pileMeters, 1)} м.п.)`} />
                 <RowKV label="Бурение, м" value={formatFixed(card.todayTotals.drillingMeters, 1)} />
                 {card.todayTotals.downtimeHours > 0 && (
                   <RowKV label="Простой" value={formatHours(card.todayTotals.downtimeHours)} />

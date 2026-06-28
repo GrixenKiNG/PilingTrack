@@ -43,6 +43,7 @@ export interface FleetCard {
   engineHoursTotal: number | null;
   nextMaintenanceDate: string | null;
   nextMaintenanceAtHours: number | null;
+  assignedSiteId: string | null;
   assignedSiteName: string | null;
   assignedOperatorName: string | null;
   assignedCrewName: string | null;
@@ -143,7 +144,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
         select: {
           name: true,
           operator: { select: { name: true } },
-          site: { select: { name: true } },
+          site: { select: { id: true, name: true } },
         },
       },
       maintenanceRecords: {
@@ -287,6 +288,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       engineHoursTotal: eq.engineHoursTotal,
       nextMaintenanceDate: eq.nextMaintenanceDate?.toISOString() ?? null,
       nextMaintenanceAtHours: eq.nextMaintenanceAtHours,
+      assignedSiteId: activeCrew?.site?.id ?? null,
       assignedSiteName: activeCrew?.site?.name ?? null,
       assignedOperatorName: activeCrew?.operator?.name ?? null,
       assignedCrewName: activeCrew?.name ?? null,

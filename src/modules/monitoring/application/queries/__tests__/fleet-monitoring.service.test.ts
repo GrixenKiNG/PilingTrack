@@ -134,7 +134,7 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
           {
             name: 'Бригада Андреева',
             operator: { name: 'Иван Петров' },
-            site: { name: 'ЖК Северный' },
+            site: { id: 'site-1', name: 'ЖК Северный' },
           },
         ],
         maintenanceRecords: [],
@@ -167,6 +167,7 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
     const snap = await getFleetSnapshot({ tenantId: 'orion' });
     const card = snap.equipment[0];
 
+    expect(card.assignedSiteId).toBe('site-1');
     expect(card.assignedSiteName).toBe('ЖК Северный');
     expect(card.assignedCrewName).toBe('Бригада Андреева');
     expect(card.assignedOperatorName).toBe('Иван Петров');
