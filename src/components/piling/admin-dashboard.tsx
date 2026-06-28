@@ -11,9 +11,13 @@
  *   /api/maintenance      — наряды ТО (ремонт / требует ТО / просрочено, «сейчас»)
  *   /api/reports/recent   — сегодняшние отчёты (для риска «без фото»)
  *
- * Период (Сегодня / 7 дней / Период) влияет ТОЛЬКО на производственные числа из
- * аналитики (сваи, бурение, простой, объекты, план-факт). Операционные показатели
- * (отчёты, установки, ТО, бригады, риски) — это состояние «сейчас» и период игнорируют.
+ * Период (Весь период / Сегодня / 7 дней / Период) влияет ТОЛЬКО на
+ * производственные числа из аналитики (сваи, бурение, простой, объекты,
+ * план-факт). Операционные показатели (отчёты, установки, ТО, бригады,
+ * риски) — это состояние «сейчас» и период игнорируют. Дефолт — «Весь
+ * период» (накопительно с начала), а не «Сегодня»: диспетчер открывает
+ * дашборд не только утром смены, а в любой момент, и пустой «сегодня» до
+ * первого отчёта выглядит как «ничего не сделано».
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -82,9 +86,10 @@ const TONE_TAG: Record<Tone, string> = {
 interface Risk { id: string; tone: Tone; icon: LucideIcon; text: string; hint: string; href: string; rig?: string; site?: string | null }
 
 // ── Period helpers ────────────────────────────────────────────────────────
-type PeriodMode = 'today' | '7d' | 'custom';
+type PeriodMode = 'all' | 'today' | '7d' | 'custom';
 function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; to: string } {
   const today = getTodayInTimezone();
+  if (mode === 'all') return { from: '', to: '' }; // no bounds — loadAnalytics omits dateFrom/dateTo, server defaults to all-time
   if (mode === '7d') {
     const d = new Date(today); d.setDate(d.getDate() - 6);
     return { from: d.toISOString().slice(0, 10), to: today };
@@ -104,8 +109,9 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Filters
-  const [periodMode, setPeriodMode] = useState<PeriodMode>('today');
+  // Filters. Default 'all' — dispatcher opens the dashboard to a cumulative
+  // (since-the-start) picture first; "Сегодня" is an explicit, secondary choice.
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [siteFilter, setSiteFilter] = useState('all');
@@ -117,7 +123,9 @@ export function AdminDashboard() {
   const loadAnalytics = useCallback(async () => {
     setLoading(true); setLoadError(null);
     try {
-      const params = new URLSearchParams({ dateFrom: range.from, dateTo: range.to });
+      const params = new URLSearchParams();
+      if (range.from) params.set('dateFrom', range.from);
+      if (range.to) params.set('dateTo', range.to);
       if (siteFilter !== 'all') params.set('siteId', siteFilter);
       const res = await authFetch(`/api/analytics/sites?${params.toString()}`);
       if (!res.ok) throw new Error('analytics');
@@ -317,7 +325,7 @@ export function AdminDashboard() {
         {/* Фильтры: период + Объект + Установка */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex overflow-hidden rounded-md border border-slate-200">
-            {([['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Период']] as const).map(([m, label]) => (
+            {([['all', 'Весь период'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Период']] as const).map(([m, label]) => (
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
                 className={cn('px-2.5 py-1 text-xs font-medium', periodMode === m ? 'bg-blue-50 text-blue-700' : 'bg-white text-slate-500 hover:bg-slate-50')}>
                 {label}
