@@ -75,8 +75,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 
-# Install tsx for running TypeScript directly
-RUN npm install -g tsx
+# tsx is a devDependency, pruned out of node_modules above. Reinstall it
+# locally (not -g — a global install isn't tracked by package-lock.json or
+# `npm audit`) so `npx tsx` below resolves the project's pinned version.
+COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
+RUN npm install --no-save --prefer-offline --no-audit tsx
 
 # Own the /app dir itself (its contents are already nextjs-owned via COPY --chown).
 # Without this, the local-fallback PDF path (savePdfBuffer → cwd/storage when S3
@@ -98,4 +101,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 EXPOSE 3002
 
 # Start all workers (can override via ENABLED_WORKERS env var)
-CMD ["tsx", "src/workers/unified-worker.ts"]
+CMD ["npx", "tsx", "src/workers/unified-worker.ts"]

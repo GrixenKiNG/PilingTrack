@@ -131,6 +131,9 @@ async function main(): Promise<void> {
     logger.error('Uncaught exception in unified worker', {
       error: error.message,
     });
+    // Node's state is undefined after an uncaught exception — exit and let
+    // Docker restart the container rather than keep running degraded.
+    process.exit(1);
   });
 
   process.on('unhandledRejection', (reason) => {

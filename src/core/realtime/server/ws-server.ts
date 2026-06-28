@@ -21,7 +21,7 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { ClientManager } from './client-manager';
 import { canSubscribe, getDefaultChannels } from './channel-router';
-import { authenticateWS } from './auth';
+import { authenticateWS, validateWSOrigin, sendAuthError } from './auth';
 import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
 import { logger } from '@/lib/logger';
 import { setWsConnectionCount, recordWorkerHeartbeat } from '@/core/observability/health-tracker';
@@ -70,6 +70,12 @@ export async function startWSServer(): Promise<ServerHandle> {
   // ============================================================
 
   wss.on('connection', async (ws, req) => {
+    // Reject cross-origin upgrade attempts before touching auth/DB.
+    if (!validateWSOrigin(req)) {
+      sendAuthError(ws, 403, 'Origin not allowed');
+      return;
+    }
+
     // Authenticate
     const auth = await authenticateWS(req);
 

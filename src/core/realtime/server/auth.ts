@@ -23,6 +23,24 @@ export interface WSAuthResult {
 }
 
 /**
+ * Validate the Origin header on a WebSocket upgrade request.
+ * Mirrors the HTTP CSRF check in lib/csrf-protection.ts: same-origin (Origin
+ * host === Host header) passes; an Origin present but pointing elsewhere is
+ * rejected. Missing Origin is allowed, same as the HTTP CSRF fallback, since
+ * non-browser clients (health checks, internal tooling) don't send one.
+ */
+export function validateWSOrigin(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Authenticate a WebSocket upgrade request.
  * Extracts session cookie, verifies token, returns user context.
  */

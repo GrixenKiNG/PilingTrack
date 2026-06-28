@@ -48,7 +48,7 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { authenticateWS } from '@/core/realtime/server/auth';
+import { authenticateWS, validateWSOrigin } from '@/core/realtime/server/auth';
 
 // ============================================================
 // Helpers
@@ -60,6 +60,12 @@ function createMockReq(headers: Record<string, string | undefined>): IncomingMes
 
   if (headers.cookie) {
     req.headers.cookie = headers.cookie;
+  }
+  if (headers.origin) {
+    req.headers.origin = headers.origin;
+  }
+  if (headers.host) {
+    req.headers.host = headers.host;
   }
 
   req.url = headers.url || '/';
@@ -241,6 +247,32 @@ describe('WebSocket Authentication', () => {
       const result = await authenticateWS(req);
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ============================================================
+  // Origin validation (S-4 audit fix)
+  // ============================================================
+
+  describe('validateWSOrigin', () => {
+    it('allows a same-origin request', () => {
+      const req = createMockReq({ origin: 'https://orionpiling.ru', host: 'orionpiling.ru' });
+      expect(validateWSOrigin(req)).toBe(true);
+    });
+
+    it('rejects a cross-origin request', () => {
+      const req = createMockReq({ origin: 'https://evil.example', host: 'orionpiling.ru' });
+      expect(validateWSOrigin(req)).toBe(false);
+    });
+
+    it('allows a missing Origin header (non-browser clients)', () => {
+      const req = createMockReq({ host: 'orionpiling.ru' });
+      expect(validateWSOrigin(req)).toBe(true);
+    });
+
+    it('rejects a malformed Origin header', () => {
+      const req = createMockReq({ origin: 'not-a-valid-url', host: 'orionpiling.ru' });
+      expect(validateWSOrigin(req)).toBe(false);
     });
   });
 });
