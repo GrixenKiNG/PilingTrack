@@ -91,6 +91,7 @@ describe('WebSocket Authentication', () => {
         role: 'OPERATOR',
         type: 'session',
         v: 1,
+        sv: 0,
       });
 
       mocks.dbUserFindUnique.mockResolvedValue({
@@ -100,6 +101,7 @@ describe('WebSocket Authentication', () => {
         role: 'OPERATOR',
         tenantId: 'tenant-1',
         isActive: true,
+        sessionVersion: 0,
       });
 
       mocks.dbUserSiteAssignmentFindMany.mockResolvedValue([
@@ -131,6 +133,7 @@ describe('WebSocket Authentication', () => {
         role: 'ADMIN',
         type: 'session',
         v: 1,
+        sv: 0,
       });
 
       mocks.dbUserFindUnique.mockResolvedValue({
@@ -140,6 +143,7 @@ describe('WebSocket Authentication', () => {
         role: 'ADMIN',
         tenantId: 'tenant-1',
         isActive: true,
+        sessionVersion: 0,
       });
 
       mocks.dbUserSiteAssignmentFindMany.mockResolvedValue([]);
@@ -244,6 +248,36 @@ describe('WebSocket Authentication', () => {
       mocks.dbUserFindUnique.mockResolvedValue(null);
 
       const req = createMockReq({ cookie: 'pt-session=orphaned-token' });
+      const result = await authenticateWS(req);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when sessionVersion does not match (force-logout revoked the token)', async () => {
+      // Token was issued with sv=0, but the user's password/PIN was changed
+      // since, bumping User.sessionVersion to 1 — the same revocation
+      // mechanism lib/auth.ts uses for HTTP requests must also kill WS.
+      mocks.verifySessionToken.mockResolvedValue({
+        sub: 'user-4',
+        email: 'revoked@example.com',
+        name: 'Revoked User',
+        role: 'OPERATOR',
+        type: 'session',
+        v: 1,
+        sv: 0,
+      });
+
+      mocks.dbUserFindUnique.mockResolvedValue({
+        id: 'user-4',
+        email: 'revoked@example.com',
+        name: 'Revoked User',
+        role: 'OPERATOR',
+        tenantId: 'tenant-1',
+        isActive: true,
+        sessionVersion: 1,
+      });
+
+      const req = createMockReq({ cookie: 'pt-session=stale-sv-token' });
       const result = await authenticateWS(req);
 
       expect(result).toBeNull();

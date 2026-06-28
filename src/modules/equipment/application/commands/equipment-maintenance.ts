@@ -85,10 +85,15 @@ export async function updateMaintenance(
 ) {
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, equipmentId: true, completedAt: true, startedAt: true, tenantId: true },
+    select: { id: true, equipmentId: true, completedAt: true, startedAt: true, tenantId: true, acceptedById: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
+  }
+  // Accepted records are a closed financial/audit record — acceptMaintenance
+  // is the deliberate "lock it" step; allowing edits afterwards defeats that.
+  if (existing.acceptedById) {
+    throw new ServiceError('Запись уже принята, изменения недоступны', 409);
   }
 
   const data: Record<string, unknown> = {};

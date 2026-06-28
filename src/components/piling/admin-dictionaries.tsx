@@ -108,16 +108,20 @@ export function AdminDictionaries() {
   };
 
   const setStatus = async (kind: DictionaryKind, item: RegistryItem, isActive: boolean) => {
-    const response = await authFetch('/api/dictionary/manage', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: kind, id: item.id, isActive }),
-    });
-    if (!response.ok) {
-      toast.error(await responseError(response, 'Не удалось изменить статус'));
-      return;
+    try {
+      const response = await authFetch('/api/dictionary/manage', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: kind, id: item.id, isActive }),
+      });
+      if (!response.ok) {
+        toast.error(await responseError(response, 'Не удалось изменить статус'));
+        return;
+      }
+      toast.success(isActive ? 'Восстановлено' : 'Архивировано');
+      await loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось изменить статус');
     }
-    toast.success(isActive ? 'Восстановлено' : 'Архивировано');
-    await loadData();
   };
 
   const saveLength = async () => {
@@ -146,17 +150,21 @@ export function AdminDictionaries() {
 
   const deleteItem = async () => {
     if (!confirmDelete) return;
-    const response = await authFetch('/api/dictionary/manage', {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: confirmDelete.kind, id: confirmDelete.item.id }),
-    });
-    if (!response.ok) {
-      toast.error(await responseError(response, 'Не удалось удалить'));
-      return;
+    try {
+      const response = await authFetch('/api/dictionary/manage', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: confirmDelete.kind, id: confirmDelete.item.id }),
+      });
+      if (!response.ok) {
+        toast.error(await responseError(response, 'Не удалось удалить'));
+        return;
+      }
+      toast.success('Элемент удалён');
+      setConfirmDelete(null);
+      await loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось удалить');
     }
-    toast.success('Элемент удалён');
-    setConfirmDelete(null);
-    await loadData();
   };
 
   if (loading) {

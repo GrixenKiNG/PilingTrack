@@ -115,6 +115,17 @@ describe('updateMaintenance — lifecycle transitions', () => {
     await updateMaintenance('eq_1', 'rec_1', { workDone: 'продули радиатор' }, { tenantId: 'orion', userId: 'usr_9' });
     expect(updateRecMock.mock.calls[0][0].data.workDone).toBe('продули радиатор');
   });
+
+  it('rejects edits to an already-accepted record', async () => {
+    findUniqueRecMock.mockResolvedValue({
+      id: 'rec_1', equipmentId: 'eq_1', completedAt: new Date(), startedAt: new Date(), tenantId: 'orion',
+      acceptedById: 'usr_admin',
+    });
+    await expect(
+      updateMaintenance('eq_1', 'rec_1', { cost: 999 }, { tenantId: 'orion', userId: 'usr_9' }),
+    ).rejects.toThrow('Запись уже принята');
+    expect(updateRecMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('acceptMaintenance — приёмка', () => {

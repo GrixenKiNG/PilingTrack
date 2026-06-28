@@ -180,24 +180,28 @@ export function MaintenanceBoard() {
 
   useEffect(() => {
     void (async () => {
-      const [assigneeRes, equipmentRes, sitesRes, crewsRes] = await Promise.all([
-        authFetch('/api/maintenance/assignees'),
-        authFetch('/api/equipment?limit=100'),
-        authFetch('/api/sites?limit=100'),
-        authFetch('/api/crews?limit=100'),
-      ]);
-      if (assigneeRes.ok) setAssignees(((await assigneeRes.json()).users ?? []) as AssigneeOption[]);
-      if (equipmentRes.ok) {
-        const data = await equipmentRes.json();
-        setEquipment((data.data ?? data.equipment ?? []) as EquipmentDTO[]);
-      }
-      if (sitesRes.ok) {
-        const data = await sitesRes.json();
-        setSites((data.data ?? data.sites ?? []) as SiteOption[]);
-      }
-      if (crewsRes.ok) {
-        const data = await crewsRes.json();
-        setCrews(((data.data ?? data.crews ?? []) as CrewAssignment[]).filter((crew) => crew.isActive));
+      try {
+        const [assigneeRes, equipmentRes, sitesRes, crewsRes] = await Promise.all([
+          authFetch('/api/maintenance/assignees'),
+          authFetch('/api/equipment?limit=100'),
+          authFetch('/api/sites?limit=100'),
+          authFetch('/api/crews?limit=100'),
+        ]);
+        if (assigneeRes.ok) setAssignees(((await assigneeRes.json()).users ?? []) as AssigneeOption[]);
+        if (equipmentRes.ok) {
+          const data = await equipmentRes.json();
+          setEquipment((data.data ?? data.equipment ?? []) as EquipmentDTO[]);
+        }
+        if (sitesRes.ok) {
+          const data = await sitesRes.json();
+          setSites((data.data ?? data.sites ?? []) as SiteOption[]);
+        }
+        if (crewsRes.ok) {
+          const data = await crewsRes.json();
+          setCrews(((data.data ?? data.crews ?? []) as CrewAssignment[]).filter((crew) => crew.isActive));
+        }
+      } catch {
+        toast.error('Не удалось загрузить фильтры (исполнители/установки/объекты/бригады)');
       }
     })();
   }, []);

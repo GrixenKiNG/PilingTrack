@@ -74,10 +74,14 @@ export async function authenticateWS(req: IncomingMessage): Promise<WSAuthResult
         role: true,
         tenantId: true,
         isActive: true,
+        sessionVersion: true,
       },
     });
 
-    if (!user || !user.isActive) {
+    // sessionVersion mirrors the check in lib/auth.ts — a password/PIN change
+    // or deactivation bumps it, which must kill live WS sessions too, not
+    // just future HTTP requests.
+    if (!user || !user.isActive || (payload.sv ?? 0) !== user.sessionVersion) {
       return null;
     }
 

@@ -21,11 +21,12 @@ export function useReportHistory(reportId: string | null | undefined): UseReport
     void (async () => {
       try {
         const res = await authFetch(`/api/reports/${encodeURIComponent(reportId)}/history`, { signal: controller.signal });
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as ReportHistory;
         setState({ data, loading: false, error: false });
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
+        console.error('useReportHistory failed', { reportId, err });
         setState({ data: null, loading: false, error: true });
       }
     })();

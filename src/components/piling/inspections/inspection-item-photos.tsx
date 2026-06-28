@@ -78,6 +78,8 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       );
       setPhotos(tiles);
       onCountChangeRef.current?.(tiles.length);
+    } catch {
+      toast.error('Не удалось загрузить фото');
     } finally {
       setLoading(false);
     }

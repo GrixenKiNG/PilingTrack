@@ -68,6 +68,8 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
         })
       );
       setPhotos(tiles);
+    } catch {
+      toast.error('Не удалось загрузить фото');
     } finally {
       setLoading(false);
     }

@@ -140,6 +140,8 @@ async function main(): Promise<void> {
     logger.error('Unhandled rejection in unified worker', {
       reason: reason instanceof Error ? reason.message : String(reason),
     });
+    // Same rationale as uncaughtException above — don't keep running degraded.
+    process.exit(1);
   });
 }
 
