@@ -40,7 +40,7 @@ cd PilingTrack
 **Остановить стек:** `docker compose --env-file .env.docker down`
 **Сбросить всё (включая БД):** `docker compose --env-file .env.docker down -v && setup.bat`
 
-Установка на телефон/планшет (PWA) — см. [INSTALL-MOBILE.md](INSTALL-MOBILE.md).
+Открыть на телефоне/планшете (ярлык на главный экран) — см. [INSTALL-MOBILE.md](INSTALL-MOBILE.md).
 
 ---
 
@@ -51,7 +51,6 @@ cd PilingTrack
 - `src/modules` — bounded contexts с доменной логикой
 - `src/services` — orchestration/service-layer, интеграции и cross-cutting logic
 - `src/core` — инфраструктурные механики: event bus, outbox, observability, reliability
-- `src/mobile` — офлайн-режим, local DB, sync engine
 - `src/workers` — фоновые worker entrypoints
 - `prisma` — схема БД и seed
 - `docs/adr` — архитектурные решения
@@ -67,7 +66,6 @@ cd PilingTrack
 
 - управление объектами, оборудованием и бригадами
 - сменные отчеты по сваям, лидерному бурению и простоям
-- offline-first сценарии с синхронизацией
 - CQRS/read models для аналитики и агрегатов
 - PDF-экспорт сводных и одиночных отчетов
 - feedback/alerts/observability контур
@@ -75,9 +73,9 @@ cd PilingTrack
 
 ## Технологии
 
-- Next.js 16, React 19, TypeScript 5
-- Prisma 6, PostgreSQL, Redis
-- BullMQ, ws, Dexie, Zod
+- Next.js 16, React 19, TypeScript 6
+- Prisma 7, PostgreSQL, Redis
+- BullMQ, ws, Zod
 - Vitest, Playwright, k6
 - OpenTelemetry, Sentry, Prometheus, Grafana
 
