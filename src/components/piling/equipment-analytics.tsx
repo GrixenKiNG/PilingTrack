@@ -17,7 +17,6 @@ import { useRouter } from 'next/navigation';
 import {
   Gauge, HardHat, Drill, Clock, Fuel, Wrench, Printer, ArrowUpDown,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
@@ -190,16 +189,17 @@ function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
       {tiles.map((t) => (
-        <Card key={t.label} className={cn('border shadow-sm', t.alert && 'border-amber-300 bg-amber-50/40')}>
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-slate-600">{t.label}</span>
-              <t.icon className={cn('h-4 w-4', t.alert ? 'text-amber-600' : 'text-slate-400')} />
-            </div>
-            <p className="font-mono text-xl font-bold tabular-nums text-slate-900">{t.value}</p>
-            <p className="mt-1 text-3xs text-slate-500">{t.detail}</p>
-          </CardContent>
-        </Card>
+        <div key={t.label} className="kpi-animated relative rounded-lg border p-4 shadow-sm">
+          {t.alert && (
+            <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-white" aria-label="Требует внимания" />
+          )}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-white/85">{t.label}</span>
+            <t.icon className="h-4 w-4 text-white/85" />
+          </div>
+          <p className="font-mono text-xl font-bold tabular-nums text-white">{t.value}</p>
+          <p className="mt-1 text-3xs text-white/75">{t.detail}</p>
+        </div>
       ))}
     </div>
   );

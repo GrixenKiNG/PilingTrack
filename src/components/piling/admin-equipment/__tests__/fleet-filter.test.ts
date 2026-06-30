@@ -24,6 +24,7 @@ function card(over: Partial<FleetCard>): FleetCard {
     engineHoursTotal: null,
     nextMaintenanceDate: null,
     nextMaintenanceAtHours: null,
+    assignedSiteId: null,
     assignedSiteName: null,
     assignedOperatorName: null,
     assignedCrewName: null,

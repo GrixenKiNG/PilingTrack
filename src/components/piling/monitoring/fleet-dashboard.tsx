@@ -28,45 +28,10 @@ import { authFetch } from '@/lib/api';
 import { formatHours, formatFixed, formatRelative, formatRuDate } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
+import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
+import { EQUIPMENT_STATUS_META } from '@/components/piling/admin-equipment/equipment-status';
 
-type EquipmentStatus = 'active' | 'expected' | 'idle';
 type SortBy = 'status' | 'name' | 'lastReport';
-
-interface FleetCard {
-  id: string;
-  name: string;
-  model: string;
-  manufactureYear: number | null;
-  assignedSiteId: string | null;
-  assignedSiteName: string | null;
-  status: EquipmentStatus;
-  todaysReports: number;
-  todayTotals: { piles: number; pileMeters: number; drillingMeters: number; downtimeHours: number } | null;
-  latestReport: {
-    date: string;
-    siteName: string | null;
-    operatorName: string | null;
-    shiftType: string;
-    updatedAt: string;
-  } | null;
-}
-
-interface FleetSnapshot {
-  asOf: string;
-  today: string;
-  totals: {
-    totalEquipment: number;
-    activeToday: number;
-    expected: number;
-    idle: number;
-    pilesToday: number;
-    drillingToday: number;
-    downtimeHoursToday: number;
-    crewsOnShiftToday: number;
-    operatorsOnShiftToday: number;
-  };
-  equipment: FleetCard[];
-}
 
 type Connection = 'connecting' | 'live' | 'offline';
 
@@ -299,24 +264,24 @@ const selectCls =
 
 function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
   return (
-    <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
+    <div className="kpi-animated rounded-xl border p-4 sm:p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Сегодня · {formatRuDate(snap.today)}</div>
-          <div className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight">
-            {snap.totals.activeToday} <span className="text-muted-foreground">из {snap.totals.totalEquipment} в работе</span>
+          <div className="text-xs uppercase tracking-wide text-white/80">Сегодня · {formatRuDate(snap.today)}</div>
+          <div className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+            {snap.totals.activeToday} <span className="text-white/80">из {snap.totals.totalEquipment} в работе</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className={cn(
-            'rounded-full px-2.5 py-1 text-3xs uppercase tracking-wide',
-            conn === 'live' && 'bg-emerald-100 text-emerald-700',
-            conn === 'connecting' && 'bg-amber-100 text-amber-700',
-            conn === 'offline' && 'bg-rose-100 text-rose-700',
+            'rounded-full bg-white/90 px-2.5 py-1 text-3xs uppercase tracking-wide',
+            conn === 'live' && 'text-emerald-700',
+            conn === 'connecting' && 'text-amber-700',
+            conn === 'offline' && 'text-rose-700',
           )}>
             {conn === 'live' ? 'live' : conn === 'connecting' ? '…' : 'offline'}
           </div>
-          <div className="text-3xs text-muted-foreground">обновлено {formatRelative(snap.asOf)}</div>
+          <div className="text-3xs text-white/70">обновлено {formatRelative(snap.asOf)}</div>
         </div>
       </div>
 
@@ -335,8 +300,8 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
 function Metric({ label, value, muted = false }: { label: string; value: string | number; muted?: boolean }) {
   return (
     <div>
-      <dt className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className={cn('mt-0.5 font-mono text-lg tabular-nums', muted && 'text-muted-foreground')}>{value}</dd>
+      <dt className="text-2xs uppercase tracking-wide text-white/70">{label}</dt>
+      <dd className={cn('mt-0.5 font-mono text-lg tabular-nums text-white', muted && 'text-white/80')}>{value}</dd>
     </div>
   );
 }
@@ -365,6 +330,11 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
             <div className="flex items-center gap-2">
               <span className={cn('h-2.5 w-2.5 rounded-full ring-4', s.dot, s.ring)} aria-label={s.label} />
               <h3 className="truncate text-base font-semibold leading-tight">{card.name}</h3>
+              {card.equipmentStatus === 'repair' && (
+                <span className={cn('rounded-md border px-1.5 py-0.5 text-3xs font-semibold', EQUIPMENT_STATUS_META.repair.badge)}>
+                  {EQUIPMENT_STATUS_META.repair.label}
+                </span>
+              )}
               {card.todaysReports > 1 && (
                 <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-3xs font-semibold text-indigo-700">
                   ×{card.todaysReports}
@@ -393,6 +363,7 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
             ) : (
               <RowKV label="Последний отчёт" value={formatRuDate(card.latestReport.date)} />
             )}
+            {card.downtimeReason && <RowKV label="Причина простоя" value={card.downtimeReason} />}
           </dl>
         ) : (
           <div className="mt-3 text-sm text-muted-foreground">Нет отчётов за последние 7 дней.</div>

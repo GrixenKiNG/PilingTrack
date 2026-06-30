@@ -28,6 +28,7 @@ export interface FleetCard {
   engineHoursTotal: number | null;
   nextMaintenanceDate: string | null;
   nextMaintenanceAtHours: number | null;
+  assignedSiteId: string | null;
   assignedSiteName: string | null;
   assignedOperatorName: string | null;
   assignedCrewName: string | null;
