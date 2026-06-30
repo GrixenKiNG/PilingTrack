@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import { telegramNotifier } from '@/core/notifications/telegram';
 import { logger } from '@/lib/logger';
 
@@ -34,6 +35,13 @@ const SEVERITY_MAP: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
   critical: 'critical',
 };
 
+// Constant-time string comparison to prevent a timing side-channel on the
+// shared-secret token (mirrors auth-service.ts's constantTimeEquals).
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 function isAuthorized(request: NextRequest): boolean {
   const expected = process.env.ALERTMANAGER_WEBHOOK_TOKEN;
   if (!expected) return false; // misconfigured — reject rather than open
@@ -41,7 +49,8 @@ function isAuthorized(request: NextRequest): boolean {
   const header = request.headers.get('authorization');
   const bearer = header?.startsWith('Bearer ') ? header.slice(7) : null;
   const query = request.nextUrl.searchParams.get('token');
-  return bearer === expected || query === expected;
+  return (!!bearer && constantTimeEquals(bearer, expected)) ||
+    (!!query && constantTimeEquals(query, expected));
 }
 
 export async function POST(request: NextRequest) {

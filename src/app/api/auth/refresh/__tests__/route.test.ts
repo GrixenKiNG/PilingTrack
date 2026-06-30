@@ -4,7 +4,11 @@
  * Refresh-token rotation is in the security hot path: a regression here
  * lets an attacker keep a stolen token alive forever. Pin:
  *   - 400 on invalid body
- *   - 200 with new token pair on success, sets pt-refresh httpOnly cookie
+ *   - 200 on success, sets pt-refresh httpOnly cookie, body carries ONLY
+ *     expiresAt (accessToken/refreshToken must never appear in the JSON
+ *     body — they're delivered via httpOnly cookies only; a body leak
+ *     defeats the httpOnly mitigation for any code that can read fetch
+ *     responses, e.g. XSS or client-side error tracking)
  *   - DELETE revokes and clears the cookie even if no token cookie present
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -60,11 +64,9 @@ describe('POST /api/auth/refresh', () => {
     const res = await POST(jsonReq({ refreshToken: 'refresh-OLD' }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({
-      accessToken: 'access-NEW',
-      refreshToken: 'refresh-NEW',
-      expiresAt: '2030-01-01T00:00:00Z',
-    });
+    // Body must carry ONLY expiresAt — accessToken/refreshToken go out via
+    // httpOnly cookies only (checked below), never in the readable JSON body.
+    expect(body).toEqual({ expiresAt: '2030-01-01T00:00:00Z' });
 
     // Old token rotated, session cookie attached, refresh cookie set on
     // the narrow path /api/auth/refresh (not /).

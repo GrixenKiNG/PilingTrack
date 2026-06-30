@@ -50,12 +50,15 @@ export interface ProvisionedDeviceKey {
 export async function provisionDeviceKey(input: {
   name: string;
   equipmentId: string;
-  tenantId?: string | null;
+  tenantId: string;
   siteId?: string | null;
   createdById?: string | null;
 }): Promise<ProvisionedDeviceKey> {
+  if (!input.tenantId) {
+    throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  }
   const equipment = await db.equipment.findUnique({
-    where: { id: input.equipmentId },
+    where: { id: input.equipmentId, tenantId: input.tenantId },
     select: { id: true, isActive: true },
   });
   if (!equipment || !equipment.isActive) {

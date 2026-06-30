@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCanAccessReportOwner, ensureTenantAccess } from '@/services/auth/resource-access-service';
+import { assertCan } from '@/services/auth/authorization-service';
 import { generateSinglePdf } from '@/lib/pdf-generator';
 import { loadSingleReportPdfContext } from '@/lib/pdf-data';
 import { enqueuePdfGeneration, getPdfJobStatus, getPdfJobOwnerId, downloadPdf } from '@/lib/pdf-queue';
@@ -144,10 +145,16 @@ export const GET = withApi(async (request: NextRequest) => {
 
   // A single-report PDF belongs to the operator who triggered it — only
   // they (or someone with reports.read_cross_user) may poll/download it.
+  // Fail closed when the job record is gone (BullMQ prunes completed jobs
+  // by count, independently of the rendered PDF's own RESULTS_TTL in
+  // storage) — the rendered file can outlive the job that proves ownership.
   const ownerId = await getPdfJobOwnerId(jobId);
   if (ownerId) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCanAccessReportOwner(user!, ownerId, 'reports.read_cross_user');
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    assertCan(user!, 'reports.read_cross_user');
   }
 
   if (action === 'status') {

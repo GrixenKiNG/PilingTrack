@@ -8,7 +8,9 @@
  *   { refreshToken: "raw-token-string" }
  *
  * Response:
- *   { accessToken, refreshToken, expiresAt }
+ *   { expiresAt }
+ * (accessToken/refreshToken are delivered via httpOnly cookies only — never
+ * in the body, see the comment at the response below)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -39,11 +41,11 @@ export const POST = withMutation(
 
     const tokens = await rotateRefreshToken(validated.data.refreshToken, ip, ua);
 
-    const response = NextResponse.json({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresAt: tokens.expiresAt,
-    });
+    // Tokens are delivered exclusively via httpOnly cookies below — never in
+    // the response body, where any XSS, client logger, or error-tracking
+    // integration that captures fetch responses could read them, defeating
+    // the httpOnly mitigation entirely.
+    const response = NextResponse.json({ expiresAt: tokens.expiresAt });
 
     // Update session cookie with new access token
     attachSessionCookie(response, tokens.accessToken);

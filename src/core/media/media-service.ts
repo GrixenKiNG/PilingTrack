@@ -129,6 +129,35 @@ async function getDbClient() {
  * Without an entity → media/{tenant}/misc/...  Segments are sanitized so the
  * inspection composite id ("insId__itemId") and others stay path-safe.
  */
+/**
+ * Map a (server-validated, allowlisted) content type to a file extension.
+ *
+ * Deliberately does NOT derive the extension from the client-supplied
+ * fileName: buildMediaKey() sanitizes tenantId/entityType/entityId but
+ * concatenates the extension raw, so an unsanitized fileName like
+ * "x.tar/../other-tenant/forged" (last "." before a path-traversal-style
+ * suffix, no further dots) would make a fileName-derived extension contain
+ * "/" and "..", letting the uploader smuggle the S3 key outside its
+ * intended media/<tenant>/<entityType>/<entityId>/ prefix. Deriving
+ * strictly from the already-validated contentType closes this off
+ * entirely instead of trying to sanitize an attacker-controlled string.
+ */
+export function getExtensionForContentType(contentType: string): string {
+  const map: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+    'image/heic-sequence': '.heic',
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  };
+  return map[contentType] ?? '';
+}
+
 export function buildMediaKey(
   tenantId: string,
   entityType: string | null | undefined,
@@ -185,7 +214,7 @@ export class MediaService {
     }
 
     // Generate unique key — organized into per-entity folders (folder per установка).
-    const extension = this.getExtension(request.fileName);
+    const extension = getExtensionForContentType(request.contentType);
     const mediaId = crypto.randomUUID();
     const key = buildMediaKey(request.tenantId, request.entityType, request.entityId, mediaId, extension);
     const db = await getDbClient();
@@ -466,15 +495,6 @@ export class MediaService {
       createdAt: media.createdAt,
       updatedAt: media.updatedAt,
     };
-  }
-
-  /**
-   * Get file extension from filename.
-   */
-  private getExtension(fileName: string): string {
-    const lastDot = fileName.lastIndexOf('.');
-    if (lastDot === -1) return '';
-    return fileName.slice(lastDot).toLowerCase();
   }
 }
 
