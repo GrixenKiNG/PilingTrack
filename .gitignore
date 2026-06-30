@@ -14,6 +14,8 @@ tsconfig.tsbuildinfo
 .env.test.local
 .env.production.local
 .env.docker
+*.pem
+*.key
 
 # Database dumps — никогда не коммитим (могут содержать реальные данные).
 backups/
