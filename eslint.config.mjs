@@ -125,6 +125,8 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "node_modules/**",
     ".next/**",
     ".worktrees/**",
+    ".claude/worktrees/**",
+    ".claude/skills/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
