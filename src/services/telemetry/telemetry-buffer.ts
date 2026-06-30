@@ -127,6 +127,7 @@ export class TelemetryBuffer {
               db.telemetryRecord.create({
                 data: {
                   type: record.type,
+                  tenantId: record.tenantId,
                   equipmentId: record.equipmentId,
                   siteId: record.siteId || null,
                   value: record.value,

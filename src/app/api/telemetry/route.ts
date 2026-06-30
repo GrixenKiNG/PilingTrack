@@ -16,6 +16,7 @@ import {
   telemetryBuffer,
   getSamplingConfig,
   getIngestStats,
+  findForeignEquipmentIds,
 } from '@/services/telemetry/telemetry-ingestion-service';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withApi } from '@/core/api-wrapper';
@@ -106,6 +107,12 @@ export const POST = withApi(async (request: NextRequest) => {
     const roleCheck = assertAnyRole(user!, ['ADMIN', 'DISPATCHER', 'OPERATOR']);
     if (roleCheck) return roleCheck;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
+
     // Check circuit breaker before accepting data
     const circuitResponse = checkCircuitBreaker();
     if (circuitResponse) return circuitResponse;
@@ -132,9 +139,23 @@ export const POST = withApi(async (request: NextRequest) => {
           { status: 400 }
         );
       }
+
+      // Tenant ownership (IDOR guard, fail-closed): equipmentId comes from the
+      // request body, so verify every referenced rig belongs to the caller's
+      // tenant before writing.
+      const requestedIds = [...new Set(validated.data.map((r) => r.equipmentId))];
+      const foreign = await findForeignEquipmentIds(tenantId, requestedIds);
+      if (foreign.length > 0) {
+        return NextResponse.json(
+          { error: 'One or more equipment ids are not in your tenant' },
+          { status: 403 }
+        );
+      }
+
       const count = await ingestTelemetryBatch(
         validated.data.map((d) => ({
           ...d,
+          tenantId,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
           type: d.type as any,
           siteId: d.siteId ?? undefined,
@@ -161,9 +182,19 @@ export const POST = withApi(async (request: NextRequest) => {
         { status: 400 }
       );
     }
+
+    const foreign = await findForeignEquipmentIds(tenantId, [validated.data.equipmentId]);
+    if (foreign.length > 0) {
+      return NextResponse.json(
+        { error: 'Equipment id is not in your tenant' },
+        { status: 403 }
+      );
+    }
+
     const id = await ingestTelemetry({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: validated.data.type as any,
+      tenantId,
       equipmentId: validated.data.equipmentId,
       value: validated.data.value,
       siteId: validated.data.siteId || undefined,
@@ -209,6 +240,12 @@ export const POST = withApi(async (request: NextRequest) => {
 export const GET = withApi(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
 
     const { searchParams } = request.nextUrl;
     const action = searchParams.get('action');
@@ -284,6 +321,7 @@ export const GET = withApi(async (request: NextRequest) => {
         '@/services/telemetry/telemetry-ingestion-service'
       );
       const analysis = await getTelemetryAnalysis({
+        tenantId,
         equipmentId,
         from: new Date(from),
         to: new Date(to),
@@ -295,6 +333,7 @@ export const GET = withApi(async (request: NextRequest) => {
       '@/services/telemetry/telemetry-ingestion-service'
     );
     const records = await getTelemetryByRange({
+      tenantId,
       equipmentId,
       siteId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary

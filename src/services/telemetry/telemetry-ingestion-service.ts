@@ -43,6 +43,7 @@ export type TelemetryType =
 
 export interface TelemetryRecord {
   type: TelemetryType;
+  tenantId: string;
   equipmentId: string;
   siteId?: string;
   value: number;
@@ -184,6 +185,12 @@ export function getIngestStats(): {
  * 4. Buffer for batched DB writes
  */
 export async function ingestTelemetry(record: TelemetryRecord): Promise<string> {
+  // Fail closed: every record must carry the writer's tenant, never inferred
+  // from equipmentId alone — callers resolve and validate it first.
+  if (!record.tenantId) {
+    throw new Error('ingestTelemetry: tenantId is required');
+  }
+
   // Rate limit
   if (!checkIngestRateLimit()) {
     throw new Error('Telemetry ingest rate limit exceeded (max 1000 records/sec)');
@@ -219,6 +226,11 @@ export async function ingestTelemetryBatch(
 ): Promise<number> {
   if (records.length === 0) return 0;
 
+  // Fail closed: same per-record tenant guarantee as ingestTelemetry.
+  if (records.some((r) => !r.tenantId)) {
+    throw new Error('ingestTelemetryBatch: tenantId is required on every record');
+  }
+
   // Rate limit check for batch
   if (!checkIngestRateLimit()) {
     throw new Error('Telemetry ingest rate limit exceeded (max 1000 records/sec)');
@@ -240,16 +252,45 @@ export async function ingestTelemetryBatch(
 }
 
 /**
+ * equipmentIds that do NOT belong to tenantId — empty means every id is
+ * owned by the caller's tenant. equipmentId arrives from request bodies/query
+ * params, so callers must check this before writing or reading telemetry
+ * against it (Equipment is the only tenant anchor TelemetryRecord has at the
+ * API boundary).
+ */
+export async function findForeignEquipmentIds(
+  tenantId: string,
+  equipmentIds: string[]
+): Promise<string[]> {
+  if (!tenantId) {
+    throw new Error('findForeignEquipmentIds: tenantId is required');
+  }
+  if (equipmentIds.length === 0) return [];
+  const db = await getDbClient();
+  const owned = await db.equipment.findMany({
+    where: { id: { in: equipmentIds }, tenantId },
+    select: { id: true },
+  });
+  const ownedSet = new Set(owned.map((e) => e.id));
+  return equipmentIds.filter((id) => !ownedSet.has(id));
+}
+
+/**
  * Get latest telemetry for a specific equipment.
  */
 export async function getLatestTelemetry(
   equipmentId: string,
+  tenantId: string,
   type?: TelemetryType
 ) {
+  if (!tenantId) {
+    throw new Error('getLatestTelemetry: tenantId is required');
+  }
   const db = await getDbClient();
   return db.telemetryRecord.findFirst({
     where: {
       equipmentId,
+      tenantId,
       ...(type ? { type } : {}),
     },
     orderBy: { timestamp: 'desc' },
@@ -260,6 +301,7 @@ export async function getLatestTelemetry(
  * Get telemetry data for a time range.
  */
 export async function getTelemetryByRange(params: {
+  tenantId: string;
   equipmentId?: string;
   equipmentIds?: string[]; // restrict to this set — used for operator-scoped reads
   siteId?: string;
@@ -268,9 +310,13 @@ export async function getTelemetryByRange(params: {
   to: Date;
   limit?: number;
 }) {
+  if (!params.tenantId) {
+    throw new Error('getTelemetryByRange: tenantId is required');
+  }
   const db = await getDbClient();
   return db.telemetryRecord.findMany({
     where: {
+      tenantId: params.tenantId,
       ...(params.equipmentId
         ? { equipmentId: params.equipmentId }
         : params.equipmentIds && params.equipmentIds.length > 0
@@ -292,13 +338,18 @@ export async function getTelemetryByRange(params: {
  * Get aggregated telemetry stats for a time range.
  */
 export async function getTelemetryStats(params: {
+  tenantId: string;
   equipmentId?: string;
   siteId?: string;
   from: Date;
   to: Date;
 }) {
+  if (!params.tenantId) {
+    throw new Error('getTelemetryStats: tenantId is required');
+  }
   const db = await getDbClient();
   const where: Record<string, unknown> = {
+    tenantId: params.tenantId,
     timestamp: {
       gte: params.from,
       lte: params.to,
@@ -333,12 +384,17 @@ export async function getTelemetryStats(params: {
  * `machine_state` is excluded (it's a state code, not a metric).
  */
 export async function getTelemetryAnalysis(params: {
+  tenantId: string;
   equipmentId: string;
   from: Date;
   to: Date;
 }) {
+  if (!params.tenantId) {
+    throw new Error('getTelemetryAnalysis: tenantId is required');
+  }
   const db = await getDbClient();
   const where = {
+    tenantId: params.tenantId,
     equipmentId: params.equipmentId,
     timestamp: { gte: params.from, lte: params.to },
   };

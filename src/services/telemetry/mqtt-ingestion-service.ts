@@ -91,9 +91,22 @@ async function handleTelemetryMessage(topic: string, payload: Buffer): Promise<v
   const message = validated.data;
 
   try {
+    // The MQTT topic only carries equipmentId, no authenticated tenant —
+    // resolve it from the rig itself rather than trusting the payload.
+    const { db } = await import('@/lib/db');
+    const equipment = await db.equipment.findUnique({
+      where: { id: equipmentId },
+      select: { tenantId: true },
+    });
+    if (!equipment) {
+      logger.warn('MQTT: unknown equipmentId, dropping message', { topic, equipmentId });
+      return;
+    }
+
     await ingestTelemetry({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: message.type as any,
+      tenantId: equipment.tenantId,
       equipmentId,
       siteId: (message.metadata?.siteId as string) ?? undefined,
       value: message.value,

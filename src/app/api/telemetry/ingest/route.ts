@@ -277,6 +277,13 @@ function validateTelemetry(data: unknown): ValidationResult {
 // ============================================================
 
 async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown[]) {
+  // Fail closed: every persisted record needs a tenant. Legacy device keys
+  // provisioned before tenant scoping may still have a null tenantId.
+  const tenantId = identity.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  if (!tenantId) {
+    throw new Error('ingestTelemetry (device): tenant context missing for this device key');
+  }
+
   const records = Array.isArray(data) ? data : [data];
 
   // equipmentId and siteId are derived from authenticated device identity,
@@ -286,6 +293,7 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
     const r = record as Record<string, unknown>;
     return {
       type: r.type as string,
+      tenantId,
       equipmentId: identity.equipmentId,
       siteId: identity.siteId,
       value: Number(r.value),

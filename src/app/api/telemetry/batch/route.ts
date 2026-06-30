@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { ingestTelemetryBatch, telemetryBuffer } from '@/services/telemetry/telemetry-ingestion-service';
+import { ingestTelemetryBatch, telemetryBuffer, findForeignEquipmentIds } from '@/services/telemetry/telemetry-ingestion-service';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { logger } from '@/lib/logger';
 import { withApi } from '@/core/api-wrapper';
@@ -126,12 +126,8 @@ export const POST = withApi(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
     const requestedIds = [...new Set(validated.data.map((r) => r.equipmentId))];
-    const { db } = await import('@/lib/db');
-    const owned = await db.equipment.findMany({
-      where: { id: { in: requestedIds }, tenantId },
-      select: { id: true },
-    });
-    if (owned.length !== requestedIds.length) {
+    const foreign = await findForeignEquipmentIds(tenantId, requestedIds);
+    if (foreign.length > 0) {
       return NextResponse.json(
         { error: 'One or more equipment ids are not in your tenant' },
         { status: 403 }
@@ -141,6 +137,7 @@ export const POST = withApi(async (request: NextRequest) => {
     const count = await ingestTelemetryBatch(
       validated.data.map((d) => ({
         ...d,
+        tenantId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         type: d.type as any,
         siteId: d.siteId ?? undefined,

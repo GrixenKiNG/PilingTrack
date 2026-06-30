@@ -902,6 +902,7 @@ model ReportAudit {
 model TelemetryRecord {
   id          String   @id @default(cuid())
   type        String   // pile_strike, drilling_depth, equipment_gps, cycle_time, pressure, vibration, temperature
+  tenantId    String
   equipmentId String
   siteId      String?
   value       Float
@@ -915,6 +916,7 @@ model TelemetryRecord {
   @@index([equipmentId, timestamp])
   @@index([siteId, timestamp])
   @@index([type, timestamp])
+  @@index([tenantId])
 }
 
 // ============================================================
