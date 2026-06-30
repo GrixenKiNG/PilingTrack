@@ -37,6 +37,9 @@ export const PUT = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const body = await request.json();
     const validated = updateCrewSchema.safeParse(body);
@@ -46,12 +49,10 @@ export const PUT = withMutation(
         { status: 400 }
       );
     }
-    const { updateCrew, getCrewById } = await getCrewsModule();
-    const existing = await getCrewById(id);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    await ensureTenantAccess(user!, existing.site?.tenantId ?? null, 'Crew');
+    const { updateCrew } = await getCrewsModule();
     const crew = await updateCrew({
       crewId: id,
+      tenantId,
       name: validated.data.name,
       operatorId: validated.data.operatorId,
       equipmentId: validated.data.equipmentId,
@@ -77,13 +78,13 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
-    const { deleteCrew, getCrewById } = await getCrewsModule();
-    const existing = await getCrewById(id);
+    const { deleteCrew } = await getCrewsModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    await ensureTenantAccess(user!, existing.site?.tenantId ?? null, 'Crew');
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const result = await deleteCrew({ crewId: id, userId: user!.id });
+    const result = await deleteCrew({ crewId: id, tenantId, userId: user!.id });
 
     invalidateCrewsCache();
 

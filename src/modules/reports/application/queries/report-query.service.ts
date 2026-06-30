@@ -232,11 +232,16 @@ export async function listReportsForUserScope(
 }
 
 export async function exportReportsCsv(filters: {
+  tenantId: string;
   siteId?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
 }) {
-  const where: Record<string, unknown> = {};
+  if (!filters.tenantId) {
+    throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  }
+
+  const where: Record<string, unknown> = { tenantId: filters.tenantId };
   if (filters.siteId) where.siteId = filters.siteId;
   if (filters.dateFrom || filters.dateTo) {
     where.date = {};

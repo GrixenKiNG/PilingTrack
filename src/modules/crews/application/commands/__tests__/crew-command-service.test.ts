@@ -282,11 +282,13 @@ describe('Crew Command Service', () => {
         siteId: 'site-1',
       }, 'user-1');
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
       await updateCrew({
         crewId: 'crew-1',
         name: 'New Name',
         userId: 'user-1',
+        tenantId: 'tenant-1',
       });
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
@@ -300,11 +302,13 @@ describe('Crew Command Service', () => {
         siteId: 'site-1',
       }, 'user-1');
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
       await updateCrew({
         crewId: 'crew-1',
         isActive: false,
         userId: 'user-1',
+        tenantId: 'tenant-1',
       });
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
@@ -321,11 +325,13 @@ describe('Crew Command Service', () => {
       }, 'user-1');
       aggregate.clearPendingEvents();
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
       await updateCrew({
         crewId: 'crew-1',
         isActive: true,
         userId: 'user-1',
+        tenantId: 'tenant-1',
       });
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
@@ -338,7 +344,42 @@ describe('Crew Command Service', () => {
       await expect(updateCrew({
         crewId: 'nonexistent',
         name: 'New Name',
+        tenantId: 'tenant-1',
       })).rejects.toThrow('Crew not found');
+    });
+
+    // IDOR guard: a crew resolved by id alone says nothing about tenant
+    // ownership (PrismaCrewRepository.findById is tenant-blind). Mirrors the
+    // requireTenantSite pattern (sites) and getAccessibleCrews (crews list).
+    it('fails closed when the crew belongs to a different tenant (cross-tenant IDOR)', async () => {
+      const aggregate = CrewAggregate.create({
+        name: 'Test Crew',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+      }, 'user-1');
+      mockRepoFindById.mockResolvedValue(aggregate);
+      // Tenant-scoped lookup finds nothing — the crew exists, but not in this tenant.
+      mockDb.crew.findFirst.mockResolvedValue(null);
+
+      await expect(updateCrew({
+        crewId: 'crew-1',
+        name: 'Hijacked',
+        userId: 'attacker',
+        tenantId: 'other-tenant',
+      })).rejects.toThrow('Crew not found');
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when tenantId is empty (IDOR guard)', async () => {
+      await expect(updateCrew({
+        crewId: 'crew-1',
+        name: 'New Name',
+        tenantId: '',
+      })).rejects.toThrow('tenantId is required');
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
     });
   });
 
@@ -354,10 +395,12 @@ describe('Crew Command Service', () => {
         siteId: 'site-1',
       }, 'user-1');
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
       const result = await deleteCrew({
         crewId: 'crew-1',
         userId: 'user-1',
+        tenantId: 'tenant-1',
       });
 
       expect(result).toEqual({ success: true, deactivated: true });
@@ -368,7 +411,7 @@ describe('Crew Command Service', () => {
     it('should reject delete if crew not found', async () => {
       mockRepoFindById.mockResolvedValue(null);
 
-      await expect(deleteCrew({ crewId: 'nonexistent' }))
+      await expect(deleteCrew({ crewId: 'nonexistent', tenantId: 'tenant-1' }))
         .rejects.toThrow('Crew not found');
     });
 
@@ -382,8 +425,9 @@ describe('Crew Command Service', () => {
       aggregate.deactivate('user-1');
       aggregate.clearPendingEvents();
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
-      await expect(deleteCrew({ crewId: 'crew-1' }))
+      await expect(deleteCrew({ crewId: 'crew-1', tenantId: 'tenant-1' }))
         .rejects.toThrow('Crew is already deactivated');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
@@ -397,12 +441,40 @@ describe('Crew Command Service', () => {
         siteId: 'site-1',
       }, 'user-1');
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
-      await deleteCrew({ crewId: 'crew-1', userId: 'user-1' });
+      await deleteCrew({ crewId: 'crew-1', userId: 'user-1', tenantId: 'tenant-1' });
 
       // The destructive force path (deleteMany reports + crew.delete) is gone.
       expect(mockDb.report.deleteMany).not.toHaveBeenCalled();
       expect(mockDb.crew.delete).not.toHaveBeenCalled();
+    });
+
+    // IDOR guard: mirrors the updateCrew cross-tenant test above.
+    it('fails closed when the crew belongs to a different tenant (cross-tenant IDOR)', async () => {
+      const aggregate = CrewAggregate.create({
+        name: 'Test Crew',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+      }, 'user-1');
+      mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue(null);
+
+      await expect(deleteCrew({
+        crewId: 'crew-1',
+        userId: 'attacker',
+        tenantId: 'other-tenant',
+      })).rejects.toThrow('Crew not found');
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when tenantId is empty (IDOR guard)', async () => {
+      await expect(deleteCrew({ crewId: 'crew-1', tenantId: '' }))
+        .rejects.toThrow('tenantId is required');
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
     });
   });
 
@@ -432,9 +504,10 @@ describe('Crew Command Service', () => {
       aggregate.deactivate('user-1');
       aggregate.clearPendingEvents();
       mockRepoFindById.mockResolvedValue(aggregate);
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
       // Second deactivate should fail
-      await expect(deleteCrew({ crewId: 'crew-1' }))
+      await expect(deleteCrew({ crewId: 'crew-1', tenantId: 'tenant-1' }))
         .rejects.toThrow('Crew is already deactivated');
     });
   });

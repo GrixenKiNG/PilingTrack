@@ -40,6 +40,19 @@ async function assertEquipmentNotDoubleBooked(equipmentId: string, excludeCrewId
   }
 }
 
+// Tenant ownership guard for writes (IDOR fix): PrismaCrewRepository.findById
+// resolves a crew by id alone, with no tenant filter — anyone who can guess a
+// UUID can reach a crew that belongs to a different tenant. ensureTenantAccess
+// (used by the GET route) doesn't help here because crews.manage is ADMIN/
+// DISPATCHER-only and that check unconditionally bypasses both roles. Mirrors
+// requireTenantSite (sites) and getAccessibleCrews (crews list) instead: an
+// unconditional, fail-closed tenant scope with no role bypass.
+async function requireTenantCrew(crewId: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  const crew = await db.crew.findFirst({ where: { id: crewId, site: { tenantId } } });
+  if (!crew) throw new ServiceError('Crew not found', 404);
+}
+
 // Tenant integrity: a crew may only be assembled from parts of one tenant.
 // Closes the cross-tenant composition vector (operator/equipment/site with
 // mismatched tenants). No-op under a single tenant. The site is the tenant
@@ -173,6 +186,8 @@ export async function createCrew(command: CreateCrewCommand) {
 }
 
 export async function updateCrew(command: UpdateCrewCommand) {
+  await requireTenantCrew(command.crewId, command.tenantId);
+
   const repo = getCrewRepository();
   const aggregate = await repo.findById(command.crewId);
   if (!aggregate) {
@@ -309,6 +324,8 @@ export async function updateCrew(command: UpdateCrewCommand) {
 }
 
 export async function deleteCrew(command: DeleteCrewCommand) {
+  await requireTenantCrew(command.crewId, command.tenantId);
+
   const repo = getCrewRepository();
   const aggregate = await repo.findById(command.crewId);
   if (!aggregate) {

@@ -12,6 +12,7 @@ export interface CreateCrewCommand {
 
 export interface UpdateCrewCommand {
   crewId: string;
+  tenantId: string;
   name?: string;
   operatorId?: string;
   equipmentId?: string;
@@ -24,5 +25,6 @@ export interface UpdateCrewCommand {
 
 export interface DeleteCrewCommand {
   crewId: string;
+  tenantId: string;
   userId?: string;
 }
