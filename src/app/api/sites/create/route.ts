@@ -17,6 +17,7 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
@@ -34,6 +35,7 @@ export const POST = withMutation(
         name: validation.data.name,
         pilePlans: validation.data.pilePlans,
         drillingPlans: validation.data.drillingPlans,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       }, { tenantId, actorId: user!.id });
 
       await invalidateSites(tenantId);

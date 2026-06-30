@@ -17,6 +17,7 @@ export const GET = withApi(
     if (error) return error;
 
     const { id } = await params;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const site = await getSiteWithHierarchy(user!, tenantId, id);
@@ -33,8 +34,10 @@ export const PUT = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const commandContext = { tenantId, actorId: user!.id };
     const { id } = await params;
     const body = await request.json();
@@ -72,11 +75,13 @@ export const PUT = withMutation(
     if (validated.data.isActive !== undefined) {
       if (validated.data.isActive) await activateSite(id, commandContext);
       else await deactivateSite(id, commandContext);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       site = await getSiteWithHierarchy(user!, tenantId, id);
     }
 
     if (validated.data.completed !== undefined) {
       await setSiteCompleted(id, validated.data.completed, commandContext);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       site = await getSiteWithHierarchy(user!, tenantId, id);
     }
 
@@ -93,6 +98,7 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;

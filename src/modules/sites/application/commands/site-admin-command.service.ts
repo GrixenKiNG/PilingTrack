@@ -353,6 +353,7 @@ export async function createSiteHierarchyItem(input: {
   }
 
   if (input.type === 'cluster') {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
     const parentId = input.parentId!;
     const parent = await db.pileField.findFirst({ where: { id: parentId, siteId: input.siteId }, select: { id: true } });
     if (!parent) throw new ServiceError('Parent not found', 404);
@@ -362,6 +363,7 @@ export async function createSiteHierarchyItem(input: {
   }
 
   if (input.type === 'picket') {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
     const parentId = input.parentId!;
     const parent = await db.cluster.findFirst({ where: { id: parentId, field: { siteId: input.siteId } }, select: { id: true } });
     if (!parent) throw new ServiceError('Parent not found', 404);

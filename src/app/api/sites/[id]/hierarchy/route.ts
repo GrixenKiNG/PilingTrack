@@ -16,6 +16,7 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage_hierarchy');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
@@ -32,6 +33,7 @@ export const POST = withMutation(
       type: validated.data.type,
       name: validated.data.name,
       parentId: validated.data.parentId,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     }, { tenantId, actorId: user!.id });
     await invalidateSites(tenantId);
     return NextResponse.json({ item });
@@ -46,6 +48,7 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.manage_hierarchy');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
@@ -57,6 +60,7 @@ export const DELETE = withMutation(
         { status: 400 }
       );
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const result = await deleteSiteHierarchyItem(id, validated.data.type, validated.data.itemId, { tenantId, actorId: user!.id });
     await invalidateSites(tenantId);
     return NextResponse.json(result);

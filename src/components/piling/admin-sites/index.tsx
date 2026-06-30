@@ -105,6 +105,7 @@ export function AdminSites() {
   const allRows = useMemo(() => {
     const operational = new Map(rows.map((row) => [row.siteId, row]));
     return sites.map((site): SiteOverviewRow => operational.has(site.id)
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded by the .has() check above
       ? { ...operational.get(site.id)!, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate }
       : { siteId: site.id, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate,
           plannedPiles: site.plannedPiles, plannedPileMeters: 0, actualPiles: 0, actualPileMeters: 0,

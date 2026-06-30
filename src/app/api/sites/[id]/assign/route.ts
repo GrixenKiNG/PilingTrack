@@ -16,6 +16,7 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.assign_users');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
@@ -24,6 +25,7 @@ export const POST = withMutation(
     if (!validated.success) {
       return NextResponse.json({ error: 'Validation failed', details: validated.error.flatten() }, { status: 400 });
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const assignment = await assignUserToSite(id, validated.data.userId, { tenantId, actorId: user!.id });
     await invalidateSites(tenantId);
     return NextResponse.json({ assignment });
@@ -38,10 +40,12 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'sites.assign_users');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const userId = request.nextUrl.searchParams.get('userId');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const result = await unassignUserFromSite(id, userId || '', { tenantId, actorId: user!.id });
     await invalidateSites(tenantId);
     return NextResponse.json(result);
