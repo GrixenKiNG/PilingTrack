@@ -13,20 +13,27 @@
  *   - PostgreSQL running
  */
 
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 // Detect which Prisma client to use
 function getPrismaClient() {
   const provider = process.env.DATABASE_PROVIDER || 'sqlite';
 
   if (provider === 'postgres') {
-    // Try to load the postgres client
+    // Prisma 7 requires an adapter when driverAdapters is set in the schema
+    // (see prisma/seed.ts) — a bare `new PrismaClient()` throws otherwise.
+    let PostgresClient: any;
     try {
-      const { PrismaClient: PostgresClient } = require('../src/generated/postgres-client');
-      return new PostgresClient();
+      ({ PrismaClient: PostgresClient } = require('../src/generated/postgres-client'));
     } catch {
-      throw new Error('PostgreSQL Prisma client not generated. Run: npm run db:generate:postgres');
+      throw new Error('PostgreSQL Prisma client not generated. Run: npm run db:generate');
     }
+    const connectionString = process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL_POSTGRES (or DATABASE_URL) is required.');
+    }
+    return new PostgresClient({ adapter: new PrismaPg({ connectionString }) });
   }
 
   // For SQLite dev, just log what WOULD be applied
@@ -41,86 +48,52 @@ async function applyHardening(prisma: any) {
   // ============================================================
   console.log('📋 Step 1: CHECK constraints...');
 
-  const checkConstraints = [
-    // Role constraint
-    `ALTER TABLE "User" ADD CONSTRAINT IF NOT EXISTS chk_user_role_valid
-      CHECK ("role" IN ('ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'))`,
+  // Postgres has no `ADD CONSTRAINT IF NOT EXISTS` (only ADD COLUMN supports that).
+  // Idempotency comes from the DO block catching duplicate_object (constraint already exists).
+  const idempotentAdd = (table: string, name: string, check: string) => `
+    DO $$ BEGIN
+      ALTER TABLE "${table}" ADD CONSTRAINT ${name} CHECK (${check});
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;`;
 
-    // Report status
-    `ALTER TABLE "Report" ADD CONSTRAINT IF NOT EXISTS chk_report_status_valid
-      CHECK ("status" IN ('draft', 'submitted'))`,
-
-    // Report shiftType
-    `ALTER TABLE "Report" ADD CONSTRAINT IF NOT EXISTS chk_report_shift_valid
-      CHECK ("shiftType" IN ('DAY', 'NIGHT'))`,
-
-    // Report date not in future
-    `ALTER TABLE "Report" ADD CONSTRAINT IF NOT EXISTS chk_report_date_not_future
-      CHECK ("date" <= CURRENT_DATE)`,
-
-    // Downtime duration
-    `ALTER TABLE "ReportDowntime" ADD CONSTRAINT IF NOT EXISTS chk_downtime_duration_positive
-      CHECK ("duration" >= 0)`,
-
-    // PileWork count
-    `ALTER TABLE "PileWork" ADD CONSTRAINT IF NOT EXISTS chk_pile_count_positive
-      CHECK ("count" > 0)`,
-
-    // LeaderDrilling meters
-    `ALTER TABLE "LeaderDrilling" ADD CONSTRAINT IF NOT EXISTS chk_drilling_meters_positive
-      CHECK ("meters" >= 0)`,
-
-    // Equipment quantity
-    `ALTER TABLE "Equipment" ADD CONSTRAINT IF NOT EXISTS chk_equipment_qty_positive
-      CHECK ("qty" > 0)`,
-
-    // Site status
-    `ALTER TABLE "Site" ADD CONSTRAINT IF NOT EXISTS chk_site_status_valid
-      CHECK ("status" IN ('ACTIVE', 'COMPLETED', 'ARCHIVED'))`,
-
-    // FeedbackEvent level
-    `ALTER TABLE "FeedbackEvent" ADD CONSTRAINT IF NOT EXISTS chk_feedback_level_valid
-      CHECK ("level" IN ('info', 'warn', 'error', 'success'))`,
-
-    // FeedbackEvent priority
-    `ALTER TABLE "FeedbackEvent" ADD CONSTRAINT IF NOT EXISTS chk_feedback_priority_valid
-      CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'))`,
-
-    // FeedbackEvent audience
-    `ALTER TABLE "FeedbackEvent" ADD CONSTRAINT IF NOT EXISTS chk_feedback_audience_valid
-      CHECK ("audience" IN ('OPERATIONS', 'MANAGEMENT', 'TECHNICAL'))`,
-
-    // IdempotencyKey status
-    `ALTER TABLE "IdempotencyKey" ADD CONSTRAINT IF NOT EXISTS chk_idempotency_status_valid
-      CHECK ("status" IN ('pending', 'processing', 'completed', 'failed'))`,
-
-    // OutboxEvent published
-    `ALTER TABLE "OutboxEvent" ADD CONSTRAINT IF NOT EXISTS chk_outbox_published
-      CHECK ("published" IN (true, false))`,
-
-    // RefreshToken
-    `ALTER TABLE "RefreshToken" ADD CONSTRAINT IF NOT EXISTS chk_refresh_token_valid
-      CHECK (NOT "revoked" OR "revokedReason" IS NOT NULL)`,
+  const checkConstraints: { name: string; sql: string }[] = [
+    { name: 'chk_user_role_valid', sql: idempotentAdd('User', 'chk_user_role_valid', `"role" IN ('ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT')`) },
+    { name: 'chk_report_status_valid', sql: idempotentAdd('Report', 'chk_report_status_valid', `"status" IN ('draft', 'submitted')`) },
+    { name: 'chk_report_shift_valid', sql: idempotentAdd('Report', 'chk_report_shift_valid', `"shiftType" IN ('DAY', 'NIGHT')`) },
+    // Report.date is TEXT (clean 'YYYY-MM-DD', no time component) by design — cast for comparison.
+    { name: 'chk_report_date_not_future', sql: idempotentAdd('Report', 'chk_report_date_not_future', `"date"::date <= CURRENT_DATE`) },
+    { name: 'chk_downtime_duration_positive', sql: idempotentAdd('ReportDowntime', 'chk_downtime_duration_positive', `"duration" >= 0`) },
+    { name: 'chk_pile_count_positive', sql: idempotentAdd('PileWork', 'chk_pile_count_positive', `"count" > 0`) },
+    { name: 'chk_drilling_meters_positive', sql: idempotentAdd('LeaderDrilling', 'chk_drilling_meters_positive', `"meters" >= 0`) },
+    { name: 'chk_equipment_qty_positive', sql: idempotentAdd('Equipment', 'chk_equipment_qty_positive', `"qty" > 0`) },
+    // Value lists below matched against the authoritative types (SiteStatus in
+    // site.aggregate.ts; FeedbackEventLevel/Audience/Priority in lib/types.ts),
+    // not just what happened to be in the DB — the original lists here had both
+    // missing real values (INACTIVE, audit, USER, ALL) and fictional ones
+    // (ARCHIVED, MANAGEMENT, TECHNICAL) that don't exist anywhere in the code.
+    { name: 'chk_site_status_valid', sql: idempotentAdd('Site', 'chk_site_status_valid', `"status" IN ('ACTIVE', 'INACTIVE', 'COMPLETED')`) },
+    { name: 'chk_feedback_level_valid', sql: idempotentAdd('FeedbackEvent', 'chk_feedback_level_valid', `"level" IN ('info', 'warn', 'error', 'success', 'audit')`) },
+    { name: 'chk_feedback_priority_valid', sql: idempotentAdd('FeedbackEvent', 'chk_feedback_priority_valid', `"priority" IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')`) },
+    { name: 'chk_feedback_audience_valid', sql: idempotentAdd('FeedbackEvent', 'chk_feedback_audience_valid', `"audience" IN ('ALL', 'OPERATIONS', 'USER')`) },
+    { name: 'chk_idempotency_status_valid', sql: idempotentAdd('IdempotencyKey', 'chk_idempotency_status_valid', `"status" IN ('pending', 'processing', 'completed', 'failed')`) },
+    { name: 'chk_outbox_published', sql: idempotentAdd('OutboxEvent', 'chk_outbox_published', `"published" IN (true, false)`) },
+    { name: 'chk_refresh_token_valid', sql: idempotentAdd('RefreshToken', 'chk_refresh_token_valid', `NOT "revoked" OR "revokedReason" IS NOT NULL`) },
   ];
 
   let appliedChecks = 0;
-  let skippedChecks = 0;
+  let failedChecks = 0;
 
-  for (const sql of checkConstraints) {
+  for (const { name, sql } of checkConstraints) {
     try {
       await prisma.$executeRawUnsafe(sql);
       appliedChecks++;
     } catch (e: any) {
-      if (e.message?.includes('already exists')) {
-        skippedChecks++;
-      } else {
-        console.warn(`  ⚠️  Warning: ${e.message?.substring(0, 100)}`);
-        skippedChecks++;
-      }
+      failedChecks++;
+      console.error(`  ❌ ${name} failed: ${e.message?.substring(0, 200)}`);
     }
   }
 
-  console.log(`  ✅ ${appliedChecks} CHECK constraints applied (${skippedChecks} already exist)\n`);
+  console.log(`  ✅ ${appliedChecks} CHECK constraints applied/verified (${failedChecks} failed — see errors above)\n`);
 
   // ============================================================
   // 2. PARTIAL INDEXES (правило #17)
@@ -253,72 +226,41 @@ async function applyHardening(prisma: any) {
   console.log(`  ✅ ${appliedSoft} soft delete columns, ${appliedSoftIdx} partial indexes added\n`);
 
   // ============================================================
-  // 4. ROW-LEVEL SECURITY (правило #25)
+  // 4. ROW-LEVEL SECURITY (правило #25) — verification only.
+  //
+  // RLS enable/policies/FORCE are owned by Prisma migrations
+  // (20260425000000_enable_rls_foundation and later). The old mutating
+  // version of this step silently failed on every CREATE POLICY
+  // (Postgres has no `CREATE POLICY IF NOT EXISTS`) while its ENABLE
+  // loop still ran — that out-of-band drift is how Tenant/OutboxEvent
+  // ended up with RLS enabled and zero policies. This step now only
+  // reports state and flags dangerous combinations.
   // ============================================================
-  console.log('🔒 Step 4: Row-Level Security...');
+  console.log('🔒 Step 4: Row-Level Security (verify, owned by migrations)...');
 
-  const rlsTables = [
-    'Tenant', 'User', 'Site', 'Report', 'ReportAnalytics',
-    'ReportStats', 'OperatorPerformance', 'DowntimeSummary',
-    'SiteWeeklyTrend', 'AuditLog', 'OutboxEvent', 'TelemetryRecord',
-  ];
+  const rlsState: { relname: string; rls: boolean; forced: boolean; policies: number }[] =
+    await prisma.$queryRawUnsafe(`
+      SELECT c.relname,
+             c.relrowsecurity AS rls,
+             c.relforcerowsecurity AS forced,
+             (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid = c.oid) AS policies
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity
+      ORDER BY c.relname`);
 
-  let enabledRLS = 0;
-  for (const table of rlsTables) {
-    try {
-      await prisma.$executeRawUnsafe(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
-      enabledRLS++;
-    } catch {
-      // Already enabled
+  let rlsProblems = 0;
+  for (const t of rlsState) {
+    if (t.policies === 0) {
+      rlsProblems++;
+      console.warn(`  ⚠️  "${t.relname}": RLS enabled but NO policies — non-owner roles are locked out${t.forced ? ' (FORCED: owner too!)' : ''}`);
+    } else if (!t.forced) {
+      rlsProblems++;
+      console.warn(`  ⚠️  "${t.relname}": RLS not FORCED — table owner bypasses all policies`);
     }
   }
 
-  // Tenant isolation policies
-  const rlsPolicies = [
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_user ON "User"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_site ON "Site"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_report ON "Report"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_stats ON "ReportStats"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_operator ON "OperatorPerformance"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_downtime ON "DowntimeSummary"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_trend ON "SiteWeeklyTrend"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_audit ON "AuditLog"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_outbox ON "OutboxEvent"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-
-    `CREATE POLICY IF NOT EXISTS tenant_isolation_telemetry ON "TelemetryRecord"
-      USING ("tenantId" IS NULL OR "tenantId" = current_setting('app.current_tenant', true))`,
-  ];
-
-  let appliedPolicies = 0;
-  for (const sql of rlsPolicies) {
-    try {
-      await prisma.$executeRawUnsafe(sql);
-      appliedPolicies++;
-    } catch (e: any) {
-      if (!e.message?.includes('already exists')) {
-        console.warn(`  ⚠️  Policy skipped: ${e.message?.substring(0, 100)}`);
-      }
-    }
-  }
-
-  console.log(`  ✅ ${enabledRLS} tables RLS enabled, ${appliedPolicies} policies applied\n`);
+  console.log(`  ✅ ${rlsState.length} tables with RLS (${rlsState.filter(t => t.forced).length} forced), ${rlsProblems} warnings\n`);
 
   // ============================================================
   // 5. VACUUM ANALYZE
@@ -341,7 +283,7 @@ async function applyHardening(prisma: any) {
   console.log(`  ✅ ${appliedChecks} CHECK constraints`);
   console.log(`  ✅ ${appliedIdx} partial indexes`);
   console.log(`  ✅ ${appliedSoft} soft delete columns + ${appliedSoftIdx} partial indexes`);
-  console.log(`  ✅ ${enabledRLS} tables with RLS, ${appliedPolicies} policies`);
+  console.log(`  ✅ RLS verified: ${rlsState.length} tables, ${rlsProblems} warnings (RLS itself is managed by migrations)`);
   console.log('\nTo set tenant context before queries:');
   console.log("  SET app.current_tenant = 'tenant-id-here';");
 }

@@ -13,6 +13,7 @@
 | [0005](0005-failure-design-approach.md) | Failure Design Document Approach | Accepted | 2026-04-08 |
 | [0006](0006-event-system-consolidation.md) | Event System Consolidation | Accepted | 2026-04-08 |
 | [0007](0007-bounded-context-vs-service-layer.md) | Bounded Contexts vs Service Layer | Accepted | 2026-04-24 |
+| [0008](0008-db-conventions-cuid-camelcase-no-fts.md) | Соглашения БД: cuid-ID, camelCase, без FTS — остаются | Accepted | 2026-07-02 |
 
 ## Как добавить новый ADR
 
