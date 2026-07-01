@@ -17,6 +17,12 @@ export const DELETE = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.manage_all');
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
@@ -26,8 +32,20 @@ export const DELETE = withMutation(
       );
     }
 
+    // Tenant ownership (IDOR guard, fail-closed): reportId is globally
+    // unique, so a delete-by-reportId with no tenant check would let this
+    // caller's tenant delete any tenant's report. Verify scope before the
+    // (irreversible) delete, mirroring dictionary-service.ts's pattern.
+    const report = await db.report.findFirst({
+      where: { reportId: parsed.data.reportId, tenantId },
+      select: { id: true },
+    });
+    if (!report) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+
     try {
-      await db.report.delete({ where: { reportId: parsed.data.reportId } });
+      await db.report.delete({ where: { id: report.id } });
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
       if (message.includes('Record to delete') || message.includes('not found')) {
