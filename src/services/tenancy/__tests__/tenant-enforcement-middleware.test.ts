@@ -11,14 +11,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { NextResponse } from 'next/server';
 import {
   tenantContextStorage,
   getCurrentTenantId,
   withTenantContext,
   requireTenant,
   tenantWhere,
-  applySecurityHeaders,
 } from '../tenant-enforcement-middleware';
 
 const ENV_KEYS = ['MULTI_TENANT_MODE', 'DEFAULT_TENANT_ID'] as const;
@@ -118,33 +116,4 @@ describe('tenant-enforcement-middleware', () => {
       expect(() => tenantWhere({ status: 'active' })).toThrow(/Tenant ID is required/);
     });
   });
-
-  describe('applySecurityHeaders', () => {
-    it('sets the hardening headers and strips x-powered-by', () => {
-      const res = NextResponse.json({ ok: true });
-      res.headers.set('x-powered-by', 'Next.js');
-
-      const out = applySecurityHeaders(res);
-
-      expect(out.headers.get('X-Frame-Options')).toBe('DENY');
-      expect(out.headers.get('X-Content-Type-Options')).toBe('nosniff');
-      expect(out.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
-      expect(out.headers.get('x-powered-by')).toBeNull();
-    });
-
-    it('adds a request id when absent', () => {
-      const res = applySecurityHeaders(NextResponse.json({ ok: true }));
-      expect(out_id(res)).toMatch(/[0-9a-f-]{36}/);
-    });
-
-    it('preserves an existing request id', () => {
-      const res = NextResponse.json({ ok: true });
-      res.headers.set('x-request-id', 'fixed-id');
-      expect(out_id(applySecurityHeaders(res))).toBe('fixed-id');
-    });
-  });
 });
-
-function out_id(res: NextResponse): string | null {
-  return res.headers.get('x-request-id');
-}

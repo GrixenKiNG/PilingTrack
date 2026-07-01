@@ -10,5 +10,4 @@ export {
   requireTenant,
   tenantWhere,
   getCurrentTenantId,
-  applySecurityHeaders,
 } from '@/services/tenancy/tenant-enforcement-middleware';

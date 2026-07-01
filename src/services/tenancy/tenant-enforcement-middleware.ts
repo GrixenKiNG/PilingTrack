@@ -19,7 +19,7 @@
  *   }
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { resolveTenantContext, isMultiTenantMode } from '@/services/tenancy/tenant-context-service';
 
 // Async local storage for tenant context
@@ -73,28 +73,4 @@ export function tenantWhere<T extends Record<string, unknown>>(
     return { ...where, tenantId } as T;
   }
   return where;
-}
-
-/**
- * Security headers + CSRF for API routes (replaces Edge middleware).
- * This is called at the API route level, not as Edge middleware.
- */
-export function applySecurityHeaders(response: NextResponse): NextResponse {
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-XSS-Protection', '0');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
-  );
-  response.headers.set('X-DNS-Prefetch-Control', 'off');
-  response.headers.delete('x-powered-by');
-
-  // Add request ID if not present
-  if (!response.headers.has('x-request-id')) {
-    response.headers.set('x-request-id', crypto.randomUUID());
-  }
-
-  return response;
 }
