@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Users, Clock, AlertTriangle, ExternalLink, Wrench, BookText, FileX } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { FleetCard } from './fleet-types';
 import { STATUS_META, KIND_LABEL } from './equipment-status';
 import { getMaintenanceFlag } from './equipment-maintenance-flag';
+import { getEquipmentBrand } from './equipment-brand-logo';
 
 const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('ru'));
 const formatNum = (n: number | null | undefined, digits = 0) =>
@@ -28,6 +30,7 @@ export function EquipmentTile({
   onSelect: (id: string) => void;
 }) {
   const st = STATUS_META[card.status];
+  const brand = getEquipmentBrand(card.model);
   const flag = getMaintenanceFlag(card);
   const t = card.todayTotals;
   const stateLabel = flag ? 'Плановое ТО' : card.status === 'active' ? 'В работе' : 'Не активна';
@@ -50,7 +53,20 @@ export function EquipmentTile({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900">{card.name}</p>
+            <div className="flex items-center gap-1.5">
+              {brand && (
+                <Image
+                  src={brand.logoSrc}
+                  alt={brand.name}
+                  title={brand.name}
+                  width={16}
+                  height={16}
+                  className="h-4 w-4 shrink-0 object-contain"
+                  unoptimized
+                />
+              )}
+              <p className="truncate text-sm font-semibold text-slate-900">{card.name}</p>
+            </div>
             <p className="text-xs text-slate-500">
               {KIND_LABEL[card.kind]}
               {card.manufactureYear ? ` · ${card.manufactureYear} г.` : ''}

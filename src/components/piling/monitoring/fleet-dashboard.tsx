@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ import { usePilingStore } from '@/lib/store';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { EQUIPMENT_STATUS_META } from '@/components/piling/admin-equipment/equipment-status';
+import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';
 
 type SortBy = 'status' | 'name' | 'lastReport';
 
@@ -316,6 +318,7 @@ const STATUS_COLOR: Record<EquipmentStatus, { dot: string; ring: string; bg: str
 
 function EquipmentCardView({ card }: { card: FleetCard }) {
   const s = STATUS_COLOR[card.status];
+  const brand = getEquipmentBrand(card.model);
   const role = usePilingStore((st) => st.currentUser?.role);
   // Equipment detail lives under /admin and is gated to ADMIN/DISPATCHER; for
   // operators the link only bounced back to /operator, so render a plain
@@ -329,6 +332,17 @@ function EquipmentCardView({ card }: { card: FleetCard }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className={cn('h-2.5 w-2.5 rounded-full ring-4', s.dot, s.ring)} aria-label={s.label} />
+              {brand && (
+                <Image
+                  src={brand.logoSrc}
+                  alt={brand.name}
+                  title={brand.name}
+                  width={16}
+                  height={16}
+                  className="h-4 w-4 shrink-0 object-contain"
+                  unoptimized
+                />
+              )}
               <h3 className="truncate text-base font-semibold leading-tight">{card.name}</h3>
               {card.equipmentStatus === 'repair' && (
                 <span className={cn('rounded-md border px-1.5 py-0.5 text-3xs font-semibold', EQUIPMENT_STATUS_META.repair.badge)}>
