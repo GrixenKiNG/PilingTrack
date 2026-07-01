@@ -58,8 +58,10 @@ if curl -fsS --max-time 20 -X POST "$WEBHOOK_URL" \
      -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $token" \
      -d "$payload" >/dev/null; then
-  mkdir -p "$(dirname "$STAMP")" 2>/dev/null || true
-  echo "$now" > "$STAMP" 2>/dev/null || true
+  # Best-effort cooldown stamp. Wrapped in a subshell so a non-writable path
+  # (e.g. a manual run as a non-root user — the systemd timer runs as root and
+  # can write /run) fails silently instead of leaking a redirect error.
+  ( echo "$now" > "$STAMP" ) 2>/dev/null || true
   echo "disk-guard: alert sent (disk ${used}%)"
 else
   echo "disk-guard: disk ${used}% but webhook POST failed" >&2
