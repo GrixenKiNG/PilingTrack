@@ -57,7 +57,9 @@ export function AdminTelegram() {
     setDialogMode('edit');
     setEditingId(config.id);
     setNewLabel(config.label);
-    setNewBotToken(config.botToken);
+    // Left blank on purpose: the token is a secret, never re-shown in plain
+    // text once saved. Blank means "keep the current token" on save.
+    setNewBotToken('');
     setNewChatId(config.chatId);
   };
 
@@ -108,20 +110,22 @@ export function AdminTelegram() {
   }, [loadData]);
 
   const handleSave = async () => {
-    if (!newLabel.trim() || !newBotToken.trim() || !newChatId.trim()) {
+    const isEdit = dialogMode === 'edit' && editingId;
+    // Token is required to create a new config, but optional when editing —
+    // an empty field means "keep the current token" (it's never re-shown).
+    if (!newLabel.trim() || !newChatId.trim() || (!isEdit && !newBotToken.trim())) {
       toast.error('Заполните все поля');
       return;
     }
     setSaving(true);
     try {
-      const isEdit = dialogMode === 'edit' && editingId;
       const res = await authFetch('/api/telegram/configs', {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(isEdit ? { id: editingId } : {}),
           label: newLabel.trim(),
-          botToken: newBotToken.trim(),
+          ...(newBotToken.trim() ? { botToken: newBotToken.trim() } : {}),
           chatId: newChatId.trim(),
         }),
       });
@@ -343,10 +347,12 @@ export function AdminTelegram() {
             <div className="space-y-1.5">
               <Label>Bot Token</Label>
               <Input
+                type="password"
                 value={newBotToken}
                 onChange={(e) => setNewBotToken(e.target.value)}
-                placeholder="123456:ABC-DEF..."
+                placeholder={dialogMode === 'edit' ? 'Оставьте пустым, чтобы не менять' : '123456:ABC-DEF...'}
                 className="h-11 font-mono text-xs"
+                autoComplete="new-password"
               />
             </div>
             <div className="space-y-1.5">

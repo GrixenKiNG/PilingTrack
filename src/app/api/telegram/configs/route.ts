@@ -25,7 +25,12 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'telegram.manage');
-    const configs = await listTelegramConfigs();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
+    const configs = await listTelegramConfigs(tenantId);
     return NextResponse.json({ configs });
   },
   { domain: 'telegram', cache: true, cacheTTL: 60_000 }
@@ -38,6 +43,11 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'telegram.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const body = await request.json();
 
     const validation = telegramConfigSchema.safeParse(body);
@@ -48,7 +58,7 @@ export const POST = withMutation(
       );
     }
 
-    const config = await createTelegramConfig(validation.data);
+    const config = await createTelegramConfig(tenantId, validation.data);
     getResponseCache('telegram').invalidateAll();
     return NextResponse.json({ config }, { status: 201 });
   },
@@ -62,6 +72,11 @@ export const PUT = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'telegram.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const body = await request.json();
 
     const validation = telegramConfigIdSchema.safeParse(body);
@@ -73,7 +88,7 @@ export const PUT = withMutation(
     }
 
     const { id, ...data } = validation.data;
-    const config = await updateTelegramConfig(id, data);
+    const config = await updateTelegramConfig(tenantId, id, data);
     getResponseCache('telegram').invalidateAll();
     return NextResponse.json({ config });
   },
@@ -87,6 +102,11 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'telegram.manage');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    }
     const body = await request.json();
 
     const validation = deleteIdSchema.safeParse(body);
@@ -97,7 +117,7 @@ export const DELETE = withMutation(
       );
     }
 
-    const result = await deleteTelegramConfig(validation.data.id);
+    const result = await deleteTelegramConfig(tenantId, validation.data.id);
     getResponseCache('telegram').invalidateAll();
     return NextResponse.json(result);
   },

@@ -32,10 +32,16 @@ async function getDbClient() {
 
 async function getConfig(): Promise<TelegramBotConfig | null> {
   try {
+    // Callers (webhook, DLQ, alert engine, report event handlers) run without
+    // a user session, so there's no per-request tenant — fall back to the
+    // deployment's default tenant, same as every other background path.
+    const tenantId = process.env.DEFAULT_TENANT_ID;
+    if (!tenantId) return null;
+
     const db = await getDbClient();
     const { decrypt, isEncrypted } = await import('@/core/security/encryption');
     const configs = await db.telegramConfig.findMany({
-      where: { enabled: true },
+      where: { enabled: true, tenantId },
       orderBy: { createdAt: 'asc' },
     });
 

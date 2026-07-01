@@ -6,7 +6,7 @@
  *   https://api.telegram.org/botenc:.../...
  * and silently failed. Fix decrypts the token via @/core/security/encryption.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { findManyMock, decryptMock, isEncryptedMock } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
@@ -31,17 +31,29 @@ import { telegramNotifier } from '../telegram';
 
 describe('telegramNotifier — botToken decryption', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
     findManyMock.mockReset();
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
+    // getConfig() has no per-request tenant (this notifier is called from
+    // background paths — webhook, DLQ, alert engine), so it resolves the
+    // deployment's default tenant instead.
+    process.env.DEFAULT_TENANT_ID = 'test-tenant';
     fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ result: { title: 'Test Chat' } }),
       text: async () => '',
     });
     vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    // Restore process.env — a mutation here would otherwise leak into other
+    // test files sharing this worker (vitest does not snapshot process.env).
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
   });
 
   it('decrypts enc:-prefixed botToken before calling Telegram API', async () => {
@@ -79,5 +91,25 @@ describe('telegramNotifier — botToken decryption', () => {
     const res = await telegramNotifier.testConnection();
     expect(res).toEqual({ ok: false, error: 'Not configured' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('scopes the config lookup by the default tenant', async () => {
+    findManyMock.mockResolvedValue([
+      { botToken: '999:plain-token', chatId: '-100123', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+
+    await telegramNotifier.testConnection();
+
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { enabled: true, tenantId: 'test-tenant' } }),
+    );
+  });
+
+  it('fails closed (no config, no DB call) when DEFAULT_TENANT_ID is unset', async () => {
+    delete process.env.DEFAULT_TENANT_ID;
+    const res = await telegramNotifier.testConnection();
+    expect(res).toEqual({ ok: false, error: 'Not configured' });
+    expect(findManyMock).not.toHaveBeenCalled();
   });
 });

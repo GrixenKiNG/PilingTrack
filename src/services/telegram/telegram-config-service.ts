@@ -10,8 +10,17 @@ function normalizeText(value: unknown, field: string) {
   return normalized;
 }
 
-export async function listTelegramConfigs() {
+function requireTenantId(tenantId: string) {
+  if (!tenantId) {
+    throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  }
+  return tenantId;
+}
+
+export async function listTelegramConfigs(tenantId: string) {
+  requireTenantId(tenantId);
   const configs = await db.telegramConfig.findMany({
+    where: { tenantId },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -32,17 +41,22 @@ export async function listTelegramConfigs() {
   });
 }
 
-export async function createTelegramConfig(input: {
-  label: unknown;
-  botToken: unknown;
-  chatId: unknown;
-  enabled?: unknown;
-}) {
+export async function createTelegramConfig(
+  tenantId: string,
+  input: {
+    label: unknown;
+    botToken: unknown;
+    chatId: unknown;
+    enabled?: unknown;
+  }
+) {
+  requireTenantId(tenantId);
   const rawBotToken = normalizeText(input.botToken, 'botToken');
   const encryptedBotToken = encrypt(rawBotToken);
 
   return db.telegramConfig.create({
     data: {
+      tenantId,
       label: normalizeText(input.label, 'label'),
       botToken: encryptedBotToken,
       chatId: normalizeText(input.chatId, 'chatId'),
@@ -52,6 +66,7 @@ export async function createTelegramConfig(input: {
 }
 
 export async function updateTelegramConfig(
+  tenantId: string,
   id: string,
   input: {
     label?: unknown;
@@ -60,8 +75,16 @@ export async function updateTelegramConfig(
     enabled?: unknown;
   }
 ) {
+  requireTenantId(tenantId);
   if (!id) {
     throw new ServiceError('id required', 400);
+  }
+
+  // Tenant ownership (IDOR guard): verify the config belongs to this tenant
+  // before touching it — id alone is not enough.
+  const existing = await db.telegramConfig.findFirst({ where: { id, tenantId }, select: { id: true } });
+  if (!existing) {
+    throw new ServiceError('Config not found', 404);
   }
 
   const data: Record<string, unknown> = {};
@@ -86,9 +109,16 @@ export async function updateTelegramConfig(
   }
 }
 
-export async function deleteTelegramConfig(id: string) {
+export async function deleteTelegramConfig(tenantId: string, id: string) {
+  requireTenantId(tenantId);
   if (!id) {
     throw new ServiceError('id required', 400);
+  }
+
+  // Tenant ownership (IDOR guard) before an irreversible delete.
+  const existing = await db.telegramConfig.findFirst({ where: { id, tenantId }, select: { id: true } });
+  if (!existing) {
+    throw new ServiceError('Config not found', 404);
   }
 
   try {
