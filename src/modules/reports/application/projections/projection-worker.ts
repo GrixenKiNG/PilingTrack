@@ -466,7 +466,13 @@ export function startProjectionWorker(intervalMs = 5000) {
     logger.info('Projection worker starting', { intervalMs });
   }
 
+  // Re-entrancy guard: don't let a new pass start while the previous is still
+  // running (projections are idempotent, but overlapping passes just pile up
+  // duplicate DB work). Mirrors the guard in startOutboxWorker.
+  let running = false;
   const processOnce = async () => {
+    if (running) return;
+    running = true;
     try {
       const count = await projectOutboxEvents(projectEvent);
       if (count > 0) {
@@ -474,6 +480,8 @@ export function startProjectionWorker(intervalMs = 5000) {
       }
     } catch (error) {
       logger.error('Projection worker error', error);
+    } finally {
+      running = false;
     }
   };
 

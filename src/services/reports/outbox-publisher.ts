@@ -229,7 +229,18 @@ export function startOutboxWorker(
   handler: (event: ReportDomainEvent) => Promise<void>,
   intervalMs: number = 10000 // 10 seconds
 ) {
+  // Re-entrancy guard. consumeOutboxEvents dispatches the handler BEFORE it
+  // atomically claims the row (dispatch-then-mark, so a failed handler retries).
+  // The handlers include a NON-idempotent Telegram send (report PDF). With a
+  // naive setInterval, a slow pass (PDF render + Telegram upload can take longer
+  // than intervalMs — the embedded worker polls every 2s) lets the next tick
+  // start while the previous is mid-send: both findMany the same not-yet-claimed
+  // row and both send the PDF → duplicate Telegram reports. Skipping a tick
+  // while a pass is still running makes dispatch effectively single-flight.
+  let running = false;
   const processOnce = async () => {
+    if (running) return;
+    running = true;
     try {
       const count = await publishOutboxEvents(handler);
       if (count > 0) {
@@ -237,6 +248,8 @@ export function startOutboxWorker(
       }
     } catch (error) {
       logger.error('Outbox worker error', error);
+    } finally {
+      running = false;
     }
   };
 

@@ -265,6 +265,36 @@ describe('Outbox Publisher', () => {
       worker.stop();
     });
 
+    it('does not overlap passes: a tick during an in-flight pass is skipped (re-entrancy guard)', async () => {
+      // Guards the duplicate-Telegram-report bug: consumeOutboxEvents dispatches
+      // the (non-idempotent) handler before claiming the row, so an overlapping
+      // pass would re-send the same not-yet-published report PDF. Simulate a slow
+      // pass by hanging the first findMany, then fire the interval again.
+      let releaseFirstPass!: () => void;
+      mocks.mockFindMany.mockImplementationOnce(
+        () => new Promise((resolve) => { releaseFirstPass = () => resolve([]); })
+      );
+      mocks.mockFindMany.mockResolvedValue([]);
+
+      const handler = vi.fn().mockResolvedValue(undefined);
+      const worker = startOutboxWorker(handler, 1000);
+
+      // Immediate processOnce() has entered and is awaiting the hanging findMany.
+      await Promise.resolve();
+      expect(mocks.mockFindMany).toHaveBeenCalledTimes(1);
+
+      // A tick fires while the first pass is still in flight — must be skipped.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mocks.mockFindMany).toHaveBeenCalledTimes(1);
+
+      // Once the first pass finishes, later ticks run normally again.
+      releaseFirstPass();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mocks.mockFindMany.mock.calls.length).toBeGreaterThan(1);
+
+      worker.stop();
+    });
+
     it('stops polling after worker.stop()', async () => {
       mocks.mockFindMany.mockResolvedValue([]);
 
