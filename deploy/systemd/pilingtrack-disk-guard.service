@@ -1,0 +1,11 @@
+[Unit]
+Description=PilingTrack independent host disk guard
+After=docker.service
+
+[Service]
+Type=oneshot
+# Override defaults here if needed, e.g.:
+#   Environment=DISK_GUARD_THRESHOLD=80
+ExecStart=/bin/bash /opt/pilingtrack/scripts/disk-guard.sh
+StandardOutput=journal
+StandardError=journal
