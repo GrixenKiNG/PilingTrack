@@ -98,6 +98,29 @@ export function findOverdueMaintenance(
   );
 }
 
+/** Open work orders/inspections older than this are flagged as stale. */
+export const STALE_OPEN_ORDER_DAYS = 14;
+
+const OPEN_ORDER_TERMINAL = new Set(['DONE', 'CANCELLED']);
+
+/**
+ * Days an order has been sitting open, or null when it's closed / younger
+ * than the staleness threshold. Open orders used to live "В работе" forever
+ * with no visual difference from fresh ones, so the journal stopped being a
+ * signal (10+ inspections «В процессе» from weeks ago looked normal).
+ */
+export function staleOpenOrderDays(
+  order: { status: string; createdAt: string | Date | null | undefined },
+  now: Date = new Date(),
+): number | null {
+  if (OPEN_ORDER_TERMINAL.has(order.status)) return null;
+  if (!order.createdAt) return null;
+  const created = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+  if (Number.isNaN(created.getTime())) return null;
+  const days = Math.floor((now.getTime() - created.getTime()) / 86_400_000);
+  return days >= STALE_OPEN_ORDER_DAYS ? days : null;
+}
+
 /** Minimal equipment shape needed to judge crew coverage. */
 export interface CrewCandidate {
   id: string;

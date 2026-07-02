@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Wrench, Calendar } from 'lucide-react';
+import { MapPin, Wrench, Calendar, Gauge } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,11 +25,14 @@ interface ShiftInfoProps {
   equipment: { id: string; name: string }[];
   selectedEquipmentId: string;
   onEquipmentChange: (v: string) => void;
+  engineHours: string;
+  onEngineHoursChange: (v: string) => void;
 }
 
 export function ShiftInfo({
   date, onDateChange, shiftStart, onShiftStartChange, shiftEnd, onShiftEndChange,
   sites, selectedSiteId, onSiteChange, equipment, selectedEquipmentId, onEquipmentChange,
+  engineHours, onEngineHoursChange,
 }: ShiftInfoProps) {
   return (
     <>
@@ -71,6 +74,24 @@ export function ShiftInfo({
               </SelectContent>
             </Select>
           </div>
+          {selectedEquipmentId && (
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5" />Моточасы на конец смены
+                <span className="font-normal text-slate-400">(необязательно)</span>
+              </Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                placeholder="со счётчика, напр. 5701"
+                value={engineHours}
+                onChange={(e) => onEngineHoursChange(e.target.value)}
+                className="h-11 font-mono"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
     </>

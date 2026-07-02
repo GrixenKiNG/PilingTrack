@@ -29,6 +29,7 @@ export interface UseReportFormReturn {
   downtimeReasons: DowntimeReasonDTO[];
   equipment: { id: string; name: string }[];
   selectedEquipmentId: string; setSelectedEquipmentId: (v: string) => void;
+  engineHours: string; setEngineHours: (v: string) => void;
   selectedFieldId: string; setSelectedFieldId: (v: string) => void;
   selectedClusterId: string; setSelectedClusterId: (v: string) => void;
   selectedPicketId: string; setSelectedPicketId: (v: string) => void;
@@ -91,6 +92,8 @@ export function useReportForm(): UseReportFormReturn {
   const [downtimeReasons, setDowntimeReasons] = useState<DowntimeReasonDTO[]>([]);
   const [equipment, setEquipment] = useState<{ id: string; name: string }[]>([]);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
+  // Optional end-of-shift engine-hours reading (kept as string for the input).
+  const [engineHours, setEngineHours] = useState('');
 
   const [selectedFieldId, setSelectedFieldId] = useState('');
   const [selectedClusterId, setSelectedClusterId] = useState('');
@@ -326,10 +329,15 @@ export function useReportForm(): UseReportFormReturn {
     const finalReportId = reportId || crypto.randomUUID();
     setSubmitting(true);
     try {
+      const parsedEngineHours = Number(engineHours);
       const payload: CreateReportPayload = {
         reportId: finalReportId, userId: user.id, siteId: selectedSiteId, date, shiftStart, shiftEnd,
         version: baseVersion,
         equipmentId: selectedEquipmentId || undefined,
+        engineHours:
+          engineHours.trim() !== '' && Number.isInteger(parsedEngineHours) && parsedEngineHours >= 0
+            ? parsedEngineHours
+            : undefined,
         piles: effectivePiles.map((p) => ({ picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
         drillings: effectiveDrillings.map((d) => ({ picketId: d.picketId || undefined, typeId: d.typeId, count: d.count, metersPerUnit: d.metersPerUnit, meters: d.meters })),
         downtimes: effectiveDowntimes.map((dt) => ({ reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || undefined })),
@@ -346,6 +354,9 @@ export function useReportForm(): UseReportFormReturn {
       }
       if (!res.ok) throw new Error(result?.error || 'Ошибка отправки отчёта');
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
+      // Reading saved but looks suspicious (below the previous maximum) —
+      // tell the operator without failing anything.
+      if (result?.meterWarning) toast.warning(result.meterWarning);
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });
       if (user && selectedSiteId && date) localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);
       // Show the confirmation screen instead of redirecting silently; its
@@ -362,6 +373,7 @@ export function useReportForm(): UseReportFormReturn {
     reportId, date, setDate, shiftStart, setShiftStart, shiftEnd, setShiftEnd,
     sites, siteTree, setSiteTree, selectedSiteId: selectedSiteId || '', setSelectedSiteId: setSelectedSite,
     pileGrades, drillingTypes, downtimeReasons, equipment, selectedEquipmentId, setSelectedEquipmentId,
+    engineHours, setEngineHours,
     selectedFieldId, setSelectedFieldId, selectedClusterId, setSelectedClusterId, selectedPicketId, setSelectedPicketId,
     piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,

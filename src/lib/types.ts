@@ -197,6 +197,8 @@ export interface CreateReportPayload {
   shiftStart?: string;
   shiftEnd?: string;
   equipmentId?: string;
+  /** Optional end-of-shift engine-hours reading → rig's MeterReading journal. */
+  engineHours?: number;
   piles: {
     picketId?: string;
     pileGradeId: string;

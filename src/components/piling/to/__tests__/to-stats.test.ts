@@ -5,6 +5,7 @@ import {
   computeToStats,
   findOverdueMaintenance,
   findUncrewedEquipment,
+  staleOpenOrderDays,
   daysUntil,
   dueText,
   type JournalRecord,
@@ -126,6 +127,21 @@ describe('findOverdueMaintenance', () => {
       NOW,
     );
     expect(out.map((o) => o.id)).toEqual(['big', 'small']);
+  });
+});
+
+describe('staleOpenOrderDays', () => {
+  const NOW = new Date('2026-07-02T00:00:00Z');
+
+  it('flags an open order older than the threshold with its age in days', () => {
+    expect(staleOpenOrderDays({ status: 'IN_PROGRESS', createdAt: '2026-06-10T00:00:00Z' }, NOW)).toBe(22);
+  });
+
+  it('returns null for fresh, closed, or dateless orders', () => {
+    expect(staleOpenOrderDays({ status: 'IN_PROGRESS', createdAt: '2026-06-25T00:00:00Z' }, NOW)).toBeNull();
+    expect(staleOpenOrderDays({ status: 'DONE', createdAt: '2026-01-01T00:00:00Z' }, NOW)).toBeNull();
+    expect(staleOpenOrderDays({ status: 'CANCELLED', createdAt: '2026-01-01T00:00:00Z' }, NOW)).toBeNull();
+    expect(staleOpenOrderDays({ status: 'PLANNED', createdAt: null }, NOW)).toBeNull();
   });
 });
 

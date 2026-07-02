@@ -62,6 +62,7 @@ export function ReportForm() {
     sites, siteTree, selectedSiteId, setSelectedSiteId,
     pileGrades, drillingTypes, downtimeReasons, equipment,
     selectedEquipmentId, setSelectedEquipmentId,
+    engineHours, setEngineHours,
     selectedFieldId, setSelectedFieldId, selectedClusterId, setSelectedClusterId,
     selectedPicketId, setSelectedPicketId,
     piles, drillings, downtimes,
@@ -174,7 +175,8 @@ export function ReportForm() {
           <ShiftInfo date={date} onDateChange={setDate} shiftStart={shiftStart} onShiftStartChange={setShiftStart}
             shiftEnd={shiftEnd} onShiftEndChange={setShiftEnd}
             sites={sites} selectedSiteId={selectedSiteId} onSiteChange={handleSiteChange}
-            equipment={equipment} selectedEquipmentId={selectedEquipmentId} onEquipmentChange={setSelectedEquipmentId} />
+            equipment={equipment} selectedEquipmentId={selectedEquipmentId} onEquipmentChange={setSelectedEquipmentId}
+            engineHours={engineHours} onEngineHoursChange={setEngineHours} />
 
           {selectedSiteId && siteTree && siteTree.fields.length > 0 && (
             <CascadingSelect siteTree={siteTree} selectedFieldId={selectedFieldId} selectedClusterId={selectedClusterId}

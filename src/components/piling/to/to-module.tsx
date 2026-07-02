@@ -44,6 +44,7 @@ import {
   computeToStats,
   findOverdueMaintenance,
   findUncrewedEquipment,
+  staleOpenOrderDays,
   dueText,
 } from './to-stats';
 
@@ -533,6 +534,7 @@ function JournalRow({ record }: { record: JournalRecord }) {
   const isInspection = isInspectionRecord(record);
   const href = isInspection && record.inspection ? `/inspections/${record.inspection.id}` : '/admin/maintenance';
   const score = record.inspection?.healthScore;
+  const staleDays = staleOpenOrderDays(record);
 
   return (
     <tr className="align-top hover:bg-orange-50/30">
@@ -565,6 +567,13 @@ function JournalRow({ record }: { record: JournalRecord }) {
         <span className={cn('inline-flex rounded border px-2 py-1 text-2xs font-semibold', STATUS_STYLE[record.status] ?? STATUS_STYLE.PLANNED)}>
           {STATUS_LABEL[record.status] ?? record.status}
         </span>
+        {staleDays != null && (
+          <div className="mt-1">
+            <span className="inline-flex rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-2xs font-semibold text-rose-700">
+              просрочен · {staleDays} дн.
+            </span>
+          </div>
+        )}
       </td>
     </tr>
   );

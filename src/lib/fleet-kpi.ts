@@ -5,13 +5,17 @@
  *
  * Definitions (per the maintenance design spec §6):
  * - Failure  = a REPAIR or FAULT work order.
- * - Downtime = Σ (completedAt − startedAt) over failures that have both stamps.
+ * - Downtime = Σ (completedAt − startedAt) over closed failures, PLUS the
+ *   still-running time of OPEN failures (startedAt ?? createdAt → now, clamped
+ *   to the period). A rig sitting in an unclosed repair used to contribute
+ *   zero downtime, so availability showed 100% during a live repair.
  * - Fleet hours = period length × equipment count (total machine-hours).
  * - Operating hours = fleet hours − downtime.
  * - MTBF = operating hours / failure count.
- * - MTTR = mean repair duration (hours).
+ * - MTTR = mean repair duration (hours) — closed repairs only.
  * - Availability = operating hours / fleet hours (0..1).
- * - PM compliance = scheduled WOs closed / scheduled WOs in period.
+ * - PM compliance = scheduled WOs closed / scheduled WOs **with a planned
+ *   date**. Undated open WOs (zombie orders) used to inflate the denominator.
  */
 
 const HOUR_MS = 3_600_000;
@@ -27,6 +31,10 @@ export interface KpiRecord {
   startedAt: string | Date | null;
   completedAt: string | Date | null;
   cost: number | null;
+  /** Fallback start for open failures that never got startedAt. */
+  createdAt?: string | Date | null;
+  /** Planned date — only dated scheduled WOs count toward PM compliance. */
+  scheduledAt?: string | Date | null;
 }
 
 export interface ProblemRig {
@@ -61,10 +69,11 @@ const toMs = (v: string | Date | null): number | null => {
 
 export function computeFleetKpi(
   records: KpiRecord[],
-  opts: { from: Date; to: Date; equipmentCount: number },
+  opts: { from: Date; to: Date; equipmentCount: number; now?: Date },
 ): FleetKpi {
   const periodHours = Math.max(0, (opts.to.getTime() - opts.from.getTime()) / HOUR_MS);
   const fleetHours = periodHours * Math.max(0, opts.equipmentCount);
+  const nowMs = (opts.now ?? new Date()).getTime();
 
   const failures = records.filter((r) => FAILURE_TYPES.has(r.type));
   const failureCount = failures.length;
@@ -78,6 +87,17 @@ export function computeFleetKpi(
       const h = (c - s) / HOUR_MS;
       repairDurations.push(h);
       downtimeHours += h;
+    } else if (c == null && f.status !== 'DONE' && f.status !== 'CANCELLED') {
+      // Open failure: the rig is down right now. Count its running time
+      // (clamped to the report period) so availability reflects reality
+      // instead of showing 100% until someone closes the work order.
+      // Excluded from MTTR — that stays "mean duration of closed repairs".
+      const openStart = s ?? toMs(f.createdAt ?? null);
+      if (openStart != null) {
+        const end = Math.min(nowMs, opts.to.getTime());
+        const start = Math.max(openStart, opts.from.getTime());
+        if (end > start) downtimeHours += (end - start) / HOUR_MS;
+      }
     }
   }
 
@@ -89,7 +109,11 @@ export function computeFleetKpi(
   const mtbfHours = failureCount > 0 ? operatingHours / failureCount : null;
   const availability = fleetHours > 0 ? operatingHours / fleetHours : null;
 
-  const scheduled = records.filter((r) => SCHEDULED_TYPES.has(r.type));
+  // Only WOs with a planned date count: an undated WO can't be "on schedule"
+  // or "late", and stale undated orders were dragging compliance toward zero.
+  const scheduled = records.filter(
+    (r) => SCHEDULED_TYPES.has(r.type) && r.scheduledAt != null,
+  );
   const pmPlanned = scheduled.length;
   const pmClosed = scheduled.filter((r) => r.status === 'DONE').length;
   const pmCompliance = pmPlanned > 0 ? pmClosed / pmPlanned : null;
