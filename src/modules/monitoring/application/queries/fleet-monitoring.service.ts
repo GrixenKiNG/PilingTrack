@@ -148,8 +148,12 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
         },
       },
       maintenanceRecords: {
+        // Any OPEN repair/fault marks the rig — not just IN_PROGRESS. A logged
+        // but not-yet-started fault (PLANNED/ASSIGNED/ON_HOLD) still means the
+        // rig needs repair; filtering to IN_PROGRESS hid a CRITICAL fault from
+        // the fleet card while analytics counted it as a failure (mismatch).
         where: {
-          status: 'IN_PROGRESS',
+          status: { notIn: ['DONE', 'CANCELLED'] },
           type: { in: ['REPAIR', 'FAULT'] },
         },
         take: 1,
