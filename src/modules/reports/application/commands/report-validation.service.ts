@@ -6,6 +6,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 export function validateDowntimeWithinShift(
   shiftStart?: string | null,
@@ -32,7 +33,9 @@ export function validateDowntimeWithinShift(
 }
 
 export function validateReportDateNotInFuture(date: string) {
-  const today = new Date().toISOString().split('T')[0];
+  // Business-timezone "today", not server UTC: with the server on UTC an
+  // operator's legitimate MSK "today" was rejected between 00:00 and 03:00 MSK.
+  const today = getTodayInTimezone();
   if (date > today) {
     throw new ServiceError('Дата отчёта не может быть в будущем', 400);
   }

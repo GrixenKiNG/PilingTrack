@@ -238,6 +238,10 @@ export interface ReportDTO {
   piles: (PileWorkDTO & { pileGrade: PileGradeDTO })[];
   drillings: (LeaderDrillingDTO & { type: DrillingTypeDTO })[];
   downtimes: (ReportDowntimeDTO & { reason: DowntimeReasonDTO })[];
+  /** Computed server-side in one batched media query (listReportsForReview). */
+  hasPhotos?: boolean;
+  /** First completed photo of the report, for the list thumbnail. */
+  thumbnailMediaId?: string | null;
 }
 
 export interface ReportListItemDTO {

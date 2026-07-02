@@ -51,7 +51,7 @@ import {
 function overdueLabel(item: OverdueMaintenance): string {
   const parts: string[] = [];
   if (item.overdueDays != null) parts.push(`просрочка ${item.overdueDays} дн.`);
-  if (item.overdueHours != null) parts.push(`+${item.overdueHours} м/ч сверх порога`);
+  if (item.overdueHours != null) parts.push(`+${item.overdueHours} м.ч. сверх порога`);
   return parts.join(' · ');
 }
 
@@ -423,8 +423,8 @@ export function ToModule() {
               <div className="space-y-3">
                 <InfoLine label="Молот" value={HAMMER_LABEL[selected.hammerKind]} />
                 <InfoLine label="Комбинированная" value={selected.isCombined ? 'Да, есть вращатель' : 'Нет'} />
-                <InfoLine label="Наработка" value={selected.engineHoursTotal != null ? `${selected.engineHoursTotal} м/ч` : 'не указана'} />
-                <InfoLine label="Следующий порог" value={selected.nextMaintenanceAtHours != null ? `${selected.nextMaintenanceAtHours} м/ч` : 'не задан'} />
+                <InfoLine label="Наработка" value={selected.engineHoursTotal != null ? `${selected.engineHoursTotal} м.ч.` : 'не указана'} />
+                <InfoLine label="Следующий порог" value={selected.nextMaintenanceAtHours != null ? `${selected.nextMaintenanceAtHours} м.ч.` : 'не задан'} />
                 <InfoLine label="Плановая дата" value={fmtDate(selected.nextMaintenanceDate)} hint={dueText(selected.nextMaintenanceDate)} />
               </div>
             ) : (
@@ -554,7 +554,7 @@ function JournalRow({ record }: { record: JournalRecord }) {
         </div>
       </td>
       <td className="px-3 py-3 font-mono text-sm text-slate-800">
-        {record.engineHoursAtService != null ? `${record.engineHoursAtService} м/ч` : '—'}
+        {record.engineHoursAtService != null ? `${record.engineHoursAtService} м.ч.` : '—'}
       </td>
       <td className="px-3 py-3">
         <span className={cn('inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 font-mono text-sm font-bold', scoreTone(score))}>

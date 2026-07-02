@@ -157,7 +157,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                     <span>исполнитель: {r.assigneeId ? resolveAssigneeName(r.assigneeId, names) : (r.performedBy || '—')}</span>
                     {r.scheduledAt && <span>план {formatRuDate(r.scheduledAt.slice(0, 10))}</span>}
                     {r.completedAt && <span>факт {formatRuDate(r.completedAt.slice(0, 10))}</span>}
-                    {r.engineHoursAtService != null && <span>{r.engineHoursAtService} м/ч</span>}
+                    {r.engineHoursAtService != null && <span>{r.engineHoursAtService} м.ч.</span>}
                     {r.cost != null && <span>{formatCost(r.cost)}</span>}
                   </div>
                   {r.description && <p className="mt-0.5 text-xs text-slate-400">{r.description}</p>}

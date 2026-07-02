@@ -20,10 +20,14 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { FeedbackEventDTO, FeedbackEventPriority } from '@/lib/types';
 
+// Shape of GET /api/ready (see src/app/api/ready) — the old ok/session fields
+// never existed in the response, so the panel permanently showed "unknown / not set".
 interface ReadyPayload {
   ready: boolean;
-  database?: { provider?: string; ok?: boolean };
-  session?: { configured?: boolean };
+  checks?: {
+    database?: { status?: string; latencyMs?: number };
+    environment?: { status?: string };
+  };
 }
 
 interface FeedbackSummary {
@@ -318,7 +322,7 @@ export function FeedbackCenter() {
                   {health?.ready ? 'Система готова' : 'Проверка состояния'}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  База: {health?.database?.ok ? 'ok' : 'unknown'} / Сессии: {health?.session?.configured ? 'ok' : 'not set'}
+                  База: {health?.checks?.database?.status === 'pass' ? 'в норме' : 'нет ответа'} / Окружение: {health?.checks?.environment?.status === 'pass' ? 'в норме' : 'проблема'}
                 </p>
               </div>
             )}

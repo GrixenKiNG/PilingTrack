@@ -42,10 +42,10 @@ const DUE_META: Record<PmDueStatus, { label: string; cls: string }> = {
 
 function dueDetail(p: Plan): string {
   if (p.triggerType === 'HOURS') {
-    if (p.due.hoursRemaining == null) return `каждые ${p.intervalHours ?? '—'} м/ч`;
+    if (p.due.hoursRemaining == null) return `каждые ${p.intervalHours ?? '—'} м.ч.`;
     return p.due.hoursRemaining >= 0
-      ? `осталось ${p.due.hoursRemaining} м/ч`
-      : `перебег ${Math.abs(p.due.hoursRemaining)} м/ч`;
+      ? `осталось ${p.due.hoursRemaining} м.ч.`
+      : `перебег ${Math.abs(p.due.hoursRemaining)} м.ч.`;
   }
   if (p.due.daysRemaining == null) return `каждые ${p.intervalDays ?? '—'} дн.`;
   return p.due.daysRemaining >= 0 ? `через ${p.due.daysRemaining} дн.` : `просрочка ${Math.abs(p.due.daysRemaining)} дн.`;
@@ -171,7 +171,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             min={1}
             value={interval}
             onChange={(e) => setIntervalValue(e.target.value)}
-            placeholder={trigger === 'HOURS' ? 'интервал, м/ч (напр. 250)' : 'интервал, дней (напр. 90)'}
+            placeholder={trigger === 'HOURS' ? 'интервал, м.ч. (напр. 250)' : 'интервал, дней (напр. 90)'}
             className="h-9"
           />
           <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>

@@ -61,7 +61,10 @@ async function applyHardening(prisma: any) {
     { name: 'chk_report_status_valid', sql: idempotentAdd('Report', 'chk_report_status_valid', `"status" IN ('draft', 'submitted')`) },
     { name: 'chk_report_shift_valid', sql: idempotentAdd('Report', 'chk_report_shift_valid', `"shiftType" IN ('DAY', 'NIGHT')`) },
     // Report.date is TEXT (clean 'YYYY-MM-DD', no time component) by design — cast for comparison.
-    { name: 'chk_report_date_not_future', sql: idempotentAdd('Report', 'chk_report_date_not_future', `"date"::date <= CURRENT_DATE`) },
+    // Compare against business-timezone "today" (MSK), not CURRENT_DATE: the DB runs on UTC,
+    // where MSK's "today" is still "tomorrow" between 00:00 and 03:00 MSK — legitimate
+    // night-shift reports would violate a CURRENT_DATE check.
+    { name: 'chk_report_date_not_future', sql: idempotentAdd('Report', 'chk_report_date_not_future', `"date"::date <= (now() AT TIME ZONE 'Europe/Moscow')::date`) },
     { name: 'chk_downtime_duration_positive', sql: idempotentAdd('ReportDowntime', 'chk_downtime_duration_positive', `"duration" >= 0`) },
     { name: 'chk_pile_count_positive', sql: idempotentAdd('PileWork', 'chk_pile_count_positive', `"count" > 0`) },
     { name: 'chk_drilling_meters_positive', sql: idempotentAdd('LeaderDrilling', 'chk_drilling_meters_positive', `"meters" >= 0`) },

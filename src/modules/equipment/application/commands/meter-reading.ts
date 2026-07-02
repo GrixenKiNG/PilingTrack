@@ -68,7 +68,7 @@ export async function addMeterReading(
     const prev = await latestReading(tx as typeof db, equipmentId);
     const warning =
       prev && input.engineHours < prev.engineHours
-        ? `Новое показание (${input.engineHours} м/ч) меньше предыдущего (${prev.engineHours} м/ч)`
+        ? `Новое показание (${input.engineHours} м.ч.) меньше предыдущего (${prev.engineHours} м.ч.)`
         : null;
 
     const reading = await tx.meterReading.create({

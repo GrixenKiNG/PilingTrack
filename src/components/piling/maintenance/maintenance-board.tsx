@@ -468,9 +468,9 @@ export function MaintenanceBoard() {
                           </div>
                         </td>
                         <td className="px-2.5 py-2.5">
-                          <div className="font-mono font-semibold text-slate-800">{currentHours(record) ?? '—'} м/ч</div>
+                          <div className="font-mono font-semibold text-slate-800">{currentHours(record) ?? '—'} м.ч.</div>
                           <div className={cn('mt-1 text-2xs', dueHours != null && dueHours <= 10 ? 'font-semibold text-orange-600' : 'text-slate-500')}>
-                            {dueHours != null ? `${dueHours >= 0 ? '+' : ''}${dueHours} м/ч` : '—'}
+                            {dueHours != null ? `${dueHours >= 0 ? '+' : ''}${dueHours} м.ч.` : '—'}
                           </div>
                         </td>
                         <td className="px-2.5 py-2.5">
@@ -705,13 +705,13 @@ function MaintenanceDetailPanel({
 
           <PanelSection title="Наработка">
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м/ч` : '—'} />
-              <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м/ч` : '—'} />
+              <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м.ч.` : '—'} />
+              <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м.ч.` : '—'} />
               <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                 <div className="h-full rounded-full bg-orange-500" style={{ width: `${progress}%` }} />
               </div>
-              <MetricLine label="Порог ТО" value={interval != null ? `${interval} м/ч` : 'не задан'} />
-              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
+              <MetricLine label="Порог ТО" value={interval != null ? `${interval} м.ч.` : 'не задан'} />
+              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м.ч.)` : 'не закрывалось'} />
             </div>
           </PanelSection>
 

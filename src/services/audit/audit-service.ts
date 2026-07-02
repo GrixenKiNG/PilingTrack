@@ -31,11 +31,24 @@ function describeAuditEvent(event: AuditEvent) {
         title: 'Слишком много попыток входа',
         message: 'Сработало ограничение по частоте попыток входа.',
       };
+    case 'auth.logout': // the logout route records this shorter action name
     case 'auth.logout.succeeded':
       return {
         level: 'info' as const,
         title: 'Выход выполнен',
         message: 'Сессия пользователя была завершена.',
+      };
+    case 'site.completed':
+      return {
+        level: 'info' as const,
+        title: 'Объект отмечен выполненным',
+        message: 'Работы на объекте отмечены как завершённые.',
+      };
+    case 'site.completion_cleared':
+      return {
+        level: 'info' as const,
+        title: 'Отметка выполнения снята',
+        message: 'Объект возвращён в работу.',
       };
     case 'report.created':
       return {

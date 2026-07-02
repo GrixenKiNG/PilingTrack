@@ -82,7 +82,29 @@ export function ReportForm() {
   const totalMeters = drillings.reduce((s, d) => s + d.meters, 0);
   const totalDrillingCount = drillings.reduce((s, d) => s + d.count, 0);
   const totalDowntime = downtimes.reduce((s, d) => s + d.duration, 0);
-  const hasEntries = piles.length > 0 || drillings.length > 0 || downtimes.length > 0;
+
+  // Filled-but-unconfirmed entry rows (the operator typed values but didn't tap
+  // "+"). They count as real entries: submit auto-commits them instead of
+  // blocking the whole report over a missed tap.
+  const pendingPile = temp.tempPileGrade && Number(temp.tempPileCount) > 0
+    ? { gradeId: temp.tempPileGrade, count: Number(temp.tempPileCount) }
+    : undefined;
+  const pendingDrilling = temp.tempDrillType && Number(temp.tempDrillCount) > 0 && Number(temp.tempDrillMetersPerUnit) > 0
+    ? { typeId: temp.tempDrillType, count: Number(temp.tempDrillCount), metersPerUnit: Number(temp.tempDrillMetersPerUnit) }
+    : undefined;
+  const pendingDowntime = temp.tempDowntimeReason && Number(temp.tempDowntimeDuration) > 0
+    ? { reasonId: temp.tempDowntimeReason, duration: Number(temp.tempDowntimeDuration), comment: temp.tempDowntimeComment }
+    : undefined;
+
+  const hasEntries = piles.length > 0 || drillings.length > 0 || downtimes.length > 0
+    || Boolean(pendingPile || pendingDrilling || pendingDowntime);
+
+  const submitWithPending = () => {
+    void handleSubmit({ pile: pendingPile, drilling: pendingDrilling, downtime: pendingDowntime });
+    if (pendingPile) { temp.setTempPileGrade(''); temp.setTempPileCount(''); }
+    if (pendingDrilling) { temp.setTempDrillType(''); temp.setTempDrillCount(''); temp.setTempDrillMetersPerUnit(''); }
+    if (pendingDowntime) { temp.setTempDowntimeReason(''); temp.setTempDowntimeDuration(''); temp.setTempDowntimeComment(''); }
+  };
 
   const handleSiteChange = (val: string) => {
     setSelectedSiteId(val);
@@ -185,7 +207,7 @@ export function ReportForm() {
           <SubmitBar totalPiles={totalPiles} totalPileMeters={totalPileMeters}
             totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
             totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
-            selectedSiteId={selectedSiteId} hasEntries={hasEntries} submitting={submitting} onSubmit={handleSubmit} />
+            selectedSiteId={selectedSiteId} hasEntries={hasEntries} submitting={submitting} onSubmit={submitWithPending} />
         </div>
       </div>
     </div>

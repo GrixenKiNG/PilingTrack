@@ -193,7 +193,7 @@ export function MeterReadingsPanel({
             >
               <div className="min-w-0">
                 <div className="font-mono text-sm font-semibold text-slate-800">
-                  {r.engineHours.toLocaleString('ru')} м/ч
+                  {r.engineHours.toLocaleString('ru')} м.ч.
                 </div>
                 <div className="text-2xs text-slate-500">
                   {fmtDate(r.recordedAt)}

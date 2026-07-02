@@ -58,6 +58,13 @@ describe('Report Validation', () => {
       expect(() => validateReportDateNotInFuture(today)).not.toThrow();
     });
 
+    it('should pass for MSK "today" even while the server clock (UTC) is still on yesterday', () => {
+      // Regression: between 00:00 and 03:00 MSK the UTC date lags MSK by a day,
+      // and UTC-based validation rejected legitimate same-day reports.
+      const mskToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+      expect(() => validateReportDateNotInFuture(mskToday)).not.toThrow();
+    });
+
     it('should pass for past dates', () => {
       expect(() => validateReportDateNotInFuture('2020-01-01')).not.toThrow();
     });

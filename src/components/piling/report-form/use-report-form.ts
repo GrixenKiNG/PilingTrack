@@ -49,7 +49,11 @@ export interface UseReportFormReturn {
   removePile: (id: string) => void;
   removeDrilling: (id: string) => void;
   removeDowntime: (id: string) => void;
-  handleSubmit: () => Promise<void>;
+  handleSubmit: (pending?: {
+    pile?: { gradeId: string; count: number };
+    drilling?: { typeId: string; count: number; metersPerUnit: number };
+    downtime?: { reasonId: string; duration: number; comment: string };
+  }) => Promise<void>;
   getPileMetersPerUnit: (gradeId: string) => number;
   getPicketPath: (picketId: string) => string;
   getPileGradeName: (id: string) => string;
@@ -198,6 +202,12 @@ export function useReportForm(): UseReportFormReturn {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
   useEffect(() => { loadSiteTree(selectedSiteId); }, [selectedSiteId, loadSiteTree]);
+
+  // A lone rig option (operator's crew rig) needs no manual tap — pre-select it.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
+    if (equipment.length === 1 && !selectedEquipmentId) setSelectedEquipmentId(equipment[0].id);
+  }, [equipment, selectedEquipmentId]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { if (!date) return; loadData(); }, [date, loadData]);
 
@@ -290,10 +300,29 @@ export function useReportForm(): UseReportFormReturn {
   const removeDrilling = (id: string) => setDrillings((prev) => prev.filter((d) => d.id !== id));
   const removeDowntime = (id: string) => setDowntimes((prev) => prev.filter((d) => d.id !== id));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (pending?: {
+    pile?: { gradeId: string; count: number };
+    drilling?: { typeId: string; count: number; metersPerUnit: number };
+    downtime?: { reasonId: string; duration: number; comment: string };
+  }) => {
     if (!selectedSiteId || !user) { toast.error('Выберите объект'); return; }
-    if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
+    // Entry rows the operator filled but didn't confirm with the "+" button
+    // still count — requiring the extra tap silently blocked whole reports.
+    const effectivePiles: PileEntry[] = pending?.pile
+      ? [...piles, { id: crypto.randomUUID(), picketId: selectedPicketId, pileGradeId: pending.pile.gradeId, count: pending.pile.count }]
+      : piles;
+    const effectiveDrillings: DrillingEntry[] = pending?.drilling
+      ? [...drillings, { id: crypto.randomUUID(), picketId: selectedPicketId, typeId: pending.drilling.typeId, count: pending.drilling.count, metersPerUnit: pending.drilling.metersPerUnit, meters: Number((pending.drilling.count * pending.drilling.metersPerUnit).toFixed(1)) }]
+      : drillings;
+    const effectiveDowntimes: DowntimeEntry[] = pending?.downtime
+      ? [...downtimes, { id: crypto.randomUUID(), reasonId: pending.downtime.reasonId, duration: pending.downtime.duration, comment: pending.downtime.comment }]
+      : downtimes;
+    if (effectivePiles.length === 0 && effectiveDrillings.length === 0 && effectiveDowntimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
     if (equipment.length > 0 && !selectedEquipmentId) { toast.error('Выберите установку'); return; }
+    // Reflect auto-committed rows in the UI so a failed submit doesn't lose them.
+    if (pending?.pile) setPiles(effectivePiles);
+    if (pending?.drilling) setDrillings(effectiveDrillings);
+    if (pending?.downtime) setDowntimes(effectiveDowntimes);
     const finalReportId = reportId || crypto.randomUUID();
     setSubmitting(true);
     try {
@@ -301,9 +330,9 @@ export function useReportForm(): UseReportFormReturn {
         reportId: finalReportId, userId: user.id, siteId: selectedSiteId, date, shiftStart, shiftEnd,
         version: baseVersion,
         equipmentId: selectedEquipmentId || undefined,
-        piles: piles.map((p) => ({ picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
-        drillings: drillings.map((d) => ({ picketId: d.picketId || undefined, typeId: d.typeId, count: d.count, metersPerUnit: d.metersPerUnit, meters: d.meters })),
-        downtimes: downtimes.map((dt) => ({ reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || undefined })),
+        piles: effectivePiles.map((p) => ({ picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
+        drillings: effectiveDrillings.map((d) => ({ picketId: d.picketId || undefined, typeId: d.typeId, count: d.count, metersPerUnit: d.metersPerUnit, meters: d.meters })),
+        downtimes: effectiveDowntimes.map((dt) => ({ reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || undefined })),
       };
       const res = await authFetch('/api/reports/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json().catch(() => null);
