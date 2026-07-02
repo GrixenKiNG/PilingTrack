@@ -226,7 +226,7 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (12686 symbols, 22638 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (12705 symbols, 22656 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
