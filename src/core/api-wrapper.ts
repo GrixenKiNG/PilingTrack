@@ -120,7 +120,15 @@ export function withMutation<T extends any[]>(
     const csrfCheck = withCsrf(request);
     if (csrfCheck) return csrfCheck;
 
-    const identifier = getRateLimitIdentifier(request);
+    // Key the bucket by route + session + IP. IP alone collapses to one
+    // shared `host-…` bucket for EVERY user and EVERY mutation route when
+    // TRUST_PROXY is unset (or users sit behind one NAT): 100 requests/min
+    // of anyone's normal activity then 429s the whole plant (audit H1).
+    // The session component is a sha256 prefix (getSessionCacheScope), never
+    // the raw token; unauthenticated callers share a per-route IP bucket.
+    const ip = getRateLimitIdentifier(request);
+    const sessionScope = getSessionCacheScope(request) ?? 'anon';
+    const identifier = `mut:${request.nextUrl.pathname}:${sessionScope}:${ip}`;
     const rl = await rateLimiter.check(identifier, _opts?.rateLimit ?? MUTATION_RATE_LIMIT);
     if (!rl.allowed) {
       return NextResponse.json(

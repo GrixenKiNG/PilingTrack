@@ -125,36 +125,14 @@ describe('WebSocket Authentication', () => {
       expect(mocks.verifySessionToken).toHaveBeenCalledWith('valid-token-123');
     });
 
-    it('should authenticate with token from query param', async () => {
-      mocks.verifySessionToken.mockResolvedValue({
-        sub: 'user-2',
-        email: 'api@example.com',
-        name: 'API User',
-        role: 'ADMIN',
-        type: 'session',
-        v: 1,
-        sv: 0,
-      });
-
-      mocks.dbUserFindUnique.mockResolvedValue({
-        id: 'user-2',
-        email: 'api@example.com',
-        name: 'API User',
-        role: 'ADMIN',
-        tenantId: 'tenant-1',
-        isActive: true,
-        sessionVersion: 0,
-      });
-
-      mocks.dbUserSiteAssignmentFindMany.mockResolvedValue([]);
-
+    it('rejects a token passed via query param (cookie is the only channel)', async () => {
+      // Query tokens leaked long-lived session JWTs into proxy/access logs
+      // and had no production consumer (audit M4) — must not authenticate.
       const req = createMockReq({ url: '/?token=my-api-token' });
       const result = await authenticateWS(req);
 
-      expect(result).not.toBeNull();
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
-      expect(result!.userId).toBe('user-2');
-      expect(mocks.verifySessionToken).toHaveBeenCalledWith('my-api-token');
+      expect(result).toBeNull();
+      expect(mocks.verifySessionToken).not.toHaveBeenCalled();
     });
   });
 

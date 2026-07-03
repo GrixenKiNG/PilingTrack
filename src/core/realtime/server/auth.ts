@@ -50,9 +50,11 @@ export async function authenticateWS(req: IncomingMessage): Promise<WSAuthResult
     const cookieHeader = req.headers.cookie || '';
     const cookies = parseCookie(cookieHeader);
 
-    // Get session token from cookie or query param
-    const sessionToken = cookies[SESSION_COOKIE_NAME] ||
-      new URL(req.url || '', 'http://x').searchParams.get('token');
+    // Session token comes from the cookie only. The old `?token=` query
+    // fallback put long-lived session JWTs into proxy/access logs and had no
+    // production consumer — the browser client authenticates via the
+    // same-origin cookie (audit M4).
+    const sessionToken = cookies[SESSION_COOKIE_NAME];
 
     if (!sessionToken) {
       return null;

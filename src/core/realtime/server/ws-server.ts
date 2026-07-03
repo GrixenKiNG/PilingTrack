@@ -63,7 +63,11 @@ export async function startWSServer(): Promise<ServerHandle> {
     }));
   });
 
-  const wss = new WebSocketServer({ server });
+  // Clients only send small JSON control frames (subscribe/unsubscribe/ack/
+  // ping) — 64 KB is generous. Without maxPayload the ws default is 100 MiB,
+  // letting one authorized client OOM the 384 MB container (audit H6); ws
+  // closes oversized frames with 1009 before buffering them fully.
+  const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 });
 
   // ============================================================
   // Connection Handler
@@ -125,7 +129,22 @@ export async function startWSServer(): Promise<ServerHandle> {
     // Message Handler
     // ============================================================
 
+    // Per-connection inbound rate limit: control frames are rare (a burst on
+    // reconnect at most), so 120 per 10 s is far above legitimate use while
+    // stopping a flood of expensive JSON.parse calls (audit H6).
+    let msgWindowStart = Date.now();
+    let msgCount = 0;
+
     ws.on('message', (raw) => {
+      const now = Date.now();
+      if (now - msgWindowStart > 10_000) {
+        msgWindowStart = now;
+        msgCount = 0;
+      }
+      if (++msgCount > 120) {
+        ws.close(1008, 'Message rate limit exceeded');
+        return;
+      }
       try {
         const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
 
