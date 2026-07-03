@@ -69,11 +69,28 @@ jobs:
             docker compose up -d \$SVCS
           "
 
-      - name: Verify health
+      - name: Verify health + deployed SHA
         run: |
+          # Expected SHA = current prod HEAD (the step above pulled main there).
+          EXPECTED=$(ssh -i ~/.ssh/id user1@87.242.102.125 "git -C /opt/pilingtrack rev-parse --short HEAD")
+          echo "Expected version: $EXPECTED"
           for i in $(seq 1 30); do
             if curl -sf https://orionpiling.ru/api/health > /dev/null; then
-              curl -s https://orionpiling.ru/api/health
+              BODY=$(curl -s https://orionpiling.ru/api/health)
+              echo "$BODY"
+              ACTUAL=$(echo "$BODY" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+              # The gate used to accept any 200 — a stale container (old image
+              # still running) passed "verification" (audit H3/M2). The app
+              # only serves the wrong version when 'app' wasn't in the deploy
+              # set, so only enforce the match when it was rebuilt.
+              case " ${{ inputs.services }} " in
+                *" app "*)
+                  if [ "$ACTUAL" != "$EXPECTED" ]; then
+                    echo "::error::Version mismatch: health reports '$ACTUAL', expected '$EXPECTED' — old container still serving?"
+                    exit 1
+                  fi
+                  ;;
+              esac
               exit 0
             fi
             sleep 3
