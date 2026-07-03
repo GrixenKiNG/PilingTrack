@@ -5,12 +5,21 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  // Bake the package version into the bundle at build time. The standalone
-  // server starts via `node server.js` (not `npm`), so npm_package_version
-  // is absent at runtime and /api/health reported "unknown". next build runs
-  // via npm, so npm_package_version IS set here — capture it for runtime.
+  // Bake a version into the bundle at build time. Next's `env` config
+  // replaces every `process.env.APP_VERSION` reference in compiled code
+  // with this literal — including in the standalone runtime (`node
+  // server.js`, not `npm`), where a plain `process.env.APP_VERSION` read
+  // would otherwise be shadowed by whatever this block resolves to, no
+  // matter what the container's real env var says. That shadowing is
+  // exactly how health kept reporting the stale npm package version
+  // (2.6.0) after the Docker image's APP_VERSION ARG/ENV was fixed to
+  // carry the real deploy SHA (audit M2): this file preferred
+  // npm_package_version unconditionally. Prefer the Dockerfile-supplied
+  // SHA (present in process.env during `next build`, see Dockerfile's
+  // builder stage) and fall back to the package version for local
+  // `npm run build` without Docker.
   env: {
-    APP_VERSION: process.env.npm_package_version ?? "unknown",
+    APP_VERSION: process.env.APP_VERSION ?? process.env.npm_package_version ?? "unknown",
   },
   turbopack: {
     root: path.resolve(import.meta.dirname),
