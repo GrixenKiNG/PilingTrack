@@ -4,12 +4,21 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+const { getRedisClientMock, redisPingMock } = vi.hoisted(() => ({
+  getRedisClientMock: vi.fn(),
+  redisPingMock: vi.fn(),
+}));
+
 // Mock db before importing module under test
 vi.mock('@/lib/db', () => ({
   db: {
     $queryRaw: vi.fn(),
   },
   getDatabaseProvider: () => 'postgresql',
+}));
+
+vi.mock('@/lib/redis-cache', () => ({
+  getRedisClient: getRedisClientMock,
 }));
 
 import { getHealth, getReadiness, getLiveness, diskHealthFromStats } from '../health-checks';
@@ -23,6 +32,8 @@ describe('Health Checks', () => {
     vi.clearAllMocks();
     process.env.DATABASE_URL_POSTGRES = 'postgresql://test';
     process.env.SESSION_SECRET = 'test-secret';
+    redisPingMock.mockResolvedValue('PONG');
+    getRedisClientMock.mockResolvedValue({ ping: redisPingMock });
   });
 
   describe('getLiveness', () => {
@@ -49,6 +60,7 @@ describe('Health Checks', () => {
       expect(result.checks.database.status).toBe('pass');
       expect(result.checks.memory.status).toBe('pass');
       expect(result.checks.environment.status).toBe('pass');
+      expect(result.checks.redis.status).toBe('pass');
       expect(result.database_provider).toBe('postgresql');
       expect(result.timestamp).toBeDefined();
       expect(result.uptime).toBeGreaterThanOrEqual(0);
@@ -95,6 +107,20 @@ describe('Health Checks', () => {
 
       expect(result.checks.disk).toBeDefined();
       expect(['pass', 'warn']).toContain(result.checks.disk.status);
+    });
+
+    it('should return degraded when Redis is unavailable', async () => {
+      vi.mocked(db.$queryRaw).mockResolvedValue([{ '?column?': 1 }]);
+      getRedisClientMock.mockResolvedValue(null);
+
+      const result = await getHealth();
+
+      expect(result.status).toBe('degraded');
+      expect(result.checks.redis).toEqual({
+        name: 'redis',
+        status: 'warn',
+        details: { error: 'no client (connect failed)' },
+      });
     });
   });
 
