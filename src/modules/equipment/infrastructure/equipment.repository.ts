@@ -12,12 +12,24 @@ export class PrismaEquipmentRepository implements EquipmentRepository {
     const s = agg.getState();
     const pd = toPrismaData(agg);
     const evts = agg.getPendingEvents();
-    await db.equipment.upsert({
-      where: { id: s.id },
-      create: pd,
-      update: { name: pd.name, model: pd.model, qty: pd.qty, description: pd.description, isActive: pd.isActive },
+    // Transactional outbox (audit finding #3): the upsert and its domain
+    // events must commit or fail together. The previous version wrote them
+    // as two separate statements — a standalone `equipment.upsert` already
+    // committed by the time the outbox `Promise.all` ran, so a failing
+    // outbox write silently lost the domain event while the equipment
+    // change stuck. site.repository.ts / report.repository.ts (the
+    // DDD-migration reference) already use this same pattern.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
+    await db.$transaction(async (tx: any) => {
+      await tx.equipment.upsert({
+        where: { id: s.id },
+        create: pd,
+        update: { name: pd.name, model: pd.model, qty: pd.qty, description: pd.description, isActive: pd.isActive },
+      });
+      if (evts.length > 0) {
+        await Promise.all(evts.map(e => tx.outboxEvent.create({ data: toOutboxData(e) })));
+      }
     });
-    if (evts.length > 0) await Promise.all(evts.map(e => db.outboxEvent.create({ data: toOutboxData(e) })));
     agg.clearPendingEvents();
   }
 

@@ -127,3 +127,85 @@ describe('rotateRefreshToken — family max-lifetime (90d)', () => {
     expect(createMock).toHaveBeenCalledTimes(1); // new token issued
   });
 });
+
+describe('rotateRefreshToken — concurrent rotation of the SAME token (audit finding #2)', () => {
+  // Reproduces the TOCTOU: two concurrent requests present the identical
+  // raw refresh token. Both read the same non-revoked row (findUnique is
+  // outside any lock), both pass every check, and — before this fix — both
+  // reach an unconditional `update` that just sets revoked=true regardless
+  // of current state. Neither request can tell it "lost a race," so both
+  // proceed to mint a new child token from the same parent: two valid
+  // sessions from what should be a single-use rotation, and the reuse
+  // detector (which only looks for OTHER token hashes in the family) never
+  // sees it because both requests present the SAME hash.
+  const baseToken = {
+    id: 't-current',
+    userId: 'u1',
+    token: 'hash',
+    family: 'fam-fresh',
+    familyCreatedAt: daysAgo(10),
+    expiresAt: daysAhead(20),
+    revoked: false,
+  };
+
+  beforeEach(() => {
+    findUniqueMock.mockReset().mockResolvedValue(baseToken);
+    findManyMock.mockReset().mockResolvedValue([]); // no sibling-token reuse
+    createMock.mockReset().mockResolvedValue({});
+    updateMock.mockReset().mockResolvedValue({});
+    userFindUniqueMock.mockReset().mockResolvedValue({
+      id: 'u1', email: 'a@b.ru', name: 'A', role: 'OPERATOR', isActive: true, tenantId: 'orion',
+    });
+    createSessionTokenMock.mockReset().mockResolvedValue('access-NEW');
+  });
+
+  it('the loser of the atomic revoke race is treated as reuse — 401, family revoked, no new token', async () => {
+    // The atomic claim (updateMany where id + revoked:false) returns
+    // count:0 when a concurrent request already flipped revoked=true first.
+    updateManyMock.mockReset().mockImplementation(async (args: { where: Record<string, unknown> }) => {
+      if (args.where.id === baseToken.id && args.where.revoked === false) {
+        return { count: 0 }; // lost the race — someone else revoked it first
+      }
+      return { count: 1 }; // the subsequent family-revoke call
+    });
+
+    await expect(rotateRefreshToken('raw-token')).rejects.toMatchObject({ status: 401 });
+
+    // Must not mint a second child token from the same already-rotated parent.
+    expect(createMock).not.toHaveBeenCalled();
+    // Must revoke the whole family, same response as the sibling-reuse path.
+    expect(updateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { family: baseToken.family },
+        data: expect.objectContaining({ revoked: true, revokedReason: expect.stringMatching(/reuse/i) }),
+      })
+    );
+  });
+
+  it('the winner of the atomic revoke race proceeds normally', async () => {
+    updateManyMock.mockReset().mockImplementation(async (args: { where: Record<string, unknown> }) => {
+      if (args.where.id === baseToken.id && args.where.revoked === false) {
+        return { count: 1 }; // won the race — this request revoked it
+      }
+      return { count: 1 };
+    });
+
+    const pair = await rotateRefreshToken('raw-token');
+
+    expect(pair.accessToken).toBe('access-NEW');
+    expect(createMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('the per-token revoke uses a conditional updateMany, not an unconditional update', async () => {
+    // Pins the actual mechanism of the fix: an unconditional `update` can
+    // never detect a lost race (it always "succeeds"), so the revoke step
+    // itself must be the atomic updateMany+count check, not a plain update.
+    updateManyMock.mockReset().mockResolvedValue({ count: 1 });
+
+    await rotateRefreshToken('raw-token');
+
+    expect(updateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: baseToken.id, revoked: false } })
+    );
+  });
+});
