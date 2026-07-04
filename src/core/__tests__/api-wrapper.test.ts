@@ -2,7 +2,7 @@
  * API Wrapper — Unit Tests
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { withApi, withMutation } from '../api-wrapper';
 
@@ -45,10 +45,66 @@ import { ServiceError } from '@/lib/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter } from '@/lib/rate-limiter';
+import { exportHttpMetricsPrometheus, resetHttpMetrics } from '@/core/observability/http-metrics';
 
-function mockRequest(): NextRequest {
-  return new NextRequest('http://localhost/api/test');
+function mockRequest(method = 'GET'): NextRequest {
+  return new NextRequest('http://localhost/api/test', { method });
 }
+
+describe('withApi — HTTP metrics (audit finding #9: alerts.yml had no data source)', () => {
+  beforeEach(() => {
+    resetHttpMetrics();
+  });
+
+  it('records a successful request with its method/domain/status', async () => {
+    const handler = withApi(async () => NextResponse.json({ ok: true }), { domain: 'reports' });
+    await handler(mockRequest('GET'));
+
+    const out = exportHttpMetricsPrometheus();
+    expect(out).toContain('http_requests_total{method="GET",route="reports",status="200"} 1');
+  });
+
+  it('records a ServiceError response under its actual (non-200) status', async () => {
+    const handler = withApi(
+      async () => { throw new ServiceError('Not authorized', 403); },
+      { domain: 'media.confirm' },
+    );
+    await handler(mockRequest('POST'));
+
+    const out = exportHttpMetricsPrometheus();
+    expect(out).toContain('http_requests_total{method="POST",route="media.confirm",status="403"} 1');
+  });
+
+  it('records a generic 500 under status 500', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handler = withApi(async () => { throw new Error('boom'); }, { domain: 'reports' });
+    await handler(mockRequest('GET'));
+
+    const out = exportHttpMetricsPrometheus();
+    expect(out).toContain('http_requests_total{method="GET",route="reports",status="500"} 1');
+    consoleSpy.mockRestore();
+  });
+
+  it('falls back to route="unknown" when no domain is configured', async () => {
+    const handler = withApi(async () => NextResponse.json({ ok: true }));
+    await handler(mockRequest('GET'));
+
+    const out = exportHttpMetricsPrometheus();
+    expect(out).toContain('http_requests_total{method="GET",route="unknown",status="200"} 1');
+  });
+
+  it('records a cached GET response too (cache hit still counts as a served request)', async () => {
+    const handler = withApi(
+      async () => NextResponse.json({ ok: true }),
+      { domain: 'cache-test-metrics', cache: true, cacheTTL: 60_000 },
+    );
+    await handler(mockRequest('GET'));
+    await handler(mockRequest('GET')); // second call served from cache
+
+    const out = exportHttpMetricsPrometheus();
+    expect(out).toContain('http_requests_total{method="GET",route="cache-test-metrics",status="200"} 2');
+  });
+});
 
 describe('withApi', () => {
   it('should pass through successful responses', async () => {

@@ -7,6 +7,7 @@ import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 import { getResponseCache } from '@/core/cache';
+import { recordHttpRequest } from '@/core/observability/http-metrics';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { readSessionToken } from '@/services/auth/session-service';
 
@@ -46,17 +47,20 @@ export function withApi<T extends any[]>(
   _opts?: ApiWrapperOptions
 ) {
   return async (request: NextRequest, ...args: T) => {
+    const domain = _opts?.domain || 'unknown';
+    const startedAt = performance.now();
+    let response: NextResponse;
+
     try {
       if (
         _opts?.cache &&
         request.method === 'GET' &&
         !request.nextUrl.searchParams.has('_ts')
       ) {
-        const domain = _opts.domain || 'unknown';
         const responseCache = getResponseCache(domain);
         const userScope = getSessionCacheScope(request);
 
-        return await responseCache.getOrFetch(
+        response = await responseCache.getOrFetch(
           {
             endpoint: `${request.method}:${request.nextUrl.pathname}`,
             params: Object.fromEntries(request.nextUrl.searchParams.entries()),
@@ -65,43 +69,45 @@ export function withApi<T extends any[]>(
           () => handler(request, ...args),
           { ttl: _opts.cacheTTL }
         );
+      } else {
+        response = await handler(request, ...args);
       }
-
-      return await handler(request, ...args);
     } catch (error: unknown) {
       if (error instanceof ServiceError) {
-        return NextResponse.json(
+        response = NextResponse.json(
           { error: error.message },
           { status: error.status }
         );
-      }
-
-      if (error instanceof CircuitOpenError) {
+      } else if (error instanceof CircuitOpenError) {
         const retryAfterSec = Math.ceil(error.retryAfterMs / 1000);
-        return NextResponse.json(
+        response = NextResponse.json(
           { error: 'Service temporarily unavailable', retryAfter: retryAfterSec },
           { status: 503, headers: { 'Retry-After': String(retryAfterSec) } }
         );
+      } else if (isPrismaKnownError(error) && PRISMA_STATUS[error.code]) {
+        response = NextResponse.json(
+          { error: error.code === 'P2025' ? 'Not found' : error.message },
+          { status: PRISMA_STATUS[error.code] }
+        );
+      } else {
+        logger.error('API handler failed', error, { domain });
+        Sentry.captureException(error, { tags: { domain, route: request.nextUrl.pathname } });
+        response = NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
       }
-
-      if (isPrismaKnownError(error)) {
-        const status = PRISMA_STATUS[error.code];
-        if (status) {
-          return NextResponse.json(
-            { error: error.code === 'P2025' ? 'Not found' : error.message },
-            { status }
-          );
-        }
-      }
-
-      const domain = _opts?.domain || 'unknown';
-      logger.error('API handler failed', error, { domain });
-      Sentry.captureException(error, { tags: { domain, route: request.nextUrl.pathname } });
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
     }
+
+    // audit finding #9: alerts.yml's HighAPILatencyP95/P99/HighAPIErrorRate
+    // reference http_request_duration_seconds_bucket / http_requests_total,
+    // but nothing ever created them — every route funnels through here, so
+    // this is the one place that can record every request without adding
+    // per-route boilerplate. `domain` is the existing low-cardinality label
+    // already used for Sentry tags/error logs — never the raw URL (which
+    // would carry real entity IDs and grow the label set unboundedly).
+    recordHttpRequest(request.method, domain, response.status, (performance.now() - startedAt) / 1000);
+    return response;
   };
 }
 

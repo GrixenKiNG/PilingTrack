@@ -14,6 +14,8 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { generatePrometheusMetrics } from '@/lib/cache-metrics';
 import { exportPrometheusMetrics, getLagMetrics } from '@/core/observability/lag-monitor';
 import { getCurrentStatus } from '@/core/observability/health-tracker';
+import { getEventLoopLagSeconds, resetEventLoopLag } from '@/core/observability/event-loop-lag';
+import { exportHttpMetricsPrometheus } from '@/core/observability/http-metrics';
 import { withApi } from '@/core/api-wrapper';
 import { logger } from '@/lib/logger';
 
@@ -74,11 +76,12 @@ export const GET = withApi(
     output += `# TYPE process_heap_used_bytes gauge\n`;
     output += `process_heap_used_bytes ${memUsage.heapUsed}\n\n`;
 
-    output += `# HELP nodejs_eventloop_lag_seconds Node.js event loop lag in seconds\n`;
+    output += `# HELP nodejs_eventloop_lag_seconds Mean event loop delay in seconds since the last scrape\n`;
     output += `# TYPE nodejs_eventloop_lag_seconds gauge\n`;
-    // Simple event loop lag measurement
-    const start = performance.now();
-    output += `nodejs_eventloop_lag_seconds ${(start / 1000).toFixed(6)}\n\n`;
+    output += `nodejs_eventloop_lag_seconds ${getEventLoopLagSeconds().toFixed(6)}\n\n`;
+    // Reset after reading so the next scrape reflects the interval since
+    // this one, not an all-time average that flattens out over days.
+    resetEventLoopLag();
 
     // Uptime
     output += `# HELP process_uptime_seconds Process uptime in seconds\n`;
@@ -118,6 +121,14 @@ export const GET = withApi(
       }
     } catch (err) {
       logger.error('metrics: backup metrics failed', err);
+    }
+
+    // HTTP request metrics (recorded centrally in withApi/withMutation —
+    // audit #9: alerts.yml referenced these but nothing ever created them).
+    try {
+      output += exportHttpMetricsPrometheus();
+    } catch (err) {
+      logger.error('metrics: http metrics failed', err);
     }
 
     return new NextResponse(output, {
