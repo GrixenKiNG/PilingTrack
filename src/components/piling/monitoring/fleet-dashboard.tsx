@@ -20,18 +20,15 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
 import { formatHours, formatFixed, formatRelative, formatRuDate } from '@/lib/format';
-import { usePilingStore } from '@/lib/store';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
-import { EQUIPMENT_STATUS_META } from '@/components/piling/admin-equipment/equipment-status';
-import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';
+import { EquipmentCard } from './equipment-card';
+import { EquipmentTileEditor } from './equipment-tile-editor';
+import { useEquipmentTileTemplate } from './use-equipment-tile-template';
 
 type SortBy = 'status' | 'name' | 'lastReport';
 
@@ -66,6 +63,7 @@ export function FleetDashboard() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempt = useRef(0);
+  const tile = useEquipmentTileTemplate();
 
   const fetchSnapshot = useCallback(async (opts?: { bust?: boolean }) => {
     try {
@@ -207,7 +205,7 @@ export function FleetDashboard() {
         <Skeleton className="h-24 w-full rounded-xl" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 w-full rounded-xl" />
+            <Skeleton key={i} className="h-[640px] w-full rounded-2xl" />
           ))}
         </div>
       </div>
@@ -222,6 +220,7 @@ export function FleetDashboard() {
         <div className="flex flex-wrap items-center gap-2">
           {siteOptions.length > 1 && (
             <select
+              aria-label="Фильтр по объекту"
               className={selectCls}
               value={siteFilter}
               onChange={(e) => setSiteFilter(e.target.value)}
@@ -233,6 +232,7 @@ export function FleetDashboard() {
             </select>
           )}
           <select
+            aria-label="Сортировка техники"
             className={selectCls}
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
@@ -244,11 +244,18 @@ export function FleetDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+      <div
+        className="grid gap-3 sm:gap-4"
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${tile.template.card.width}px), 1fr))`,
+        }}
+      >
         {visibleCards.map((card) => (
-          <EquipmentCardView key={card.id} card={card} />
+          <EquipmentCard key={card.id} card={card} template={tile.template} />
         ))}
       </div>
+
+      {visibleCards[0] && <EquipmentTileEditor card={visibleCards[0]} controller={tile} />}
 
       {visibleCards.length === 0 && (
         <div className="rounded-xl border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
@@ -304,105 +311,6 @@ function Metric({ label, value, muted = false }: { label: string; value: string 
     <div>
       <dt className="text-2xs uppercase tracking-wide text-white/70">{label}</dt>
       <dd className={cn('mt-0.5 font-mono text-lg tabular-nums text-white', muted && 'text-white/80')}>{value}</dd>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-
-const STATUS_COLOR: Record<EquipmentStatus, { dot: string; ring: string; bg: string; label: string }> = {
-  active:   { dot: 'bg-emerald-500', ring: 'ring-emerald-200', bg: 'bg-emerald-50/40', label: 'В работе' },
-  expected: { dot: 'bg-amber-500',   ring: 'ring-amber-200',   bg: '',                  label: 'Ждём отчёт' },
-  idle:     { dot: 'bg-slate-400',   ring: 'ring-slate-200',   bg: 'bg-muted/30',       label: 'Простой' },
-};
-
-function EquipmentCardView({ card }: { card: FleetCard }) {
-  const s = STATUS_COLOR[card.status];
-  const brand = getEquipmentBrand(card.model);
-  const role = usePilingStore((st) => st.currentUser?.role);
-  // Equipment detail lives under /admin and is gated to ADMIN/DISPATCHER; for
-  // operators the link only bounced back to /operator, so render a plain
-  // (non-clickable) card for them instead of a dead link.
-  const clickable = role === 'ADMIN' || role === 'DISPATCHER';
-
-  const body = (
-    <Card className={cn('h-full overflow-hidden transition-shadow', clickable && 'hover:shadow-md cursor-pointer', s.bg)}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={cn('h-2.5 w-2.5 rounded-full ring-4', s.dot, s.ring)} aria-label={s.label} />
-              {brand && (
-                <Image
-                  src={brand.logoSrc}
-                  alt={brand.name}
-                  title={brand.name}
-                  width={16}
-                  height={16}
-                  className="h-4 w-4 shrink-0 object-contain"
-                  unoptimized
-                />
-              )}
-              <h3 className="truncate text-base font-semibold leading-tight">{card.name}</h3>
-              {card.equipmentStatus === 'repair' && (
-                <span className={cn('rounded-md border px-1.5 py-0.5 text-3xs font-semibold', EQUIPMENT_STATUS_META.repair.badge)}>
-                  {EQUIPMENT_STATUS_META.repair.label}
-                </span>
-              )}
-              {card.todaysReports > 1 && (
-                <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-3xs font-semibold text-indigo-700">
-                  ×{card.todaysReports}
-                </span>
-              )}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground truncate">
-              {card.model}
-              {card.manufactureYear ? ` · ${card.manufactureYear}` : ''}
-            </div>
-          </div>
-        </div>
-
-        {card.latestReport ? (
-          <dl className="mt-3 space-y-1.5 text-sm">
-            <RowKV label="Объект" value={card.latestReport.siteName ?? '—'} />
-            <RowKV label="Оператор" value={card.latestReport.operatorName ?? '—'} />
-            {card.status === 'active' && card.todayTotals ? (
-              <>
-                <RowKV label="Свай" value={`${card.todayTotals.piles} (${formatFixed(card.todayTotals.pileMeters, 1)} м.п.)`} />
-                <RowKV label="Бурение, м" value={formatFixed(card.todayTotals.drillingMeters, 1)} />
-                {card.todayTotals.downtimeHours > 0 && (
-                  <RowKV label="Простой" value={formatHours(card.todayTotals.downtimeHours)} />
-                )}
-              </>
-            ) : (
-              <RowKV label="Последний отчёт" value={formatRuDate(card.latestReport.date)} />
-            )}
-            {card.downtimeReason && <RowKV label="Причина простоя" value={card.downtimeReason} />}
-          </dl>
-        ) : (
-          <div className="mt-3 text-sm text-muted-foreground">Нет отчётов за последние 7 дней.</div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  if (!clickable) return body;
-
-  return (
-    <Link
-      href={`/admin/equipment/${card.id}`}
-      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {body}
-    </Link>
-  );
-}
-
-function RowKV({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="truncate text-right text-sm font-medium">{value}</dd>
     </div>
   );
 }

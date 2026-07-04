@@ -43,7 +43,6 @@ export function EquipmentTileRenderer({
 }: EquipmentTileRendererProps) {
   const content = template.blocks.filter((block) => block.visible).map((block) => {
     const common = {
-      key: block.id,
       'data-testid': `equipment-tile-block-${block.id}`,
       'data-block-id': block.id,
       style: blockStyle(block),
@@ -57,6 +56,7 @@ export function EquipmentTileRenderer({
     if (editing) {
       return (
         <button
+          key={block.id}
           {...common}
           type="button"
           aria-label={`Редактировать блок ${block.id}`}
@@ -69,7 +69,7 @@ export function EquipmentTileRenderer({
     }
 
     return (
-      <div {...common}>
+      <div key={block.id} {...common}>
         <EquipmentTileBlockContent block={block} card={card} />
       </div>
     );

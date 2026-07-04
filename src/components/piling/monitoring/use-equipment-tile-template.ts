@@ -16,6 +16,7 @@ import {
   resetEquipmentTileTemplate,
   saveEquipmentTileTemplate,
 } from './equipment-tile-storage';
+import { migrateLegacyCardDesign } from './design-tuning-panel';
 
 const UNLOCK_KEY = 'monitoring-design-unlocked';
 
@@ -53,6 +54,7 @@ export function useEquipmentTileTemplate(): EquipmentTileTemplateController {
 
   useEffect(() => {
     if (queryUnlock) localStorage.setItem(UNLOCK_KEY, '1');
+    migrateLegacyCardDesign(localStorage);
     const saved = loadEquipmentTileTemplate(localStorage);
     setTemplate(saved);
     setDraft(saved);
@@ -181,4 +183,3 @@ export function useEquipmentTileTemplate(): EquipmentTileTemplateController {
     updateCard,
   };
 }
-

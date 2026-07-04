@@ -10,6 +10,7 @@ import {
   saveEquipmentTileTemplate,
   type StorageLike,
 } from '../equipment-tile-storage';
+import { migrateLegacyCardDesign } from '../design-tuning-panel';
 
 function createStorage(initial?: Record<string, string>): StorageLike {
   const values = new Map(Object.entries(initial ?? {}));
@@ -80,5 +81,25 @@ describe('equipment tile template', () => {
     resetEquipmentTileTemplate(storage);
 
     expect(storage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('migrates legacy local card dimensions once', () => {
+    const storage = createStorage({
+      'monitoring-card-design-v1': JSON.stringify({
+        fontScale: 1.25,
+        photoHeight: 288,
+        density: 1.2,
+        cardWidth: 340,
+        cardHeight: 760,
+      }),
+    });
+
+    migrateLegacyCardDesign(storage);
+
+    const migrated = loadEquipmentTileTemplate(storage);
+    expect(migrated.card.width).toBe(340);
+    expect(migrated.card.minHeight).toBe(760);
+    expect(migrated.blocks.find((block) => block.dataKey === 'photo')?.height).toBe(12);
+    expect(migrated.blocks.find((block) => block.dataKey === 'site')?.style.fontSize).toBe(15);
   });
 });
