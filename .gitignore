@@ -16,6 +16,10 @@ tsconfig.tsbuildinfo
 .env.docker
 *.pem
 *.key
+# Prometheus scrape-token file (M-10b) — real secret value, prod-host only,
+# never committed. See docker-compose.monitoring-prod.yml's prometheus mount
+# and observability/prometheus/prometheus-prod.yml's credentials_file.
+observability/prometheus/scrape-token
 
 # Database dumps — никогда не коммитим (могут содержать реальные данные).
 backups/

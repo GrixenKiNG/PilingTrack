@@ -19,6 +19,11 @@ services:
     volumes:
       - ./observability/prometheus/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # M-10b: same secret value as the app's METRICS_SCRAPE_TOKEN, kept in a
+      # standalone file (not this checked-in compose file) so it never lands
+      # in git. Create once on the host: `echo -n '<token>' >
+      # observability/prometheus/scrape-token`.
+      - ./observability/prometheus/scrape-token:/etc/prometheus/scrape-token:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
