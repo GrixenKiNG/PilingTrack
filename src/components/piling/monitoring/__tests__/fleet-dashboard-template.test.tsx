@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('@/components/piling/async-ui', () => ({ useMinSkeletonDuration: () => false }));
-vi.mock('next/image', () => ({ default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} /> }));
+vi.mock('next/image', () => ({ default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} /> }));
 
 const baseCard: FleetCard = {
   id: 'eq-1', name: 'Установка №1', model: 'Junttan', manufactureYear: 2022,

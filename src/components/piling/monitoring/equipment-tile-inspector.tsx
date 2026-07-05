@@ -17,12 +17,16 @@ export function EquipmentTileInspector({
   onChange,
   onCardChange,
   onDelete,
+  onReplaceImage,
+  imageError,
 }: {
   block: EquipmentTileBlock | null;
   card: EquipmentTileTemplate['card'];
   onChange: (patch: Partial<EquipmentTileBlock>) => void;
   onCardChange: (patch: Partial<EquipmentTileTemplate['card']>) => void;
   onDelete: () => void;
+  onReplaceImage: (file: File) => Promise<void>;
+  imageError: string | null;
 }) {
   if (!block) {
     return (
@@ -47,6 +51,35 @@ export function EquipmentTileInspector({
           <span>Текст блока</span>
           <textarea className={`${inputClass} min-h-24 py-2`} value={block.text ?? ''} onChange={(event) => onChange({ text: event.target.value })} />
         </label>
+      )}
+      {block.kind === 'image' && (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>Альтернативный текст</span>
+            <input className={inputClass} value={block.alt ?? ''} onChange={(event) => onChange({ alt: event.target.value })} />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-slate-600">
+            <span>Режим изображения</span>
+            <select className={inputClass} value={block.imageFit ?? 'contain'} onChange={(event) => onChange({ imageFit: event.target.value as 'contain' | 'cover' })}>
+              <option value="contain">Вписать</option><option value="cover">Заполнить</option>
+            </select>
+          </label>
+          <label className="block min-h-11 cursor-pointer rounded-lg border border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+            Заменить фото
+            <input
+              aria-label="Заменить фото"
+              className="sr-only"
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void onReplaceImage(file);
+                event.target.value = '';
+              }}
+            />
+          </label>
+          {imageError && <p role="alert" className="text-xs font-medium text-red-700">{imageError}</p>}
+        </div>
       )}
       <div className="grid grid-cols-2 gap-2">
         <NumberField label="Колонка" value={block.x + 1} min={1} max={12} onChange={(value) => onChange({ x: value - 1 })} />
@@ -80,4 +113,3 @@ export function EquipmentTileInspector({
     </section>
   );
 }
-

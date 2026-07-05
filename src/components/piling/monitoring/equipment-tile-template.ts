@@ -34,6 +34,9 @@ export interface EquipmentTileBlock {
   kind: EquipmentTileBlockKind;
   dataKey?: EquipmentTileDataKey;
   text?: string;
+  assetId?: string;
+  imageFit?: 'contain' | 'cover';
+  alt?: string;
   x: number;
   y: number;
   width: number;
@@ -77,6 +80,7 @@ const BLOCK_KINDS = new Set<EquipmentTileBlockKind>(['data', 'text', 'divider', 
 const FONT_WEIGHTS = new Set([400, 500, 600, 700]);
 const TEXT_ALIGNS = new Set(['left', 'center', 'right']);
 const ITEM_ALIGNS = new Set(['start', 'center', 'end']);
+const IMAGE_FITS = new Set(['contain', 'cover']);
 
 const BASE_STYLE: EquipmentTileBlockStyle = {
   background: '#ffffff',
@@ -185,6 +189,10 @@ function isValidBlock(value: unknown): value is EquipmentTileBlock {
   if (!BLOCK_KINDS.has(value.kind as EquipmentTileBlockKind)) return false;
   if (value.kind === 'data' && !DATA_KEYS.has(value.dataKey as EquipmentTileDataKey)) return false;
   if (value.kind === 'text' && typeof value.text !== 'string') return false;
+  if (value.kind === 'image') {
+    if (typeof value.assetId !== 'string' || value.assetId.trim().length === 0) return false;
+    if (!IMAGE_FITS.has(value.imageFit as string) || typeof value.alt !== 'string') return false;
+  }
   if (!isIntegerInRange(value.x, 0, EQUIPMENT_TILE_COLUMNS - 1)) return false;
   if (!isIntegerInRange(value.y, 0, 999)) return false;
   if (!isIntegerInRange(value.width, 1, EQUIPMENT_TILE_COLUMNS)) return false;
@@ -221,4 +229,3 @@ export function validateEquipmentTileTemplate(value: unknown): EquipmentTileTemp
   if (new Set(ids).size !== ids.length) return null;
   return cloneEquipmentTileTemplate(value as unknown as EquipmentTileTemplate);
 }
-

@@ -251,7 +251,7 @@ export function FleetDashboard() {
         }}
       >
         {visibleCards.map((card) => (
-          <EquipmentCard key={card.id} card={card} template={tile.template} />
+          <EquipmentCard key={card.id} card={card} template={tile.template} assetStorage={tile.assetStorage} />
         ))}
       </div>
 
@@ -314,4 +314,3 @@ function Metric({ label, value, muted = false }: { label: string; value: string 
     </div>
   );
 }
-

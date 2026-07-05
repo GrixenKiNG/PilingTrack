@@ -5,7 +5,7 @@ import { EquipmentTileRenderer } from '../equipment-tile-renderer';
 import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
 
 vi.mock('next/image', () => ({
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
+  default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} />,
 }));
 
 const card: FleetCard = {
@@ -45,7 +45,7 @@ describe('EquipmentTileRenderer', () => {
 
   it('renders arbitrary text and omits hidden blocks', () => {
     const template = structuredClone(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
-    template.blocks.find((block) => block.id === 'operator')!.visible = false;
+    template.blocks = template.blocks.map((block) => block.id === 'operator' ? { ...block, visible: false } : block);
     template.blocks.push({
       ...structuredClone(template.blocks[1]),
       id: 'custom-text',

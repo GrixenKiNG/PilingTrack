@@ -14,6 +14,7 @@ export function EquipmentTileEditor({ card, controller }: { card: FleetCard; con
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'library' | 'inspector' | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const selectedBlock = controller.draft.blocks.find((block) => block.id === selectedBlockId) ?? null;
 
   if (!controller.unlocked) return null;
@@ -29,6 +30,27 @@ export function EquipmentTileEditor({ card, controller }: { card: FleetCard; con
     const block = controller.addBlock(kind, dataKey);
     setSelectedBlockId(block.id);
     setMobilePanel('inspector');
+  };
+
+  const uploadImage = async (file: File) => {
+    setImageError(null);
+    try {
+      const block = await controller.addImage(file);
+      setSelectedBlockId(block.id);
+      setMobilePanel('inspector');
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'Не удалось сохранить изображение');
+    }
+  };
+
+  const replaceImage = async (file: File) => {
+    if (!selectedBlockId) return;
+    setImageError(null);
+    try {
+      await controller.replaceImage(selectedBlockId, file);
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'Не удалось заменить изображение');
+    }
   };
 
   const closeEditor = () => {
@@ -57,7 +79,7 @@ export function EquipmentTileEditor({ card, controller }: { card: FleetCard; con
 
   return (
     <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-slate-100 text-slate-950" role="dialog" aria-label="Редактор шаблона плитки">
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 shadow-sm">
+      <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 shadow-sm">
         <strong className="mr-auto text-sm">Редактор плитки установки</strong>
         <button type="button" className={toolbarButton} disabled={!controller.canUndo} onClick={controller.undo}>Отменить</button>
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>
@@ -72,7 +94,7 @@ export function EquipmentTileEditor({ card, controller }: { card: FleetCard; con
         {!preview && (
           <aside className={`${mobilePanel === 'library' ? 'fixed inset-y-16 left-0 z-30 block w-[min(90vw,320px)] shadow-2xl' : 'hidden'} overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 lg:static lg:block lg:w-auto lg:shadow-none`}>
             <button type="button" className={`${toolbarButton} mb-3 w-full lg:hidden`} onClick={() => setMobilePanel(null)}>Закрыть панель</button>
-            <EquipmentTileBlockLibrary onAdd={addBlock} />
+            <EquipmentTileBlockLibrary onAdd={addBlock} onUploadImage={uploadImage} uploadError={imageError} />
           </aside>
         )}
         <main className="overflow-auto p-4 sm:p-8">
@@ -81,6 +103,7 @@ export function EquipmentTileEditor({ card, controller }: { card: FleetCard; con
             template={controller.draft}
             selectedBlockId={selectedBlockId}
             preview={preview}
+            assetStorage={controller.assetStorage}
             onSelectBlock={setSelectedBlockId}
             onMoveBlock={controller.moveBlock}
             onResizeBlock={controller.resizeBlock}
@@ -95,6 +118,8 @@ export function EquipmentTileEditor({ card, controller }: { card: FleetCard; con
               onChange={updateSelectedBlock}
               onCardChange={controller.updateCard}
               onDelete={deleteSelectedBlock}
+              onReplaceImage={replaceImage}
+              imageError={imageError}
             />
           </aside>
         )}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { usePilingStore } from '@/lib/store';
+import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
 import { EquipmentTileRenderer } from './equipment-tile-renderer';
 import {
   DEFAULT_EQUIPMENT_TILE_TEMPLATE,
@@ -12,13 +13,15 @@ import {
 export function EquipmentCard({
   card,
   template = DEFAULT_EQUIPMENT_TILE_TEMPLATE,
+  assetStorage,
 }: {
   card: FleetCard;
   template?: EquipmentTileTemplate;
+  assetStorage?: EquipmentTileAssetStorage;
 }) {
   const role = usePilingStore((state) => state.currentUser?.role);
   const clickable = role === 'ADMIN' || role === 'DISPATCHER';
-  const body = <EquipmentTileRenderer card={card} template={template} />;
+  const body = <EquipmentTileRenderer card={card} template={template} assetStorage={assetStorage} />;
 
   if (!clickable) return body;
 

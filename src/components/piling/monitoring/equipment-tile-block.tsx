@@ -6,6 +6,8 @@ import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment
 import { KIND_LABEL } from '@/components/piling/admin-equipment/equipment-status';
 import { formatFixed, formatHours } from '@/lib/format';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
+import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
+import { EquipmentTileImageBlock } from './equipment-tile-image-block';
 import type { EquipmentTileBlock } from './equipment-tile-template';
 
 function Value({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
@@ -42,16 +44,16 @@ function PhotoBlock({ card }: { card: FleetCard }) {
       )}
       <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/10 to-transparent" />
       <div className="absolute left-3 top-3 max-w-[72%] text-left text-white">
-        <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>
+        <span className={`inline-flex rounded-md px-2 py-1 text-3xs font-bold uppercase ${status.classes}`}>
           {status.label}
         </span>
         <h3 className="mt-1 line-clamp-1 text-base font-bold leading-tight drop-shadow">{card.name}</h3>
-        <p className="line-clamp-1 text-[11px] font-medium text-white/85">
+        <p className="line-clamp-1 text-2xs font-medium text-white/85">
           {card.model}{card.model && KIND_LABEL[card.kind] !== '—' ? ` · ${KIND_LABEL[card.kind]}` : ''}
         </p>
       </div>
       {card.inventoryNumber && (
-        <span className="absolute right-3 top-3 rounded-md bg-white/20 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur">
+        <span className="absolute right-3 top-3 rounded-md bg-white/20 px-2 py-1 text-3xs font-semibold text-white backdrop-blur">
           {card.inventoryNumber}
         </span>
       )}
@@ -59,10 +61,28 @@ function PhotoBlock({ card }: { card: FleetCard }) {
   );
 }
 
-export function EquipmentTileBlockContent({ block, card }: { block: EquipmentTileBlock; card: FleetCard }) {
+export function EquipmentTileBlockContent({
+  block,
+  card,
+  assetStorage,
+}: {
+  block: EquipmentTileBlock;
+  card: FleetCard;
+  assetStorage: EquipmentTileAssetStorage;
+}) {
   if (block.kind === 'text') return <span className="whitespace-pre-wrap break-words">{block.text}</span>;
   if (block.kind === 'divider') return <span className="block h-px w-full bg-current opacity-20" />;
-  if (block.kind === 'image' || block.dataKey === 'photo') return <PhotoBlock card={card} />;
+  if (block.kind === 'image') {
+    return (
+      <EquipmentTileImageBlock
+        storage={assetStorage}
+        assetId={block.assetId ?? ''}
+        alt={block.alt ?? ''}
+        fit={block.imageFit ?? 'contain'}
+      />
+    );
+  }
+  if (block.dataKey === 'photo') return <PhotoBlock card={card} />;
 
   const hoursLeft =
     card.nextMaintenanceAtHours != null && card.engineHoursTotal != null
@@ -104,4 +124,3 @@ export function EquipmentTileBlockContent({ block, card }: { block: EquipmentTil
       return <span>—</span>;
   }
 }
-

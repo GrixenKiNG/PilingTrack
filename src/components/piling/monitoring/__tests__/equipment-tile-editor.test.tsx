@@ -6,7 +6,7 @@ import { EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY } from '../equipment-tile-storage';
 import { useEquipmentTileTemplate } from '../use-equipment-tile-template';
 
 vi.mock('next/image', () => ({
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
+  default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} />,
 }));
 
 const card: FleetCard = {
@@ -36,6 +36,8 @@ describe('EquipmentTileEditor', () => {
         clear: () => values.clear(),
       },
     });
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:editor-image') });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
     window.history.replaceState({}, '', '/monitoring');
   });
 
@@ -91,5 +93,35 @@ describe('EquipmentTileEditor', () => {
 
     await waitFor(() => expect(screen.queryByText('Новый текст')).not.toBeInTheDocument());
     expect(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('uploads a local photo and saves its presentation settings', async () => {
+    window.history.replaceState({}, '', '/monitoring?design=1');
+    render(<Harness />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
+    const file = new File(['image'], 'crane.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Загрузить фото'), { target: { files: [file] } });
+
+    const altInput = await screen.findByLabelText('Альтернативный текст');
+    expect(altInput).toHaveValue('crane.png');
+    fireEvent.change(altInput, { target: { value: 'Кран на объекте' } });
+    fireEvent.change(screen.getByLabelText('Режим изображения'), { target: { value: 'cover' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    const saved = JSON.parse(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY) ?? '{}');
+    expect(saved.blocks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'image', assetId: expect.any(String), alt: 'Кран на объекте', imageFit: 'cover' }),
+    ]));
+  });
+
+  it('shows a validation error for an unsupported photo file', async () => {
+    window.history.replaceState({}, '', '/monitoring?design=1');
+    render(<Harness />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
+    fireEvent.change(screen.getByLabelText('Загрузить фото'), {
+      target: { files: [new File(['pdf'], 'manual.pdf', { type: 'application/pdf' })] },
+    });
+
+    expect(await screen.findByText('Поддерживаются только JPG, PNG и WebP')).toBeInTheDocument();
   });
 });

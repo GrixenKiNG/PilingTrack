@@ -1,5 +1,9 @@
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { cn } from '@/lib/utils';
+import {
+  getDefaultEquipmentTileAssetStorage,
+  type EquipmentTileAssetStorage,
+} from './equipment-tile-asset-storage';
 import { EquipmentTileBlockContent } from './equipment-tile-block';
 import type { EquipmentTileBlock, EquipmentTileTemplate } from './equipment-tile-template';
 
@@ -9,6 +13,7 @@ export interface EquipmentTileRendererProps {
   editing?: boolean;
   selectedBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
+  assetStorage?: EquipmentTileAssetStorage;
 }
 
 function blockStyle(block: EquipmentTileBlock): React.CSSProperties {
@@ -40,6 +45,7 @@ export function EquipmentTileRenderer({
   editing = false,
   selectedBlockId = null,
   onSelectBlock,
+  assetStorage = getDefaultEquipmentTileAssetStorage(),
 }: EquipmentTileRendererProps) {
   const content = template.blocks.filter((block) => block.visible).map((block) => {
     const common = {
@@ -63,14 +69,14 @@ export function EquipmentTileRenderer({
           aria-pressed={selectedBlockId === block.id}
           onClick={() => onSelectBlock?.(block.id)}
         >
-          <EquipmentTileBlockContent block={block} card={card} />
+          <EquipmentTileBlockContent block={block} card={card} assetStorage={assetStorage} />
         </button>
       );
     }
 
     return (
       <div key={block.id} {...common}>
-        <EquipmentTileBlockContent block={block} card={card} />
+        <EquipmentTileBlockContent block={block} card={card} assetStorage={assetStorage} />
       </div>
     );
   });
