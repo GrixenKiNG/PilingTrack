@@ -6,11 +6,13 @@ import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
 export function EquipmentTileImageBlock({
   storage,
   assetId,
+  revision,
   alt,
   fit,
 }: {
   storage: EquipmentTileAssetStorage;
   assetId: string;
+  revision?: number;
   alt: string;
   fit: 'contain' | 'cover';
 }) {
@@ -30,13 +32,13 @@ export function EquipmentTileImageBlock({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [assetId, storage]);
+  }, [assetId, revision, storage]);
 
   if (loaded?.assetId !== assetId) {
     return <span className="text-xs text-slate-400">Загрузка изображения…</span>;
   }
   if (!loaded.src) {
-    return <span className="text-xs text-slate-400">Изображение недоступно</span>;
+    return <span className="text-xs text-slate-400">Фото не загружено</span>;
   }
 
   return <img src={loaded.src} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;

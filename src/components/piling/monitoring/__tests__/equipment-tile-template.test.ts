@@ -46,14 +46,13 @@ describe('equipment tile template', () => {
     expect(validateEquipmentTileTemplate(invalid)).toBeNull();
   });
 
-  it('accepts a local image reference and rejects an image without an asset id', () => {
+  it('accepts image presentation without a shared asset id', () => {
     const valid = structuredClone(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
     valid.blocks.push({
       ...structuredClone(valid.blocks[1]),
       id: 'local-image',
       kind: 'image',
       dataKey: undefined,
-      assetId: 'asset-1',
       imageFit: 'cover',
       alt: 'Фото крана',
       y: 30,
@@ -61,7 +60,7 @@ describe('equipment tile template', () => {
     expect(validateEquipmentTileTemplate(valid)).not.toBeNull();
 
     const imageBlock = valid.blocks.at(-1);
-    if (imageBlock) delete imageBlock.assetId;
+    if (imageBlock) delete imageBlock.alt;
     expect(validateEquipmentTileTemplate(valid)).toBeNull();
   });
 

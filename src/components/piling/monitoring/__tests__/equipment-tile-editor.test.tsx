@@ -2,6 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentTileEditor } from '../equipment-tile-editor';
+import {
+  createMemoryEquipmentTileAssetStorage,
+  getEquipmentTileImageAssetId,
+  type EquipmentTileAssetStorage,
+} from '../equipment-tile-asset-storage';
 import { EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY } from '../equipment-tile-storage';
 import { useEquipmentTileTemplate } from '../use-equipment-tile-template';
 
@@ -19,9 +24,17 @@ const card: FleetCard = {
   downtimeReason: null, latestReport: null,
 };
 
-function Harness() {
-  const controller = useEquipmentTileTemplate();
-  return <EquipmentTileEditor card={card} controller={controller} />;
+const secondCard: FleetCard = { ...card, id: 'eq-2', name: 'Установка №24', inventoryNumber: 'INV-24' };
+
+function Harness({
+  assetStorage,
+  cards = [card],
+}: {
+  assetStorage?: EquipmentTileAssetStorage;
+  cards?: FleetCard[];
+}) {
+  const controller = useEquipmentTileTemplate(assetStorage);
+  return <EquipmentTileEditor cards={cards} controller={controller} />;
 }
 
 describe('EquipmentTileEditor', () => {
@@ -97,7 +110,8 @@ describe('EquipmentTileEditor', () => {
 
   it('uploads a local photo and saves its presentation settings', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
-    render(<Harness />);
+    const assetStorage = createMemoryEquipmentTileAssetStorage();
+    render(<Harness assetStorage={assetStorage} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     const file = new File(['image'], 'crane.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('Загрузить фото'), { target: { files: [file] } });
@@ -109,9 +123,10 @@ describe('EquipmentTileEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
 
     const saved = JSON.parse(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY) ?? '{}');
-    expect(saved.blocks).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'image', assetId: expect.any(String), alt: 'Кран на объекте', imageFit: 'cover' }),
-    ]));
+    const imageBlock = saved.blocks.find((block: { kind: string }) => block.kind === 'image');
+    expect(imageBlock).toEqual(expect.objectContaining({ alt: 'Кран на объекте', imageFit: 'cover' }));
+    expect(imageBlock).not.toHaveProperty('assetId');
+    expect(await assetStorage.get(getEquipmentTileImageAssetId(card.id, imageBlock.id))).not.toBeNull();
   });
 
   it('shows a validation error for an unsupported photo file', async () => {
@@ -123,5 +138,26 @@ describe('EquipmentTileEditor', () => {
     });
 
     expect(await screen.findByText('Поддерживаются только JPG, PNG и WebP')).toBeInTheDocument();
+  });
+
+  it('assigns an uploaded photo to the selected installation', async () => {
+    window.history.replaceState({}, '', '/monitoring?design=1');
+    const assetStorage = createMemoryEquipmentTileAssetStorage();
+    render(<Harness cards={[card, secondCard]} assetStorage={assetStorage} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
+
+    fireEvent.change(screen.getByLabelText('Установка для фото'), { target: { value: secondCard.id } });
+    fireEvent.change(screen.getByLabelText('Загрузить фото'), {
+      target: { files: [new File(['second'], 'second.png', { type: 'image/png' })] },
+    });
+
+    const savedBlock = await screen.findByLabelText('Альтернативный текст');
+    expect(savedBlock).toHaveValue('second.png');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    const saved = JSON.parse(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY) ?? '{}');
+    const imageBlock = saved.blocks.find((block: { kind: string }) => block.kind === 'image');
+
+    expect(await assetStorage.get(getEquipmentTileImageAssetId(secondCard.id, imageBlock.id))).not.toBeNull();
+    expect(await assetStorage.get(getEquipmentTileImageAssetId(card.id, imageBlock.id))).toBeNull();
   });
 });

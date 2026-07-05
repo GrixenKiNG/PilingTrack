@@ -30,7 +30,7 @@ describe('EquipmentTileImageBlock', () => {
     const storage = createMemoryEquipmentTileAssetStorage();
     render(<EquipmentTileImageBlock storage={storage} assetId="missing" alt="" fit="contain" />);
 
-    expect(await screen.findByText('Изображение недоступно')).toBeInTheDocument();
+    expect(await screen.findByText('Фото не загружено')).toBeInTheDocument();
   });
 
   it('revokes object URLs after replacement and unmount', async () => {

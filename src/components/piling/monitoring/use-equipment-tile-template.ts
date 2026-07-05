@@ -18,18 +18,16 @@ import {
 } from './equipment-tile-storage';
 import { migrateLegacyCardDesign } from './design-tuning-panel';
 import {
+  getEquipmentTileImageAssetId,
   getDefaultEquipmentTileAssetStorage,
+  isEquipmentTileImageAssetId,
   type EquipmentTileAssetStorage,
 } from './equipment-tile-asset-storage';
 
 const UNLOCK_KEY = 'monitoring-design-unlocked';
 
-function imageAssetIds(template: EquipmentTileTemplate): Set<string> {
-  return new Set(
-    template.blocks
-      .filter((block) => block.kind === 'image' && block.assetId)
-      .map((block) => block.assetId as string),
-  );
+function imageBlockIds(template: EquipmentTileTemplate): Set<string> {
+  return new Set(template.blocks.filter((block) => block.kind === 'image').map((block) => block.id));
 }
 
 function deleteUnreferencedImageAssets(
@@ -37,10 +35,15 @@ function deleteUnreferencedImageAssets(
   retained: EquipmentTileTemplate,
   storage: EquipmentTileAssetStorage,
 ): void {
-  const retainedIds = imageAssetIds(retained);
-  for (const assetId of imageAssetIds(source)) {
-    if (!retainedIds.has(assetId)) void storage.delete(assetId);
-  }
+  const sourceIds = imageBlockIds(source);
+  const retainedIds = imageBlockIds(retained);
+  const removedIds = [...sourceIds].filter((blockId) => !retainedIds.has(blockId));
+  if (removedIds.length === 0) return;
+  void storage.list().then(async (records) => {
+    await Promise.all(records
+      .filter((record) => removedIds.some((blockId) => isEquipmentTileImageAssetId(record.id, blockId)))
+      .map((record) => storage.delete(record.id)));
+  });
 }
 
 export interface EquipmentTileTemplateController {
@@ -59,8 +62,8 @@ export interface EquipmentTileTemplateController {
   undo(): void;
   redo(): void;
   addBlock(kind: EquipmentTileBlockKind, dataKey?: EquipmentTileDataKey): EquipmentTileBlock;
-  addImage(file: File): Promise<EquipmentTileBlock>;
-  replaceImage(blockId: string, file: File): Promise<void>;
+  addImage(file: File, equipmentId: string): Promise<EquipmentTileBlock>;
+  replaceImage(blockId: string, file: File, equipmentId: string): Promise<void>;
   updateBlock(blockId: string, patch: Partial<EquipmentTileBlock>): void;
   removeBlock(blockId: string): void;
   moveBlock(blockId: string, x: number, y: number): void;
@@ -166,19 +169,20 @@ export function useEquipmentTileTemplate(
     return block;
   }, [draft, pushDraft]);
 
-  const addImage = useCallback(async (file: File) => {
-    const assetId = await assetStorage.put(file);
+  const addImage = useCallback(async (file: File, equipmentId: string) => {
     const lastRow = draft.blocks.reduce((max, block) => Math.max(max, block.y + block.height), 0);
     const base = cloneEquipmentTileTemplate(DEFAULT_EQUIPMENT_TILE_TEMPLATE).blocks[1];
+    const blockId = `image-${Date.now()}-${draft.blocks.length}`;
+    await assetStorage.put(file, getEquipmentTileImageAssetId(equipmentId, blockId));
     const block = placeBlock({
       ...base,
-      id: `image-${Date.now()}-${draft.blocks.length}`,
+      id: blockId,
       kind: 'image' as const,
       dataKey: undefined,
       text: undefined,
-      assetId,
       imageFit: 'contain' as const,
       alt: file.name,
+      assetRevision: Date.now(),
       x: 0,
       y: lastRow,
       width: 12,
@@ -196,11 +200,11 @@ export function useEquipmentTileTemplate(
     });
   }, [draft, pushDraft]);
 
-  const replaceImage = useCallback(async (blockId: string, file: File) => {
+  const replaceImage = useCallback(async (blockId: string, file: File, equipmentId: string) => {
     const block = draft.blocks.find((candidate) => candidate.id === blockId && candidate.kind === 'image');
-    if (!block?.assetId) throw new TypeError('Image block not found');
-    const assetId = await assetStorage.put(file);
-    updateBlock(blockId, { assetId, alt: block.alt || file.name });
+    if (!block) throw new TypeError('Image block not found');
+    await assetStorage.put(file, getEquipmentTileImageAssetId(equipmentId, blockId));
+    updateBlock(blockId, { assetRevision: Date.now(), alt: block.alt || 'Фото установки' });
   }, [assetStorage, draft.blocks, updateBlock]);
 
   const removeBlock = useCallback((blockId: string) => {

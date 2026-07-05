@@ -6,7 +6,10 @@ import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment
 import { KIND_LABEL } from '@/components/piling/admin-equipment/equipment-status';
 import { formatFixed, formatHours } from '@/lib/format';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
-import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
+import {
+  getEquipmentTileImageAssetId,
+  type EquipmentTileAssetStorage,
+} from './equipment-tile-asset-storage';
 import { EquipmentTileImageBlock } from './equipment-tile-image-block';
 import type { EquipmentTileBlock } from './equipment-tile-template';
 
@@ -73,10 +76,12 @@ export function EquipmentTileBlockContent({
   if (block.kind === 'text') return <span className="whitespace-pre-wrap break-words">{block.text}</span>;
   if (block.kind === 'divider') return <span className="block h-px w-full bg-current opacity-20" />;
   if (block.kind === 'image') {
+    const assetId = getEquipmentTileImageAssetId(card.id, block.id);
     return (
       <EquipmentTileImageBlock
         storage={assetStorage}
-        assetId={block.assetId ?? ''}
+        assetId={assetId}
+        revision={block.assetRevision}
         alt={block.alt ?? ''}
         fit={block.imageFit ?? 'contain'}
       />

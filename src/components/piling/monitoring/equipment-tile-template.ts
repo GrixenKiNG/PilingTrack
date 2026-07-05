@@ -35,6 +35,7 @@ export interface EquipmentTileBlock {
   dataKey?: EquipmentTileDataKey;
   text?: string;
   assetId?: string;
+  assetRevision?: number;
   imageFit?: 'contain' | 'cover';
   alt?: string;
   x: number;
@@ -190,8 +191,8 @@ function isValidBlock(value: unknown): value is EquipmentTileBlock {
   if (value.kind === 'data' && !DATA_KEYS.has(value.dataKey as EquipmentTileDataKey)) return false;
   if (value.kind === 'text' && typeof value.text !== 'string') return false;
   if (value.kind === 'image') {
-    if (typeof value.assetId !== 'string' || value.assetId.trim().length === 0) return false;
     if (!IMAGE_FITS.has(value.imageFit as string) || typeof value.alt !== 'string') return false;
+    if (value.assetRevision != null && !isFiniteInRange(value.assetRevision, 0, Number.MAX_SAFE_INTEGER)) return false;
   }
   if (!isIntegerInRange(value.x, 0, EQUIPMENT_TILE_COLUMNS - 1)) return false;
   if (!isIntegerInRange(value.y, 0, 999)) return false;

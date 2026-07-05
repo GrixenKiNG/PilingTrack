@@ -7,14 +7,20 @@ const TEST_PNG = Buffer.from(
 );
 
 test.describe('monitoring equipment tile editor', () => {
-  test('edits one local template and applies it to every tile', async ({ page }, testInfo) => {
+  test('applies one layout with a different photo for every installation', async ({ page }, testInfo) => {
     test.skip(!['chromium', 'Mobile Chrome'].includes(testInfo.project.name));
 
     await login(page, 'admin@piling.ru', 'admin123');
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       localStorage.removeItem('monitoring-equipment-tile-template-v1');
       localStorage.removeItem('monitoring-equipment-tile-template-v1-migrated');
       localStorage.removeItem('monitoring-design-unlocked');
+      await new Promise<void>((resolve) => {
+        const request = indexedDB.deleteDatabase('monitoring-equipment-tile-assets-v1');
+        request.addEventListener('success', () => resolve(), { once: true });
+        request.addEventListener('error', () => resolve(), { once: true });
+        request.addEventListener('blocked', () => resolve(), { once: true });
+      });
     });
     if (testInfo.project.name === 'Mobile Chrome') {
       await page.setViewportSize({ width: 390, height: 844 });
@@ -46,6 +52,18 @@ test.describe('monitoring equipment tile editor', () => {
     await page.getByLabel('Альтернативный текст').fill('Фото установки');
     await page.getByLabel('Режим изображения').selectOption('cover');
 
+    const equipmentSelect = page.getByLabel('Установка для фото');
+    const equipmentIds = await equipmentSelect.locator('option').evaluateAll((options) =>
+      options.map((option) => (option as HTMLOptionElement).value),
+    );
+    expect(equipmentIds.length).toBeGreaterThan(1);
+    await equipmentSelect.selectOption(equipmentIds[1]);
+    await page.getByLabel('Заменить фото').setInputFiles({
+      name: 'installation-second.png',
+      mimeType: 'image/png',
+      buffer: TEST_PNG,
+    });
+
     await page.screenshot({
       path: `output/playwright/monitoring-tile-editor-${testInfo.project.name.toLowerCase().replaceAll(' ', '-')}.png`,
       fullPage: true,
@@ -56,11 +74,19 @@ test.describe('monitoring equipment tile editor', () => {
     const tileCount = await tiles.count();
     expect(tileCount).toBeGreaterThan(0);
     await expect(page.getByText('Проверка общего шаблона')).toHaveCount(tileCount);
-    await expect(page.getByRole('img', { name: 'Фото установки' })).toHaveCount(tileCount);
+    await expect(page.getByRole('img', { name: 'Фото установки' })).toHaveCount(2);
+    const sourcesBeforeReload = await tiles.evaluateAll((items) => items
+      .map((item) => item.querySelector<HTMLImageElement>('img[alt="Фото установки"]')?.src)
+      .filter((source): source is string => Boolean(source)));
+    expect(new Set(sourcesBeforeReload).size).toBe(2);
 
     await page.reload();
     await expect(page.getByText('Проверка общего шаблона')).toHaveCount(tileCount);
-    await expect(page.getByRole('img', { name: 'Фото установки' })).toHaveCount(tileCount);
+    await expect(page.getByRole('img', { name: 'Фото установки' })).toHaveCount(2);
+    const sourcesAfterReload = await tiles.evaluateAll((items) => items
+      .map((item) => item.querySelector<HTMLImageElement>('img[alt="Фото установки"]')?.src)
+      .filter((source): source is string => Boolean(source)));
+    expect(new Set(sourcesAfterReload).size).toBe(2);
     const widths = await page.evaluate(() => ({
       document: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,

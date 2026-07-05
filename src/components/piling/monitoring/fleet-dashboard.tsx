@@ -255,7 +255,7 @@ export function FleetDashboard() {
         ))}
       </div>
 
-      {visibleCards[0] && <EquipmentTileEditor card={visibleCards[0]} controller={tile} />}
+      {visibleCards[0] && <EquipmentTileEditor cards={visibleCards} controller={tile} />}
 
       {visibleCards.length === 0 && (
         <div className="rounded-xl border bg-muted/30 p-6 text-center text-sm text-muted-foreground">

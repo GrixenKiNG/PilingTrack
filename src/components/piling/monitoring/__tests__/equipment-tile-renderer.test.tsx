@@ -2,6 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentTileRenderer } from '../equipment-tile-renderer';
+import {
+  createMemoryEquipmentTileAssetStorage,
+  getEquipmentTileImageAssetId,
+} from '../equipment-tile-asset-storage';
 import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
 
 vi.mock('next/image', () => ({
@@ -31,6 +35,8 @@ const card: FleetCard = {
   downtimeReason: null,
   latestReport: null,
 };
+
+const secondCard: FleetCard = { ...card, id: 'eq-2', name: 'Установка №24' };
 
 describe('EquipmentTileRenderer', () => {
   it('renders live card values using template positions', () => {
@@ -78,5 +84,37 @@ describe('EquipmentTileRenderer', () => {
     expect(siteBlock).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(siteBlock);
     expect(onSelectBlock).toHaveBeenCalledWith('site');
+  });
+
+  it('renders a different stored photo for every installation', async () => {
+    const storage = createMemoryEquipmentTileAssetStorage();
+    const template = structuredClone(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
+    const imageBlock = {
+      ...structuredClone(template.blocks[1]),
+      id: 'installation-photo',
+      kind: 'image' as const,
+      dataKey: undefined,
+      imageFit: 'cover' as const,
+      alt: 'Фото установки',
+      assetRevision: 1,
+      y: 24,
+      width: 12,
+      height: 6,
+    };
+    template.blocks.push(imageBlock);
+    await storage.put(new File(['one'], 'one.png', { type: 'image/png' }), getEquipmentTileImageAssetId(card.id, imageBlock.id));
+    await storage.put(new File(['second'], 'second.png', { type: 'image/png' }), getEquipmentTileImageAssetId(secondCard.id, imageBlock.id));
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob: Blob) => `blob:${blob.size}`) });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+
+    render(
+      <>
+        <EquipmentTileRenderer card={card} template={template} assetStorage={storage} />
+        <EquipmentTileRenderer card={secondCard} template={template} assetStorage={storage} />
+      </>,
+    );
+
+    const photos = await screen.findAllByRole('img', { name: 'Фото установки' });
+    expect(photos.map((photo) => photo.getAttribute('src'))).toEqual(['blob:3', 'blob:6']);
   });
 });

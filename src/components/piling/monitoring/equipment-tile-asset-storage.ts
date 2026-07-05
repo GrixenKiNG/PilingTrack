@@ -2,6 +2,16 @@ export const MAX_EQUIPMENT_TILE_IMAGE_BYTES = 12 * 1024 * 1024;
 export const EQUIPMENT_TILE_ASSET_DATABASE = 'monitoring-equipment-tile-assets-v1';
 const EQUIPMENT_TILE_ASSET_STORE = 'assets';
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const EQUIPMENT_TILE_IMAGE_ASSET_PREFIX = 'equipment-tile-image:';
+
+export function getEquipmentTileImageAssetId(equipmentId: string, blockId: string): string {
+  return `${EQUIPMENT_TILE_IMAGE_ASSET_PREFIX}${encodeURIComponent(equipmentId)}:${encodeURIComponent(blockId)}`;
+}
+
+export function isEquipmentTileImageAssetId(assetId: string, blockId?: string): boolean {
+  if (!assetId.startsWith(EQUIPMENT_TILE_IMAGE_ASSET_PREFIX)) return false;
+  return blockId == null || assetId.endsWith(`:${encodeURIComponent(blockId)}`);
+}
 
 export interface EquipmentTileAssetRecord {
   id: string;

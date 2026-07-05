@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
   createMemoryEquipmentTileAssetStorage,
+  getEquipmentTileImageAssetId,
+  isEquipmentTileImageAssetId,
   MAX_EQUIPMENT_TILE_IMAGE_BYTES,
   validateEquipmentTileImageFile,
 } from '../equipment-tile-asset-storage';
 
 describe('equipment tile image asset storage', () => {
+  it('builds independent asset ids for every installation and photo block', () => {
+    const first = getEquipmentTileImageAssetId('rig 1', 'photo/main');
+    const second = getEquipmentTileImageAssetId('rig 2', 'photo/main');
+
+    expect(first).toBe('equipment-tile-image:rig%201:photo%2Fmain');
+    expect(second).not.toBe(first);
+    expect(isEquipmentTileImageAssetId(first)).toBe(true);
+    expect(isEquipmentTileImageAssetId(first, 'photo/main')).toBe(true);
+    expect(isEquipmentTileImageAssetId(first, 'other-photo')).toBe(false);
+    expect(isEquipmentTileImageAssetId('legacy-random-id')).toBe(false);
+  });
+
   it.each(['image/jpeg', 'image/png', 'image/webp'])('accepts %s files', (type) => {
     const file = new File(['image'], 'machine-image', { type });
     expect(validateEquipmentTileImageFile(file)).toBeNull();

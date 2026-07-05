@@ -18,6 +18,7 @@ export function EquipmentTileInspector({
   onCardChange,
   onDelete,
   onReplaceImage,
+  equipmentName,
   imageError,
 }: {
   block: EquipmentTileBlock | null;
@@ -26,6 +27,7 @@ export function EquipmentTileInspector({
   onCardChange: (patch: Partial<EquipmentTileTemplate['card']>) => void;
   onDelete: () => void;
   onReplaceImage: (file: File) => Promise<void>;
+  equipmentName: string;
   imageError: string | null;
 }) {
   if (!block) {
@@ -54,6 +56,7 @@ export function EquipmentTileInspector({
       )}
       {block.kind === 'image' && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-xs font-semibold text-slate-700">Фото: {equipmentName}</p>
           <label className="space-y-1 text-xs font-medium text-slate-600">
             <span>Альтернативный текст</span>
             <input className={inputClass} value={block.alt ?? ''} onChange={(event) => onChange({ alt: event.target.value })} />
