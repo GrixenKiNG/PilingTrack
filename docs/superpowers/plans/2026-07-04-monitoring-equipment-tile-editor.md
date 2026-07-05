@@ -18,7 +18,8 @@
 - Store the first release under `monitoring-equipment-tile-template-v1` in `localStorage`.
 - Keep `/monitoring?design=1` as the local editor unlock; normal users must not see editing controls.
 - Use a 12-column integer grid and prevent out-of-bounds placement.
-- Do not add server storage, uploads, collaboration, or arbitrary external images.
+- Do not add server storage, collaboration, or arbitrary external image URLs.
+- Accept local JPG, PNG, and WebP files up to 12 MB; store blobs in IndexedDB and keep only `assetId` in the template.
 - All editor actions must remain keyboard reachable with visible focus states and 44px minimum action targets.
 
 ---
@@ -347,3 +348,80 @@ Run `mcp__gitnexus__detect_changes(scope: "all", worktree: "C:\\PillingR\\my-pro
 - [ ] **Step 6: Commit verification fixes only if files changed**
 
 Stage only monitoring editor/test files, rerun staged change detection, and commit with `test(monitoring): verify equipment tile editor`.
+
+### Task 7: Local image upload blocks backed by IndexedDB
+
+**Files:**
+- Create: `src/components/piling/monitoring/equipment-tile-asset-storage.ts`
+- Create: `src/components/piling/monitoring/equipment-tile-image-block.tsx`
+- Create: `src/components/piling/monitoring/__tests__/equipment-tile-asset-storage.test.ts`
+- Create: `src/components/piling/monitoring/__tests__/equipment-tile-image-block.test.tsx`
+- Modify: `src/components/piling/monitoring/equipment-tile-template.ts`
+- Modify: `src/components/piling/monitoring/equipment-tile-block-library.tsx`
+- Modify: `src/components/piling/monitoring/equipment-tile-inspector.tsx`
+- Modify: `src/components/piling/monitoring/equipment-tile-block.tsx`
+- Modify: `src/components/piling/monitoring/use-equipment-tile-template.ts`
+
+**Interfaces:**
+- Produces: `EquipmentTileAssetStorage` with `put(file)`, `get(assetId)`, `delete(assetId)`; `createIndexedDbEquipmentTileAssetStorage(indexedDB)`; `<EquipmentTileImageBlock assetId alt fit storage />`.
+- Extends: `EquipmentTileBlock` with `assetId?: string`, `imageFit?: 'contain' | 'cover'`, and `alt?: string`.
+
+- [ ] **Step 1: Write failing asset validation and storage tests**
+
+Test JPG/PNG/WebP acceptance, rejection of unsupported MIME types, rejection above 12 MB, deterministic blob retrieval, replacement, and deletion using an in-memory storage adapter that satisfies the same interface as IndexedDB.
+
+- [ ] **Step 2: Run tests and verify missing-module failure**
+
+Run: `npx.cmd vitest run src/components/piling/monitoring/__tests__/equipment-tile-asset-storage.test.ts`
+
+Expected: FAIL because `equipment-tile-asset-storage` does not exist.
+
+- [ ] **Step 3: Implement storage and validation**
+
+Use database `monitoring-equipment-tile-assets-v1`, version `1`, object store `assets`, records `{ id, blob, name, type, updatedAt }`. Reject invalid files before opening a write transaction. Return a generated stable asset id from `put`.
+
+- [ ] **Step 4: Write failing image block lifecycle tests**
+
+Mock `URL.createObjectURL` and `URL.revokeObjectURL`. Assert a stored blob renders with the requested alt and fit, a missing asset shows `Изображение недоступно`, and every created URL is revoked after replacement or unmount.
+
+- [ ] **Step 5: Implement `EquipmentTileImageBlock`**
+
+Load the blob asynchronously by `assetId`, create one object URL, revoke the previous URL before replacement and on cleanup, and render a neutral placeholder on missing/error state.
+
+- [ ] **Step 6: Add upload and image properties to the editor**
+
+Add `Добавить фото` with an accessible hidden `input[type=file]` accepting `.jpg,.jpeg,.png,.webp`. After validation/storage, create an image block with `assetId`, `imageFit: 'contain'`, and `alt` from the filename. Inspector allows replacing the file, editing alt text, and choosing `contain`/`cover`. Show storage errors next to the upload control without discarding the rest of the draft.
+
+- [ ] **Step 7: Remove unreferenced blobs after explicit image deletion**
+
+When an image block is deleted, check the current draft for another block with the same `assetId`; delete the blob only when no block references it. Reset deletes all template-owned image records.
+
+- [ ] **Step 8: Run focused tests and TypeScript**
+
+Run: `npx.cmd vitest run src/components/piling/monitoring/__tests__`
+
+Run: `npx.cmd tsc --noEmit --pretty false`
+
+Expected: PASS.
+
+- [ ] **Step 9: Commit image upload support**
+
+Run GitNexus staged change detection and commit with `feat(monitoring): add local image blocks`.
+
+### Task 8: Repeat final verification with an uploaded image
+
+**Files:**
+- Modify: `e2e/monitoring-tile-editor.spec.ts`
+- Modify only monitoring editor files when the verification exposes a reproducible defect.
+
+- [ ] **Step 1: Extend E2E with a generated in-memory PNG upload**
+
+Use Playwright `setInputFiles` with a small PNG buffer. Verify preview, `cover` selection, save/reload persistence, application to all cards, and desktop/mobile screenshots.
+
+- [ ] **Step 2: Run focused, full unit, lint, build, and E2E checks**
+
+Expected: all commands exit 0; screenshots show no horizontal overflow.
+
+- [ ] **Step 3: Run final GitNexus change detection and commit verification changes**
+
+Stage only image/editor/E2E files, review affected processes, and commit with `test(monitoring): verify local image blocks`.
