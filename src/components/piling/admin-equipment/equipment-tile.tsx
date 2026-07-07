@@ -14,11 +14,6 @@ import { getEquipmentBrand } from './equipment-brand-logo';
 const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('ru'));
 const formatNum = (n: number | null | undefined, digits = 0) =>
   n == null ? '—' : n.toLocaleString('ru', { maximumFractionDigits: digits });
-const downtimeDays = (hours: number | null | undefined) => {
-  if (hours == null) return '—';
-  if (hours <= 0) return '0';
-  return String(Math.ceil(hours / 24));
-};
 
 export function EquipmentTile({
   card,
@@ -111,7 +106,7 @@ export function EquipmentTile({
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Metric label="сваи шт./м.п." value={t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'} />
           <Metric label="бурение шт./м" value={t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'} />
-          <Metric label="простой, дн." value={t ? downtimeDays(t.downtimeHours) : '—'} />
+          <Metric label="простой, ч" value={t ? formatNum(t.downtimeHours, 1) : '—'} />
         </div>
 
         {flag ? (

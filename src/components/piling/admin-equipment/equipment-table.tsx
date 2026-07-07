@@ -11,11 +11,6 @@ type SortKey = 'name' | 'equipmentStatus' | 'reportStatus' | 'engineHoursTotal';
 const formatNum = (n: number | null | undefined, digits = 0) =>
   n == null ? '—' : n.toLocaleString('ru', { maximumFractionDigits: digits });
 
-const downtimeDays = (hours: number | null | undefined) => {
-  if (hours == null) return '—';
-  if (hours <= 0) return '0';
-  return String(Math.ceil(hours / 24));
-};
 
 export function EquipmentTable({
   cards,
@@ -55,7 +50,7 @@ export function EquipmentTable({
             <th className={th} onClick={() => toggle('reportStatus')}><StackedHeader words={['Статус', 'отчёта', '↕']} /></th>
             <th className="px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Сваи', 'шт./м.п.']} align="right" /></th>
             <th className="px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Бурение', 'шт./м']} align="right" /></th>
-            <th className="px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Простой', 'дн.', 'причина']} /></th>
+            <th className="px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Простой', 'ч', 'причина']} /></th>
             <th className={th} onClick={() => toggle('engineHoursTotal')}>Моточасы ↕</th>
             <th className={staticTh}>ТО</th>
           </tr>
@@ -101,7 +96,7 @@ export function EquipmentTable({
                   {t ? <CompactMetric first={`${formatNum(t.drillingCount)} шт.`} second={`${formatNum(t.drillingMeters, 1)} м`} /> : '—'}
                 </td>
                 <td>
-                  <div className="font-mono text-slate-800">{t ? `${downtimeDays(t.downtimeHours)} дн.` : '—'}</div>
+                  <div className="font-mono text-slate-800">{t ? `${formatNum(t.downtimeHours, 1)} ч` : '—'}</div>
                   <div className="text-3xs leading-tight text-slate-500" title={c.downtimeReason ?? ''}>
                     <WordStack value={c.downtimeReason} />
                   </div>
