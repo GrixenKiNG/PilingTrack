@@ -12,11 +12,76 @@ description: >-
 
 # PilingTrack CSP / Monitoring Campaign
 
-**Status as of 2026-07-08: OPEN. Unsolved.** Nobody has reproduced the bug
-end-to-end, localized the exact injection point, or shipped a fix yet. This
-file is the campaign's working memory — read it top to bottom before you
-touch anything, and update it (or the closure note at the bottom) when you
-learn something that changes the picture.
+**Status as of 2026-07-09: OPEN — ROOT-CAUSED, no clean in-place fix yet.**
+Reproduced end-to-end locally and the injection point is localized (Phase 2
+complete). No fix shipped — the fix is now a build-pipeline *decision*, see
+below. This file is the campaign's working memory — read it top to bottom
+before you touch anything, and update it (or the closure note at the bottom)
+when you learn something that changes the picture.
+
+### 2026-07-09 investigation — confirmed findings (verified locally)
+
+- **Reproduced** with `npm run build && npm start` (standalone prod server,
+  `NODE_ENV=production`). On `/monitoring` the console shows exactly the
+  campaign's expected error for chunk `0c_v1-l3b~-oa.js`. It fires **before
+  auth** (page bounces to `/login` on 401, error still fires).
+- **Root cause localized (Experiment 1):** the served HTML has **35 `<script>`
+  tags; 34 carry the nonce, exactly 1 does not.** The nonce-less one is
+  `<script src="/_next/static/chunks/<hash>.js" async>` with **no `nonce`
+  attribute**. The CSP response header itself is correct (fresh nonce +
+  strict-dynamic). So this is a *nonce-stamping gap on one specific SSR script
+  tag*, not a policy-string bug — **do not touch `buildNonceCsp`.**
+- **What the rogue chunk is:** the **lucide-react base chunk** (1324 bytes:
+  `createLucideIcon`/`mergeClasses`/`forwardRef`, `globalThis.TURBOPACK.push`).
+  Turbopack auto-barrel-optimizes `lucide-react` into this separate bootstrap
+  chunk; its `<script>` tag is emitted without the nonce (suspected React
+  Float `preinit` path that doesn't thread the nonce — a Next+Turbopack
+  framework bug, cf. vercel/next.js#89754-adjacent).
+- **NOT `/monitoring`-specific.** The same nonce-less chunk appears on
+  `/login`, `/operator`, `/report`, `/history`, `/inspections` too. The
+  "/monitoring" framing was just where it was first noticed. The Sentry
+  `tunnelRoute:"/monitoring"` lead (Experiment 4) is a **dead end** for this
+  bug — refuted.
+- **Bundler confirmed = Turbopack** (build banner `Next.js 16.2.6
+  (Turbopack)`). Resolves Experiment 5's open question; the `~` in chunk names
+  is Turbopack naming, not webpack split-chunks.
+
+### Fixes RULED OUT on 2026-07-09 (don't repeat these)
+
+| Attempt | Result |
+|---|---|
+| Upgrade Next `16.2.6 → 16.2.10` (keep Turbopack) | **Does not fix** — verified: still 34/35 nonced, same lucide chunk nonce-less (renamed `141azqsq5pyeo.js`). Reverted. |
+| `next build --webpack` (webpack threads nonce correctly) | **Build fails type-check** on this repo/version — generated route validator error `checkFields<Diff<{GET?:Function;HEAD?:Function;OPTIONS?:Function}>>`. Would need that error fixed first, and is a full bundler switch. |
+| `experimental.optimizePackageImports` to drop lucide opt | **No-op under Turbopack** — Next docs: "not needed when using Turbopack; Turbopack automatically analyzes and optimizes imports." Turbopack ignores the option. |
+| Weaken CSP (`'unsafe-inline'`/`'self'`/drop strict-dynamic) | Fenced off — forbidden (see Fenced-off wrong paths). |
+| Hash (`'sha256-'`) the chunk | Fenced off — chunk name+content change every build. |
+
+### Remaining viable paths (a DECISION, not a blind patch — route via `pilingtrack-change-control`)
+
+1. **Switch prod build to webpack** — most likely real fix (mature nonce
+   threading; also unlocks SRI). Prerequisite: resolve the route-validator
+   type error above. Cost: abandons the deliberate Turbopack build; slower
+   builds. Needs owner sign-off (build-pipeline change class).
+2. **`Content-Security-Policy-Report-Only` shadow + track upstream** (Phase 3
+   #4) — doesn't fix for users; gathers evidence while waiting for a
+   Next/Turbopack fix. Low risk.
+3. **Wait for an upstream Turbopack/React-Float nonce fix** and re-test each
+   Next patch (`grep '"next"' package.json` for current version; retest the
+   Experiment-1 nonce count).
+
+**Impact — ASSESSED 2026-07-09: cosmetic / low urgency.** Verified in a local
+standalone build with Playwright across `/login`, `/admin`, `/monitoring`:
+the page renders fully (53 lucide icons on `/monitoring`), React **hydrates
+successfully** (`__reactFiber` present, 23 live buttons/3 selects), and there
+is **exactly one console error per load** (the CSP block) with **no** React
+"element type is invalid", hydration, or chunk-load errors. Icons show because
+they are SSR'd into the HTML and hydration succeeds regardless of the blocked
+chunk. So the symptom is **console/Sentry noise + a defense-in-depth gap** (a
+script escaping nonce control), NOT user-facing breakage. Prioritize
+accordingly — the safe interim (Report-Only, or simply wait for an upstream
+Turbopack/React-Float nonce fix and retest each Next release) is reasonable;
+the webpack bundler switch is the only real fix but is a larger, sign-off-level
+change for a cosmetic symptom.
 
 **Prime directive: do not patch `src/proxy.ts` blind, and do not weaken the
 CSP to make the symptom go away.** The nonce + `strict-dynamic` policy is a
