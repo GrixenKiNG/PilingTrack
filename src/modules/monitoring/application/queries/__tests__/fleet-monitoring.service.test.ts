@@ -8,10 +8,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { equipmentFindMany, reportFindMany, analyticsFindMany } = vi.hoisted(() => ({
+const { equipmentFindMany, reportFindMany, analyticsFindMany, mediaFindMany } = vi.hoisted(() => ({
   equipmentFindMany: vi.fn(),
   reportFindMany: vi.fn(),
   analyticsFindMany: vi.fn(),
+  mediaFindMany: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -19,6 +20,7 @@ vi.mock('@/lib/db', () => ({
     equipment: { findMany: equipmentFindMany },
     report: { findMany: reportFindMany },
     reportAnalytics: { findMany: analyticsFindMany },
+    media: { findMany: mediaFindMany },
   },
 }));
 
@@ -69,7 +71,9 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
     equipmentFindMany.mockReset();
     reportFindMany.mockReset();
     analyticsFindMany.mockReset();
+    mediaFindMany.mockReset();
     analyticsFindMany.mockResolvedValue([]);
+    mediaFindMany.mockResolvedValue([]);
   });
 
   it('maps inventory fields onto the card and serializes the maintenance date', async () => {
@@ -206,5 +210,43 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
 
     expect(snap.equipment[0].equipmentStatus).toBe('repair');
     expect(snap.equipment[0].reportStatus).toBe('missing');
+  });
+
+  it('resolves photoUrl from the latest completed equipment media', async () => {
+    equipmentFindMany.mockResolvedValue([
+      {
+        id: 'eq-1', name: 'A', model: '', manufactureYear: null, kind: 'OTHER',
+        inventoryNumber: null, serialNumber: null, engineHoursTotal: null,
+        nextMaintenanceDate: null, nextMaintenanceAtHours: null, crews: [],
+        maintenanceRecords: [],
+      },
+      {
+        id: 'eq-2', name: 'B', model: '', manufactureYear: null, kind: 'OTHER',
+        inventoryNumber: null, serialNumber: null, engineHoursTotal: null,
+        nextMaintenanceDate: null, nextMaintenanceAtHours: null, crews: [],
+        maintenanceRecords: [],
+      },
+    ]);
+    reportFindMany.mockResolvedValue([]);
+    // Rows arrive pre-sorted newest-first (orderBy: createdAt desc), matching
+    // the real Prisma query — the map keeps the first row seen per entity.
+    mediaFindMany.mockResolvedValue([
+      { id: 'media-1', entityId: 'eq-1', cdnUrl: 'https://cdn.example.com/photo.jpg', createdAt: new Date('2026-06-15T00:00:00.000Z') },
+      { id: 'media-2', entityId: 'eq-1', cdnUrl: null, createdAt: new Date('2026-06-01T00:00:00.000Z') },
+    ]);
+
+    const snap = await getFleetSnapshot({ tenantId: 'orion' });
+
+    expect(mediaFindMany).toHaveBeenCalledTimes(1);
+    const call = mediaFindMany.mock.calls[0][0];
+    expect(call.where.entityType).toBe('equipment');
+    expect(call.where.tenantId).toBe('orion');
+    expect(call.where.uploadStatus).toBe('completed');
+    expect(call.where.isDeleted).toBe(false);
+
+    const eq1 = snap.equipment.find((c) => c.id === 'eq-1');
+    const eq2 = snap.equipment.find((c) => c.id === 'eq-2');
+    expect(eq1?.photoUrl).toBe('https://cdn.example.com/photo.jpg');
+    expect(eq2?.photoUrl).toBeNull();
   });
 });

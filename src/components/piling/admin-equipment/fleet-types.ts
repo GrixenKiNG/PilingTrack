@@ -52,6 +52,7 @@ export interface FleetCard {
     shiftType: string;
     updatedAt: string;
   } | null;
+  photoUrl: string | null;
 }
 
 export interface FleetSnapshot {

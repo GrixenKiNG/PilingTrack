@@ -67,6 +67,7 @@ export interface FleetCard {
     shiftType: string;
     updatedAt: string;
   } | null;
+  photoUrl: string | null;
 }
 
 export interface FleetSnapshot {
@@ -173,6 +174,27 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
   }
 
   const equipmentIds = equipment.map((e) => e.id);
+
+  // Latest completed, non-deleted photo per equipment (entityType='equipment').
+  const photoRows = equipmentIds.length
+    ? await db.media.findMany({
+        where: {
+          entityType: 'equipment',
+          entityId: { in: equipmentIds },
+          tenantId: opts.tenantId,
+          uploadStatus: 'completed',
+          isDeleted: false,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, entityId: true, cdnUrl: true },
+      })
+    : [];
+  const photoByEquipment = new Map<string, string>();
+  for (const m of photoRows) {
+    if (m.entityId && !photoByEquipment.has(m.entityId)) {
+      photoByEquipment.set(m.entityId, m.cdnUrl ?? `/api/media/${m.id}/download`);
+    }
+  }
 
   // One query pulls every report in the recent window — small dataset.
   // Date is stored as 'YYYY-MM-DD' string in the schema, so plain string
@@ -317,6 +339,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
             updatedAt: latest.updatedAt.toISOString(),
           }
         : null,
+      photoUrl: photoByEquipment.get(eq.id) ?? null,
     };
   });
 
