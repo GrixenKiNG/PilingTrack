@@ -13,3 +13,5 @@ export type {
   EquipmentStatus,
   FleetSnapshotOptions,
 } from './application/queries/fleet-monitoring.service';
+
+export { getTemplate, saveTemplate } from './application/template-service';
