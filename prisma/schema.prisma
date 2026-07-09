@@ -457,6 +457,17 @@ model ChecklistItem {
   @@index([sectionId])
 }
 
+model MonitoringTileTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  template  Json
+  updatedBy String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([tenantId])
+}
+
 model Inspection {
   id                  String   @id @default(cuid())
   tenantId            String
