@@ -1,21 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { authFetch } from '@/lib/api';
 import { createTemplateHistory, type TemplateHistory } from './equipment-tile-history';
 import { placeBlock, resizeBlock } from './equipment-tile-layout';
 import {
   cloneEquipmentTileTemplate,
   DEFAULT_EQUIPMENT_TILE_TEMPLATE,
+  validateEquipmentTileTemplate,
   type EquipmentTileBlock,
   type EquipmentTileBlockKind,
   type EquipmentTileDataKey,
   type EquipmentTileTemplate,
 } from './equipment-tile-template';
-import {
-  loadEquipmentTileTemplate,
-  resetEquipmentTileTemplate,
-  saveEquipmentTileTemplate,
-} from './equipment-tile-storage';
+import { loadEquipmentTileTemplate } from './equipment-tile-storage';
 import { migrateLegacyCardDesign } from './design-tuning-panel';
 import {
   getDefaultEquipmentTileAssetStorage,
@@ -57,8 +56,8 @@ export interface EquipmentTileTemplateController {
   assetStorage: EquipmentTileAssetStorage;
   startEditing(): void;
   cancelEditing(): void;
-  saveDraft(): void;
-  reset(): void;
+  saveDraft(): Promise<void>;
+  reset(): Promise<void>;
   undo(): void;
   redo(): void;
   addBlock(kind: EquipmentTileBlockKind, dataKey?: EquipmentTileDataKey): EquipmentTileBlock;
@@ -88,16 +87,36 @@ export function useEquipmentTileTemplate(
   useEffect(() => {
     if (queryUnlock) localStorage.setItem(UNLOCK_KEY, '1');
     migrateLegacyCardDesign(localStorage);
-    const saved = loadEquipmentTileTemplate(localStorage);
     let active = true;
-    queueMicrotask(() => {
+    void (async () => {
+      let serverTemplate = cloneEquipmentTileTemplate(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
+      try {
+        const res = await authFetch('/api/monitoring/template');
+        if (res.ok) {
+          const body: unknown = await res.json();
+          serverTemplate = validateEquipmentTileTemplate(body) ?? serverTemplate;
+        }
+      } catch {
+        // network/parse failure — fall back to the default so the page still renders
+      }
       if (!active) return;
-      setTemplate(saved);
-      setDraft(saved);
-      historyRef.current = createTemplateHistory(saved);
+
+      let initial = serverTemplate;
+      const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
+      if (isServerDefault) {
+        // No row saved server-side yet — migrate a pre-existing local customization once.
+        const local = loadEquipmentTileTemplate(localStorage);
+        if (JSON.stringify(local) !== JSON.stringify(DEFAULT_EQUIPMENT_TILE_TEMPLATE)) {
+          initial = local;
+        }
+      }
+
+      setTemplate(initial);
+      setDraft(initial);
+      historyRef.current = createTemplateHistory(initial);
       setHistoryState({ canUndo: false, canRedo: false });
       setUnlocked(queryUnlock || localStorage.getItem(UNLOCK_KEY) === '1');
-    });
+    })();
     return () => { active = false; };
   }, [queryUnlock]);
 
@@ -124,16 +143,32 @@ export function useEquipmentTileTemplate(
     setEditing(false);
   }, [assetStorage, draft, template]);
 
-  const saveDraft = useCallback(() => {
+  const saveDraft = useCallback(async () => {
     deleteUnreferencedImageAssets(template, draft, assetStorage);
-    saveEquipmentTileTemplate(localStorage, draft);
+    const res = await authFetch('/api/monitoring/template', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(draft),
+    });
+    if (!res.ok) {
+      toast.error(res.status === 403 ? 'Только администратор может сохранять шаблон' : 'Не удалось сохранить шаблон');
+      return;
+    }
     setTemplate(cloneEquipmentTileTemplate(draft));
     setEditing(false);
   }, [assetStorage, draft, template]);
 
-  const reset = useCallback(() => {
-    resetEquipmentTileTemplate(localStorage);
+  const reset = useCallback(async () => {
     const next = cloneEquipmentTileTemplate(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
+    const res = await authFetch('/api/monitoring/template', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next),
+    });
+    if (!res.ok) {
+      toast.error(res.status === 403 ? 'Только администратор может сбросить шаблон' : 'Не удалось сбросить шаблон');
+      return;
+    }
     historyRef.current = createTemplateHistory(next);
     setTemplate(next);
     setDraft(next);

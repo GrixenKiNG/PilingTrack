@@ -1,11 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
+import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
 import { FleetDashboard } from '../fleet-dashboard';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
+vi.mock('@/lib/store', () => ({
+  usePilingStore: (selector: (state: { currentUser: { role: string } | null }) => unknown) =>
+    selector({ currentUser: { role: 'ADMIN' } }),
+}));
 vi.mock('@/components/piling/async-ui', () => ({ useMinSkeletonDuration: () => false }));
 vi.mock('next/image', () => ({ default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} /> }));
 
@@ -38,7 +43,22 @@ describe('FleetDashboard shared equipment template', () => {
       },
     });
     window.history.replaceState({}, '', '/monitoring?design=1');
-    mocks.authFetch.mockResolvedValue({ ok: true, json: async () => snapshot });
+    let serverTemplate: unknown = DEFAULT_EQUIPMENT_TILE_TEMPLATE;
+    mocks.authFetch.mockReset();
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (url.startsWith('/api/monitoring/fleet')) {
+        return { ok: true, json: async () => snapshot };
+      }
+      if (url === '/api/monitoring/template' && method === 'GET') {
+        return { ok: true, json: async () => serverTemplate };
+      }
+      if (url === '/api/monitoring/template' && method === 'PUT') {
+        serverTemplate = JSON.parse(init?.body as string);
+        return { ok: true, json: async () => serverTemplate };
+      }
+      throw new Error(`Unexpected authFetch: ${method} ${url}`);
+    });
   });
 
   it('applies one saved template to all visible equipment cards', async () => {

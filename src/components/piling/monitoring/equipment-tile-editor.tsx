@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
+import { usePilingStore } from '@/lib/store';
 import { EquipmentTileBlockLibrary } from './equipment-tile-block-library';
 import { EquipmentTileCanvas } from './equipment-tile-canvas';
 import { EquipmentTileInspector } from './equipment-tile-inspector';
@@ -16,11 +17,15 @@ export function EquipmentTileEditor({ cards, controller }: { cards: FleetCard[];
   const [preview, setPreview] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'library' | 'inspector' | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
   const selectedCard = cards.find((card) => card.id === selectedCardId) ?? cards[0] ?? null;
   const selectedBlock = controller.draft.blocks.find((block) => block.id === selectedBlockId) ?? null;
 
   if (!selectedCard) return null;
   if (!controller.unlocked) return null;
+  // Read-only users never see the editor affordances — saving/uploading is
+  // ADMIN-only server-side (403), so there's nothing for them to do here.
+  if (!isAdmin) return null;
   if (!controller.editing) {
     return (
       <button type="button" className="fixed bottom-4 right-4 z-40 min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={controller.startEditing}>
@@ -98,8 +103,8 @@ export function EquipmentTileEditor({ cards, controller }: { cards: FleetCard[];
         <button type="button" className={toolbarButton} disabled={!controller.canUndo} onClick={controller.undo}>Отменить</button>
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>
         <button type="button" className={toolbarButton} aria-pressed={preview} onClick={() => setPreview((value) => !value)}>Предпросмотр</button>
-        <button type="button" className={toolbarButton} onClick={() => { controller.reset(); setSelectedBlockId(null); }}>Сбросить</button>
-        <button type="button" className="min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={controller.saveDraft}>Сохранить</button>
+        <button type="button" className={toolbarButton} onClick={() => { void controller.reset(); setSelectedBlockId(null); }}>Сбросить</button>
+        <button type="button" className="min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={() => void controller.saveDraft()}>Сохранить</button>
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('library')}>Блоки</button>}
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('inspector')}>Свойства</button>}
         <button type="button" className={toolbarButton} onClick={closeEditor}>Закрыть</button>

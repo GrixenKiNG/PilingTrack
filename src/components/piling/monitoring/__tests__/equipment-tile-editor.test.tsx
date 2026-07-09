@@ -2,26 +2,43 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentTileEditor } from '../equipment-tile-editor';
-import { EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY } from '../equipment-tile-storage';
+import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
 import { useEquipmentTileTemplate } from '../use-equipment-tile-template';
 
 vi.mock('next/image', () => ({
   default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} />,
 }));
 
+const storeState = vi.hoisted(() => ({ role: 'ADMIN' as string | null }));
+vi.mock('@/lib/store', () => ({
+  usePilingStore: (selector: (state: { currentUser: { role: string } | null }) => unknown) =>
+    selector({ currentUser: storeState.role ? { role: storeState.role } : null }),
+}));
+
+type FetchCall = { url: string; method: string; body?: unknown };
+
 /**
- * uploadEquipmentPhoto (Task 4) drives fetch directly: POST /api/media (presign) ->
- * PUT uploadUrl (S3) -> POST /api/media/:id/confirm. Stub fetch end-to-end so the
- * real validateEquipmentTileImageFile() gate still runs (keeps the "unsupported
- * file" test meaningful) while no real network call happens.
+ * The hook now drives everything through fetch: GET/PUT /api/monitoring/template
+ * (Task 5) plus uploadEquipmentPhoto's POST /api/media (presign) -> PUT uploadUrl
+ * (S3) -> POST /api/media/:id/confirm (Task 4). `authFetch` isn't mocked at the
+ * module level (it's a thin wrapper around `fetch`), so stubbing global fetch
+ * exercises the real request path end-to-end.
  */
-function stubUploadFetch() {
-  const calls: { url: string; method: string; body?: unknown }[] = [];
+function stubFetch() {
+  const calls: FetchCall[] = [];
+  let serverTemplate: unknown = DEFAULT_EQUIPMENT_TILE_TEMPLATE;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
     calls.push({ url, method, body });
+    if (url === '/api/monitoring/template' && method === 'GET') {
+      return new Response(JSON.stringify(serverTemplate), { status: 200 });
+    }
+    if (url === '/api/monitoring/template' && method === 'PUT') {
+      serverTemplate = body;
+      return new Response(JSON.stringify(body), { status: 200 });
+    }
     if (url === '/api/media' && method === 'POST') {
       return new Response(JSON.stringify({ mediaId: 'media-1', uploadUrl: 'https://s3.example/upload' }), { status: 200 });
     }
@@ -57,7 +74,14 @@ function Harness({
   return <EquipmentTileEditor cards={cards} controller={controller} />;
 }
 
+function lastPut(calls: FetchCall[]) {
+  const putCalls = calls.filter((call) => call.url === '/api/monitoring/template' && call.method === 'PUT');
+  return putCalls[putCalls.length - 1]?.body as { blocks: { kind: string; text?: string; alt?: string; imageFit?: string; style?: Record<string, unknown> }[] } | undefined;
+}
+
 describe('EquipmentTileEditor', () => {
+  let calls: FetchCall[];
+
   beforeEach(() => {
     const values = new Map<string, string>();
     Object.defineProperty(window, 'localStorage', {
@@ -72,6 +96,8 @@ describe('EquipmentTileEditor', () => {
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:editor-image') });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
     window.history.replaceState({}, '', '/monitoring');
+    calls = stubFetch();
+    storeState.role = 'ADMIN';
   });
 
   it('stays hidden until design mode is unlocked', async () => {
@@ -84,7 +110,7 @@ describe('EquipmentTileEditor', () => {
     expect(await screen.findByRole('button', { name: 'Редактировать шаблон' })).toBeInTheDocument();
   });
 
-  it('adds and edits arbitrary text, then saves it locally', async () => {
+  it('adds and edits arbitrary text, then saves it to the server', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
@@ -96,8 +122,8 @@ describe('EquipmentTileEditor', () => {
     fireEvent.change(screen.getByLabelText('Выравнивание текста'), { target: { value: 'center' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
 
-    const saved = JSON.parse(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY) ?? '{}');
-    expect(saved.blocks).toEqual(expect.arrayContaining([
+    await waitFor(() => expect(lastPut(calls)).toBeDefined());
+    expect(lastPut(calls)?.blocks).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'text', text: 'Контрольная подпись', style: expect.objectContaining({ fontSize: 18, textAlign: 'center' }) }),
     ]));
   });
@@ -121,16 +147,18 @@ describe('EquipmentTileEditor', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Редактировать шаблон' })).toBeInTheDocument());
+
     fireEvent.click(screen.getByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
 
     await waitFor(() => expect(screen.queryByText('Новый текст')).not.toBeInTheDocument());
-    expect(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY)).toBeNull();
+    await waitFor(() => expect(lastPut(calls)).toEqual(DEFAULT_EQUIPMENT_TILE_TEMPLATE));
   });
 
   it('uploads a photo via the media API and saves its presentation settings', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
-    const calls = stubUploadFetch();
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     const file = new File(['image'], 'crane.png', { type: 'image/png' });
@@ -142,8 +170,8 @@ describe('EquipmentTileEditor', () => {
     fireEvent.change(screen.getByLabelText('Режим изображения'), { target: { value: 'cover' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
 
-    const saved = JSON.parse(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY) ?? '{}');
-    const imageBlock = saved.blocks.find((block: { kind: string }) => block.kind === 'image');
+    await waitFor(() => expect(lastPut(calls)).toBeDefined());
+    const imageBlock = lastPut(calls)?.blocks.find((block) => block.kind === 'image');
     expect(imageBlock).toEqual(expect.objectContaining({ alt: 'Кран на объекте', imageFit: 'cover' }));
     expect(imageBlock).not.toHaveProperty('assetId');
 
@@ -155,7 +183,6 @@ describe('EquipmentTileEditor', () => {
 
   it('shows a validation error for an unsupported photo file', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
-    stubUploadFetch();
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.change(screen.getByLabelText('Загрузить фото'), {
@@ -163,12 +190,11 @@ describe('EquipmentTileEditor', () => {
     });
 
     expect(await screen.findByText('Поддерживаются только JPG, PNG и WebP')).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(calls.some((call) => call.url === '/api/media' && call.method === 'POST')).toBe(false);
   });
 
   it('uploads the photo against the selected installation', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
-    const calls = stubUploadFetch();
     render(<Harness cards={[card, secondCard]} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
 
@@ -182,5 +208,14 @@ describe('EquipmentTileEditor', () => {
 
     const presign = calls.find((call) => call.url === '/api/media' && call.method === 'POST');
     expect(presign?.body).toEqual(expect.objectContaining({ entityType: 'equipment', entityId: secondCard.id }));
+  });
+
+  it('hides the editor entry for non-ADMIN users', async () => {
+    storeState.role = 'OPERATOR';
+    window.history.replaceState({}, '', '/monitoring?design=1');
+    render(<Harness />);
+
+    await waitFor(() => expect(calls.some((call) => call.url === '/api/monitoring/template')).toBe(true));
+    expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
   });
 });
