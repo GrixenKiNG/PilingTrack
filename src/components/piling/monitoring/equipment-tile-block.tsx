@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { AlertTriangle, MapPin, Timer, User, Wrench } from 'lucide-react';
+import { authFetch } from '@/lib/api';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
@@ -19,6 +21,34 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
       </span>
     </div>
   );
+}
+
+// The media download endpoint returns { url } with a presigned S3 link (same
+// contract report-thumbnail.tsx and equipment-photos.tsx consume) — an <img>
+// can't point at it directly, so resolve it first. cdnUrl values pass through.
+function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
+  const [url, setUrl] = useState<string | null>(photoUrl.startsWith('/api/') ? null : photoUrl);
+
+  useEffect(() => {
+    if (!photoUrl.startsWith('/api/')) { setUrl(photoUrl); return; }
+    let active = true;
+    setUrl(null);
+    void (async () => {
+      try {
+        const res = await authFetch(photoUrl);
+        if (!res.ok) return;
+        const body: unknown = await res.json();
+        const signed = (body as { url?: unknown }).url;
+        if (active && typeof signed === 'string') setUrl(signed);
+      } catch {
+        // leave the placeholder — a broken photo must not break the tile
+      }
+    })();
+    return () => { active = false; };
+  }, [photoUrl]);
+
+  if (!url) return <span className="text-xs text-slate-400">Фото не загружено</span>;
+  return <img src={url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
 }
 
 function PhotoBlock({ card }: { card: FleetCard }) {
@@ -76,14 +106,7 @@ export function EquipmentTileBlockContent({
   if (block.kind === 'divider') return <span className="block h-px w-full bg-current opacity-20" />;
   if (block.kind === 'image') {
     if (!card.photoUrl) return <span className="text-xs text-slate-400">Фото не загружено</span>;
-    return (
-      <img
-        src={card.photoUrl}
-        alt={block.alt ?? card.name}
-        className="h-full w-full"
-        style={{ objectFit: block.imageFit ?? 'cover' }}
-      />
-    );
+    return <ServerPhoto photoUrl={card.photoUrl} alt={block.alt ?? card.name} fit={block.imageFit ?? 'cover'} />;
   }
   if (block.dataKey === 'photo') return <PhotoBlock card={card} />;
 
