@@ -2,17 +2,39 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentTileEditor } from '../equipment-tile-editor';
-import {
-  createMemoryEquipmentTileAssetStorage,
-  getEquipmentTileImageAssetId,
-  type EquipmentTileAssetStorage,
-} from '../equipment-tile-asset-storage';
 import { EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY } from '../equipment-tile-storage';
 import { useEquipmentTileTemplate } from '../use-equipment-tile-template';
 
 vi.mock('next/image', () => ({
   default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} />,
 }));
+
+/**
+ * uploadEquipmentPhoto (Task 4) drives fetch directly: POST /api/media (presign) ->
+ * PUT uploadUrl (S3) -> POST /api/media/:id/confirm. Stub fetch end-to-end so the
+ * real validateEquipmentTileImageFile() gate still runs (keeps the "unsupported
+ * file" test meaningful) while no real network call happens.
+ */
+function stubUploadFetch() {
+  const calls: { url: string; method: string; body?: unknown }[] = [];
+  global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+    calls.push({ url, method, body });
+    if (url === '/api/media' && method === 'POST') {
+      return new Response(JSON.stringify({ mediaId: 'media-1', uploadUrl: 'https://s3.example/upload' }), { status: 200 });
+    }
+    if (url === 'https://s3.example/upload' && method === 'PUT') {
+      return new Response(null, { status: 200 });
+    }
+    if (url === '/api/media/media-1/confirm' && method === 'POST') {
+      return new Response(JSON.stringify({ id: 'media-1' }), { status: 200 });
+    }
+    throw new Error(`Unexpected fetch: ${method} ${url}`);
+  }) as typeof fetch;
+  return calls;
+}
 
 const card: FleetCard = {
   id: 'eq-1', name: 'Установка №12', model: 'Junttan', manufactureYear: 2022,
@@ -21,19 +43,17 @@ const card: FleetCard = {
   assignedSiteId: 'site-1', assignedSiteName: 'Северный мост', assignedOperatorName: 'Иванов', assignedCrewName: null,
   status: 'active', reportStatus: 'has_report', equipmentStatus: 'working', todaysReports: 1,
   todayTotals: { piles: 12, pileMeters: 144.5, drillingCount: 4, drillingMeters: 28.2, downtimeHours: 1.5 },
-  downtimeReason: null, latestReport: null,
+  downtimeReason: null, latestReport: null, photoUrl: null,
 };
 
 const secondCard: FleetCard = { ...card, id: 'eq-2', name: 'Установка №24', inventoryNumber: 'INV-24' };
 
 function Harness({
-  assetStorage,
   cards = [card],
 }: {
-  assetStorage?: EquipmentTileAssetStorage;
   cards?: FleetCard[];
 }) {
-  const controller = useEquipmentTileTemplate(assetStorage);
+  const controller = useEquipmentTileTemplate();
   return <EquipmentTileEditor cards={cards} controller={controller} />;
 }
 
@@ -108,10 +128,10 @@ describe('EquipmentTileEditor', () => {
     expect(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY)).toBeNull();
   });
 
-  it('uploads a local photo and saves its presentation settings', async () => {
+  it('uploads a photo via the media API and saves its presentation settings', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
-    const assetStorage = createMemoryEquipmentTileAssetStorage();
-    render(<Harness assetStorage={assetStorage} />);
+    const calls = stubUploadFetch();
+    render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     const file = new File(['image'], 'crane.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('Загрузить фото'), { target: { files: [file] } });
@@ -126,11 +146,16 @@ describe('EquipmentTileEditor', () => {
     const imageBlock = saved.blocks.find((block: { kind: string }) => block.kind === 'image');
     expect(imageBlock).toEqual(expect.objectContaining({ alt: 'Кран на объекте', imageFit: 'cover' }));
     expect(imageBlock).not.toHaveProperty('assetId');
-    expect(await assetStorage.get(getEquipmentTileImageAssetId(card.id, imageBlock.id))).not.toBeNull();
+
+    const presign = calls.find((call) => call.url === '/api/media' && call.method === 'POST');
+    expect(presign?.body).toEqual(expect.objectContaining({ entityType: 'equipment', entityId: card.id, fileName: 'crane.png' }));
+    expect(calls.some((call) => call.url === 'https://s3.example/upload' && call.method === 'PUT')).toBe(true);
+    expect(calls.some((call) => call.url === '/api/media/media-1/confirm' && call.method === 'POST')).toBe(true);
   });
 
   it('shows a validation error for an unsupported photo file', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
+    stubUploadFetch();
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.change(screen.getByLabelText('Загрузить фото'), {
@@ -138,12 +163,13 @@ describe('EquipmentTileEditor', () => {
     });
 
     expect(await screen.findByText('Поддерживаются только JPG, PNG и WebP')).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('assigns an uploaded photo to the selected installation', async () => {
+  it('uploads the photo against the selected installation', async () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
-    const assetStorage = createMemoryEquipmentTileAssetStorage();
-    render(<Harness cards={[card, secondCard]} assetStorage={assetStorage} />);
+    const calls = stubUploadFetch();
+    render(<Harness cards={[card, secondCard]} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
 
     fireEvent.change(screen.getByLabelText('Установка для фото'), { target: { value: secondCard.id } });
@@ -153,11 +179,8 @@ describe('EquipmentTileEditor', () => {
 
     const savedBlock = await screen.findByLabelText('Альтернативный текст');
     expect(savedBlock).toHaveValue('second.png');
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
-    const saved = JSON.parse(localStorage.getItem(EQUIPMENT_TILE_TEMPLATE_STORAGE_KEY) ?? '{}');
-    const imageBlock = saved.blocks.find((block: { kind: string }) => block.kind === 'image');
 
-    expect(await assetStorage.get(getEquipmentTileImageAssetId(secondCard.id, imageBlock.id))).not.toBeNull();
-    expect(await assetStorage.get(getEquipmentTileImageAssetId(card.id, imageBlock.id))).toBeNull();
+    const presign = calls.find((call) => call.url === '/api/media' && call.method === 'POST');
+    expect(presign?.body).toEqual(expect.objectContaining({ entityType: 'equipment', entityId: secondCard.id }));
   });
 });

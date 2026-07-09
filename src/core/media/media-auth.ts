@@ -29,6 +29,11 @@ export async function assertCanAccessMediaEntity(
   entityType: string | null | undefined,
   entityId: string | null | undefined,
 ): Promise<void> {
+  if (entityType === 'equipment') {
+    if (actor.role !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
+    return;
+  }
+
   if (isPrivilegedRole(actor.role)) return;
 
   if (!entityType || !entityId) {

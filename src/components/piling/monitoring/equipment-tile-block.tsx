@@ -6,11 +6,7 @@ import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment
 import { KIND_LABEL } from '@/components/piling/admin-equipment/equipment-status';
 import { formatFixed, formatHours } from '@/lib/format';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
-import {
-  getEquipmentTileImageAssetId,
-  type EquipmentTileAssetStorage,
-} from './equipment-tile-asset-storage';
-import { EquipmentTileImageBlock } from './equipment-tile-image-block';
+import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
 import type { EquipmentTileBlock } from './equipment-tile-template';
 
 function Value({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
@@ -67,7 +63,10 @@ function PhotoBlock({ card }: { card: FleetCard }) {
 export function EquipmentTileBlockContent({
   block,
   card,
-  assetStorage,
+  // Kept in the prop shape for caller compatibility (assetStorage still threads
+  // through EquipmentTileRenderer/Canvas for the editor's live preview machinery);
+  // no longer used here since 'image' blocks render card.photoUrl from the server.
+  assetStorage: _assetStorage,
 }: {
   block: EquipmentTileBlock;
   card: FleetCard;
@@ -76,14 +75,13 @@ export function EquipmentTileBlockContent({
   if (block.kind === 'text') return <span className="whitespace-pre-wrap break-words">{block.text}</span>;
   if (block.kind === 'divider') return <span className="block h-px w-full bg-current opacity-20" />;
   if (block.kind === 'image') {
-    const assetId = getEquipmentTileImageAssetId(card.id, block.id);
+    if (!card.photoUrl) return <span className="text-xs text-slate-400">Фото не загружено</span>;
     return (
-      <EquipmentTileImageBlock
-        storage={assetStorage}
-        assetId={assetId}
-        revision={block.assetRevision}
-        alt={block.alt ?? ''}
-        fit={block.imageFit ?? 'contain'}
+      <img
+        src={card.photoUrl}
+        alt={block.alt ?? card.name}
+        className="h-full w-full"
+        style={{ objectFit: block.imageFit ?? 'cover' }}
       />
     );
   }

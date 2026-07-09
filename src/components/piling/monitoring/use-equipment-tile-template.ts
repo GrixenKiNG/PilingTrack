@@ -18,11 +18,11 @@ import {
 } from './equipment-tile-storage';
 import { migrateLegacyCardDesign } from './design-tuning-panel';
 import {
-  getEquipmentTileImageAssetId,
   getDefaultEquipmentTileAssetStorage,
   isEquipmentTileImageAssetId,
   type EquipmentTileAssetStorage,
 } from './equipment-tile-asset-storage';
+import { uploadEquipmentPhoto } from './equipment-photo-upload';
 
 const UNLOCK_KEY = 'monitoring-design-unlocked';
 
@@ -73,6 +73,7 @@ export interface EquipmentTileTemplateController {
 
 export function useEquipmentTileTemplate(
   providedAssetStorage?: EquipmentTileAssetStorage,
+  onPhotoUploaded?: () => void,
 ): EquipmentTileTemplateController {
   const queryUnlock =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('design') === '1';
@@ -173,7 +174,8 @@ export function useEquipmentTileTemplate(
     const lastRow = draft.blocks.reduce((max, block) => Math.max(max, block.y + block.height), 0);
     const base = cloneEquipmentTileTemplate(DEFAULT_EQUIPMENT_TILE_TEMPLATE).blocks[1];
     const blockId = `image-${Date.now()}-${draft.blocks.length}`;
-    await assetStorage.put(file, getEquipmentTileImageAssetId(equipmentId, blockId));
+    await uploadEquipmentPhoto(file, equipmentId);
+    onPhotoUploaded?.();
     const block = placeBlock({
       ...base,
       id: blockId,
@@ -182,7 +184,6 @@ export function useEquipmentTileTemplate(
       text: undefined,
       imageFit: 'contain' as const,
       alt: file.name,
-      assetRevision: Date.now(),
       x: 0,
       y: lastRow,
       width: 12,
@@ -191,7 +192,7 @@ export function useEquipmentTileTemplate(
     }, draft.blocks);
     pushDraft({ ...draft, blocks: [...draft.blocks, block] });
     return block;
-  }, [assetStorage, draft, pushDraft]);
+  }, [draft, pushDraft, onPhotoUploaded]);
 
   const updateBlock = useCallback((blockId: string, patch: Partial<EquipmentTileBlock>) => {
     pushDraft({
@@ -203,9 +204,10 @@ export function useEquipmentTileTemplate(
   const replaceImage = useCallback(async (blockId: string, file: File, equipmentId: string) => {
     const block = draft.blocks.find((candidate) => candidate.id === blockId && candidate.kind === 'image');
     if (!block) throw new TypeError('Image block not found');
-    await assetStorage.put(file, getEquipmentTileImageAssetId(equipmentId, blockId));
-    updateBlock(blockId, { assetRevision: Date.now(), alt: block.alt || 'Фото установки' });
-  }, [assetStorage, draft.blocks, updateBlock]);
+    await uploadEquipmentPhoto(file, equipmentId);
+    onPhotoUploaded?.();
+    updateBlock(blockId, { alt: block.alt || 'Фото установки' });
+  }, [draft.blocks, updateBlock, onPhotoUploaded]);
 
   const removeBlock = useCallback((blockId: string) => {
     pushDraft({ ...draft, blocks: draft.blocks.filter((block) => block.id !== blockId) });

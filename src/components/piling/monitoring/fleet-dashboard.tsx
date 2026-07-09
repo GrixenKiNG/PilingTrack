@@ -63,8 +63,6 @@ export function FleetDashboard() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempt = useRef(0);
-  const tile = useEquipmentTileTemplate();
-
   const fetchSnapshot = useCallback(async (opts?: { bust?: boolean }) => {
     try {
       const url = opts?.bust
@@ -82,6 +80,13 @@ export function FleetDashboard() {
       setError((err as Error).message);
     }
   }, []);
+
+  // Refetch after an admin uploads/replaces an equipment photo so the new
+  // card.photoUrl shows up without waiting for the next WS event.
+  const onPhotoUploaded = useCallback(() => {
+    void fetchSnapshot({ bust: true });
+  }, [fetchSnapshot]);
+  const tile = useEquipmentTileTemplate(undefined, onPhotoUploaded);
 
   // Debounce: many report.* events in quick succession (saving a long
   // report sends a few updates) collapse into one refetch ~500ms later.
