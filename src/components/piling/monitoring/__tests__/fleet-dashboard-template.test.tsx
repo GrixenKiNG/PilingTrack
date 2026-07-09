@@ -16,7 +16,7 @@ const baseCard: FleetCard = {
   assignedSiteId: 'site-1', assignedSiteName: 'Объект №1', assignedOperatorName: 'Иванов', assignedCrewName: null,
   status: 'active', reportStatus: 'has_report', equipmentStatus: 'working', todaysReports: 1,
   todayTotals: { piles: 2, pileMeters: 20, drillingCount: 1, drillingMeters: 5, downtimeHours: 0 },
-  downtimeReason: null, latestReport: null,
+  downtimeReason: null, latestReport: null, photoUrl: null,
 };
 
 const snapshot: FleetSnapshot = {

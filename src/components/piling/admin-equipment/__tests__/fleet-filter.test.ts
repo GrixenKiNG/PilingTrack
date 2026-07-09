@@ -35,6 +35,7 @@ function card(over: Partial<FleetCard>): FleetCard {
     todayTotals: null,
     downtimeReason: null,
     latestReport: null,
+    photoUrl: null,
     ...over,
   };
 }
