@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
+import { isMultiTenantMode } from '@/services/tenancy/tenant-context-service';
 import {
   assertCan,
   can,
@@ -79,8 +80,10 @@ export async function ensureTenantAccess(
   // ADMIN/DISPATCHER bypass tenant checks
   if (user.role === 'ADMIN' || user.role === 'DISPATCHER') return;
 
-  // Single-tenant deployment — no isolation to enforce.
-  if (process.env.MULTI_TENANT_MODE !== 'true') return;
+  // Single-tenant deployment — no isolation to enforce. Mode parsing is
+  // centralized in isMultiTenantMode(): comparing to the literal 'true' here
+  // silently skipped enforcement under the canonical value 'multi' (audit H7).
+  if (!isMultiTenantMode()) return;
 
   // Multi-tenant deployment from here on.
   // Fail-closed: an OPERATOR/ASSISTANT without a tenant assignment must NOT

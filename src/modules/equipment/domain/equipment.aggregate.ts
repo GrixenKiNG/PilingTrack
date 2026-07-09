@@ -30,11 +30,12 @@ export class EquipmentAggregate {
 
   static reconstitute(state: EquipmentInfo): EquipmentAggregate { return new EquipmentAggregate(state); }
 
-  update(data: { name?: string; model?: string; qty?: number; description?: string }, userId?: string): void {
+  update(data: { name?: string; model?: string; qty?: number; description?: string; isActive?: boolean }, userId?: string): void {
     if (data.name !== undefined) { if (!data.name.trim()) throw new Error('Name required'); this.state.name = data.name.trim(); }
     if (data.model !== undefined) this.state.model = data.model;
     if (data.qty !== undefined) this.state.qty = data.qty;
     if (data.description !== undefined) this.state.description = data.description;
+    if (data.isActive !== undefined) this.state.isActive = data.isActive;
     this.state.updatedAt = new Date().toISOString();
     this.pendingEvents.push(createEquipmentEvent('EquipmentUpdated', this.state.id, { changes: data }, { userId }));
   }

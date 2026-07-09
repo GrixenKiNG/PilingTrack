@@ -10,11 +10,17 @@ export async function checkWebSocket(): Promise<WebSocketHealth> {
     }
 
     const connCount = await client.get('system:ws:connections');
-    const connections = connCount ? parseInt(connCount, 10) : 0;
+    // The WS server refreshes this key with a 60s TTL. A missing key means
+    // the heartbeat stopped — the server is down or can't reach Redis. The
+    // old code mapped that to `up, connections: 0`, which kept deep health
+    // green through a dead WS server (audit H3).
+    if (connCount == null) {
+      return { status: 'down' };
+    }
 
     return {
       status: 'up',
-      connections,
+      connections: parseInt(connCount, 10) || 0,
     };
   } catch {
     return { status: 'down' };

@@ -133,12 +133,41 @@ function checkEnv(): HealthCheck {
 // Health (Overall — checks all dependencies)
 // ============================================================
 
+async function checkRedis(): Promise<HealthCheck> {
+  // Redis backs rate limiting, cache and WS heartbeats. Health stayed green
+  // while pilingtrack-redis crash-looped for hours (audit H3) because nothing
+  // here pinged it. Status is 'warn', not 'fail': the app still serves
+  // requests without Redis, and a hard fail would flip readiness and let a
+  // Redis blip cascade through compose depends_on health gates (the 2026-07-01
+  // outage pattern).
+  try {
+    const { getRedisClient } = await import('@/lib/redis-cache');
+    const client = await getRedisClient();
+    if (!client) return { name: 'redis', status: 'warn', details: { error: 'no client (connect failed)' } };
+    const started = Date.now();
+    const pong = await Promise.race([
+      client.ping(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('ping timeout (1500ms)')), 1500)),
+    ]);
+    return pong === 'PONG'
+      ? { name: 'redis', status: 'pass', details: { latencyMs: Date.now() - started } }
+      : { name: 'redis', status: 'warn', details: { error: `unexpected reply: ${String(pong)}` } };
+  } catch (error) {
+    return {
+      name: 'redis',
+      status: 'warn',
+      details: { error: error instanceof Error ? error.message : 'ping failed' },
+    };
+  }
+}
+
 export async function getHealth() {
   const checks = await Promise.all([
     checkDatabase(),
     Promise.resolve(checkMemory()),
     Promise.resolve(checkEnv()),
     checkDisk(),
+    checkRedis(),
   ]);
 
   const hasFailure = checks.some(c => c.status === 'fail');

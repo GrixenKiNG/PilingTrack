@@ -158,6 +158,51 @@ export function getExtensionForContentType(contentType: string): string {
   return map[contentType] ?? '';
 }
 
+/** ISOBMFF (MP4-family) container: bytes 4-8 are "ftyp", brand follows. */
+function isHeicOrHeifContainer(bytes: Buffer): boolean {
+  if (bytes.length < 12) return false;
+  if (bytes.subarray(4, 8).toString('ascii') !== 'ftyp') return false;
+  const brand = bytes.subarray(8, 12).toString('ascii');
+  return ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1', 'heim', 'heis'].includes(brand);
+}
+
+/**
+ * Verify the actual downloaded bytes match the declared (allowlisted)
+ * content type — a "magic bytes" / file-signature check.
+ *
+ * Content-Type is entirely client-supplied at upload time (getPresignedUrl)
+ * and, before this check, was never verified against anything but the
+ * allowlist string comparison. A caller could declare "image/jpeg" and
+ * upload arbitrary bytes; confirmUpload() would try Sharp, but on failure
+ * only logged a warning and still marked the upload "completed" (see
+ * confirm-upload-validation.test.ts). This function is the actual gate:
+ * confirmUpload rejects when it returns false instead of completing.
+ *
+ * Deliberately fails CLOSED: an unmapped/unknown content type (which
+ * shouldn't reach here anyway, since getPresignedUrl already checks the
+ * allowlist) returns false rather than true.
+ */
+export function contentMatchesMagicBytes(contentType: string, bytes: Buffer): boolean {
+  const checks: Record<string, (b: Buffer) => boolean> = {
+    'image/jpeg': (b) => b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+    'image/png': (b) => b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    'image/gif': (b) => b.length >= 6 && ['GIF87a', 'GIF89a'].includes(b.subarray(0, 6).toString('ascii')),
+    'image/webp': (b) => b.length >= 12 && b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WEBP',
+    'image/heic': isHeicOrHeifContainer,
+    'image/heif': isHeicOrHeifContainer,
+    'image/heic-sequence': isHeicOrHeifContainer,
+    'application/pdf': (b) => b.length >= 5 && b.subarray(0, 5).toString('ascii') === '%PDF-',
+    // OLE2 Compound File Binary — legacy .doc.
+    'application/msword': (b) => b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])),
+    // .docx is a ZIP container — PK\x03\x04 (regular), \x05\x06 (empty), \x07\x08 (spanned).
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': (b) =>
+      b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07),
+  };
+
+  const check = checks[contentType];
+  return check ? check(bytes) : false;
+}
+
 export function buildMediaKey(
   tenantId: string,
   entityType: string | null | undefined,
@@ -282,11 +327,28 @@ export class MediaService {
       return this.s3Client.send(command);
     });
 
+    if (!fetched.Body) {
+      await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
+      throw new ServiceError('Uploaded object is empty or unreadable', 422);
+    }
+    const sourceBytes = Buffer.from(await fetched.Body.transformToByteArray());
+
+    // Content-Type is entirely client-declared at getPresignedUrl() time and
+    // was, until now, never checked against the actual bytes — a caller
+    // could declare "image/jpeg" and upload arbitrary bytes straight through
+    // (media review, 2026-07-04). Reject instead of silently completing.
+    if (!contentMatchesMagicBytes(media.contentType, sourceBytes)) {
+      await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
+      throw new ServiceError(
+        `Uploaded content does not match declared type ${media.contentType}`,
+        422,
+      );
+    }
+
     let thumbnailKey: string | null = null;
-    if (media.contentType.startsWith('image/') && fetched.Body) {
+    if (media.contentType.startsWith('image/')) {
       try {
         const { default: sharp } = await import('sharp');
-        const sourceBytes = Buffer.from(await fetched.Body.transformToByteArray());
         const thumbBuffer = await sharp(sourceBytes)
           .rotate() // honour EXIF orientation — phone photos otherwise come out sideways
           .resize(this.config.thumbnailWidth, this.config.thumbnailWidth, {

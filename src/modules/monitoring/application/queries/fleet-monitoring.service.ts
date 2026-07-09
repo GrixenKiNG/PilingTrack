@@ -148,8 +148,12 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
         },
       },
       maintenanceRecords: {
+        // Any OPEN repair/fault marks the rig — not just IN_PROGRESS. A logged
+        // but not-yet-started fault (PLANNED/ASSIGNED/ON_HOLD) still means the
+        // rig needs repair; filtering to IN_PROGRESS hid a CRITICAL fault from
+        // the fleet card while analytics counted it as a failure (mismatch).
         where: {
-          status: 'IN_PROGRESS',
+          status: { notIn: ['DONE', 'CANCELLED'] },
           type: { in: ['REPAIR', 'FAULT'] },
         },
         take: 1,
@@ -243,16 +247,22 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       todayTotals = { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 };
       const downtimeByReason = new Map<string, { duration: number; comment: string | null }>();
       for (const r of todays) {
+        // Prefer the precomputed ReportAnalytics projection (consistent with
+        // the admin analytics screens), but fall back to summing the raw
+        // report rows — already loaded above — when the projection is missing
+        // or lagging. Skipping the report entirely (the previous `continue`)
+        // left a card showing status "active" with all-zero totals.
         const a = analyticsByReport.get(r.reportId);
-        if (!a) continue;
-        todayTotals.piles += a.totalPiles;
-        todayTotals.pileMeters += r.piles.reduce(
+        const piles = r.piles ?? [];
+        const drillings = r.drillings ?? [];
+        todayTotals.piles += a?.totalPiles ?? piles.reduce((sum, pile) => sum + pile.count, 0);
+        todayTotals.pileMeters += piles.reduce(
           (sum, pile) => sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
           0,
         );
-        todayTotals.drillingCount += r.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
-        todayTotals.drillingMeters += a.totalDrilling;
-        todayTotals.downtimeHours += a.totalDowntime;
+        todayTotals.drillingCount += drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
+        todayTotals.drillingMeters += a?.totalDrilling ?? drillings.reduce((sum, drilling) => sum + (drilling.meters || 0), 0);
+        todayTotals.downtimeHours += a?.totalDowntime ?? (r.downtimes ?? []).reduce((sum, downtime) => sum + (downtime.duration || 0), 0);
         for (const downtime of r.downtimes ?? []) {
           const reasonName = downtime.reason?.name ?? 'Причина не указана';
           const current = downtimeByReason.get(reasonName) ?? { duration: 0, comment: null };

@@ -20,7 +20,7 @@ export async function updateEquipment(cmd: UpdateEquipmentCommand) {
   const repo = getEquipmentRepository();
   const agg = await repo.findById(cmd.equipmentId, cmd.tenantId);
   if (!agg) throw new ServiceError('Equipment not found', 404);
-  agg.update({ name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description }, cmd.userId);
+  agg.update({ name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description, isActive: cmd.isActive }, cmd.userId);
   await repo.save(agg);
 }
 

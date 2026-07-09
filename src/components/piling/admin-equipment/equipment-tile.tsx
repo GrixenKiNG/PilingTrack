@@ -14,11 +14,6 @@ import { getEquipmentBrand } from './equipment-brand-logo';
 const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('ru'));
 const formatNum = (n: number | null | undefined, digits = 0) =>
   n == null ? '—' : n.toLocaleString('ru', { maximumFractionDigits: digits });
-const downtimeDays = (hours: number | null | undefined) => {
-  if (hours == null) return '—';
-  if (hours <= 0) return '0';
-  return String(Math.ceil(hours / 24));
-};
 
 export function EquipmentTile({
   card,
@@ -33,12 +28,28 @@ export function EquipmentTile({
   const brand = getEquipmentBrand(card.model);
   const flag = getMaintenanceFlag(card);
   const t = card.todayTotals;
-  const stateLabel = flag ? 'Плановое ТО' : card.status === 'active' ? 'В работе' : 'Не активна';
-  const stateClass = flag
-    ? 'border-amber-200 bg-amber-50 text-amber-700'
-    : card.status === 'active'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      : 'border-slate-200 bg-slate-50 text-slate-500';
+  // Badge reflects, in priority order: an open repair, a maintenance-due flag,
+  // then today's report presence. The old fallback label "Не активна" wrongly
+  // read as "decommissioned" for any rig that simply had no report yet today.
+  const inRepair = card.equipmentStatus === 'repair';
+  const stateLabel = inRepair
+    ? 'Ремонт'
+    : flag
+      ? 'Плановое ТО'
+      : card.status === 'active'
+        ? 'В работе'
+        : card.status === 'expected'
+          ? 'Ожидается'
+          : 'Нет отчёта сегодня';
+  const stateClass = inRepair
+    ? 'border-blue-200 bg-blue-50 text-blue-700'
+    : flag
+      ? 'border-amber-200 bg-amber-50 text-amber-700'
+      : card.status === 'active'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : card.status === 'expected'
+          ? 'border-sky-200 bg-sky-50 text-sky-700'
+          : 'border-slate-200 bg-slate-50 text-slate-500';
   const barClass = flag === 'overdue' ? 'bg-rose-500' : flag === 'soon' ? 'bg-amber-500' : st.bar;
 
   return (
@@ -95,7 +106,7 @@ export function EquipmentTile({
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Metric label="сваи шт./м.п." value={t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'} />
           <Metric label="бурение шт./м" value={t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'} />
-          <Metric label="простой, дн." value={t ? downtimeDays(t.downtimeHours) : '—'} />
+          <Metric label="простой, ч" value={t ? formatNum(t.downtimeHours, 1) : '—'} />
         </div>
 
         {flag ? (

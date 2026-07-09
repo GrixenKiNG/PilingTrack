@@ -25,6 +25,13 @@ ENV SESSION_SECRET=build-time-secret-for-validation-32chars-min
 ENV DEVICE_KEY_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars
 ENV PIN_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars-xxx
 ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
+# APP_VERSION must exist in THIS stage: `next build` (Turbopack) inlines
+# `process.env.APP_VERSION` into the server bundle at build time, so the
+# runner-stage ENV alone is invisible to compiled route code — health kept
+# reporting the npm package version (2.6.0) instead of the deployed SHA
+# even though the runtime env var was set correctly (audit M2).
+ARG APP_VERSION=unknown
+ENV APP_VERSION=$APP_VERSION
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

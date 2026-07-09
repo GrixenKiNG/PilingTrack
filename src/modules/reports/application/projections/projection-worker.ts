@@ -230,7 +230,10 @@ export async function projectOperatorPerformanceFull(userId: string, siteId: str
     }
   }
 
-  const downtimeRatio = totalShiftMinutes > 0 ? totalDowntime / totalShiftMinutes : 0;
+  // ReportDowntime.duration is stored in HOURS (the report form collects
+  // hours), while totalShiftMinutes is in minutes — convert before dividing,
+  // else the ratio came out ~60× too small.
+  const downtimeRatio = totalShiftMinutes > 0 ? (totalDowntime * 60) / totalShiftMinutes : 0;
 
   await db.operatorPerformance.upsert({
     where: { userId_siteId_date: { userId, siteId, date } },

@@ -73,9 +73,17 @@ function loadPrismaRuntimeModule(): PrismaRuntimeModule {
 }
 
 function createPrismaClient(): PostgresPrismaClient {
-  if (!process.env.DATABASE_URL_POSTGRES) {
+  // Runtime queries prefer DATABASE_URL — in docker-compose that's PgBouncer
+  // (transaction pooling); local dev points it straight at postgres, which is
+  // equally fine. The old code read only DATABASE_URL_POSTGRES (the direct /
+  // migrations URL), so PgBouncer sat idle while app/workers/ws all connected
+  // to postgres directly (audit H5). Transaction pooling is safe here: the
+  // only tenant-context mechanism in use is transaction-local set_config
+  // (withTenantContext); the session-level SET variant has no callers.
+  const url = process.env.DATABASE_URL || process.env.DATABASE_URL_POSTGRES;
+  if (!url) {
     throw new Error(
-      'DATABASE_URL_POSTGRES is required. Set it in .env or environment variables.'
+      'DATABASE_URL (or DATABASE_URL_POSTGRES) is required. Set it in .env or environment variables.'
     );
   }
 
@@ -84,7 +92,6 @@ function createPrismaClient(): PostgresPrismaClient {
   // Connection pool resilience settings
   const poolTimeout = parseInt(process.env.PRISMA_POOL_TIMEOUT || '10', 10);
   const connectionLimit = parseInt(process.env.PRISMA_CONNECTION_LIMIT || '20', 10);
-  const url = process.env.DATABASE_URL_POSTGRES;
 
   const { PrismaClient } = loadPrismaRuntimeModule();
   const adapter = new PrismaPg({

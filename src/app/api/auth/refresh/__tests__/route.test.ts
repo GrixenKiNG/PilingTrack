@@ -24,7 +24,12 @@ vi.mock('@/core/security/refresh-tokens', () => ({
   rotateRefreshToken: rotateMock,
   revokeRefreshToken: revokeMock,
 }));
-vi.mock('@/services/auth/session-service', () => ({ attachSessionCookie: attachCookieMock }));
+// readSessionToken is consumed by withMutation's rate-limit key (session-scoped
+// buckets); return null so the route under test runs as an anonymous caller.
+vi.mock('@/services/auth/session-service', () => ({
+  attachSessionCookie: attachCookieMock,
+  readSessionToken: () => null,
+}));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 
 import { POST, DELETE } from '../route';

@@ -67,25 +67,41 @@ let redisClient: Redis | null = null;
 
 export async function getRedisClient(): Promise<Redis | null> {
   if (!redisClient) {
-    redisClient = new Redis(REDIS_URL, getRedisOptions());
+    const client = new Redis(REDIS_URL, getRedisOptions());
+    redisClient = client;
 
-    redisClient.on('error', (err) => {
+    client.on('error', (err) => {
       logger.error('Redis: connection error', err);
     });
 
-    redisClient.on('connect', () => {
+    client.on('connect', () => {
       if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
         logger.info('Redis: connected');
       }
     });
 
-    redisClient.on('ready', () => {
+    client.on('ready', () => {
       if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
         logger.info('Redis: ready');
       }
     });
 
-    await redisClient.connect();
+    client.on('end', () => {
+      // Terminal close: retryStrategy gave up (returned null). Without this
+      // reset the dead client stayed the singleton forever — a brief startup
+      // race became permanent degradation until a container restart
+      // (audit M1: ~5760 heartbeat/metrics errors per day at green health).
+      if (redisClient === client) redisClient = null;
+    });
+
+    try {
+      await client.connect();
+    } catch (err) {
+      logger.error('Redis: initial connect failed', err instanceof Error ? err : new Error(String(err)));
+      client.disconnect();
+      if (redisClient === client) redisClient = null;
+      return null;
+    }
   }
 
   return redisClient;

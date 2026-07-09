@@ -8,22 +8,49 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { generatePrometheusMetrics } from '@/lib/cache-metrics';
 import { exportPrometheusMetrics, getLagMetrics } from '@/core/observability/lag-monitor';
 import { getCurrentStatus } from '@/core/observability/health-tracker';
+import { getEventLoopLagSeconds, resetEventLoopLag } from '@/core/observability/event-loop-lag';
+import { exportHttpMetricsPrometheus } from '@/core/observability/http-metrics';
 import { withApi } from '@/core/api-wrapper';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
+// Constant-time string comparison to prevent a timing side-channel on the
+// shared-secret token (mirrors auth-service.ts's / alerts/webhook's
+// constantTimeEquals — same secret-comparison class of bug).
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+// Prometheus's static scrape_configs can't do a session login (no cookie
+// jar, no JWT refresh) — this endpoint needs its own service-to-service
+// credential separate from user auth. Fails closed: unset
+// METRICS_SCRAPE_TOKEN or any non-matching header means "not authorized via
+// token," falling through to the existing session-based check below (so a
+// logged-in admin can still open /api/metrics in a browser to debug).
+function isValidScrapeToken(request: NextRequest): boolean {
+  const expected = process.env.METRICS_SCRAPE_TOKEN;
+  if (!expected) return false;
+  const header = request.headers.get('authorization');
+  const bearer = header?.startsWith('Bearer ') ? header.slice(7) : null;
+  return !!bearer && constantTimeEquals(bearer, expected);
+}
+
 export const GET = withApi(
   async (request: NextRequest) => {
-    const { user, error } = await requireAuth(request);
-    if (error) return error;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'system.read');
+    if (!isValidScrapeToken(request)) {
+      const { user, error } = await requireAuth(request);
+      if (error) return error;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      assertCan(user!, 'system.read');
+    }
     let output = '';
 
     // Application cache metrics
@@ -49,11 +76,12 @@ export const GET = withApi(
     output += `# TYPE process_heap_used_bytes gauge\n`;
     output += `process_heap_used_bytes ${memUsage.heapUsed}\n\n`;
 
-    output += `# HELP nodejs_eventloop_lag_seconds Node.js event loop lag in seconds\n`;
+    output += `# HELP nodejs_eventloop_lag_seconds Mean event loop delay in seconds since the last scrape\n`;
     output += `# TYPE nodejs_eventloop_lag_seconds gauge\n`;
-    // Simple event loop lag measurement
-    const start = performance.now();
-    output += `nodejs_eventloop_lag_seconds ${(start / 1000).toFixed(6)}\n\n`;
+    output += `nodejs_eventloop_lag_seconds ${getEventLoopLagSeconds().toFixed(6)}\n\n`;
+    // Reset after reading so the next scrape reflects the interval since
+    // this one, not an all-time average that flattens out over days.
+    resetEventLoopLag();
 
     // Uptime
     output += `# HELP process_uptime_seconds Process uptime in seconds\n`;
@@ -93,6 +121,14 @@ export const GET = withApi(
       }
     } catch (err) {
       logger.error('metrics: backup metrics failed', err);
+    }
+
+    // HTTP request metrics (recorded centrally in withApi/withMutation —
+    // audit #9: alerts.yml referenced these but nothing ever created them).
+    try {
+      output += exportHttpMetricsPrometheus();
+    } catch (err) {
+      logger.error('metrics: http metrics failed', err);
     }
 
     return new NextResponse(output, {

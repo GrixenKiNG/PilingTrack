@@ -133,7 +133,9 @@ function OverviewHero({
           </div>
           <div>
             <div className="text-white/55">Статус</div>
-            <div className="font-medium">{eq.isActive ? 'В работе' : 'Не активна'}</div>
+            {/* eq.isActive is the equipment lifecycle flag (in service / decommissioned),
+                not whether it worked today — labelling it "В работе" overstated it. */}
+            <div className="font-medium">{eq.isActive ? 'В эксплуатации' : 'Списана'}</div>
           </div>
         </div>
       </div>
@@ -171,7 +173,7 @@ function OverviewTiles({
       <OverviewTile
         title="Текущее состояние"
         rows={[
-          ['Статус', eq.isActive ? 'В работе' : 'Не активна'],
+          ['Статус', eq.isActive ? 'В эксплуатации' : 'Списана'],
           ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} ч` : '—'],
           ['Телематика', devicesCount > 0 ? `${devicesCount} устройств` : 'не подключена'],
           ['Последний отчёт', timeline[0]?.date || '—'],

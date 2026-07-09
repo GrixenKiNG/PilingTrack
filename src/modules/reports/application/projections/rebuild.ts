@@ -74,11 +74,12 @@ export async function rebuildSiteDailySummary(): Promise<RebuildResult> {
     agg.set(key, cur);
   }
 
-  // Wipe and rebuild — simpler than diffing, and the table is small.
-  await db.siteDailySummary.deleteMany({});
-  for (const v of agg.values()) {
-    await db.siteDailySummary.create({ data: v });
-  }
+  // Wipe and rebuild atomically — a non-transactional wipe followed by a
+  // failing insert would leave the projection empty until the next run.
+  await db.$transaction(async (tx) => {
+    await tx.siteDailySummary.deleteMany({});
+    await tx.siteDailySummary.createMany({ data: [...agg.values()] });
+  });
   return { name: 'site-daily', rowsWritten: agg.size, durationMs: Date.now() - start };
 }
 
@@ -89,6 +90,14 @@ export async function rebuildSiteDailySummary(): Promise<RebuildResult> {
 export async function rebuildSiteWeeklyTrend(): Promise<RebuildResult> {
   const start = Date.now();
   const daily = await db.siteDailySummary.findMany();
+
+  // SiteWeeklyTrend.tenantId is NOT NULL on prod (schema drift: nullable in
+  // schema.prisma). Creating rows without it wiped the projection nightly and
+  // then crashed on the first insert — resolve it from Site, exactly like the
+  // live path in projection-worker does.
+  const sites = await db.site.findMany({ select: { id: true, tenantId: true } });
+  const tenantBySite = new Map(sites.map((s) => [s.id, s.tenantId]));
+  const fallbackTenant = process.env.DEFAULT_TENANT_ID || null;
 
   const mondayOf = (isoDate: string) => {
     const d = new Date(`${isoDate}T00:00:00Z`);
@@ -126,19 +135,25 @@ export async function rebuildSiteWeeklyTrend(): Promise<RebuildResult> {
     weekly.set(key, cur);
   }
 
-  await db.siteWeeklyTrend.deleteMany({});
-  for (const v of weekly.values()) {
+  const rows = [...weekly.values()].map((v) => {
     v.dailyMetrics.sort((a, b) => a.date.localeCompare(b.date));
-    await db.siteWeeklyTrend.create({
-      data: {
-        siteId: v.siteId, weekStart: v.weekStart, weekEnd: v.weekEnd,
-        totalPiles: v.totalPiles, totalDrilling: v.totalDrilling,
-        totalDowntime: v.totalDowntime, reportCount: v.reportCount,
-        dailyMetrics: v.dailyMetrics as never,
-        pilesTrend: null, drillingTrend: null, downtimeTrend: null,
-      },
-    });
-  }
+    return {
+      siteId: v.siteId,
+      tenantId: tenantBySite.get(v.siteId) ?? fallbackTenant,
+      weekStart: v.weekStart, weekEnd: v.weekEnd,
+      totalPiles: v.totalPiles, totalDrilling: v.totalDrilling,
+      totalDowntime: v.totalDowntime, reportCount: v.reportCount,
+      dailyMetrics: v.dailyMetrics as never,
+      pilesTrend: null, drillingTrend: null, downtimeTrend: null,
+    };
+  });
+
+  // Atomic wipe+rebuild: the old delete-then-create-in-a-loop left the table
+  // empty when any insert failed (which is exactly what happened on prod).
+  await db.$transaction(async (tx) => {
+    await tx.siteWeeklyTrend.deleteMany({});
+    await tx.siteWeeklyTrend.createMany({ data: rows });
+  });
   return { name: 'site-weekly', rowsWritten: weekly.size, durationMs: Date.now() - start };
 }
 

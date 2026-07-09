@@ -21,13 +21,19 @@ rule_files:
   - '/etc/prometheus/alerts.yml'
 
 scrape_configs:
-  # /api/metrics требует auth (requireAuth + assertCan('system.read')).
-  # TODO M-10b: добавить bearer-token bypass для service-to-service scrape,
-  # тогда раскомментировать.
-  # - job_name: 'pilingtrack-app'
-  #   metrics_path: '/api/metrics'
-  #   static_configs:
-  #     - targets: ['app:3000']
+  # M-10b done: /api/metrics accepts a static Bearer scrape token
+  # (METRICS_SCRAPE_TOKEN on the app, same value in ./scrape-token here)
+  # in addition to session auth. credentials_file keeps the secret out of
+  # this checked-in config — see docker-compose.monitoring-prod.yml's mount.
+  - job_name: 'pilingtrack-app'
+    metrics_path: '/api/metrics'
+    authorization:
+      credentials_file: /etc/prometheus/scrape-token
+    static_configs:
+      - targets: ['app:3000']
+        labels:
+          service: 'pilingtrack-app'
+          tier: 'frontend'
 
   # ws:3001/metrics отдаёт JSON, не Prom-формат — пропускаем пока. Когда
   # ws начнёт экспонировать prom-метрики — раскомментировать.

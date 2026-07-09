@@ -141,27 +141,26 @@ export async function recomputeSiteDailySummary(siteId: string, date: string) {
 }
 
 async function handleReportForDailySummary(event: ReportDomainEvent) {
-  // Bug guard: never write a daily-summary row keyed on an empty siteId.
-  if (!event.siteId) {
-    logger.warn('SiteDailySummary skipped: missing siteId on event', {
-      eventType: event.type, aggregateId: event.aggregateId,
-    });
-    return;
-  }
-
-  // Resolve the report's date from the event payload first; fall back to
-  // the report row itself for older events that don't carry it.
+  // The transactional outbox stores only event.data as payload, dropping the
+  // event-level siteId/date metadata — so when this handler runs off a
+  // republished outbox event, both can be missing. Fall back to the Report
+  // row, looked up by reportId: event.aggregateId IS Report.reportId (the
+  // business key), NOT the primary-key `id`. The previous code both hard-
+  // skipped on a missing siteId (losing every outbox-driven summary) and
+  // queried by the wrong key (`id`), so the fallback never resolved.
+  let siteId = event.siteId;
   let date = (event.data?.date as string | undefined) || null;
-  if (!date) {
+  if (!siteId || !date) {
     const { db } = await import('@/lib/db');
     const report = await db.report.findUnique({
-      where: { id: event.aggregateId },
-      select: { date: true },
+      where: { reportId: event.aggregateId },
+      select: { siteId: true, date: true },
     });
-    date = report?.date || null;
+    siteId = siteId || report?.siteId;
+    date = date || report?.date || null;
   }
-  if (!date) {
-    logger.warn('SiteDailySummary skipped: cannot resolve report date', {
+  if (!siteId || !date) {
+    logger.warn('SiteDailySummary skipped: cannot resolve siteId/date', {
       eventType: event.type, aggregateId: event.aggregateId,
     });
     return;
@@ -169,11 +168,10 @@ async function handleReportForDailySummary(event: ReportDomainEvent) {
 
   // Critical projection — propagate so outbox publisher can retry / DLQ.
   try {
-    await recomputeSiteDailySummary(event.siteId, date);
+    await recomputeSiteDailySummary(siteId, date);
   } catch (error) {
     logger.error('SiteDailySummary recompute failed', error, {
-      eventType: event.type, aggregateId: event.aggregateId,
-      siteId: event.siteId, date,
+      eventType: event.type, aggregateId: event.aggregateId, siteId, date,
     });
     throw error;
   }
@@ -188,9 +186,12 @@ export function registerAlertEventHandler() {
 }
 
 async function handleDowntimeAlert(event: ReportDomainEvent) {
+  // duration is in HOURS (the report form collects hours). This previously
+  // used a 120/240 threshold as if it were minutes, so the alert never fired
+  // for realistic shift downtime (2–11 h). Thresholds: >2 h warns, >4 h high.
   const duration = (event.data.duration as number) || 0;
 
-  if (duration <= 120) return;
+  if (duration <= 2) return;
 
   logger.warn('High downtime detected', {
     duration,
@@ -202,8 +203,8 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
   try {
     const { telegramNotifier } = await import('@/core/notifications/telegram');
     await telegramNotifier.sendAlert({
-      severity: duration > 240 ? 'high' : 'medium',
-      message: `Простой ${duration} мин зафиксирован в отчёте`,
+      severity: duration > 4 ? 'high' : 'medium',
+      message: `Простой ${duration} ч зафиксирован в отчёте`,
       siteId: event.siteId,
       reportId: event.aggregateId,
     });

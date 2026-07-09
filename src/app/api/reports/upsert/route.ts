@@ -85,6 +85,33 @@ export const POST = withMutation(
       { enforceEditWindow: true, actor: user! }
     );
 
+    // Optional end-of-shift engine hours → the rig's MeterReading journal.
+    // Non-fatal by design: the shift report must never be lost because a
+    // meter reading failed; the monotonicity check inside only warns anyway.
+    let meterWarning: string | null = null;
+    if (validatedDto.engineHours != null && validatedDto.equipmentId && tenantId) {
+      try {
+        const { addMeterReading } = await import('@/modules/equipment');
+        const meterResult = await addMeterReading(
+          validatedDto.equipmentId,
+          {
+            engineHours: validatedDto.engineHours,
+            note: `Показание из сменного отчёта за ${validatedDto.date}`,
+          },
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+          { tenantId, recordedById: user!.id },
+        );
+        meterWarning = meterResult.warning;
+      } catch (err) {
+        const { logger } = await import('@/lib/logger');
+        logger.warn('meter reading from report failed', {
+          equipmentId: validatedDto.equipmentId,
+          engineHours: validatedDto.engineHours,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     await recordFeedbackEvent({
       level: 'success',
       scope: 'reports',
@@ -105,7 +132,7 @@ export const POST = withMutation(
       },
     });
 
-    return createJsonResponse({ report: result, requestId }, { status: 200 }, requestId);
+    return createJsonResponse({ report: result, meterWarning, requestId }, { status: 200 }, requestId);
   },
   { domain: 'reports' }
 );

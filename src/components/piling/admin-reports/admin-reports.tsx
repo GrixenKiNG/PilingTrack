@@ -114,7 +114,6 @@ export function AdminReports() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
-  const [photoReportIds, setPhotoReportIds] = useState<Record<string, boolean>>({});
   // The preview pane shows the user-selected report, falling back to the first
   // one when nothing is selected (so it's never empty while reports exist).
   const effectivePreview = previewReport ?? reports[0] ?? null;
@@ -125,36 +124,6 @@ export function AdminReports() {
       void loadReferenceData();
     }
   }, [showCreateDialog, loadReferenceData]);
-
-  useEffect(() => {
-    const missing = reports
-      .map((report) => report.reportId)
-      .filter((reportId) => photoReportIds[reportId] === undefined)
-      .slice(0, 100);
-    if (missing.length === 0) return;
-
-    let cancelled = false;
-    void (async () => {
-      const { authFetch } = await import('@/lib/api');
-      const entries = await Promise.all(missing.map(async (reportId) => {
-        try {
-          const res = await authFetch(`/api/media?entityType=report&entityId=${encodeURIComponent(reportId)}`);
-          if (!res.ok) return [reportId, false] as const;
-          const json = await res.json();
-          return [reportId, Array.isArray(json.data) && json.data.length > 0] as const;
-        } catch {
-          return [reportId, false] as const;
-        }
-      }));
-      if (!cancelled) {
-        setPhotoReportIds((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [photoReportIds, reports]);
 
   const handleDelete = async (report: ReportDTO) => {
     if (!report.reportId) return;
@@ -197,17 +166,17 @@ export function AdminReports() {
       if (quickFilter === 'yesterday' && report.date !== yesterday) return false;
       if (quickFilter === 'week' && report.date < weekStart) return false;
       if (quickFilter === 'downtime' && totals.downtimeHours <= 0) return false;
-      if (quickFilter === 'withPhotos' && photoReportIds[report.reportId] !== true) return false;
+      if (quickFilter === 'withPhotos' && report.hasPhotos !== true) return false;
       if (quickFilter === 'edited' && !report.lastEditedByName) return false;
       if (filterEquipmentId !== 'all' && report.equipment?.id !== filterEquipmentId) return false;
       return true;
     });
-  }, [filterEquipmentId, photoReportIds, quickFilter, reports]);
+  }, [filterEquipmentId, quickFilter, reports]);
 
   const totals = useMemo(() => addTotals(filteredReports), [filteredReports]);
   const photoCount = useMemo(
-    () => filteredReports.filter((r) => photoReportIds[r.reportId] === true).length,
-    [filteredReports, photoReportIds],
+    () => filteredReports.filter((r) => r.hasPhotos === true).length,
+    [filteredReports],
   );
   const reportWord = `${filteredReports.length} ${pluralizeRu(filteredReports.length, ['отчёт', 'отчёта', 'отчётов'])}`;
 
@@ -218,6 +187,8 @@ export function AdminReports() {
     const roleLabel = report.lastEditedByRole === 'ADMIN' ? 'Администратор'
       : report.lastEditedByRole === 'DISPATCHER' ? 'Диспетчер'
       : report.lastEditedByRole === 'ASSISTANT' ? 'Помощник' : 'Оператор';
+    // The admin account is literally named «Администратор» — avoid «Администратор: Администратор».
+    if (report.lastEditedByName === roleLabel) return roleLabel;
     return `${roleLabel}: ${report.lastEditedByName}`;
   };
 
@@ -537,7 +508,7 @@ function EvidenceReportRow({
       <MetricCell value={formatHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} tone={totals.downtimeHours > 0 ? 'amber' : 'slate'} />
 
       <div className="flex items-center justify-end gap-1">
-        <ReportThumbnail reportId={report.reportId} />
+        <ReportThumbnail reportId={report.reportId} mediaId={report.thumbnailMediaId ?? null} />
         <IconButton label="Предпросмотр PDF" onClick={() => onPreviewPdf(report)} icon={Eye} />
         <IconButton label="Подробнее" onClick={() => onOpenDetails(report)} icon={ShieldCheck} />
         <IconButton label="Редактировать" onClick={() => onEdit(report)} icon={Pencil} />

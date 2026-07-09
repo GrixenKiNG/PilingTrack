@@ -214,6 +214,9 @@ export const reportUpsertSchema = z.object({
   crewId: internalIdSchema.optional(),
   userId: internalIdSchema.optional(),
   equipmentId: internalIdSchema.optional(),
+  // Optional end-of-shift engine-hours reading. Feeds the rig's MeterReading
+  // journal so hour-based PM planning has data without a separate workflow.
+  engineHours: z.number().int().min(0).max(500_000).optional().nullable(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
   shiftType: z.enum(['DAY', 'NIGHT']).default('DAY'),
   shiftStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),

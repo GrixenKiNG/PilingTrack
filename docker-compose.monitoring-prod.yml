@@ -19,6 +19,19 @@ services:
     volumes:
       - ./observability/prometheus/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # M-10b: same secret value as the app's METRICS_SCRAPE_TOKEN, kept in a
+      # standalone file (not this checked-in compose file) so it never lands
+      # in git. Create once on the host:
+      #   printf '%s' '<token>' > observability/prometheus/scrape-token
+      #   chmod 644 observability/prometheus/scrape-token
+      # 644, not 600: the prom/prometheus image reads this as its own
+      # (non-root, non-user1) user — 600 gave "permission denied" on first
+      # deploy. Also note: this is a single-file bind mount, so a `git pull`
+      # that replaces prometheus-prod.yml (new inode) leaves an already-running
+      # container seeing the OLD content forever — `docker compose up -d
+      # --no-deps --force-recreate prometheus` is required after config
+      # changes, `curl -X POST :9090/-/reload` alone is not enough.
+      - ./observability/prometheus/scrape-token:/etc/prometheus/scrape-token:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

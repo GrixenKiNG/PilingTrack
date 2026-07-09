@@ -179,7 +179,7 @@ export function EquipmentAnalytics() {
 
 function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
   const tiles = [
-    { label: 'Установки', icon: Gauge, value: `${fleet.activeCount} / ${fleet.totalEquipment}`, detail: 'в работе / всего' },
+    { label: 'Установки', icon: Gauge, value: `${fleet.activeCount} / ${fleet.totalEquipment}`, detail: 'с отчётами за период / всего' },
     { label: 'Сваи', icon: HardHat, value: `${fmt(fleet.piles)} шт`, detail: `${fmt(fleet.pileMeters)} м.п.` },
     { label: 'Бурение', icon: Drill, value: `${fmt(fleet.drillingCount)} шт`, detail: `${fmt(fleet.drillingMeters)} м.п.` },
     { label: 'Простой', icon: Clock, value: fmtHours(fleet.downtimeHours), detail: 'суммарно' },
@@ -230,7 +230,7 @@ function FleetTh({
   const { k, label, right } = column;
   return (
     <th className={cn('px-3 py-2', right ? 'text-right' : 'text-left')}>
-      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex items-center gap-1 hover:text-slate-700', sortKey === k && 'text-slate-900')}>
+      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex min-h-[44px] items-center gap-1 hover:text-slate-700', sortKey === k && 'text-slate-900')}>
         {label}
         <ArrowUpDown className="h-3 w-3 opacity-50" />
         {sortKey === k && <span className="text-3xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
@@ -311,7 +311,19 @@ function FleetTable({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.equipmentId} className="cursor-pointer border-t hover:bg-slate-50/60" onClick={() => onOpen(r.equipmentId)}>
+            <tr
+              key={r.equipmentId}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer border-t hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              onClick={() => onOpen(r.equipmentId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpen(r.equipmentId);
+                }
+              }}
+            >
               <td className="px-3 py-2">
                 <div className="font-medium text-slate-900">{r.name}</div>
                 <div className="text-2xs text-slate-400">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>

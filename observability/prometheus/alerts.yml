@@ -168,6 +168,16 @@ groups:
           summary: "Outbox event backlog > 1000"
           description: "{{ $value }} events pending processing"
 
+      - alert: DeadLetterQueueNotEmpty
+        expr: dlq_pending_count > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "Dead Letter Queue has unprocessed events"
+          description: "{{ $value }} events in DLQ have exhausted retries and need manual attention"
+
   # ============================================================
   # Infrastructure Alerts
   # ============================================================

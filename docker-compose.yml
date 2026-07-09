@@ -89,11 +89,23 @@ services:
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       - TELEGRAM_API_BASE=${TELEGRAM_API_BASE:-}
+      # The report-submitted Telegram handler runs IN-PROCESS in this app
+      # container (registerAllEventHandlers in app/api/route.ts), and
+      # telegram getConfig() resolves the bot config by DEFAULT_TENANT_ID.
+      # Without it here the app logged "Telegram not configured — skipping
+      # document" and every submitted-report notification was silently
+      # dropped, even though the config exists and the workers service had
+      # the var. (Also used as the tenant fallback on background paths.)
+      - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID:-}
       # Shared secret Alertmanager uses to authenticate to /api/alerts/webhook.
       # MUST be present on the app too — the webhook fails closed (401) when it's
       # unset, silently dropping every alert. Kept optional (empty default) so
       # dev without monitoring still boots.
       - ALERTMANAGER_WEBHOOK_TOKEN=${ALERTMANAGER_WEBHOOK_TOKEN:-}
+      # Shared secret Prometheus uses to scrape /api/metrics (M-10b). Same
+      # fail-closed pattern as above: unset means the token path never
+      # matches, and /api/metrics falls back to session auth only.
+      - METRICS_SCRAPE_TOKEN=${METRICS_SCRAPE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

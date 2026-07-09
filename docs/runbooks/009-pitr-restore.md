@@ -1,9 +1,25 @@
 # Runbook: Point-in-time recovery (PITR)
 
+> ## ⚠️ PITR СЕЙЧАС НЕДОСТУПЕН (с 2026-06-24)
+>
+> `archive_mode=off` в `docker-compose.prod.yml` — осознанное решение после
+> инцидента, когда сломанный `archive_command` накопил 9,6 ГБ WAL и заполнил
+> диск до 100 %. WAL-архив пуст, восстановление «на любую секунду» из этого
+> runbook **невозможно**.
+>
+> **Фактически доступно сегодня:** ночной logical dump (runbook 006, локально
+> + off-site в Cloudflare R2) и еженедельный basebackup. **Реальный RPO — до
+> ~24 часов** (последний ночной дамп), не секунды. Таймер
+> `pilingtrack-pitr-basebackup` делает только базовую копию, без WAL.
+>
+> Всё ниже — инструкция на случай, если WAL-архивирование решат включить
+> обратно (с починенным no-clobber `archive_command` и мониторингом
+> `pg_stat_archiver`). До этого раздел «Restore» этого runbook неприменим.
+
 | Metadata | Value |
 |---|---|
 | **Severity** | 🟢 preventive / 🔴 P0 during restore |
-| **SLA** | Restore < 60 min to any second within the last ~28 days |
+| **SLA** | ~~Restore < 60 min to any second~~ — недоступно, см. предупреждение выше |
 | **Owned by** | Whoever holds prod SSH |
 
 PITR is the *layer on top of* the nightly logical dump (runbook 006). The

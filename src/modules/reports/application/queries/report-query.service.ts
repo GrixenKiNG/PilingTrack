@@ -101,7 +101,7 @@ export async function listReportsForReview(
     where.userId = userId;
   }
 
-  return paginateQuery(
+  const page = await paginateQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     (args) => db.report.findMany(args as any),
     { cursor: pagination?.cursor, limit: pagination?.limit ?? 25 },
@@ -111,6 +111,33 @@ export async function listReportsForReview(
       orderBy: { date: 'desc' },
     }
   );
+
+  // hasPhotos + first thumbnail id in one batched query — the admin list used
+  // to fire two GET /api/media round-trips per report (~200 requests per screen).
+  // Media.entityId stores Report.reportId (business UUID), not Report.id.
+  const reportIds = page.data
+    .map((r) => (r as { reportId?: string }).reportId)
+    .filter((id): id is string => Boolean(id));
+  const mediaRows = reportIds.length
+    ? await db.media.findMany({
+        where: { entityType: 'report', entityId: { in: reportIds }, isDeleted: false, uploadStatus: 'completed' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, entityId: true },
+      })
+    : [];
+  const thumbByReport = new Map<string, string>();
+  for (const m of mediaRows) {
+    if (m.entityId && !thumbByReport.has(m.entityId)) thumbByReport.set(m.entityId, m.id);
+  }
+
+  return {
+    ...page,
+    data: page.data.map((r) => {
+      const row = r as { reportId?: string; journalPhotoMediaId?: string | null };
+      const thumbnailMediaId = (row.reportId ? thumbByReport.get(row.reportId) : undefined) ?? row.journalPhotoMediaId ?? null;
+      return { ...r, hasPhotos: thumbnailMediaId != null, thumbnailMediaId };
+    }),
+  };
 }
 
 // ── Recent reports for the dispatcher dashboard evidence journal ──────────────
@@ -150,7 +177,9 @@ export async function listRecentReportsForDashboard(
     },
   });
 
-  const ids = reports.map((r) => r.id);
+  // Media.entityId stores Report.reportId (business UUID), not Report.id —
+  // grouping by r.id matched zero rows and hasPhoto fell back to journalPhotoMediaId only.
+  const ids = reports.map((r) => r.reportId);
   const counts = ids.length
     ? await db.media.groupBy({
         by: ['entityId'],
@@ -172,8 +201,8 @@ export async function listRecentReportsForDashboard(
     operatorName: r.user?.name ?? '—',
     crewName: r.crew?.name ?? null,
     status: r.status,
-    hasPhoto: r.journalPhotoMediaId != null || withMedia.has(r.id),
-    photoCount: counts.find((c) => c.entityId === r.id)?._count ?? (r.journalPhotoMediaId ? 1 : 0),
+    hasPhoto: r.journalPhotoMediaId != null || withMedia.has(r.reportId),
+    photoCount: counts.find((c) => c.entityId === r.reportId)?._count ?? (r.journalPhotoMediaId ? 1 : 0),
     edited: r.version > 1,
     updatedAt: r.updatedAt.toISOString(),
   }));

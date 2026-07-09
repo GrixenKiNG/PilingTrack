@@ -65,6 +65,20 @@ describe('ensureTenantAccess', () => {
         )
       ).resolves.toBeUndefined();
     });
+
+    it('enforces under the canonical mode value "multi" too', async () => {
+      // Regression (2026-07-02 audit H7): this check compared the env var to
+      // the literal 'true' while the canonical value elsewhere is 'multi' —
+      // enabling multi-tenant the documented way silently skipped enforcement.
+      process.env.MULTI_TENANT_MODE = 'multi';
+      await expect(
+        ensureTenantAccess(
+          { id: 'u1', role: 'OPERATOR', tenantId: 't-a' },
+          't-b',
+          'report'
+        )
+      ).rejects.toThrow(/different tenant/);
+    });
   });
 
   describe('privileged roles', () => {

@@ -10,15 +10,18 @@
 export interface EquipmentBrand {
   name: string;
   logoSrc: string;
+  // Pastel band background for the fleet card header, used when no equipment
+  // photo is available for the model (see equipment-photo.ts).
+  tint: string;
 }
 
 const BRAND_BY_MODEL: Record<string, EquipmentBrand> = {
-  'PVE 50PR': { name: 'PVE', logoSrc: '/icons/equipment-brands/pve.png' },
-  'SD-20': { name: 'Kopernik', logoSrc: '/icons/equipment-brands/kopernik.png' },
-  'Banut 655': { name: 'ABI (Banut)', logoSrc: '/icons/equipment-brands/abi-banut.png' },
-  'LRH 100': { name: 'Liebherr', logoSrc: '/icons/equipment-brands/liebherr.svg' },
-  'RTG RM20': { name: 'RTG Rammtechnik', logoSrc: '/icons/equipment-brands/rtg.svg' },
-  'КБУРГ-16': { name: 'БашСтрой', logoSrc: '/icons/equipment-brands/bashstroy.png' },
+  'PVE 50PR': { name: 'PVE', logoSrc: '/icons/equipment-brands/pve.png', tint: '#FDECE3' },
+  'SD-20': { name: 'Kopernik', logoSrc: '/icons/equipment-brands/kopernik.png', tint: '#E6F1FB' },
+  'Banut 655': { name: 'ABI (Banut)', logoSrc: '/icons/equipment-brands/abi-banut.png', tint: '#FDECE3' },
+  'LRH 100': { name: 'Liebherr', logoSrc: '/icons/equipment-brands/liebherr.svg', tint: '#FFF6DA' },
+  'RTG RM20': { name: 'RTG Rammtechnik', logoSrc: '/icons/equipment-brands/rtg.svg', tint: '#EAF3DE' },
+  'КБУРГ-16': { name: 'БашСтрой', logoSrc: '/icons/equipment-brands/bashstroy.png', tint: '#FBEAF0' },
 };
 
 export function getEquipmentBrand(model: string | null | undefined): EquipmentBrand | null {

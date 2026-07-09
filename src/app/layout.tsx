@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { ThemeProvider } from 'next-themes';
-import { Toaster } from '@/components/ui/toaster';
+// Sonner, not the Radix toaster: every toast.* call in the app goes through
+// sonner, and without its <Toaster/> mounted they all silently no-op (login
+// errors and report-submit errors were invisible to users).
+import { Toaster } from 'sonner';
 import './globals.css';
 
 // Force every HTML route to be rendered per request so the proxy can
@@ -99,7 +102,7 @@ export default async function RootLayout({
           nonce={nonce}
         >
           {children}
-          <Toaster />
+          <Toaster richColors position="top-center" closeButton />
         </ThemeProvider>
       </body>
     </html>

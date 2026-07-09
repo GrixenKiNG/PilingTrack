@@ -199,15 +199,42 @@ export async function rotateRefreshToken(
     );
   }
 
-  // Revoke the current token
-  await db.refreshToken.update({
-    where: { id: existingToken.id },
+  // Revoke the current token — ATOMICALLY, conditioned on it still being
+  // unrevoked (audit finding #2). Two concurrent requests presenting the
+  // identical raw token both read the same non-revoked row above and both
+  // pass every check — the sibling-reuse scan a few lines up only looks
+  // for OTHER token hashes in the family, so it can't see this. An
+  // unconditional `update` here would let both requests "succeed" and both
+  // mint a new child token from the same parent. updateMany + count is the
+  // same atomic-claim pattern already used for outbox consumption
+  // (outbox-publisher.ts): only one caller can flip revoked false→true,
+  // the loser gets count:0 and must not proceed to create a token.
+  const claim = await db.refreshToken.updateMany({
+    where: { id: existingToken.id, revoked: false },
     data: {
       revoked: true,
       revokedAt: new Date(),
       lastUsedAt: new Date(),
     },
   });
+
+  if (claim.count === 0) {
+    // Lost the race — another request already rotated this exact token.
+    // Treat identically to the sibling-reuse path: revoke the whole family.
+    await db.refreshToken.updateMany({
+      where: { family: existingToken.family },
+      data: {
+        revoked: true,
+        revokedAt: new Date(),
+        revokedReason: 'Concurrent token reuse detected — possible token theft',
+      },
+    });
+
+    throw new ServiceError(
+      'Security: refresh token was reused. All sessions revoked. Please re-authenticate.',
+      401
+    );
+  }
 
   // Fetch user for new access token
   const user = await db.user.findUnique({

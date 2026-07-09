@@ -7,32 +7,42 @@ import { authFetch } from '@/lib/api';
 
 interface Props {
   reportId: string;
+  /**
+   * First photo of the report when the caller already knows it (batched
+   * server-side). `null` = report has no photos, skip all requests.
+   * `undefined` = unknown, fall back to fetching the media list.
+   */
+  mediaId?: string | null;
 }
 
-export function ReportThumbnail({ reportId }: Props) {
+export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [fullUrl, setFullUrl] = useState<string | null>(null);
   const [mediaId, setMediaId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (knownMediaId === null) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await authFetch(`/api/media?entityType=report&entityId=${encodeURIComponent(reportId)}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        const photo = json.data?.[0];
-        if (!photo || cancelled) return;
-        setMediaId(photo.id);
-        const dl = await authFetch(`/api/media/${photo.id}/download?thumb=1`);
+        let photoId = knownMediaId;
+        if (!photoId) {
+          const res = await authFetch(`/api/media?entityType=report&entityId=${encodeURIComponent(reportId)}`);
+          if (!res.ok) return;
+          const json = await res.json();
+          photoId = json.data?.[0]?.id;
+        }
+        if (!photoId || cancelled) return;
+        setMediaId(photoId);
+        const dl = await authFetch(`/api/media/${photoId}/download?thumb=1`);
         if (dl.ok && !cancelled) setThumbUrl((await dl.json()).url);
       } catch {
         /* silent — list view is best-effort */
       }
     })();
     return () => { cancelled = true; };
-  }, [reportId]);
+  }, [reportId, knownMediaId]);
 
   const handleOpen = async (e: React.MouseEvent) => {
     e.stopPropagation();

@@ -19,11 +19,11 @@ interface SiteAnalytics {
   totalDowntime: number;
 }
 
-// Subset of listCrewSummaries() via GET /api/crews/all.
+// Subset of the GET /api/crews/all payload ({ crews: [...] }, rig name nested).
 interface CrewSummary {
   id: string;
   siteId: string;
-  equipmentName: string;
+  equipment: { id: string; name: string } | null;
   isActive: boolean;
 }
 
@@ -61,14 +61,16 @@ export function useSitesOverview(): SitesOverview {
         ]);
         if (!analyticsRes.ok) throw new Error(`Аналитика объектов недоступна (${analyticsRes.status})`);
         const analytics: SiteAnalytics[] = (await analyticsRes.json()).analytics ?? [];
-        const crews: CrewSummary[] = crewsRes.ok ? ((await crewsRes.json()).data ?? []) : [];
+        // The endpoint responds { crews: [...] } — reading .data here used to
+        // zero out every site's crew count ("Без бригад: 2" with 7 active crews).
+        const crews: CrewSummary[] = crewsRes.ok ? ((await crewsRes.json()).crews ?? []) : [];
 
         const bySite = new Map<string, { count: number; rigs: Set<string> }>();
         for (const crew of crews) {
           if (!crew.isActive) continue;
           const entry = bySite.get(crew.siteId) ?? { count: 0, rigs: new Set<string>() };
           entry.count += 1;
-          if (crew.equipmentName) entry.rigs.add(crew.equipmentName);
+          if (crew.equipment?.name) entry.rigs.add(crew.equipment.name);
           bySite.set(crew.siteId, entry);
         }
 
