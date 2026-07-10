@@ -1,16 +1,16 @@
-import { db } from '@/lib/db';
-import {
-  cloneEquipmentTileTemplate,
-  DEFAULT_EQUIPMENT_TILE_TEMPLATE,
-  validateEquipmentTileTemplate,
-  type EquipmentTileTemplate,
-} from '@/components/piling/monitoring/equipment-tile-template';
+/**
+ * Monitoring tile template — thin alias over the shared layout service
+ * (surface 'monitoring-equipment-tile'). Kept so the legacy
+ * /api/monitoring/template route and existing callers keep working while
+ * clients migrate to /api/layout/[surfaceId].
+ */
+
+import type { EquipmentTileTemplate } from '@/components/piling/monitoring/equipment-tile-template';
+import { getLayout, saveLayout } from '@/modules/layout';
+import { MONITORING_EQUIPMENT_TILE_SURFACE_ID } from '@/modules/layout';
 
 export async function getTemplate(tenantId: string): Promise<EquipmentTileTemplate> {
-  if (!tenantId) throw new Error('getTemplate: tenantId is required'); // fail closed
-  const row = await db.monitoringTileTemplate.findUnique({ where: { tenantId } });
-  if (!row) return cloneEquipmentTileTemplate(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
-  return validateEquipmentTileTemplate(row.template) ?? cloneEquipmentTileTemplate(DEFAULT_EQUIPMENT_TILE_TEMPLATE);
+  return getLayout(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID) as Promise<EquipmentTileTemplate>;
 }
 
 export async function saveTemplate(
@@ -18,13 +18,5 @@ export async function saveTemplate(
   template: unknown,
   updatedBy: string,
 ): Promise<EquipmentTileTemplate> {
-  if (!tenantId) throw new Error('saveTemplate: tenantId is required'); // fail closed
-  const validated = validateEquipmentTileTemplate(template);
-  if (!validated) throw new TypeError('Invalid equipment tile template');
-  await db.monitoringTileTemplate.upsert({
-    where: { tenantId },
-    create: { tenantId, template: validated as object, updatedBy },
-    update: { template: validated as object, updatedBy },
-  });
-  return validated;
+  return saveLayout(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID, template, updatedBy) as Promise<EquipmentTileTemplate>;
 }

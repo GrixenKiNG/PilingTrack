@@ -1,68 +1,26 @@
-export const EQUIPMENT_TILE_COLUMNS = 12;
+/**
+ * Monitoring surface template: types, block catalog keys, default template
+ * and validator for the /monitoring equipment tile. The grid model and
+ * validation engine live in the shared layout-editor module; this file only
+ * narrows them to the monitoring block catalog.
+ */
 
-export type EquipmentTileBlockKind = 'data' | 'text' | 'divider' | 'image';
+import {
+  cloneLayoutTemplate,
+  createTemplateValidator,
+  LAYOUT_COLUMNS,
+  type LayoutBlock,
+  type LayoutBlockKind,
+  type LayoutBlockStyle,
+  type LayoutTemplate,
+} from '@/components/piling/layout-editor/layout-template';
 
-export type EquipmentTileDataKey =
-  | 'photo'
-  | 'identity'
-  | 'status'
-  | 'inventoryNumber'
-  | 'site'
-  | 'operator'
-  | 'engineHours'
-  | 'maintenance'
-  | 'todayPiles'
-  | 'todayDrilling'
-  | 'todayDowntime'
-  | 'maintenanceAlert';
+export const EQUIPMENT_TILE_COLUMNS = LAYOUT_COLUMNS;
 
-export interface EquipmentTileBlockStyle {
-  background: string;
-  color: string;
-  borderColor: string;
-  borderWidth: number;
-  borderRadius: number;
-  padding: number;
-  fontSize: number;
-  fontWeight: 400 | 500 | 600 | 700;
-  textAlign: 'left' | 'center' | 'right';
-  alignItems: 'start' | 'center' | 'end';
-}
+export type EquipmentTileBlockKind = LayoutBlockKind;
+export type EquipmentTileBlockStyle = LayoutBlockStyle;
 
-export interface EquipmentTileBlock {
-  id: string;
-  kind: EquipmentTileBlockKind;
-  dataKey?: EquipmentTileDataKey;
-  text?: string;
-  assetId?: string;
-  assetRevision?: number;
-  imageFit?: 'contain' | 'cover';
-  alt?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  visible: boolean;
-  style: EquipmentTileBlockStyle;
-}
-
-export interface EquipmentTileTemplate {
-  version: 1;
-  card: {
-    width: number;
-    minHeight: number;
-    rowHeight: number;
-    gap: number;
-    background: string;
-    borderColor: string;
-    borderWidth: number;
-    borderRadius: number;
-    padding: number;
-  };
-  blocks: EquipmentTileBlock[];
-}
-
-const DATA_KEYS = new Set<EquipmentTileDataKey>([
+export const EQUIPMENT_TILE_DATA_KEYS = [
   'photo',
   'identity',
   'status',
@@ -75,13 +33,17 @@ const DATA_KEYS = new Set<EquipmentTileDataKey>([
   'todayDrilling',
   'todayDowntime',
   'maintenanceAlert',
-]);
+] as const;
 
-const BLOCK_KINDS = new Set<EquipmentTileBlockKind>(['data', 'text', 'divider', 'image']);
-const FONT_WEIGHTS = new Set([400, 500, 600, 700]);
-const TEXT_ALIGNS = new Set(['left', 'center', 'right']);
-const ITEM_ALIGNS = new Set(['start', 'center', 'end']);
-const IMAGE_FITS = new Set(['contain', 'cover']);
+export type EquipmentTileDataKey = (typeof EQUIPMENT_TILE_DATA_KEYS)[number];
+
+export interface EquipmentTileBlock extends LayoutBlock {
+  dataKey?: EquipmentTileDataKey;
+}
+
+export interface EquipmentTileTemplate extends LayoutTemplate {
+  blocks: EquipmentTileBlock[];
+}
 
 const BASE_STYLE: EquipmentTileBlockStyle = {
   background: '#ffffff',
@@ -156,84 +118,12 @@ export const DEFAULT_EQUIPMENT_TILE_TEMPLATE: EquipmentTileTemplate = {
   ],
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteInRange(value: unknown, min: number, max: number): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
-}
-
-function isIntegerInRange(value: unknown, min: number, max: number): value is number {
-  return Number.isInteger(value) && isFiniteInRange(value, min, max);
-}
-
-// Caps keep an ADMIN-authored template from ballooning the JSONB row that is
-// served to every viewer on every load; generous enough to never bite editing.
-function isShortString(value: unknown, max: number): value is string {
-  return typeof value === 'string' && value.length <= max;
-}
-
-function isValidStyle(value: unknown): value is EquipmentTileBlockStyle {
-  if (!isRecord(value)) return false;
-  return (
-    isShortString(value.background, 200) &&
-    isShortString(value.color, 200) &&
-    isShortString(value.borderColor, 200) &&
-    isFiniteInRange(value.borderWidth, 0, 12) &&
-    isFiniteInRange(value.borderRadius, 0, 64) &&
-    isFiniteInRange(value.padding, 0, 64) &&
-    isFiniteInRange(value.fontSize, 8, 96) &&
-    FONT_WEIGHTS.has(value.fontWeight as number) &&
-    TEXT_ALIGNS.has(value.textAlign as string) &&
-    ITEM_ALIGNS.has(value.alignItems as string)
-  );
-}
-
-function isValidBlock(value: unknown): value is EquipmentTileBlock {
-  if (!isRecord(value)) return false;
-  if (!isShortString(value.id, 100) || value.id.trim().length === 0) return false;
-  if (!BLOCK_KINDS.has(value.kind as EquipmentTileBlockKind)) return false;
-  if (value.kind === 'data' && !DATA_KEYS.has(value.dataKey as EquipmentTileDataKey)) return false;
-  if (value.kind === 'text' && !isShortString(value.text, 2000)) return false;
-  if (value.kind === 'image') {
-    if (!IMAGE_FITS.has(value.imageFit as string) || !isShortString(value.alt, 300)) return false;
-    if (value.assetRevision != null && !isFiniteInRange(value.assetRevision, 0, Number.MAX_SAFE_INTEGER)) return false;
-  }
-  if (!isIntegerInRange(value.x, 0, EQUIPMENT_TILE_COLUMNS - 1)) return false;
-  if (!isIntegerInRange(value.y, 0, 999)) return false;
-  if (!isIntegerInRange(value.width, 1, EQUIPMENT_TILE_COLUMNS)) return false;
-  if (!isIntegerInRange(value.height, 1, 100)) return false;
-  if ((value.x as number) + (value.width as number) > EQUIPMENT_TILE_COLUMNS) return false;
-  return typeof value.visible === 'boolean' && isValidStyle(value.style);
-}
-
-function isValidCard(value: unknown): value is EquipmentTileTemplate['card'] {
-  if (!isRecord(value)) return false;
-  return (
-    isFiniteInRange(value.width, 200, 1200) &&
-    isFiniteInRange(value.minHeight, 240, 2400) &&
-    isFiniteInRange(value.rowHeight, 12, 96) &&
-    isFiniteInRange(value.gap, 0, 32) &&
-    typeof value.background === 'string' &&
-    typeof value.borderColor === 'string' &&
-    isFiniteInRange(value.borderWidth, 0, 12) &&
-    isFiniteInRange(value.borderRadius, 0, 64) &&
-    isFiniteInRange(value.padding, 0, 64)
-  );
-}
-
 export function cloneEquipmentTileTemplate(template: EquipmentTileTemplate): EquipmentTileTemplate {
-  return JSON.parse(JSON.stringify(template)) as EquipmentTileTemplate;
+  return cloneLayoutTemplate(template);
 }
+
+const validate = createTemplateValidator(EQUIPMENT_TILE_DATA_KEYS);
 
 export function validateEquipmentTileTemplate(value: unknown): EquipmentTileTemplate | null {
-  if (!isRecord(value) || value.version !== 1 || !isValidCard(value.card) || !Array.isArray(value.blocks)) {
-    return null;
-  }
-  if (value.blocks.length > 200) return null;
-  if (!value.blocks.every(isValidBlock)) return null;
-  const ids = value.blocks.map((block) => block.id);
-  if (new Set(ids).size !== ids.length) return null;
-  return cloneEquipmentTileTemplate(value as unknown as EquipmentTileTemplate);
+  return validate(value) as EquipmentTileTemplate | null;
 }

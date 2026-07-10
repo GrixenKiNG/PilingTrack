@@ -457,14 +457,16 @@ model ChecklistItem {
   @@index([sectionId])
 }
 
-model MonitoringTileTemplate {
+model ModuleLayoutTemplate {
   id        String   @id @default(cuid())
-  tenantId  String   @unique
+  tenantId  String
+  surfaceId String
   template  Json
   updatedBy String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
+  @@unique([tenantId, surfaceId])
   @@index([tenantId])
 }
 
