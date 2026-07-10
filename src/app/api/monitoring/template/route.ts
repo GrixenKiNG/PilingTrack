@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withApi, withMutation } from '@/core/api-wrapper';
-import { getTemplate, saveTemplate } from '@/modules/monitoring/application/template-service';
+import { getTemplate, saveTemplate } from '@/modules/monitoring';
 
 export const runtime = 'nodejs';
 

@@ -168,12 +168,18 @@ function isIntegerInRange(value: unknown, min: number, max: number): value is nu
   return Number.isInteger(value) && isFiniteInRange(value, min, max);
 }
 
+// Caps keep an ADMIN-authored template from ballooning the JSONB row that is
+// served to every viewer on every load; generous enough to never bite editing.
+function isShortString(value: unknown, max: number): value is string {
+  return typeof value === 'string' && value.length <= max;
+}
+
 function isValidStyle(value: unknown): value is EquipmentTileBlockStyle {
   if (!isRecord(value)) return false;
   return (
-    typeof value.background === 'string' &&
-    typeof value.color === 'string' &&
-    typeof value.borderColor === 'string' &&
+    isShortString(value.background, 200) &&
+    isShortString(value.color, 200) &&
+    isShortString(value.borderColor, 200) &&
     isFiniteInRange(value.borderWidth, 0, 12) &&
     isFiniteInRange(value.borderRadius, 0, 64) &&
     isFiniteInRange(value.padding, 0, 64) &&
@@ -186,12 +192,12 @@ function isValidStyle(value: unknown): value is EquipmentTileBlockStyle {
 
 function isValidBlock(value: unknown): value is EquipmentTileBlock {
   if (!isRecord(value)) return false;
-  if (typeof value.id !== 'string' || value.id.trim().length === 0) return false;
+  if (!isShortString(value.id, 100) || value.id.trim().length === 0) return false;
   if (!BLOCK_KINDS.has(value.kind as EquipmentTileBlockKind)) return false;
   if (value.kind === 'data' && !DATA_KEYS.has(value.dataKey as EquipmentTileDataKey)) return false;
-  if (value.kind === 'text' && typeof value.text !== 'string') return false;
+  if (value.kind === 'text' && !isShortString(value.text, 2000)) return false;
   if (value.kind === 'image') {
-    if (!IMAGE_FITS.has(value.imageFit as string) || typeof value.alt !== 'string') return false;
+    if (!IMAGE_FITS.has(value.imageFit as string) || !isShortString(value.alt, 300)) return false;
     if (value.assetRevision != null && !isFiniteInRange(value.assetRevision, 0, Number.MAX_SAFE_INTEGER)) return false;
   }
   if (!isIntegerInRange(value.x, 0, EQUIPMENT_TILE_COLUMNS - 1)) return false;
@@ -225,6 +231,7 @@ export function validateEquipmentTileTemplate(value: unknown): EquipmentTileTemp
   if (!isRecord(value) || value.version !== 1 || !isValidCard(value.card) || !Array.isArray(value.blocks)) {
     return null;
   }
+  if (value.blocks.length > 200) return null;
   if (!value.blocks.every(isValidBlock)) return null;
   const ids = value.blocks.map((block) => block.id);
   if (new Set(ids).size !== ids.length) return null;

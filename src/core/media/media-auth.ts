@@ -12,6 +12,7 @@ interface MediaContext {
   userId: string;
   entityType: string | null;
   entityId: string | null;
+  tenantId?: string | null;
 }
 
 /**
@@ -57,12 +58,31 @@ export async function assertCanAccessMediaEntity(
 /**
  * Authorize an action against an existing media record (confirm/delete/download).
  *
- * Admins/dispatchers always allowed. Other roles: must own the upload. We
- * deliberately don't fall through to entity ownership here because the
+ * Equipment photos are org-wide assets, not personal uploads: every role on
+ * the fleet dashboard must be able to READ them (tenant-scoped, fail-closed),
+ * while only ADMIN may mutate — mirroring assertCanAccessMediaEntity above.
+ *
+ * For everything else: admins/dispatchers allowed, other roles must own the
+ * upload. We deliberately don't fall through to entity ownership because the
  * media is the source of truth once it exists, and entity ownership might
  * not exist (draft) or may have changed (admin reassigned the report).
  */
-export function assertCanAccessMedia(actor: ActorLike, media: MediaContext): void {
+export function assertCanAccessMedia(
+  actor: ActorLike,
+  media: MediaContext,
+  action: 'read' | 'mutate' = 'mutate',
+): void {
+  if (media.entityType === 'equipment') {
+    if (action === 'read') {
+      if (!actor.tenantId || !media.tenantId || actor.tenantId !== media.tenantId) {
+        throw new ServiceError('Forbidden', 403);
+      }
+      return;
+    }
+    if (actor.role !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
+    return;
+  }
+
   if (isPrivilegedRole(actor.role)) return;
   if (media.userId === actor.id) return;
   throw new ServiceError('Forbidden', 403);

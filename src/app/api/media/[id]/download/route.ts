@@ -19,14 +19,14 @@ export const GET = withApi(
     const { db } = await import('@/lib/db');
     const media = await db.media.findUnique({
       where: { id },
-      select: { key: true, thumbnailKey: true, entityType: true, entityId: true, isDeleted: true, uploadStatus: true, userId: true },
+      select: { key: true, thumbnailKey: true, entityType: true, entityId: true, isDeleted: true, uploadStatus: true, userId: true, tenantId: true },
     });
     if (!media || media.isDeleted) return NextResponse.json({ error: 'Media not found' }, { status: 404 });
     if (media.uploadStatus !== 'completed') return NextResponse.json({ error: 'Upload not completed' }, { status: 409 });
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      assertCanAccessMedia(user!, media);
+      assertCanAccessMedia(user!, media, 'read');
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
