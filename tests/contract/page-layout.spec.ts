@@ -4,16 +4,16 @@ import {
   type PageLayoutTemplate,
 } from '@/components/piling/layout-editor/page-layout-template';
 import {
-  ANALYTICS_KPI_WIDGET_IDS,
+  ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from '@/components/piling/analytics-dashboard/kpi-catalog';
 
-const validate = createPageLayoutValidator(ANALYTICS_KPI_WIDGET_IDS);
+const validate = createPageLayoutValidator(ANALYTICS_DASHBOARD_WIDGET_IDS);
 
 describe('page-layout validator', () => {
   it('accepts the shipped analytics-dashboard default', () => {
     expect(validate(DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE)).toBeTruthy();
-    expect(DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE.widgets.length).toBe(ANALYTICS_KPI_WIDGET_IDS.length);
+    expect(DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE.widgets.length).toBe(ANALYTICS_DASHBOARD_WIDGET_IDS.length);
   });
 
   it('rejects an unknown widget id (catalog is the allow-list)', () => {

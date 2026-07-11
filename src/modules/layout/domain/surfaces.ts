@@ -25,7 +25,7 @@ import { createTemplateValidator } from '@/components/piling/layout-editor/layou
 import { createPageLayoutValidator } from '@/components/piling/layout-editor/page-layout-template';
 import {
   ANALYTICS_DASHBOARD_SURFACE_ID,
-  ANALYTICS_KPI_WIDGET_IDS,
+  ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from '@/components/piling/analytics-dashboard/kpi-catalog';
 
@@ -64,7 +64,7 @@ const LAYOUT_SURFACES: Record<string, LayoutSurfaceConfig> = {
     id: ANALYTICS_DASHBOARD_SURFACE_ID,
     kind: 'page-layout',
     defaultTemplate: DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
-    validate: createPageLayoutValidator(ANALYTICS_KPI_WIDGET_IDS),
+    validate: createPageLayoutValidator(ANALYTICS_DASHBOARD_WIDGET_IDS),
   },
 };
 

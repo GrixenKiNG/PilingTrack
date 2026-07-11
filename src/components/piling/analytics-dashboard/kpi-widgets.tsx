@@ -1,22 +1,25 @@
 'use client';
 
 /**
- * Client catalog for the 'analytics-dashboard' page-layout surface: renders
- * each KPI-tile widget from live fleet data. `AnalyticsKpiRow` renders the
- * saved layout on /admin/analytics; `AnalyticsDashboardLayoutEditor` is the
- * configurator mounted in Settings → «Шаблоны плиток».
+ * Client catalog for the 'analytics-dashboard' page-layout surface. KPI tiles
+ * render from live fleet data; the tab sections are placed by the same saved
+ * layout (visibility/order per zone) but their heavy chart/table JSX lives in
+ * admin-analytics and is passed in there. `useAnalyticsDashboardLayout` is the
+ * shared controller; `AnalyticsDashboardLayoutEditor` is the Settings
+ * configurator (KPIs render live, sections render as labelled placeholders).
  */
 
 import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
-import { PageLayoutRenderer, type RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
 import { PageLayoutEditor } from '@/components/piling/layout-editor/page-layout-editor';
-import { usePageLayoutTemplate } from '@/components/piling/layout-editor/use-page-layout-template';
+import { usePageLayoutTemplate, type PageLayoutController } from '@/components/piling/layout-editor/use-page-layout-template';
 import { createPageLayoutValidator } from '@/components/piling/layout-editor/page-layout-template';
+import type { RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
 import {
   ANALYTICS_DASHBOARD_SURFACE_ID,
-  ANALYTICS_KPI_WIDGET_IDS,
+  ANALYTICS_DASHBOARD_WIDGETS,
+  ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from './kpi-catalog';
 
@@ -61,27 +64,36 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
   };
 }
 
-const validate = createPageLayoutValidator(ANALYTICS_KPI_WIDGET_IDS);
+/** Labelled placeholders for the tab-section widgets (used in the configurator). */
+function buildSectionPlaceholders(): Record<string, RenderablePageWidget> {
+  const out: Record<string, RenderablePageWidget> = {};
+  for (const w of ANALYTICS_DASHBOARD_WIDGETS) {
+    if (w.zone === 'kpi') continue;
+    out[w.id] = {
+      id: w.id,
+      title: w.title,
+      render: () => (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">{w.title}</div>
+      ),
+    };
+  }
+  return out;
+}
 
-function useDashboardController() {
+const validate = createPageLayoutValidator(ANALYTICS_DASHBOARD_WIDGET_IDS);
+
+export function useAnalyticsDashboardLayout(): PageLayoutController {
   return usePageLayoutTemplate({
     surfaceId: ANALYTICS_DASHBOARD_SURFACE_ID,
     defaultTemplate: DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
     validate,
-    catalogIds: ANALYTICS_KPI_WIDGET_IDS,
+    catalogIds: ANALYTICS_DASHBOARD_WIDGET_IDS,
   });
-}
-
-/** KPI row on /admin/analytics, rendered from the tenant's saved layout. */
-export function AnalyticsKpiRow({ data }: { data: AnalyticsKpiData }) {
-  const controller = useDashboardController();
-  const widgets = buildAnalyticsKpiWidgets(data);
-  return <PageLayoutRenderer template={controller.template} widgets={widgets} />;
 }
 
 /** Configurator for Settings → «Шаблоны плиток». Fetches live data for preview. */
 export function AnalyticsDashboardLayoutEditor() {
-  const controller = useDashboardController();
+  const controller = useAnalyticsDashboardLayout();
   const [data, setData] = useState<AnalyticsKpiData | null>(null);
 
   useEffect(() => {
@@ -113,10 +125,13 @@ export function AnalyticsDashboardLayoutEditor() {
     return () => { active = false; };
   }, []);
 
-  const widgets = buildAnalyticsKpiWidgets(data ?? {
-    totalEquipment: 0, sitesCount: 0, pilesToday: 0, pileMetersToday: 0,
-    drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0,
-  });
+  const widgets = {
+    ...buildAnalyticsKpiWidgets(data ?? {
+      totalEquipment: 0, sitesCount: 0, pilesToday: 0, pileMetersToday: 0,
+      drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0,
+    }),
+    ...buildSectionPlaceholders(),
+  };
 
-  return <PageLayoutEditor title="Дашборд аналитики — KPI" controller={controller} widgets={widgets} />;
+  return <PageLayoutEditor title="Дашборд аналитики" controller={controller} widgets={widgets} />;
 }

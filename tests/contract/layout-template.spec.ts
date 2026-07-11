@@ -14,7 +14,7 @@ vi.mock('@/lib/db', () => ({
 import { db } from '@/lib/db';
 import { getLayout, getLayoutSet, saveLayout, deleteLayout, UnknownSurfaceError } from '@/modules/layout';
 import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '@/components/piling/admin-equipment/equipment-card-template';
-import { ANALYTICS_KPI_WIDGET_IDS } from '@/components/piling/analytics-dashboard/kpi-catalog';
+import { ANALYTICS_DASHBOARD_WIDGET_IDS } from '@/components/piling/analytics-dashboard/kpi-catalog';
 
 const anyDb = db.moduleLayoutTemplate as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
@@ -89,7 +89,7 @@ describe('layout service', () => {
   it('returns the analytics-dashboard page-layout default (widget list)', async () => {
     anyDb.findUnique.mockResolvedValue(null);
     const t = await getLayout('orion', 'analytics-dashboard') as unknown as { widgets: { id: string }[] };
-    expect(t.widgets.length).toBe(ANALYTICS_KPI_WIDGET_IDS.length);
+    expect(t.widgets.length).toBe(ANALYTICS_DASHBOARD_WIDGET_IDS.length);
     expect(t.widgets.map((w) => w.id)).toContain('kpi-drilling');
   });
 

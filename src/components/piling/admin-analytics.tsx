@@ -20,7 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { AnalyticsKpiRow } from '@/components/piling/analytics-dashboard/kpi-widgets';
+import { useAnalyticsDashboardLayout, buildAnalyticsKpiWidgets } from '@/components/piling/analytics-dashboard/kpi-widgets';
+import { PageLayoutRenderer } from '@/components/piling/layout-editor/page-layout-renderer';
 
 interface OperatorRow {
   userId: string;
@@ -76,6 +77,7 @@ const TABS = [
 ];
 
 export function AdminAnalytics() {
+  const layout = useAnalyticsDashboardLayout();
   const [tab, setTab] = useState<'operators' | 'trends' | 'kpi'>('operators');
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState<string>('all');
@@ -195,6 +197,14 @@ export function AdminAnalytics() {
       }));
   }, [trendRows]);
 
+  const placement = (id: string) => layout.template.widgets.find((w) => w.id === id);
+  const sectionVisible = (id: string) => placement(id)?.visible ?? true;
+  const orderedSections = (items: { id: string; node: React.ReactNode }[]) =>
+    items
+      .filter((it) => sectionVisible(it.id))
+      .sort((a, b) => (placement(a.id)?.order ?? 0) - (placement(b.id)?.order ?? 0))
+      .map((it) => <div key={it.id}>{it.node}</div>);
+
   return (
     <div data-testid="operations-analytics" className="space-y-4 p-4 lg:p-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -209,7 +219,7 @@ export function AdminAnalytics() {
         </div>
       </div>
 
-      {fleet && <AnalyticsKpiRow data={{
+      {fleet && <PageLayoutRenderer template={layout.template} widgets={buildAnalyticsKpiWidgets({
         totalEquipment: fleet.totals.totalEquipment,
         sitesCount: sites.length,
         pilesToday: fleet.totals.pilesToday,
@@ -218,7 +228,7 @@ export function AdminAnalytics() {
         downtimeHoursToday: fleet.totals.downtimeHoursToday,
         crewsOnShiftToday: fleet.totals.crewsOnShiftToday,
         operatorsOnShiftToday: fleet.totals.operatorsOnShiftToday,
-      }} />}
+      })} />}
 
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((t) => (
@@ -282,7 +292,9 @@ export function AdminAnalytics() {
           ) : operatorSummary.length === 0 ? (
             <EmptyState text="За выбранный период нет данных по операторам" />
           ) : (
-            <>
+            <div className="space-y-4">
+              {orderedSections([
+                { id: 'chart-operators', node: (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" /> Топ-10 по забитым сваям</CardTitle>
@@ -301,7 +313,8 @@ export function AdminAnalytics() {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-
+                ) },
+                { id: 'table-operators', node: (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Сводка по операторам</CardTitle>
@@ -339,7 +352,9 @@ export function AdminAnalytics() {
                   </table>
                 </CardContent>
               </Card>
-            </>
+                ) },
+              ])}
+            </div>
           )}
         </>
       )}
@@ -350,7 +365,7 @@ export function AdminAnalytics() {
             <Skeleton className="h-80 w-full" />
           ) : trendChartData.length === 0 ? (
             <EmptyState text="Нет данных по неделям. Проекция SiteWeeklyTrend заполняется автоматически по мере поступления отчётов." />
-          ) : (
+          ) : sectionVisible('chart-trends') ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Тренд за 8 недель</CardTitle>
@@ -370,7 +385,7 @@ export function AdminAnalytics() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </>
       )}
 
@@ -382,6 +397,8 @@ export function AdminAnalytics() {
             <EmptyState text="Нет данных ТО за период." />
           ) : (
             <div className="space-y-4">
+              {orderedSections([
+                { id: 'kpi-maintenance', node: (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <KpiCard label="Готовность парка" value={kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—'} hint="доля времени без ремонтов" />
                 <KpiCard label="MTBF" value={fmtHours(kpi.mtbfHours)} hint="наработка между отказами" />
@@ -391,7 +408,8 @@ export function AdminAnalytics() {
                 <KpiCard label="Простой по ремонтам" value={fmtHours(kpi.downtimeHours)} hint="суммарно" />
                 <KpiCard label="Затраты на ТО" value={`${kpi.totalCost.toLocaleString('ru')} ₽`} hint="за период" />
               </div>
-
+                ) },
+                { id: 'table-problem-rigs', node: (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Топ проблемных установок</CardTitle>
@@ -421,6 +439,8 @@ export function AdminAnalytics() {
                   )}
                 </CardContent>
               </Card>
+                ) },
+              ])}
             </div>
           )}
         </>
