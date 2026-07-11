@@ -1,29 +1,31 @@
 'use client';
 
-import { useRef } from 'react';
-import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
-import { EquipmentTileRenderer } from './equipment-tile-renderer';
-import type { EquipmentTileTemplate } from './equipment-tile-template';
-import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
+/**
+ * Generic editor canvas (shared editor engine): the renderer plus pointer/
+ * keyboard drag-move and drag-resize of the selected block on the 12-col
+ * grid. Extracted from the monitoring equipment-tile canvas.
+ */
 
-export function EquipmentTileCanvas({
-  card,
+import { useRef } from 'react';
+import { LayoutRenderer, type RenderBlockContent } from './layout-renderer';
+import type { LayoutTemplate } from './layout-template';
+
+export function LayoutCanvas({
   template,
+  renderBlockContent,
   selectedBlockId,
   preview,
   onSelectBlock,
   onMoveBlock,
   onResizeBlock,
-  assetStorage,
 }: {
-  card: FleetCard;
-  template: EquipmentTileTemplate;
+  template: LayoutTemplate;
+  renderBlockContent: RenderBlockContent;
   selectedBlockId: string | null;
   preview: boolean;
   onSelectBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, x: number, y: number) => void;
   onResizeBlock: (blockId: string, width: number, height: number) => void;
-  assetStorage: EquipmentTileAssetStorage;
 }) {
   const dragRef = useRef<{ blockId: string; startX: number; startY: number; x: number; y: number; width: number; height: number; resize: boolean } | null>(null);
   const selected = template.blocks.find((block) => block.id === selectedBlockId) ?? null;
@@ -62,7 +64,7 @@ export function EquipmentTileCanvas({
       onPointerUp={() => { dragRef.current = null; }}
       onKeyDown={keyboardMove}
     >
-      <EquipmentTileRenderer card={card} template={template} assetStorage={assetStorage} editing={!preview} selectedBlockId={selectedBlockId} onSelectBlock={onSelectBlock} />
+      <LayoutRenderer template={template} renderBlockContent={renderBlockContent} editing={!preview} selectedBlockId={selectedBlockId} onSelectBlock={onSelectBlock} />
       {!preview && selected && (
         <div
           aria-hidden

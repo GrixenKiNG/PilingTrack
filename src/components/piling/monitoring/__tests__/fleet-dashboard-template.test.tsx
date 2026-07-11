@@ -50,10 +50,10 @@ describe('FleetDashboard shared equipment template', () => {
       if (url.startsWith('/api/monitoring/fleet')) {
         return { ok: true, json: async () => snapshot };
       }
-      if (url === '/api/monitoring/template' && method === 'GET') {
+      if (url === '/api/layout/monitoring-equipment-tile' && method === 'GET') {
         return { ok: true, json: async () => serverTemplate };
       }
-      if (url === '/api/monitoring/template' && method === 'PUT') {
+      if (url === '/api/layout/monitoring-equipment-tile' && method === 'PUT') {
         serverTemplate = JSON.parse(init?.body as string);
         return { ok: true, json: async () => serverTemplate };
       }

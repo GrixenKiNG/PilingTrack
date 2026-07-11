@@ -1,5 +1,10 @@
+/**
+ * Monitoring wrapper around the shared LayoutRenderer: binds block content to
+ * a FleetCard via EquipmentTileBlockContent. Public API unchanged.
+ */
+
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
-import { cn } from '@/lib/utils';
+import { LayoutRenderer } from '@/components/piling/layout-editor/layout-renderer';
 import {
   getDefaultEquipmentTileAssetStorage,
   type EquipmentTileAssetStorage,
@@ -16,29 +21,6 @@ export interface EquipmentTileRendererProps {
   assetStorage?: EquipmentTileAssetStorage;
 }
 
-function blockStyle(block: EquipmentTileBlock): React.CSSProperties {
-  const alignItems = block.style.alignItems === 'start' ? 'flex-start' : block.style.alignItems === 'end' ? 'flex-end' : 'center';
-  const justifyContent = block.style.textAlign === 'left' ? 'flex-start' : block.style.textAlign === 'right' ? 'flex-end' : 'center';
-  return {
-    gridColumn: `${block.x + 1} / span ${block.width}`,
-    gridRow: `${block.y + 1} / span ${block.height}`,
-    display: 'flex',
-    alignItems,
-    justifyContent,
-    overflow: 'hidden',
-    background: block.style.background,
-    color: block.style.color,
-    borderColor: block.style.borderColor,
-    borderWidth: block.style.borderWidth,
-    borderStyle: block.style.borderWidth > 0 ? 'solid' : 'none',
-    borderRadius: block.style.borderRadius,
-    padding: block.style.padding,
-    fontSize: block.style.fontSize,
-    fontWeight: block.style.fontWeight,
-    textAlign: block.style.textAlign,
-  };
-}
-
 export function EquipmentTileRenderer({
   card,
   template,
@@ -47,58 +29,15 @@ export function EquipmentTileRenderer({
   onSelectBlock,
   assetStorage = getDefaultEquipmentTileAssetStorage(),
 }: EquipmentTileRendererProps) {
-  const content = template.blocks.filter((block) => block.visible).map((block) => {
-    const common = {
-      'data-testid': `equipment-tile-block-${block.id}`,
-      'data-block-id': block.id,
-      style: blockStyle(block),
-      className: cn(
-        'relative min-h-0 min-w-0 transition-shadow',
-        editing && 'cursor-pointer outline outline-1 outline-blue-300 hover:outline-blue-500',
-        editing && selectedBlockId === block.id && 'z-10 outline-2 outline-blue-600 shadow-lg',
-      ),
-    };
-
-    if (editing) {
-      return (
-        <button
-          key={block.id}
-          {...common}
-          type="button"
-          aria-label={`Редактировать блок ${block.id}`}
-          aria-pressed={selectedBlockId === block.id}
-          onClick={() => onSelectBlock?.(block.id)}
-        >
-          <EquipmentTileBlockContent block={block} card={card} assetStorage={assetStorage} />
-        </button>
-      );
-    }
-
-    return (
-      <div key={block.id} {...common}>
-        <EquipmentTileBlockContent block={block} card={card} assetStorage={assetStorage} />
-      </div>
-    );
-  });
-
   return (
-    <article
-      data-testid="equipment-tile"
-      className="grid h-full w-full overflow-hidden shadow-sm"
-      style={{
-        minHeight: template.card.minHeight,
-        gridTemplateColumns: `repeat(12, minmax(0, 1fr))`,
-        gridAutoRows: template.card.rowHeight,
-        gap: template.card.gap,
-        padding: template.card.padding,
-        background: template.card.background,
-        borderColor: template.card.borderColor,
-        borderWidth: template.card.borderWidth,
-        borderStyle: template.card.borderWidth > 0 ? 'solid' : 'none',
-        borderRadius: template.card.borderRadius,
-      }}
-    >
-      {content}
-    </article>
+    <LayoutRenderer
+      template={template}
+      editing={editing}
+      selectedBlockId={selectedBlockId}
+      onSelectBlock={onSelectBlock}
+      renderBlockContent={(block) => (
+        <EquipmentTileBlockContent block={block as EquipmentTileBlock} card={card} assetStorage={assetStorage} />
+      )}
+    />
   );
 }
