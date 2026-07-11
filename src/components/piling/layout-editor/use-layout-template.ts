@@ -58,21 +58,16 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
   const [editing, setEditing] = useState(false);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const historyRef = useRef<TemplateHistory<T>>(createTemplateHistory(defaultTemplate));
-  // Stable refs so the load effect runs once per surface, not per render of
-  // caller-supplied closures.
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      const opts = optionsRef.current;
-      let serverTemplate = cloneLayoutTemplate(opts.defaultTemplate);
+      let serverTemplate = cloneLayoutTemplate(defaultTemplate);
       try {
         const res = await authFetch(endpoint);
         if (res.ok) {
           const body: unknown = await res.json();
-          serverTemplate = opts.validate(body) ?? serverTemplate;
+          serverTemplate = validate(body) ?? serverTemplate;
         }
       } catch {
         // network/parse failure — fall back to the default so the page still renders
@@ -80,10 +75,10 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       if (!active) return;
 
       let initial = serverTemplate;
-      const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(opts.defaultTemplate);
-      if (isServerDefault && opts.loadLocalSeed) {
-        const local = opts.loadLocalSeed();
-        if (local && JSON.stringify(local) !== JSON.stringify(opts.defaultTemplate)) {
+      const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(defaultTemplate);
+      if (isServerDefault && loadLocalSeed) {
+        const local = loadLocalSeed();
+        if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) {
           initial = local;
         }
       }
@@ -94,7 +89,7 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       setHistoryState({ canUndo: false, canRedo: false });
     })();
     return () => { active = false; };
-     
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per surface; the surface's defaultTemplate/validate/loadLocalSeed are fixed for a given surfaceId
   }, [endpoint]);
 
   const pushDraft = useCallback((next: T) => {
