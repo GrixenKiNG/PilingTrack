@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { usePilingStore } from '@/lib/store';
 import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-dashboard/kpi-widgets';
+import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';
 
 type NotificationKey = 'dailyReport' | 'equipmentDowntime' | 'safetyIncident' | 'shiftEnd';
 
@@ -56,15 +57,26 @@ export function WorkspaceSettings() {
 
 function TemplatesTab() {
   const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
+  const [surface, setSurface] = useState<'analytics' | 'main'>('analytics');
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-orange-500" />Редактирование рабочего пространства</CardTitle>
-          <CardDescription>Состав, порядок и размер плиток на дашборде аналитики.</CardDescription>
+          <CardDescription>Состав, порядок и размер плиток на дашбордах.</CardDescription>
         </CardHeader>
-        <CardContent>
-          {isAdmin ? <AnalyticsDashboardLayoutEditor /> : <p className="text-sm text-slate-500">Настройка раскладки доступна администратору.</p>}
+        <CardContent className="space-y-4">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 text-sm">
+            {([['analytics', 'Дашборд аналитики'], ['main', 'Главный дашборд']] as const).map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setSurface(id)}
+                className={surface === id ? 'rounded-md bg-white px-3 py-1.5 font-medium text-slate-900 shadow-sm' : 'px-3 py-1.5 text-slate-500 hover:text-slate-700'}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {isAdmin
+            ? (surface === 'analytics' ? <AnalyticsDashboardLayoutEditor /> : <MainDashboardLayoutEditor />)
+            : <p className="text-sm text-slate-500">Настройка раскладки доступна администратору.</p>}
         </CardContent>
       </Card>
 

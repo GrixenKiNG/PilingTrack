@@ -28,10 +28,15 @@ import {
   ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from '@/components/piling/analytics-dashboard/kpi-catalog';
+import {
+  MAIN_DASHBOARD_SURFACE_ID,
+  MAIN_DASHBOARD_WIDGET_IDS,
+  DEFAULT_MAIN_DASHBOARD_TEMPLATE,
+} from '@/components/piling/main-dashboard/kpi-catalog';
 
 export const MONITORING_EQUIPMENT_TILE_SURFACE_ID = 'monitoring-equipment-tile';
 export const EQUIPMENT_CARD_SURFACE_ID = 'equipment-card';
-export { ANALYTICS_DASHBOARD_SURFACE_ID };
+export { ANALYTICS_DASHBOARD_SURFACE_ID, MAIN_DASHBOARD_SURFACE_ID };
 
 export type LayoutSurfaceKind = 'card-blocks' | 'page-layout';
 
@@ -65,6 +70,12 @@ const LAYOUT_SURFACES: Record<string, LayoutSurfaceConfig> = {
     kind: 'page-layout',
     defaultTemplate: DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
     validate: createPageLayoutValidator(ANALYTICS_DASHBOARD_WIDGET_IDS),
+  },
+  [MAIN_DASHBOARD_SURFACE_ID]: {
+    id: MAIN_DASHBOARD_SURFACE_ID,
+    kind: 'page-layout',
+    defaultTemplate: DEFAULT_MAIN_DASHBOARD_TEMPLATE,
+    validate: createPageLayoutValidator(MAIN_DASHBOARD_WIDGET_IDS),
   },
 };
 
