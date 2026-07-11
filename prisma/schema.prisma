@@ -461,12 +461,16 @@ model ModuleLayoutTemplate {
   id        String   @id @default(cuid())
   tenantId  String
   surfaceId String
+  // '' = base layout for the whole surface (applied to every tile without its
+  // own override); a non-empty value scopes the layout to one entity (e.g. a
+  // single equipment card the admin customized).
+  entityId  String   @default("")
   template  Json
   updatedBy String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  @@unique([tenantId, surfaceId])
+  @@unique([tenantId, surfaceId, entityId])
   @@index([tenantId])
 }
 

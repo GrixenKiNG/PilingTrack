@@ -8,7 +8,7 @@
  * props. Extracted from the monitoring equipment-tile editor.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LayoutBlockLibrary, type LayoutDataBlockDef } from './layout-block-library';
 import { LayoutCanvas } from './layout-canvas';
 import { LayoutInspector } from './layout-inspector';
@@ -35,6 +35,9 @@ export function LayoutEditor({
   dataBlocks,
   visible,
   imageSupport,
+  headerControl,
+  autoOpen = false,
+  onClose,
 }: {
   title: string;
   controller: LayoutController;
@@ -43,6 +46,12 @@ export function LayoutEditor({
   /** Caller-side gate (role/unlock). When false the editor renders nothing. */
   visible: boolean;
   imageSupport?: LayoutEditorImageSupport;
+  /** Extra toolbar control (e.g. a scope switcher), independent of imageSupport. */
+  headerControl?: React.ReactNode;
+  /** Open the editor immediately on mount (parent-driven modal flow). */
+  autoOpen?: boolean;
+  /** Fired when the editor closes (after save or cancel) in autoOpen mode. */
+  onClose?: () => void;
 }) {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
@@ -50,8 +59,29 @@ export function LayoutEditor({
   const [imageError, setImageError] = useState<string | null>(null);
   const selectedBlock = controller.draft.blocks.find((block) => block.id === selectedBlockId) ?? null;
 
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpen && !openedRef.current) {
+      openedRef.current = true;
+      controller.startEditing();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once on mount in modal mode
+  }, [autoOpen]);
+  // Fire onClose only after the editor has actually been open (editing true),
+  // so the initial pre-open render doesn't immediately close it.
+  const wasEditingRef = useRef(false);
+  useEffect(() => {
+    if (controller.editing) {
+      wasEditingRef.current = true;
+      return;
+    }
+    if (wasEditingRef.current && onClose) onClose();
+  }, [controller.editing, onClose]);
+
   if (!visible) return null;
   if (!controller.editing) {
+    // In modal mode the parent controls mounting; don't show the floating entry.
+    if (autoOpen) return null;
     return (
       <button type="button" className="fixed bottom-4 right-4 z-40 min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={controller.startEditing}>
         Редактировать шаблон
@@ -118,6 +148,7 @@ export function LayoutEditor({
     <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-slate-100 text-slate-950" role="dialog" aria-label="Редактор шаблона плитки">
       <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 shadow-sm">
         <strong className="mr-auto text-sm">{title}</strong>
+        {headerControl}
         {imageSupport?.headerControl}
         <button type="button" className={toolbarButton} disabled={!controller.canUndo} onClick={controller.undo}>Отменить</button>
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>

@@ -1,12 +1,16 @@
 /**
- * Layout service: per-tenant persisted layout template for a registered
- * editable surface. Generalization of the former monitoring template-service
- * — one row per (tenant, surface) in ModuleLayoutTemplate.
+ * Layout service: per-tenant persisted layout templates for a registered
+ * editable surface. A surface has one BASE layout (entityId = '') plus
+ * optional per-entity overrides (entityId = the entity's id). A tile resolves
+ * to: its own override -> the base -> the surface's hardcoded default.
  */
 
 import { db } from '@/lib/db';
 import { cloneLayoutTemplate, type LayoutTemplate } from '@/components/piling/layout-editor/layout-template';
 import { getSurfaceConfig } from '../domain/surfaces';
+
+/** entityId value for the surface-wide base layout. */
+export const BASE_ENTITY = '';
 
 export class UnknownSurfaceError extends Error {
   constructor(surfaceId: string) {
@@ -15,15 +19,51 @@ export class UnknownSurfaceError extends Error {
   }
 }
 
-export async function getLayout(tenantId: string, surfaceId: string): Promise<LayoutTemplate> {
+export interface LayoutSet {
+  base: LayoutTemplate;
+  overrides: Record<string, LayoutTemplate>;
+}
+
+export async function getLayout(
+  tenantId: string,
+  surfaceId: string,
+  entityId: string = BASE_ENTITY,
+): Promise<LayoutTemplate> {
   if (!tenantId) throw new Error('getLayout: tenantId is required'); // fail closed
   const surface = getSurfaceConfig(surfaceId);
   if (!surface) throw new UnknownSurfaceError(surfaceId);
-  const row = await db.moduleLayoutTemplate.findUnique({
-    where: { tenantId_surfaceId: { tenantId, surfaceId } },
+
+  // Per-entity override wins when present and valid.
+  if (entityId !== BASE_ENTITY) {
+    const own = await db.moduleLayoutTemplate.findUnique({
+      where: { tenantId_surfaceId_entityId: { tenantId, surfaceId, entityId } },
+    });
+    const ownValid = own && surface.validate(own.template);
+    if (ownValid) return ownValid;
+  }
+
+  // Fall back to the base layout, then the hardcoded default.
+  const base = await db.moduleLayoutTemplate.findUnique({
+    where: { tenantId_surfaceId_entityId: { tenantId, surfaceId, entityId: BASE_ENTITY } },
   });
-  if (!row) return cloneLayoutTemplate(surface.defaultTemplate);
-  return surface.validate(row.template) ?? cloneLayoutTemplate(surface.defaultTemplate);
+  if (base) return surface.validate(base.template) ?? cloneLayoutTemplate(surface.defaultTemplate);
+  return cloneLayoutTemplate(surface.defaultTemplate);
+}
+
+export async function getLayoutSet(tenantId: string, surfaceId: string): Promise<LayoutSet> {
+  if (!tenantId) throw new Error('getLayoutSet: tenantId is required'); // fail closed
+  const surface = getSurfaceConfig(surfaceId);
+  if (!surface) throw new UnknownSurfaceError(surfaceId);
+  const rows = await db.moduleLayoutTemplate.findMany({ where: { tenantId, surfaceId } });
+  let base = cloneLayoutTemplate(surface.defaultTemplate);
+  const overrides: Record<string, LayoutTemplate> = {};
+  for (const row of rows) {
+    const valid = surface.validate(row.template);
+    if (!valid) continue;
+    if (row.entityId === BASE_ENTITY) base = valid;
+    else overrides[row.entityId] = valid;
+  }
+  return { base, overrides };
 }
 
 export async function saveLayout(
@@ -31,6 +71,7 @@ export async function saveLayout(
   surfaceId: string,
   template: unknown,
   updatedBy: string,
+  entityId: string = BASE_ENTITY,
 ): Promise<LayoutTemplate> {
   if (!tenantId) throw new Error('saveLayout: tenantId is required'); // fail closed
   const surface = getSurfaceConfig(surfaceId);
@@ -38,9 +79,25 @@ export async function saveLayout(
   const validated = surface.validate(template);
   if (!validated) throw new TypeError(`Invalid layout template for surface ${surfaceId}`);
   await db.moduleLayoutTemplate.upsert({
-    where: { tenantId_surfaceId: { tenantId, surfaceId } },
-    create: { tenantId, surfaceId, template: validated as object, updatedBy },
+    where: { tenantId_surfaceId_entityId: { tenantId, surfaceId, entityId } },
+    create: { tenantId, surfaceId, entityId, template: validated as object, updatedBy },
     update: { template: validated as object, updatedBy },
   });
   return validated;
+}
+
+/**
+ * Remove a saved layout at the given scope. Deleting a per-entity override
+ * makes that tile fall back to the base; deleting the base falls back to the
+ * hardcoded default. No-op if nothing is saved there.
+ */
+export async function deleteLayout(
+  tenantId: string,
+  surfaceId: string,
+  entityId: string = BASE_ENTITY,
+): Promise<void> {
+  if (!tenantId) throw new Error('deleteLayout: tenantId is required'); // fail closed
+  const surface = getSurfaceConfig(surfaceId);
+  if (!surface) throw new UnknownSurfaceError(surfaceId);
+  await db.moduleLayoutTemplate.deleteMany({ where: { tenantId, surfaceId, entityId } });
 }

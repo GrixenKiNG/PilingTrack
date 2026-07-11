@@ -3,7 +3,15 @@
  * persisted layout templates (shared module layout editor).
  */
 
-export { getLayout, saveLayout, UnknownSurfaceError } from './application/layout-service';
+export {
+  getLayout,
+  getLayoutSet,
+  saveLayout,
+  deleteLayout,
+  BASE_ENTITY,
+  UnknownSurfaceError,
+  type LayoutSet,
+} from './application/layout-service';
 export {
   getSurfaceConfig,
   MONITORING_EQUIPMENT_TILE_SURFACE_ID,

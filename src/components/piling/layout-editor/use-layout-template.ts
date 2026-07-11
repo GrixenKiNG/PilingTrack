@@ -41,6 +41,11 @@ export interface UseLayoutTemplateOptions<T extends LayoutTemplate> {
   surfaceId: string;
   defaultTemplate: T;
   validate: (value: unknown) => T | null;
+  /**
+   * Scope of the layout: omit / '' for the surface-wide base, or an entity id
+   * to edit that single tile's override. Changing it reloads the controller.
+   */
+  entityId?: string;
   /** One-time local seed when the server has no saved row yet (legacy migration). */
   loadLocalSeed?: () => T | null;
   /** Draft discarded without saving (cancel) — clean up draft-only resources. */
@@ -51,46 +56,48 @@ export interface UseLayoutTemplateOptions<T extends LayoutTemplate> {
 }
 
 export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTemplateOptions<T>): LayoutController<T> {
-  const { surfaceId, defaultTemplate, validate, loadLocalSeed, onDraftDiscarded, onBeforeSave, onAfterReset } = options;
-  const endpoint = `/api/layout/${surfaceId}`;
+  const { surfaceId, defaultTemplate, validate, entityId, loadLocalSeed, onDraftDiscarded, onBeforeSave, onAfterReset } = options;
+  const endpoint = entityId
+    ? `/api/layout/${surfaceId}?entityId=${encodeURIComponent(entityId)}`
+    : `/api/layout/${surfaceId}`;
   const [template, setTemplate] = useState<T>(() => cloneLayoutTemplate(defaultTemplate));
   const [draft, setDraft] = useState<T>(() => cloneLayoutTemplate(defaultTemplate));
   const [editing, setEditing] = useState(false);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const historyRef = useRef<TemplateHistory<T>>(createTemplateHistory(defaultTemplate));
 
+  const loadTemplate = useCallback(async (): Promise<T> => {
+    let serverTemplate = cloneLayoutTemplate(defaultTemplate);
+    try {
+      const res = await authFetch(endpoint);
+      if (res.ok) {
+        const body: unknown = await res.json();
+        serverTemplate = validate(body) ?? serverTemplate;
+      }
+    } catch {
+      // network/parse failure — fall back to the default so the page still renders
+    }
+    const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(defaultTemplate);
+    if (isServerDefault && loadLocalSeed) {
+      const local = loadLocalSeed();
+      if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) return local;
+    }
+    return serverTemplate;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the scope (endpoint) changes; surface config is fixed per surfaceId
+  }, [endpoint]);
+
+  const applyLoaded = useCallback((initial: T) => {
+    setTemplate(initial);
+    setDraft(initial);
+    historyRef.current = createTemplateHistory(initial);
+    setHistoryState({ canUndo: false, canRedo: false });
+  }, []);
+
   useEffect(() => {
     let active = true;
-    void (async () => {
-      let serverTemplate = cloneLayoutTemplate(defaultTemplate);
-      try {
-        const res = await authFetch(endpoint);
-        if (res.ok) {
-          const body: unknown = await res.json();
-          serverTemplate = validate(body) ?? serverTemplate;
-        }
-      } catch {
-        // network/parse failure — fall back to the default so the page still renders
-      }
-      if (!active) return;
-
-      let initial = serverTemplate;
-      const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(defaultTemplate);
-      if (isServerDefault && loadLocalSeed) {
-        const local = loadLocalSeed();
-        if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) {
-          initial = local;
-        }
-      }
-
-      setTemplate(initial);
-      setDraft(initial);
-      historyRef.current = createTemplateHistory(initial);
-      setHistoryState({ canUndo: false, canRedo: false });
-    })();
+    void loadTemplate().then((initial) => { if (active) applyLoaded(initial); });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per surface; the surface's defaultTemplate/validate/loadLocalSeed are fixed for a given surfaceId
-  }, [endpoint]);
+  }, [loadTemplate, applyLoaded]);
 
   const pushDraft = useCallback((next: T) => {
     const pushed = historyRef.current.push(next);
@@ -131,22 +138,17 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
   }, [draft, template, endpoint, onBeforeSave]);
 
   const reset = useCallback(async () => {
-    const next = cloneLayoutTemplate(defaultTemplate);
-    const res = await authFetch(endpoint, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(next),
-    });
+    // Remove the saved layout at this scope; a tile override falls back to the
+    // base, the base falls back to the hardcoded default.
+    const res = await authFetch(endpoint, { method: 'DELETE' });
     if (!res.ok) {
       toast.error(res.status === 403 ? 'Только администратор может сбросить шаблон' : 'Не удалось сбросить шаблон');
       return;
     }
-    historyRef.current = createTemplateHistory(next);
-    setTemplate(next);
-    setDraft(next);
-    setHistoryState({ canUndo: false, canRedo: false });
+    const initial = await loadTemplate();
+    applyLoaded(initial);
     onAfterReset?.();
-  }, [defaultTemplate, endpoint, onAfterReset]);
+  }, [endpoint, loadTemplate, applyLoaded, onAfterReset]);
 
   const undo = useCallback(() => {
     setDraft(historyRef.current.undo());

@@ -39,6 +39,10 @@ function stubFetch() {
       serverTemplate = body;
       return new Response(JSON.stringify(body), { status: 200 });
     }
+    if (url === '/api/layout/monitoring-equipment-tile' && method === 'DELETE') {
+      serverTemplate = DEFAULT_EQUIPMENT_TILE_TEMPLATE;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
     if (url === '/api/media' && method === 'POST') {
       return new Response(JSON.stringify({ mediaId: 'media-1', uploadUrl: 'https://s3.example/upload' }), { status: 200 });
     }
@@ -154,7 +158,8 @@ describe('EquipmentTileEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
 
     await waitFor(() => expect(screen.queryByText('Новый текст')).not.toBeInTheDocument());
-    await waitFor(() => expect(lastPut(calls)).toEqual(DEFAULT_EQUIPMENT_TILE_TEMPLATE));
+    // Reset removes the saved row (DELETE) and falls back to the default.
+    expect(calls.some((call) => call.url === '/api/layout/monitoring-equipment-tile' && call.method === 'DELETE')).toBe(true);
   });
 
   it('uploads a photo via the media API and saves its presentation settings', async () => {
