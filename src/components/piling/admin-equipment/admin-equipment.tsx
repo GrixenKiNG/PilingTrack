@@ -10,6 +10,7 @@ import { EquipmentStatsBar } from './equipment-stats-bar';
 import { EquipmentFilters, EMPTY_FILTERS, type FleetFilterState } from './equipment-filters';
 import { EquipmentViewToggle, type FleetView } from './equipment-view-toggle';
 import { EquipmentTile } from './equipment-tile';
+import { EquipmentCardGrid } from './equipment-card-grid';
 import { EquipmentTable } from './equipment-table';
 import { EquipmentDetail } from './detail/equipment-detail';
 import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
@@ -22,7 +23,16 @@ export function AdminEquipment() {
   const { create } = useEquipmentList();
 
   const [filters, setFilters] = useState<FleetFilterState>(EMPTY_FILTERS);
-  const [view, setView] = useState<FleetView>('tiles');
+  // View choice is a local UI preference, not part of the shared template.
+  const [view, setViewState] = useState<FleetView>(() => {
+    if (typeof window === 'undefined') return 'tiles';
+    const saved = localStorage.getItem('equipment-view-mode');
+    return saved === 'table' || saved === 'layout' ? saved : 'tiles';
+  });
+  const setView = (next: FleetView) => {
+    setViewState(next);
+    localStorage.setItem('equipment-view-mode', next);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [panelWidth, setPanelWidth] = useState(520);
@@ -134,6 +144,8 @@ export function AdminEquipment() {
                 <EquipmentTile key={c.id} card={c} selected={c.id === selectedId} onSelect={setSelectedId} />
               ))}
             </div>
+          ) : view === 'layout' ? (
+            <EquipmentCardGrid cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
           ) : (
             <EquipmentTable cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
           )}

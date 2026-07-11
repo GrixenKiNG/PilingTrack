@@ -11,6 +11,11 @@ import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '@/components/piling/admin-equip
 describe('layout service', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('ships a valid equipment-card default template (saveable as-is)', async () => {
+    (db.moduleLayoutTemplate.upsert as any).mockImplementation(async ({ create }: any) => ({ template: create.template }));
+    await expect(saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1')).resolves.toBeTruthy();
+  });
+
   it('returns the surface default when no row exists', async () => {
     (db.moduleLayoutTemplate.findUnique as any).mockResolvedValue(null);
     const t = await getLayout('orion', 'equipment-card');
