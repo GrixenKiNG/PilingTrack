@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { AnalyticsKpiRow } from '@/components/piling/analytics-dashboard/kpi-widgets';
 
 interface OperatorRow {
   userId: string;
@@ -208,16 +209,16 @@ export function AdminAnalytics() {
         </div>
       </div>
 
-      {fleet && <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <KpiCard label="Установок" value={String(fleet.totals.totalEquipment)} hint="из мониторинга" />
-        <KpiCard label="Объектов" value={String(sites.length)} hint="активных" />
-        <KpiCard label="Сваи" value={`${fleet.totals.pilesToday} шт`} hint="за сегодня" />
-        <KpiCard label="Метры свай" value={`${Math.round(fleet.totals.pileMetersToday)} м`} hint="за сегодня" />
-        <KpiCard label="Бурение" value={`${Math.round(fleet.totals.drillingToday)} м`} hint="за сегодня" />
-        <KpiCard label="Простой" value={`${fleet.totals.downtimeHoursToday} ч`} hint="за сегодня" />
-        <KpiCard label="Бригады" value={String(fleet.totals.crewsOnShiftToday)} hint="на смене" />
-        <KpiCard label="Операторы" value={String(fleet.totals.operatorsOnShiftToday)} hint="на смене" />
-      </div>}
+      {fleet && <AnalyticsKpiRow data={{
+        totalEquipment: fleet.totals.totalEquipment,
+        sitesCount: sites.length,
+        pilesToday: fleet.totals.pilesToday,
+        pileMetersToday: fleet.totals.pileMetersToday,
+        drillingToday: fleet.totals.drillingToday,
+        downtimeHoursToday: fleet.totals.downtimeHoursToday,
+        crewsOnShiftToday: fleet.totals.crewsOnShiftToday,
+        operatorsOnShiftToday: fleet.totals.operatorsOnShiftToday,
+      }} />}
 
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((t) => (
@@ -455,14 +456,3 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function AnalyticsReferenceDashboard() {
-  const kpis = [
-    ['Погонные метры', '12 864 м', '+18%', 'к апрелю'],
-    ['Свай забито', '642 шт.', '+12%', 'к апрелю'],
-    ['Коэф. использования', '78%', '+6 п.п.', 'к апрелю'],
-    ['Средняя глубина', '20,1 м', '-2%', 'к апрелю'],
-  ];
-  const equipment = [['BG 36H', '85%'], ['Liebherr LB 28', '76%'], ['SANY SR365R', '63%'], ['Junttan PMx22', '82%'], ['Soilmec SR-95', '41%']];
-  const sites = [['ЖК Северный берег', '4 256 м'], ['МОК City Tower', '3 124 м'], ['ТЦ Атлантика', '2 408 м'], ['Мост через р. Волга', '1 876 м'], ['Портовая набережная', '1 200 м']];
-  return <section data-testid="operations-analytics" className="space-y-4 bg-slate-50 p-4 text-slate-900 lg:p-6"><header className="flex items-center justify-between gap-3"><div><h1 className="text-xl font-bold">Аналитика</h1><p className="mt-1 text-sm text-slate-500">Операционные показатели по объектам и установкам</p></div><Button variant="outline" size="sm">Период: 01.05.2024 — 31.05.2024</Button></header><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{kpis.map(([label, value, trend, hint], i) => <Card key={label}><CardContent className="p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p><p className={`mt-1 text-xs ${i === 3 ? 'text-red-500' : 'text-emerald-600'}`}>{trend} <span className="text-slate-400">{hint}</span></p></CardContent></Card>)}</div><div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]"><Card><CardHeader><CardTitle className="text-sm">Погонные метры (динамика)</CardTitle></CardHeader><CardContent><div className="h-48 rounded-md bg-gradient-to-b from-cyan-50 to-white p-4"><svg viewBox="0 0 600 180" className="h-full w-full" aria-label="График динамики погонных метров"><polyline fill="none" stroke="#06b6d4" strokeWidth="4" points="0,148 75,132 150,138 225,105 300,112 375,76 450,68 525,32 600,18"/><polyline fill="none" stroke="#94a3b8" strokeDasharray="7 6" strokeWidth="3" points="0,158 75,145 150,130 225,118 300,103 375,91 450,74 525,57 600,45"/></svg></div></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Структура простоев</CardTitle></CardHeader><CardContent className="flex items-center gap-5"><div className="h-32 w-32 shrink-0 rounded-full" style={{ background: 'conic-gradient(#f97316 0 32%, #facc15 32% 52%, #06b6d4 52% 72%, #94a3b8 72% 100%)' }} /><div className="space-y-2 text-xs"><p>● Отсутствие материалов — 32%</p><p>● Технические работы — 20%</p><p>● Погодные условия — 13%</p><p>● Прочее — 10%</p></div></CardContent></Card></div><div className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]"><Card><CardHeader><CardTitle className="text-sm">Использование оборудования</CardTitle></CardHeader><CardContent className="space-y-4">{equipment.map(([name, value]) => <div key={name}><div className="mb-1 flex justify-between text-xs"><span>{name}</span><span>{value}</span></div><div className="h-2 rounded bg-slate-100"><div className="h-2 rounded bg-cyan-500" style={{ width: value }} /></div></div>)}</CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Топ объектов по погонным метрам</CardTitle></CardHeader><CardContent className="space-y-3">{sites.map(([name, value], index) => <div key={name} className="flex items-center justify-between border-b border-slate-100 pb-2 text-sm"><span><b className="mr-2 text-slate-400">{index + 1}</b>{name}</span><strong>{value}</strong></div>)}</CardContent></Card></div></section>;
-}

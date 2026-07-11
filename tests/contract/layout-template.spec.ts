@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => ({
 import { db } from '@/lib/db';
 import { getLayout, getLayoutSet, saveLayout, deleteLayout, UnknownSurfaceError } from '@/modules/layout';
 import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '@/components/piling/admin-equipment/equipment-card-template';
+import { ANALYTICS_KPI_WIDGET_IDS } from '@/components/piling/analytics-dashboard/kpi-catalog';
 
 const anyDb = db.moduleLayoutTemplate as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
@@ -83,6 +84,13 @@ describe('layout service', () => {
     anyDb.deleteMany.mockResolvedValue({ count: 1 });
     await deleteLayout('orion', 'equipment-card', 'eq-1');
     expect(anyDb.deleteMany.mock.calls[0][0].where).toEqual({ tenantId: 'orion', surfaceId: 'equipment-card', entityId: 'eq-1' });
+  });
+
+  it('returns the analytics-dashboard page-layout default (widget list)', async () => {
+    anyDb.findUnique.mockResolvedValue(null);
+    const t = await getLayout('orion', 'analytics-dashboard') as unknown as { widgets: { id: string }[] };
+    expect(t.widgets.length).toBe(ANALYTICS_KPI_WIDGET_IDS.length);
+    expect(t.widgets.map((w) => w.id)).toContain('kpi-drilling');
   });
 
   it('rejects unknown surfaces (registry is the allow-list)', async () => {
