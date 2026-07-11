@@ -1,56 +1,186 @@
 'use client';
 
-import { useState } from 'react';
-import { BellRing, Building2, Database, LayoutGrid, LayoutTemplate, Save, Settings2, ShieldCheck, UsersRound } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { BellRing, Building2, Database, LayoutGrid, LayoutTemplate, Save, Send, Settings2, ShieldCheck, UsersRound } from 'lucide-react';
 import { toast } from 'sonner';
+import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { usePilingStore } from '@/lib/store';
+import {
+  DEFAULT_WORKSPACE_SETTINGS,
+  NOTIFICATION_KEYS,
+  type WorkspaceSettings as WorkspaceSettingsData,
+} from '@/modules/settings/domain/settings';
 import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';
 
-type NotificationKey = 'dailyReport' | 'equipmentDowntime' | 'safetyIncident' | 'shiftEnd';
+type Tab = 'workspace' | 'roles' | 'notifications' | 'template';
 
-const notificationLabels: Record<NotificationKey, { title: string; description: string }> = {
-  dailyReport: { title: 'Ежедневные отчёты', description: 'Напоминание о незаполненных отчётах по сменам.' },
-  equipmentDowntime: { title: 'Простой оборудования', description: 'Сигнал, когда установка простаивает дольше установленного времени.' },
-  safetyIncident: { title: 'Нарушения безопасности', description: 'Уведомления о критичных замечаниях на объекте.' },
-  shiftEnd: { title: 'Окончание смены', description: 'Сводка результатов и незавершённых задач.' },
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Администратор',
+  DISPATCHER: 'Диспетчер',
+  OPERATOR: 'Оператор',
+  ASSISTANT: 'Помощник',
 };
+const ROLE_ORDER = ['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'];
 
-function Toggle({ checked, label, onClick }: { checked: boolean; label: string; onClick: () => void }) {
+function Toggle({ checked, label, disabled, onClick }: { checked: boolean; label: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <button type="button" role="switch" aria-label={label} aria-checked={checked} data-state={checked ? 'checked' : 'unchecked'} onClick={onClick}
-      className={`relative h-6 w-11 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 ${checked ? 'bg-orange-500' : 'bg-slate-200'}`}>
+    <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled} onClick={onClick}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-orange-500' : 'bg-slate-200'}`}>
       <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
     </button>
   );
 }
 
+function Field({ label, value, onChange, disabled, placeholder }: { label: string; value: string; onChange: (v: string) => void; disabled: boolean; placeholder?: string }) {
+  return (
+    <label className="block">
+      <span className="text-xs text-slate-500">{label}</span>
+      <input
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50 disabled:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+      />
+    </label>
+  );
+}
+
 export function WorkspaceSettings() {
-  const [notifications, setNotifications] = useState<Record<NotificationKey, boolean>>({ dailyReport: true, equipmentDowntime: true, safetyIncident: true, shiftEnd: false });
-  const [activeTab, setActiveTab] = useState<'workspace' | 'roles' | 'notifications' | 'template'>('workspace');
-  const toggleNotification = (key: NotificationKey) => setNotifications((current) => ({ ...current, [key]: !current[key] }));
+  const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
+  const [activeTab, setActiveTab] = useState<Tab>('workspace');
+  const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);
+  const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await authFetch('/api/settings');
+        if (res.ok && active) setSettings(await res.json());
+      } catch { /* keep defaults */ }
+    })();
+    void (async () => {
+      const counts: Record<string, number> = {};
+      let cursor: string | null = null;
+      for (let i = 0; i < 50; i++) {
+        const url: string = `/api/users?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+        const res: Response | null = await authFetch(url).catch(() => null);
+        if (!res || !res.ok) break;
+        const body: { users?: Array<{ role: string }>; nextCursor?: string | null } = await res.json();
+        for (const u of (body.users ?? [])) counts[u.role] = (counts[u.role] ?? 0) + 1;
+        cursor = body.nextCursor ?? null;
+        if (!cursor) break;
+      }
+      if (active) setRoleCounts(counts);
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const save = useCallback(async (next: WorkspaceSettingsData) => {
+    if (!isAdmin) return;
+    setSaving(true);
+    try {
+      const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+      if (!res.ok) { toast.error(res.status === 403 ? 'Только администратор может сохранять настройки' : 'Не удалось сохранить'); return; }
+      setSettings(await res.json());
+      toast.success('Настройки сохранены');
+    } finally {
+      setSaving(false);
+    }
+  }, [isAdmin]);
+
+  const setField = (patch: Partial<WorkspaceSettingsData>) => setSettings((s) => ({ ...s, ...patch }));
+  const toggleNotification = (key: string) => {
+    const next = { ...settings, notifications: { ...settings.notifications, [key]: !settings.notifications[key] } };
+    setSettings(next);
+    void save(next);
+  };
 
   return (
     <div data-testid="operations-settings" className="space-y-6 p-4 lg:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="flex items-center gap-2 text-xl font-bold text-slate-950"><Settings2 className="h-5 w-5 text-orange-500" />Настройки</h1><p className="mt-1 text-sm text-slate-500">Управление рабочим пространством, доступом и правилами уведомлений.</p></div><Button onClick={() => toast.success('Настройки рабочего пространства сохранены')}><Save className="mr-2 h-4 w-4" />Сохранить изменения</Button></header>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-950"><Settings2 className="h-5 w-5 text-orange-500" />Настройки</h1>
+          <p className="mt-1 text-sm text-slate-500">Управление рабочим пространством, доступом и правилами уведомлений.</p>
+        </div>
+        {isAdmin && activeTab === 'workspace' && (
+          <Button onClick={() => void save(settings)} disabled={saving}><Save className="mr-2 h-4 w-4" />Сохранить изменения</Button>
+        )}
+      </header>
 
-      <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-slate-200 text-sm font-medium">{([{ id: 'workspace', label: 'Рабочее пространство' }, { id: 'roles', label: 'Пользователи и роли' }, { id: 'notifications', label: 'Уведомления' }, { id: 'template', label: 'Шаблоны плиток' }] as const).map((tab) => <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-slate-950' : 'pb-3 text-slate-500'}>{tab.label}</button>)}</nav>
+      <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-slate-200 text-sm font-medium">
+        {([{ id: 'workspace', label: 'Рабочее пространство' }, { id: 'roles', label: 'Пользователи и роли' }, { id: 'notifications', label: 'Уведомления' }, { id: 'template', label: 'Шаблоны плиток' }] as const).map((tab) => (
+          <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-slate-950' : 'pb-3 text-slate-500'}>{tab.label}</button>
+        ))}
+      </nav>
 
-      {activeTab === 'template' ? <TemplatesTab /> : <>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-orange-500" />Рабочее пространство</CardTitle><CardDescription>Основные параметры компании и единиц измерения.</CardDescription></CardHeader><CardContent className="space-y-4"><SettingValue label="Название компании" value="PilingTrack Demo" /><SettingValue label="Часовой пояс" value="UTC+3 — Москва" /><SettingValue label="Единицы измерения" value="Метры, часы, рубли" /><SettingValue label="Язык интерфейса" value="Русский" /></CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><UsersRound className="h-4 w-4 text-orange-500" />Пользователи и роли</CardTitle><CardDescription>Кто управляет объектами, установками и отчётами.</CardDescription></CardHeader><CardContent className="space-y-3"><RoleRow role="Администратор" count="12 пользователей" description="Полный доступ к настройкам и справочникам." /><RoleRow role="Руководитель проекта" count="8 пользователей" description="Контроль объектов, отчётов и аналитики." /><RoleRow role="Производитель работ" count="15 пользователей" description="Смена, задачи бригад и оперативные данные." /><Button variant="outline" className="w-full justify-start" asChild><a href="/admin/users"><ShieldCheck className="mr-2 h-4 w-4" />Управление ролями</a></Button></CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-orange-500" />Уведомления</CardTitle><CardDescription>Выберите события, о которых система сообщает команде.</CardDescription></CardHeader><CardContent className="space-y-4">{(Object.keys(notificationLabels) as NotificationKey[]).map((key) => { const item = notificationLabels[key]; return <div key={key} className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-slate-800">{item.title}</p><p className="mt-0.5 text-xs leading-5 text-slate-500">{item.description}</p></div><Toggle checked={notifications[key]} label={item.title} onClick={() => toggleNotification(key)} /></div>; })}</CardContent></Card>
-      </div>
+      {activeTab === 'workspace' && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-orange-500" />Рабочее пространство</CardTitle><CardDescription>Реквизиты компании и единицы измерения.</CardDescription></CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <Field label="Название компании" value={settings.companyName} disabled={!isAdmin} placeholder="ООО «Орион»" onChange={(v) => setField({ companyName: v })} />
+              <Field label="ИНН" value={settings.inn} disabled={!isAdmin} placeholder="7802XXXXXX" onChange={(v) => setField({ inn: v })} />
+              <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} onChange={(v) => setField({ timezone: v })} />
+              <Field label="Формат даты" value={settings.dateFormat} disabled={!isAdmin} onChange={(v) => setField({ dateFormat: v })} />
+              <label className="block">
+                <span className="text-xs text-slate-500">Единицы измерения</span>
+                <select value={settings.units} disabled={!isAdmin} onChange={(e) => setField({ units: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
+                  <option value="metric">Метрическая (м, ч)</option>
+                  <option value="imperial">Имперская (ft)</option>
+                </select>
+              </label>
+              <Field label="Валюта" value={settings.currency} disabled={!isAdmin} onChange={(v) => setField({ currency: v })} />
+            </CardContent>
+          </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-orange-500" />Интеграции и резервное копирование</CardTitle><CardDescription>Состояние подключений и защита операционных данных.</CardDescription></CardHeader><CardContent className="space-y-3"><StatusRow label="API-доступ" value="Настроен" positive /><StatusRow label="1С:ERP" value="Подключено" positive /><StatusRow label="BI-экспорт" value="Настроен" positive /><Separator /><StatusRow label="Последнее резервное копирование" value="Сегодня, 02:00" /><Button variant="outline" className="w-full justify-start"><Database className="mr-2 h-4 w-4" />Создать резервную копию</Button></CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><LayoutTemplate className="h-4 w-4 text-orange-500" />Шаблон плиток установок</CardTitle><CardDescription>Единая структура карточек на экране мониторинга.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-800">Единый шаблон оборудования</p><p className="mt-1 text-xs leading-5 text-slate-500">Размер, сетка, границы блоков, текст и фото каждой установки редактируются в модуле мониторинга.</p></div><Button variant="outline" className="w-full justify-start" asChild><a href="/monitoring?design=1"><LayoutTemplate className="mr-2 h-4 w-4" />Открыть редактор шаблона</a></Button></CardContent></Card>
-      </div>
-      </>}
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-orange-500" />Интеграции и резервное копирование</CardTitle><CardDescription>Подключения и защита данных.</CardDescription></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">Telegram-бот</span><a href="/admin/telegram" className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Send className="h-3.5 w-3.5" />Настроить</a></div>
+              <p className="text-xs leading-5 text-slate-500">Резервное копирование выполняется на сервере по расписанию (off-site). Управление — на стороне инфраструктуры.</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'roles' && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UsersRound className="h-4 w-4 text-orange-500" />Пользователи и роли</CardTitle><CardDescription>Фактическое число пользователей по ролям.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            {ROLE_ORDER.map((role) => (
+              <div key={role} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 text-sm">
+                <span className="font-medium text-slate-800">{ROLE_LABELS[role] ?? role}</span>
+                <span className="text-slate-500">{roleCounts[role] ?? 0}</span>
+              </div>
+            ))}
+            <Button variant="outline" className="w-full justify-start" asChild><a href="/admin/users"><ShieldCheck className="mr-2 h-4 w-4" />Управление ролями</a></Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'notifications' && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-orange-500" />Уведомления</CardTitle><CardDescription>События, о которых система сообщает команде.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            {NOTIFICATION_KEYS.map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-slate-800">{label}</p>
+                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
+              </div>
+            ))}
+            {!isAdmin && <p className="text-xs text-slate-500">Изменение доступно администратору.</p>}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'template' && <TemplatesTab />}
     </div>
   );
 }
@@ -87,7 +217,3 @@ function TemplatesTab() {
     </div>
   );
 }
-
-function SettingValue({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-medium text-slate-800">{value}</p></div>; }
-function RoleRow({ role, count, description }: { role: string; count: string; description: string }) { return <div className="rounded-lg border border-slate-100 p-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-slate-800">{role}</p><span className="text-xs text-slate-500">{count}</span></div><p className="mt-1 text-xs text-slate-500">{description}</p></div>; }
-function StatusRow({ label, value, positive = false }: { label: string; value: string; positive?: boolean }) { return <div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">{label}</span><span className={positive ? 'font-medium text-emerald-600' : 'font-medium text-slate-800'}>{value}</span></div>; }

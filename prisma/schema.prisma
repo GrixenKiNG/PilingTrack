@@ -457,6 +457,24 @@ model ChecklistItem {
   @@index([sectionId])
 }
 
+model TenantSettings {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  companyName   String   @default("")
+  inn           String   @default("")
+  timezone      String   @default("UTC+3")
+  dateFormat    String   @default("DD.MM.YYYY")
+  units         String   @default("metric")
+  currency      String   @default("RUB")
+  // Notification preferences: { [key]: boolean }.
+  notifications Json     @default("{}")
+  updatedBy     String   @default("")
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([tenantId])
+}
+
 model ModuleLayoutTemplate {
   id        String   @id @default(cuid())
   tenantId  String
