@@ -5,9 +5,16 @@ import { normalizeDictionaryName } from './system-templates';
 
 export type DictType = 'pileGrade' | 'drillingType' | 'downtimeReason';
 export type DictFilter = 'active' | 'archived' | 'all';
-export interface UsageCount { reportCount: number; planCount: number }
+export interface UsageCount { reportCount: number; planCount: number; siteCount: number }
 export type UsageMap = Record<string, UsageCount>;
-export interface DictionaryUsage { pileGrade: UsageMap; drillingType: UsageMap; downtimeReason: UsageMap }
+export interface DictionaryUsage { pileGrade: UsageMap; drillingType: UsageMap; downtimeReason: UsageMap; siteTotals?: Record<DictType, number> }
+
+/** Distinct real sites touched by any row of one kind (for "Используются в N объектах"). */
+function distinctSites(rows: Array<Record<string, string>>, reportSite: Map<string, string>): number {
+  const sites = new Set<string>();
+  for (const row of rows) { const s = reportSite.get(row.reportId); if (s) sites.add(s); }
+  return sites.size;
+}
 
 export interface CreateDictionaryItemInput {
   name: string;
@@ -128,39 +135,56 @@ export async function createDictionaryItem(
 export async function getItemUsage(tenantId: string, type: DictType, id: string): Promise<UsageCount> {
   assertTenantId(tenantId);
   if (type === 'pileGrade') {
-    const [reports, planCount] = await Promise.all([
+    const [works, planCount] = await Promise.all([
       db.pileWork.findMany({
         where: { pileGradeId: id, report: { tenantId } },
-        select: { reportId: true },
-        distinct: ['reportId'],
+        select: { reportId: true, report: { select: { siteId: true } } },
       }),
       db.sitePilePlan.count({ where: { pileGradeId: id, site: { tenantId } } }),
     ]);
-    return { reportCount: reports.length, planCount };
+    return {
+      reportCount: new Set(works.map((w) => w.reportId)).size,
+      planCount,
+      siteCount: new Set(works.map((w) => w.report.siteId)).size,
+    };
   }
   if (type === 'drillingType') {
-    const reports = await db.leaderDrilling.findMany({
+    const rows = await db.leaderDrilling.findMany({
       where: { typeId: id, report: { tenantId } },
-      select: { reportId: true },
-      distinct: ['reportId'],
+      select: { reportId: true, report: { select: { siteId: true } } },
     });
-    return { reportCount: reports.length, planCount: 0 };
+    return {
+      reportCount: new Set(rows.map((r) => r.reportId)).size,
+      planCount: 0,
+      siteCount: new Set(rows.map((r) => r.report.siteId)).size,
+    };
   }
-  const reports = await db.reportDowntime.findMany({
+  const rows = await db.reportDowntime.findMany({
     where: { reasonId: id, report: { tenantId } },
-    select: { reportId: true },
-    distinct: ['reportId'],
+    select: { reportId: true, report: { select: { siteId: true } } },
   });
-  return { reportCount: reports.length, planCount: 0 };
+  return {
+    reportCount: new Set(rows.map((r) => r.reportId)).size,
+    planCount: 0,
+    siteCount: new Set(rows.map((r) => r.report.siteId)).size,
+  };
 }
 
-function countDistinctReports(rows: Array<Record<string, string>>, fk: string): UsageMap {
+function aggregateUsage(
+  rows: Array<Record<string, string>>,
+  fk: string,
+  reportSite: Map<string, string>,
+): UsageMap {
   const result: UsageMap = {};
+  const sites: Record<string, Set<string>> = {};
   for (const row of rows) {
     const id = row[fk];
-    if (!result[id]) result[id] = { reportCount: 0, planCount: 0 };
+    if (!result[id]) { result[id] = { reportCount: 0, planCount: 0, siteCount: 0 }; sites[id] = new Set(); }
     result[id].reportCount += 1;
+    const siteId = reportSite.get(row.reportId);
+    if (siteId) sites[id].add(siteId);
   }
+  for (const id of Object.keys(result)) result[id].siteCount = sites[id].size;
   return result;
 }
 
@@ -180,16 +204,28 @@ export async function getDictionaryUsage(tenantId: string): Promise<DictionaryUs
     db.sitePilePlan.groupBy({ by: ['pileGradeId'], where: { pileGradeId: { in: pileIds.map(({ id }) => id) } }, _count: { _all: true } }),
   ]);
 
-  const pileGrade = countDistinctReports(pileRows as Array<Record<string, string>>, 'pileGradeId');
+  // Resolve reportId → siteId once, so "objects" counts are distinct real sites (no fake data).
+  const reportIds = [...new Set([...pileRows, ...drillRows, ...downtimeRows].map((r) => (r as { reportId: string }).reportId))];
+  const reports = reportIds.length
+    ? await db.report.findMany({ where: { id: { in: reportIds }, tenantId }, select: { id: true, siteId: true } })
+    : [];
+  const reportSite = new Map(reports.map((r) => [r.id, r.siteId]));
+
+  const pileGrade = aggregateUsage(pileRows as Array<Record<string, string>>, 'pileGradeId', reportSite);
   for (const plan of planRows as Array<{ pileGradeId: string; _count: { _all: number } }>) {
-    if (!pileGrade[plan.pileGradeId]) pileGrade[plan.pileGradeId] = { reportCount: 0, planCount: 0 };
+    if (!pileGrade[plan.pileGradeId]) pileGrade[plan.pileGradeId] = { reportCount: 0, planCount: 0, siteCount: 0 };
     pileGrade[plan.pileGradeId].planCount = plan._count._all;
   }
 
   return {
     pileGrade,
-    drillingType: countDistinctReports(drillRows as Array<Record<string, string>>, 'typeId'),
-    downtimeReason: countDistinctReports(downtimeRows as Array<Record<string, string>>, 'reasonId'),
+    drillingType: aggregateUsage(drillRows as Array<Record<string, string>>, 'typeId', reportSite),
+    downtimeReason: aggregateUsage(downtimeRows as Array<Record<string, string>>, 'reasonId', reportSite),
+    siteTotals: {
+      pileGrade: distinctSites(pileRows as Array<Record<string, string>>, reportSite),
+      drillingType: distinctSites(drillRows as Array<Record<string, string>>, reportSite),
+      downtimeReason: distinctSites(downtimeRows as Array<Record<string, string>>, reportSite),
+    },
   };
 }
 
@@ -249,6 +285,25 @@ export async function setPileGradeLength(
   const updated = await db.pileGrade.update({ where: { id, tenantId }, data: { lengthMm } });
   await recordAuditEvent({
     action: 'dictionary.length_updated', scope: 'dictionaries', actorId,
+    targetId: id, tenantId, metadata: { type: 'pileGrade', before: item, after: updated },
+  });
+  return updated;
+}
+
+export async function setPileGradeSection(
+  context: DictionaryMutationContext,
+  id: string,
+  sectionOrDiameter: string | null
+) {
+  const { tenantId, actorId } = context;
+  assertTenantId(tenantId);
+  const trimmed = sectionOrDiameter?.trim() || null;
+  if (trimmed && trimmed.length > 100) throw new ServiceError('Сечение слишком длинное', 400);
+  const item = await db.pileGrade.findFirst({ where: { id, tenantId } });
+  if (!item) throw new ServiceError('Элемент не найден', 404);
+  const updated = await db.pileGrade.update({ where: { id, tenantId }, data: { sectionOrDiameter: trimmed } });
+  await recordAuditEvent({
+    action: 'dictionary.section_updated', scope: 'dictionaries', actorId,
     targetId: id, tenantId, metadata: { type: 'pileGrade', before: item, after: updated },
   });
   return updated;

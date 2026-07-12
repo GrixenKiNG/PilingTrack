@@ -9,6 +9,7 @@ const { dbMock, auditMock } = vi.hoisted(() => ({
     pileGrade: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
     drillingType: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
     downtimeReason: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
+    report: { findMany: vi.fn() },
   },
   auditMock: vi.fn(),
 }));
@@ -72,7 +73,7 @@ describe('deleteDictionaryItem (guarded hard delete)', () => {
 
   it('throws 409 when the pile grade is used in reports', async () => {
     dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', isActive: true });
-    dbMock.pileWork.findMany.mockResolvedValue([{ reportId: 'r1' }, { reportId: 'r2' }]);
+    dbMock.pileWork.findMany.mockResolvedValue([{ reportId: 'r1', report: { siteId: 's1' } }, { reportId: 'r2', report: { siteId: 's1' } }]);
     dbMock.sitePilePlan.count.mockResolvedValue(0);
 
     await expect(deleteDictionaryItem(mutation, 'pileGrade', 'g1')).rejects.toMatchObject({ status: 409 });
@@ -138,7 +139,7 @@ describe('archive/restore/rename', () => {
 
   it('rejects rename when the item is already used', async () => {
     dbMock.drillingType.findFirst.mockResolvedValue({ id: 't1', name: 'old', isActive: true });
-    dbMock.leaderDrilling.findMany.mockResolvedValue([{ reportId: 'r1' }]);
+    dbMock.leaderDrilling.findMany.mockResolvedValue([{ reportId: 'r1', report: { siteId: 's1' } }]);
 
     await expect(renameDictionaryItem(mutation, 'drillingType', 't1', 'new'))
       .rejects.toMatchObject({ status: 409 });
@@ -160,12 +161,14 @@ describe('getDictionaryUsage', () => {
     dbMock.pileGrade.findMany.mockResolvedValue([{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }]);
     dbMock.drillingType.findMany.mockResolvedValue([{ id: 't1' }]);
     dbMock.downtimeReason.findMany.mockResolvedValue([]);
+    dbMock.report.findMany.mockResolvedValue([{ id: 'r1', siteId: 's1' }, { id: 'r2', siteId: 's2' }]);
 
     const usage = await getDictionaryUsage(tenantId);
-    expect(usage.pileGrade.g1).toEqual({ reportCount: 2, planCount: 0 });
-    expect(usage.pileGrade.g2).toEqual({ reportCount: 1, planCount: 0 });
-    expect(usage.pileGrade.g3).toEqual({ reportCount: 0, planCount: 4 });
-    expect(usage.drillingType.t1).toEqual({ reportCount: 1, planCount: 0 });
+    expect(usage.pileGrade.g1).toEqual({ reportCount: 2, planCount: 0, siteCount: 2 });
+    expect(usage.pileGrade.g2).toEqual({ reportCount: 1, planCount: 0, siteCount: 1 });
+    expect(usage.pileGrade.g3).toEqual({ reportCount: 0, planCount: 4, siteCount: 0 });
+    expect(usage.drillingType.t1).toEqual({ reportCount: 1, planCount: 0, siteCount: 1 });
+    expect(usage.siteTotals).toEqual({ pileGrade: 2, drillingType: 1, downtimeReason: 0 });
   });
 });
 
