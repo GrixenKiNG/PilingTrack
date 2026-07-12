@@ -1,1 +1,1 @@
-export { getAccessibleCrews, getCrewById, listAllCrews } from './crew-query.service';
+export { getAccessibleCrews, getCrewById } from './crew-query.service';

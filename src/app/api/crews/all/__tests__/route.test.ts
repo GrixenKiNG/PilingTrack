@@ -11,7 +11,6 @@ const { requireAuthMock, cachedCrewsMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
-vi.mock('@/modules/crews', () => ({ listCrewSummaries: vi.fn() }));
 vi.mock('@/lib/cached-queries', () => ({ getCachedCrewsAll: cachedCrewsMock }));
 
 import { GET } from '../route';

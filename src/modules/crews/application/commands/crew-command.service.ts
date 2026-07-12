@@ -356,21 +356,3 @@ export async function deleteCrew(command: DeleteCrewCommand) {
 
   return { success: true, deactivated: true };
 }
-
-export async function assignCrewToSite(crewId: string, siteId: string, userId?: string) {
-  const repo = getCrewRepository();
-  const aggregate = await repo.findById(crewId);
-  if (!aggregate) throw new ServiceError('Crew not found', 404);
-
-  const fromSiteId = aggregate.getState().siteId;
-  aggregate.assignToSite(siteId, userId);
-  await repo.save(aggregate);
-
-  await recordAuditEvent({
-    action: 'crew.updated',
-    scope: 'crews',
-    actorId: userId || null,
-    targetId: crewId,
-    metadata: { before: { siteId: fromSiteId }, after: { siteId } },
-  });
-}
