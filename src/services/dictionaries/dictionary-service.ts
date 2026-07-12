@@ -69,18 +69,6 @@ async function mapDuplicate<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function listActiveDictionaries(tenantId: string) {
-  assertTenantId(tenantId);
-  const where = { tenantId, isActive: true };
-  const [pileGrades, drillingTypes, downtimeReasons] = await Promise.all([
-    db.pileGrade.findMany({ where, orderBy: { name: 'asc' } }),
-    db.drillingType.findMany({ where, orderBy: { name: 'asc' } }),
-    db.downtimeReason.findMany({ where, orderBy: { name: 'asc' } }),
-  ]);
-
-  return { pileGrades, drillingTypes, downtimeReasons };
-}
-
 export async function createDictionaryItem(
   context: DictionaryMutationContext,
   type: DictType,

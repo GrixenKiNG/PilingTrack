@@ -1,4 +1,4 @@
-import { Archive, CalendarDays, FileText, MoreHorizontal, Pencil, RotateCcw, Ruler, Trash2 } from 'lucide-react';
+import { Archive, Pencil, RotateCcw, Ruler, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -23,6 +23,7 @@ export interface RegistryItem {
 interface DictionaryTableProps {
   kind: DictionaryKind;
   title: string;
+  statusLabel: string;
   items: RegistryItem[];
   onRename: (item: RegistryItem) => void;
   onLength: (item: RegistryItem) => void;
@@ -38,11 +39,13 @@ function lengthLabel(lengthMm?: number | null): string {
 }
 
 export function DictionaryTable({
-  kind, title, items, onRename, onLength, onStatus, onDelete, onSelect, selectedId,
+  kind, title, statusLabel, items, onRename, onLength, onStatus, onDelete, onSelect, selectedId,
 }: DictionaryTableProps) {
   const isPileGrade = kind === 'pileGrade';
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const checkedAll = items.length > 0 && items.every((item) => checkedIds.includes(item.id));
+  // Selection may reference rows hidden by a newer filter/search — act only on visible ones.
+  const checkedItems = items.filter((item) => checkedIds.includes(item.id));
 
   const toggleItem = (id: string, checked: boolean) => {
     setCheckedIds((current) => checked ? [...new Set([...current, id])] : current.filter((value) => value !== id));
@@ -52,11 +55,27 @@ export function DictionaryTable({
     setCheckedIds(checked ? items.map((item) => item.id) : []);
   };
 
+  const bulkStatus = (isActive: boolean) => {
+    for (const item of checkedItems.filter((it) => it.isActive !== isActive)) onStatus(item, isActive);
+    setCheckedIds([]);
+  };
+
   return (
     <div>
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-base font-semibold text-slate-900">{title} — активные</h2>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{items.filter((item) => item.isActive).length}</span>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="text-base font-semibold text-slate-900">{title} — {statusLabel}</h2>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{items.length}</span>
+        {checkedItems.length > 0 && (
+          <div className="ml-auto flex items-center gap-2 text-xs">
+            <span className="text-slate-500">Выбрано: {checkedItems.length}</span>
+            {checkedItems.some((item) => item.isActive) && (
+              <button type="button" onClick={() => bulkStatus(false)} className="rounded-md border border-orange-300 px-2 py-1 font-medium text-orange-600 hover:bg-orange-50">Архивировать</button>
+            )}
+            {checkedItems.some((item) => !item.isActive) && (
+              <button type="button" onClick={() => bulkStatus(true)} className="rounded-md border border-slate-300 px-2 py-1 font-medium text-slate-700 hover:bg-slate-50">Восстановить</button>
+            )}
+          </div>
+        )}
       </div>
     <Card className="overflow-hidden rounded-lg">
       <div className="overflow-x-auto">

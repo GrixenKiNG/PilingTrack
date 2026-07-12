@@ -19,7 +19,7 @@ vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }
 import {
   deleteDictionaryItem,
   archiveDictionaryItem, restoreDictionaryItem, renameDictionaryItem,
-  createDictionaryItem, getDictionaryUsage, listActiveDictionaries, listDictionaries,
+  createDictionaryItem, getDictionaryUsage, listDictionaries,
 } from '../dictionary-service';
 
 const tenantId = 'tenant-a';
@@ -52,7 +52,7 @@ describe('tenant isolation', () => {
     dbMock.drillingType.findMany.mockResolvedValue([]);
     dbMock.downtimeReason.findMany.mockResolvedValue([]);
 
-    await listActiveDictionaries(tenantId);
+    await listDictionaries(tenantId, 'active');
 
     expect(dbMock.pileGrade.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { tenantId, isActive: true },

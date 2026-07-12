@@ -22,6 +22,13 @@ import {
 } from './admin-dictionaries/dictionary-form';
 
 type StatusFilter = 'active' | 'archived' | 'all';
+interface HistoryEntry {
+  id: string;
+  title: string;
+  at: string;
+  meta: string | null;
+  changes?: Array<{ label: string; before: string; after: string }>;
+}
 interface FormState { mode: 'create' | 'rename'; kind: DictionaryKind; item?: RegistryItem }
 interface LengthState { item: RegistryItem; value: string }
 
@@ -58,6 +65,7 @@ export function AdminDictionaries() {
   const [selectedItem, setSelectedItem] = useState<RegistryItem | null>(null);
   const [panelDraft, setPanelDraft] = useState<{ name: string; section: string; length: string } | null>(null);
   const [inspectorTab, setInspectorTab] = useState<'general' | 'history'>('general');
+  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [activeKind, setActiveKind] = useState<DictionaryKind>('pileGrade');
   const [panelWidth, setPanelWidth] = useState(380);
 
@@ -65,7 +73,9 @@ export function AdminDictionaries() {
     setLoading(true);
     setLoadError(false);
     try {
-      const response = await authFetch(`/api/dictionary/manage?filter=${filter}`);
+      // Always fetch everything: summary cards must show real archived counts
+      // regardless of the table's status filter (which is applied client-side).
+      const response = await authFetch('/api/dictionary/manage?filter=all');
       if (!response.ok) throw new Error('load');
       const payload = await response.json();
       setData({
@@ -84,19 +94,42 @@ export function AdminDictionaries() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, []);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- async registry load on mount/filter change
   useEffect(() => { void loadData(); }, [loadData]);
+
+  // Real change history from the audit log, loaded when the tab is opened.
+  const selectedId = selectedItem?.id;
+  useEffect(() => {
+    if (inspectorTab !== 'history' || !selectedId) return;
+    let active = true;
+    void (async () => {
+      try {
+        const response = await authFetch(`/api/audit?scope=dictionaries&targetId=${encodeURIComponent(selectedId)}&limit=20`);
+        if (!response.ok) throw new Error('audit');
+        const payload = await response.json() as { entries?: HistoryEntry[] };
+         
+        if (active) setHistory(payload.entries ?? []);
+      } catch {
+        if (active) setHistory([]);
+      }
+    })();
+    return () => { active = false; };
+  }, [inspectorTab, selectedId]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ru');
     return Object.fromEntries(KINDS.map(({ kind }) => [
       kind,
-      data[kind].filter((item) => !query || [item.name, item.code, item.sectionOrDiameter]
-        .some((value) => value?.toLocaleLowerCase('ru').includes(query))),
+      data[kind]
+        .filter((item) => filter === 'all' || (filter === 'active' ? item.isActive : !item.isActive))
+        .filter((item) => !query || [item.name, item.code, item.sectionOrDiameter]
+          .some((value) => value?.toLocaleLowerCase('ru').includes(query))),
     ])) as Record<DictionaryKind, RegistryItem[]>;
-  }, [data, search]);
+  }, [data, search, filter]);
+
+  const statusLabel = filter === 'active' ? 'активные' : filter === 'archived' ? 'архив' : 'все';
 
   const dictionarySummary = useMemo(() => KINDS.map(({ kind, summaryTitle, icon: Icon }) => ({
     kind, summaryTitle, Icon,
@@ -120,6 +153,8 @@ export function AdminDictionaries() {
   const selectItem = (item: RegistryItem | null) => {
     setSelectedItem(item);
     setPanelDraft(item ? { name: item.name, section: item.sectionOrDiameter || '', length: formatMetres(item.lengthMm) } : null);
+    setInspectorTab('general');
+    setHistory(null);
   };
 
   const panelDirty = !!(selectedItem && panelDraft && (
@@ -142,6 +177,12 @@ export function AdminDictionaries() {
       const section = panelDraft.section.trim();
       if (section !== (selectedItem.sectionOrDiameter || '')) payload.sectionOrDiameter = section || null;
       const lengthRaw = panelDraft.length.trim();
+      if (!lengthRaw && selectedItem.lengthMm != null) {
+        // Length is the single source for м.п. — clearing it would silently
+        // zero the meters KPI, so refuse explicitly instead of ignoring.
+        toast.error('Длина обязательна для марки сваи');
+        return;
+      }
       if (lengthRaw) {
         const metres = Number(lengthRaw.replace(',', '.'));
         if (!Number.isFinite(metres) || metres <= 0) { toast.error('Введите положительную длину в метрах'); return; }
@@ -222,6 +263,8 @@ export function AdminDictionaries() {
         return;
       }
       toast.success(isActive ? 'Восстановлено' : 'Архивировано');
+      // Keep the inspector in sync when the status of the selected item changed.
+      if (selectedItem?.id === item.id) selectItem({ ...selectedItem, isActive });
       await loadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Не удалось изменить статус');
@@ -307,7 +350,7 @@ export function AdminDictionaries() {
 
           <section aria-label="Сводка справочников" className="mt-4 grid gap-3 md:grid-cols-3">
             {dictionarySummary.map(({ kind, summaryTitle, Icon, active, archived, objects }) => (
-              <button key={kind} type="button" className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:shadow-sm" onClick={() => setSearch('')}>
+              <button key={kind} type="button" className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:shadow-sm" onClick={() => { setActiveKind(kind); setSearch(''); }}>
                 <div className="flex items-center gap-4"><Icon className="h-10 w-10 shrink-0 text-sky-500" /><div><p className="text-sm font-semibold text-slate-800">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-sky-600">{active}</p><p className="text-xs text-sky-600">активных</p></div><div className="border-l border-slate-200 pl-4"><p className="text-lg font-semibold text-slate-500">{archived}</p><p className="text-xs text-slate-400">архивных</p></div></div></div></div>
                 <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">Используются в {objects} объектах</p>
               </button>
@@ -319,6 +362,7 @@ export function AdminDictionaries() {
               <DictionaryTable
                 kind={kind}
                 title={title}
+                statusLabel={statusLabel}
                 items={filtered[kind]}
                 onRename={(item) => setForm({ mode: 'rename', kind, item })}
                 onLength={(item) => setLengthState({ item, value: item.lengthMm == null ? '' : String(item.lengthMm / 1000) })}
@@ -361,8 +405,29 @@ export function AdminDictionaries() {
           </label>
           </> : (selectedItem.code ? <div><span className="text-slate-500">Код</span><div className="mt-1 rounded-md border border-slate-200 bg-slate-50 p-2 font-medium text-slate-800">{selectedItem.code}</div></div> : null)}
           </div>
-          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Этот сортамент уже используется в {selectedItem.reportCount} отчётах и {selectedItem.planCount} планах.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-slate-800">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Планы</span><b>{selectedItem.planCount}</b></p><button type="button" className="text-xs font-medium text-sky-600 hover:underline">Открыть использование ↗</button></section>
-          <div className="mt-auto border-t border-slate-100 pt-5"><div className="grid grid-cols-2 gap-2"><Button className="bg-orange-500 text-white hover:bg-orange-600" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="border-orange-400 text-orange-600 hover:bg-orange-50" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-slate-500">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="py-8 text-sm text-slate-600"><p className="font-medium">История изменений</p><p className="mt-2 text-slate-500">Последнее обновление: {new Date(selectedItem.updatedAt).toLocaleDateString('ru-RU')}</p><p className="mt-1 text-slate-500">Текущий статус: {selectedItem.isActive ? 'активен' : 'архив'}</p></div>}</> : <><Search className="mx-auto mb-3 h-10 w-10 text-slate-300" /><p className="text-sm text-slate-500">Выберите запись</p><p className="mt-1 text-xs text-slate-400">Сведения откроются здесь, в этом же окне</p></>}
+          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Этот сортамент уже используется в {selectedItem.reportCount} отчётах и {selectedItem.planCount} планах.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-slate-800">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Планы</span><b>{selectedItem.planCount}</b></p></section>
+          <div className="mt-auto border-t border-slate-100 pt-5"><div className="grid grid-cols-2 gap-2"><Button className="bg-orange-500 text-white hover:bg-orange-600" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="border-orange-400 text-orange-600 hover:bg-orange-50" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-slate-500">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-slate-600">
+            {history === null ? <p className="py-6 text-center text-slate-400">Загрузка истории…</p>
+              : history.length === 0 ? <p className="py-6 text-center text-slate-400">Записей аудита по элементу нет.</p>
+              : <ul className="space-y-3">
+                  {history.map((entry) => (
+                    <li key={entry.id} className="rounded-lg border border-slate-100 p-2.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium text-slate-800">{entry.title}</span>
+                        <span className="shrink-0 text-xs text-slate-400">{entry.at}</span>
+                      </div>
+                      {entry.meta && <p className="mt-0.5 text-xs text-slate-500">{entry.meta}</p>}
+                      {entry.changes && entry.changes.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5 text-xs text-slate-500">
+                          {entry.changes.map((change, index) => (
+                            <li key={index}>{change.label}: <s className="text-slate-400">{change.before}</s> → <b className="text-slate-700">{change.after}</b></li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>}
+          </div>}</> : <><Search className="mx-auto mb-3 h-10 w-10 text-slate-300" /><p className="text-sm text-slate-500">Выберите запись</p><p className="mt-1 text-xs text-slate-400">Сведения откроются здесь, в этом же окне</p></>}
         </div>
         </div>
       </aside>
