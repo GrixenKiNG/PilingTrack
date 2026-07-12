@@ -119,3 +119,9 @@ scripts/prod-dump.sql.gz
 
 # Isolated feature worktrees
 .worktrees/
+
+# local tool/state dirs
+.mimocode/
+
+# local design prototypes (not for prod public/)
+public/prototypes/

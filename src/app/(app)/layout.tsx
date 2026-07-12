@@ -42,6 +42,7 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
     { label: 'Бригады', href: '/admin/crews' },
     { label: 'Отчёты', href: '/admin/reports' },
     { label: 'Аналитика', href: '/admin/analytics' },
+    { label: 'Настройки', href: '/admin/settings' },
     { label: 'Справочники', href: '/admin/dictionaries' },
     { label: 'Пользователи', href: '/admin/users' },
     { label: 'Telegram', href: '/admin/telegram' },
@@ -56,6 +57,7 @@ const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
     { label: 'Бригады', href: '/admin/crews' },
     { label: 'Отчёты', href: '/admin/reports' },
     { label: 'Аналитика', href: '/admin/analytics' },
+    { label: 'Настройки', href: '/admin/settings' },
     { label: 'Справочники', href: '/admin/dictionaries' },
   ],
 };
