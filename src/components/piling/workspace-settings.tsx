@@ -49,12 +49,23 @@ function Field({ label, value, onChange, disabled, placeholder }: { label: strin
   );
 }
 
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-2.5">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-medium text-slate-900">{value}</span>
+    </div>
+  );
+}
+
 export function WorkspaceSettings() {
   const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
   const [activeTab, setActiveTab] = useState<Tab>('workspace');
   const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [snapshot, setSnapshot] = useState<WorkspaceSettingsData | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -108,9 +119,6 @@ export function WorkspaceSettings() {
           <h1 className="flex items-center gap-2 text-xl font-bold text-slate-950"><Settings2 className="h-5 w-5 text-orange-500" />Настройки</h1>
           <p className="mt-1 text-sm text-slate-500">Управление рабочим пространством, доступом и правилами уведомлений.</p>
         </div>
-        {isAdmin && activeTab === 'workspace' && (
-          <Button onClick={() => void save(settings)} disabled={saving}><Save className="mr-2 h-4 w-4" />Сохранить изменения</Button>
-        )}
       </header>
 
       <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-slate-200 text-sm font-medium">
@@ -121,31 +129,99 @@ export function WorkspaceSettings() {
 
       {activeTab === 'workspace' && (
         <div className="grid gap-4 lg:grid-cols-2">
+          {/* Рабочее пространство — просмотр + Редактировать */}
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-orange-500" />Рабочее пространство</CardTitle><CardDescription>Реквизиты компании и единицы измерения.</CardDescription></CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field label="Название компании" value={settings.companyName} disabled={!isAdmin} placeholder="ООО «Орион»" onChange={(v) => setField({ companyName: v })} />
-              <Field label="ИНН" value={settings.inn} disabled={!isAdmin} placeholder="7802XXXXXX" onChange={(v) => setField({ inn: v })} />
-              <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} onChange={(v) => setField({ timezone: v })} />
-              <Field label="Формат даты" value={settings.dateFormat} disabled={!isAdmin} onChange={(v) => setField({ dateFormat: v })} />
-              <label className="block">
-                <span className="text-xs text-slate-500">Единицы измерения</span>
-                <select value={settings.units} disabled={!isAdmin} onChange={(e) => setField({ units: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
-                  <option value="metric">Метрическая (м, ч)</option>
-                  <option value="imperial">Имперская (ft)</option>
-                </select>
-              </label>
-              <Field label="Валюта" value={settings.currency} disabled={!isAdmin} onChange={(v) => setField({ currency: v })} />
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-orange-500" />Рабочее пространство</CardTitle>
+              {isAdmin && !editing && (
+                <Button variant="outline" size="sm" onClick={() => { setSnapshot(settings); setEditing(true); }}>Редактировать</Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {editing ? (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Название компании" value={settings.companyName} disabled={!isAdmin} placeholder="ООО «Орион»" onChange={(v) => setField({ companyName: v })} />
+                    <Field label="ИНН" value={settings.inn} disabled={!isAdmin} placeholder="7802XXXXXX" onChange={(v) => setField({ inn: v })} />
+                    <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} onChange={(v) => setField({ timezone: v })} />
+                    <Field label="Формат даты" value={settings.dateFormat} disabled={!isAdmin} onChange={(v) => setField({ dateFormat: v })} />
+                    <label className="block">
+                      <span className="text-xs text-slate-500">Единицы измерения</span>
+                      <select value={settings.units} disabled={!isAdmin} onChange={(e) => setField({ units: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
+                        <option value="metric">Метрическая (м, ч)</option>
+                        <option value="imperial">Имперская (ft)</option>
+                      </select>
+                    </label>
+                    <Field label="Валюта" value={settings.currency} disabled={!isAdmin} onChange={(v) => setField({ currency: v })} />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={async () => { await save(settings); setEditing(false); }} disabled={saving}><Save className="mr-2 h-4 w-4" />Сохранить</Button>
+                    <Button size="sm" variant="outline" onClick={() => { if (snapshot) setSettings(snapshot); setEditing(false); }}>Отмена</Button>
+                  </div>
+                </div>
+              ) : (
+                <dl className="divide-y divide-slate-100 text-sm">
+                  <Row label="Название компании" value={settings.companyName || '—'} />
+                  <Row label="ИНН" value={settings.inn || '—'} />
+                  <Row label="Часовой пояс" value={settings.timezone || '—'} />
+                  <Row label="Формат даты" value={settings.dateFormat || '—'} />
+                  <Row label="Единицы измерения" value={settings.units === 'imperial' ? 'Имперская (ft)' : 'Метрическая система'} />
+                  <Row label="Валюта" value={settings.currency || '—'} />
+                </dl>
+              )}
             </CardContent>
           </Card>
 
+          {/* Доступ по ролям — реальные 4 роли */}
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-orange-500" />Доступ по ролям</CardTitle>
+              <Button variant="outline" size="sm" asChild><a href="/admin/users">Управление ролями</a></Button>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-xs text-slate-500"><span>Роль</span><span>Пользователей</span></div>
+              {ROLE_ORDER.map((role) => (
+                <div key={role} className="flex items-center justify-between border-b border-slate-100 py-2.5 text-sm">
+                  <span className="text-slate-800">{ROLE_LABELS[role] ?? role}</span>
+                  <span className="font-medium text-slate-700">{roleCounts[role] ?? 0}</span>
+                </div>
+              ))}
+              <a href="/admin/users" className="mt-3 inline-block text-sm font-medium text-blue-600 hover:underline">Все роли и права доступа →</a>
+            </CardContent>
+          </Card>
+
+          {/* Уведомления */}
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-orange-500" />Уведомления</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {NOTIFICATION_KEYS.map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-slate-800">{label}</p>
+                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Интеграции и резервное копирование — честно */}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-orange-500" />Интеграции и резервное копирование</CardTitle><CardDescription>Подключения и защита данных.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">Telegram-бот</span><a href="/admin/telegram" className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Send className="h-3.5 w-3.5" />Настроить</a></div>
               <p className="text-xs leading-5 text-slate-500">Резервное копирование выполняется на сервере по расписанию (off-site). Управление — на стороне инфраструктуры.</p>
             </CardContent>
+          </Card>
+
+          {/* Шаблоны плиток — на всю ширину */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-orange-500" />Шаблоны плиток</CardTitle>
+                <CardDescription>Состав, порядок и размер плиток на дашбордах, мониторинге и в оборудовании.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setActiveTab('template')}>Открыть редактор</Button>
+            </CardHeader>
           </Card>
         </div>
       )}
