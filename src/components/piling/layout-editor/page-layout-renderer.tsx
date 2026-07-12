@@ -15,10 +15,13 @@ export interface RenderablePageWidget {
   render: (settings: Record<string, unknown>) => React.ReactNode;
 }
 
-const SIZE_STYLE: Record<WidgetSize, React.CSSProperties> = {
-  sm: { flexGrow: 1, flexBasis: 150, minWidth: 150 },
-  md: { flexGrow: 2, flexBasis: 240, minWidth: 240 },
-  lg: { flexGrow: 3, flexBasis: 340, minWidth: 340 },
+// 12-column grid: size = how many tiles share a row (sm 4/row, md 3/row,
+// lg 2/row on desktop; always 2/row on mobile). Tiles in one row are equal
+// width and height — the earlier flex-basis layout produced ragged rows.
+const SIZE_SPAN: Record<WidgetSize, string> = {
+  sm: 'lg:col-span-3',
+  md: 'lg:col-span-4',
+  lg: 'lg:col-span-6',
 };
 
 export function PageLayoutRenderer({
@@ -35,9 +38,9 @@ export function PageLayoutRenderer({
     .sort((a, b) => a.order - b.order);
 
   return (
-    <div className={className ?? 'flex flex-wrap gap-3'}>
+    <div className={className ?? 'grid grid-cols-2 gap-3 lg:grid-cols-12'}>
       {visible.map((w) => (
-        <div key={w.id} style={SIZE_STYLE[w.size]}>
+        <div key={w.id} className={`col-span-1 ${SIZE_SPAN[w.size]} min-w-0 [&>*]:h-full`}>
           {widgets[w.id].render(w.settings ?? {})}
         </div>
       ))}
