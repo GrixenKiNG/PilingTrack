@@ -23,14 +23,22 @@ import { cn } from '@/lib/utils';
 import { useAnalyticsDashboardLayout, buildAnalyticsKpiWidgets } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { PageLayoutRenderer } from '@/components/piling/layout-editor/page-layout-renderer';
 
-interface OperatorRow {
-  userId: string;
-  userName: string;
-  totalPiles: number;
-  totalDrilling: number;
-  totalDowntime: number;
-  reportCount: number;
-  days: number;
+/** Real period analytics from /api/admin/analytics/overview (computed from reports). */
+interface OverviewData {
+  period: { from: string; to: string; days: number };
+  kpi: {
+    meters: { value: number; deltaPct: number | null };
+    piles: { value: number; deltaPct: number | null };
+    drilling: { value: number; deltaPct: number | null };
+    downtimePct: { value: number | null; deltaPp: number | null };
+  };
+  daily: { date: string; meters: number }[];
+  equipmentUsage: { id: string; name: string; activeDays: number; usagePct: number }[];
+  siteRating: { id: string; name: string; meters: number; piles: number }[];
+  operators: {
+    userId: string; userName: string; workedHours: number | null;
+    meters: number; piles: number; drilling: number; downtimePct: number | null; reports: number;
+  }[];
 }
 
 interface WeeklyTrendRow {
@@ -82,14 +90,15 @@ export function AdminAnalytics() {
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState<string>('all');
 
-  // Default period: last 30 days
+  // Default period: last 7 days (deltas then read "к пред. неделе")
   const today = new Date();
   const todayIso = today.toISOString().slice(0, 10);
-  const monthAgoIso = new Date(today.getTime() - 30 * 86400000).toISOString().slice(0, 10);
-  const [dateFrom, setDateFrom] = useState(monthAgoIso);
+  const weekAgoIso = new Date(today.getTime() - 6 * 86400000).toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(weekAgoIso);
   const [dateTo, setDateTo] = useState(todayIso);
 
-  const [operatorSummary, setOperatorSummary] = useState<OperatorRow[]>([]);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [showAllOperators, setShowAllOperators] = useState(false);
   const [trendRows, setTrendRows] = useState<WeeklyTrendRow[]>([]);
   const [kpi, setKpi] = useState<FleetKpiData | null>(null);
   const [fleet, setFleet] = useState<FleetSnapshotSummary | null>(null);
@@ -115,17 +124,16 @@ export function AdminAnalytics() {
     })();
   }, []);
 
-  const loadOperators = useCallback(async () => {
+  const loadOverview = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
       if (siteId !== 'all') params.set('siteId', siteId);
-      const res = await authFetch(`/api/admin/analytics/operator-performance?${params}`);
+      const res = await authFetch(`/api/admin/analytics/overview?${params}`);
       if (res.ok) {
-        const data = await res.json();
-        setOperatorSummary(data.summary || []);
+        setOverview(await res.json() as OverviewData);
       } else {
-        toast.error('Ошибка загрузки данных операторов');
+        toast.error('Ошибка загрузки аналитики за период');
       }
     } catch { toast.error('Ошибка'); } finally { setLoading(false); }
   }, [dateFrom, dateTo, siteId]);
@@ -158,21 +166,26 @@ export function AdminAnalytics() {
     } catch { toast.error('Ошибка'); } finally { setLoading(false); }
   }, [dateFrom, dateTo]);
 
+  // Period overview feeds the KPI deltas, the overview sections and the
+  // operators tab — reload it whenever the filters change.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
-    if (tab === 'operators') void loadOperators();
-    else if (tab === 'trends') void loadTrends();
-    else void loadKpi();
-  }, [tab, loadOperators, loadTrends, loadKpi]);
+    void loadOverview();
+  }, [loadOverview]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
+    if (tab === 'trends') void loadTrends();
+    else if (tab === 'kpi') void loadKpi();
+  }, [tab, loadTrends, loadKpi]);
 
   const operatorChartData = useMemo(
-    () => operatorSummary.slice(0, 10).map((o) => ({
+    () => (overview?.operators ?? []).slice(0, 10).map((o) => ({
       name: o.userName.split(' ').slice(0, 2).join(' '),
-      Сваи: o.totalPiles,
-      Бурение: Math.round(o.totalDrilling),
-      Отчёты: o.reportCount,
+      Сваи: o.piles,
+      Бурение: Math.round(o.drilling),
     })),
-    [operatorSummary]
+    [overview]
   );
 
   const trendChartData = useMemo(() => {
@@ -196,6 +209,8 @@ export function AdminAnalytics() {
         Простои: Math.round(w.downtime),
       }));
   }, [trendRows]);
+
+  const operators = overview?.operators ?? [];
 
   const placement = (id: string) => layout.template.widgets.find((w) => w.id === id);
   const sectionVisible = (id: string) => placement(id)?.visible ?? true;
@@ -228,8 +243,63 @@ export function AdminAnalytics() {
         downtimeHoursToday: fleet.totals.downtimeHoursToday,
         crewsOnShiftToday: fleet.totals.crewsOnShiftToday,
         operatorsOnShiftToday: fleet.totals.operatorsOnShiftToday,
+        period: overview ? {
+          label: overview.period.days === 7 ? 'к пред. неделе' : 'к пред. периоду',
+          meters: overview.kpi.meters,
+          piles: overview.kpi.piles,
+          drilling: overview.kpi.drilling,
+          downtime: { value: overview.kpi.downtimePct.value, deltaPp: overview.kpi.downtimePct.deltaPp },
+        } : undefined,
       })} />}
 
+      {/* Overview: динамика метров + использование установок (real report data) */}
+      {overview && (sectionVisible('chart-dynamics') || sectionVisible('usage-equipment')) && (
+        <div className="grid gap-4 lg:grid-cols-3 items-stretch">
+          {sectionVisible('chart-dynamics') && (
+            <Card className={sectionVisible('usage-equipment') ? 'lg:col-span-2' : 'lg:col-span-3'}>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Динамика погонных метров</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={overview.daily.map((d) => ({ день: d.date.slice(8) + '.' + d.date.slice(5, 7), 'Погонные метры': d.meters }))} margin={{ top: 18, right: 16, bottom: 4, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="день" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="Погонные метры" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} label={{ position: 'top', fontSize: 10, fill: '#0369a1' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+          {sectionVisible('usage-equipment') && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Использование установок</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                {overview.equipmentUsage.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-500">Нет активных установок.</p>
+                ) : overview.equipmentUsage.map((e) => (
+                  <div key={e.id} className="flex items-center gap-2 text-xs" title={`Дней с отчётом: ${e.activeDays} из ${overview.period.days}`}>
+                    <span className="w-36 truncate text-slate-700">{e.name}</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-sky-500" style={{ width: `${e.usagePct}%` }} />
+                    </div>
+                    <span className="w-9 text-right font-medium tabular-nums text-slate-700">{e.usagePct}%</span>
+                  </div>
+                ))}
+                <p className="pt-1 text-2xs text-slate-400">Доля дней периода, когда по установке был отчёт.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-3 items-start">
+      <div className={overview && sectionVisible('rating-sites') ? 'lg:col-span-2 space-y-4' : 'lg:col-span-3 space-y-4'}>
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((t) => (
           <button
@@ -264,23 +334,19 @@ export function AdminAnalytics() {
                 ))}
               </select>
             </div>
-            {(tab === 'operators' || tab === 'kpi') && (
-              <>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">С</label>
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">По</label>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
-                </div>
-                <Button size="sm" onClick={tab === 'kpi' ? loadKpi : loadOperators} disabled={loading}>
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Применить'}
-                </Button>
-              </>
-            )}
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">С</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">По</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <Button size="sm" onClick={tab === 'kpi' ? loadKpi : loadOverview} disabled={loading}>
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Применить'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -289,7 +355,7 @@ export function AdminAnalytics() {
         <>
           {loading ? (
             <Skeleton className="h-80 w-full" />
-          ) : operatorSummary.length === 0 ? (
+          ) : (overview?.operators.length ?? 0) === 0 ? (
             <EmptyState text="За выбранный период нет данных по операторам" />
           ) : (
             <div className="space-y-4">
@@ -324,15 +390,15 @@ export function AdminAnalytics() {
                     <thead>
                       <tr className="border-b text-left text-xs text-slate-500">
                         <th className="py-2 pr-3">Оператор</th>
-                        <th className="py-2 px-3 text-right">Сваи</th>
-                        <th className="py-2 px-3 text-right">Бурение, м.п.</th>
-                        <th className="py-2 px-3 text-right">Простои, ч</th>
-                        <th className="py-2 px-3 text-right">Отчётов</th>
-                        <th className="py-2 pl-3 text-right">Дней</th>
+                        <th className="py-2 px-3 text-right">Отработано, ч</th>
+                        <th className="py-2 px-3 text-right">Погонные метры, м</th>
+                        <th className="py-2 px-3 text-right">Сваи, шт</th>
+                        <th className="py-2 px-3 text-right">Простой, %</th>
+                        <th className="py-2 pl-3 text-right">Отчётов</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {operatorSummary.map((o, i) => (
+                      {(showAllOperators ? operators : operators.slice(0, 5)).map((o, i) => (
                         <motion.tr
                           key={o.userId}
                           initial={{ opacity: 0, y: 6 }}
@@ -341,15 +407,23 @@ export function AdminAnalytics() {
                           className="border-b last:border-b-0 hover:bg-slate-50"
                         >
                           <td className="py-2 pr-3 font-medium">{o.userName}</td>
-                          <td className="py-2 px-3 text-right font-mono">{o.totalPiles}</td>
-                          <td className="py-2 px-3 text-right font-mono">{Math.round(o.totalDrilling)}</td>
-                          <td className="py-2 px-3 text-right font-mono">{Math.round(o.totalDowntime)}</td>
-                          <td className="py-2 px-3 text-right font-mono">{o.reportCount}</td>
-                          <td className="py-2 pl-3 text-right font-mono text-slate-500">{o.days}</td>
+                          <td className="py-2 px-3 text-right font-mono">{o.workedHours != null ? o.workedHours.toLocaleString('ru-RU', { maximumFractionDigits: 1 }) : '—'}</td>
+                          <td className="py-2 px-3 text-right font-mono">{Math.round(o.meters).toLocaleString('ru-RU')}</td>
+                          <td className="py-2 px-3 text-right font-mono">{o.piles}</td>
+                          <td className="py-2 px-3 text-right font-mono">{o.downtimePct != null ? `${o.downtimePct.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}` : '—'}</td>
+                          <td className="py-2 pl-3 text-right font-mono text-slate-500">{o.reports}</td>
                         </motion.tr>
                       ))}
                     </tbody>
                   </table>
+                  {operators.length > 5 && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                      <span>Показано {showAllOperators ? operators.length : 5} из {operators.length} операторов</span>
+                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="font-medium text-blue-600 hover:underline">
+                        {showAllOperators ? 'Свернуть' : 'Смотреть всех'}
+                      </button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
                 ) },
@@ -445,6 +519,44 @@ export function AdminAnalytics() {
           )}
         </>
       )}
+      </div>
+
+      {/* Right column: рейтинг объектов по погонным метрам (real report data) */}
+      {overview && sectionVisible('rating-sites') && (
+        <Card className="lg:sticky lg:top-4">
+          <CardHeader>
+            <CardTitle className="text-sm">Рейтинг объектов</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {overview.siteRating.length === 0 ? (
+              <p className="py-4 text-center text-sm text-slate-500">За период нет отчётов.</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Объект</span>
+                  <span>Погонные метры, м · Сваи, шт</span>
+                </div>
+                {overview.siteRating.map((s) => {
+                  const max = overview.siteRating[0]?.meters || 1;
+                  return (
+                    <div key={s.id}>
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="truncate font-medium text-slate-800">{s.name}</span>
+                        <span className="shrink-0 font-mono text-slate-700">{Math.round(s.meters).toLocaleString('ru-RU')} <span className="text-xs text-slate-400">· {s.piles}</span></span>
+                      </div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(4, Math.round((s.meters / max) * 100))}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <a href="/admin/reports" className="inline-block text-xs font-medium text-blue-600 hover:underline">Смотреть отчёт по объектам →</a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@
 import type { PageLayoutTemplate, WidgetSize } from '@/components/piling/layout-editor/page-layout-template';
 
 /** Where a widget renders on the analytics page. */
-export type AnalyticsZone = 'kpi' | 'operators' | 'trends' | 'maintenance';
+export type AnalyticsZone = 'kpi' | 'overview' | 'operators' | 'trends' | 'maintenance';
 
 export interface AnalyticsWidgetMeta {
   id: string;
@@ -30,6 +30,9 @@ export const ANALYTICS_DASHBOARD_WIDGETS: readonly AnalyticsWidgetMeta[] = [
   { id: 'kpi-downtime', title: 'Простой', zone: 'kpi', defaultSize: 'sm' },
   { id: 'kpi-crews', title: 'Бригады', zone: 'kpi', defaultSize: 'sm' },
   { id: 'kpi-operators', title: 'Операторы', zone: 'kpi', defaultSize: 'sm' },
+  { id: 'chart-dynamics', title: 'Динамика погонных метров', zone: 'overview', defaultSize: 'lg' },
+  { id: 'usage-equipment', title: 'Использование установок', zone: 'overview', defaultSize: 'md' },
+  { id: 'rating-sites', title: 'Рейтинг объектов', zone: 'overview', defaultSize: 'md' },
   { id: 'chart-operators', title: 'Топ-10 по сваям (график)', zone: 'operators', defaultSize: 'lg' },
   { id: 'table-operators', title: 'Сводка по операторам', zone: 'operators', defaultSize: 'lg' },
   { id: 'chart-trends', title: 'Тренд за 8 недель', zone: 'trends', defaultSize: 'lg' },

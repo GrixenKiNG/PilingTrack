@@ -32,33 +32,59 @@ export interface AnalyticsKpiData {
   downtimeHoursToday: number;
   crewsOnShiftToday: number;
   operatorsOnShiftToday: number;
+  /** Period production KPIs with real deltas (from /api/admin/analytics/overview). */
+  period?: {
+    label: string; // e.g. 'к пред. неделе'
+    meters: { value: number; deltaPct: number | null };
+    piles: { value: number; deltaPct: number | null };
+    drilling: { value: number; deltaPct: number | null };
+    downtime: { value: number | null; deltaPp: number | null };
+  };
 }
 
-function KpiTile({ label, value, hint }: { label: string; value: string; hint: string }) {
+function KpiTile({ label, value, hint, delta }: { label: string; value: string; hint: string; delta?: { text: string; good: boolean } | null }) {
   return (
     <Card className="h-full">
       <CardContent className="p-4">
         <p className="text-xs text-slate-500">{label}</p>
         <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
-        <p className="mt-1 text-xs text-slate-400">{hint}</p>
+        {delta
+          ? <p className={`mt-1 text-xs font-medium ${delta.good ? 'text-emerald-600' : 'text-red-500'}`}>{delta.text}</p>
+          : <p className="mt-1 text-xs text-slate-400">{hint}</p>}
       </CardContent>
     </Card>
   );
 }
 
+const fmtRu = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+const signed = (n: number, suffix: string) => `${n > 0 ? '+' : ''}${n.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}${suffix}`;
+
 export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, RenderablePageWidget> {
-  const tile = (id: string, title: string, value: string, hint: string): RenderablePageWidget => ({
+  const tile = (id: string, title: string, value: string, hint: string, delta?: { text: string; good: boolean } | null): RenderablePageWidget => ({
     id,
     title,
-    render: () => <KpiTile label={title} value={value} hint={hint} />,
+    render: () => <KpiTile label={title} value={value} hint={hint} delta={delta} />,
   });
+  const p = d.period;
+  const pctDelta = (deltaPct: number | null | undefined) =>
+    p && deltaPct != null ? { text: `${signed(deltaPct, '%')} ${p.label}`, good: deltaPct >= 0 } : null;
   return {
-    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'из мониторинга'),
+    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего'),
     'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных'),
-    'kpi-piles': tile('kpi-piles', 'Сваи (шт)', `${d.pilesToday} шт`, 'за сегодня'),
-    'kpi-pile-meters': tile('kpi-pile-meters', 'Метры свай', `${Math.round(d.pileMetersToday)} м`, 'за сегодня'),
-    'kpi-drilling': tile('kpi-drilling', 'Бурение', `${Math.round(d.drillingToday)} м`, 'за сегодня'),
-    'kpi-downtime': tile('kpi-downtime', 'Простой', `${d.downtimeHoursToday} ч`, 'за сегодня'),
+    'kpi-piles': tile('kpi-piles', 'Сваи (шт)',
+      p ? `${fmtRu(p.piles.value)} шт` : `${d.pilesToday} шт`,
+      p ? 'за период' : 'за сегодня', pctDelta(p?.piles.deltaPct)),
+    'kpi-pile-meters': tile('kpi-pile-meters', 'Погонные метры',
+      p ? `${fmtRu(p.meters.value)} м` : `${Math.round(d.pileMetersToday)} м`,
+      p ? 'за период' : 'за сегодня', pctDelta(p?.meters.deltaPct)),
+    'kpi-drilling': tile('kpi-drilling', 'Бурение',
+      p ? `${fmtRu(p.drilling.value)} м` : `${Math.round(d.drillingToday)} м`,
+      p ? 'за период' : 'за сегодня', pctDelta(p?.drilling.deltaPct)),
+    'kpi-downtime': tile('kpi-downtime', 'Простой',
+      p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : `${d.downtimeHoursToday} ч`,
+      p ? 'доля времени смен' : 'за сегодня',
+      // For downtime a NEGATIVE delta (less idle time) is the good direction.
+      p && p.downtime.deltaPp != null ? { text: `${signed(p.downtime.deltaPp, ' п.п.')} ${p.label}`, good: p.downtime.deltaPp <= 0 } : null),
     'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене'),
     'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене'),
   };
