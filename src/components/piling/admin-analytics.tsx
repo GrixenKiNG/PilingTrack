@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   BarChart3,
@@ -19,6 +19,7 @@ import { authFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
 import { useAnalyticsDashboardLayout, buildAnalyticsKpiWidgets } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { PageLayoutRenderer } from '@/components/piling/layout-editor/page-layout-renderer';
@@ -98,6 +99,7 @@ export function AdminAnalytics() {
   const [dateTo, setDateTo] = useState(todayIso);
 
   const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [showAllOperators, setShowAllOperators] = useState(false);
   const [trendRows, setTrendRows] = useState<WeeklyTrendRow[]>([]);
   const [kpi, setKpi] = useState<FleetKpiData | null>(null);
@@ -124,18 +126,27 @@ export function AdminAnalytics() {
     })();
   }, []);
 
+  const overviewReqRef = useRef(0);
   const loadOverview = useCallback(async () => {
+    const reqId = ++overviewReqRef.current;
     setLoading(true);
+    setOverviewError(null);
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
       if (siteId !== 'all') params.set('siteId', siteId);
       const res = await authFetch(`/api/admin/analytics/overview?${params}`);
+      // Ignore a stale response if a newer request has since been fired.
+      if (reqId !== overviewReqRef.current) return;
       if (res.ok) {
         setOverview(await res.json() as OverviewData);
       } else {
-        toast.error('Ошибка загрузки аналитики за период');
+        setOverviewError('Не удалось загрузить аналитику за период.');
       }
-    } catch { toast.error('Ошибка'); } finally { setLoading(false); }
+    } catch {
+      if (reqId === overviewReqRef.current) setOverviewError('Сеть недоступна. Проверьте соединение и повторите.');
+    } finally {
+      if (reqId === overviewReqRef.current) setLoading(false);
+    }
   }, [dateFrom, dateTo, siteId]);
 
   const loadTrends = useCallback(async () => {
@@ -211,6 +222,11 @@ export function AdminAnalytics() {
   }, [trendRows]);
 
   const operators = overview?.operators ?? [];
+  // A loaded-but-empty period: no operators, no site output, flat daily series.
+  const periodEmpty = !!overview
+    && overview.operators.length === 0
+    && overview.siteRating.length === 0
+    && overview.daily.every((d) => d.meters === 0);
 
   const placement = (id: string) => layout.template.widgets.find((w) => w.id === id);
   const sectionVisible = (id: string) => placement(id)?.visible ?? true;
@@ -252,8 +268,20 @@ export function AdminAnalytics() {
         } : undefined,
       })} />}
 
+      {/* Overview data states: error (retry) / first-load skeleton / empty period */}
+      {overviewError ? (
+        <QueryErrorBanner message={overviewError} onRetry={() => void loadOverview()} retrying={loading} />
+      ) : !overview && loading ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Skeleton className="h-64 w-full lg:col-span-2" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : periodEmpty ? (
+        <EmptyState text="За выбранный период нет отчётов. Измените период или объект в фильтрах выше." />
+      ) : null}
+
       {/* Overview: динамика метров + использование установок (real report data) */}
-      {overview && (sectionVisible('chart-dynamics') || sectionVisible('usage-equipment')) && (
+      {overview && !periodEmpty && (sectionVisible('chart-dynamics') || sectionVisible('usage-equipment')) && (
         <div className="grid gap-4 lg:grid-cols-3 items-stretch">
           {sectionVisible('chart-dynamics') && (
             <Card className={sectionVisible('usage-equipment') ? 'lg:col-span-2' : 'lg:col-span-3'}>
