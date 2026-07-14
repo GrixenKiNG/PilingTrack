@@ -36,9 +36,12 @@ const kburgPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) 
   sourceUrl: 'https://www.gruzovik.com/stroitelnaya-tehnika/svaeboynye-ustanovki/bashstroy-kburg-16-a9759783.html',
 }));
 
-const kopernikPhotos: OrionEquipmentPhoto[] = [
-  { src: '/orion/equipment/kopernik-sd20/01.jpg', alt: 'Сваебойная установка Kopernik SD-20C', credit: 'Экскаватор Ру', sourceUrl: 'https://exkavator.ru/excapedia/technic/kopernik_sd-20c' },
-];
+const kopernikPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) => ({
+  src: `/orion/equipment/kopernik-sd20/0${index + 1}.jpg`,
+  alt: `Сваебойная установка Kopernik SD-20C, ракурс ${index + 1}`,
+  credit: 'Ehkskavator.ru',
+  sourceUrl: 'https://ehkskavator.ru/item/1038754',
+}));
 
 const banutPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) => ({
   src: `/orion/equipment/banut-655/0${index + 1}.jpg`,
@@ -51,7 +54,8 @@ const bauerPhotos: OrionEquipmentPhoto[] = [
   { src: '/icons/equipment-photos/rtg-rm20.jpg', alt: 'Bauer RTG RM20 на площадке', credit: 'Geomek', sourceUrl: 'https://geomek.se/en/foundations/machines/bauer-rtg/' },
   { src: '/orion/equipment/bauer-rtg-rm20/02.jpg', alt: 'Установка Bauer RTG в работе', credit: 'Geomek', sourceUrl: 'https://geomek.se/en/foundations/machines/bauer-rtg/' },
   { src: '/orion/equipment/bauer-rtg-rm20/03.jpg', alt: 'RTG RM20, рабочий ракурс', credit: 'RTG Rammtechnik', sourceUrl: 'https://www.rtg-rammtechnik.de/de/rm-20' },
-  { src: 'https://i.ytimg.com/vi/6dRLGVUa62Q/hqdefault.jpg', alt: 'RTG RM20 в официальном видео', credit: 'RTG Rammtechnik / YouTube', sourceUrl: 'https://www.rtg-rammtechnik.de/de/rm-20' },
+  { src: '/orion/equipment/bauer-rtg-rm20/04.jpg', alt: 'RTG RM20, вид со стороны рабочего оборудования', credit: 'Equipment Corporation of America', sourceUrl: 'https://www.ecanet.com/equipment/for-sale/rtg-rm20' },
+  { src: '/orion/equipment/bauer-rtg-rm20/05.jpg', alt: 'RTG RM20, вид сзади', credit: 'Equipment Corporation of America', sourceUrl: 'https://www.ecanet.com/equipment/for-sale/rtg-rm20' },
 ];
 
 export type OrionStory = {
