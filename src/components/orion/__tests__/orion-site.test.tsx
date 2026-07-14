@@ -1,11 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../orion-site.module.css', () => ({
-  default: new Proxy({}, { get: () => 'orion-test-class' }),
+  default: new Proxy({}, {
+    get: (_target, property) => property === 'then' ? undefined : 'orion-test-class',
+  }),
 }));
 import { OrionSite } from '../orion-site';
-import { orionEquipment, orionStories } from '../orion-content';
+import { orionEquipment, orionProcessSteps, orionProofPoints, orionStories } from '../orion-content';
 
 describe('ORION public site', () => {
   it('uses the eight confirmed fleet units and no fictional project stories', () => {
@@ -20,6 +22,18 @@ describe('ORION public site', () => {
       'Bauer RTG RM20',
     ]);
     expect(orionStories).toEqual([]);
+    expect(orionProofPoints).toEqual([
+      { value: '8', label: 'единиц собственного парка' },
+      { value: 'ППР', label: 'работа по проекту' },
+      { value: 'Экипаж', label: 'аренда с оператором' },
+    ]);
+    expect(orionProcessSteps).toEqual([
+      expect.objectContaining({ number: '01', title: 'Исходные данные' }),
+      expect.objectContaining({ number: '02', title: 'Технология и ППР' }),
+      expect.objectContaining({ number: '03', title: 'Мобилизация' }),
+      expect.objectContaining({ number: '04', title: 'Производство' }),
+      expect.objectContaining({ number: '05', title: 'Документация' }),
+    ]);
     expect(orionEquipment.every(({ photoSlots }) => photoSlots === 5)).toBe(true);
     for (const equipment of orionEquipment) {
       expect(equipment.photos).toHaveLength(5);
@@ -35,5 +49,18 @@ describe('ORION public site', () => {
     }
     expect(screen.getByText(/готовим портфолио реализованных объектов/i)).toBeInTheDocument();
     expect(screen.getAllByText(/проверено фото/i)).toHaveLength(8);
+    expect(screen.getByText('единиц собственного парка')).toBeInTheDocument();
+    expect(screen.getByText('работа по проекту')).toBeInTheDocument();
+    expect(screen.getByText('аренда с оператором')).toBeInTheDocument();
+    expect(screen.getByText(/референс модели/i)).toBeInTheDocument();
+    expect(screen.queryByText('24/7')).not.toBeInTheDocument();
+
+    const submitButton = screen.getByRole('button', { name: /отправить запрос/i });
+    const form = submitButton.closest('form');
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+
+    expect(screen.queryByText(/запрос принят/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/онлайн-отправка ещё не подключена/i)).toBeInTheDocument();
   });
 });

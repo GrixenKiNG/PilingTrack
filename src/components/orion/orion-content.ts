@@ -76,6 +76,31 @@ export const orionEquipment: OrionEquipment[] = [
 
 export const orionStories: OrionStory[] = [];
 
+export type OrionProofPoint = {
+  value: string;
+  label: string;
+};
+
+export type OrionProcessStep = {
+  number: string;
+  title: string;
+  copy: string;
+};
+
+export const orionProofPoints = [
+  { value: '8', label: 'единиц собственного парка' },
+  { value: 'ППР', label: 'работа по проекту' },
+  { value: 'Экипаж', label: 'аренда с оператором' },
+] as const satisfies readonly OrionProofPoint[];
+
+export const orionProcessSteps = [
+  { number: '01', title: 'Исходные данные', copy: 'Изучаем проект, геологию, условия площадки и производственный график.' },
+  { number: '02', title: 'Технология и ППР', copy: 'Согласовываем способ производства работ, состав техники и последовательность.' },
+  { number: '03', title: 'Мобилизация', copy: 'Готовим установку, экипаж и зоны ответственности к выходу на объект.' },
+  { number: '04', title: 'Производство', copy: 'Ведём работы по согласованной технологии и производственному контролю.' },
+  { number: '05', title: 'Документация', copy: 'Фиксируем выполненные этапы и передаём предусмотренную исполнительную документацию.' },
+] as const satisfies readonly OrionProcessStep[];
+
 export const orionCapabilities = [
   ['01', 'Свайные работы', 'Подбираем технологию и технику под геологию, ППР и производственный график объекта.'],
   ['02', 'Лидерное бурение', 'Обеспечиваем точную подготовку основания в условиях сложных грунтов и плотной застройки.'],
