@@ -1,6 +1,6 @@
 'use client';
 
-import { WifiOff } from 'lucide-react';
+import { WifiOff } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 
 /**

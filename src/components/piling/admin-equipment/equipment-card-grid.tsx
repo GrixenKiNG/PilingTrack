@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil } from '@/components/piling/icons/unified-icons';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';

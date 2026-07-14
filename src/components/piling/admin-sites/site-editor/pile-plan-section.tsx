@@ -1,6 +1,6 @@
 'use client';
 
-import { HardHat, Plus, X } from 'lucide-react';
+import { HardHat, Plus, X } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

@@ -8,7 +8,7 @@
  */
 
 import { useEffect } from 'react';
-import { ArrowUp, ArrowDown, RotateCcw, Save } from 'lucide-react';
+import { ArrowUp, ArrowDown, RotateCcw, Save } from '@/components/piling/icons/unified-icons';
 import type { PageLayoutController } from './use-page-layout-template';
 import { PageLayoutRenderer, type RenderablePageWidget } from './page-layout-renderer';
 import { WIDGET_SIZES, type WidgetSize } from './page-layout-template';

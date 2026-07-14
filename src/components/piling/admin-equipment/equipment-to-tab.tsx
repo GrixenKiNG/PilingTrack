@@ -7,9 +7,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, ClipboardCheck, ExternalLink } from 'lucide-react';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PilingIcon } from '@/components/piling/icons';
 
 interface JournalRecord {
   id: string;
@@ -53,15 +53,15 @@ export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Link href="/inspections/new" className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600 no-underline">
-          <ClipboardCheck className="h-4 w-4" /> Начать осмотр / ТО
+          <PilingIcon name="inspection" size={16} tone="success" decorative className="!text-white" /> Начать осмотр / ТО
         </Link>
         <Link href="/admin/to" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-orange-600">
-          Полный журнал <ExternalLink className="h-3.5 w-3.5" />
+          Полный журнал <PilingIcon name="external" size={14} decorative />
         </Link>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        <div className="flex justify-center py-6 text-slate-400"><PilingIcon name="refresh" size={20} decorative className="animate-spin" /></div>
       ) : records.length === 0 ? (
         <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">Записей ТО по этой установке пока нет</p>
       ) : (
@@ -72,7 +72,7 @@ export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
               <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
                 <div className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-50 text-xs font-bold',
                   typeof score === 'number' ? scoreColor(score) : 'text-slate-400')}>
-                  {typeof score === 'number' ? score : (INSPECTION_TYPES.has(r.type) ? '—' : '🔧')}
+                  {typeof score === 'number' ? score : (INSPECTION_TYPES.has(r.type) ? '—' : <PilingIcon name="repair" size={18} tone="warning" decorative />)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

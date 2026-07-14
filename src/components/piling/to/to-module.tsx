@@ -24,7 +24,7 @@ import {
   SlidersHorizontal,
   Wrench,
   type LucideIcon,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';

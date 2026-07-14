@@ -1,4 +1,4 @@
-import { Archive, Pencil, RotateCcw, Ruler, Trash2 } from 'lucide-react';
+import { Archive, Pencil, RotateCcw, Ruler, Trash2 } from '@/components/piling/icons/unified-icons';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';

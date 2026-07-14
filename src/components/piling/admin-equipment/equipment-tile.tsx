@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Users, Clock, AlertTriangle, ExternalLink, Wrench, BookText, FileX } from 'lucide-react';
+import { Users, Clock, AlertTriangle, ExternalLink, Wrench, BookText, FileX } from '@/components/piling/icons/unified-icons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';

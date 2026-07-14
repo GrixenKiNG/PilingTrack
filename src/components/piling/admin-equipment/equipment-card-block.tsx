@@ -9,7 +9,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { BookText, ExternalLink, Wrench } from 'lucide-react';
+import { BookText, ExternalLink, Wrench } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 import type { LayoutBlock } from '@/components/piling/layout-editor/layout-template';
 import { EquipmentTileBlockContent } from '@/components/piling/monitoring/equipment-tile-block';

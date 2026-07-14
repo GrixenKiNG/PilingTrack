@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { AlertTriangle, MapPin, Timer, User, Wrench } from 'lucide-react';
+import { AlertTriangle, MapPin, Timer, User, Wrench } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';

@@ -1,7 +1,6 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Drill, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { formatNumber } from '@/lib/format';
 import type { DrillingTypeDTO } from '@/lib/types';
+import { PilingIcon } from '@/components/piling/icons';
 
 interface DrillingSectionProps {
   drillings: { id: string; picketId: string; typeId: string; count: number; metersPerUnit: number; meters: number }[];
@@ -43,7 +43,7 @@ export function DrillingSection({
       <Card>
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2"><Drill className="w-4 h-4 text-blue-500" />Лидерное бурение</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2"><PilingIcon name="drilling-auger" size={18} tone="info" decorative />Лидерное бурение</CardTitle>
             {totalMeters > 0 && (
               <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formatNumber(totalMeters)} м</span>
             )}
@@ -60,7 +60,7 @@ export function DrillingSection({
                 min="1" className="h-11 font-mono" />
               <Input type="number" step="0.1" placeholder="Метры на 1 шт." value={tempMetersPerUnit} onChange={(e) => onTempMetersPerUnitChange(e.target.value)}
                 min="0.1" className="h-11 font-mono" />
-              <Button onClick={onAdd} className="h-11 bg-blue-500 hover:bg-blue-600 text-white px-4"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={onAdd} className="h-11 bg-blue-500 hover:bg-blue-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
             </div>
             {(tempCount || tempMetersPerUnit) && (
               <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
@@ -84,7 +84,7 @@ export function DrillingSection({
                     </span>
                     <button onClick={() => onRemove(drill.id)}
                       className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-4 h-4" />
+                      <PilingIcon name="delete" size={16} tone="danger" decorative />
                     </button>
                   </div>
                 </div>

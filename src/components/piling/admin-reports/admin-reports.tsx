@@ -21,7 +21,7 @@ import {
   UserRound,
   Wrench,
   X,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';

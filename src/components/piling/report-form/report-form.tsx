@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from '@/components/piling/icons/unified-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useReportForm } from './use-report-form';
 import { ShiftInfo } from './shift-info';
@@ -76,6 +76,15 @@ export function ReportForm() {
 
   const router = useRouter();
   const temp = useTempState();
+
+  useEffect(() => {
+    if (loading || !window.location.hash) return;
+    const targetId = window.location.hash.slice(1);
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading]);
 
   // Computed
   const totalPiles = piles.reduce((s, p) => s + p.count, 0);
@@ -172,11 +181,13 @@ export function ReportForm() {
       {/* Form */}
       <div className="flex-1 overflow-y-auto pb-24">
         <div className="p-4 space-y-4">
-          <ShiftInfo date={date} onDateChange={setDate} shiftStart={shiftStart} onShiftStartChange={setShiftStart}
-            shiftEnd={shiftEnd} onShiftEndChange={setShiftEnd}
-            sites={sites} selectedSiteId={selectedSiteId} onSiteChange={handleSiteChange}
-            equipment={equipment} selectedEquipmentId={selectedEquipmentId} onEquipmentChange={setSelectedEquipmentId}
-            engineHours={engineHours} onEngineHoursChange={setEngineHours} />
+          <div id="inspection" className="scroll-mt-24">
+            <ShiftInfo date={date} onDateChange={setDate} shiftStart={shiftStart} onShiftStartChange={setShiftStart}
+              shiftEnd={shiftEnd} onShiftEndChange={setShiftEnd}
+              sites={sites} selectedSiteId={selectedSiteId} onSiteChange={handleSiteChange}
+              equipment={equipment} selectedEquipmentId={selectedEquipmentId} onEquipmentChange={setSelectedEquipmentId}
+              engineHours={engineHours} onEngineHoursChange={setEngineHours} />
+          </div>
 
           {selectedSiteId && siteTree && siteTree.fields.length > 0 && (
             <CascadingSelect siteTree={siteTree} selectedFieldId={selectedFieldId} selectedClusterId={selectedClusterId}
@@ -198,18 +209,22 @@ export function ReportForm() {
             onRemove={removeDrilling} getDrillTypeName={getDrillTypeName} getPicketPath={getPicketPath}
             totalMeters={totalMeters} />
 
-          <DowntimeSection downtimes={downtimes} downtimeReasons={downtimeReasons} show={showDowntime} onToggle={() => setShowDowntime(!showDowntime)}
-            tempReason={temp.tempDowntimeReason} tempDuration={temp.tempDowntimeDuration} tempComment={temp.tempDowntimeComment}
-            onTempReasonChange={temp.setTempDowntimeReason} onTempDurationChange={temp.setTempDowntimeDuration}
-            onTempCommentChange={temp.setTempDowntimeComment} onAdd={() => temp.addDowntime(addDowntime)}
-            onRemove={removeDowntime} getDowntimeReasonName={getDowntimeReasonName} totalDowntime={totalDowntime} />
+          <div id="defect" className="scroll-mt-24">
+            <DowntimeSection downtimes={downtimes} downtimeReasons={downtimeReasons} show={showDowntime} onToggle={() => setShowDowntime(!showDowntime)}
+              tempReason={temp.tempDowntimeReason} tempDuration={temp.tempDowntimeDuration} tempComment={temp.tempDowntimeComment}
+              onTempReasonChange={temp.setTempDowntimeReason} onTempDurationChange={temp.setTempDowntimeDuration}
+              onTempCommentChange={temp.setTempDowntimeComment} onAdd={() => temp.addDowntime(addDowntime)}
+              onRemove={removeDowntime} getDowntimeReasonName={getDowntimeReasonName} totalDowntime={totalDowntime} />
+          </div>
 
-          <PhotoSection reportId={reportId} canEdit />
+          <div id="photo" className="scroll-mt-24"><PhotoSection reportId={reportId} canEdit /></div>
 
-          <SubmitBar totalPiles={totalPiles} totalPileMeters={totalPileMeters}
-            totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
-            totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
-            selectedSiteId={selectedSiteId} hasEntries={hasEntries} submitting={submitting} onSubmit={submitWithPending} />
+          <div id="submit" className="scroll-mt-24">
+            <SubmitBar totalPiles={totalPiles} totalPileMeters={totalPileMeters}
+              totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
+              totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
+              selectedSiteId={selectedSiteId} hasEntries={hasEntries} submitting={submitting} onSubmit={submitWithPending} />
+          </div>
         </div>
       </div>
     </div>

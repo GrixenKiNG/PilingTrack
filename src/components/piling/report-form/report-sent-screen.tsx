@@ -1,7 +1,7 @@
 'use client';
 
-import { CheckCircle2 } from 'lucide-react';
 import { formatNumber } from '@/lib/format';
+import { IconTile } from '@/components/piling/icons';
 
 interface ReportSentScreenProps {
   siteName: string;
@@ -29,9 +29,9 @@ export function ReportSentScreen({
     <div className="flex flex-col min-h-screen bg-slate-50">
       <div className="flex-1 overflow-y-auto px-4 pt-12 pb-28">
         <div className="flex flex-col items-center text-center">
-          <CheckCircle2 className="w-20 h-20 text-green-500" strokeWidth={1.5} />
+          <IconTile icon="handoff" label="Передано диспетчеру" tone="success" size={64} className="h-20 w-20" />
           <h1 className="mt-4 text-2xl font-bold text-slate-900">Отчёт отправлен!</h1>
-          <p className="mt-1 text-sm text-slate-500">Сменный отчёт сохранён в {time}</p>
+          <p className="mt-1 text-sm text-slate-500">Передано диспетчеру · сохранено в {time}</p>
         </div>
 
         <div className="mt-8 mx-auto w-full max-w-sm rounded-xl bg-white border shadow-sm divide-y">

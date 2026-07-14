@@ -5,7 +5,7 @@ import {
   Plus,
   Trash2,
   FolderTree,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import type { SiteFullData } from './types';
 
 interface HierarchyTreeProps {

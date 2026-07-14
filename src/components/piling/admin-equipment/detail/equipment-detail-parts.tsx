@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from '@/components/piling/icons/unified-icons';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';

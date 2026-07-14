@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Gauge, HardHat, Drill, Clock, Fuel, Wrench, Printer, ArrowUpDown,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';

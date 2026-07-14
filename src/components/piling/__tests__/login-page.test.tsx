@@ -30,7 +30,8 @@ vi.mock('next/image', () => ({
   default: ({ alt, ...props }: any) => <img alt={alt} {...props} />,
 }));
 
-vi.mock('lucide-react', () => ({
+vi.mock('lucide-react', async (importActual) => ({
+  ...(await importActual<typeof import('lucide-react')>()),
   HardHat: () => <div data-testid="hardhat-icon" />,
   Mail: () => <div data-testid="mail-icon" />,
   Lock: () => <div data-testid="lock-icon" />,

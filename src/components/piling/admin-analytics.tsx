@@ -9,7 +9,7 @@ import {
   HardHat,
   Loader2,
   Wrench,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,

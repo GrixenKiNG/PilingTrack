@@ -125,3 +125,7 @@ scripts/prod-dump.sql.gz
 
 # local design prototypes (not for prod public/)
 public/prototypes/
+
+# root design-scratch mockups (not shipped)
+/design-vision.html
+/pilingtrack-*.html

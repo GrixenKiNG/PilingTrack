@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { PageLayoutEditor } from '@/components/piling/layout-editor/page-layout-editor';
 import { usePageLayoutTemplate, type PageLayoutController } from '@/components/piling/layout-editor/use-page-layout-template';
 import { createPageLayoutValidator } from '@/components/piling/layout-editor/page-layout-template';
@@ -42,15 +43,20 @@ export interface AnalyticsKpiData {
   };
 }
 
-function KpiTile({ label, value, hint, delta }: { label: string; value: string; hint: string; delta?: { text: string; good: boolean } | null }) {
+const ANALYTICS_KPI_ICONS: Record<string, PilingIconName> = { 'kpi-equipment': 'equipment-rig', 'kpi-sites': 'site', 'kpi-piles': 'pile-group', 'kpi-pile-meters': 'linear-meters', 'kpi-drilling': 'drilling-auger', 'kpi-downtime': 'downtime', 'kpi-crews': 'crew', 'kpi-operators': 'operator' };
+
+function KpiTile({ id, label, value, hint, delta }: { id: string; label: string; value: string; hint: string; delta?: { text: string; good: boolean } | null }) {
   return (
     <Card className="h-full">
-      <CardContent className="p-4">
+      <CardContent className="flex min-h-28 items-center gap-4 p-4">
+        <PilingIcon name={ANALYTICS_KPI_ICONS[id] ?? 'analytics'} size={44} decorative />
+        <div className="min-w-0">
         <p className="text-xs text-slate-500">{label}</p>
         <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
         {delta
           ? <p className={`mt-1 text-xs font-medium ${delta.good ? 'text-emerald-600' : 'text-red-500'}`}>{delta.text}</p>
           : <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+        </div>
       </CardContent>
     </Card>
   );
@@ -63,7 +69,7 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
   const tile = (id: string, title: string, value: string, hint: string, delta?: { text: string; good: boolean } | null): RenderablePageWidget => ({
     id,
     title,
-    render: () => <KpiTile label={title} value={value} hint={hint} delta={delta} />,
+    render: () => <KpiTile id={id} label={title} value={value} hint={hint} delta={delta} />,
   });
   const p = d.period;
   const pctDelta = (deltaPct: number | null | undefined) =>

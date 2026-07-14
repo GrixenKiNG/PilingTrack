@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, AlertTriangle, Loader2 } from 'lucide-react';
+import { Send, AlertTriangle, Loader2 } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
 import { Card, CardContent } from '@/components/ui/card';

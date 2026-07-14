@@ -1,23 +1,32 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, MapPin, Plus, FileText, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
+
+const OPERATOR_ACTIONS: { label: string; icon: PilingIconName; target: string }[] = [
+  { label: 'Осмотр', icon: 'inspection', target: 'inspection' },
+  { label: 'Моточасы', icon: 'engine-hours', target: 'engine-hours' },
+  { label: 'Дефект', icon: 'defect', target: 'defect' },
+  { label: 'Фото', icon: 'camera', target: 'photo' },
+  { label: 'Отправить', icon: 'send', target: 'submit' },
+];
+
+const SHIFT_STEPS = ['Осмотр', 'Моточасы', 'Дефект', 'Передано диспетчеру'];
 
 export function OperatorDashboard() {
   const user = usePilingStore((s) => s.currentUser);
   const router = useRouter();
   const selectedSiteId = usePilingStore((s) => s.selectedSiteId);
   const setSelectedSite = usePilingStore((s) => s.setSelectedSite);
-
   const [sites, setSites] = useState<SiteFlatDTO[]>([]);
   const [reports, setReports] = useState<ReportListItemDTO[]>([]);
   const [todayReport, setTodayReport] = useState<ReportListItemDTO | null>(null);
@@ -25,7 +34,7 @@ export function OperatorDashboard() {
   const [today, setToday] = useState('');
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync local date after hydration
     setToday(getTodayInTimezone());
   }, []);
 
@@ -37,23 +46,20 @@ export function OperatorDashboard() {
         authFetch(`/api/sites?userId=${user.id}`),
         authFetch(`/api/reports/my?userId=${user.id}`),
       ]);
-
       if (sitesRes.ok) {
         const sitesData = await sitesRes.json();
         const accessibleSites = sitesData.data || sitesData.sites || [];
         setSites(accessibleSites);
-        if (accessibleSites.length === 0) {
-          setSelectedSite(null);
-        } else if (!selectedSiteId || !accessibleSites.some((site: SiteFlatDTO) => site.id === selectedSiteId)) {
+        if (accessibleSites.length === 0) setSelectedSite(null);
+        else if (!selectedSiteId || !accessibleSites.some((site: SiteFlatDTO) => site.id === selectedSiteId)) {
           setSelectedSite(accessibleSites[0].id);
         }
       }
-
       if (reportsRes.ok) {
         const reportsData = await reportsRes.json();
         const items = reportsData.data || reportsData.reports || [];
         setReports(items);
-        setTodayReport(items.find((r: ReportListItemDTO) => r.date === today) || null);
+        setTodayReport(items.find((report: ReportListItemDTO) => report.date === today) || null);
       }
     } catch {
       toast.error('Ошибка загрузки данных');
@@ -63,153 +69,124 @@ export function OperatorDashboard() {
   }, [selectedSiteId, setSelectedSite, today, user]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch dashboard data on dependency change
     void loadData();
   }, [loadData]);
 
-  const currentSite = sites.find((s) => s.id === selectedSiteId);
-  const active = !!todayReport;
-  const noSite = sites.length === 0;
-  const siteNotSelected = !noSite && !currentSite;
-  const ctaDisabled = noSite || siteNotSelected;
-
   if (loading) {
     return (
-      <div className="p-4 space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-[320px] w-full rounded-2xl" />
-        <Skeleton className="h-12 w-full" />
+      <div className="mx-auto max-w-xl space-y-4 p-4">
+        <Skeleton className="h-12 w-48" />
+        <Skeleton className="h-52 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
 
+  const currentSite = sites.find((site) => site.id === selectedSiteId);
+  const noSite = sites.length === 0;
+  const ctaDisabled = noSite || !currentSite;
+  const active = Boolean(todayReport);
+  const submitted = todayReport?.status === 'submitted';
   const displayName = user?.name?.trim() || 'Оператор';
+  const openReport = (target?: string) => router.push(target ? `/report#${target}` : '/report');
 
   return (
-    <div className="p-4 pb-24 space-y-6">
+    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-slate-500">Здравствуйте,</p>
-          <h1 className="text-lg font-semibold text-slate-900">{displayName}</h1>
+          <p className="text-xl font-bold text-slate-900">Оператор</p>
+          <p className="text-sm text-slate-500">{displayName}</p>
         </div>
-        {reports.length > 0 && (
-          <button
-            onClick={() => router.push('/history')}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
-          >
-            <History className="w-3.5 h-3.5" />
-            История
-            <ChevronRight className="w-3 h-3" />
-          </button>
-        )}
+        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white">
+          <PilingIcon name="operator" size={34} decorative />
+        </div>
       </header>
 
-      {/* HERO CTA — dominant action */}
       <motion.button
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        onClick={() => router.push('/report')}
+        type="button"
+        onClick={() => openReport()}
         disabled={ctaDisabled}
-        aria-label={
-          noSite ? 'Нет назначенных объектов' :
-          siteNotSelected ? 'Выберите объект' :
-          active ? 'Редактировать отчёт за сегодня' : 'Начать смену'
-        }
-        className={`relative w-full min-h-[320px] rounded-2xl p-6 text-left transition-all active:scale-[0.99] disabled:cursor-not-allowed overflow-hidden ${
-          ctaDisabled
-            ? 'bg-gradient-to-br from-slate-400 to-slate-500 text-white shadow-md'
-            : active
-            ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
-            : 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30'
-        }`}
+        className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-orange-500 bg-white px-6 py-5 text-center shadow-sm transition hover:bg-orange-50/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-slate-300 disabled:opacity-60"
       >
-        <div className="absolute top-4 right-4 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider bg-white/20 backdrop-blur px-2.5 py-1 rounded-full">
-          <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-200 animate-pulse' : 'bg-white/80'}`} />
-          {noSite ? 'Нет объекта' : siteNotSelected ? 'Выберите объект' : active ? 'Смена идёт' : 'Начать смену'}
-        </div>
-
-        <div className="flex flex-col justify-between h-full min-h-[272px]">
-          <div>
-            <p className="text-sm font-medium text-white/80">Отчёт за сегодня</p>
-            <div className="mt-2 flex items-baseline gap-2">
-              {todayReport ? (
-                <>
-                  <span className="text-7xl font-bold font-mono tabular-nums leading-none">
-                    {todayReport.totalPiles}
-                  </span>
-                  <span className="text-lg text-white/80">свай</span>
-                </>
-              ) : (
-                <span className="text-4xl font-bold">Новая смена</span>
-              )}
-            </div>
-            {todayReport && (
-              <p className="mt-2 text-sm text-white/80 font-mono">
-                + {todayReport.totalDrilling} м бурения
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 text-base font-semibold mt-6">
-            {active ? <FileText className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-            <span>
-              {noSite ? 'Нет назначенных объектов' :
-               siteNotSelected ? 'Выберите объект ниже' :
-               active ? 'Редактировать' : 'Создать отчёт'}
-            </span>
-            {!ctaDisabled && <ChevronRight className="w-5 h-5 ml-auto" />}
-          </div>
-        </div>
+        <PilingIcon name={active ? 'reports' : 'shift-start'} size={126} decorative />
+        <span className="mt-1 text-xl font-semibold text-slate-900">
+          {active ? 'Редактировать отчёт' : 'Начало смены'}
+        </span>
+        <span className="mt-1 text-xs text-slate-500">
+          {currentSite?.name || 'Нет назначенного объекта'}
+        </span>
       </motion.button>
 
-      {/* Secondary: site selector */}
+      <section aria-label="Действия смены" className="grid grid-cols-6 gap-3">
+        {OPERATOR_ACTIONS.map((action, index) => (
+          <button
+            key={action.label}
+            type="button"
+            onClick={() => openReport(action.target)}
+            disabled={ctaDisabled}
+            className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
+          >
+            <PilingIcon name={action.icon} size={82} decorative />
+            <span className="mt-1 text-base font-semibold text-slate-800">{action.label}</span>
+          </button>
+        ))}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white px-3 py-4" aria-label="Статус передачи смены">
+        <div className="grid grid-cols-4 gap-1">
+          {SHIFT_STEPS.map((step, index) => {
+            const complete = submitted && index === SHIFT_STEPS.length - 1;
+            return (
+              <div key={step} className="relative flex flex-col items-center text-center">
+                {index > 0 && <span className={`absolute right-1/2 top-2 h-px w-full ${complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />}
+                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${complete ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-white'}`} />
+                <span className="mt-2 text-3xs leading-tight text-slate-600 sm:text-xs">{step}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-          <MapPin className="w-3.5 h-3.5" />
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+          <PilingIcon name="site" size={24} decorative />
           Объект
         </label>
         {sites.length > 0 ? (
           <Select value={selectedSiteId || ''} onValueChange={setSelectedSite}>
-            <SelectTrigger className="w-full h-12">
-              <SelectValue placeholder="Выберите объект" />
-            </SelectTrigger>
+            <SelectTrigger className="h-12 w-full bg-white"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
             <SelectContent>
-              {sites.map((site) => (
-                <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
-              ))}
+              {sites.map((site) => <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>)}
             </SelectContent>
           </Select>
         ) : (
-          <div className="h-12 rounded-md border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-sm text-slate-400">
+          <div className="flex h-12 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-sm text-slate-400">
             Нет назначенных объектов
           </div>
         )}
       </div>
 
       {reports.length > 0 && (
-        <section className="border-t border-slate-200 pt-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-            Последние отчёты
-          </h2>
+        <section className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Последние отчёты</h2>
+            <button type="button" onClick={() => router.push('/history')} className="text-xs font-medium text-blue-700">История</button>
+          </div>
           <ul className="divide-y divide-slate-100">
-            {reports.slice(0, 3).map((r) => (
-              <li key={r.id}>
-                <button
-                  onClick={() => router.push(`/history?reportId=${r.id}`)}
-                  className="w-full flex items-center justify-between py-3 text-left hover:bg-slate-50 rounded-md px-2 -mx-2 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{r.siteName}</p>
-                    <p className="text-xs text-slate-500 font-mono">
-                      {new Date(r.date).toLocaleDateString('ru-RU')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600 font-mono tabular-nums whitespace-nowrap">
-                    <span>{r.totalPiles} св.</span>
-                    <span className="text-slate-300">·</span>
-                    <span>{r.totalDrilling} м</span>
-                    <ChevronRight className="w-4 h-4 text-slate-400 ml-1" />
-                  </div>
+            {reports.slice(0, 3).map((report) => (
+              <li key={report.id}>
+                <button type="button" onClick={() => router.push(`/history?reportId=${report.id}`)} className="flex w-full items-center justify-between py-3 text-left">
+                  <span>
+                    <span className="block text-sm font-medium text-slate-900">{report.siteName}</span>
+                    <span className="block text-xs text-slate-500">{new Date(report.date).toLocaleDateString('ru-RU')}</span>
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-slate-600">
+                    {report.totalPiles} св. · {report.totalDrilling} м
+                    <PilingIcon name="external" size={16} decorative />
+                  </span>
                 </button>
               </li>
             ))}

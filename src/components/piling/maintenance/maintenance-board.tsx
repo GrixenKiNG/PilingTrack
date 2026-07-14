@@ -23,7 +23,7 @@ import {
   Truck,
   Wrench,
   type LucideIcon,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate, formatPersonName } from '@/lib/format';

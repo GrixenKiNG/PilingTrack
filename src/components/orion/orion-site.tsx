@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowDownRight, FileText, Menu, X } from 'lucide-react';
+import { ArrowDownRight, FileText, Menu, X } from '@/components/piling/icons/unified-icons';
 import { orionCapabilities, orionProcessSteps, orionStories } from './orion-content';
 import { OrionContact } from './orion-contact';
 import { OrionFleet } from './orion-fleet';

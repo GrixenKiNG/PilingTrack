@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 

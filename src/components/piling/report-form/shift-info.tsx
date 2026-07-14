@@ -1,6 +1,5 @@
 'use client';
 
-import { MapPin, Wrench, Calendar, Gauge } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PilingIcon } from '@/components/piling/icons';
 
 interface ShiftInfoProps {
   date: string;
@@ -39,7 +39,7 @@ export function ShiftInfo({
       <Card>
         <CardContent className="p-4 space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Дата</Label>
+            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><PilingIcon name="calendar" size={14} decorative />Дата</Label>
             <Input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} className="h-11 font-mono" />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -53,7 +53,7 @@ export function ShiftInfo({
       <Card>
         <CardContent className="p-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />Объект</Label>
+            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><PilingIcon name="site" size={14} decorative />Объект</Label>
             <Select value={selectedSiteId} onValueChange={onSiteChange}>
               <SelectTrigger className="w-full h-11"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
               <SelectContent>
@@ -66,7 +66,8 @@ export function ShiftInfo({
       <Card>
         <CardContent className="p-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
+            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><PilingIcon name="equipment-rig" size={14} decorative />Установка</Label>
+            <span id="engine-hours" className="block scroll-mt-24" />
             <Select value={selectedEquipmentId} onValueChange={onEquipmentChange}>
               <SelectTrigger className="w-full h-11"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
               <SelectContent>
@@ -77,7 +78,7 @@ export function ShiftInfo({
           {selectedEquipmentId && (
             <div className="mt-3 space-y-1.5">
               <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
-                <Gauge className="w-3.5 h-3.5" />Моточасы на конец смены
+                <PilingIcon name="engine-hours" size={16} tone="info" decorative />Моточасы на конец смены
                 <span className="font-normal text-slate-400">(необязательно)</span>
               </Label>
               <Input

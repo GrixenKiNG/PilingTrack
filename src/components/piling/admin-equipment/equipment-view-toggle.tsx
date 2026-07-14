@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutGrid, LayoutTemplate, List } from 'lucide-react';
+import { LayoutGrid, LayoutTemplate, List } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 
 export type FleetView = 'tiles' | 'table' | 'layout';
