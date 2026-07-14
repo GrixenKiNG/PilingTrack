@@ -20,6 +20,12 @@ describe('ORION public site', () => {
       'Bauer RTG RM20',
     ]);
     expect(orionStories).toEqual([]);
+    expect(orionEquipment.every(({ photoSlots }) => photoSlots === 5)).toBe(true);
+    for (const equipment of orionEquipment) {
+      expect(equipment.photos.length).toBeGreaterThan(0);
+      expect(equipment.photos.length).toBeLessThanOrEqual(5);
+      expect(equipment.photos.every(({ sourceUrl }) => sourceUrl.startsWith('https://'))).toBe(true);
+    }
   });
 
   it('offers an engineering consultation and labels future project stories honestly', () => {
@@ -29,5 +35,6 @@ describe('ORION public site', () => {
       expect(link).toHaveAttribute('href', '#contact');
     }
     expect(screen.getByText(/готовим портфолио реализованных объектов/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/проверено фото/i)).toHaveLength(8);
   });
 });

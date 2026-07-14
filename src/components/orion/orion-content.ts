@@ -1,11 +1,58 @@
+export type OrionEquipmentPhoto = {
+  src: string;
+  alt: string;
+  credit: string;
+  sourceUrl: string;
+};
+
 export type OrionEquipment = {
   name: string;
   category: string;
   summary: string;
-  image: string | null;
-  imageAlt: string;
-  sourceUrl?: string;
+  photoSlots: 5;
+  photos: OrionEquipmentPhoto[];
 };
+
+const pvePhotos: OrionEquipmentPhoto[] = [
+  { src: '/icons/equipment-photos/pve-50pr.jpg', alt: 'Сваебойная установка PVE 50PR на площадке', credit: 'PVE / Dieseko Group', sourceUrl: 'https://www.diesekogroup.com/our-brands/woltman/' },
+  { src: '/orion/equipment/pve-50pr/02.jpg', alt: 'PVE 50PR в рабочей конфигурации', credit: 'Dieseko Group', sourceUrl: 'https://www.diesekogroup.com/our-brands/woltman/' },
+  { src: '/orion/equipment/pve-50pr/03.jpg', alt: 'PVE 50PR, общий вид', credit: 'Imeco', sourceUrl: 'https://www.imeco.at/used-equipment/piling-rigs-with-impact-hammers/' },
+  { src: '/orion/equipment/pve-50pr/04.jpg', alt: 'PVE 50PR, вид со стороны мачты', credit: 'Imeco', sourceUrl: 'https://www.imeco.at/used-equipment/piling-rigs-with-impact-hammers/' },
+  { src: 'https://i.ytimg.com/vi/Th_hQ_1Ty0I/hqdefault.jpg', alt: 'PVE 50PR в демонстрационном видео', credit: 'SMT Sweden / YouTube', sourceUrl: 'https://www.mascus.fr/construction/piling-rigs/pve-50-pr/en8q8rgq.html' },
+];
+
+const liebherrPhotos: OrionEquipmentPhoto[] = [
+  { src: '/orion/equipment/liebherr-lrh100/01.webp', alt: 'Liebherr LRH 100 с гидромолотом', credit: 'Liebherr', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
+  { src: '/orion/equipment/liebherr-lrh100/02.webp', alt: 'Liebherr LRH 100 при погружении свай', credit: 'Liebherr', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
+  { src: '/orion/equipment/liebherr-lrh100/03.webp', alt: 'Liebherr LRH 100 на фундаментных работах', credit: 'Liebherr', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
+  { src: '/orion/equipment/liebherr-lrh100/04.webp', alt: 'Liebherr LRH 100, рабочее оборудование', credit: 'Liebherr', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
+  { src: '/orion/equipment/liebherr-lrh100/05.webp', alt: 'Liebherr LRH 100, модельный ракурс', credit: 'Liebherr', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
+];
+
+const kburgPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) => ({
+  src: `/orion/equipment/kburg-16/0${index + 1}.jpg`,
+  alt: `Копрово-бурильная установка КБУРГ-16, ракурс ${index + 1}`,
+  credit: 'БашСтрой / Gruzovik.com',
+  sourceUrl: 'https://www.gruzovik.com/stroitelnaya-tehnika/svaeboynye-ustanovki/bashstroy-kburg-16-a9759783.html',
+}));
+
+const kopernikPhotos: OrionEquipmentPhoto[] = [
+  { src: '/orion/equipment/kopernik-sd20/01.jpg', alt: 'Сваебойная установка Kopernik SD-20C', credit: 'Экскаватор Ру', sourceUrl: 'https://exkavator.ru/excapedia/technic/kopernik_sd-20c' },
+];
+
+const banutPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) => ({
+  src: `/orion/equipment/banut-655/0${index + 1}.jpg`,
+  alt: `Сваебойная установка Banut 655, ракурс ${index + 1}`,
+  credit: 'Fymas Auctions',
+  sourceUrl: 'https://www.fymasauctions.dk/us/Listing/Details/24097910',
+}));
+
+const bauerPhotos: OrionEquipmentPhoto[] = [
+  { src: '/icons/equipment-photos/rtg-rm20.jpg', alt: 'Bauer RTG RM20 на площадке', credit: 'Geomek', sourceUrl: 'https://geomek.se/en/foundations/machines/bauer-rtg/' },
+  { src: '/orion/equipment/bauer-rtg-rm20/02.jpg', alt: 'Установка Bauer RTG в работе', credit: 'Geomek', sourceUrl: 'https://geomek.se/en/foundations/machines/bauer-rtg/' },
+  { src: '/orion/equipment/bauer-rtg-rm20/03.jpg', alt: 'RTG RM20, рабочий ракурс', credit: 'RTG Rammtechnik', sourceUrl: 'https://www.rtg-rammtechnik.de/de/rm-20' },
+  { src: 'https://i.ytimg.com/vi/6dRLGVUa62Q/hqdefault.jpg', alt: 'RTG RM20 в официальном видео', credit: 'RTG Rammtechnik / YouTube', sourceUrl: 'https://www.rtg-rammtechnik.de/de/rm-20' },
+];
 
 export type OrionStory = {
   slug: string;
@@ -13,14 +60,14 @@ export type OrionStory = {
 };
 
 export const orionEquipment: OrionEquipment[] = [
-  { name: 'PVE 50PR', category: 'Вибропогружение', summary: 'Погружение и извлечение шпунта и свай.', image: '/icons/equipment-photos/pve-50pr.jpg', imageAlt: 'Вибропогружатель PVE 50PR', sourceUrl: 'https://www.pve-equipment.com/' },
-  { name: 'Liebherr LRH 100 №1', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', image: '/icons/equipment-photos/liebherr-lrh100.jpg', imageAlt: 'Установка Liebherr LRH 100', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
-  { name: 'Liebherr LRH 100 №2', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', image: '/icons/equipment-photos/liebherr-lrh100.jpg', imageAlt: 'Установка Liebherr LRH 100 на строительной площадке', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
-  { name: 'КБУРГ-16.02 №1', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', image: null, imageAlt: 'Копрово-буровая установка КБУРГ-16.02', sourceUrl: 'https://svaeboi.ru/katalog/polnopovorotnye-koprovo-burilnye-ustanovki/kburg-16/' },
-  { name: 'КБУРГ-16.02 №2', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', image: null, imageAlt: 'Копрово-буровая установка КБУРГ-16.02', sourceUrl: 'https://svaeboi.ru/katalog/polnopovorotnye-koprovo-burilnye-ustanovki/kburg-16/' },
-  { name: 'Kopernik-SD-20', category: 'Сваебойные работы', summary: 'Работа со сваями длиной до 20 метров.', image: null, imageAlt: 'Сваебойная установка Kopernik-SD-20' },
-  { name: 'Banut 655', category: 'Свайные работы', summary: 'Универсальная работа с гидромолотом.', image: '/icons/equipment-photos/banut-655.jpg', imageAlt: 'Сваебойная установка Banut 655' },
-  { name: 'Bauer RTG RM20', category: 'Буровые работы', summary: 'Бурение и устройство оснований.', image: '/icons/equipment-photos/rtg-rm20.jpg', imageAlt: 'Буровая установка Bauer RTG RM20', sourceUrl: 'https://geomek.se/en/foundations/machines/bauer-rtg/' },
+  { name: 'PVE 50PR', category: 'Вибропогружение', summary: 'Погружение и извлечение шпунта и свай.', photoSlots: 5, photos: pvePhotos },
+  { name: 'Liebherr LRH 100 №1', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', photoSlots: 5, photos: liebherrPhotos },
+  { name: 'Liebherr LRH 100 №2', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', photoSlots: 5, photos: liebherrPhotos },
+  { name: 'КБУРГ-16.02 №1', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', photoSlots: 5, photos: kburgPhotos },
+  { name: 'КБУРГ-16.02 №2', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', photoSlots: 5, photos: kburgPhotos },
+  { name: 'Kopernik-SD-20', category: 'Сваебойные работы', summary: 'Работа со сваями длиной до 20 метров.', photoSlots: 5, photos: kopernikPhotos },
+  { name: 'Banut 655', category: 'Свайные работы', summary: 'Универсальная работа с гидромолотом.', photoSlots: 5, photos: banutPhotos },
+  { name: 'Bauer RTG RM20', category: 'Буровые работы', summary: 'Бурение и устройство оснований.', photoSlots: 5, photos: bauerPhotos },
 ];
 
 export const orionStories: OrionStory[] = [];

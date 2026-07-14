@@ -12,6 +12,7 @@ const navigation = [
 export function OrionSite() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formState, setFormState] = useState<'idle' | 'success'>('idle');
+  const [activePhotos, setActivePhotos] = useState<Record<string, number>>({});
 
   return (
     <main className={styles.site}>
@@ -49,10 +50,35 @@ export function OrionSite() {
 
         <section className={styles.fleet} id="fleet">
           <div className={styles.sectionHeading}><p className={styles.kicker}>Парк техники</p><h2>Своя техника.<br /><em>Свой контроль.</em></h2><p>Восемь установок под разные технологические задачи. Каждая карточка — часть живого парка, а не иллюстрация из каталога.</p></div>
-          <div className={styles.fleetGrid}>{orionEquipment.map((equipment, index) => <article className={styles.machine} key={equipment.name}>
-            <div className={styles.machineImage}>{equipment.image ? <img src={equipment.image} alt={equipment.imageAlt} loading={index > 1 ? 'lazy' : undefined} /> : <div className={styles.machineFallback}><HardHat size={34} /><span>Фото верифицируется</span></div>}<b>0{index + 1}</b></div>
-            <div className={styles.machineBody}><p>{equipment.category}</p><h3>{equipment.name}</h3><span>{equipment.summary}</span>{equipment.sourceUrl && <a href={equipment.sourceUrl} target="_blank" rel="noreferrer">Источник фотографии <ArrowDownRight size={14} /></a>}</div>
-          </article>)}</div>
+          <div className={styles.fleetGrid}>{orionEquipment.map((equipment, index) => {
+            const activeIndex = activePhotos[equipment.name] ?? 0;
+            const activePhoto = equipment.photos[activeIndex] ?? equipment.photos[0];
+
+            return <article className={styles.machine} key={equipment.name}>
+              <div className={styles.machineImage}>
+                <img src={activePhoto.src} alt={activePhoto.alt} loading={index > 1 ? 'lazy' : undefined} />
+                <b>0{index + 1}</b>
+                <span className={styles.photoCount}>{equipment.photos.length}/{equipment.photoSlots} проверено фото</span>
+              </div>
+              <div className={styles.machineThumbs} aria-label={`Фотографии ${equipment.name}`}>
+                {Array.from({ length: equipment.photoSlots }, (_, photoIndex) => {
+                  const photo = equipment.photos[photoIndex];
+                  return photo ? <button
+                    aria-label={`Показать фото ${photoIndex + 1} — ${equipment.name}`}
+                    aria-pressed={activeIndex === photoIndex}
+                    className={activeIndex === photoIndex ? styles.activeThumb : undefined}
+                    key={photo.src}
+                    onClick={() => setActivePhotos((current) => ({ ...current, [equipment.name]: photoIndex }))}
+                    type="button"
+                  ><img src={photo.src} alt="" loading="lazy" /></button> : <span className={styles.pendingThumb} key={`pending-${photoIndex}`}><HardHat size={13} /><i>ожидает</i></span>;
+                })}
+              </div>
+              <div className={styles.machineBody}>
+                <p>{equipment.category}</p><h3>{equipment.name}</h3><span>{equipment.summary}</span>
+                <a href={activePhoto.sourceUrl} target="_blank" rel="noreferrer">{activePhoto.credit} · источник <ArrowDownRight size={14} /></a>
+              </div>
+            </article>;
+          })}</div>
         </section>
 
         <section className={styles.stories} id="stories">
