@@ -272,7 +272,7 @@ export function ToModule() {
           <section className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-normal text-slate-950">Техготовность</h1>
+                <h1 className="text-xl font-bold tracking-normal text-slate-950">Техготовность</h1>
                 <p className="text-xs text-slate-500">наряды, осмотры и журнал по установке</p>
               </div>
               <SlidersHorizontal className="h-5 w-5 text-orange-500" />
