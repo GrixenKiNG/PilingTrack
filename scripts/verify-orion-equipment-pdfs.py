@@ -23,7 +23,7 @@ A4_HEIGHT_POINTS = 841.89
 A4_TOLERANCE_POINTS = 1.0
 
 EXPECTED_SOURCE_URLS = {
-    "pve-50pr.pdf": "https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf",
+    "pve-50pr.pdf": "https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf",
     "liebherr-lrh100.pdf": (
         "https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/"
         "data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-"
@@ -34,9 +34,9 @@ EXPECTED_SOURCE_URLS = {
         "bashstroy-kburg-16-a9759783.html"
     ),
     "kopernik-sd20c.pdf": "https://exkavator.ru/excapedia/technic/kopernik_sd-20c",
-    "banut-655.pdf": "https://www.prommashini.ru/upload/burovie_ust/BANUT%20655.pdf",
+    "banut-655.pdf": "https://exkavator.ru/excapedia/technic/banut_655",
     "bauer-rtg-rm20.pdf": (
-        "https://www.agd-equipment.co.uk/images/pdf/RTG_RM20_Specification_Details.pdf"
+        "https://www.ecanet.com/equipment/rm-20"
     ),
 }
 

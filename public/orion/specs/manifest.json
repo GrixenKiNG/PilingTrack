@@ -2,8 +2,8 @@
   "pve-50pr.pdf": {
     "model": "PVE 50PR",
     "source": {
-      "label": "PVE — 50PR technical brochure",
-      "url": "https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf"
+      "label": "Dieseko Group — PVE/Woltman 50 PR-FF brochure",
+      "url": "https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf"
     },
     "specifications": [
       {
@@ -17,10 +17,6 @@
       {
         "label": "Мощность двигателя",
         "value": "250 л. с."
-      },
-      {
-        "label": "Эксплуатационная масса",
-        "value": "51 т"
       },
       {
         "label": "Транспортная ширина",
@@ -122,8 +118,8 @@
   "banut-655.pdf": {
     "model": "Banut 655",
     "source": {
-      "label": "Banut — техническая спецификация 655",
-      "url": "https://www.prommashini.ru/upload/burovie_ust/BANUT%20655.pdf"
+      "label": "Экскаватор Ру — Banut 655",
+      "url": "https://exkavator.ru/excapedia/technic/banut_655"
     },
     "specifications": [
       {
@@ -145,18 +141,14 @@
       {
         "label": "Масса сваи",
         "value": "8,5–12 т"
-      },
-      {
-        "label": "Наклоны мачты",
-        "value": "18° / 45° и 18°"
       }
     ]
   },
   "bauer-rtg-rm20.pdf": {
     "model": "Bauer RTG RM20",
     "source": {
-      "label": "RTG Rammtechnik — RM 20 specification (03/2016)",
-      "url": "https://www.agd-equipment.co.uk/images/pdf/RTG_RM20_Specification_Details.pdf"
+      "label": "Equipment Corporation of America — RM 20",
+      "url": "https://www.ecanet.com/equipment/rm-20"
     },
     "specifications": [
       {
@@ -174,10 +166,6 @@
       {
         "label": "Высота",
         "value": "25,7 м"
-      },
-      {
-        "label": "Масса с HRS 5",
-        "value": "Около 68,6 т"
       }
     ]
   }

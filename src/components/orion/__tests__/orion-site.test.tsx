@@ -65,13 +65,20 @@ describe('ORION public site', () => {
     expect(Object.fromEntries(
       Object.entries(orionEquipmentProfiles).map(([key, profile]) => [key, profile.source.url]),
     )).toEqual({
-      'pve-50pr': 'https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf',
+      'pve-50pr': 'https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf',
       'liebherr-lrh100': 'https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-data-sheet-specifications-10538148-english.pdf',
       'kburg-16': 'https://www.gruzovik.com/stroitelnaya-tehnika/svaeboynye-ustanovki/bashstroy-kburg-16-a9759783.html',
       'kopernik-sd20c': 'https://exkavator.ru/excapedia/technic/kopernik_sd-20c',
-      'banut-655': 'https://www.prommashini.ru/upload/burovie_ust/BANUT%20655.pdf',
-      'bauer-rtg-rm20': 'https://www.agd-equipment.co.uk/images/pdf/RTG_RM20_Specification_Details.pdf',
+      'banut-655': 'https://exkavator.ru/excapedia/technic/banut_655',
+      'bauer-rtg-rm20': 'https://www.ecanet.com/equipment/rm-20',
     });
+
+    expect(orionEquipmentProfiles['pve-50pr'].specifications.map(({ label }) => label))
+      .not.toContain('Эксплуатационная масса');
+    expect(orionEquipmentProfiles['banut-655'].specifications.map(({ label }) => label))
+      .not.toContain('Наклоны мачты');
+    expect(orionEquipmentProfiles['bauer-rtg-rm20'].specifications.map(({ label }) => label))
+      .not.toContain('Масса с HRS 5');
   });
 
   it('offers an engineering consultation and labels future project stories honestly', () => {
@@ -127,9 +134,9 @@ describe('ORION public site', () => {
     expect(downloadLink).toHaveAttribute('download');
 
     const sourceLink = within(region).getByRole('link', {
-      name: /Источник характеристик — PVE 50PR: PVE — 50PR technical brochure/i,
+      name: /Источник характеристик — PVE 50PR: Dieseko Group — PVE\/Woltman 50 PR-FF brochure/i,
     });
-    expect(sourceLink).toHaveAttribute('href', 'https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf');
+    expect(sourceLink).toHaveAttribute('href', 'https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf');
     expect(sourceLink).toHaveAttribute('target', '_blank');
     expect(sourceLink).toHaveAttribute('rel', 'noreferrer');
 
