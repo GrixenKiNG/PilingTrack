@@ -71,11 +71,20 @@ export function OrionEquipmentProfilePanel({
         <p>Подготовлено {profile.preparedAt}.</p>
 
         <div className={styles.profileActions}>
-          <a download href={profile.pdfPath}>
+          <a
+            aria-label={`Скачать PDF на русском — ${equipmentName}`}
+            download
+            href={profile.pdfPath}
+          >
             Скачать PDF на русском <Download aria-hidden="true" size={16} />
           </a>
-          <a href={profile.source.url} rel="noreferrer" target="_blank">
-            Источник характеристик <ArrowDownRight aria-hidden="true" size={16} />
+          <a
+            aria-label={`Источник характеристик — ${equipmentName}: ${profile.source.label}`}
+            href={profile.source.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Источник: {profile.source.label} <ArrowDownRight aria-hidden="true" size={16} />
           </a>
         </div>
       </section>

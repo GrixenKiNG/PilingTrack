@@ -45,6 +45,7 @@ test.describe('ORION Industrial Cinematic', () => {
     await expect(downloadLink).toHaveAttribute('download', '');
 
     const sourceLink = region.getByRole('link', { name: /источник характеристик/i });
+    await expect(sourceLink).toHaveAttribute('href', 'https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf');
     await expect(sourceLink).toHaveAttribute('target', '_blank');
     await expect(sourceLink).toHaveAttribute('rel', 'noreferrer');
 

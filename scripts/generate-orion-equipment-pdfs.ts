@@ -31,6 +31,8 @@ const PAGE = {
   footerY: 810,
 } as const;
 
+const MANIFEST_PATH = path.join(ROOT, 'public', 'orion', 'specs', 'manifest.json');
+
 function pdfText(value: string): string {
   return value.replace(/[‐‑‒–—−]/g, '-');
 }
@@ -155,6 +157,20 @@ function drawFeatures(
   });
 
   return y;
+}
+
+function writeManifest(profiles: readonly OrionEquipmentProfile[]): void {
+  const manifest = Object.fromEntries(profiles.map((profile) => [
+    path.basename(profile.pdfPath),
+    {
+      model: profile.model,
+      source: profile.source,
+      specifications: profile.specifications.map(({ label, value }) => ({ label, value })),
+    },
+  ]));
+
+  fs.mkdirSync(path.dirname(MANIFEST_PATH), { recursive: true });
+  fs.writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 }
 
 function createEquipmentPdf(profile: OrionEquipmentProfile): Promise<{ file: string; size: number }> {
@@ -325,6 +341,8 @@ async function main(): Promise<void> {
   if (profiles.length !== 6) {
     throw new Error(`Expected 6 ORION equipment profiles, received ${profiles.length}`);
   }
+
+  writeManifest(profiles);
 
   for (const profile of profiles) {
     const result = await createEquipmentPdf(profile);

@@ -62,9 +62,16 @@ describe('ORION public site', () => {
       expect(profile.pdfPath).toMatch(/^\/orion\/specs\/.+\.pdf$/);
       expect(profile.disclaimer).toBe(ORION_PROFILE_DISCLAIMER);
     }
-    expect(orionEquipmentProfiles['liebherr-lrh100'].source.url).toBe(
-      'https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-data-sheet-specifications-10538148-english.pdf',
-    );
+    expect(Object.fromEntries(
+      Object.entries(orionEquipmentProfiles).map(([key, profile]) => [key, profile.source.url]),
+    )).toEqual({
+      'pve-50pr': 'https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf',
+      'liebherr-lrh100': 'https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-data-sheet-specifications-10538148-english.pdf',
+      'kburg-16': 'https://www.gruzovik.com/stroitelnaya-tehnika/svaeboynye-ustanovki/bashstroy-kburg-16-a9759783.html',
+      'kopernik-sd20c': 'https://exkavator.ru/excapedia/technic/kopernik_sd-20c',
+      'banut-655': 'https://www.prommashini.ru/upload/burovie_ust/BANUT%20655.pdf',
+      'bauer-rtg-rm20': 'https://www.agd-equipment.co.uk/images/pdf/RTG_RM20_Specification_Details.pdf',
+    });
   });
 
   it('offers an engineering consultation and labels future project stories honestly', () => {
@@ -114,14 +121,15 @@ describe('ORION public site', () => {
     expect(within(region).getByText('Подготовлено 15.07.2026.', { exact: true })).toBeVisible();
 
     const downloadLink = within(region).getByRole('link', {
-      name: /скачать pdf на русском/i,
+      name: 'Скачать PDF на русском — PVE 50PR',
     });
     expect(downloadLink).toHaveAttribute('href', '/orion/specs/pve-50pr.pdf');
     expect(downloadLink).toHaveAttribute('download');
 
     const sourceLink = within(region).getByRole('link', {
-      name: /источник характеристик/i,
+      name: /Источник характеристик — PVE 50PR: PVE — 50PR technical brochure/i,
     });
+    expect(sourceLink).toHaveAttribute('href', 'https://www.agd-equipment.co.uk/images/articles/large/folder_pve_piling_1005_lr.pdf');
     expect(sourceLink).toHaveAttribute('target', '_blank');
     expect(sourceLink).toHaveAttribute('rel', 'noreferrer');
 
