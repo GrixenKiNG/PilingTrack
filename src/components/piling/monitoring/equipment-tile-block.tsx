@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { AlertTriangle, MapPin, Timer, User, Wrench } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
@@ -26,10 +25,13 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
 // The media download endpoint returns { url } with a presigned S3 link (same
 // contract report-thumbnail.tsx and equipment-photos.tsx consume) — an <img>
 // can't point at it directly, so resolve it first. cdnUrl values pass through.
-function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
-  const [url, setUrl] = useState<string | null>(photoUrl.startsWith('/api/') ? null : photoUrl);
+function useResolvedPhotoUrl(photoUrl: string | null | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(
+    photoUrl && !photoUrl.startsWith('/api/') ? photoUrl : null,
+  );
 
   useEffect(() => {
+    if (!photoUrl) { setUrl(null); return; }
     if (!photoUrl.startsWith('/api/')) { setUrl(photoUrl); return; }
     let active = true;
     setUrl(null);
@@ -47,12 +49,21 @@ function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fi
     return () => { active = false; };
   }, [photoUrl]);
 
+  return url;
+}
+
+function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
+  const url = useResolvedPhotoUrl(photoUrl);
   if (!url) return <span className="text-xs text-slate-400">Фото не загружено</span>;
   return <img src={url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
 }
 
 function PhotoBlock({ card }: { card: FleetCard }) {
-  const photo = getEquipmentPhoto(card.model);
+  // Настоящее фото этой установки из Media (грузится в карточке установки).
+  // Статика по модели — только запасной вариант для установок без загруженного
+  // фото: это стоковый снимок модели, а не самой машины, поэтому реальное фото
+  // всегда важнее.
+  const photo = useResolvedPhotoUrl(card.photoUrl ?? getEquipmentPhoto(card.model));
   const brand = getEquipmentBrand(card.model);
   const status =
     card.equipmentStatus === 'repair'
@@ -67,8 +78,11 @@ function PhotoBlock({ card }: { card: FleetCard }) {
     <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: brand?.tint ?? '#cbd5e1' }}>
       {photo && (
         <>
-          <Image src={photo} alt="" fill aria-hidden className="scale-125 object-cover blur-lg opacity-70" unoptimized />
-          <Image src={photo} alt="" fill sizes="(max-width: 768px) 100vw, 480px" className="object-contain" unoptimized />
+          {/* Обычный img, а не next/image: фото из Media приходит presigned-ссылкой
+              на S3 — внешний динамический хост, для next/image потребовал бы
+              remotePatterns и всё равно не кэшировался бы (ссылка одноразовая). */}
+          <img src={photo} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-lg" />
+          <img src={photo} alt="" className="absolute inset-0 h-full w-full object-contain" />
         </>
       )}
       <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/10 to-transparent" />

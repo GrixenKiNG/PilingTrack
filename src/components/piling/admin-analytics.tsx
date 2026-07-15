@@ -455,17 +455,17 @@ export function AdminAnalytics() {
           ) : !kpi ? (
             <EmptyState text="Нет данных ТО за период." />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {orderedSections([
                 { id: 'kpi-maintenance', node: (
               <MaintenanceSummaryTile kpi={kpi} />
                 ) },
                 { id: 'table-problem-rigs', node: (
-              <Card className="gap-2 py-3">
+              <Card className="gap-1 py-2">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Топ проблемных установок</CardTitle>
                 </CardHeader>
-                <CardContent className="max-h-[118px] overflow-y-auto">
+                <CardContent className="max-h-[92px] overflow-y-auto">
                   {kpi.topProblemRigs.length === 0 ? (
                     <p className="text-sm text-slate-500 py-4 text-center">Отказов за период не зафиксировано.</p>
                   ) : (
@@ -560,7 +560,7 @@ function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
     { label: 'ППР закрыто', value: `${kpi.pmClosed} / ${kpi.pmPlanned}` },
   ];
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-4">
         {metrics.map((m) => (
           <div key={m.label} className="min-w-0">
