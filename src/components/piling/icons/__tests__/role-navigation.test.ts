@@ -27,9 +27,24 @@ describe('ROLE_NAVIGATION', () => {
     const adminRoutes = ROLE_NAVIGATION.ADMIN.map((item) => item.href);
     const dispatcherRoutes = ROLE_NAVIGATION.DISPATCHER.map((item) => item.href);
 
-    expect(adminRoutes).toEqual(expect.arrayContaining(['/admin/users', '/admin/telegram', '/admin/dlq']));
-    expect(dispatcherRoutes).not.toEqual(expect.arrayContaining(['/admin/users', '/admin/telegram', '/admin/dlq']));
+    expect(adminRoutes).toContain('/admin/users');
+    expect(dispatcherRoutes).not.toContain('/admin/users');
     expect(dispatcherRoutes).toContain('/admin/to');
+  });
+
+  it('folds Telegram and DLQ into Settings (out of top-level navigation)', () => {
+    for (const items of Object.values(ROLE_NAVIGATION)) {
+      const routes = items.map((item) => item.href);
+      expect(routes).not.toContain('/admin/telegram');
+      expect(routes).not.toContain('/admin/dlq');
+    }
+  });
+
+  it('places Settings at the very end for admin and dispatcher', () => {
+    for (const role of ['ADMIN', 'DISPATCHER'] as const) {
+      const items = ROLE_NAVIGATION[role];
+      expect(items[items.length - 1].href).toBe('/admin/settings');
+    }
   });
 });
 

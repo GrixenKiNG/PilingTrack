@@ -33,10 +33,9 @@ export const ANALYTICS_DASHBOARD_WIDGETS: readonly AnalyticsWidgetMeta[] = [
   { id: 'chart-dynamics', title: 'Динамика погонных метров', zone: 'overview', defaultSize: 'lg' },
   { id: 'usage-equipment', title: 'Использование установок', zone: 'overview', defaultSize: 'md' },
   { id: 'rating-sites', title: 'Рейтинг объектов', zone: 'overview', defaultSize: 'md' },
-  { id: 'chart-operators', title: 'Топ-10 по сваям (график)', zone: 'operators', defaultSize: 'lg' },
-  { id: 'table-operators', title: 'Сводка по операторам', zone: 'operators', defaultSize: 'lg' },
-  { id: 'chart-trends', title: 'Тренд за 8 недель', zone: 'trends', defaultSize: 'lg' },
-  { id: 'kpi-maintenance', title: 'KPI надёжности ТО', zone: 'maintenance', defaultSize: 'lg' },
+  { id: 'table-operators', title: 'Топ-10 по забитым сваям', zone: 'operators', defaultSize: 'lg' },
+  { id: 'chart-trends', title: 'Тренд за месяц', zone: 'trends', defaultSize: 'lg' },
+  { id: 'kpi-maintenance', title: 'Надёжность ТО — сводка', zone: 'maintenance', defaultSize: 'lg' },
   { id: 'table-problem-rigs', title: 'Топ проблемных установок', zone: 'maintenance', defaultSize: 'lg' },
 ];
 

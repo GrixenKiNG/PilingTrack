@@ -218,8 +218,8 @@ export function AdminUsers() {
   return (
     <>
       <OpsPage
-        layout="wideMain"
         header={header}
+        kpi={<OpsKpiBar items={kpis} />}
         aside={active ? (
           <UserDetail
             user={active}
@@ -230,7 +230,6 @@ export function AdminUsers() {
           />
         ) : <OpsDetailEmpty message="Выберите пользователя, чтобы увидеть доступы и историю." />}
       >
-        <OpsKpiBar items={kpis} />
         <OpsFilterBar
           quickFilters={QUICK_FILTERS}
           active={quick}

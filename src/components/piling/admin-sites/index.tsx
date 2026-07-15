@@ -275,8 +275,8 @@ export function AdminSites() {
             />
           )
           : <OpsDetailEmpty message="Выберите объект, чтобы увидеть план/факт, иерархию и историю." />}
+        kpi={<OpsKpiBar items={kpis} />}
       >
-        <OpsKpiBar items={kpis} />
         <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${allRows.length}`} />
         <OpsTable
           columns={columns}

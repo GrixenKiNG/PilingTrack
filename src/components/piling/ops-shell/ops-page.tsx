@@ -1,38 +1,68 @@
 'use client';
 
-import type { ComponentType, ReactNode } from 'react';
+import { useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
 /**
- * Two-column operational screen layout: a flexible main column and a fixed-width
- * right detail panel that becomes sticky on wide viewports. Mirrors the proven
- * admin-reports layout. Pass the detail panel as `aside`.
+ * Two-column operational screen layout: a flexible main column and a resizable
+ * right detail panel that becomes sticky on wide viewports. Pass the detail
+ * panel as `aside`; drag its left edge to resize (same pattern as
+ * admin-dictionaries / admin-equipment).
+ *
+ * `header` и `kpi` идут во всю ширину страницы, НАД колонками: внутри левой
+ * колонки KPI-бар делил место с панелью (~840px), и плитки в один ряд
+ * схлопывались до ~130px — иконка с подписью не помещались.
  */
 export function OpsPage({
   header,
+  kpi,
   aside,
   children,
-  layout = 'default',
 }: {
   header: ReactNode;
+  kpi?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
-  layout?: 'default' | 'wideMain';
 }) {
+  const [panelWidth, setPanelWidth] = useState(520);
+
+  const startResize = (event: React.MouseEvent) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startW = panelWidth;
+    const onMove = (moveEvent: MouseEvent) => {
+      setPanelWidth(Math.min(720, Math.max(320, startW + (startX - moveEvent.clientX))));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   return (
-    <div className="min-h-full bg-slate-50/60 p-4 lg:p-6">
-      <div className={cn(
-        'grid gap-4',
-        layout === 'wideMain'
-          ? '2xl:grid-cols-[minmax(0,1fr)_560px]'
-          : 'xl:grid-cols-[minmax(0,1fr)_520px] 2xl:grid-cols-[minmax(0,1fr)_560px]'
-      )}>
-        <div className="min-w-0 space-y-4">
-          {header}
-          {children}
-        </div>
-        {aside}
+    <div className="min-h-full space-y-4 bg-slate-50/60 p-4 lg:p-6">
+      {header}
+      {kpi}
+      <div
+        style={{ '--panel-w': `${panelWidth}px` } as CSSProperties}
+        className="grid grid-cols-1 gap-4 xl:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
+      >
+        <div className="min-w-0 space-y-4">{children}</div>
+        {aside && (
+          <div className="relative min-w-0">
+            {/* Потяните за левый край, чтобы изменить ширину панели. */}
+            <div
+              onMouseDown={startResize}
+              title="Потяните, чтобы изменить ширину"
+              className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize xl:block"
+            >
+              <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+            </div>
+            {aside}
+          </div>
+        )}
       </div>
     </div>
   );

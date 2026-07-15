@@ -91,30 +91,32 @@ export function AdminEquipment() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="space-y-4 p-4 lg:p-6">
+      {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
+          плитки в один ряд ужимались до ~128px и текст обрезался. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <PilingIcon name="equipment-rig" size={24} tone="primary" decorative />
+            Установки
+          </h1>
+          <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
+            <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
+          </Button>
+        </div>
+      </div>
+
+      <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
+
       <div
         style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
         className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
       >
         {/* Left: fleet list */}
         <div className="min-w-0 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-                <PilingIcon name="equipment-rig" size={24} tone="primary" decorative />
-                Установки
-              </h1>
-              <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
-                <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
-              </Button>
-            </div>
-          </div>
-
-          <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
-
           <div className="flex flex-wrap items-center justify-between gap-3">
             <EquipmentFilters
               sites={options.sites}

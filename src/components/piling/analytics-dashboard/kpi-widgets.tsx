@@ -47,9 +47,14 @@ const ANALYTICS_KPI_ICONS: Record<string, PilingIconName> = { 'kpi-equipment': '
 
 function KpiTile({ id, label, value, hint, delta }: { id: string; label: string; value: string; hint: string; delta?: { text: string; good: boolean } | null }) {
   return (
-    <Card className="h-full">
-      <CardContent className="flex min-h-28 items-center gap-4 p-4">
-        <PilingIcon name={ANALYTICS_KPI_ICONS[id] ?? 'analytics'} size={44} decorative />
+    // py-0/gap-0: у shadcn Card свои py-6 + gap-6 — они добавляли 48px поверх
+    // min-h-28 и делали плитку 162px вместо 112px, как в остальных модулях.
+    <Card className="h-full gap-0 py-0">
+      {/* Иконка во всю высоту плитки + описание — как в дашборде. */}
+      <CardContent className="flex h-full min-h-28 items-stretch gap-4 p-4">
+        <span className="relative w-20 shrink-0 self-stretch">
+          <PilingIcon name={ANALYTICS_KPI_ICONS[id] ?? 'analytics'} fill decorative className="absolute inset-0" />
+        </span>
         <div className="min-w-0">
         <p className="text-xs text-slate-500">{label}</p>
         <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>

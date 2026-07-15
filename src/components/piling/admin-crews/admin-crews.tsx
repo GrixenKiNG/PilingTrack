@@ -222,8 +222,8 @@ export function AdminCrews() {
             />
           )
           : <OpsDetailEmpty message="Выберите бригаду, чтобы увидеть состав и историю назначений." />}
+        kpi={<OpsKpiBar items={kpis} />}
       >
-        <OpsKpiBar items={kpis} />
         <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${crews.length}`} />
         <OpsTable
           columns={columns}

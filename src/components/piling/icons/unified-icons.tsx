@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import type { LucideIcon, LucideProps } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { PILING_ICON_SCALE, PilingIcon, type PilingIconName } from './piling-icon';
 
 /**
@@ -16,11 +17,30 @@ function toSourceSize(size: LucideProps['size']) {
   return Number.isFinite(numericSize) ? numericSize / PILING_ICON_SCALE : 24 / PILING_ICON_SCALE;
 }
 
+/** `h-4`, `w-8`, `size-5`, `h-[18px]`, `h-full` … — a caller-supplied icon box. */
+const SIZE_CLASS_RE = /(?:^|\s)(?:size-|[hw]-)(?:\d|\[|px\b|full\b|auto\b)/;
+
 function createUnifiedIcon(name: PilingIconName): LucideIcon {
   const UnifiedIcon = forwardRef<SVGSVGElement, LucideProps>(function UnifiedIcon(
     { size = 24, className, 'aria-label': label },
     _ref,
   ) {
+    // Call sites size these icons with Tailwind (`h-4 w-4`), the same way they
+    // size a real Lucide icon. PilingIcon writes an inline width/height, and an
+    // inline style beats a class — so those classes were silently ignored and
+    // every raster icon rendered at the same 36px regardless of what the call
+    // site asked for (the app-wide "icons are all different sizes" symptom).
+    // When the caller brings its own size classes, let them own the box and
+    // stretch the glyph into it; otherwise fall back to the numeric `size`.
+    if (className && SIZE_CLASS_RE.test(className)) {
+      return (
+        <span className={cn('inline-flex shrink-0 items-center justify-center', className)}>
+          {label
+            ? <PilingIcon name={name} fill label={label} />
+            : <PilingIcon name={name} fill decorative />}
+        </span>
+      );
+    }
     return label ? (
       <PilingIcon name={name} size={toSourceSize(size)} className={className} label={label} />
     ) : (

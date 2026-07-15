@@ -20,6 +20,7 @@ import {
   DictionaryForm,
   type DictionaryFormValue,
 } from './admin-dictionaries/dictionary-form';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 
 type StatusFilter = 'active' | 'archived' | 'all';
 interface HistoryEntry {
@@ -32,10 +33,12 @@ interface HistoryEntry {
 interface FormState { mode: 'create' | 'rename'; kind: DictionaryKind; item?: RegistryItem }
 interface LengthState { item: RegistryItem; value: string }
 
-const KINDS: Array<{ kind: DictionaryKind; title: string; summaryTitle: string; addLabel: string; icon: typeof HardHat }> = [
-  { kind: 'pileGrade', title: 'Сваи', summaryTitle: 'Сортаменты свай', addLabel: 'Добавить марку сваи', icon: Ruler },
-  { kind: 'drillingType', title: 'Бурение', summaryTitle: 'Типы бурения', addLabel: 'Добавить тип бурения', icon: Drill },
-  { kind: 'downtimeReason', title: 'Простои', summaryTitle: 'Причины простоев', addLabel: 'Добавить причину простоя', icon: Clock },
+// `icon` — компактная линейная иконка для вкладок; `pilingIcon` — предметная
+// иконка для плиток сводки (тот же набор и тот же вид, что в дашборде).
+const KINDS: Array<{ kind: DictionaryKind; title: string; summaryTitle: string; addLabel: string; icon: typeof HardHat; pilingIcon: PilingIconName }> = [
+  { kind: 'pileGrade', title: 'Сваи', summaryTitle: 'Сортаменты свай', addLabel: 'Добавить марку сваи', icon: Ruler, pilingIcon: 'pile-group' },
+  { kind: 'drillingType', title: 'Бурение', summaryTitle: 'Типы бурения', addLabel: 'Добавить тип бурения', icon: Drill, pilingIcon: 'drilling-auger' },
+  { kind: 'downtimeReason', title: 'Простои', summaryTitle: 'Причины простоев', addLabel: 'Добавить причину простоя', icon: Clock, pilingIcon: 'downtime' },
 ];
 
 async function responseError(response: Response, fallback: string): Promise<string> {
@@ -131,8 +134,8 @@ export function AdminDictionaries() {
 
   const statusLabel = filter === 'active' ? 'активные' : filter === 'archived' ? 'архив' : 'все';
 
-  const dictionarySummary = useMemo(() => KINDS.map(({ kind, summaryTitle, icon: Icon }) => ({
-    kind, summaryTitle, Icon,
+  const dictionarySummary = useMemo(() => KINDS.map(({ kind, summaryTitle, pilingIcon }) => ({
+    kind, summaryTitle, pilingIcon,
     active: data[kind].filter((item) => item.isActive).length,
     archived: data[kind].filter((item) => !item.isActive).length,
     objects: objectTotals[kind],
@@ -349,9 +352,10 @@ export function AdminDictionaries() {
           </div>
 
           <section aria-label="Сводка справочников" className="mt-4 grid gap-3 md:grid-cols-3">
-            {dictionarySummary.map(({ kind, summaryTitle, Icon, active, archived, objects }) => (
+            {dictionarySummary.map(({ kind, summaryTitle, pilingIcon, active, archived, objects }) => (
               <button key={kind} type="button" className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-orange-300 hover:shadow-sm" onClick={() => { setActiveKind(kind); setSearch(''); }}>
-                <div className="flex items-center gap-4"><Icon className="h-10 w-10 shrink-0 text-sky-500" /><div><p className="text-sm font-semibold text-slate-800">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-sky-600">{active}</p><p className="text-xs text-sky-600">активных</p></div><div className="border-l border-slate-200 pl-4"><p className="text-lg font-semibold text-slate-500">{archived}</p><p className="text-xs text-slate-400">архивных</p></div></div></div></div>
+                {/* Иконка во всю высоту плитки + описание — как в дашборде. */}
+                <div className="flex items-stretch gap-4"><span className="relative w-20 shrink-0 self-stretch"><PilingIcon name={pilingIcon} fill decorative className="absolute inset-0" /></span><div><p className="text-sm font-semibold text-slate-800">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-sky-600">{active}</p><p className="text-xs text-sky-600">активных</p></div><div className="border-l border-slate-200 pl-4"><p className="text-lg font-semibold text-slate-500">{archived}</p><p className="text-xs text-slate-400">архивных</p></div></div></div></div>
                 <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">Используются в {objects} объектах</p>
               </button>
             ))}

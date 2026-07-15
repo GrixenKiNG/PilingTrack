@@ -72,10 +72,16 @@ export type PilingIconProps = (DecorativeIconProps | MeaningfulIconProps) & {
   size?: PilingIconSize;
   tone?: PilingIconTone;
   className?: string;
+  /**
+   * Stretch to the container instead of a fixed px box. The caller owns the
+   * dimensions (e.g. a self-stretching square in a KPI tile), which lets the
+   * icon track the tile's height without ever overflowing it.
+   */
+  fill?: boolean;
 };
 
 export function PilingIcon({
-  name, size = 24, tone = 'neutral', decorative = false, label, className,
+  name, size = 24, tone = 'neutral', decorative = false, label, className, fill = false,
 }: PilingIconProps) {
   const asset = approvedIconAssets[name];
   const renderedSize = size * PILING_ICON_SCALE;
@@ -85,14 +91,18 @@ export function PilingIcon({
         aria-hidden={decorative || undefined}
         data-piling-icon={name}
         data-tone={tone}
-        style={{ width: renderedSize, height: renderedSize }}
-        className={cn('piling-icon piling-icon--approved inline-flex shrink-0 items-center justify-center', className)}
+        style={fill ? undefined : { width: renderedSize, height: renderedSize }}
+        className={cn(
+          'piling-icon piling-icon--approved inline-flex items-center justify-center',
+          fill ? 'h-full w-full' : 'shrink-0',
+          className,
+        )}
       >
         <Image
           src={`/icons/pilingtrack/${asset}.png`}
           alt={decorative ? '' : (label ?? '')}
-          width={209}
-          height={184}
+          width={200}
+          height={200}
           // Small static UI icons: serve the raw PNG (the dev image-optimizer
           // bottlenecks on many concurrent icons and left them blank) and load
           // eagerly since KPI/nav icons are always above the fold.
@@ -112,9 +122,9 @@ export function PilingIcon({
     <Icon
       data-piling-icon={name}
       data-tone={tone}
-      width={renderedSize}
-      height={renderedSize}
-      className={cn('piling-icon shrink-0', className)}
+      width={fill ? undefined : renderedSize}
+      height={fill ? undefined : renderedSize}
+      className={cn('piling-icon', fill ? 'h-full w-full' : 'shrink-0', className)}
       {...accessibility}
     />
   );

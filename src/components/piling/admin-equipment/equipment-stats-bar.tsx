@@ -2,7 +2,8 @@
 
 import type { FleetCard, FleetSnapshot } from './fleet-types';
 import { getMaintenanceFlag } from './equipment-maintenance-flag';
-import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
+import { type PilingIconName } from '@/components/piling/icons';
+import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 
 const EQUIPMENT_KPI_ICONS: PilingIconName[] = ['equipment-rig', 'equipment-rig', 'downtime', 'repair', 'operator', 'maintenance-due'];
 
@@ -27,18 +28,12 @@ export function EquipmentStatsBar({
     { label: 'ТО', value: maintenanceRisks, tone: maintenanceRisks > 0 ? 'text-orange-600' : 'text-success' },
   ];
 
+  // Плитки повторяют раскладку OpsKpiBar (модуль «Объекты»): иконка в правом
+  // верхнем углу, тот же размер (48×48) и та же высота плитки.
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className={KPI_GRID} style={kpiGridStyle(metrics.length)}>
       {metrics.map((metric, index) => (
-        <div key={metric.label} className="kpi-animated flex min-h-36 items-center gap-4 rounded-xl border p-4">
-          <PilingIcon name={EQUIPMENT_KPI_ICONS[index]} size={74} decorative />
-          <div className="min-w-0">
-          <div className="text-xs text-white/80">{metric.label}</div>
-          <div className="mt-1 text-2xl font-bold text-white">
-            {metric.value}
-          </div>
-          </div>
-        </div>
+        <KpiTile key={metric.label} icon={EQUIPMENT_KPI_ICONS[index]} label={metric.label} value={metric.value} />
       ))}
     </div>
   );

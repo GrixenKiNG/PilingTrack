@@ -15,6 +15,8 @@ const operatorNavigation: NavigationItem[] = [
   { label: 'История', href: '/history', icon: 'history' },
 ];
 
+// Telegram и DLQ теперь живут вкладками внутри «Настроек» (см. workspace-settings),
+// а «Настройки» стоят в самом конце списка модулей.
 const dispatcherNavigation: NavigationItem[] = [
   { label: 'Дашборд', href: '/admin', icon: 'dashboard' },
   { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring', tone: 'info' },
@@ -24,19 +26,19 @@ const dispatcherNavigation: NavigationItem[] = [
   { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
   { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
   { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
-  { label: 'Настройки', href: '/admin/settings', icon: 'settings' },
   { label: 'Справочники', href: '/admin/dictionaries', icon: 'documents' },
 ];
+
+const settingsNav: NavigationItem = { label: 'Настройки', href: '/admin/settings', icon: 'settings' };
 
 export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   OPERATOR: operatorNavigation,
   ASSISTANT: operatorNavigation,
-  DISPATCHER: dispatcherNavigation,
+  DISPATCHER: [...dispatcherNavigation, settingsNav],
   ADMIN: [
     ...dispatcherNavigation,
     { label: 'Пользователи', href: '/admin/users', icon: 'users' },
-    { label: 'Telegram', href: '/admin/telegram', icon: 'telegram', tone: 'info' },
-    { label: 'DLQ', href: '/admin/dlq', icon: 'risk', tone: 'danger' },
+    settingsNav,
   ],
 };
 

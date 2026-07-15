@@ -14,8 +14,10 @@ import {
 } from '@/modules/settings/domain/settings';
 import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';
+import { AdminTelegram } from '@/components/piling/admin-telegram';
+import { AdminDlq } from '@/components/piling/admin-dlq';
 
-type Tab = 'workspace' | 'roles' | 'notifications' | 'template';
+type Tab = 'workspace' | 'roles' | 'notifications' | 'template' | 'telegram' | 'dlq';
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Администратор',
@@ -27,9 +29,14 @@ const ROLE_ORDER = ['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'];
 
 function Toggle({ checked, label, disabled, onClick }: { checked: boolean; label: string; disabled?: boolean; onClick: () => void }) {
   return (
+    // Дорожка 44px, кружок 20px, поля по 2px с каждой стороны:
+    // выключено — left 2px, включено — +20px (2..42). `left-0.5` обязателен:
+    // без него кружок вставал в статическую позицию, а <button> центрирует
+    // содержимое, поэтому отсчёт шёл от середины и включённый кружок вылезал
+    // на 8px за правый край дорожки.
     <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled} onClick={onClick}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-orange-500' : 'bg-slate-200'}`}>
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
 }
@@ -122,8 +129,15 @@ export function WorkspaceSettings() {
       </header>
 
       <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-slate-200 text-sm font-medium">
-        {([{ id: 'workspace', label: 'Рабочее пространство' }, { id: 'roles', label: 'Пользователи и роли' }, { id: 'notifications', label: 'Уведомления' }, { id: 'template', label: 'Шаблоны плиток' }] as const).map((tab) => (
-          <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-slate-950' : 'pb-3 text-slate-500'}>{tab.label}</button>
+        {([
+          { id: 'workspace', label: 'Рабочее пространство' },
+          { id: 'roles', label: 'Пользователи и роли' },
+          { id: 'notifications', label: 'Уведомления' },
+          { id: 'template', label: 'Шаблоны плиток' },
+          // Telegram и DLQ — операционное обслуживание, только администратор.
+          ...(isAdmin ? [{ id: 'telegram', label: 'Telegram' }, { id: 'dlq', label: 'Очередь (DLQ)' }] as const : []),
+        ] as const).map((tab) => (
+          <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`shrink-0 ${activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-slate-950' : 'pb-3 text-slate-500'}`}>{tab.label}</button>
         ))}
       </nav>
 
@@ -208,7 +222,8 @@ export function WorkspaceSettings() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-orange-500" />Интеграции и резервное копирование</CardTitle><CardDescription>Подключения и защита данных.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">Telegram-бот</span><a href="/admin/telegram" className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Send className="h-3.5 w-3.5" />Настроить</a></div>
+              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">Telegram-бот</span>{isAdmin ? <button type="button" onClick={() => setActiveTab('telegram')} className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Send className="h-3.5 w-3.5" />Настроить</button> : <span className="text-slate-400">только администратор</span>}</div>
+              {isAdmin && <div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-600">Очередь сообщений (DLQ)</span><button type="button" onClick={() => setActiveTab('dlq')} className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Database className="h-3.5 w-3.5" />Открыть</button></div>}
               <p className="text-xs leading-5 text-slate-500">Резервное копирование выполняется на сервере по расписанию (off-site). Управление — на стороне инфраструктуры.</p>
             </CardContent>
           </Card>
@@ -257,6 +272,14 @@ export function WorkspaceSettings() {
       )}
 
       {activeTab === 'template' && <TemplatesTab />}
+
+      {activeTab === 'telegram' && (isAdmin
+        ? <AdminTelegram />
+        : <p className="text-sm text-slate-500">Настройка Telegram-бота доступна администратору.</p>)}
+
+      {activeTab === 'dlq' && (isAdmin
+        ? <AdminDlq />
+        : <p className="text-sm text-slate-500">Очередь недоставленных сообщений доступна администратору.</p>)}
     </div>
   );
 }

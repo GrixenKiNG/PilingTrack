@@ -427,20 +427,31 @@ export function AdminDashboard() {
 
 type KpiTone = 'blue' | 'emerald' | 'teal' | 'amber' | 'violet' | 'red';
 
-// All KPI tiles share the animated cycling gradient (see .kpi-animated in
-// globals.css) for a lively, consistent look matching the operator CTA. `tone`
-// is retained on the props for call-site clarity but no longer drives colour.
+// Плитка дашборда — эталон вида KPI для всего приложения (см. KpiTile в
+// components/piling/kpi-tile.tsx, который повторяет её в остальных модулях).
+// Здесь она своя, потому что несёт ещё и прогресс-бар план/факт.
+// `tone` оставлен в пропсах для наглядности вызова, но цвет не задаёт.
 function KpiTile({ icon, label, value, sub, progress }: {
   icon: PilingIconName; tone: KpiTone; label: string; value: ReactNode; sub?: string; progress?: number;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition hover:border-orange-200 hover:shadow-md">
-      <div className="flex items-center gap-4">
-        <PilingIcon name={icon} size={44} decorative />
+    <div className="flex h-full min-w-0 flex-col rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition hover:border-orange-200 hover:shadow-md">
+      {/* Иконка тянется во всю высоту плитки, описание — рядом. Высоту задаёт
+          плитка (flex-1), а иконка позиционируется абсолютно, поэтому её
+          собственный размер не раздувает плитку и не выходит за рамку.
+          Ряд тянется на всю высоту — иначе иконки на плитках без прогресс-бара
+          оказывались мельче соседних. */}
+      <div className="flex flex-1 items-stretch gap-4">
+        <span className="relative w-20 shrink-0 self-stretch">
+          <PilingIcon name={icon} fill decorative className="absolute inset-0" />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium text-slate-600">{label}</div>
-          <div className="mt-1 truncate font-mono text-xl font-semibold leading-tight text-slate-900 2xl:text-2xl">{value}</div>
-          {sub && <div className="mt-1 truncate text-xs text-slate-500">{sub}</div>}
+          {/* Составные значения («1 754 шт / 25 412 м.п.») не помещаются в строку
+              рядом с крупной иконкой — переносим, а не обрезаем: описание должно
+              читаться целиком. */}
+          <div className="mt-1 font-mono text-xl font-semibold leading-tight text-balance break-words text-slate-900 2xl:text-2xl">{value}</div>
+          {sub && <div className="mt-1 break-words text-xs text-slate-500">{sub}</div>}
           {progress != null && (
             <div className="mt-3 flex items-center gap-2">
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">

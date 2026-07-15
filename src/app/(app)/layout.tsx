@@ -261,27 +261,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     let active = true;
 
     const bootstrap = async () => {
-      // Import dynamically to avoid circular deps
-      const { fetchSessionUser } = await import('@/lib/api');
-      const sessionUser = await fetchSessionUser();
-      if (!active) return;
+      try {
+        // Import dynamically to avoid circular deps
+        const { probeSession } = await import('@/lib/api');
+        const probe = await probeSession();
+        if (!active) return;
 
-      const existingUser = usePilingStore.getState().currentUser;
+        const existingUser = usePilingStore.getState().currentUser;
 
-      if (sessionUser) {
-        if (existingUser) {
-          usePilingStore.getState().setCurrentUser(sessionUser);
-        } else {
-          usePilingStore.getState().login(sessionUser);
+        if (probe.status === 'authenticated') {
+          if (existingUser) {
+            usePilingStore.getState().setCurrentUser(probe.user);
+          } else {
+            usePilingStore.getState().login(probe.user);
+          }
+        } else if (probe.status === 'anonymous' && existingUser) {
+          // Только явный ответ сервера «сессии нет» разлогинивает. При
+          // 'unknown' (сеть/5xx) оставляем текущую сессию как есть — иначе
+          // моргание БД выкидывало оператора на /login посреди работы.
+          usePilingStore.getState().logout();
+          router.replace('/login');
+          return;
         }
-      } else if (existingUser) {
-        usePilingStore.getState().logout();
-        router.replace('/login');
-        return;
-      }
-
-      if (active) {
-        setBootstrapping(false);
+      } finally {
+        // Даже если проверка упала, снимаем «Проверка сессии...»: раньше
+        // исключение здесь навсегда оставляло приложение на этом экране.
+        if (active) setBootstrapping(false);
       }
     };
 

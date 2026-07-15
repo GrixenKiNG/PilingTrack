@@ -7,17 +7,15 @@ import {
   TrendingUp,
   Users,
   HardHat,
-  Loader2,
   Wrench,
 } from '@/components/piling/icons/unified-icons';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
 } from 'recharts';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
@@ -88,15 +86,18 @@ const TABS = [
 export function AdminAnalytics() {
   const layout = useAnalyticsDashboardLayout();
   const [tab, setTab] = useState<'operators' | 'trends' | 'kpi'>('operators');
+  // Выбор объекта живёт во вкладке «Тренды» — глобального фильтра больше нет.
+  const [trendSiteId, setTrendSiteId] = useState<string>('all');
   const [sites, setSites] = useState<Site[]>([]);
-  const [siteId, setSiteId] = useState<string>('all');
 
   // Default period: last 7 days (deltas then read "к пред. неделе")
   const today = new Date();
   const todayIso = today.toISOString().slice(0, 10);
   const weekAgoIso = new Date(today.getTime() - 6 * 86400000).toISOString().slice(0, 10);
-  const [dateFrom, setDateFrom] = useState(weekAgoIso);
-  const [dateTo, setDateTo] = useState(todayIso);
+  // Период фиксирован: последние 7 дней. Блок выбора периода убран, поэтому
+  // границы больше не меняются — держим их простыми константами.
+  const dateFrom = weekAgoIso;
+  const dateTo = todayIso;
 
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
@@ -133,7 +134,6 @@ export function AdminAnalytics() {
     setOverviewError(null);
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
-      if (siteId !== 'all') params.set('siteId', siteId);
       const res = await authFetch(`/api/admin/analytics/overview?${params}`);
       // Ignore a stale response if a newer request has since been fired.
       if (reqId !== overviewReqRef.current) return;
@@ -147,13 +147,14 @@ export function AdminAnalytics() {
     } finally {
       if (reqId === overviewReqRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo, siteId]);
+  }, [dateFrom, dateTo]);
 
   const loadTrends = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ weeks: '8' });
-      if (siteId !== 'all') params.set('siteId', siteId);
+      // «Тренд за месяц» — 4 недельных бакета (site-weekly-trend агрегирует по неделям).
+      const params = new URLSearchParams({ weeks: '4' });
+      if (trendSiteId !== 'all') params.set('siteId', trendSiteId);
       const res = await authFetch(`/api/admin/analytics/site-weekly-trend?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -162,7 +163,7 @@ export function AdminAnalytics() {
         toast.error('Ошибка загрузки трендов');
       }
     } catch { toast.error('Ошибка'); } finally { setLoading(false); }
-  }, [siteId]);
+  }, [trendSiteId]);
 
   const loadKpi = useCallback(async () => {
     setLoading(true);
@@ -189,15 +190,6 @@ export function AdminAnalytics() {
     if (tab === 'trends') void loadTrends();
     else if (tab === 'kpi') void loadKpi();
   }, [tab, loadTrends, loadKpi]);
-
-  const operatorChartData = useMemo(
-    () => (overview?.operators ?? []).slice(0, 10).map((o) => ({
-      name: o.userName.split(' ').slice(0, 2).join(' '),
-      Сваи: o.piles,
-      Бурение: Math.round(o.drilling),
-    })),
-    [overview]
-  );
 
   const trendChartData = useMemo(() => {
     // Group by weekStart, pick latest entry per week (or sum across sites)
@@ -282,14 +274,14 @@ export function AdminAnalytics() {
 
       {/* Overview: динамика метров + использование установок (real report data) */}
       {overview && !periodEmpty && (sectionVisible('chart-dynamics') || sectionVisible('usage-equipment')) && (
-        <div className="grid gap-4 lg:grid-cols-3 items-stretch">
+        <div className="grid gap-4 lg:grid-cols-2 items-stretch">
           {sectionVisible('chart-dynamics') && (
-            <Card className={sectionVisible('usage-equipment') ? 'lg:col-span-2' : 'lg:col-span-3'}>
+            <Card className={cn('gap-2 py-3', sectionVisible('usage-equipment') ? '' : 'lg:col-span-2')}>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Динамика погонных метров</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={260}>
+                <ResponsiveContainer width="100%" height={155}>
                   <LineChart data={overview.daily.map((d) => ({ день: d.date.slice(8) + '.' + d.date.slice(5, 7), 'Погонные метры': d.meters }))} margin={{ top: 18, right: 16, bottom: 4, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="день" tick={{ fontSize: 11 }} />
@@ -303,11 +295,11 @@ export function AdminAnalytics() {
             </Card>
           )}
           {sectionVisible('usage-equipment') && (
-            <Card>
+            <Card className="gap-2 py-3">
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Использование установок</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2.5">
+              <CardContent className="max-h-[195px] space-y-2.5 overflow-y-auto">
                 {overview.equipmentUsage.length === 0 ? (
                   <p className="py-4 text-center text-sm text-slate-500">Нет активных установок.</p>
                 ) : overview.equipmentUsage.map((e) => (
@@ -326,8 +318,8 @@ export function AdminAnalytics() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3 items-start">
-      <div className={overview && sectionVisible('rating-sites') ? 'lg:col-span-2 space-y-4' : 'lg:col-span-3 space-y-4'}>
+      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
+      <div className={overview && sectionVisible('rating-sites') ? 'min-w-0 space-y-4' : 'lg:col-span-2 space-y-4'}>
       <div className="flex items-center gap-2 flex-wrap">
         {TABS.map((t) => (
           <button
@@ -346,39 +338,6 @@ export function AdminAnalytics() {
         ))}
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-end gap-3 flex-wrap">
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Объект</label>
-              <select
-                value={siteId}
-                onChange={(e) => setSiteId(e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white"
-              >
-                <option value="all">Все объекты</option>
-                {sites.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">С</label>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">По</label>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
-            </div>
-            <Button size="sm" onClick={tab === 'kpi' ? loadKpi : loadOverview} disabled={loading}>
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Применить'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {tab === 'operators' && (
         <>
           {loading ? (
@@ -388,30 +347,10 @@ export function AdminAnalytics() {
           ) : (
             <div className="space-y-4">
               {orderedSections([
-                { id: 'chart-operators', node: (
-              <Card>
+                { id: 'table-operators', node: (
+              <Card className="gap-2 py-3">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" /> Топ-10 по забитым сваям</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={operatorChartData} margin={{ top: 10, right: 16, bottom: 40, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={50} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="Сваи" fill="#f97316" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Бурение" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-                ) },
-                { id: 'table-operators', node: (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Сводка по операторам</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -468,12 +407,30 @@ export function AdminAnalytics() {
           ) : trendChartData.length === 0 ? (
             <EmptyState text="Нет данных по неделям. Проекция SiteWeeklyTrend заполняется автоматически по мере поступления отчётов." />
           ) : sectionVisible('chart-trends') ? (
-            <Card>
+            <Card className="gap-2 py-3">
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Тренд за 8 недель</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Тренд за месяц</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={320}>
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-2xs text-slate-500">Объект:</span>
+                  {[{ id: 'all', name: 'Все объекты' }, ...sites].map((site) => (
+                    <button
+                      key={site.id}
+                      type="button"
+                      onClick={() => setTrendSiteId(site.id)}
+                      className={cn(
+                        'rounded-md border px-2 py-0.5 text-2xs transition-colors',
+                        trendSiteId === site.id
+                          ? 'border-blue-200 bg-blue-50 font-semibold text-blue-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50',
+                      )}
+                    >
+                      {site.name}
+                    </button>
+                  ))}
+                </div>
+                <ResponsiveContainer width="100%" height={115}>
                   <LineChart data={trendChartData} margin={{ top: 10, right: 16, bottom: 10, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="week" tick={{ fontSize: 11 }} />
@@ -501,22 +458,14 @@ export function AdminAnalytics() {
             <div className="space-y-4">
               {orderedSections([
                 { id: 'kpi-maintenance', node: (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <KpiCard label="Готовность парка" value={kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—'} hint="доля времени без ремонтов" />
-                <KpiCard label="MTBF" value={fmtHours(kpi.mtbfHours)} hint="наработка между отказами" />
-                <KpiCard label="MTTR" value={fmtHours(kpi.mttrHours)} hint="среднее время ремонта" />
-                <KpiCard label="Выполнение ППР" value={kpi.pmCompliance != null ? `${(kpi.pmCompliance * 100).toFixed(0)}%` : '—'} hint={`${kpi.pmClosed} из ${kpi.pmPlanned} закрыто`} />
-                <KpiCard label="Отказы за период" value={String(kpi.failureCount)} hint="ремонты + неисправности" />
-                <KpiCard label="Простой по ремонтам" value={fmtHours(kpi.downtimeHours)} hint="суммарно" />
-                <KpiCard label="Затраты на ТО" value={`${kpi.totalCost.toLocaleString('ru')} ₽`} hint="за период" />
-              </div>
+              <MaintenanceSummaryTile kpi={kpi} />
                 ) },
                 { id: 'table-problem-rigs', node: (
-              <Card>
+              <Card className="gap-2 py-3">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Топ проблемных установок</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="max-h-[118px] overflow-y-auto">
                   {kpi.topProblemRigs.length === 0 ? (
                     <p className="text-sm text-slate-500 py-4 text-center">Отказов за период не зафиксировано.</p>
                   ) : (
@@ -551,11 +500,11 @@ export function AdminAnalytics() {
 
       {/* Right column: рейтинг объектов по погонным метрам (real report data) */}
       {overview && sectionVisible('rating-sites') && (
-        <Card className="lg:sticky lg:top-4">
+        <Card className="gap-2 py-3 lg:sticky lg:top-4">
           <CardHeader>
             <CardTitle className="text-sm">Рейтинг объектов</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-[195px] overflow-y-auto">
             {overview.siteRating.length === 0 ? (
               <p className="py-4 text-center text-sm text-slate-500">За период нет отчётов.</p>
             ) : (
@@ -595,15 +544,32 @@ function fmtHours(h: number | null): string {
   return `${h.toFixed(1)} ч`;
 }
 
-function KpiCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+/**
+ * Надёжность ТО одной плиткой: семь отдельных карточек не помещались в блок
+ * шириной 704px, поэтому метрики сведены в одну сетку внутри общей рамки.
+ */
+function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
+  const metrics: { label: string; value: string; tone?: string }[] = [
+    { label: 'Готовность парка', value: kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—', tone: 'text-emerald-600' },
+    { label: 'MTBF', value: fmtHours(kpi.mtbfHours) },
+    { label: 'MTTR', value: fmtHours(kpi.mttrHours) },
+    { label: 'Выполнение ППР', value: kpi.pmCompliance != null ? `${(kpi.pmCompliance * 100).toFixed(0)}%` : '—' },
+    { label: 'Отказы за период', value: String(kpi.failureCount), tone: kpi.failureCount > 0 ? 'text-red-600' : undefined },
+    { label: 'Простой по ремонтам', value: fmtHours(kpi.downtimeHours) },
+    { label: 'Затраты на ТО', value: `${kpi.totalCost.toLocaleString('ru')} ₽` },
+    { label: 'ППР закрыто', value: `${kpi.pmClosed} / ${kpi.pmPlanned}` },
+  ];
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-xs text-slate-500">{label}</div>
-        <div className="mt-1 text-xl font-bold text-slate-900">{value}</div>
-        <div className="mt-0.5 text-2xs text-slate-400">{hint}</div>
-      </CardContent>
-    </Card>
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-4">
+        {metrics.map((m) => (
+          <div key={m.label} className="min-w-0">
+            <div className="truncate text-2xs text-slate-500">{m.label}</div>
+            <div className={cn('font-mono text-sm font-bold', m.tone ?? 'text-slate-900')}>{m.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

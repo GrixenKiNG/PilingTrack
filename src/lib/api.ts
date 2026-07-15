@@ -89,19 +89,44 @@ export async function logoutClient() {
   }
 }
 
-export async function fetchSessionUser() {
-  const res = await fetch('/api/auth/me', {
-    credentials: 'same-origin',
-  });
+type SessionUser = { id: string; email: string; name: string; role: UserRole };
 
-  if (!res.ok) {
-    return null;
+/**
+ * Результат проверки сессии. Три состояния, а не два: «не смогли проверить»
+ * (сеть/5xx) — это НЕ то же самое, что «сессии нет».
+ */
+export type SessionProbe =
+  | { status: 'authenticated'; user: SessionUser }
+  | { status: 'anonymous' }
+  | { status: 'unknown' };
+
+/**
+ * Проверяет сессию через /api/auth/me.
+ *
+ * Раньше здесь было `if (!res.ok) return null`, и вызывающий код трактовал
+ * null как «сессии нет» → принудительный logout + редирект на /login. Но 500
+ * (auth.ts отдаёт его на ЛЮБОЙ сбой БД) и сетевой обрыв попадали в ту же ветку,
+ * поэтому короткого моргания БД хватало, чтобы выкинуть работающего оператора
+ * из приложения. Явно разделяем «сервер сказал 401» и «проверить не удалось»:
+ * на 'unknown' сессию трогать нельзя.
+ */
+export async function probeSession(): Promise<SessionProbe> {
+  let res: Response;
+  try {
+    res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+  } catch {
+    return { status: 'unknown' };
   }
 
-  const data = (await res.json()) as {
-    user?: { id: string; email: string; name: string; role: UserRole };
-  };
-  return data.user || null;
+  if (res.status === 401) return { status: 'anonymous' };
+  if (!res.ok) return { status: 'unknown' };
+
+  try {
+    const data = (await res.json()) as { user?: SessionUser };
+    return data.user ? { status: 'authenticated', user: data.user } : { status: 'anonymous' };
+  } catch {
+    return { status: 'unknown' };
+  }
 }
 
 export function authGet(url: string) {
