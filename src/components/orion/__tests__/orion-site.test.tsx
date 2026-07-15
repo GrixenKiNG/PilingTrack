@@ -77,4 +77,44 @@ describe('ORION public site', () => {
     expect(screen.queryByText(/запрос принят/i)).not.toBeInTheDocument();
     expect(screen.getByText(/онлайн-отправка ещё не подключена/i)).toBeInTheDocument();
   });
+
+  it('reveals an accessible technical passport with document actions', () => {
+    render(<OrionSite />);
+
+    const toggle = screen.getByRole('button', {
+      name: /все характеристики pve 50pr/i,
+    });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', 'orion-profile-0-pve-50pr');
+    expect(screen.getByRole('region', {
+      name: /технические характеристики pve 50pr/i,
+    })).toBeVisible();
+    expect(screen.getByRole('link', {
+      name: /скачать pdf на русском/i,
+    })).toHaveAttribute('href', '/orion/specs/pve-50pr.pdf');
+    expect(screen.getByRole('link', {
+      name: /источник характеристик/i,
+    })).toHaveAttribute('target', '_blank');
+  });
+
+  it('keeps equipment passports expanded independently', () => {
+    render(<OrionSite />);
+
+    const pveToggle = screen.getByRole('button', {
+      name: /все характеристики pve 50pr/i,
+    });
+    const banutToggle = screen.getByRole('button', {
+      name: /все характеристики banut 655/i,
+    });
+
+    fireEvent.click(pveToggle);
+    fireEvent.click(banutToggle);
+
+    expect(pveToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(banutToggle).toHaveAttribute('aria-expanded', 'true');
+  });
 });
