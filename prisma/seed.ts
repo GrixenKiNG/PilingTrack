@@ -90,6 +90,22 @@ async function seed() {
 
   const tenantId = process.env.DEFAULT_TENANT_ID ?? 'orion';
 
+  // Тенант должен существовать до пользователей: User.tenantId ссылается на
+  // Tenant.id внешним ключом (User_tenantId_fkey, живёт с init-миграции).
+  // Сид его не создавал, поэтому на чистой базе (CI) падал с P2003 — E2E был
+  // красным. Локально это не всплывало: там база залита копией прода, где
+  // тенант уже есть.
+  await db.tenant.upsert({
+    where: { id: tenantId },
+    update: {},
+    create: {
+      id: tenantId,
+      slug: tenantId,
+      name: tenantId === 'orion' ? 'Orion Piling' : tenantId,
+      isActive: true,
+    },
+  });
+
   // Use fixed passwords for testing
   const adminPassword = 'admin123';
   const dispatcherPassword = 'dispatch123';
