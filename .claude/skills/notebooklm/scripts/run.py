@@ -9,6 +9,18 @@ import sys
 import subprocess
 from pathlib import Path
 
+# Windows consoles default to a legacy code page (e.g. cp1251) that cannot encode
+# the emoji this skill prints, which crashed run.py before any work happened.
+# Force UTF-8 for our own output and for every child script we spawn.
+if os.name == 'nt':
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding='utf-8')
+        except Exception:
+            pass
+    os.environ.setdefault('PYTHONUTF8', '1')
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+
 
 def get_venv_python():
     """Get the virtual environment Python executable"""
