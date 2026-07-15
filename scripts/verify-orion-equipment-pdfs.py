@@ -7,10 +7,17 @@ from pypdf import PdfReader
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "public" / "orion" / "specs"
 REFERENCE_PHRASE = "Справочные характеристики модели"
+BRANDING_PHRASES = (
+    "Справочная карточка ОРИОН",
+    "не официальный перевод производителя",
+)
 DISCLAIMER = (
     "Справочные характеристики модели. Фактическая комплектация конкретной "
     "установки уточняется по паспорту машины."
 )
+A4_WIDTH_POINTS = 595.28
+A4_HEIGHT_POINTS = 841.89
+A4_TOLERANCE_POINTS = 1.0
 
 EXPECTED_PDFS = {
     "pve-50pr.pdf": (
@@ -43,12 +50,6 @@ EXPECTED_PDFS = {
 }
 
 
-def extract_text(pdf_path: Path) -> str:
-    reader = PdfReader(pdf_path)
-    assert reader.pages, f"{pdf_path.name}: PDF has no pages"
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
-
-
 def main() -> None:
     present = {path.name for path in OUTPUT_DIR.glob("*.pdf")} if OUTPUT_DIR.exists() else set()
     expected = set(EXPECTED_PDFS)
@@ -66,9 +67,33 @@ def main() -> None:
         if not pdf_path.exists():
             continue
 
-        text = " ".join(extract_text(pdf_path).split())
+        reader = PdfReader(pdf_path)
+        if len(reader.pages) != 1:
+            errors.append(f"{filename}: expected exactly 1 page, found {len(reader.pages)}")
+            continue
+
+        page = reader.pages[0]
+        width = float(page.mediabox.width)
+        height = float(page.mediabox.height)
+        if (
+            abs(width - A4_WIDTH_POINTS) > A4_TOLERANCE_POINTS
+            or abs(height - A4_HEIGHT_POINTS) > A4_TOLERANCE_POINTS
+        ):
+            errors.append(
+                f"{filename}: expected A4 mediabox within {A4_TOLERANCE_POINTS} pt, "
+                f"found {width:.2f} x {height:.2f} pt"
+            )
+
+        text = " ".join((page.extract_text() or "").split())
         source_host = urlparse(source_url).netloc
-        for expected_text in (model, source_host, REFERENCE_PHRASE, DISCLAIMER):
+        expected_texts = (
+            model,
+            source_host,
+            REFERENCE_PHRASE,
+            DISCLAIMER,
+            *BRANDING_PHRASES,
+        )
+        for expected_text in expected_texts:
             if expected_text not in text:
                 errors.append(f"{filename}: missing text {expected_text!r}")
 
