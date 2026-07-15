@@ -8,6 +8,10 @@ vi.mock('../orion-site.module.css', () => ({
 }));
 import { OrionSite } from '../orion-site';
 import { orionEquipment, orionProcessSteps, orionProofPoints, orionStories } from '../orion-content';
+import {
+  ORION_PROFILE_DISCLAIMER,
+  orionEquipmentProfiles,
+} from '../orion-equipment-profiles';
 
 describe('ORION public site', () => {
   it('uses the eight confirmed fleet units and no fictional project stories', () => {
@@ -38,6 +42,16 @@ describe('ORION public site', () => {
     for (const equipment of orionEquipment) {
       expect(equipment.photos).toHaveLength(5);
       expect(equipment.photos.every(({ sourceUrl }) => sourceUrl.startsWith('https://'))).toBe(true);
+    }
+    expect(new Set(orionEquipment.map((item) => item.profileKey))).toHaveLength(6);
+
+    for (const profile of Object.values(orionEquipmentProfiles)) {
+      expect(profile.description.length).toBeGreaterThan(80);
+      expect(profile.specifications.length).toBeGreaterThanOrEqual(3);
+      expect(profile.features.length).toBeGreaterThanOrEqual(3);
+      expect(profile.source.url).toMatch(/^https:\/\//);
+      expect(profile.pdfPath).toMatch(/^\/orion\/specs\/.+\.pdf$/);
+      expect(profile.disclaimer).toBe(ORION_PROFILE_DISCLAIMER);
     }
   });
 

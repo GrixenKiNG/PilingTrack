@@ -1,3 +1,5 @@
+import type { OrionEquipmentProfileKey } from './orion-equipment-profiles';
+
 export type OrionEquipmentPhoto = {
   src: string;
   alt: string;
@@ -7,6 +9,7 @@ export type OrionEquipmentPhoto = {
 
 export type OrionEquipment = {
   name: string;
+  profileKey: OrionEquipmentProfileKey;
   category: string;
   summary: string;
   photoSlots: 5;
@@ -64,14 +67,14 @@ export type OrionStory = {
 };
 
 export const orionEquipment: OrionEquipment[] = [
-  { name: 'PVE 50PR', category: 'Вибропогружение', summary: 'Погружение и извлечение шпунта и свай.', photoSlots: 5, photos: pvePhotos },
-  { name: 'Liebherr LRH 100 №1', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', photoSlots: 5, photos: liebherrPhotos },
-  { name: 'Liebherr LRH 100 №2', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', photoSlots: 5, photos: liebherrPhotos },
-  { name: 'КБУРГ-16.02 №1', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', photoSlots: 5, photos: kburgPhotos },
-  { name: 'КБУРГ-16.02 №2', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', photoSlots: 5, photos: kburgPhotos },
-  { name: 'Kopernik-SD-20', category: 'Сваебойные работы', summary: 'Работа со сваями длиной до 20 метров.', photoSlots: 5, photos: kopernikPhotos },
-  { name: 'Banut 655', category: 'Свайные работы', summary: 'Универсальная работа с гидромолотом.', photoSlots: 5, photos: banutPhotos },
-  { name: 'Bauer RTG RM20', category: 'Буровые работы', summary: 'Бурение и устройство оснований.', photoSlots: 5, photos: bauerPhotos },
+  { name: 'PVE 50PR', profileKey: 'pve-50pr', category: 'Вибропогружение', summary: 'Погружение и извлечение шпунта и свай.', photoSlots: 5, photos: pvePhotos },
+  { name: 'Liebherr LRH 100 №1', profileKey: 'liebherr-lrh100', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', photoSlots: 5, photos: liebherrPhotos },
+  { name: 'Liebherr LRH 100 №2', profileKey: 'liebherr-lrh100', category: 'Свайные работы', summary: 'Свайные работы и лидерное бурение.', photoSlots: 5, photos: liebherrPhotos },
+  { name: 'КБУРГ-16.02 №1', profileKey: 'kburg-16', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', photoSlots: 5, photos: kburgPhotos },
+  { name: 'КБУРГ-16.02 №2', profileKey: 'kburg-16', category: 'Копрово-буровые работы', summary: 'Лидерное бурение и монтаж свай.', photoSlots: 5, photos: kburgPhotos },
+  { name: 'Kopernik-SD-20', profileKey: 'kopernik-sd20c', category: 'Сваебойные работы', summary: 'Работа со сваями длиной до 20 метров.', photoSlots: 5, photos: kopernikPhotos },
+  { name: 'Banut 655', profileKey: 'banut-655', category: 'Свайные работы', summary: 'Универсальная работа с гидромолотом.', photoSlots: 5, photos: banutPhotos },
+  { name: 'Bauer RTG RM20', profileKey: 'bauer-rtg-rm20', category: 'Буровые работы', summary: 'Бурение и устройство оснований.', photoSlots: 5, photos: bauerPhotos },
 ];
 
 export const orionStories: OrionStory[] = [];
