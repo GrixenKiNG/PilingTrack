@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../orion-site.module.css', () => ({
@@ -43,7 +43,16 @@ describe('ORION public site', () => {
       expect(equipment.photos).toHaveLength(5);
       expect(equipment.photos.every(({ sourceUrl }) => sourceUrl.startsWith('https://'))).toBe(true);
     }
-    expect(new Set(orionEquipment.map((item) => item.profileKey))).toHaveLength(6);
+    expect(orionEquipment.map(({ name, profileKey }) => ({ name, profileKey }))).toEqual([
+      { name: 'PVE 50PR', profileKey: 'pve-50pr' },
+      { name: 'Liebherr LRH 100 №1', profileKey: 'liebherr-lrh100' },
+      { name: 'Liebherr LRH 100 №2', profileKey: 'liebherr-lrh100' },
+      { name: 'КБУРГ-16.02 №1', profileKey: 'kburg-16' },
+      { name: 'КБУРГ-16.02 №2', profileKey: 'kburg-16' },
+      { name: 'Kopernik-SD-20', profileKey: 'kopernik-sd20c' },
+      { name: 'Banut 655', profileKey: 'banut-655' },
+      { name: 'Bauer RTG RM20', profileKey: 'bauer-rtg-rm20' },
+    ]);
 
     for (const profile of Object.values(orionEquipmentProfiles)) {
       expect(profile.description.length).toBeGreaterThan(80);
@@ -53,6 +62,9 @@ describe('ORION public site', () => {
       expect(profile.pdfPath).toMatch(/^\/orion\/specs\/.+\.pdf$/);
       expect(profile.disclaimer).toBe(ORION_PROFILE_DISCLAIMER);
     }
+    expect(orionEquipmentProfiles['liebherr-lrh100'].source.url).toBe(
+      'https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-data-sheet-specifications-10538148-english.pdf',
+    );
   });
 
   it('offers an engineering consultation and labels future project stories honestly', () => {
@@ -78,8 +90,12 @@ describe('ORION public site', () => {
     expect(screen.getByText(/онлайн-отправка ещё не подключена/i)).toBeInTheDocument();
   });
 
-  it('reveals an accessible technical passport with document actions', () => {
+  it('reveals a complete accessible technical passport and closes it again', () => {
     render(<OrionSite />);
+
+    const highlights = screen.getByLabelText('Ключевые характеристики PVE 50PR');
+    expect(within(highlights).getAllByRole('term')).toHaveLength(3);
+    expect(within(highlights).getAllByRole('definition')).toHaveLength(3);
 
     const toggle = screen.getByRole('button', {
       name: /все характеристики pve 50pr/i,
@@ -90,31 +106,58 @@ describe('ORION public site', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAttribute('aria-controls', 'orion-profile-0-pve-50pr');
-    expect(screen.getByRole('region', {
+    const region = screen.getByRole('region', {
       name: /технические характеристики pve 50pr/i,
-    })).toBeVisible();
-    expect(screen.getByRole('link', {
+    });
+    expect(region).toBeVisible();
+    expect(within(region).getByText(ORION_PROFILE_DISCLAIMER, { exact: true })).toBeVisible();
+    expect(within(region).getByText('Подготовлено 15.07.2026.', { exact: true })).toBeVisible();
+
+    const downloadLink = within(region).getByRole('link', {
       name: /скачать pdf на русском/i,
-    })).toHaveAttribute('href', '/orion/specs/pve-50pr.pdf');
-    expect(screen.getByRole('link', {
+    });
+    expect(downloadLink).toHaveAttribute('href', '/orion/specs/pve-50pr.pdf');
+    expect(downloadLink).toHaveAttribute('download');
+
+    const sourceLink = within(region).getByRole('link', {
       name: /источник характеристик/i,
-    })).toHaveAttribute('target', '_blank');
+    });
+    expect(sourceLink).toHaveAttribute('target', '_blank');
+    expect(sourceLink).toHaveAttribute('rel', 'noreferrer');
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', {
+      name: /технические характеристики pve 50pr/i,
+    })).not.toBeInTheDocument();
   });
 
-  it('keeps equipment passports expanded independently', () => {
+  it('keeps duplicate-model equipment passports expanded independently', () => {
     render(<OrionSite />);
 
-    const pveToggle = screen.getByRole('button', {
-      name: /все характеристики pve 50pr/i,
+    const firstToggle = screen.getByRole('button', {
+      name: /все характеристики liebherr lrh 100 №1/i,
     });
-    const banutToggle = screen.getByRole('button', {
-      name: /все характеристики banut 655/i,
+    const secondToggle = screen.getByRole('button', {
+      name: /все характеристики liebherr lrh 100 №2/i,
     });
 
-    fireEvent.click(pveToggle);
-    fireEvent.click(banutToggle);
+    fireEvent.click(firstToggle);
+    fireEvent.click(secondToggle);
 
-    expect(pveToggle).toHaveAttribute('aria-expanded', 'true');
-    expect(banutToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(firstToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(secondToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', {
+      name: /технические характеристики liebherr lrh 100 №1/i,
+    })).toBeVisible();
+    expect(screen.getByRole('region', {
+      name: /технические характеристики liebherr lrh 100 №2/i,
+    })).toBeVisible();
+
+    fireEvent.click(firstToggle);
+
+    expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(secondToggle).toHaveAttribute('aria-expanded', 'true');
   });
 });

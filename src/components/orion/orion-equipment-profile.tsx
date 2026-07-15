@@ -3,6 +3,7 @@ import type { OrionEquipmentProfile } from './orion-equipment-profiles';
 import styles from './orion-site.module.css';
 
 type OrionEquipmentProfilePanelProps = {
+  equipmentName: string;
   profile: OrionEquipmentProfile;
   panelId: string;
   expanded: boolean;
@@ -10,6 +11,7 @@ type OrionEquipmentProfilePanelProps = {
 };
 
 export function OrionEquipmentProfilePanel({
+  equipmentName,
   profile,
   panelId,
   expanded,
@@ -22,7 +24,7 @@ export function OrionEquipmentProfilePanel({
 
   return (
     <div>
-      <dl className={styles.machineHighlights} aria-label={`Ключевые характеристики ${profile.model}`}>
+      <dl className={styles.machineHighlights} aria-label={`Ключевые характеристики ${equipmentName}`}>
         {highlightedSpecifications.map((specification) => (
           <div key={specification.label}>
             <dt>{specification.label}</dt>
@@ -33,6 +35,7 @@ export function OrionEquipmentProfilePanel({
 
       <button
         aria-controls={panelId}
+        aria-label={`Все характеристики ${equipmentName}`}
         aria-expanded={expanded}
         className={styles.profileToggle}
         onClick={onToggle}
@@ -43,7 +46,7 @@ export function OrionEquipmentProfilePanel({
       </button>
 
       <section
-        aria-label={`Технические характеристики ${profile.model}`}
+        aria-label={`Технические характеристики ${equipmentName}`}
         className={styles.profilePanel}
         hidden={!expanded}
         id={panelId}
@@ -64,9 +67,8 @@ export function OrionEquipmentProfilePanel({
           {profile.features.map((feature) => <li key={feature}>{feature}</li>)}
         </ul>
 
-        <p className={styles.profileNotice}>
-          {profile.disclaimer} Подготовлено {profile.preparedAt}.
-        </p>
+        <p className={styles.profileNotice}>{profile.disclaimer}</p>
+        <p>Подготовлено {profile.preparedAt}.</p>
 
         <div className={styles.profileActions}>
           <a download href={profile.pdfPath}>

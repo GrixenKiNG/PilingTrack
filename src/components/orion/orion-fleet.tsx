@@ -41,6 +41,7 @@ export function OrionFleet() {
                   <span>{equipment.summary}</span>
                   <a href={activePhoto.sourceUrl} target="_blank" rel="noreferrer">{activePhoto.credit} · источник <ArrowDownRight size={14} /></a>
                   <OrionEquipmentProfilePanel
+                    equipmentName={equipment.name}
                     expanded={profileExpanded}
                     onToggle={() => setExpandedProfiles((current) => ({
                       ...current,

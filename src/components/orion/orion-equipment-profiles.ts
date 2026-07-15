@@ -54,7 +54,7 @@ export const orionEquipmentProfiles: Record<OrionEquipmentProfileKey, OrionEquip
       { label: 'Транспортировка', value: 'В собранном виде' },
     ],
     features: ['Работа со сваями длиной до 19,0 м', 'Диапазон массы падающей части 2,5–7 т', 'Транспортировка в собранном виде'],
-    source: { label: 'Liebherr — LRH 100', url: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
+    source: { label: 'Liebherr — LRH 100', url: 'https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-data-sheet-specifications-10538148-english.pdf' },
     pdfPath: '/orion/specs/liebherr-lrh100.pdf',
     preparedAt: '15.07.2026',
     disclaimer: ORION_PROFILE_DISCLAIMER,
