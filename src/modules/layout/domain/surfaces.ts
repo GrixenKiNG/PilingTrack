@@ -21,8 +21,8 @@ import {
   DEFAULT_EQUIPMENT_CARD_TEMPLATE,
   EQUIPMENT_CARD_DATA_KEYS,
 } from '@/components/piling/admin-equipment/equipment-card-template';
-import { createTemplateValidator } from '@/components/piling/layout-editor/layout-template';
-import { createPageLayoutValidator } from '@/components/piling/layout-editor/page-layout-template';
+import { createTemplateValidator } from './layout-template';
+import { createPageLayoutValidator } from './page-layout-template';
 import {
   ANALYTICS_DASHBOARD_SURFACE_ID,
   ANALYTICS_DASHBOARD_WIDGET_IDS,
