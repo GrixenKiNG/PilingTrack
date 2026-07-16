@@ -1,0 +1,172 @@
+{
+  "pve-50pr.pdf": {
+    "model": "PVE 50PR",
+    "source": {
+      "label": "Dieseko Group — PVE/Woltman 50 PR-FF brochure",
+      "url": "https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf"
+    },
+    "specifications": [
+      {
+        "label": "Длина лидера",
+        "value": "24,8 / 27,8 м"
+      },
+      {
+        "label": "Масса сваи и молота",
+        "value": "18,5 т"
+      },
+      {
+        "label": "Мощность двигателя",
+        "value": "250 л. с."
+      },
+      {
+        "label": "Транспортная ширина",
+        "value": "3,45 м"
+      }
+    ]
+  },
+  "liebherr-lrh100.pdf": {
+    "model": "Liebherr LRH 100",
+    "source": {
+      "label": "Liebherr — LRH 100",
+      "url": "https://www.liebherr.com/shared/media/construction-machinery/deep-foundation/pdf/data-sheet-archive/lrb-series/liebherr-lrh-100-piling-rig-english-technical-data-sheet-specifications-10538148-english.pdf"
+    },
+    "specifications": [
+      {
+        "label": "Длина сваи",
+        "value": "19,0 м"
+      },
+      {
+        "label": "Эксплуатационная масса",
+        "value": "65 т"
+      },
+      {
+        "label": "Масса падающей части",
+        "value": "2,5–7 т"
+      },
+      {
+        "label": "Наклон",
+        "value": "±18,4°"
+      },
+      {
+        "label": "Транспортировка",
+        "value": "В собранном виде"
+      }
+    ]
+  },
+  "kburg-16.pdf": {
+    "model": "КБУРГ-16",
+    "source": {
+      "label": "Gruzovik.com — КБУРГ-16",
+      "url": "https://www.gruzovik.com/stroitelnaya-tehnika/svaeboynye-ustanovki/bashstroy-kburg-16-a9759783.html"
+    },
+    "specifications": [
+      {
+        "label": "Длина сваи",
+        "value": "16 м"
+      },
+      {
+        "label": "Сечение сваи",
+        "value": "400 × 400 мм"
+      },
+      {
+        "label": "Масса сваи",
+        "value": "6,5 т"
+      },
+      {
+        "label": "Масса установки",
+        "value": "49,1 т"
+      },
+      {
+        "label": "Скорость бурения",
+        "value": "23 об/мин"
+      }
+    ]
+  },
+  "kopernik-sd20c.pdf": {
+    "model": "Kopernik SD-20C",
+    "source": {
+      "label": "Экскаватор Ру — Kopernik SD-20C",
+      "url": "https://exkavator.ru/excapedia/technic/kopernik_sd-20c"
+    },
+    "specifications": [
+      {
+        "label": "Масса без инструмента",
+        "value": "57 т"
+      },
+      {
+        "label": "Мощность двигателя",
+        "value": "267 л. с."
+      },
+      {
+        "label": "Диаметр бурения с обсадной трубой",
+        "value": "2000 мм"
+      },
+      {
+        "label": "Диаметр бурения без обсадной трубы",
+        "value": "1500 мм"
+      },
+      {
+        "label": "Высота мачты",
+        "value": "21,57 м"
+      },
+      {
+        "label": "Частота вращения",
+        "value": "8–30 об/мин"
+      }
+    ]
+  },
+  "banut-655.pdf": {
+    "model": "Banut 655",
+    "source": {
+      "label": "Экскаватор Ру — Banut 655",
+      "url": "https://exkavator.ru/excapedia/technic/banut_655"
+    },
+    "specifications": [
+      {
+        "label": "Длина сваи",
+        "value": "20 м"
+      },
+      {
+        "label": "Полезная длина лидера",
+        "value": "15 м"
+      },
+      {
+        "label": "Масса",
+        "value": "Около 70 т"
+      },
+      {
+        "label": "Мощность двигателя",
+        "value": "261 кВт"
+      },
+      {
+        "label": "Масса сваи",
+        "value": "8,5–12 т"
+      }
+    ]
+  },
+  "bauer-rtg-rm20.pdf": {
+    "model": "Bauer RTG RM20",
+    "source": {
+      "label": "Equipment Corporation of America — RM 20",
+      "url": "https://www.ecanet.com/equipment/rm-20"
+    },
+    "specifications": [
+      {
+        "label": "Длина сваи",
+        "value": "20 м"
+      },
+      {
+        "label": "Масса падающей части",
+        "value": "10 т"
+      },
+      {
+        "label": "Мощность двигателя",
+        "value": "201 кВт"
+      },
+      {
+        "label": "Высота",
+        "value": "25,7 м"
+      }
+    ]
+  }
+}

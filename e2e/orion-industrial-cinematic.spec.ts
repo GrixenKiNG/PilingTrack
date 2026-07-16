@@ -17,6 +17,50 @@ test.describe('ORION Industrial Cinematic', () => {
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
   });
 
+  // AC: At 375x812, the PVE 50PR passport exposes its sourced details and stays usable without horizontal overflow.
+  // Behavior: Open the PVE passport -> inspect its document actions -> close it with Enter.
+  // @category: fixture-e2e
+  // @lane: fixture-e2e
+  // @dependency: ORION static equipment profiles
+  // @complexity: medium
+  // ROI: 65
+  test('opens and closes the PVE technical passport on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/orion');
+
+    const toggle = page.getByRole('button', { name: 'Все характеристики PVE 50PR' });
+    await toggle.scrollIntoViewIfNeeded();
+    await toggle.click();
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const region = page.getByRole('region', { name: 'Технические характеристики PVE 50PR' });
+    await expect(region).toBeVisible();
+    await expect(region.getByText(
+      'Справочные характеристики модели. Фактическая комплектация конкретной установки уточняется по паспорту машины.',
+      { exact: true },
+    )).toBeVisible();
+
+    const downloadLink = region.getByRole('link', { name: /скачать pdf на русском/i });
+    await expect(downloadLink).toHaveAttribute('href', '/orion/specs/pve-50pr.pdf');
+    await expect(downloadLink).toHaveAttribute('download', '');
+
+    const sourceLink = region.getByRole('link', { name: /источник характеристик/i });
+    await expect(sourceLink).toHaveAttribute('href', 'https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf');
+    await expect(sourceLink).toHaveAttribute('target', '_blank');
+    await expect(sourceLink).toHaveAttribute('rel', 'noreferrer');
+
+    const metrics = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(region).toBeHidden();
+  });
+
   test('keeps content available with reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/orion');

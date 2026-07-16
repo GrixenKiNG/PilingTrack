@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { ArrowDownRight, HardHat } from 'lucide-react';
 import { orionEquipment } from './orion-content';
+import { OrionEquipmentProfilePanel } from './orion-equipment-profile';
+import { orionEquipmentProfiles } from './orion-equipment-profiles';
 import styles from './orion-site.module.css';
 
 export function OrionFleet() {
   const [activePhotos, setActivePhotos] = useState<Record<string, number>>({});
+  const [expandedProfiles, setExpandedProfiles] = useState<Record<string, boolean>>({});
 
   return (
     <section className={styles.fleet} id="fleet">
@@ -20,6 +23,9 @@ export function OrionFleet() {
         {orionEquipment.map((equipment, index) => {
           const activeIndex = activePhotos[equipment.name] ?? 0;
           const activePhoto = equipment.photos[activeIndex] ?? equipment.photos[0];
+          const profile = orionEquipmentProfiles[equipment.profileKey];
+          const panelId = `orion-profile-${index}-${equipment.profileKey}`;
+          const profileExpanded = expandedProfiles[equipment.name] ?? false;
 
           return (
             <article className={styles.machine} key={equipment.name}>
@@ -34,6 +40,16 @@ export function OrionFleet() {
                   <h3>{equipment.name}</h3>
                   <span>{equipment.summary}</span>
                   <a href={activePhoto.sourceUrl} target="_blank" rel="noreferrer">{activePhoto.credit} · источник <ArrowDownRight size={14} /></a>
+                  <OrionEquipmentProfilePanel
+                    equipmentName={equipment.name}
+                    expanded={profileExpanded}
+                    onToggle={() => setExpandedProfiles((current) => ({
+                      ...current,
+                      [equipment.name]: !profileExpanded,
+                    }))}
+                    panelId={panelId}
+                    profile={profile}
+                  />
                 </div>
                 <div className={styles.machineThumbs} aria-label={`Фотографии ${equipment.name}`}>
                   {Array.from({ length: equipment.photoSlots }, (_, photoIndex) => {
