@@ -330,7 +330,7 @@ export function AdminDictionaries() {
       <div className="min-w-0 space-y-4">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight text-slate-950">Справочники</h1><p className="mt-1 text-sm text-slate-500">Рабочие значения вашей организации для отчётов и планирования</p></div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-2xs font-medium text-slate-400">Ctrl + K</kbd></div><div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 rounded-md border border-slate-200 bg-white py-0 pl-9 pr-3 text-sm"><option value="active">Активные / Архив / Все</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 bg-orange-500 text-white hover:bg-orange-600" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />Добавить</Button></div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-2xs font-medium text-slate-400">Ctrl + K</kbd></div><div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 rounded-md border border-slate-200 bg-white py-0 pl-9 pr-3 text-sm"><option value="active">Активные / Архив / Все</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 bg-orange-500 text-white hover:bg-orange-600" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />Добавить</Button></div>
       </header>
 
       {loadError ? (
@@ -343,7 +343,9 @@ export function AdminDictionaries() {
         </Alert>
       ) : (
         <Tabs value={activeKind} onValueChange={(value) => setActiveKind(value as DictionaryKind)}>
-          <div className="border-b border-slate-200">
+          {/* overflow-x-auto: панель вкладок шире 390px и на мобильном распирала
+              страницу горизонтально — теперь прокручивается внутри себя. */}
+          <div className="overflow-x-auto border-b border-slate-200">
             <TabsList className="h-12 rounded-none bg-transparent p-0">
               {KINDS.map(({ kind, title, icon: Icon }) => (
                 <TabsTrigger key={kind} value={kind} className="h-12 rounded-none border-b-2 border-transparent px-6 data-[state=active]:border-orange-500 data-[state=active]:bg-white data-[state=active]:shadow-none"><Icon className="mr-1.5 h-4 w-4" />{title}</TabsTrigger>
