@@ -119,3 +119,13 @@ scripts/prod-dump.sql.gz
 
 # Isolated feature worktrees
 .worktrees/
+
+# local tool/state dirs
+.mimocode/
+
+# local design prototypes (not for prod public/)
+public/prototypes/
+
+# root design-scratch mockups (not shipped)
+/design-vision.html
+/pilingtrack-*.html

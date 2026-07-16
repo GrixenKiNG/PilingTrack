@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Users, Clock, AlertTriangle, ExternalLink, Wrench, BookText, FileX } from 'lucide-react';
+import { Users, Clock, AlertTriangle, ExternalLink, Wrench, BookText, FileX } from '@/components/piling/icons/unified-icons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -62,22 +62,28 @@ export function EquipmentTile({
     >
       <div className={cn('h-1 w-full', barClass)} />
       <CardContent className="p-4">
+        {brand && (
+          <div className="mb-3 flex justify-center">
+            <div
+              className={cn('flex items-center justify-center', brand.logoBg && 'rounded-xl px-4 py-3')}
+              style={brand.logoBg ? { background: brand.logoBg } : undefined}
+            >
+              <Image
+                src={brand.logoSrc}
+                alt={brand.name}
+                title={brand.name}
+                width={brand.compact ? 96 : 128}
+                height={brand.compact ? 96 : 128}
+                className={cn('object-contain', brand.compact ? 'h-24 w-24' : 'h-32 w-32')}
+                style={brand.compact ? { transform: 'scaleX(1.1)' } : undefined}
+                unoptimized
+              />
+            </div>
+          </div>
+        )}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              {brand && (
-                <Image
-                  src={brand.logoSrc}
-                  alt={brand.name}
-                  title={brand.name}
-                  width={16}
-                  height={16}
-                  className="h-4 w-4 shrink-0 object-contain"
-                  unoptimized
-                />
-              )}
-              <p className="truncate text-sm font-semibold text-slate-900">{card.name}</p>
-            </div>
+            <p className="truncate text-sm font-semibold text-slate-900">{card.name}</p>
             <p className="text-xs text-slate-500">
               {KIND_LABEL[card.kind]}
               {card.manufactureYear ? ` · ${card.manufactureYear} г.` : ''}

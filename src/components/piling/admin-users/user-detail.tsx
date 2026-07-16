@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil, Power, PowerOff, Trash2 } from 'lucide-react';
+import { Pencil, Power, PowerOff, Trash2 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ROLE_LABELS, type OperationalUserDTO } from '@/lib/types';

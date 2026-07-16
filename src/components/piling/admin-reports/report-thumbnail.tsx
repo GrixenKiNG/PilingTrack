@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Image as ImageIcon, X } from 'lucide-react';
+import { Image as ImageIcon, X } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 
 interface Props {

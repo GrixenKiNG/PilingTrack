@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType, ReactNode } from 'react';
-import { History, X } from 'lucide-react';
+import { History, X } from '@/components/piling/icons/unified-icons';
 
 /**
  * Right-hand detail panel shell. Sticky on wide viewports. The body is whatever

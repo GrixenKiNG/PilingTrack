@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus, CheckCircle2 } from 'lucide-react';
+import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus, CheckCircle2 } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -275,8 +275,8 @@ export function AdminSites() {
             />
           )
           : <OpsDetailEmpty message="Выберите объект, чтобы увидеть план/факт, иерархию и историю." />}
+        kpi={<OpsKpiBar items={kpis} />}
       >
-        <OpsKpiBar items={kpis} />
         <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${allRows.length}`} />
         <OpsTable
           columns={columns}

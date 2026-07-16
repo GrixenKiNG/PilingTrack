@@ -9,7 +9,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { ReportDTO } from '@/lib/types';
 
-vi.mock('lucide-react', () => ({
+vi.mock('lucide-react', async (importActual) => ({
+  ...(await importActual<typeof import('lucide-react')>()),
   HardHat: () => null,
   Drill: () => null,
   Clock: () => null,

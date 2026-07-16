@@ -16,10 +16,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Gauge, HardHat, Drill, Clock, Fuel, Wrench, Printer, ArrowUpDown,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { KIND_LABELS } from '@/components/piling/admin-equipment/equipment-form';
 import type { EquipmentKindDTO } from '@/lib/types';
 import { appPageRoute } from '@/lib/routes';
@@ -187,19 +188,9 @@ function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
     { label: 'ТО', icon: Wrench, value: String(fleet.maintenanceDueCount), detail: 'скоро / просрочено', alert: fleet.maintenanceDueCount > 0 },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+    <div className={KPI_GRID} style={kpiGridStyle(tiles.length)}>
       {tiles.map((t) => (
-        <div key={t.label} className="kpi-animated relative rounded-lg border p-4 shadow-sm">
-          {t.alert && (
-            <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-white" aria-label="Требует внимания" />
-          )}
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-white/85">{t.label}</span>
-            <t.icon className="h-4 w-4 text-white/85" />
-          </div>
-          <p className="font-mono text-xl font-bold tabular-nums text-white">{t.value}</p>
-          <p className="mt-1 text-3xs text-white/75">{t.detail}</p>
-        </div>
+        <KpiTile key={t.label} icon={t.icon} label={t.label} value={t.value} detail={t.detail} alert={t.alert} />
       ))}
     </div>
   );

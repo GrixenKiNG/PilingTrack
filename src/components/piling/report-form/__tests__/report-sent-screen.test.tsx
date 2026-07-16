@@ -2,10 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ReportSentScreen } from '../report-sent-screen';
 
-vi.mock('lucide-react', () => ({
-  CheckCircle2: () => <div data-testid="check-icon" />,
-}));
-
 const baseProps = {
   siteName: 'Ленина 12',
   date: '2026-05-29',

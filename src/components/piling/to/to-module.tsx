@@ -24,7 +24,7 @@ import {
   SlidersHorizontal,
   Wrench,
   type LucideIcon,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { cn } from '@/lib/utils';
 import { healthScoreColor } from '@/components/piling/inspections/inspection-labels';
 import { MeterReadingsPanel } from './meter-readings-panel';
@@ -267,12 +268,21 @@ export function ToModule() {
           </section>
         </div>
       )}
+      {/* KPI — во всю ширину, над тремя колонками: в средней колонке плитки в
+          один ряд ужимались до ~160px и подпись переносилась в четыре строки. */}
+      <section className={`mx-auto w-full max-w-[1500px] ${KPI_GRID}`} style={kpiGridStyle(4)}>
+        <KpiTile icon={ClipboardCheck} label="ТО и осмотры" value={stats.inspections} />
+        <KpiTile icon={Wrench} label="ремонт / отказы" value={stats.repairs} />
+        <KpiTile icon={AlertTriangle} label="открыто" value={stats.open} />
+        <KpiTile icon={ShieldCheck} label="средний балл" value={stats.averageScore ?? '—'} />
+      </section>
+
       <div className="mx-auto grid w-full max-w-[1500px] gap-4 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
         <aside className="space-y-3">
           <section className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold tracking-normal text-slate-950">Техготовность</h1>
+                <h1 className="text-xl font-bold tracking-normal text-slate-950">Техготовность</h1>
                 <p className="text-xs text-slate-500">наряды, осмотры и журнал по установке</p>
               </div>
               <SlidersHorizontal className="h-5 w-5 text-orange-500" />
@@ -358,13 +368,6 @@ export function ToModule() {
                 </Button>
               </div>
             </div>
-          </section>
-
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard icon={ClipboardCheck} label="ТО и осмотры" value={stats.inspections} />
-            <KpiCard icon={Wrench} label="ремонт / отказы" value={stats.repairs} tone="amber" />
-            <KpiCard icon={AlertTriangle} label="открыто" value={stats.open} tone="red" />
-            <KpiCard icon={ShieldCheck} label="средний балл" value={stats.averageScore ?? '—'} tone="green" />
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-white">
@@ -482,32 +485,6 @@ export function ToModule() {
             </div>
           </section>
         </aside>
-      </div>
-    </div>
-  );
-}
-
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  tone = 'blue',
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string | number;
-  tone?: 'blue' | 'amber' | 'red' | 'green';
-}) {
-  // tone retained for call-site clarity; all KPI tiles use the shared animated
-  // gradient (.kpi-animated) for a consistent look.
-  void tone;
-
-  return (
-    <div className="kpi-animated flex h-[74px] items-center gap-3 rounded-lg border px-4">
-      <Icon className="h-7 w-7 shrink-0 text-white/90" strokeWidth={1.8} />
-      <div>
-        <div className="font-mono text-2xl font-bold text-white">{value}</div>
-        <div className="text-xs text-white/80">{label}</div>
       </div>
     </div>
   );

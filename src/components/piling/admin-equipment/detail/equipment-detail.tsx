@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, Printer, Timer, ClipboardList } from 'lucide-react';
+import { Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, Printer, Timer, ClipboardList } from '@/components/piling/icons/unified-icons';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';

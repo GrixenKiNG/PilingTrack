@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HardHat, ArrowLeft } from 'lucide-react';
+import { HardHat, ArrowLeft } from '@/components/piling/icons/unified-icons';
 
 /**
  * Русская страница 404 в стиле приложения. Заменяет дефолтную англоязычную

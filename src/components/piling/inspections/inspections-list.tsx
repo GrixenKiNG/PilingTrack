@@ -9,7 +9,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
@@ -18,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { PilingIcon } from '@/components/piling/icons';
 import {
   LEVEL_LABEL, LEVEL_STYLE, STATUS_LABEL, STATUS_STYLE, healthScoreColor,
   type InspectionLevel, type InspectionStatus,
@@ -61,10 +61,10 @@ export function InspectionsList() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-800">Осмотры</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold text-slate-800"><PilingIcon name="inspection" size={24} tone="success" decorative />Осмотры</h1>
         <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
           <Link href="/inspections/new">
-            <Plus className="w-3.5 h-3.5 mr-1" /> Провести осмотр
+            <PilingIcon name="inspection" size={16} tone="success" decorative className="mr-1 !text-white" /> Провести осмотр
           </Link>
         </Button>
       </div>
@@ -95,7 +95,7 @@ export function InspectionsList() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <ClipboardList className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <PilingIcon name="inspection" size={16} tone="info" decorative />
                     <span className="font-medium truncate">
                       {r.equipment?.name ?? '—'}
                     </span>

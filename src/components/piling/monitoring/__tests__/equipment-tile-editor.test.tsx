@@ -18,7 +18,7 @@ vi.mock('@/lib/store', () => ({
 type FetchCall = { url: string; method: string; body?: unknown };
 
 /**
- * The hook now drives everything through fetch: GET/PUT /api/monitoring/template
+ * The hook now drives everything through fetch: GET/PUT /api/layout/monitoring-equipment-tile
  * (Task 5) plus uploadEquipmentPhoto's POST /api/media (presign) -> PUT uploadUrl
  * (S3) -> POST /api/media/:id/confirm (Task 4). `authFetch` isn't mocked at the
  * module level (it's a thin wrapper around `fetch`), so stubbing global fetch
@@ -32,12 +32,16 @@ function stubFetch() {
     const method = init?.method ?? 'GET';
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
     calls.push({ url, method, body });
-    if (url === '/api/monitoring/template' && method === 'GET') {
+    if (url === '/api/layout/monitoring-equipment-tile' && method === 'GET') {
       return new Response(JSON.stringify(serverTemplate), { status: 200 });
     }
-    if (url === '/api/monitoring/template' && method === 'PUT') {
+    if (url === '/api/layout/monitoring-equipment-tile' && method === 'PUT') {
       serverTemplate = body;
       return new Response(JSON.stringify(body), { status: 200 });
+    }
+    if (url === '/api/layout/monitoring-equipment-tile' && method === 'DELETE') {
+      serverTemplate = DEFAULT_EQUIPMENT_TILE_TEMPLATE;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
     if (url === '/api/media' && method === 'POST') {
       return new Response(JSON.stringify({ mediaId: 'media-1', uploadUrl: 'https://s3.example/upload' }), { status: 200 });
@@ -75,7 +79,7 @@ function Harness({
 }
 
 function lastPut(calls: FetchCall[]) {
-  const putCalls = calls.filter((call) => call.url === '/api/monitoring/template' && call.method === 'PUT');
+  const putCalls = calls.filter((call) => call.url === '/api/layout/monitoring-equipment-tile' && call.method === 'PUT');
   return putCalls[putCalls.length - 1]?.body as { blocks: { kind: string; text?: string; alt?: string; imageFit?: string; style?: Record<string, unknown> }[] } | undefined;
 }
 
@@ -154,7 +158,8 @@ describe('EquipmentTileEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
 
     await waitFor(() => expect(screen.queryByText('Новый текст')).not.toBeInTheDocument());
-    await waitFor(() => expect(lastPut(calls)).toEqual(DEFAULT_EQUIPMENT_TILE_TEMPLATE));
+    // Reset removes the saved row (DELETE) and falls back to the default.
+    expect(calls.some((call) => call.url === '/api/layout/monitoring-equipment-tile' && call.method === 'DELETE')).toBe(true);
   });
 
   it('uploads a photo via the media API and saves its presentation settings', async () => {
@@ -215,7 +220,7 @@ describe('EquipmentTileEditor', () => {
     window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
 
-    await waitFor(() => expect(calls.some((call) => call.url === '/api/monitoring/template')).toBe(true));
+    await waitFor(() => expect(calls.some((call) => call.url === '/api/layout/monitoring-equipment-tile')).toBe(true));
     expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
   });
 });

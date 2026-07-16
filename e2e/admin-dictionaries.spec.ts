@@ -12,11 +12,21 @@ test.describe('Справочники организации', () => {
     await expect(page.getByRole('columnheader', { name: 'Отчёты' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Планы' })).toBeVisible();
 
+    // Номера колонок берём из заголовков, а не хардкодим: в таблице появилась
+    // колонка с чекбоксами (массовые действия), и жёсткие индексы от неё
+    // разъезжаются — rowName становился пустым, а локатор ловил все строки.
+    const headers = (await page.locator('thead th').allInnerTexts()).map((t) => t.trim());
+    const col = (name: string) => {
+      const index = headers.indexOf(name);
+      expect(index, `колонка "${name}" в таблице справочника`).toBeGreaterThan(-1);
+      return index;
+    };
+
     const firstDataRow = page.locator('tbody tr').first();
     await expect(firstDataRow).toBeVisible();
-    const rowName = (await firstDataRow.locator('td').first().innerText()).trim();
-    const reportCount = Number((await firstDataRow.locator('td').nth(3).innerText()).trim());
-    const planCount = Number((await firstDataRow.locator('td').nth(4).innerText()).trim());
+    const rowName = (await firstDataRow.locator('td').nth(col('Название')).innerText()).trim();
+    const reportCount = Number((await firstDataRow.locator('td').nth(col('Отчёты')).innerText()).trim());
+    const planCount = Number((await firstDataRow.locator('td').nth(col('Планы')).innerText()).trim());
     if (reportCount > 0 || planCount > 0) {
       await expect(page.getByRole('button', { name: `Переименовать ${rowName}` })).toBeDisabled();
       await expect(page.getByRole('button', { name: `Архивировать ${rowName}` })).toBeEnabled();

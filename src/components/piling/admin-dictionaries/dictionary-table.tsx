@@ -1,6 +1,8 @@
-import { Archive, Pencil, RotateCcw, Ruler, Trash2 } from 'lucide-react';
+import { Archive, Pencil, RotateCcw, Ruler, Trash2 } from '@/components/piling/icons/unified-icons';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export type DictionaryKind = 'pileGrade' | 'drillingType' | 'downtimeReason';
 
@@ -14,64 +16,101 @@ export interface RegistryItem {
   updatedAt: string;
   reportCount: number;
   planCount: number;
+  siteCount: number;
   lengthMm?: number | null;
 }
 
 interface DictionaryTableProps {
   kind: DictionaryKind;
   title: string;
+  statusLabel: string;
   items: RegistryItem[];
   onRename: (item: RegistryItem) => void;
   onLength: (item: RegistryItem) => void;
   onStatus: (item: RegistryItem, isActive: boolean) => void;
   onDelete: (item: RegistryItem) => void;
+  onSelect: (item: RegistryItem) => void;
+  selectedId?: string;
 }
 
 function lengthLabel(lengthMm?: number | null): string {
   if (lengthMm == null) return 'Не задана';
-  const metres = lengthMm / 1000;
-  return `${Number.isInteger(metres) ? metres : metres.toFixed(1)} м`;
+  return (lengthMm / 1000).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function DictionaryTable({
-  kind, title, items, onRename, onLength, onStatus, onDelete,
+  kind, title, statusLabel, items, onRename, onLength, onStatus, onDelete, onSelect, selectedId,
 }: DictionaryTableProps) {
   const isPileGrade = kind === 'pileGrade';
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const checkedAll = items.length > 0 && items.every((item) => checkedIds.includes(item.id));
+  // Selection may reference rows hidden by a newer filter/search — act only on visible ones.
+  const checkedItems = items.filter((item) => checkedIds.includes(item.id));
+
+  const toggleItem = (id: string, checked: boolean) => {
+    setCheckedIds((current) => checked ? [...new Set([...current, id])] : current.filter((value) => value !== id));
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setCheckedIds(checked ? items.map((item) => item.id) : []);
+  };
+
+  const bulkStatus = (isActive: boolean) => {
+    for (const item of checkedItems.filter((it) => it.isActive !== isActive)) onStatus(item, isActive);
+    setCheckedIds([]);
+  };
 
   return (
-    <Card className="overflow-hidden rounded-md">
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="text-base font-semibold text-slate-900">{title} — {statusLabel}</h2>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{items.length}</span>
+        {checkedItems.length > 0 && (
+          <div className="ml-auto flex items-center gap-2 text-xs">
+            <span className="text-slate-500">Выбрано: {checkedItems.length}</span>
+            {checkedItems.some((item) => item.isActive) && (
+              <button type="button" onClick={() => bulkStatus(false)} className="rounded-md border border-orange-300 px-2 py-1 font-medium text-orange-600 hover:bg-orange-50">Архивировать</button>
+            )}
+            {checkedItems.some((item) => !item.isActive) && (
+              <button type="button" onClick={() => bulkStatus(true)} className="rounded-md border border-slate-300 px-2 py-1 font-medium text-slate-700 hover:bg-slate-50">Восстановить</button>
+            )}
+          </div>
+        )}
+      </div>
+    <Card className="overflow-hidden rounded-lg">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] table-auto text-sm">
           <thead className="bg-slate-50">
             <tr className="border-b text-left text-xs text-slate-500">
+              <th className="w-10 px-3 py-2.5"><Checkbox aria-label="Выбрать все" checked={checkedAll} onCheckedChange={(checked) => toggleAll(checked === true)} /></th>
               <th className="px-3 py-2 font-medium">Название</th>
               {isPileGrade && <th className="px-3 py-2 font-medium">Код / сечение</th>}
-              {isPileGrade && <th className="px-3 py-2 font-medium">Длина</th>}
+              {isPileGrade && <th className="px-3 py-2 font-medium">Длина, м</th>}
               <th className="px-3 py-2 text-center font-medium">Отчёты</th>
               <th className="px-3 py-2 text-center font-medium">Планы</th>
               <th className="px-3 py-2 font-medium">Статус</th>
-              <th className="px-3 py-2 font-medium">Обновлено</th>
+              <th className="px-3 py-2 font-medium">Обновлено ↓</th>
               <th className="px-3 py-2 text-right font-medium">Действия</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={isPileGrade ? 8 : 6} className="px-3 py-8 text-center text-xs text-slate-400">
+                <td colSpan={isPileGrade ? 9 : 7} className="px-3 py-8 text-center text-xs text-slate-400">
                   {title}: ничего не найдено
                 </td>
               </tr>
-            ) : items.map((item) => {
+            ) : [...items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((item) => {
               const used = item.reportCount > 0 || item.planCount > 0;
               return (
-                <tr key={item.id} className="border-b last:border-0 hover:bg-slate-50/70">
+                <tr key={item.id} onClick={() => onSelect(item)} className={`cursor-pointer border-b last:border-0 hover:bg-sky-50/70 ${selectedId === item.id ? 'bg-sky-50/70 ring-1 ring-inset ring-sky-400' : ''}`}>
+                  <td className="px-3 py-2"><Checkbox aria-label={`Выбрать ${item.name}`} checked={checkedIds.includes(item.id)} onClick={(event) => event.stopPropagation()} onCheckedChange={(checked) => toggleItem(item.id, checked === true)} /></td>
                   <td className={`px-3 py-2 font-medium ${item.isActive ? 'text-slate-800' : 'text-slate-400'}`}>
                     {item.name}
                   </td>
                   {isPileGrade && (
                     <td className="px-3 py-2 text-xs text-slate-600">
-                      <div>{item.code || '—'}</div>
-                      <div className="text-slate-400">{item.sectionOrDiameter || '—'}</div>
+                      {item.sectionOrDiameter || item.code || '—'}
                     </td>
                   )}
                   {isPileGrade && (
@@ -86,7 +125,7 @@ export function DictionaryTable({
                     {item.planCount}
                   </td>
                   <td className="px-3 py-2">
-                    <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-3xs">
+                    <Badge variant={item.isActive ? 'default' : 'secondary'} className={item.isActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'text-3xs'}>
                       {item.isActive ? 'Активен' : 'Архив'}
                     </Badge>
                   </td>
@@ -136,5 +175,7 @@ export function DictionaryTable({
         </table>
       </div>
     </Card>
+    {items.length === 0 && <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500"><p className="font-medium text-slate-700">Ничего не найдено</p><p className="mt-1 text-xs">Попробуйте изменить параметры поиска или фильтра.</p></div>}
+    </div>
   );
 }

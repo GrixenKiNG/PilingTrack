@@ -1,6 +1,6 @@
 'use client';
 
-import { Drill, HardHat, Ruler } from 'lucide-react';
+import { Drill, HardHat, Ruler } from '@/components/piling/icons/unified-icons';
 import type { PilePlanRow, DrillingPlanRow } from '../types';
 import { totalDrillingMeters, totalPileCount, totalPileMeters } from './plan-helpers';
 

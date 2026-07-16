@@ -1,7 +1,6 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Clock, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { DowntimeReasonDTO } from '@/lib/types';
+import { PilingIcon } from '@/components/piling/icons';
 
 interface DowntimeSectionProps {
   downtimes: { id: string; reasonId: string; duration: number; comment: string }[];
@@ -42,7 +42,7 @@ export function DowntimeSection({
       <Card>
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2"><Clock className="w-4 h-4 text-amber-500" />Простой техники</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2"><PilingIcon name="downtime" size={18} tone="warning" decorative />Простой техники</CardTitle>
             <button onClick={onToggle} className="text-xs text-orange-500 font-medium">{show ? 'Скрыть' : '+ Добавить'}</button>
           </div>
         </CardHeader>
@@ -56,7 +56,7 @@ export function DowntimeSection({
               <div className="flex gap-2">
                 <Input type="number" step="0.5" placeholder="Часы" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
                   min="0.5" className="h-11 font-mono flex-1" />
-                <Button onClick={onAdd} className="h-11 bg-amber-500 hover:bg-amber-600 text-white px-4"><Plus className="w-4 h-4" /></Button>
+                <Button onClick={onAdd} className="h-11 bg-amber-500 hover:bg-amber-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
               <Input placeholder="Комментарий (необязательно)" value={tempComment} onChange={(e) => onTempCommentChange(e.target.value)} className="h-11" />
             </div>
@@ -73,7 +73,7 @@ export function DowntimeSection({
                       <span className="text-sm font-mono font-bold text-amber-600">{dt.duration} ч</span>
                       <button onClick={() => onRemove(dt.id)}
                         className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-4 h-4" />
+                        <PilingIcon name="delete" size={16} tone="danger" decorative />
                       </button>
                     </div>
                   </div>

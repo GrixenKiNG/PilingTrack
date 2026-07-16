@@ -23,6 +23,13 @@ const ACTION_LABELS: Record<string, string> = {
   'user.created': 'Пользователь создан',
   'user.updated': 'Пользователь изменён',
   'user.deleted': 'Пользователь удалён',
+  'dictionary.created': 'Элемент создан',
+  'dictionary.renamed': 'Переименован',
+  'dictionary.archived': 'Архивирован',
+  'dictionary.restored': 'Восстановлен',
+  'dictionary.length_updated': 'Длина изменена',
+  'dictionary.section_updated': 'Сечение изменено',
+  'dictionary.deleted': 'Удалён',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -35,6 +42,8 @@ const FIELD_LABELS: Record<string, string> = {
   plannedDrilling: 'План бурения',
   role: 'Роль',
   email: 'Email',
+  lengthMm: 'Длина, мм',
+  sectionOrDiameter: 'Сечение',
 };
 
 // Fields that change on every save but carry no evidentiary meaning.

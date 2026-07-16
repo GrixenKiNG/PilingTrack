@@ -25,8 +25,8 @@ import { useRouter } from 'next/navigation';
 import {
   AlertTriangle, CameraOff, Clock, FileWarning,
   PauseCircle, TrendingDown, Truck, Building2, Wrench, type LucideIcon,
-  FileText, HardHat, Drill, RefreshCw,
-} from 'lucide-react';
+  RefreshCw,
+} from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
@@ -34,6 +34,9 @@ import { getTodayInTimezone } from '@/lib/timezone';
 import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
+import { useMainDashboardLayout } from '@/components/piling/main-dashboard/dashboard-layout';
+import { PageLayoutRenderer, type RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import type { SiteAnalyticsDTO } from '@/lib/types';
 
 // ── Shapes of the read-only sources (decoupled, like maintenance-board) ──
@@ -100,6 +103,7 @@ function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; t
 
 export function AdminDashboard() {
   const router = useRouter();
+  const layout = useMainDashboardLayout();
   const [analytics, setAnalytics] = useState<SiteAnalyticsDTO[]>([]);
   const [siteOptions, setSiteOptions] = useState<SiteOption[]>([]);
   const [fleet, setFleet] = useState<FleetSnapshot | null>(null);
@@ -314,6 +318,15 @@ export function AdminDashboard() {
     );
   }
 
+  const dashKpiWidgets: Record<string, RenderablePageWidget> = {
+    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="смен сдано сегодня" /> },
+    'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={`${formatNumber(kpis.actualPiles)} шт / ${formatNumber(kpis.actualPileMeters)} м.п.`} sub={`план ${formatNumber(kpis.plannedPiles)} шт / ${formatNumber(kpis.plannedPileMeters)} м.п.`} progress={pileProgress} /> },
+    'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`} sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`} progress={drillingProgress} /> },
+    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={`${formatNumber(kpis.downtime)} ч`} sub="за период" /> },
+    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={`${kpis.rigsWorking} в работе`} sub={`из ${kpis.rigsTotal}`} progress={fleetProgress} /> },
+    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={`${formatNumber(kpis.toRisk)} риска`} sub={`из ${kpis.rigsTotal} установок`} /> },
+  };
+
   return (
     <div className="space-y-4 p-4 lg:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -369,29 +382,8 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* KPI strip — карточки как на референсе */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiTile icon={FileText} tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="смен сдано сегодня" />
-        <KpiTile
-          icon={HardHat}
-          tone="emerald"
-          label="Сваи"
-          value={`${formatNumber(kpis.actualPiles)} шт / ${formatNumber(kpis.actualPileMeters)} м.п.`}
-          sub={`план ${formatNumber(kpis.plannedPiles)} шт / ${formatNumber(kpis.plannedPileMeters)} м.п.`}
-          progress={pileProgress}
-        />
-        <KpiTile
-          icon={Drill}
-          tone="teal"
-          label="Бурение"
-          value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`}
-          sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`}
-          progress={drillingProgress}
-        />
-        <KpiTile icon={Clock} tone="amber" label="Простой" value={`${formatNumber(kpis.downtime)} ч`} sub="за период" />
-        <KpiTile icon={Truck} tone="violet" label="Установки" value={`${kpis.rigsWorking} в работе`} sub={`из ${kpis.rigsTotal}`} progress={fleetProgress} />
-        <KpiTile icon={Wrench} tone="red" label="ТО" value={`${formatNumber(kpis.toRisk)} риска`} sub={`из ${kpis.rigsTotal} установок`} />
-      </div>
+      {/* KPI strip — состав/порядок/размер настраиваются в Настройки → Шаблоны плиток */}
+      <PageLayoutRenderer template={layout.template} widgets={dashKpiWidgets} />
 
       {/* Две колонки: слева план-факт + установки, справа риски */}
       <div className="grid gap-3 lg:grid-cols-3">
@@ -435,28 +427,37 @@ export function AdminDashboard() {
 
 type KpiTone = 'blue' | 'emerald' | 'teal' | 'amber' | 'violet' | 'red';
 
-// All KPI tiles share the animated cycling gradient (see .kpi-animated in
-// globals.css) for a lively, consistent look matching the operator CTA. `tone`
-// is retained on the props for call-site clarity but no longer drives colour.
-function KpiTile({ icon: Icon, label, value, sub, progress }: {
-  icon: LucideIcon; tone: KpiTone; label: string; value: ReactNode; sub?: string; progress?: number;
+// Плитка дашборда — эталон вида KPI для всего приложения (см. KpiTile в
+// components/piling/kpi-tile.tsx, который повторяет её в остальных модулях).
+// Здесь она своя, потому что несёт ещё и прогресс-бар план/факт.
+// `tone` оставлен в пропсах для наглядности вызова, но цвет не задаёт.
+function KpiTile({ icon, label, value, sub, progress }: {
+  icon: PilingIconName; tone: KpiTone; label: string; value: ReactNode; sub?: string; progress?: number;
 }) {
   return (
-    <div className="kpi-animated min-w-0 rounded-xl border px-4 py-4 shadow-sm">
-      <div className="flex items-start gap-3.5">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white">
-          <Icon className="h-6 w-6" />
-        </div>
+    <div className="flex h-full min-w-0 flex-col rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition hover:border-orange-200 hover:shadow-md">
+      {/* Иконка тянется во всю высоту плитки, описание — рядом. Высоту задаёт
+          плитка (flex-1), а иконка позиционируется абсолютно, поэтому её
+          собственный размер не раздувает плитку и не выходит за рамку.
+          Ряд тянется на всю высоту — иначе иконки на плитках без прогресс-бара
+          оказывались мельче соседних. */}
+      <div className="flex flex-1 items-stretch gap-4">
+        <span className="relative w-20 shrink-0 self-stretch">
+          <PilingIcon name={icon} fill decorative className="absolute inset-0" />
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-medium text-white/80">{label}</div>
-          <div className="mt-1 truncate font-mono text-xl font-semibold leading-tight text-white 2xl:text-2xl">{value}</div>
-          {sub && <div className="mt-1 truncate text-xs text-white/70">{sub}</div>}
+          <div className="text-xs font-medium text-slate-600">{label}</div>
+          {/* Составные значения («1 754 шт / 25 412 м.п.») не помещаются в строку
+              рядом с крупной иконкой — переносим, а не обрезаем: описание должно
+              читаться целиком. */}
+          <div className="mt-1 font-mono text-xl font-semibold leading-tight text-balance break-words text-slate-900 2xl:text-2xl">{value}</div>
+          {sub && <div className="mt-1 break-words text-xs text-slate-500">{sub}</div>}
           {progress != null && (
             <div className="mt-3 flex items-center gap-2">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/30">
-                <div className="h-full rounded-full bg-white" style={{ width: `${clampPct(progress)}%` }} />
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-emerald-600" style={{ width: `${clampPct(progress)}%` }} />
               </div>
-              <span className="font-mono text-xs text-white/90">{Math.round(clampPct(progress))}%</span>
+              <span className="font-mono text-xs text-slate-600">{Math.round(clampPct(progress))}%</span>
             </div>
           )}
         </div>

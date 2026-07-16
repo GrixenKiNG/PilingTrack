@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/db', () => ({
-  db: { monitoringTileTemplate: { findUnique: vi.fn(), upsert: vi.fn() } },
+  db: { moduleLayoutTemplate: { findUnique: vi.fn(), upsert: vi.fn() } },
 }));
 
 import { db } from '@/lib/db';
@@ -12,7 +12,7 @@ describe('monitoring template service', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('returns the default template when no row exists', async () => {
-    (db.monitoringTileTemplate.findUnique as any).mockResolvedValue(null);
+    (db.moduleLayoutTemplate.findUnique as any).mockResolvedValue(null);
     const t = await getTemplate('orion');
     expect(t.version).toBe(DEFAULT_EQUIPMENT_TILE_TEMPLATE.version);
     expect(Array.isArray(t.blocks)).toBe(true);
@@ -22,10 +22,12 @@ describe('monitoring template service', () => {
     await expect(saveTemplate('orion', { nope: true }, 'user1')).rejects.toThrow();
   });
 
-  it('upserts a valid template', async () => {
-    (db.monitoringTileTemplate.upsert as any).mockImplementation(async ({ create }: any) => ({ template: create.template }));
+  it('upserts a valid template under the monitoring surface', async () => {
+    (db.moduleLayoutTemplate.upsert as any).mockImplementation(async ({ create }: any) => ({ template: create.template }));
     const res = await saveTemplate('orion', DEFAULT_EQUIPMENT_TILE_TEMPLATE, 'user1');
     expect(res.version).toBe(1);
-    expect(db.monitoringTileTemplate.upsert).toHaveBeenCalledOnce();
+    expect(db.moduleLayoutTemplate.upsert).toHaveBeenCalledOnce();
+    const call = (db.moduleLayoutTemplate.upsert as any).mock.calls[0][0];
+    expect(call.create.surfaceId).toBe('monitoring-equipment-tile');
   });
 });

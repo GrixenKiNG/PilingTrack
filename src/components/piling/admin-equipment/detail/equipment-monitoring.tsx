@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Cog, Droplets, Activity } from 'lucide-react';
+import { Cog, Droplets, Activity } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { formatNum, formatRelative } from '@/lib/format';

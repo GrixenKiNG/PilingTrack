@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Wrench, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleet } from './use-fleet';
@@ -10,10 +9,12 @@ import { EquipmentStatsBar } from './equipment-stats-bar';
 import { EquipmentFilters, EMPTY_FILTERS, type FleetFilterState } from './equipment-filters';
 import { EquipmentViewToggle, type FleetView } from './equipment-view-toggle';
 import { EquipmentTile } from './equipment-tile';
+import { EquipmentCardGrid } from './equipment-card-grid';
 import { EquipmentTable } from './equipment-table';
 import { EquipmentDetail } from './detail/equipment-detail';
 import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
 import { CreateEquipmentDialog } from './equipment-dialogs';
+import { PilingIcon } from '@/components/piling/icons';
 
 export function AdminEquipment() {
   const { snapshot, loading, error, refetch } = useFleet();
@@ -22,7 +23,16 @@ export function AdminEquipment() {
   const { create } = useEquipmentList();
 
   const [filters, setFilters] = useState<FleetFilterState>(EMPTY_FILTERS);
-  const [view, setView] = useState<FleetView>('tiles');
+  // View choice is a local UI preference, not part of the shared template.
+  const [view, setViewState] = useState<FleetView>(() => {
+    if (typeof window === 'undefined') return 'tiles';
+    const saved = localStorage.getItem('equipment-view-mode');
+    return saved === 'table' || saved === 'layout' ? saved : 'tiles';
+  });
+  const setView = (next: FleetView) => {
+    setViewState(next);
+    localStorage.setItem('equipment-view-mode', next);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [panelWidth, setPanelWidth] = useState(520);
@@ -81,30 +91,32 @@ export function AdminEquipment() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="space-y-4 p-4 lg:p-6">
+      {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
+          плитки в один ряд ужимались до ~128px и текст обрезался. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <PilingIcon name="equipment-rig" size={24} tone="primary" decorative />
+            Установки
+          </h1>
+          <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
+            <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
+          </Button>
+        </div>
+      </div>
+
+      <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
+
       <div
         style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
         className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
       >
         {/* Left: fleet list */}
         <div className="min-w-0 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-                <Wrench className="h-5 w-5 text-orange-500" />
-                Установки
-              </h1>
-              <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
-                <Plus className="mr-1 h-4 w-4" /> Добавить
-              </Button>
-            </div>
-          </div>
-
-          <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
-
           <div className="flex flex-wrap items-center justify-between gap-3">
             <EquipmentFilters
               sites={options.sites}
@@ -118,7 +130,7 @@ export function AdminEquipment() {
 
           {filtered.length === 0 ? (
             <div className="py-16 text-center">
-              <Wrench className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+              <PilingIcon name="equipment-rig" size={48} decorative className="mx-auto mb-3 opacity-40" />
               <p className="text-sm text-slate-500">
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
@@ -134,6 +146,8 @@ export function AdminEquipment() {
                 <EquipmentTile key={c.id} card={c} selected={c.id === selectedId} onSelect={setSelectedId} />
               ))}
             </div>
+          ) : view === 'layout' ? (
+            <EquipmentCardGrid cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
           ) : (
             <EquipmentTable cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
           )}
@@ -159,14 +173,14 @@ export function AdminEquipment() {
                     aria-label="Закрыть карточку"
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   >
-                    <X className="h-4 w-4" />
+                    <PilingIcon name="close" size={16} decorative />
                   </button>
                 </div>
                 <EquipmentDetail equipmentId={selectedId} embedded />
               </div>
             ) : (
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
-                <Wrench className="mb-3 h-10 w-10 text-slate-300" />
+                <PilingIcon name="equipment-rig" size={40} decorative className="mb-3 opacity-40" />
                 <p className="text-sm text-slate-500">Выберите установку</p>
                 <p className="mt-1 text-xs text-slate-400">Карточка откроется здесь, в этом же окне</p>
               </div>

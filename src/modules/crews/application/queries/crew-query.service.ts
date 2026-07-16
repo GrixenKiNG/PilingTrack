@@ -48,44 +48,6 @@ export async function getCrewById(crewId: string) {
   return crew;
 }
 
-export async function listAllCrews() {
-  return db.crew.findMany({
-    select: { id: true, name: true, operatorId: true, siteId: true, equipmentId: true },
-    orderBy: { name: 'asc' },
-  });
-}
-
-/**
- * List crew summaries for admin views
- */
-export async function listCrewSummaries() {
-  const crews = await db.crew.findMany({
-    include: {
-      operator: { select: { name: true } },
-      equipment: { select: { name: true } },
-      site: { select: { name: true, tenantId: true } },
-      assistants: { select: { id: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  return crews.map((crew) => ({
-    id: crew.id,
-    name: crew.name,
-    operatorId: crew.operatorId,
-    operatorName: crew.operator.name,
-    assistantsCount: crew.assistants.length,
-    equipmentId: crew.equipmentId,
-    equipmentName: crew.equipment.name,
-    siteId: crew.siteId,
-    siteName: crew.site.name,
-    tenantId: crew.site?.tenantId ?? null,
-    isActive: crew.isActive,
-    createdAt: crew.createdAt,
-    updatedAt: crew.updatedAt,
-  }));
-}
-
 /**
  * Get crew for operator (with role-based access control)
  */

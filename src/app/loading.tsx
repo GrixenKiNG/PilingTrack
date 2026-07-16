@@ -1,4 +1,4 @@
-import { HardHat } from 'lucide-react';
+import { HardHat } from '@/components/piling/icons/unified-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Loading() {

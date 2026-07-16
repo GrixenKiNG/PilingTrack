@@ -3,7 +3,7 @@
 import { ErrorBoundary } from 'react-error-boundary';
 import type { FallbackProps } from 'react-error-boundary';
 import { useCallback } from 'react';
-import { HardHat, RefreshCw } from 'lucide-react';
+import { HardHat, RefreshCw } from '@/components/piling/icons/unified-icons';
 
 function Fallback({ error, resetErrorBoundary }: FallbackProps) {
   const handleReload = useCallback(() => {

@@ -1,7 +1,6 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { HardHat, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { formatNumber } from '@/lib/format';
 import type { PileGradeDTO } from '@/lib/types';
+import { PilingIcon } from '@/components/piling/icons';
 
 interface PileSectionProps {
   piles: { id: string; picketId: string; pileGradeId: string; count: number }[];
@@ -45,7 +45,7 @@ export function PileSection({
       <Card>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" />Забитые сваи</h3>
+            <h3 className="text-sm font-semibold flex items-center gap-2"><PilingIcon name="pile-driving" size={18} tone="primary" decorative />Забитые сваи</h3>
             <div className="flex items-center gap-2">
               {totalPiles > 0 && (
                 <span className="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
@@ -69,7 +69,7 @@ export function PileSection({
                 <Input type="number" placeholder="Кол-во" value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="w-24 h-12 min-h-[48px] font-mono text-lg" />
                 <Button onClick={onAdd} min-w={48} min-h={48} className="h-12 min-h-[48px] w-12 bg-orange-500 hover:bg-orange-600 text-white">
-                  <Plus className="w-5 h-5" />
+                  <PilingIcon name="add" size={20} decorative className="!text-white" />
                 </Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
@@ -89,7 +89,7 @@ export function PileSection({
               <div className="flex gap-2">
                 <Input type="number" placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="h-11 font-mono" />
-                <Button onClick={onAdd} className="h-11 bg-orange-500 hover:bg-orange-600 text-white px-4"><Plus className="w-4 h-4" /></Button>
+                <Button onClick={onAdd} className="h-11 bg-orange-500 hover:bg-orange-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
               {(tempGrade || tempCount) && (
@@ -115,7 +115,7 @@ export function PileSection({
                     </span>
                     <button onClick={() => onRemove(pile.id)}
                       className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-4 h-4" />
+                      <PilingIcon name="delete" size={16} tone="danger" decorative />
                     </button>
                   </div>
                 </div>

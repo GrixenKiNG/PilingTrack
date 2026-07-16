@@ -12,6 +12,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { getLubeMap, type LubePoint } from '@/modules/inspections/domain/lubrication-maps';
+import { PilingIcon } from '@/components/piling/icons';
 
 /** Силуэт гусеничной сваебойной установки (viewBox 0 0 200 240). */
 function CrawlerRig() {
@@ -45,7 +46,7 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
   return (
     <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
       <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-800">
-        <span aria-hidden>🛢️</span> Карта смазки
+        <PilingIcon name="maintenance-due" size={18} tone="warning" decorative /> Карта смазки
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[180px_1fr]">

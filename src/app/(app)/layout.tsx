@@ -3,61 +3,20 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HardHat, LogOut, Menu } from 'lucide-react';
 import { usePilingStore } from '@/lib/store';
 import { AppErrorBoundary } from '@/components/piling/app-error-boundary';
 import { FeedbackCenter } from '@/components/piling/feedback-center';
+import { PilingIcon, ROLE_NAVIGATION } from '@/components/piling/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { logoutClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import type { UserRole } from '@/lib/types';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -8 },
-};
-
-const roleNavigation: Record<UserRole, { label: string; href: string }[]> = {
-  OPERATOR: [
-    { label: 'Главная', href: '/operator' },
-    { label: 'Отчёт', href: '/report' },
-    { label: 'Мониторинг', href: '/monitoring' },
-    { label: 'История', href: '/history' },
-  ],
-  ASSISTANT: [
-    { label: 'Главная', href: '/operator' },
-    { label: 'Отчёт', href: '/report' },
-    { label: 'Мониторинг', href: '/monitoring' },
-    { label: 'История', href: '/history' },
-  ],
-  ADMIN: [
-    { label: 'Дашборд', href: '/admin' },
-    { label: 'Мониторинг', href: '/monitoring' },
-    { label: 'Объекты', href: '/admin/sites' },
-    { label: 'Установки', href: '/admin/equipment' },
-    { label: 'Техготовность', href: '/admin/to' },
-    { label: 'Бригады', href: '/admin/crews' },
-    { label: 'Отчёты', href: '/admin/reports' },
-    { label: 'Аналитика', href: '/admin/analytics' },
-    { label: 'Справочники', href: '/admin/dictionaries' },
-    { label: 'Пользователи', href: '/admin/users' },
-    { label: 'Telegram', href: '/admin/telegram' },
-    { label: 'DLQ', href: '/admin/dlq' },
-  ],
-  DISPATCHER: [
-    { label: 'Дашборд', href: '/admin' },
-    { label: 'Мониторинг', href: '/monitoring' },
-    { label: 'Объекты', href: '/admin/sites' },
-    { label: 'Установки', href: '/admin/equipment' },
-    { label: 'Техготовность', href: '/admin/to' },
-    { label: 'Бригады', href: '/admin/crews' },
-    { label: 'Отчёты', href: '/admin/reports' },
-    { label: 'Аналитика', href: '/admin/analytics' },
-    { label: 'Справочники', href: '/admin/dictionaries' },
-  ],
 };
 
 function isActivePath(currentPath: string, href: string): boolean {
@@ -73,7 +32,7 @@ function isActivePath(currentPath: string, href: string): boolean {
 function OperatorLayout({ children }: { children: React.ReactNode }) {
   const user = usePilingStore((s) => s.currentUser);
   const pathname = usePathname();
-  const navItems = roleNavigation[user?.role || 'OPERATOR'];
+  const navItems = ROLE_NAVIGATION[user?.role || 'OPERATOR'];
 
   const nav = (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t safe-area-bottom">
@@ -96,18 +55,13 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
                   isActive ? 'bg-orange-100' : ''
                 )}
               >
-                <span className={cn('text-lg', isActive && item.href === '/report' && 'text-white')}>
-                  {item.href === '/operator'
-                    ? '📊'
-                    : item.href === '/report'
-                      ? '➕'
-                      : item.href === '/monitoring'
-                        ? '🛰️'
-                        : '📋'}
-                </span>
-                {isActive && item.href === '/report' && (
-                  <div className="absolute inset-0 w-10 h-10 rounded-xl bg-orange-500" />
-                )}
+                <PilingIcon
+                  name={item.icon}
+                  tone={isActive ? (item.tone ?? 'primary') : 'neutral'}
+                  size={24}
+                  decorative
+                  className={cn('relative z-10', isActive && '!text-orange-700')}
+                />
               </div>
               <span className="text-3xs font-medium">{item.label}</span>
             </a>
@@ -122,9 +76,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
       <div className="sticky top-0 z-30 bg-white border-b pt-safe">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center">
-              <HardHat className="w-4 h-4 text-white" />
-            </div>
+            <PilingIcon name="equipment-rig" size={34} tone="primary" decorative />
             <div>
               <h1 className="text-sm font-bold text-slate-900">PilingTrack</h1>
             </div>
@@ -137,8 +89,9 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
               size="sm"
               onClick={() => void logoutClient()}
               className="h-8 text-slate-400 hover:text-red-500"
+              aria-label="Выйти"
             >
-              <LogOut className="w-4 h-4" />
+              <PilingIcon name="logout" size={16} tone="danger" decorative />
             </Button>
           </div>
         </div>
@@ -164,19 +117,17 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = usePilingStore((s) => s.currentUser);
   const pathname = usePathname();
-  const navItems = roleNavigation[user?.role || 'ADMIN'];
+  const navItems = ROLE_NAVIGATION[user?.role || 'ADMIN'];
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isDispatcher = user?.role === 'DISPATCHER';
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2.5 px-4 py-5">
-        <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center">
-          <HardHat className="w-5 h-5 text-white" />
-        </div>
+      <div className="flex items-center gap-3 px-5 py-5">
+        <PilingIcon name="equipment-rig" size={38} tone="primary" decorative />
         <div>
-          <h1 className="text-sm font-bold text-slate-900">PilingTrack</h1>
+          <h1 className="text-lg font-bold tracking-tight text-slate-900">PilingTrack</h1>
           <p className="text-3xs text-slate-500">
             {isDispatcher ? 'Панель диспетчера' : 'Панель администратора'}
           </p>
@@ -185,7 +136,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
       <Separator />
 
-      <nav className="flex-1 px-3 py-3 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {navItems.map((item) => {
           const isActive = isActivePath(pathname, item.href);
 
@@ -195,12 +146,19 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
               href={item.href}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all no-underline',
+                'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all no-underline',
                 isActive
-                  ? 'bg-orange-100 text-orange-700'
+                  ? 'border-l-2 border-orange-500 bg-orange-50 text-orange-700'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               )}
             >
+              <PilingIcon
+                name={item.icon}
+                tone={isActive ? (item.tone ?? 'primary') : 'neutral'}
+                size={30}
+                decorative
+                className={isActive ? '!text-orange-700' : undefined}
+              />
               {item.label}
             </a>
           );
@@ -226,7 +184,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           onClick={() => void logoutClient()}
           className="w-full justify-start text-slate-500 hover:text-red-600 hover:border-red-200"
         >
-          <LogOut className="w-4 h-4 mr-2" />
+          <PilingIcon name="logout" size={16} tone="danger" decorative className="mr-2" />
           Выйти
         </Button>
       </div>
@@ -235,7 +193,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col bg-white border-r z-30">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white border-r z-30">
         {sidebarContent}
       </aside>
 
@@ -243,8 +201,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3 px-4 py-3">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <button className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100">
-                <Menu className="w-5 h-5 text-slate-600" />
+              <button aria-label="Открыть меню навигации" className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100">
+                <PilingIcon name="menu" size={20} decorative />
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0">
@@ -254,15 +212,13 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           </Sheet>
           <div className="flex items-center gap-2">
             <FeedbackCenter />
-            <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
-              <HardHat className="w-3.5 h-3.5 text-white" />
-            </div>
+            <PilingIcon name="equipment-rig" size={30} tone="primary" decorative />
             <span className="text-sm font-bold text-slate-900">PilingTrack</span>
           </div>
         </div>
       </div>
 
-      <main className="lg:ml-60 min-h-screen">
+      <main className="lg:ml-64 min-h-screen bg-[#f7f8fa]">
         <AnimatePresence mode="wait">
           <motion.div
             key={user?.id}
@@ -305,27 +261,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     let active = true;
 
     const bootstrap = async () => {
-      // Import dynamically to avoid circular deps
-      const { fetchSessionUser } = await import('@/lib/api');
-      const sessionUser = await fetchSessionUser();
-      if (!active) return;
+      try {
+        // Import dynamically to avoid circular deps
+        const { probeSession } = await import('@/lib/api');
+        const probe = await probeSession();
+        if (!active) return;
 
-      const existingUser = usePilingStore.getState().currentUser;
+        const existingUser = usePilingStore.getState().currentUser;
 
-      if (sessionUser) {
-        if (existingUser) {
-          usePilingStore.getState().setCurrentUser(sessionUser);
-        } else {
-          usePilingStore.getState().login(sessionUser);
+        if (probe.status === 'authenticated') {
+          if (existingUser) {
+            usePilingStore.getState().setCurrentUser(probe.user);
+          } else {
+            usePilingStore.getState().login(probe.user);
+          }
+        } else if (probe.status === 'anonymous' && existingUser) {
+          // Только явный ответ сервера «сессии нет» разлогинивает. При
+          // 'unknown' (сеть/5xx) оставляем текущую сессию как есть — иначе
+          // моргание БД выкидывало оператора на /login посреди работы.
+          usePilingStore.getState().logout();
+          router.replace('/login');
+          return;
         }
-      } else if (existingUser) {
-        usePilingStore.getState().logout();
-        router.replace('/login');
-        return;
-      }
-
-      if (active) {
-        setBootstrapping(false);
+      } finally {
+        // Даже если проверка упала, снимаем «Проверка сессии...»: раньше
+        // исключение здесь навсегда оставляло приложение на этом экране.
+        if (active) setBootstrapping(false);
       }
     };
 
@@ -350,9 +311,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex items-center gap-3 text-slate-500">
-          <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center">
-            <HardHat className="w-4 h-4 text-white" />
-          </div>
+          <PilingIcon name="equipment-rig" size={38} tone="primary" decorative />
           <span className="text-sm font-medium">Проверка сессии...</span>
         </div>
       </div>

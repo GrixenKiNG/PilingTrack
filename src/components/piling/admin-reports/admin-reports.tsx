@@ -21,12 +21,13 @@ import {
   UserRound,
   Wrench,
   X,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { cn } from '@/lib/utils';
 import { formatNumber, formatHours, pluralizeRu } from '@/lib/format';
@@ -108,6 +109,8 @@ export function AdminReports() {
 
   const [detailReport, setDetailReport] = useState<ReportDTO | null>(null);
   const [previewReport, setPreviewReport] = useState<ReportDTO | null>(null);
+  // Ширина правой панели — тянется за левый край (как в справочниках/установках).
+  const [panelWidth, setPanelWidth] = useState(520);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editReport, setEditReport] = useState<ReportDTO | null>(null);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
@@ -180,6 +183,21 @@ export function AdminReports() {
   );
   const reportWord = `${filteredReports.length} ${pluralizeRu(filteredReports.length, ['отчёт', 'отчёта', 'отчётов'])}`;
 
+  const startResize = (event: React.MouseEvent) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startW = panelWidth;
+    const onMove = (moveEvent: MouseEvent) => {
+      setPanelWidth(Math.min(720, Math.max(320, startW + (startX - moveEvent.clientX))));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 
   const formatLastEditor = (report: ReportDTO) => {
@@ -219,15 +237,22 @@ export function AdminReports() {
           />
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px] 2xl:grid-cols-[minmax(0,1fr)_560px]">
-          <div className="min-w-0 space-y-4">
-            <ReportsHeader
-              reportWord={reportWord}
-              onPrint={() => window.print()}
-              onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
-            />
+        <div className="space-y-4">
+          {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой
+              колонки плитки в один ряд ужимались и текст обрезался. */}
+          <ReportsHeader
+            reportWord={reportWord}
+            onPrint={() => window.print()}
+            onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
+          />
 
-            <EvidenceSummary reportCount={filteredReports.length} totals={totals} photoCount={photoCount} />
+          <EvidenceSummary reportCount={filteredReports.length} totals={totals} photoCount={photoCount} />
+
+          <div
+            style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
+            className="grid gap-4 xl:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
+          >
+          <div className="min-w-0 space-y-4">
 
             <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
@@ -338,15 +363,26 @@ export function AdminReports() {
             </section>
           </div>
 
-          <ReportEvidencePreview
-            report={effectivePreview}
-            history={reportHistory}
-            formatDate={formatDate}
-            onClose={() => setPreviewReport(null)}
-            onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
-            onPreviewPdf={handlePreviewPdf}
-            onPrint={() => window.print()}
-          />
+          <div className="relative min-w-0">
+            {/* Потяните за левый край, чтобы изменить ширину панели. */}
+            <div
+              onMouseDown={startResize}
+              title="Потяните, чтобы изменить ширину"
+              className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize xl:block"
+            >
+              <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+            </div>
+            <ReportEvidencePreview
+              report={effectivePreview}
+              history={reportHistory}
+              formatDate={formatDate}
+              onClose={() => setPreviewReport(null)}
+              onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
+              onPreviewPdf={handlePreviewPdf}
+              onPrint={() => window.print()}
+            />
+          </div>
+          </div>
         </div>
       )}
 
@@ -427,16 +463,9 @@ function EvidenceSummary({ reportCount, totals, photoCount }: { reportCount: num
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className={KPI_GRID} style={kpiGridStyle(items.length)}>
       {items.map((item) => (
-        <div key={item.label} className="kpi-animated rounded-lg border p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-white/80">{item.label}</span>
-            <item.icon className="h-4 w-4 text-white/90" />
-          </div>
-          <p className="font-mono text-xl font-bold tabular-nums text-white">{item.value}</p>
-          <p className="mt-0.5 text-3xs text-white/70">{item.detail}</p>
-        </div>
+        <KpiTile key={item.label} icon={item.icon} label={item.label} value={item.value} detail={item.detail} />
       ))}
     </div>
   );

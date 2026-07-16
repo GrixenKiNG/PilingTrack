@@ -1,4 +1,10 @@
-import type { EquipmentTileBlock, EquipmentTileTemplate } from './equipment-tile-template';
+/**
+ * Generic block/card property inspector (shared editor engine). Image tools
+ * (replace photo) appear only for surfaces that provide them. Extracted from
+ * the monitoring equipment-tile inspector.
+ */
+
+import type { LayoutBlock, LayoutTemplate } from './layout-template';
 
 const inputClass = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
@@ -11,24 +17,26 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
   );
 }
 
-export function EquipmentTileInspector({
+export interface LayoutInspectorImageTools {
+  subjectName: string;
+  onReplaceImage: (file: File) => Promise<void>;
+  error: string | null;
+}
+
+export function LayoutInspector({
   block,
   card,
   onChange,
   onCardChange,
   onDelete,
-  onReplaceImage,
-  equipmentName,
-  imageError,
+  imageTools,
 }: {
-  block: EquipmentTileBlock | null;
-  card: EquipmentTileTemplate['card'];
-  onChange: (patch: Partial<EquipmentTileBlock>) => void;
-  onCardChange: (patch: Partial<EquipmentTileTemplate['card']>) => void;
+  block: LayoutBlock | null;
+  card: LayoutTemplate['card'];
+  onChange: (patch: Partial<LayoutBlock>) => void;
+  onCardChange: (patch: Partial<LayoutTemplate['card']>) => void;
   onDelete: () => void;
-  onReplaceImage: (file: File) => Promise<void>;
-  equipmentName: string;
-  imageError: string | null;
+  imageTools?: LayoutInspectorImageTools;
 }) {
   if (!block) {
     return (
@@ -41,7 +49,7 @@ export function EquipmentTileInspector({
     );
   }
 
-  const changeStyle = (patch: Partial<EquipmentTileBlock['style']>) => onChange({ style: { ...block.style, ...patch } });
+  const changeStyle = (patch: Partial<LayoutBlock['style']>) => onChange({ style: { ...block.style, ...patch } });
   return (
     <section aria-label="Свойства блока" className="space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -56,7 +64,7 @@ export function EquipmentTileInspector({
       )}
       {block.kind === 'image' && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-          <p className="text-xs font-semibold text-slate-700">Фото: {equipmentName}</p>
+          {imageTools && <p className="text-xs font-semibold text-slate-700">Фото: {imageTools.subjectName}</p>}
           <label className="space-y-1 text-xs font-medium text-slate-600">
             <span>Альтернативный текст</span>
             <input className={inputClass} value={block.alt ?? ''} onChange={(event) => onChange({ alt: event.target.value })} />
@@ -67,21 +75,23 @@ export function EquipmentTileInspector({
               <option value="contain">Вписать</option><option value="cover">Заполнить</option>
             </select>
           </label>
-          <label className="block min-h-11 cursor-pointer rounded-lg border border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-            Заменить фото
-            <input
-              aria-label="Заменить фото"
-              className="sr-only"
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void onReplaceImage(file);
-                event.target.value = '';
-              }}
-            />
-          </label>
-          {imageError && <p role="alert" className="text-xs font-medium text-red-700">{imageError}</p>}
+          {imageTools && (
+            <label className="block min-h-11 cursor-pointer rounded-lg border border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              Заменить фото
+              <input
+                aria-label="Заменить фото"
+                className="sr-only"
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void imageTools.onReplaceImage(file);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          )}
+          {imageTools?.error && <p role="alert" className="text-xs font-medium text-red-700">{imageTools.error}</p>}
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">
@@ -98,13 +108,13 @@ export function EquipmentTileInspector({
       </div>
       <label className="space-y-1 text-xs font-medium text-slate-600">
         <span>Выравнивание текста</span>
-        <select className={inputClass} value={block.style.textAlign} onChange={(event) => changeStyle({ textAlign: event.target.value as EquipmentTileBlock['style']['textAlign'] })}>
+        <select className={inputClass} value={block.style.textAlign} onChange={(event) => changeStyle({ textAlign: event.target.value as LayoutBlock['style']['textAlign'] })}>
           <option value="left">Слева</option><option value="center">По центру</option><option value="right">Справа</option>
         </select>
       </label>
       <label className="space-y-1 text-xs font-medium text-slate-600">
         <span>Начертание</span>
-        <select className={inputClass} value={block.style.fontWeight} onChange={(event) => changeStyle({ fontWeight: Number(event.target.value) as EquipmentTileBlock['style']['fontWeight'] })}>
+        <select className={inputClass} value={block.style.fontWeight} onChange={(event) => changeStyle({ fontWeight: Number(event.target.value) as LayoutBlock['style']['fontWeight'] })}>
           <option value="400">Обычное</option><option value="500">Среднее</option><option value="600">Полужирное</option><option value="700">Жирное</option>
         </select>
       </label>

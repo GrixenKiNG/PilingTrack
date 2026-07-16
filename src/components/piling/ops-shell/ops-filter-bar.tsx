@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Filter } from 'lucide-react';
+import { Filter } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 import type { OpsQuickFilter } from './types';
 

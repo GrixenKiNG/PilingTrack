@@ -12,7 +12,7 @@ import {
   Siren,
   X,
   XCircle,
-} from 'lucide-react';
+} from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { usePilingStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';

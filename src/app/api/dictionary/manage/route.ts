@@ -5,7 +5,7 @@ import { invalidateDictionaries } from '@/lib/cached-queries';
 import { assertCan } from '@/services/auth/authorization-service';
 import {
   createDictionaryItem, deleteDictionaryItem, archiveDictionaryItem,
-  restoreDictionaryItem, renameDictionaryItem, setPileGradeLength,
+  restoreDictionaryItem, renameDictionaryItem, setPileGradeLength, setPileGradeSection,
   listDictionaries, getDictionaryUsage,
   type DictFilter, type UsageMap,
 } from '@/services/dictionaries/dictionary-service';
@@ -37,13 +37,15 @@ const patchSchema = z.object({
   isActive: z.boolean().optional(),
   // Pile length in millimetres; null clears it. Only valid for pileGrade.
   lengthMm: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  // Section/diameter label; null clears it. Only valid for pileGrade.
+  sectionOrDiameter: z.string().max(100).nullable().optional(),
 }).refine(
-  (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined,
-  { message: 'name, isActive or lengthMm required' },
+  (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined || v.sectionOrDiameter !== undefined,
+  { message: 'name, isActive, lengthMm or sectionOrDiameter required' },
 );
 
 function withUsage<T extends { id: string }>(items: T[], usage: UsageMap) {
-  return items.map((it) => ({ ...it, reportCount: usage[it.id]?.reportCount ?? 0, planCount: usage[it.id]?.planCount ?? 0 }));
+  return items.map((it) => ({ ...it, reportCount: usage[it.id]?.reportCount ?? 0, planCount: usage[it.id]?.planCount ?? 0, siteCount: usage[it.id]?.siteCount ?? 0 }));
 }
 
 export const GET = withApi(async (request: NextRequest) => {
@@ -66,6 +68,7 @@ export const GET = withApi(async (request: NextRequest) => {
     pileGrades: withUsage(pileGrades, usage.pileGrade),
     drillingTypes: withUsage(drillingTypes, usage.drillingType),
     downtimeReasons: withUsage(downtimeReasons, usage.downtimeReason),
+    objectTotals: usage.siteTotals ?? { pileGrade: 0, drillingType: 0, downtimeReason: 0 },
   });
 }, { domain: 'dictionary' });
 
@@ -94,14 +97,15 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   const validated = patchSchema.safeParse(await request.json());
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
 
-  const { type, id, name, isActive, lengthMm } = validated.data;
-  if (lengthMm !== undefined && type !== 'pileGrade') {
-    return NextResponse.json({ error: 'lengthMm valid only for pileGrade' }, { status: 400 });
+  const { type, id, name, isActive, lengthMm, sectionOrDiameter } = validated.data;
+  if ((lengthMm !== undefined || sectionOrDiameter !== undefined) && type !== 'pileGrade') {
+    return NextResponse.json({ error: 'lengthMm and sectionOrDiameter valid only for pileGrade' }, { status: 400 });
   }
   if (name !== undefined) await renameDictionaryItem(context, type, id, name);
   if (isActive === true) await restoreDictionaryItem(context, type, id);
   if (isActive === false) await archiveDictionaryItem(context, type, id);
   if (lengthMm !== undefined) await setPileGradeLength(context, id, lengthMm);
+  if (sectionOrDiameter !== undefined) await setPileGradeSection(context, id, sectionOrDiameter);
   await invalidateDictionaries(context.tenantId);
   return NextResponse.json({ success: true });
 }, { domain: 'dictionary' });
