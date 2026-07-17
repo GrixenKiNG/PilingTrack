@@ -1,18 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowDownRight, FileText, Menu, X } from '@/components/piling/icons/unified-icons';
-import { orionCapabilities, orionProcessSteps, orionStories } from './orion-content';
+import { ArrowDownRight, Menu, X } from '@/components/piling/icons/unified-icons';
+import {
+  orionCapabilities,
+  orionClients,
+  orionCompanyFacts,
+  orionCompanyIntro,
+  orionDigitalControl,
+  orionDigitalControlIntro,
+  orionGeneralEquipment,
+  orionObjects,
+  orionProcessSteps,
+  orionRequisites,
+} from './orion-content';
 import { OrionContact } from './orion-contact';
 import { OrionFleet } from './orion-fleet';
 import { OrionHero } from './orion-hero';
 import styles from './orion-site.module.css';
 
 const navigation = [
+  ['О компании', '#about'],
   ['Компетенции', '#capabilities'],
   ['Парк техники', '#fleet'],
-  ['Истории объектов', '#stories'],
-  ['Процесс', '#process'],
+  ['Контроль', '#control'],
+  ['Объекты', '#stories'],
 ] as const;
 
 export function OrionSite() {
@@ -57,6 +69,19 @@ export function OrionSite() {
       <div id="content">
         <OrionHero />
 
+        <section className={styles.about} id="about">
+          <div className={styles.aboutCopy}>
+            <p className={styles.kicker}>О компании</p>
+            <h2>Строительная компания<br /><em>полного цикла.</em></h2>
+            <p>{orionCompanyIntro}</p>
+          </div>
+          <dl className={styles.aboutFacts}>
+            {orionCompanyFacts.map((fact) => (
+              <div key={fact.label}><dt>{fact.value}</dt><dd>{fact.label}</dd></div>
+            ))}
+          </dl>
+        </section>
+
         <section className={styles.capabilities} id="capabilities">
           <div className={styles.sectionHeading}>
             <p className={styles.kicker}>Компетенции</p>
@@ -71,20 +96,55 @@ export function OrionSite() {
 
         <OrionFleet />
 
+        <section className={styles.generalFleet} aria-label="Общестроительная техника">
+          <p className={styles.kicker}>Общестроительная техника</p>
+          <ul>
+            {orionGeneralEquipment.map((unit) => (
+              <li key={unit.name}><strong>{unit.name}</strong><span>{unit.role}</span></li>
+            ))}
+          </ul>
+        </section>
+
+        <section className={styles.control} id="control">
+          <div className={styles.controlIntro}>
+            <p className={styles.kicker}>Цифровой контроль</p>
+            <h2>Каждая свая —<br /><em>под контролем.</em></h2>
+            <p>{orionDigitalControlIntro}</p>
+          </div>
+          <ul className={styles.controlGrid}>
+            {orionDigitalControl.map((point) => (
+              <li key={point.title}><h3>{point.title}</h3><p>{point.copy}</p></li>
+            ))}
+          </ul>
+        </section>
+
         <section className={styles.stories} id="stories">
           <div>
-            <p className={styles.kicker}>Истории объектов</p>
-            <h2>Работа должна<br />оставлять <em>доказательства.</em></h2>
+            <p className={styles.kicker}>Объекты</p>
+            <h2>Работа оставляет<br /><em>доказательства.</em></h2>
+            <p className={styles.storiesLead}>Объекты гражданского и промышленного строительства, в которых участвовала компания.</p>
           </div>
-          {orionStories.length === 0 && (
-            <div className={styles.emptyStory}>
-              <FileText size={28} />
-              <span className={styles.emptyIndex}>Портфолио / готовится</span>
-              <h3>Готовим портфолио реализованных объектов</h3>
-              <p>Здесь появятся только реальные истории: задача, технология, техника, этапы и подтверждённый итог работ.</p>
-              <a href="#contact">Запросить референсы <ArrowDownRight size={16} /></a>
-            </div>
-          )}
+          <ul className={styles.objectGrid}>
+            {orionObjects.map((object, index) => (
+              <li key={object.title}>
+                <span className={styles.objectPhoto} aria-hidden="true">
+                  {object.image
+                    ? <img src={object.image} alt="" loading="lazy" />
+                    : <span className={styles.objectPhotoEmpty}>фото готовится</span>}
+                </span>
+                <span className={styles.objectIndex}>{String(index + 1).padStart(2, '0')}</span>
+                <h3>{object.title}</h3>
+                <p>{object.kind}</p>
+              </li>
+            ))}
+          </ul>
+
+          <div className={styles.clients}>
+            <p className={styles.kicker}>Клиенты</p>
+            <ul>
+              {orionClients.map((client) => <li key={client}>{client}</li>)}
+            </ul>
+          </div>
         </section>
 
         <section className={styles.process} id="process">
@@ -106,7 +166,26 @@ export function OrionSite() {
         <OrionContact />
       </div>
 
-      <footer className={styles.footer}><span>© ОРИОН · свайные работы и аренда техники</span><a href="#top">Наверх ↑</a></footer>
+      <footer className={styles.footer}>
+        <div className={styles.footerRequisites}>
+          <strong>{orionRequisites.legalName}</strong>
+          <span>ИНН {orionRequisites.inn} · КПП {orionRequisites.kpp}</span>
+          <span>{orionRequisites.address}</span>
+          <span>
+            {orionRequisites.phones.map((phone, index) => (
+              <span key={phone}>
+                {index > 0 && ', '}
+                <a href={`tel:${phone.replace(/[^+\d]/g, '')}`}>{phone}</a>
+              </span>
+            ))}
+          </span>
+          <a href={`mailto:${orionRequisites.email}`}>{orionRequisites.email}</a>
+        </div>
+        <div className={styles.footerBottom}>
+          <span>© ОРИОН · свайные работы и аренда техники</span>
+          <a href="#top">Наверх ↑</a>
+        </div>
+      </footer>
     </main>
   );
 }

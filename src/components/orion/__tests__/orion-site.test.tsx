@@ -87,7 +87,7 @@ describe('ORION public site', () => {
     for (const link of screen.getAllByRole('link', { name: /обсудить объект/i })) {
       expect(link).toHaveAttribute('href', '#contact');
     }
-    expect(screen.getByText(/готовим портфолио реализованных объектов/i)).toBeInTheDocument();
+    expect(screen.getByText(/Верховный Суд Чувашской Республики/i)).toBeInTheDocument();
     expect(screen.getAllByText(/проверено фото/i)).toHaveLength(8);
     expect(screen.getByText('единиц собственного парка')).toBeInTheDocument();
     expect(screen.getByText('работа по проекту')).toBeInTheDocument();
@@ -96,12 +96,11 @@ describe('ORION public site', () => {
     expect(screen.queryByText('24/7')).not.toBeInTheDocument();
 
     const submitButton = screen.getByRole('button', { name: /отправить запрос/i });
-    const form = submitButton.closest('form');
-    expect(form).not.toBeNull();
-    fireEvent.submit(form!);
-
-    expect(screen.queryByText(/запрос принят/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/онлайн-отправка ещё не подключена/i)).toBeInTheDocument();
+    expect(submitButton.closest('form')).not.toBeNull();
+    expect(screen.getByRole('checkbox', { name: /обработку персональных данных/i })).toBeRequired();
+    const emailLinks = screen.getAllByRole('link', { name: 'orion02@bk.ru' });
+    expect(emailLinks.length).toBeGreaterThan(0);
+    expect(emailLinks[0]).toHaveAttribute('href', 'mailto:orion02@bk.ru');
   });
 
   it('reveals a complete accessible technical passport and closes it again', () => {
