@@ -182,7 +182,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           )}
         </button>
       ) : (
-        <p className="text-sm text-slate-400 text-center py-6">Фото не прикреплено</p>
+        <p className="text-sm font-medium text-slate-600 text-center py-6">Фото не прикреплено</p>
       )}
 
       {/* No `capture` — iOS Safari forces camera-only when it's set and the

@@ -39,13 +39,13 @@ export function ShiftInfo({
       <Card>
         <CardContent className="p-4 space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><PilingIcon name="calendar" size={14} decorative />Дата</Label>
+            <Label className="text-sm font-semibold text-slate-800 flex items-center gap-1.5"><PilingIcon name="calendar" size={14} decorative />Дата</Label>
             <Input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} className="h-11 font-mono" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label className="text-xs font-medium text-slate-600">Начало смены</Label>
+            <div className="space-y-1.5"><Label className="text-sm font-semibold text-slate-800">Начало смены</Label>
               <Input type="time" value={shiftStart} onChange={(e) => onShiftStartChange(e.target.value)} className="h-11 font-mono" /></div>
-            <div className="space-y-1.5"><Label className="text-xs font-medium text-slate-600">Конец смены</Label>
+            <div className="space-y-1.5"><Label className="text-sm font-semibold text-slate-800">Конец смены</Label>
               <Input type="time" value={shiftEnd} onChange={(e) => onShiftEndChange(e.target.value)} className="h-11 font-mono" /></div>
           </div>
         </CardContent>
@@ -53,7 +53,7 @@ export function ShiftInfo({
       <Card>
         <CardContent className="p-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><PilingIcon name="site" size={14} decorative />Объект</Label>
+            <Label className="text-sm font-semibold text-slate-800 flex items-center gap-1.5"><PilingIcon name="site" size={14} decorative />Объект</Label>
             <Select value={selectedSiteId} onValueChange={onSiteChange}>
               <SelectTrigger className="w-full h-11"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
               <SelectContent>
@@ -66,7 +66,7 @@ export function ShiftInfo({
       <Card>
         <CardContent className="p-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><PilingIcon name="equipment-rig" size={14} decorative />Установка</Label>
+            <Label className="text-sm font-semibold text-slate-800 flex items-center gap-1.5"><PilingIcon name="equipment-rig" size={14} decorative />Установка</Label>
             <span id="engine-hours" className="block scroll-mt-24" />
             <Select value={selectedEquipmentId} onValueChange={onEquipmentChange}>
               <SelectTrigger className="w-full h-11"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
@@ -77,7 +77,7 @@ export function ShiftInfo({
           </div>
           {selectedEquipmentId && (
             <div className="mt-3 space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+              <Label className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
                 <PilingIcon name="engine-hours" size={16} tone="info" decorative />Моточасы на конец смены
                 <span className="font-normal text-slate-400">(необязательно)</span>
               </Label>

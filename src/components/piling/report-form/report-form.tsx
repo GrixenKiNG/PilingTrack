@@ -174,7 +174,7 @@ export function ReportForm() {
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-slate-900 truncate">Отчёт за смену</h1>
-          <p className="text-xs text-slate-500 truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
+          <p className="text-xs font-medium text-slate-700 truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
         </div>
       </div>
 

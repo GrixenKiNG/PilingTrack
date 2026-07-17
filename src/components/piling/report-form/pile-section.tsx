@@ -73,7 +73,7 @@ export function PileSection({
                 </Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
-              {!tempGrade && <p className="text-slate-400 text-xs">Выберите марку сваи</p>}
+              {!tempGrade && <p className="text-slate-600 text-sm font-medium">Выберите марку сваи</p>}
               {(tempGrade || tempCount) && Number(tempCount) > 0 && (
                 <div className="rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
@@ -106,12 +106,12 @@ export function PileSection({
                 <div key={pile.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900">{getPileGradeName(pile.pileGradeId)}</p>
-                    {pile.picketId && <p className="text-3xs text-slate-500 truncate">{getPicketPath(pile.picketId)}</p>}
+                    {pile.picketId && <p className="text-2xs font-medium text-slate-600 truncate">{getPicketPath(pile.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-right text-sm font-bold text-slate-900">
                       <span className="block font-mono">{pile.count} шт.</span>
-                      <span className="block text-xs text-slate-500">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
+                      <span className="block text-xs font-semibold text-slate-700">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
                     </span>
                     <button onClick={() => onRemove(pile.id)}
                       className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">

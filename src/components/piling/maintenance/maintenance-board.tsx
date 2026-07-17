@@ -48,7 +48,8 @@ import {
   type SiteOption,
   type WorkOrderRow,
 } from './maintenance-board-model';
-import { KpiCard, QuickChip } from './maintenance-board-bits';
+import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
+import { QuickChip } from './maintenance-board-bits';
 import { MaintenanceDetailPanel } from './maintenance-detail-panel';
 import { WorkOrderTable } from './work-order-table';
 import { WorkOrderFormDialog } from './work-order-form-dialog';
@@ -233,22 +234,28 @@ export function MaintenanceBoard() {
   };
 
   return (
-    <div className="grid min-h-[calc(100vh-1px)] w-full bg-slate-50/40 lg:grid-cols-[minmax(0,1fr)_420px]">
-      <main className="min-w-0 space-y-3 px-4 py-4 lg:px-5">
+    <div className="min-h-[calc(100vh-1px)] w-full bg-slate-50/40">
+      {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
+          (рядом панель 420px) плиткам достаётся ~100px и они распухают. */}
+      <div className="space-y-3 px-4 pt-4 lg:px-5">
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/admin/to" className="text-sm font-medium text-slate-500 hover:text-slate-700">← ТО</Link>
           <h1 className="text-2xl font-bold tracking-normal text-slate-950">Наряды ТО</h1>
           <p className="text-sm text-slate-600">Техническая готовность установок, регламенты и замечания</p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard icon={Wrench} label="установок" value={stats.equipment || '—'} tone="blue" />
-          <KpiCard icon={Wrench} label="требуют ТО" value={stats.open} tone="amber" />
-          <KpiCard icon={AlertTriangle} label="просрочено" value={stats.overdue} tone="red" />
-          <KpiCard icon={Truck} label="в ремонте" value={stats.inRepair} tone="blue" />
-          <KpiCard icon={CheckCircle2} label="выполнено ТО" value={`${stats.readiness}%`} tone="green" />
+        {/* Единые KPI-плитки (kpi-tile.tsx) — как в объектах/установках/отчётах. */}
+        <div className={KPI_GRID} style={kpiGridStyle(5)}>
+          <KpiTile icon="equipment-rig" label="установок" value={stats.equipment || '—'} />
+          <KpiTile icon={Wrench} label="требуют ТО" value={stats.open} alert={stats.open > 0} />
+          <KpiTile icon={AlertTriangle} label="просрочено" value={stats.overdue} alert={stats.overdue > 0} />
+          <KpiTile icon={Truck} label="в ремонте" value={stats.inRepair} />
+          <KpiTile icon={CheckCircle2} label="выполнено ТО" value={`${stats.readiness}%`} />
         </div>
+      </div>
 
+      <div className="grid w-full lg:grid-cols-[minmax(0,1fr)_420px]">
+      <main className="min-w-0 space-y-3 px-4 py-4 lg:px-5">
         <section className="rounded-lg border border-slate-200 bg-white p-3">
           <div className="flex flex-wrap items-center gap-2">
             <QuickChip active={quickFilter === 'all'} onClick={() => setQuickFilter('all')}>Все</QuickChip>
@@ -401,6 +408,7 @@ export function MaintenanceBoard() {
         busyAction={busyAction}
         onClose={(record) => updateRecordStatus(record, 'DONE')}
       />
+      </div>
 
       <WorkOrderFormDialog
         open={dialogOpen}

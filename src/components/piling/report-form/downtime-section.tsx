@@ -67,7 +67,7 @@ export function DowntimeSection({
                   <div key={dt.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900">{getDowntimeReasonName(dt.reasonId)}</p>
-                      {dt.comment && <p className="text-3xs text-slate-500 truncate">{dt.comment}</p>}
+                      {dt.comment && <p className="text-2xs font-medium text-slate-600 truncate">{dt.comment}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-mono font-bold text-amber-600">{dt.duration} ч</span>
@@ -82,7 +82,7 @@ export function DowntimeSection({
             )}
 
             {totalDowntime > 0 && (
-              <div className="text-xs text-slate-500 text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
+              <div className="text-xs font-medium text-slate-700 text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
             )}
           </CardContent>
         )}

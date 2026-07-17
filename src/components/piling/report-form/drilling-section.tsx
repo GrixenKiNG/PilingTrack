@@ -75,12 +75,12 @@ export function DrillingSection({
                 <div key={drill.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900">{getDrillTypeName(drill.typeId)}</p>
-                    {drill.picketId && <p className="text-3xs text-slate-500 truncate">{getPicketPath(drill.picketId)}</p>}
+                    {drill.picketId && <p className="text-2xs font-medium text-slate-600 truncate">{getPicketPath(drill.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-right text-sm font-bold text-slate-900">
                       <span className="block font-mono">{drill.count} шт. × {formatNumber(drill.metersPerUnit)} м</span>
-                      <span className="block text-xs text-slate-500">Объём: {formatNumber(drill.meters)} м</span>
+                      <span className="block text-xs font-semibold text-slate-700">Объём: {formatNumber(drill.meters)} м</span>
                     </span>
                     <button onClick={() => onRemove(drill.id)}
                       className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
