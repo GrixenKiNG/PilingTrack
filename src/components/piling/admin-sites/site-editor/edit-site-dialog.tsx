@@ -27,6 +27,7 @@ import type { DrillingPlanRow, PilePlanRow, SiteListItem } from '../types';
 import { PilePlanSection } from './pile-plan-section';
 import { DrillingPlanSection } from './drilling-plan-section';
 import { PlanSummary } from './plan-summary';
+import { planWipeRequiresConfirm } from './plan-helpers';
 
 interface EditSiteDialogProps {
   site: SiteListItem | null;
@@ -58,6 +59,10 @@ export function EditSiteDialog({
   const [saving, setSaving] = useState(false);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [retryKey, setRetryKey] = useState(0);
+  // Сколько строк плана реально лежало в БД на момент открытия — чтобы поймать
+  // сохранение, которое молча стёрло бы существующий план (инцидент 2026-07-17).
+  const [initialPileRows, setInitialPileRows] = useState(0);
+  const [initialDrillingRows, setInitialDrillingRows] = useState(0);
 
   // Hydrate plans from API when dialog opens — they are not part of the
   // SiteListItem and need a separate fetch keyed off the site id.
@@ -95,6 +100,8 @@ export function EditSiteDialog({
               metersPerUnit: p.metersPerUnit,
             }))
         );
+        setInitialPileRows((fullSite.pilePlans ?? []).length);
+        setInitialDrillingRows((fullSite.drillingPlans ?? []).length);
         setDetailState('ready');
       })
       .catch(() => setDetailState('error'));
@@ -104,6 +111,12 @@ export function EditSiteDialog({
     if (!site || !name.trim()) {
       toast.error('Введите название');
       return;
+    }
+    if (planWipeRequiresConfirm(initialPileRows, initialDrillingRows, pilePlans, drillingPlans)) {
+      const ok = window.confirm(
+        `Вы сохраняете объект БЕЗ плана: все текущие строки плана (сваи: ${initialPileRows}, бурение: ${initialDrillingRows}) будут удалены, а плановые цифры обнулены.\n\nПродолжить?`,
+      );
+      if (!ok) return;
     }
     setSaving(true);
     try {
