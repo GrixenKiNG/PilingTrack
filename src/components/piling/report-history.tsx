@@ -21,11 +21,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
 import type { ReportListItemDTO, ReportDTO } from '@/lib/types';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { ReportHistoryDetailDialog } from './report-history-detail-dialog';
 
 export function ReportHistory() {
   const user = usePilingStore((s) => s.currentUser);
@@ -338,156 +337,14 @@ export function ReportHistory() {
         </div>
       )}
 
-      <Dialog
-        open={!!selectedReport || detailLoading}
-        onOpenChange={(open) => {
-          if (!open) setSelectedReport(null);
-        }}
-      >
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto custom-scrollbar">
-          <DialogTitle className="sr-only">
-            {selectedReport ? `Отчёт от ${formatDate(selectedReport.date)}` : 'Загрузка отчёта'}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            {selectedReport ? `Детали отчёта за ${formatDate(selectedReport.date)}` : 'Загрузка данных отчёта'}
-          </DialogDescription>
-
-          {detailLoading ? (
-            <div className="py-8 flex justify-center">
-              <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-            </div>
-          ) : selectedReport ? (
-            <>
-              <div className="flex items-center justify-between">
-                <DialogHeader>
-                  <div className="text-base font-semibold">Отчёт от {formatDate(selectedReport.date)}</div>
-                </DialogHeader>
-                <button
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
-                  onClick={() => handlePreviewFromDetail(selectedReport.reportId!, selectedReport.date)}
-                  className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  Предпросмотр PDF
-                </button>
-              </div>
-
-              <div className="space-y-4 mt-2">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-slate-500">Объект</p>
-                    <p className="font-medium">{selectedReport.site.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Статус</p>
-                    <Badge
-                      variant="secondary"
-                      className={
-                        selectedReport.status === 'submitted'
-                          ? 'bg-green-100 text-green-700 border-green-200'
-                          : 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                      }
-                    >
-                      {selectedReport.status === 'submitted' ? 'Отправлен' : 'Черновик'}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Начало смены</p>
-                    <p className="font-mono">{selectedReport.shiftStart || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Конец смены</p>
-                    <p className="font-mono">{selectedReport.shiftEnd || '-'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-slate-500">Последнее редактирование</p>
-                    <p className="font-medium">{formatLastEditor(selectedReport)}</p>
-                  </div>
-                </div>
-
-                {selectedReport.piles?.length > 0 && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                        <HardHat className="w-4 h-4 text-orange-500" />
-                        Забитые сваи ({selectedReport.piles.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {selectedReport.piles.map((pile) => (
-                          <div
-                            key={pile.id}
-                            className="flex justify-between text-sm p-2 bg-slate-50 rounded"
-                          >
-                            <span>{pile.pileGrade?.name || '-'}</span>
-                            <span className="font-mono font-semibold">{pile.count} шт.</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {selectedReport.drillings?.length > 0 && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                        <Drill className="w-4 h-4 text-blue-500" />
-                        Лидерное бурение ({selectedReport.drillings.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {selectedReport.drillings.map((drilling) => (
-                          <div
-                            key={drilling.id}
-                            className="flex justify-between text-sm p-2 bg-slate-50 rounded"
-                          >
-                            <span>{drilling.type?.name || '-'}</span>
-                            <span className="text-right font-mono font-semibold">
-                              <span className="block">{drilling.count || 1} шт.</span>
-                              <span className="block text-xs text-slate-500">{drilling.meters} м.п.</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {selectedReport.downtimes?.length > 0 && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-amber-500" />
-                        Простой техники
-                      </h4>
-                      <div className="space-y-1">
-                        {selectedReport.downtimes.map((downtime) => (
-                          <div
-                            key={downtime.id}
-                            className="flex justify-between text-sm p-2 bg-slate-50 rounded"
-                          >
-                            <div>
-                              <span>{downtime.reason?.name || '-'}</span>
-                              {downtime.comment && (
-                                <p className="text-3xs text-slate-500">{downtime.comment}</p>
-                              )}
-                            </div>
-                            <span className="font-mono font-semibold text-amber-600">
-                              {downtime.duration} ч
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <ReportHistoryDetailDialog
+        report={selectedReport}
+        loading={detailLoading}
+        onClose={() => setSelectedReport(null)}
+        onPreviewPdf={(reportId) => handlePreviewFromDetail(reportId, selectedReport?.date ?? '')}
+        formatDate={formatDate}
+        formatLastEditor={formatLastEditor}
+      />
 
       {previewReportId && (
         <PdfPreviewDialog
