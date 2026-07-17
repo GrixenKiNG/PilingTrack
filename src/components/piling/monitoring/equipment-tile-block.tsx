@@ -31,6 +31,7 @@ function useResolvedPhotoUrl(photoUrl: string | null | undefined): string | null
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the resolved URL when photoUrl changes; the async resolve below sets the real value
     if (!photoUrl) { setUrl(null); return; }
     if (!photoUrl.startsWith('/api/')) { setUrl(photoUrl); return; }
     let active = true;

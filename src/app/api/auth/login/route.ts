@@ -8,6 +8,7 @@ import { loginSchema } from '@/lib/validation-schemas';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 import { withApi } from '@/core/api-wrapper';
+import { getRateLimitIdentifier } from '@/lib/rate-limiter';
 
 
 export const runtime = 'nodejs';
@@ -35,7 +36,11 @@ export const POST = withApi(
 
     const { email, password } = validation.data;
 
-    const result = await authenticateUserByEmailPassword(email.trim().toLowerCase(), password);
+    const result = await authenticateUserByEmailPassword(
+      email.trim().toLowerCase(),
+      password,
+      getRateLimitIdentifier(request),
+    );
 
     // Rate limited
     if (result.rateLimited) {

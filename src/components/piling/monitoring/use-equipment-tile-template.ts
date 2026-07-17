@@ -68,6 +68,7 @@ export function useEquipmentTileTemplate(
   useEffect(() => {
     if (queryUnlock) localStorage.setItem(UNLOCK_KEY, '1');
     migrateLegacyCardDesign(localStorage);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads localStorage (client-only) after mount; SSR renders locked by design
     setUnlocked(queryUnlock || localStorage.getItem(UNLOCK_KEY) === '1');
   }, [queryUnlock]);
 

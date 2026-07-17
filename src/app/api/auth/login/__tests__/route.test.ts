@@ -89,7 +89,7 @@ describe('POST /api/auth/login', () => {
     authenticateMock.mockResolvedValue({ user: null, rateLimited: false });
     await POST(jsonRequest({ email: 'Admin@Piling.RU', password: 'password123' }));
 
-    expect(authenticateMock).toHaveBeenCalledWith('admin@piling.ru', 'password123');
+    expect(authenticateMock).toHaveBeenCalledWith('admin@piling.ru', 'password123', expect.any(String));
   });
 
   it('delegates to createAuthenticatedResponse on success and audits', async () => {

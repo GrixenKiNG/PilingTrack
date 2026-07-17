@@ -9,7 +9,7 @@ import {
   createSessionToken,
   type SessionUser,
 } from '@/services/auth/session-service';
-import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT } from '@/lib/rate-limiter';
+import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT, LOGIN_IP_RATE_LIMIT } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 
 const BCRYPT_ROUNDS = 12;
@@ -162,8 +162,26 @@ function toSessionUser(user: {
   };
 }
 
-export async function authenticateUserByEmailPassword(email: string, password: string) {
-  const rateLimit = await rateLimiter.check(email.toLowerCase(), AUTH_RATE_LIMIT);
+export async function authenticateUserByEmailPassword(
+  email: string,
+  password: string,
+  // IP-derived identifier from getRateLimitIdentifier(). Optional so internal
+  // callers (scripts/tests) keep working; they share one 'unknown' bucket.
+  clientIdentifier: string = 'unknown',
+) {
+  // Dual buckets (audit A-2). Per-IP first: caps total attempts from one
+  // address, closing the "rotate emails for unlimited tries" bypass.
+  const ipLimit = await rateLimiter.check(`login-ip:${clientIdentifier}`, LOGIN_IP_RATE_LIMIT);
+  if (!ipLimit.allowed) {
+    return { user: null, rateLimited: true, retryAfter: ipLimit.retryAfter };
+  }
+
+  // Account bucket is scoped to email+IP, not bare email: a stranger firing
+  // wrong passwords at a known email must not lock the real owner out from
+  // their own address (lockout-DoS). Brute-forcing one account across many
+  // IPs is still capped by the per-IP bucket above.
+  const accountKey = `login:${email.toLowerCase()}:${clientIdentifier}`;
+  const rateLimit = await rateLimiter.check(accountKey, AUTH_RATE_LIMIT);
 
   if (!rateLimit.allowed) {
     return { user: null, rateLimited: true, retryAfter: rateLimit.retryAfter };
@@ -195,7 +213,7 @@ export async function authenticateUserByEmailPassword(email: string, password: s
     }
 
     await upgradeLegacyPasswordIfNeeded(user.id, password, verification.needsUpgrade);
-    await rateLimiter.reset(email.toLowerCase());
+    await rateLimiter.reset(accountKey);
     return { user: toSessionUser(user), rateLimited: false };
   } catch (err) {
     logger.error('authenticateUserByEmailPassword failed', err);

@@ -150,10 +150,11 @@ describe('LoginPage', () => {
     const passwordInput = screen.getByLabelText('Пароль');
     expect(passwordInput).toHaveAttribute('type', 'password');
 
-    const toggleButton = screen.getByRole('button', { name: '' });
+    const toggleButton = screen.getByRole('button', { name: 'Показать пароль' });
     fireEvent.click(toggleButton);
 
     expect(passwordInput).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: 'Скрыть пароль' })).toBeInTheDocument();
   });
 
   it('disables submit button while loading', async () => {

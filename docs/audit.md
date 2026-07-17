@@ -1,160 +1,199 @@
 # PilingTrack — Технический аудит
 
-> **Снимок состояния на 2026-05-23.** Обновляет снимок 2026-05-21 — закрыт N-4
-> (fire-and-forget регистрация event-handlers). Заменяет предыдущий аудит от 2026-04-30
-> (полная версия которого сохранена в `docs/archive/audit-2026-04-30.md`).
+> **Обновление вечера 2026-07-17:** в тот же день закрыты A-1 (restore-drill
+> проведён — runbook 010, дамп восстановим), A-2 (двойной rate-limit логина,
+> тест-first), A-3 (/api/health урезан до status+version+uptime), A-4
+> (env-бэкапы вынесены из worktree прода в /opt/pilingtrack-archive +
+> deny-паттерны в .gitignore), A-5 (кнопка пароля: aria-label + 44px +
+> focus-visible), A-6 (линт снова 0 warnings — включая 2 react-hooks
+> и layout-template.spec). Позже тем же вечером закрыт и **A-8**: все 9 файлов
+> >500 строк разрезаны по ответственности с сохранением внешних экспортов
+> (maintenance-board 843→420, admin-reports 834→343, equipment-detail 603→430,
+> admin-dashboard 599→392, to-module 597→404, media-service 591→442,
+> admin-analytics 584→488, projection-worker 524→181, report-history 505→362;
+> unit 1412/1412, lint 0). Осознанный остаток: `rate-limiter.ts` 510 строк —
+> перерос порог на 10 строк из-за конфига A-2; security-critical, резать при
+> следующем содержательном касании. Актуальные открытые: **WAL/PITR-решение
+> (остаток A-1), A-7, A-12, A-9…A-11, P-1…P-3.**
+>
+> **Снимок состояния на 2026-07-17.** Заменяет снимок 2026-05-23 (сохранён в
+> `docs/archive/audit-2026-05-23.md`, там же полная история 34 закрытых пунктов
+> апрель→май). Включает сверку с независимым production-аудитом от 2026-07-02
+> (`reports/production-audit-2026-07-02-independent.md`, оценка 5.8/10:
+> 0 Critical / 7 High / 10 Medium / 4 Low) — каждый его пункт перепроверен
+> по коду и прод-серверу 2026-07-17.
 >
 > **Политика для агентов/контрибьюторов:** этот файл — **снимок во времени**,
 > а не живой бэклог. **Не доверяйте статусам без сверки с кодом.** Перед тем
-> как браться за пункт «open», проверьте его актуальность в коде (grep, тесты,
-> `wc -l`). Если открытый пункт уже закрыт — обновите этот файл или предложите
-> новый аудит. Если закрытый пункт регрессировал — заведите новый пункт
-> (`N-N+1`), не реанимируйте старый.
->
-> Каждый закрытый пункт ниже имеет ссылку на коммит. Поиск истории:
-> `git log --grep '\(C-1\)'` (или любой другой тег).
+> как браться за пункт «open», проверьте его актуальность (grep, тесты, SSH).
+> Если пункт уже закрыт — обновите файл; если закрытый регрессировал —
+> заведите новый пункт, не реанимируйте старый.
 
 ---
 
 ## Сводка
 
-| Категория | Открыто | Отложено | Закрыто | Всего |
-|---|---|---|---|---|
-| 🔴 Critical | 0 | 0 | 3 (C-1, C-3, C-4) | 3 |
-| 🟠 High | 0 | 1 (N-2) | 10 | 11 |
-| 🟡 Medium | 0 | 0 | 14 | 14 |
-| 🟢 Low | 0 | 0 | 3 | 3 |
-| Latent / process | 0 | 0 | 3 (N-4, N-12, N-13) | 3 |
-| **Всего** | **0** | **0** | **34** | **34** |
+| Категория | Открыто | Условно/отложено | Закрыто в июле | 
+|---|---|---|---|
+| 🔴 High | 1 (A-1 PITR/restore) | 1 (A-9 multi-tenant gate) | 5 из 7 (H1, H2, H3, H5, H6) |
+| 🟠 Medium | 4 (A-2…A-5) | 2 (A-10, A-11 не перепроверены) | 3 (M1, M2, M4) |
+| 🟡 Low | 4 (A-6…A-8, A-12) | — | — |
+| Процессные | 3 (P-1…P-3) | — | — |
 
-**Закрыто за период 2026-04-30 → 2026-05-24:** 31 пункт. Аудит полностью закрыт. M-2 (npm vulns) задокументирован в README; L-2 (magic sizes) полностью устранён; M-3 закрыт правилом «одна миграция = одно смысловое изменение», прописанным в CLAUDE.md (Common Pitfalls).
+**Проверено на этом срезе:** unit **1409/1409** ✅ · ESLint **0 ошибок** (10 warnings — см. A-6) · `tsc --noEmit` чистый · `npm audit` 0 уязвимостей · прод: контейнеры healthy, v2.7.0 = ffb3901.
 
 ---
 
-## Закрыто (с коммитами)
+## Сверка с production-аудитом 2026-07-02 (burn-down)
 
-| Тег | Что | Закрыто в |
-|-----|-----|-----------|
-| C-1 | Битые проекции (siteId/userId) | `bc7c749` |
-| C-3 | JWT revocation через Redis denylist | `e510be0` |
-| C-4 | Nonce-based CSP middleware | `150caa3` |
-| H-1 | ESLint `no-restricted-imports` для границ слоёв (warn) | `899cecf` |
-| H-2 | ENCRYPTION_KEY versioning (`enc:v1:…`) + dual-decrypt + `reEncrypt()` | предшествует серии — см. `src/core/security/encryption.ts` |
-| H-3 | Backfill API для проекций (`/api/admin/projections/rebuild`) | `11fb816` |
-| H-3 prod | PgBouncer integration + scram-sha-256 + правильный port | `2327bc9`, `1d2752c`, `0957cf9` |
-| H-5 | Contract-тесты для `/api/auth/me`, `/refresh`, `/logout` | `899cecf` |
-| H-6 | CI/CD pipeline + manual prod-deploy gate | `e43740f` |
-| H-9 | Docker HOSTNAME=0.0.0.0 для биндинга | `0581151` |
-| M-1 | 10 файлов > 500 строк (health-tracker, conflict-resolution-engine, pdf-generator) | все разбиты в директории до серии |
-| M-5 | Coverage `thresholds` в `vitest.config.ts` + `coverage:check` script | предшествует серии (config) + `899cecf` (alias) |
-| M-6 | ESLint `@typescript-eslint/no-explicit-any: warn` | предшествует серии |
-| M-7 | ESLint `no-warning-comments: warn` для незакреплённых TODO/FIXME/HACK | `7af4b44` |
-| M-10 | Мониторинг в проде (Prometheus alerts, host disk alerts) | `bc86042` |
-| L-3 | Nightly Postgres backup через systemd timer | `ce078dd` |
-| **N-1** | `rebuild.ts` писал `Report.id` (cuid) вместо `Report.reportId` (uuid) | `899cecf` |
-| **N-3** | Два параллельных event-bus → modern удалён (947 строк), legacy оставлен | `7af4b44` (ADR-0006 superseded) |
-| **N-5** | `projection-worker.projectEvent` глушил ошибки → не доходили до DLQ | `899cecf` |
-| **N-7** | Тесты для `audit-service`, `tenancy/`, `telegram/` (+45 тестов) | `7af4b44` |
-| **N-8** | Тесты для `csrf-double-submit`, `csrf-protection`, `idempotency-middleware` (+62 теста) | `6a0940b` |
-| **N-9** | Тесты для `sync-engine-v2/handler` и `report-processor` (+20 тестов) | `899cecf` |
-| **H-4** | Два режима dev (full Docker vs local + Docker DB) задокументированы | новый коммит — `docs/dev-modes.md` + раздел в README |
-| **N-12** | Zero-downtime deploy runbook (build → swap) | новый коммит — `docs/runbooks/008-manual-deploy.md` + обновлён CLAUDE.md |
-| **N-13** | `npm run build` теперь в `verify`; git pre-push hook ловит barrel-break перед push | новый коммит — `.githooks/pre-push` + раздел в README |
-| **H-7** | Prod-deploy уже автоматизирован: multi-stage Dockerfile + Dockerfile.workers + Dockerfile.ws + docker-compose.prod.yml + GitHub Actions deploy + runbooks 007/008 | проверка 2026-05-21 показала всё на месте; аудит был устаревшим |
-| **M-4** | PDF SPOF убран: новый сервис `workers-pdf` с 2 репликами, `workers` оставлен под outbox+projection (leader-elected) | новый коммит — `docker-compose.yml` + `docker-compose.prod.yml` |
-| **M-11** | PWA удалён осознанно (не используется без sync v3): убраны `public/sw.js`, `sw-cache-protection.js`, `manifest.json`, maskable-иконки, компонент `ServiceWorkerRegistration`, manifest-ссылка из `layout.tsx`, исключение `sw.js/manifest.json` из proxy-matcher | новый коммит |
-| **N-4** | Fire-and-forget `registerAllEventHandlers` устранён: обёртки в `domain-events.ts` удалены, `route.ts` переключён на sync-импорт из `event-handlers.ts`, `core/event-bus` re-export пересобран. Race при первом запросе после загрузки модуля больше невозможна. | новый коммит |
-| **L-1** | `NEXT_PUBLIC_WS_URL` больше не молчаливо падает на `ws://localhost:3001`: `useRealtime` при пустом env-var остаётся в `disconnected` без шумных reconnect-attempts. `.env.production.example` теперь содержит явный placeholder `wss://YOUR_DOMAIN_HERE/ws`. | новый коммит |
-| **N-10 (Telegram downtime)** | TODO в `event-handlers.ts:201` реализован: при downtime > 120 мин отправляется Telegram-alert через существующий `telegramNotifier.sendAlert`. Severity = `high` для > 240 мин, иначе `medium`. Ошибки нотификатора не валят событие. | новый коммит |
-| **N-10 (site deactivation)** | TODO в `site.aggregate.ts:121` реализован: проверка перенесена в command-service (`deactivateSite`), где доступ к БД легитимен. Блокирует деактивацию, если у объекта есть отчёты в статусе `draft`; даёт сообщение оператору с количеством. Агрегат сохранил pure-ность. | новый коммит |
-| **N-10 (sync delete)** | TODO в `sync/route.ts:205` доведён до реализации: добавлены ADMIN-проверка, поиск отчёта, запись `report.deleted` в audit trail через `recordAuditEvent`. Полноценный schema-уровневый soft-delete отложен (требует миграции `Report.deletedAt`); это закрывает audit-aspect TODO. | новый коммит |
-| **N-10 (degradeWithCache)** | TODO в `api-error-boundary.ts:170` реализован: `DegradationFn` теперь async; добавлен `recordLastKnownGood(key, data)` хелпер для записи last-known-good в Redis (TTL 5 мин), `degradeWithCache` его читает. `ErrorBoundaryOptions.getCacheKey` пробрасывает ключ в `ErrorContext`. | новый коммит |
-| **N-10 (sync v3 tests)** | 3 TODO в `sync-engine.test.ts` (Dexie mock complexity) переписаны как явное «Skipped: tracked in N-2». Это устраняет ESLint-шум и связывает skip-и с осознанно отложенным sync v3. | новый коммит |
-| **N-10 (bulkhead queue timeout test)** | Сломанный `it.skip` удалён вместо переписывания: production-код корректен, тест зависел от vitest timer/microtask ordering, который недетерминированный. Stub без ценности убран. | новый коммит |
-| **M-8** | Добавлен хук `useMinSkeletonDuration` в `src/components/piling/async-ui.tsx` — гарантирует минимум 250ms видимости skeleton'а, устраняя «прыжок» при быстром fetch. Применён на admin-dashboard и admin-dlq как образец. Остальные сайты подключаются итеративно при касании. | новый коммит |
-| **M-9** | Добавлен компонент `QueryErrorBanner` (Alert + Retry-кнопка) — замена `toast.error('Ошибка загрузки')`. Toast одноразов и не даёт user'у понять что сломалось; banner остаётся пока ошибка актуальна и предлагает повтор. Применён на admin-dashboard и admin-dlq. | новый коммит |
-| **L-2** | 56 случаев `text-[10px]/[11px]` заменены на дизайн-токены `text-3xs` (10px) и `text-2xs` (11px). Токены объявлены в `globals.css @theme` (Tailwind v4). ESLint-правило `no-restricted-syntax` сохраняется как watchdog против новых брекетов. | новый коммит |
-| **M-2** | Раздел «known advisories» уже есть в README.md (строки 157-164): 7 moderate уязвимостей через транзитивные зависимости Next/Prisma, не имеющие прод-импакта; будут устранены апдейтом мажоров. | (документация — уже была) |
-
-Также за это время:
-- **DLQ-механизм** — был архитектурно недостижим (handlers глотали → outbox не видел провалов → MAX_RETRIES не достигалось). Исправлен в `899cecf`: `emitDomainEvent` теперь async + propagate; `moveToDlq` больше не re-queue; `unified-worker/outbox.ts` регистрирует подписчиков. См. подробный post-mortem 2026-05-20 в коммит-сообщении.
-- **3 «потерянных» исправления из апрельского аудита**, не зафиксированных в документе: H-2, M-5, M-6 — все уже были сделаны без обновления этого файла. Это и есть причина новой политики «не доверять снимку без проверки».
+| Тег июля | Находка | Статус 2026-07-17 | Доказательство |
+|---|---|---|---|
+| H1 | Глобальный rate-limit (один bucket на всех) | ✅ **Закрыт** | `api-wrapper.ts:137` — ключ `mut:{route}:{session}:{ip}`; `TRUST_PROXY=true` на проде (деплой 2026-07-03) |
+| H2 | Недельная аналитика: деструктивный rebuild без tenantId | ✅ **Закрыт** | `rebuild.ts:142,153` — tenantId по объекту + `$transaction` (deploy b8a0593-серия) |
+| H3 | Health/deploy gate — false green | ✅ **Закрыт** | `/api/ready` → `getReadiness()` (liveness/readiness разделены); смоук в деплой-чеклисте |
+| H4 | «PITR» без WAL archive | 🔴 **ОТКРЫТ** → **A-1** | Проверено SSH 2026-07-17: `archive_mode = off`, `archive_command = (disabled)` |
+| H5 | PgBouncer обходится | ✅ **Закрыт** | `db.ts:83` — приоритет `DATABASE_URL` (pgbouncer) |
+| H6 | WS 100 MB payload без backpressure | ✅ **Закрыт** | `ws-server.ts:70` — `maxPayload: 64 KB` |
+| H7 | Multi-tenant включать нельзя | 🟡 **Условный** → **A-9** | FORCE RLS на 25 таблицах живёт (2026-07-03); негативной cross-tenant матрицы всё ещё нет |
+| M1 | Redis singleton WS мёртв после стартовой ошибки | ✅ **Закрыт** | `redis-cache.ts:89-103` — сброс singleton на `end`/terminal error |
+| M2 | Версия не привязана к commit | ✅ **Закрыт** | `/api/health` на проде отдаёт `version: ffb3901` (проверено при деплое v2.7.0) |
+| M3 | Email-логин: lockout аккаунта по чужому email | 🟠 **ОТКРЫТ** → **A-2** | `auth-service.ts:166` — bucket только `email.toLowerCase()`, без IP-guard. PIN исправлен (`pin-ip-…`:211) |
+| M4 | JWT в WS query string | ✅ **Закрыт** | `realtime/server/auth.ts:53` — только cookie, `?token=` удалён |
+| M5 | Публичный /api/health болтлив | 🟠 **ОТКРЫТ** → **A-3** | `health-checks.ts` — heap/disk/uptime/checks отдаются без auth |
+| M6 | Секреты/бэкапы в worktree прода | 🟠 **ОТКРЫТ** → **A-4** | SSH 2026-07-17: `?? .env.production`, 4× `.env.bak*`, compose-баки |
+| M7 | Compose bootstrap trap (PGADMIN_PASSWORD) | ⚪ не перепроверялся → **A-10** | — |
+| M8 | Невоспроизводимые образы (latest-теги, `\|\| true`) | ⚪ не перепроверялся → **A-11** | — |
+| M9 | Кнопка показа пароля 16×16 без aria-label | 🟠 **ОТКРЫТ** → **A-5** | `login-page.tsx:126-131` — `w-4 h-4`, aria-label нет |
+| M10 | Фон логина 2.5 MB, без reduced-motion | 🟡 **ОТКРЫТ** → **A-7** | `login-page.tsx:22-24` — карусель 12 s, `prefers-reduced-motion` не учтён |
+| L1-L4 | /dashboard 404, один VM, container_name, localStorage-черновики | 🟡 приняты как ограничения масштаба → A-8 частично | — |
 
 ---
 
-## Закрыто (sync v3 снят с поддержки)
+## Открытые пункты (актуальный список)
 
-#### N-2. Sync v3 — удалён 2026-05-24
+### 🔴 A-1. Восстановление данных: WAL выключен, restore-drill не проводился (экс-H4)
 
-**Окончательное решение.** Sync v3 / offline-first инфраструктура полностью удалена: 57 файлов и ~7000 строк кода. Audit-аналитика подтвердила, что **ни один компонент инфраструктуры не использовался в продакшене**:
+`archive_mode=off` на проде (проверено 2026-07-17). Есть только ночной logical
+dump + off-site копия в R2 (работает, проверена 2026-07-01). Фактический RPO —
+до ~24 часов; восстановление на произвольную точку невозможно. **Restore-drill
+на чистой БД не проводился ни разу** — гарантия восстановления не проверена.
+*Действие:* (1) провести документированный restore-drill из ночного дампа;
+(2) решить: включать WAL-архив (pgBackRest/WAL-G) или официально принять RPO 24ч
+и переименовать «PITR» в runbook'ах, чтобы не создавать ложную уверенность.
 
-- `useRealtime` hook не импортировался ни одним production-компонентом (fleet-dashboard использует прямой `new WebSocket()`).
-- `outboxService`, `getDB` (Dexie), `OfflineInitializer` — только барелл-импорты, ни одна форма не писала в IndexedDB.
-- API-роуты `/api/sync/{v2, batch, conflicts, device-status, updates}` — нулевые callers (кроме мёртвых компонентов).
+### 🟠 A-2. Email-логин допускает lockout чужого аккаунта (экс-M3)
 
-**Что удалено:**
-- `src/mobile/` целиком
-- `src/core/conflict-resolution/`
-- `src/core/shared/sync/` + `src/core/shared/types/sync.ts`
-- `src/modules/reports/application/sync-engine-v2/`
-- `src/app/api/sync/` (все 6 роутов)
-- `dexie` из package.json
+`auth-service.ts:166`: bucket = только email → зная email, атакующий блокирует
+аккаунт на 30 мин повторными ошибками; ротацией email обходит глобальную защиту.
+PIN-вход уже исправлен (per-IP). *Действие:* двойной лимит per-IP + per-account,
+progressive delay вместо жёсткого lockout.
 
-**Что осталось работающим:**
-- Server-side WebSocket в контейнере `pilingtrack-ws` — fleet-dashboard продолжает получать realtime-обновления напрямую.
-- `Report.vectorClock` JSON-поле в БД оставлено (миграция удаления отложена; nullable, накладных нет).
+### 🟠 A-3. Публичный /api/health раскрывает внутренности (экс-M5)
 
-**Если когда-нибудь понадобится офлайн:** делать с нуля, на современном стеке (CRDT / Yjs / Liveblocks), а не реанимировать удалённое.
+Без аутентификации отдаются heap MB, disk %, uptime, статусы подсистем —
+подарок для fingerprinting. *Действие:* публично только `{status}`, детали —
+за auth или на internal-порт. Не забыть, что deploy-gate дергает этот endpoint.
 
----
+### 🟠 A-4. Секреты и бэкапы валяются в worktree прода (экс-M6)
 
-## Открыто
+`/opt/pilingtrack`: untracked `.env.production`, 4 × `.env.bak.*`,
+`docker-compose*.bak*`. Риск случайного `git add`/утечки в бандл поддержки.
+*Действие:* убрать баки после ротации, секреты — вне worktree, deny-правила
+в `.gitignore` + secret-scan хук (частично есть в session-start).
 
-_Ничего открытого. Полная картина (см. таблицу выше) — все 34 пункта закрыты._
+### 🟠 A-5. Кнопка показа пароля недоступна (экс-M9)
 
----
+16×16 px, без accessible name и focus state (`login-page.tsx:126`). На полевых
+устройствах в перчатках — вдвойне актуально. *Действие:* hit-target ≥44px,
+`aria-label` «Показать/скрыть пароль».
 
-## Закрыто правилом, а не кодом
+### 🟡 A-6. ESLint-базлайн регрессировал: 0 → 10 warnings
 
-### M-3. Миграции на 42 модели Prisma (процессный пункт)
+Все 10 — `no-explicit-any` в `tests/contract/monitoring-template.spec.ts`.
+Нулевой базлайн от 2026-06-21 сломан. *Действие:* типизировать спеку (15 мин).
 
-К 2026-05-23 было 9 миграций (тренд верный — дробятся). Не больно сейчас, но ревью миграций по PR превратится в ад если регрессируем.
+### 🟡 A-7. Фон логина: 2.5 MB, карусель без reduced-motion (экс-M10)
 
-**Закрыт 2026-05-24:** в `CLAUDE.md` → раздел «Common Pitfalls to Avoid» добавлена строка:
-> Bundling schema changes for 5+ models into one Prisma migration → One migration = one logical change.
+*Действие:* AVIF/`<picture>`, preload первого кадра, отключение по
+`prefers-reduced-motion`.
 
-Кода нет — это дисциплинарное правило. Если правило будет регулярно нарушаться, открыть пункт повторно с конкретным PR-примером.
+### 🟡 A-8. Файлы >500 строк — 9 штук (регресс класса M-1)
 
----
+Май закрыл «10 файлов >500 строк», сейчас снова 9: `maintenance-board.tsx` 843,
+`admin-reports.tsx` 834, `equipment-detail.tsx` 603, `admin-dashboard.tsx` 599,
+`to-module.tsx` 597, `media-service.ts` 591, `admin-analytics.tsx` 584,
+`projection-worker.ts` 524, `report-history.tsx` 505. Не аварийно, но тренд
+обратный. *Действие:* резать при следующем касании каждого файла (правило
+CLAUDE.md), не отдельным рефактором.
 
-## Latent (новые из этой серии)
+### 🟡 A-12. Хвосты миграций
 
-#### N-6. Skipped тесты — статус 2026-05-23
-
-После чистки 2026-05-23 в codebase остались только skip-и под sync v3 (отложенный N-2), все с явной отсылкой к причине. Шумовых skip'ов больше нет. Пункт остаётся как наблюдательный — следить, чтобы новые skip-и всегда сопровождались ссылкой на трекинг.
-
----
-
-## Закрыто полностью (исторические упоминания в коммитах)
-
-Эти теги встречаются в `git log`, но самих пунктов в исходных аудитах не было — относятся к параллельному production-readiness audit:
-
-- **H-3 prod** — pgbouncer integration (`2327bc9`, `1d2752c`, `0957cf9`)
-- **H-9** — Docker HOSTNAME (`0581151`)
-- **C-3** — JWT revocation (`e510be0`)
-- **C-4** — nonce CSP (`150caa3`)
-
-Все ✅ closed.
-
----
-
-## Что не покрыто этим аудитом
-
-- **Производительность под нагрузкой** — k6-сценарии есть (`scripts/load-test.js`, `quick-load-test.js`, `stress-test-100.js`), но регулярных прогонов нет.
-- **Реальное использование offline / PWA** — не тестировалось на устройстве в поле.
-- **Доступность (a11y)** — не проверялось по WCAG.
-- **i18n** — приложение монолингвальное (русский).
+`Report.vectorClock` (остаток sync v3, nullable) и отсутствие
+`Report.deletedAt` (полноценный soft-delete отложен с мая). Вреда нет,
+помнить при следующей волне миграций.
 
 ---
 
-**Резюме на 2026-05-23:** проект **значительно здоровее** апрельского состояния. Все Critical закрыты, 8 из 11 High закрыты, DLQ работает, тесты выросли с ~800 до 975. Архитектурный долг разгружен. Единственный остающийся открытый пункт — M-3 (миграции), процессный. L-2 устранён физически (56 случаев → 0 + дизайн-токены + ESLint watchdog). Следующий полный аудит — рекомендую через 2-3 месяца или после следующего значимого инцидента.
+## Условные / отложенные
+
+### A-9. Multi-tenant gate (экс-H7) — до включения «гибридного SaaS»
+
+FORCE RLS с fail-closed политиками живёт на проде с 2026-07-03 (25 таблиц),
+tenant-контекст в транзакциях есть, `ensureTenantAccess` ADMIN/DISPATCHER-байпас
+подтверждён владельцем как дизайн (платформенный админ). **Чего нет:**
+автоматической негативной матрицы «тенант A не видит данные тенанта B» по всем
+API-группам и tenant-scoped ревизии кэшей. Решение о втором тенанте — 2026-11-24;
+до него этот пункт — блокер включения, не текущий риск.
+
+### A-10 / A-11. Compose bootstrap trap и воспроизводимость образов (экс-M7/M8)
+
+На этом срезе не перепроверялись (низкий приоритет, не менялись с июля).
+Считать открытыми до проверки.
+
+---
+
+## Процессные
+
+### P-1. Нагрузка 100+ не подтверждена
+
+k6-сценарии лежат (`scripts/load-test.js` и др.), регулярных прогонов нет.
+Критерий приёмки июльского аудита («100 виртуальных пользователей без
+глобальных 429 и исчерпания коннектов») не проверялся после фиксов H1/H5.
+
+### P-2. Чекер границ слоёв противоречит CLAUDE.md и не в verify
+
+`scripts/check-layer-boundaries.ts` запрещает cross-module `@/modules/x`-импорты,
+которые CLAUDE.md предписывает; чекер не входит в `npm run verify` (живёт только
+в CI). Решить: либо правило, либо гайд.
+
+### P-3. Известные «спящие» зоны (без изменений)
+
+- **CSP на /monitoring** — 1 chunk (lucide/Turbopack) без nonce; косметика,
+  root-caused, кампания: `.claude/skills/pilingtrack-csp-monitoring-campaign`.
+- **Email-инфраструктуры нет** (ни SMTP, ни сервиса) — блокирует email-каналы
+  (заявки сайта ОРИОН, email-алерты из DATA-SOURCES).
+- **services→modules** миграция доделывается оппортунистически (reports —
+  эталон; users/analytics/telemetry/system — фасады).
+- Производительность под нагрузкой, a11y по WCAG, i18n — вне охвата, как и в мае.
+
+---
+
+## Что стало лучше с мая (сверх июльского burn-down)
+
+- FORCE RLS на 25 таблицах + TRUST_PROXY (деплой 2026-07-03).
+- Refresh-token TOCTOU и equipment outbox — атомарные транзакции (b8a0593).
+- 5 cross-module багов данных закрыты по data-flow аудиту 2026-07-07.
+- Иконочная система, редактор раскладок (серверное хранение), реальная
+  аналитика периодов, фикс вылетов сессии (v2.7.0, 2026-07-17 в проде).
+- Тесты: 975 → **1409** unit (+contract 35, +integration 107 на июльском срезе).
+- Zero-downtime деплой отработан трижды (30.06, 03.07, 17.07) без инцидентов.
+
+---
+
+**Резюме на 2026-07-17:** ядро July-аудита сожжено — 5 из 7 High и 3 из 10
+Medium закрыты и проверены по коду. Единственный High-долг — **дисциплина
+восстановления (A-1)**: бэкапы делаются, но восстановление никогда не
+репетировалось, а WAL-архив выключен. Рекомендованный порядок: A-1 (drill) →
+A-2/A-3 (полдня кода) → A-4 (гигиена прода) → A-5/A-6 (мелочь). Следующий
+полный аудит — октябрь 2026 или после значимого инцидента / перед включением
+второго тенанта.

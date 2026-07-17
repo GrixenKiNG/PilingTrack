@@ -13,7 +13,16 @@ tsconfig.tsbuildinfo
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 .env.docker
+# ad-hoc env backups (audit A-4: nothing that looks like an env copy may become trackable)
+.env.bak*
+.env.backup*
+*.yml.bak*
+# prod-host data dirs that used to show up as untracked noise
+basebackups/
+wal-archive/
+exporting/
 *.pem
 *.key
 # Prometheus scrape-token file (M-10b) — real secret value, prod-host only,

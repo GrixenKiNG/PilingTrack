@@ -34,7 +34,7 @@ describe('layout service', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('ships a valid equipment-card default template (saveable as-is)', async () => {
-    anyDb.upsert.mockImplementation(async ({ create }: any) => ({ template: create.template }));
+    anyDb.upsert.mockImplementation(async ({ create }: { create: { template: unknown } }) => ({ template: create.template }));
     await expect(saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1')).resolves.toBeTruthy();
   });
 
@@ -45,7 +45,7 @@ describe('layout service', () => {
   });
 
   it('a per-entity override wins over the base', async () => {
-    anyDb.findUnique.mockImplementation(async ({ where }: any) => {
+    anyDb.findUnique.mockImplementation(async ({ where }: { where: { tenantId_surfaceId_entityId: { entityId: string } } }) => {
       if (where.tenantId_surfaceId_entityId.entityId === 'eq-1') return { entityId: 'eq-1', template: customTemplate() };
       return { entityId: '', template: DEFAULT_EQUIPMENT_CARD_TEMPLATE };
     });
@@ -54,7 +54,7 @@ describe('layout service', () => {
   });
 
   it('a tile with no override falls back to the base', async () => {
-    anyDb.findUnique.mockImplementation(async ({ where }: any) => {
+    anyDb.findUnique.mockImplementation(async ({ where }: { where: { tenantId_surfaceId_entityId: { entityId: string } } }) => {
       if (where.tenantId_surfaceId_entityId.entityId === '') return { entityId: '', template: customTemplate() };
       return null; // no override for eq-2
     });
@@ -73,7 +73,7 @@ describe('layout service', () => {
   });
 
   it('saves an override scoped to its entity', async () => {
-    anyDb.upsert.mockImplementation(async ({ create }: any) => ({ template: create.template }));
+    anyDb.upsert.mockImplementation(async ({ create }: { create: { template: unknown } }) => ({ template: create.template }));
     await saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1', 'eq-1');
     const call = anyDb.upsert.mock.calls[0][0];
     expect(call.where.tenantId_surfaceId_entityId).toEqual({ tenantId: 'orion', surfaceId: 'equipment-card', entityId: 'eq-1' });
