@@ -45,15 +45,15 @@ export function PileSection({
       <Card>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold flex items-center gap-2"><PilingIcon name="pile-driving" size={18} tone="primary" decorative />Забитые сваи</h3>
+            <h3 className="text-base font-bold flex items-center gap-2"><PilingIcon name="pile-driving" size={18} tone="primary" decorative />Забитые сваи</h3>
             <div className="flex items-center gap-2">
               {totalPiles > 0 && (
-                <span className="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                <span className="text-sm font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
                   {totalPiles} шт. / {formatNumber(totalMeters)} м.п.
                 </span>
               )}
               <button onClick={onToggleMode}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium min-w-[44px] min-h-[44px] flex items-center justify-center">
+                className="text-sm text-blue-600 hover:text-blue-700 font-semibold min-w-[44px] min-h-[44px] flex items-center justify-center">
                 {quickMode ? 'Включить расширенный' : 'Включить простой'}
               </button>
             </div>
@@ -75,7 +75,7 @@ export function PileSection({
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
               {!tempGrade && <p className="text-slate-600 text-sm font-medium">Выберите марку сваи</p>}
               {(tempGrade || tempCount) && Number(tempCount) > 0 && (
-                <div className="rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
+                <div className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
                 </div>
               )}
@@ -93,7 +93,7 @@ export function PileSection({
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
               {(tempGrade || tempCount) && (
-                <div className="rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
+                <div className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
                 </div>
               )}
@@ -105,13 +105,13 @@ export function PileSection({
               {piles.map((pile) => (
                 <div key={pile.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{getPileGradeName(pile.pileGradeId)}</p>
-                    {pile.picketId && <p className="text-2xs font-medium text-slate-600 truncate">{getPicketPath(pile.picketId)}</p>}
+                    <p className="text-base font-semibold text-slate-900">{getPileGradeName(pile.pileGradeId)}</p>
+                    {pile.picketId && <p className="text-xs font-medium text-slate-600 truncate">{getPicketPath(pile.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-right text-sm font-bold text-slate-900">
+                    <span className="text-right text-base font-bold text-slate-900">
                       <span className="block font-mono">{pile.count} шт.</span>
-                      <span className="block text-xs font-semibold text-slate-700">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
+                      <span className="block text-sm font-semibold text-slate-700">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
                     </span>
                     <button onClick={() => onRemove(pile.id)}
                       className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">

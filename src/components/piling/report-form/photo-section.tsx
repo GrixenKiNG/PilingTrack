@@ -137,13 +137,13 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-slate-900">Фото отчёта</h3>
+        <h3 className="text-base font-bold text-slate-900">Фото отчёта</h3>
         {photo && canEdit && (
           <button
             type="button"
             onClick={handleDelete}
             disabled={busy}
-            className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1"
+            className="text-sm font-medium text-red-600 hover:text-red-700 flex items-center gap-1"
           >
             <Trash2 className="w-3 h-3" /> Удалить
           </button>
@@ -177,7 +177,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           ) : (
             <>
               <Camera className="w-7 h-7" />
-              <span className="text-sm">Выбрать из галереи или сделать фото</span>
+              <span className="text-base font-medium">Выбрать из галереи или сделать фото</span>
             </>
           )}
         </button>

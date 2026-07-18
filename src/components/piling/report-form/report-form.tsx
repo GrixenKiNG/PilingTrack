@@ -173,8 +173,8 @@ export function ReportForm() {
           <ArrowLeft className="w-5 h-5 text-slate-600" />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold text-slate-900 truncate">Отчёт за смену</h1>
-          <p className="text-xs font-medium text-slate-700 truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
+          <h1 className="text-lg font-bold text-slate-900 truncate">Отчёт за смену</h1>
+          <p className="text-sm font-medium text-slate-700 truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
         </div>
       </div>
 

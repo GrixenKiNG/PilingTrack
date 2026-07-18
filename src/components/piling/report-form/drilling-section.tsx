@@ -43,9 +43,9 @@ export function DrillingSection({
       <Card>
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2"><PilingIcon name="drilling-auger" size={18} tone="info" decorative />Лидерное бурение</CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-2"><PilingIcon name="drilling-auger" size={18} tone="info" decorative />Лидерное бурение</CardTitle>
             {totalMeters > 0 && (
-              <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formatNumber(totalMeters)} м</span>
+              <span className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formatNumber(totalMeters)} м</span>
             )}
           </div>
         </CardHeader>
@@ -63,7 +63,7 @@ export function DrillingSection({
               <Button onClick={onAdd} className="h-11 bg-blue-500 hover:bg-blue-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
             </div>
             {(tempCount || tempMetersPerUnit) && (
-              <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
                 Автоподсчёт: {tempCount || 0} шт. × {tempMetersPerUnit || 0} м = {formatNumber(tempVolume)} м
               </div>
             )}
@@ -74,13 +74,13 @@ export function DrillingSection({
               {drillings.map((drill) => (
                 <div key={drill.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{getDrillTypeName(drill.typeId)}</p>
-                    {drill.picketId && <p className="text-2xs font-medium text-slate-600 truncate">{getPicketPath(drill.picketId)}</p>}
+                    <p className="text-base font-semibold text-slate-900">{getDrillTypeName(drill.typeId)}</p>
+                    {drill.picketId && <p className="text-xs font-medium text-slate-600 truncate">{getPicketPath(drill.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-right text-sm font-bold text-slate-900">
+                    <span className="text-right text-base font-bold text-slate-900">
                       <span className="block font-mono">{drill.count} шт. × {formatNumber(drill.metersPerUnit)} м</span>
-                      <span className="block text-xs font-semibold text-slate-700">Объём: {formatNumber(drill.meters)} м</span>
+                      <span className="block text-sm font-semibold text-slate-700">Объём: {formatNumber(drill.meters)} м</span>
                     </span>
                     <button onClick={() => onRemove(drill.id)}
                       className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">

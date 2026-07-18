@@ -29,20 +29,20 @@ export function SubmitBar({
       {hasEntries && (
         <Card className="bg-slate-900 text-white border-0">
           <CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-slate-200 mb-3">Итого за смену</h3>
+            <h3 className="text-base font-bold text-slate-100 mb-3">Итого за смену</h3>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalPiles} шт. / {formatNumber(totalPileMeters)} м.п.</p>
-                <p className="text-2xs font-medium text-slate-300">Сваи, шт. / м.п.</p>
+                <p className="text-xs font-medium text-slate-300">Сваи, шт. / м.п.</p>
               </div>
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalDrillingCount} шт. / {formatNumber(totalMeters)} м.п.</p>
-                <p className="text-2xs font-medium text-slate-300">Бурение, шт. / м.п.</p>
+                <p className="text-xs font-medium text-slate-300">Бурение, шт. / м.п.</p>
               </div>
               {hasDowntime && (
                 <div>
                   <p className="text-lg font-bold font-mono tabular-nums text-amber-400">{formatNumber(totalDowntime)} ч</p>
-                  <p className="text-2xs font-medium text-slate-300">Простой</p>
+                  <p className="text-xs font-medium text-slate-300">Простой</p>
                 </div>
               )}
             </div>
@@ -54,7 +54,7 @@ export function SubmitBar({
         {showHint && (
           <div className="flex items-center gap-1.5 mb-2 justify-center">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-            <p className="text-xs text-amber-600 font-medium">
+            <p className="text-sm text-amber-600 font-semibold">
               {!selectedSiteId ? 'Сначала выберите объект выше' : 'Добавьте хотя бы одну сваю, бурение или простой'}
             </p>
           </div>

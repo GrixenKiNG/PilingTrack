@@ -42,8 +42,8 @@ export function DowntimeSection({
       <Card>
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2"><PilingIcon name="downtime" size={18} tone="warning" decorative />Простой техники</CardTitle>
-            <button onClick={onToggle} className="text-xs text-orange-500 font-medium">{show ? 'Скрыть' : '+ Добавить'}</button>
+            <CardTitle className="text-base font-bold flex items-center gap-2"><PilingIcon name="downtime" size={18} tone="warning" decorative />Простой техники</CardTitle>
+            <button onClick={onToggle} className="text-sm text-orange-500 font-semibold">{show ? 'Скрыть' : '+ Добавить'}</button>
           </div>
         </CardHeader>
         {show && (
@@ -66,11 +66,11 @@ export function DowntimeSection({
                 {downtimes.map((dt) => (
                   <div key={dt.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">{getDowntimeReasonName(dt.reasonId)}</p>
-                      {dt.comment && <p className="text-2xs font-medium text-slate-600 truncate">{dt.comment}</p>}
+                      <p className="text-base font-semibold text-slate-900">{getDowntimeReasonName(dt.reasonId)}</p>
+                      {dt.comment && <p className="text-xs font-medium text-slate-600 truncate">{dt.comment}</p>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono font-bold text-amber-600">{dt.duration} ч</span>
+                      <span className="text-base font-mono font-bold text-amber-600">{dt.duration} ч</span>
                       <button onClick={() => onRemove(dt.id)}
                         className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
                         <PilingIcon name="delete" size={16} tone="danger" decorative />
@@ -82,7 +82,7 @@ export function DowntimeSection({
             )}
 
             {totalDowntime > 0 && (
-              <div className="text-xs font-medium text-slate-700 text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
+              <div className="text-sm font-medium text-slate-700 text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
             )}
           </CardContent>
         )}

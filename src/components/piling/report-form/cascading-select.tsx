@@ -36,25 +36,25 @@ export function CascadingSelect({
   return (
     <Card>
       <CardContent className="p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-orange-500" />Привязка к объекту
         </h3>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Свайное поле</Label>
+          <Label className="text-sm font-semibold text-slate-800">Свайное поле</Label>
           <Select value={selectedFieldId} onValueChange={onFieldChange}>
             <SelectTrigger className="w-full h-11"><SelectValue placeholder="Выберите свайное поле..." /></SelectTrigger>
             <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Куст</Label>
+          <Label className="text-sm font-semibold text-slate-800">Куст</Label>
           <Select value={selectedClusterId} onValueChange={onClusterChange} disabled={!selectedFieldId}>
             <SelectTrigger className="w-full h-11"><SelectValue placeholder={!selectedFieldId ? 'Сначала выберите поле' : 'Выберите куст...'} /></SelectTrigger>
             <SelectContent>{clusters.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Пикет</Label>
+          <Label className="text-sm font-semibold text-slate-800">Пикет</Label>
           <Select value={selectedPicketId} onValueChange={onPicketChange} disabled={!selectedClusterId}>
             <SelectTrigger className="w-full h-11"><SelectValue placeholder={!selectedClusterId ? 'Сначала выберите куст' : 'Выберите пикет...'} /></SelectTrigger>
             <SelectContent>{pickets.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
