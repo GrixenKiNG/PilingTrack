@@ -13,6 +13,8 @@ import {
   type ReadinessScoreResult,
 } from '@/modules/readiness';
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
+import { TechReadinessModule } from './readiness/tech-readiness-module';
+import type { QueryState } from './readiness/boundaries/query-state';
 import {
   ReadinessReferenceUi,
   type EquipmentDetailSnapshot,
@@ -45,6 +47,9 @@ const SETTINGS_IDS = new Set<SettingsSection>([
   'integrations',
   'audit',
 ]);
+
+export const TECH_READINESS_PRODUCTION_SHELL_ENABLED =
+  process.env.NEXT_PUBLIC_TECH_READINESS_PRODUCTION_SHELL !== 'false';
 
 const parseView = (value: string | null): ReferenceView => {
   if (value === 'journal' || value === 'meters' || value === 'plans') return 'maintenance';
@@ -376,7 +381,7 @@ export function ToModule() {
     replaceUrlState(view, settingsSection, next);
   };
 
-  return (
+  const referenceUi = (
     <ReadinessReferenceUi
       view={view}
       onViewChange={changeView}
@@ -401,5 +406,33 @@ export function ToModule() {
       rulesAvailable={rulesAvailable}
       onRetry={() => void loadWorkspace()}
     />
+  );
+
+  if (!TECH_READINESS_PRODUCTION_SHELL_ENABLED) return referenceUi;
+
+  const queryState: QueryState = loading
+    ? { status: 'loading' }
+    : workspaceError
+      ? workspaceError.includes('Недостаточно прав')
+        ? { status: 'forbidden', message: workspaceError }
+        : { status: 'error', message: workspaceError }
+      : { status: 'ready' };
+
+  return (
+    <TechReadinessModule
+      activeView={view}
+      onViewChange={changeView}
+      queryState={queryState}
+      announcement={
+        workspaceError
+          ? `Ошибка загрузки: ${workspaceError}`
+          : loading
+            ? 'Загрузка центра технической готовности'
+            : `Открыт раздел ${view}`
+      }
+      onRetry={loadWorkspace}
+    >
+      {referenceUi}
+    </TechReadinessModule>
   );
 }
