@@ -475,6 +475,22 @@ model TenantSettings {
   @@index([tenantId])
 }
 
+model ReadinessRuleSet {
+  id          String   @id @default(cuid())
+  tenantId    String
+  status      String
+  version     String
+  criteria    Json
+  blockers    Json
+  updatedBy   String?
+  publishedAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
 model ModuleLayoutTemplate {
   id        String   @id @default(cuid())
   tenantId  String

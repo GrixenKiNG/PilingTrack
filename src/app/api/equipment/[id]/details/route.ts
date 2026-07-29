@@ -21,11 +21,10 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
-    // The detail page is admin/dispatcher tooling — gate behind the
-    // same permission as equipment.manage so operators can't browse
-    // tech specs of rigs they're not on.
+    // The detail page is read-only admin/dispatcher tooling. Mutations stay
+    // protected by equipment.manage in their dedicated routes.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'equipment.manage');
+    assertCan(user!, 'system.read');
 
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

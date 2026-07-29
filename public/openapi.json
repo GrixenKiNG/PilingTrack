@@ -212,6 +212,135 @@
             "type": "object"
           }
         }
+      },
+      "ReadinessCriterion": {
+        "type": "object",
+        "required": [
+          "key",
+          "weight",
+          "locked"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "INSPECTION",
+              "ENGINE_HOURS",
+              "PERMIT",
+              "MAINTENANCE",
+              "ACCEPTANCE"
+            ]
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "locked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReadinessBlockerRule": {
+        "type": "object",
+        "required": [
+          "condition",
+          "action",
+          "isActive"
+        ],
+        "properties": {
+          "condition": {
+            "type": "string",
+            "enum": [
+              "CRITICAL_DEFECT",
+              "PERMIT_EXPIRED",
+              "MAINTENANCE_OVERDUE_50H",
+              "INSPECTION_BELOW_80"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "DENY_START",
+              "REQUIRE_CONFIRMATION",
+              "RETURN_TO_OPERATOR"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReadinessRuleSet": {
+        "type": "object",
+        "required": [
+          "version",
+          "status",
+          "criteria",
+          "blockers"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^v\\d+\\.\\d+$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED"
+            ]
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCriterion"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessBlockerRule"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ReadinessRulesState": {
+        "type": "object",
+        "required": [
+          "published",
+          "draft",
+          "pendingChanges"
+        ],
+        "properties": {
+          "published": {
+            "$ref": "#/components/schemas/ReadinessRuleSet"
+          },
+          "draft": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReadinessRuleSet"
+              }
+            ]
+          },
+          "pendingChanges": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       }
     },
     "parameters": {
@@ -775,6 +904,89 @@
           },
           "503": {
             "description": "Not ready"
+          }
+        }
+      }
+    },
+    "/api/readiness-rules": {
+      "get": {
+        "summary": "Get published and draft technical-readiness rules",
+        "tags": [
+          "Technical readiness"
+        ],
+        "responses": {
+          "200": {
+            "description": "Readiness rules state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessRulesState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          }
+        }
+      },
+      "put": {
+        "summary": "Save a technical-readiness rules draft",
+        "tags": [
+          "Technical readiness"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessRuleSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Draft saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessRulesState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Administrator role required"
+          }
+        }
+      }
+    },
+    "/api/readiness-rules/publish": {
+      "post": {
+        "summary": "Publish the current technical-readiness rules draft",
+        "tags": [
+          "Technical readiness"
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessRulesState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Administrator role required"
           }
         }
       }
