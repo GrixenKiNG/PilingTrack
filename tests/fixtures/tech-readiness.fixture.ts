@@ -11,31 +11,37 @@ export const TECH_READINESS_FOREIGN_TENANT = {
 export const TECH_READINESS_USERS = {
   admin: {
     id: 'test-user-readiness-admin',
+    name: 'Readiness Admin',
     role: 'ADMIN',
     tenantId: TECH_READINESS_TEST_TENANT.id,
   },
   mechanic: {
     id: 'test-user-readiness-mechanic',
+    name: 'Readiness Mechanic',
     role: 'MECHANIC',
     tenantId: TECH_READINESS_TEST_TENANT.id,
   },
   dispatcher: {
     id: 'test-user-readiness-dispatcher-a',
+    name: 'Readiness Dispatcher A',
     role: 'DISPATCHER',
     tenantId: TECH_READINESS_TEST_TENANT.id,
   },
   secondDispatcher: {
     id: 'test-user-readiness-dispatcher-b',
+    name: 'Readiness Dispatcher B',
     role: 'DISPATCHER',
     tenantId: TECH_READINESS_TEST_TENANT.id,
   },
   operator: {
     id: 'test-user-readiness-operator',
+    name: 'Readiness Operator',
     role: 'OPERATOR',
     tenantId: TECH_READINESS_TEST_TENANT.id,
   },
   foreignAdmin: {
     id: 'test-user-readiness-foreign-admin',
+    name: 'Foreign Readiness Admin',
     role: 'ADMIN',
     tenantId: TECH_READINESS_FOREIGN_TENANT.id,
   },
@@ -57,6 +63,12 @@ export const TECH_READINESS_FILTERS = {
   from: '2026-07-01',
   to: '2026-07-31',
   sort: 'occurredAt.desc',
+} as const;
+
+export const TECH_READINESS_FLAGS = {
+  READINESS_SHIFTS_V1: 'true',
+  READINESS_PERMITS_V1: 'true',
+  READINESS_AUDIT_CHAIN_V1: 'false',
 } as const;
 
 export function assertIsolatedTestFixture(value: string): void {

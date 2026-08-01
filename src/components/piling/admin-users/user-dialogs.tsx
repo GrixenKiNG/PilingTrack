@@ -38,6 +38,7 @@ const RoleOptions = () => (
   <>
     <SelectItem value="OPERATOR">Оператор</SelectItem>
     <SelectItem value="ASSISTANT">Помощник</SelectItem>
+    <SelectItem value="MECHANIC">Механик</SelectItem>
     <SelectItem value="DISPATCHER">Диспетчер</SelectItem>
     <SelectItem value="ADMIN">Администратор</SelectItem>
   </>

@@ -249,6 +249,19 @@ describe('updateUser', () => {
     }));
   });
 
+  it('increments the session version when changing a role', async () => {
+    findFirstUserMock.mockResolvedValue(existingUser);
+
+    await updateUser('tenant-a', { id: 'user-b', role: 'MECHANIC' }, 'admin-a');
+
+    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        role: 'MECHANIC',
+        sessionVersion: { increment: 1 },
+      }),
+    }));
+  });
+
   it('fails closed when tenant context is missing', async () => {
     await expect(updateUser('', { id: 'user-b', name: 'X' }, 'admin-a'))
       .rejects.toMatchObject({ status: 400 });

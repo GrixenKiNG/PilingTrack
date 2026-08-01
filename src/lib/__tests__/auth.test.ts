@@ -35,7 +35,7 @@ describe('requireAuth', () => {
     mocks.readSessionToken.mockReturnValue('test-token');
   });
 
-  it('caches the authenticated user for repeated requests with the same session token', async () => {
+  it('rechecks sessionVersion for repeated requests with the same session token', async () => {
     mocks.verifySessionToken.mockResolvedValue({
       sub: 'user-1',
       email: 'operator@piling.ru',
@@ -44,7 +44,8 @@ describe('requireAuth', () => {
       type: 'session',
       v: 1,
     });
-    mocks.findUnique.mockResolvedValue({
+    mocks.findUnique
+      .mockResolvedValueOnce({
       id: 'user-1',
       email: 'operator@piling.ru',
       name: 'Operator',
@@ -53,7 +54,17 @@ describe('requireAuth', () => {
       isActive: true,
       tenantId: null,
       sessionVersion: 0,
-    });
+      })
+      .mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'operator@piling.ru',
+        name: 'Operator',
+        role: 'MECHANIC',
+        phone: '+70000000000',
+        isActive: true,
+        tenantId: null,
+        sessionVersion: 1,
+      });
 
     const { requireAuth } = await import('../auth');
 
@@ -61,10 +72,10 @@ describe('requireAuth', () => {
     const second = await requireAuth(createRequest());
 
     expect(first.error).toBeNull();
-    expect(second.error).toBeNull();
-    expect(first.user).toEqual(second.user);
-    expect(mocks.verifySessionToken).toHaveBeenCalledTimes(1);
-    expect(mocks.findUnique).toHaveBeenCalledTimes(1);
+    expect(second.user).toBeNull();
+    expect(second.error?.status).toBe(401);
+    expect(mocks.verifySessionToken).toHaveBeenCalledTimes(2);
+    expect(mocks.findUnique).toHaveBeenCalledTimes(2);
   });
 
   it('returns 401 when the token session version is stale', async () => {

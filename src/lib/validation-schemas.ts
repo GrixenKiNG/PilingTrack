@@ -39,7 +39,7 @@ export const pinAuthSchema = z.object({
 const userBaseSchema = z.object({
   email: z.string().email('Invalid email format').max(255),
   name: z.string().min(1, 'Name is required').max(200),
-  role: z.enum(['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT']),
+  role: z.enum(['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT', 'MECHANIC']),
   pin: z
     .string()
     .regex(/^\d{4,10}$/, 'PIN must contain 4 to 10 digits')

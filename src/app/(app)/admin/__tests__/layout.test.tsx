@@ -74,4 +74,14 @@ describe('AdminSectionLayout — sessionVersion check', () => {
     const result = await AdminSectionLayout({ children: 'CONTENT' as unknown as React.ReactNode });
     expect(result).toBeTruthy();
   });
+
+  it('keeps mechanics out of the shared admin route tree', async () => {
+    withCookie('mechanic-token');
+    verifySessionTokenMock.mockResolvedValue({ sub: 'mechanic-1', role: 'MECHANIC', sv: 2 });
+    findUniqueMock.mockResolvedValue({ role: 'MECHANIC', isActive: true, sessionVersion: 2 });
+
+    await expect(
+      AdminSectionLayout({ children: 'ADMIN' as unknown as React.ReactNode })
+    ).rejects.toThrow('REDIRECT:/operator');
+  });
 });

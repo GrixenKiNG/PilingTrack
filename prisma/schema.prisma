@@ -39,6 +39,7 @@ model Tenant {
 
   users       User[]
   sites       Site[]
+  settings    TenantSettings?
   invoices    TenantInvoice[]
   telematicsDevices TelematicsDevice[]
   pileGrades         PileGrade[]
@@ -107,6 +108,8 @@ model User {
 
   @@index([email])
   @@index([tenantId])
+  @@unique([tenantId, id])
+  @@index([tenantId, role, isActive])
 }
 
 // ============================================================
@@ -185,6 +188,7 @@ model Equipment {
   @@index([isActive])
   @@index([kind])
   @@index([inventoryNumber])
+  @@unique([tenantId, id])
 }
 
 enum EquipmentKind {
@@ -462,7 +466,7 @@ model TenantSettings {
   tenantId      String   @unique
   companyName   String   @default("")
   inn           String   @default("")
-  timezone      String   @default("UTC+3")
+  timezone      String   @default("Europe/Moscow")
   dateFormat    String   @default("DD.MM.YYYY")
   units         String   @default("metric")
   currency      String   @default("RUB")
@@ -471,6 +475,7 @@ model TenantSettings {
   updatedBy     String   @default("")
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
 }
@@ -717,6 +722,7 @@ model Site {
   @@index([tenantId])
   @@index([isActive])
   @@index([tenantId, isActive])
+  @@unique([tenantId, id])
 }
 
 // Site pile plan: grade → count × meters per unit → auto total meters

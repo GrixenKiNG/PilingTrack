@@ -55,12 +55,6 @@ function pruneAuthUserCache(now = Date.now()) {
 }
 
 async function resolveSessionUser(token: string): Promise<SessionResolution> {
-  const now = Date.now();
-  const cached = authUserCache.get(token);
-  if (cached && cached.expiresAt > now) {
-    return { payloadValid: true, user: cached.user };
-  }
-
   const inFlight = authUserInFlight.get(token);
   if (inFlight) {
     return inFlight;

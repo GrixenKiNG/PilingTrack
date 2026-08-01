@@ -238,7 +238,11 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const currentUser = usePilingStore((s) => s.currentUser);
   
-  if (currentUser?.role === 'ADMIN' || currentUser?.role === 'DISPATCHER') {
+  if (
+    currentUser?.role === 'ADMIN'
+    || currentUser?.role === 'DISPATCHER'
+    || currentUser?.role === 'MECHANIC'
+  ) {
     return (
       <AppErrorBoundary>
         <AdminLayout>{children}</AdminLayout>

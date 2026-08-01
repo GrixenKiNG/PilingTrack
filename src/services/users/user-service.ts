@@ -202,7 +202,8 @@ export interface UpdateUserInput {
 export async function updateUser(
   tenantId: string,
   input: UpdateUserInput,
-  actorUserId?: string | null
+  actorUserId?: string | null,
+  client: Pick<typeof db, 'user'> = db
 ) {
   const scopedTenantId = requireTenantId(tenantId);
   if (!input.id) {
@@ -225,15 +226,18 @@ export async function updateUser(
   }
 
   try {
-    const previousUser = await db.user.findFirst({
+    const previousUser = await client.user.findFirst({
       where: { id: input.id, tenantId: scopedTenantId },
       select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
     });
     if (!previousUser) {
       throw new ServiceError('User not found', 404);
     }
+    if (input.role !== undefined && input.role !== previousUser.role) {
+      data.sessionVersion = { increment: 1 };
+    }
 
-    const updatedUser = await db.user.update({
+    const updatedUser = await client.user.update({
       where: { id: input.id, tenantId: scopedTenantId },
       data,
       select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },

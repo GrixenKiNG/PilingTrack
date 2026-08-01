@@ -26,7 +26,6 @@ const dispatcherNavigation: NavigationItem[] = [
   { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
   { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
   { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
-  { label: 'Справочники', href: '/admin/dictionaries', icon: 'documents' },
 ];
 
 const settingsNav: NavigationItem = { label: 'Настройки', href: '/admin/settings', icon: 'settings' };
@@ -34,11 +33,14 @@ const settingsNav: NavigationItem = { label: 'Настройки', href: '/admin
 export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   OPERATOR: operatorNavigation,
   ASSISTANT: operatorNavigation,
+  MECHANIC: [
+    { label: 'Готовность техники', href: '/admin/to', icon: 'technical-readiness' },
+  ],
   DISPATCHER: [...dispatcherNavigation, settingsNav],
   ADMIN: [
     ...dispatcherNavigation,
+    { label: 'Справочники', href: '/admin/dictionaries', icon: 'documents' },
     { label: 'Пользователи', href: '/admin/users', icon: 'users' },
     settingsNav,
   ],
 };
-

@@ -2,6 +2,8 @@ import { PrismaClient } from '../src/generated/postgres-client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashSync } from 'bcryptjs';
 import { initializeTenantDictionaries } from '../src/services/dictionaries/tenant-dictionary-initializer';
+import { updateUser } from '../src/services/users/user-service';
+import { db as serviceDb } from '../src/lib/db';
 
 // Prisma 7 requires an adapter when driverAdapters is set in the schema.
 // Without this, `new PrismaClient()` throws and the migrate container had
@@ -105,6 +107,15 @@ async function seed() {
       isActive: true,
     },
   });
+  await db.tenantSettings.upsert({
+    where: { tenantId },
+    update: { timezone: 'Europe/Moscow' },
+    create: {
+      tenantId,
+      companyName: tenantId === 'orion' ? 'Orion Piling' : tenantId,
+      timezone: 'Europe/Moscow',
+    },
+  });
 
   // Use fixed passwords for testing
   const adminPassword = 'admin123';
@@ -112,6 +123,7 @@ async function seed() {
   const operator1Password = 'operator123';
   const operator2Password = 'sas02password';
   const assistantPassword = 'helper123';
+  const mechanicPassword = 'mechanic123';
 
   console.log('🔑 Fixed passwords for testing:');
   console.log(`   admin@piling.ru: ${adminPassword}`);
@@ -119,6 +131,7 @@ async function seed() {
   console.log(`   operator@piling.ru: ${operator1Password}`);
   console.log(`   sas02@rambler.ru: ${operator2Password}`);
   console.log(`   helper@piling.ru: ${assistantPassword}`);
+  console.log(`   mechanic@piling.ru: ${mechanicPassword}`);
 
   const admin = await db.user.upsert({
     where: { email: 'admin@piling.ru' },
@@ -209,6 +222,26 @@ async function seed() {
       phone: '+7-900-200-0001',
     },
   });
+
+  const mechanic = await db.user.upsert({
+    where: { email: 'mechanic@piling.ru' },
+    update: {
+      name: 'Механик',
+      phone: '+7-900-300-0001',
+      password: hashPassword(mechanicPassword),
+    },
+    create: {
+      tenantId,
+      email: 'mechanic@piling.ru',
+      password: hashPassword(mechanicPassword),
+      name: 'Механик',
+      role: 'OPERATOR',
+      phone: '+7-900-300-0001',
+    },
+  });
+  if (mechanic.role !== 'MECHANIC') {
+    await updateUser(tenantId, { id: mechanic.id, role: 'MECHANIC' }, admin.id, db);
+  }
 
   console.log(`Users: ${[admin, dispatcher, operator1, operator2, assistant].length}`);
 
@@ -670,5 +703,5 @@ seed()
     process.exit(1);
   })
   .finally(async () => {
-    await db.$disconnect();
+    await Promise.all([db.$disconnect(), serviceDb.$disconnect()]);
   });

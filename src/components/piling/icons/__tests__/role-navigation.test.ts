@@ -28,8 +28,14 @@ describe('ROLE_NAVIGATION', () => {
     const dispatcherRoutes = ROLE_NAVIGATION.DISPATCHER.map((item) => item.href);
 
     expect(adminRoutes).toContain('/admin/users');
+    expect(adminRoutes).toContain('/admin/dictionaries');
     expect(dispatcherRoutes).not.toContain('/admin/users');
+    expect(dispatcherRoutes).not.toContain('/admin/dictionaries');
     expect(dispatcherRoutes).toContain('/admin/to');
+  });
+
+  it('gives mechanics only the readiness destination', () => {
+    expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href)).toEqual(['/admin/to']);
   });
 
   it('folds Telegram and DLQ into Settings (out of top-level navigation)', () => {
@@ -47,4 +53,3 @@ describe('ROLE_NAVIGATION', () => {
     }
   });
 });
-

@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
-import { isMultiTenantMode } from '@/services/tenancy/tenant-context-service';
 import {
   assertCan,
   can,
@@ -64,36 +63,21 @@ export function assertCanManageUserScope(
 }
 
 /**
- * Проверяет, что пользователь имеет доступ к ресурсу указанного tenant.
- * ADMIN/DISPATCHER имеют доступ ко всем tenant.
- * OPERATOR/ASSISTANT — только к своему tenant.
- *
- * Single-tenant установки (MULTI_TENANT_MODE != 'true') пропускают проверку:
- * у юзеров и ресурсов tenantId == null, и enforcement смысла не имеет.
- * Multi-tenant установки fail-closed на отсутствии tenantId у юзера.
+ * Проверяет session-owned tenant для любой роли и режима развертывания.
+ * Отсутствующий tenant у сессии дает 403, а отсутствующий/чужой ресурс —
+ * одинаковый безопасный 404 без раскрытия существования идентификатора.
  */
 export async function ensureTenantAccess(
   user: { id: string; role: string; tenantId?: string | null },
   resourceTenantId: string | null | undefined,
   resourceName: string
 ): Promise<void> {
-  // ADMIN/DISPATCHER bypass tenant checks
-  if (user.role === 'ADMIN' || user.role === 'DISPATCHER') return;
-
-  // Single-tenant deployment — no isolation to enforce. Mode parsing is
-  // centralized in isMultiTenantMode(): comparing to the literal 'true' here
-  // silently skipped enforcement under the canonical value 'multi' (audit H7).
-  if (!isMultiTenantMode()) return;
-
-  // Multi-tenant deployment from here on.
-  // Fail-closed: an OPERATOR/ASSISTANT without a tenant assignment must NOT
-  // be able to access tenant-owned resources.
+  // Tenant isolation is session-owned for every role and deployment mode.
   if (!user.tenantId) {
-    throw new ServiceError(`Access denied: user has no tenant assignment`, 403);
+    throw new ServiceError('Tenant context missing', 403);
   }
 
-  // For OPERATOR/ASSISTANT: must have same tenantId as the resource.
   if (resourceTenantId !== user.tenantId) {
-    throw new ServiceError(`Access denied: ${resourceName} belongs to different tenant`, 403);
+    throw new ServiceError(`${resourceName} not found`, 404);
   }
 }

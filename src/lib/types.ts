@@ -3,7 +3,7 @@
 // ============================================================
 
 // Enums — 4 roles
-export type UserRole = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT';
+export type UserRole = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT' | 'MECHANIC';
 export type ReportStatus = 'draft' | 'submitted';
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -11,6 +11,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   DISPATCHER: 'Диспетчер',
   OPERATOR: 'Оператор',
   ASSISTANT: 'Помощник',
+  MECHANIC: 'Механик',
 };
 
 // ============================================================
