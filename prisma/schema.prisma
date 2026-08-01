@@ -524,6 +524,39 @@ model ReadinessScoreSnapshot {
   @@index([tenantId, shiftId, calculatedAt])
 }
 
+// Latest readiness projection. History remains in ReadinessScoreSnapshot;
+// this row only advances when a newer authoritative snapshot is observed.
+model CurrentReadiness {
+  tenantId     String
+  equipmentId  String
+  snapshotId   String
+  status       String
+  score        Int
+  calculatedAt DateTime @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([tenantId, equipmentId])
+  @@index([tenantId, status, calculatedAt])
+  @@index([tenantId, snapshotId])
+}
+
+// Durable per-tenant cursor for resumable readiness snapshot backfills.
+model ReadinessBackfillProgress {
+  tenantId       String   @id
+  lastEquipmentId String?
+  processedCount Int      @default(0)
+  errorCount     Int      @default(0)
+  lastError      String?
+  status         String   @default("RUNNING")
+  startedAt      DateTime @default(now()) @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  completedAt    DateTime? @db.Timestamptz(3)
+
+  @@index([status, updatedAt])
+}
+
 enum WorkPermitRisk {
   NORMAL
   ELEVATED
@@ -582,6 +615,7 @@ model Shift {
   cancelledById   String?
   cancelReason    String?
   version         Int        @default(1)
+  startSnapshotId String?
   createdAt       DateTime   @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime   @updatedAt @db.Timestamptz(3)
   handovers       ShiftHandover[]

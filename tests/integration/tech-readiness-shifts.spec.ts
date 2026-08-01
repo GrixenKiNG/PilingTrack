@@ -13,6 +13,9 @@ const connectionString = process.env.DATABASE_URL_POSTGRES;
 const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730104000_readiness_workflows/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730105000_readiness_shifts_handovers/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260730105500_readiness_snapshot_immutability/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260730106000_readiness_backfill_progress/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260730107000_readiness_start_snapshot_fk/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
@@ -96,6 +99,9 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     for (const migrationPath of migrationPaths) {
       await sql.query(await readFile(migrationPath, 'utf8'));
     }
+    await sql.query(`INSERT INTO "ReadinessRuleSet" ("id","tenantId","status","version","criteria","blockers","publishedAt")
+      VALUES ('rules-default',$1,'PUBLISHED',$2,$3,$4,NOW())`, [tenantId, DEFAULT_READINESS_RULES.version,
+      JSON.stringify(DEFAULT_READINESS_RULES.criteria), JSON.stringify(DEFAULT_READINESS_RULES.blockers)]);
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: url.toString(), max: 30})}); await prisma.$connect();
   }, 30_000);
 
@@ -111,7 +117,9 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     const successes = outcomes.filter((result) => result.status === 'fulfilled');
     const failures = outcomes.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     expect(successes).toHaveLength(1);
-    expect(failures.every((result) => code(result.reason) === 'VERSION_CONFLICT')).toBe(true);
+    expect(failures.map((result) => code(result.reason))).toEqual(
+      Array.from({length: failures.length}, () => 'VERSION_CONFLICT'),
+    );
     expect(await prisma.shift.count({where: {tenantId, equipmentId, state: 'STARTED'}})).toBe(1);
     expect(await prisma.auditLog.count({where: {tenantId, action: 'shift.started'}})).toBe(1);
     expect(await prisma.outboxEvent.count({where: {tenantId, aggregateType: 'Shift'}})).toBe(1);
@@ -143,6 +151,8 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       .toMatchObject({state: 'ACCEPTED', acceptedById: expect.stringMatching(/^dispatcher-/)});
     expect(await prisma.auditLog.count({where: {tenantId, entityId: 'handover-1'}})).toBe(1);
     expect(await prisma.outboxEvent.count({where: {tenantId, aggregateId: 'handover-1'}})).toBe(1);
+    expect(await prisma.outboxEvent.findFirstOrThrow({where: {tenantId, aggregateId: 'handover-1'},
+      select: {payload: true}})).toMatchObject({payload: {equipmentId, shiftId: 'accept-shift'}});
   });
 
   it('ignores a stale READY snapshot and commits an explainable blocked decision from authoritative rows', async () => {
@@ -161,10 +171,34 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     expect(result.body).toMatchObject({error: {code: 'SHIFT_START_BLOCKED', details: {blockers: [
       expect.objectContaining({condition: 'VALID_WORK_PERMIT_REQUIRED', actionLabel: expect.any(String)}),
     ]}}});
-    expect(await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'}, select: {state: true}})).toEqual({state: 'PLANNED'});
+    expect(await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'},
+      select: {state: true, startSnapshotId: true}})).toEqual({state: 'PLANNED', startSnapshotId: null});
     expect(await prisma.readinessScoreSnapshot.count({where: {tenantId, shiftId: 'blocked-shift', status: 'BLOCKED'}})).toBe(1);
     expect(await prisma.auditLog.count({where: {tenantId, entityId: 'blocked-shift', action: 'shift.start-blocked'}})).toBe(1);
     expect(await prisma.outboxEvent.count({where: {tenantId, aggregateId: 'blocked-shift'}})).toBe(1);
     expect(await prisma.idempotencyKey.count({where: {tenantId, key: 'task04-blocked-start', status: 'completed'}})).toBe(1);
+
+    await sql.query(`INSERT INTO "WorkPermit"
+      ("id","tenantId","equipmentId","risk","state","scope","validFrom","validTo","timezone",
+       "authorId","lastEditedById","approvedAt","updatedAt")
+      VALUES ('permit-after-correction',$1,$2,'NORMAL','APPROVED','Shift start',
+       '2026-08-01T00:00:00Z','2026-08-02T00:00:00Z','Europe/Moscow',
+       'operator-a','operator-a',NOW(),NOW())`, [tenantId, equipmentId]);
+    const retried = await transaction((tx) => startShiftCommand({tx,
+      context: context('operator-a', 'OPERATOR', 'corrected-start'),
+      id: 'blocked-shift', key: 'task05-corrected-start',
+      ifMatch: '"shift-blocked-shift-v1"', expectedVersion: 1,
+      now: new Date('2026-08-01T12:00:00.000Z'),
+    }));
+    expect(retried.status).toBe(200);
+    const started = await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'},
+      select: {state: true, startSnapshotId: true}});
+    expect(started).toMatchObject({state: 'STARTED', startSnapshotId: expect.any(String)});
+    expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
+      where: {id: started.startSnapshotId!}, select: {status: true, triggerId: true},
+    })).toEqual({status: 'READY', triggerId: 'blocked-shift:start:2026-08-01T12:00:00.000Z'});
+    expect(await prisma.readinessScoreSnapshot.count({
+      where: {tenantId, shiftId: 'blocked-shift', triggerType: 'SHIFT_START_DECISION'},
+    })).toBe(2);
   });
 });

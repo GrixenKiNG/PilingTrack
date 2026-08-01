@@ -59,7 +59,7 @@ async function runCommand(input: {tx: ReadinessTransaction; context: ShiftComman
 
 async function effects(input: {tx: ReadinessTransaction; context: ShiftCommandContext; key: string; action: string;
   entityType: 'Shift' | 'ShiftHandover'; entityId: string; entityVersion: number; equipmentId: string;
-  before?: unknown; after: unknown}) {
+  shiftId?: string; triggerOccurredAt: Date; before?: unknown; after: unknown}) {
   await recordChainedReadinessAudit(input.tx, {tenantId: input.context.tenantId,
     action: `${input.entityType === 'Shift' ? 'shift' : 'handover'}.${input.action}`,
     entityType: input.entityType, entityId: input.entityId, entityVersion: input.entityVersion,
@@ -72,8 +72,8 @@ async function effects(input: {tx: ReadinessTransaction; context: ShiftCommandCo
     dedupeKey: `readiness.snapshot:${input.context.tenantId}:${input.equipmentId}:${input.entityType.toUpperCase()}_${input.action.toUpperCase()}:${input.entityId}:v${input.entityVersion}`,
     payload: {triggerType: `${input.entityType.toUpperCase()}_${input.action.toUpperCase()}`,
       triggerId: `${input.entityId}:v${input.entityVersion}:${input.action}`, equipmentId: input.equipmentId,
-      shiftId: input.entityType === 'Shift' ? input.entityId : undefined,
-      triggerOccurredAt: new Date().toISOString()} as Prisma.InputJsonValue}});
+      shiftId: input.shiftId ?? (input.entityType === 'Shift' ? input.entityId : undefined),
+      triggerOccurredAt: input.triggerOccurredAt.toISOString()} as Prisma.InputJsonValue}});
 }
 
 export function createShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; key: string | null;
@@ -92,7 +92,8 @@ export function createShiftCommand(input: {tx: ReadinessTransaction; context: Sh
         type: input.payload.type, productionDate: tenantProductionDate(now, timezone), timezone,
         plannedStartAt, plannedEndAt, actorId: input.context.actorId});
       const after = serializeShift(row); await effects({tx: input.tx, context: input.context, key, action: 'created',
-        entityType: 'Shift', entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId, after});
+        entityType: 'Shift', entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
+        triggerOccurredAt: row.createdAt, after});
       return {status: 201, body: {data: after}, headers: {ETag: formatStrongEtag('shift', row.id, row.version),
         Location: `/api/readiness/shifts/${row.id}`}};
     }});
@@ -118,7 +119,7 @@ export function updateShiftCommand(input: {tx: ReadinessTransaction; context: Sh
         plannedEndAt: input.payload.plannedEndAt === undefined ? undefined : end});
       const after = serializeShift(row); await effects({tx: input.tx, context: input.context, key, action: 'updated',
         entityType: 'Shift', entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
-        before: serializeShift(beforeRow), after});
+        triggerOccurredAt: row.updatedAt, before: serializeShift(beforeRow), after});
       return {status: 200, body: {data: after}, headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};
     }});
 }
@@ -140,14 +141,14 @@ export function startShiftCommand(input: {tx: ReadinessTransaction; context: Shi
       if (!decision.allowed) {
         await effects({tx: input.tx, context: input.context, key, action: 'start-blocked', entityType: 'Shift',
           entityId: beforeRow.id, entityVersion: beforeRow.version, equipmentId: beforeRow.equipmentId,
-          before: serializeShift(beforeRow), after: {shift: serializeShift(beforeRow), decision}});
+          triggerOccurredAt: now, before: serializeShift(beforeRow), after: {shift: serializeShift(beforeRow), decision}});
         return {status: 422, body: asAuditJson({error: {code: 'SHIFT_START_BLOCKED', message: 'Shift start is blocked by published readiness rules',
           details: {blockers: decision.blockers, warnings: decision.warnings, snapshotId: decision.snapshotId}}})};
       }
       const row = await repo.start(input.context.tenantId, input.id, expected, input.context.actorId, now);
       const after = serializeShift(row); await effects({tx: input.tx, context: input.context, key, action: 'started',
         entityType: 'Shift', entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
-        before: serializeShift(beforeRow), after: {shift: after, decision}});
+        triggerOccurredAt: row.startedAt ?? now, before: serializeShift(beforeRow), after: {shift: after, decision}});
       return {status: 200, body: asAuditJson({data: after, decision}), headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};
     }});
 }
@@ -162,7 +163,8 @@ export function cancelShiftCommand(input: {tx: ReadinessTransaction; context: Sh
       assertShiftTransition(before.state, 'cancel'); const row = await repo.cancel({tenantId: input.context.tenantId, id: input.id,
         version: expected, actorId: input.context.actorId, reason, now: input.now ?? new Date()}); const after = serializeShift(row);
       await effects({tx: input.tx, context: input.context, key, action: 'cancelled', entityType: 'Shift', entityId: row.id,
-        entityVersion: row.version, equipmentId: row.equipmentId, before: serializeShift(before), after});
+        entityVersion: row.version, equipmentId: row.equipmentId, triggerOccurredAt: row.cancelledAt ?? row.updatedAt,
+        before: serializeShift(before), after});
       return {status: 200, body: {data: after}, headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};}});
 }
 
@@ -180,7 +182,8 @@ export function submitHandoverCommand(input: {tx: ReadinessTransaction; context:
       const shift = await shifts.markHandoverPending(input.context.tenantId, input.shiftId, expected);
       const after = serializeHandover(handover); await effects({tx: input.tx, context: input.context, key,
         action: 'submitted', entityType: 'ShiftHandover', entityId: handover.id, entityVersion: handover.version,
-        equipmentId: shift.equipmentId, before: null, after});
+        equipmentId: shift.equipmentId, shiftId: shift.id, triggerOccurredAt: handover.submittedAt ?? now,
+        before: null, after});
       return {status: 201, body: {data: after, shift: serializeShift(shift)},
         headers: {ETag: formatStrongEtag('handover', handover.id, handover.version), Location: `/api/readiness/handovers/${handover.id}`}};
     }});
@@ -214,6 +217,7 @@ async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCo
       const after = serializeHandover(handover); await effects({tx: input.tx, context: input.context, key,
         action: input.action === 'accept' ? 'accepted' : 'rework-requested', entityType: 'ShiftHandover',
         entityId: handover.id, entityVersion: handover.version, equipmentId: shift.equipmentId,
+        shiftId: shift.id, triggerOccurredAt: handover.acceptedAt ?? handover.reworkedAt ?? now,
         before: serializeHandover(before), after});
       return {status: 200, body: {data: after, shift: serializeShift(shift)},
         headers: {ETag: formatStrongEtag('handover', handover.id, handover.version)}};}});

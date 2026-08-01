@@ -21,6 +21,7 @@ import {
   projectReportStats,
   projectWeeklyTrend,
 } from './projection-handlers';
+import {consumeReadinessProjectionEvent} from '@/modules/readiness/application/projection/consumer';
 
 // Re-export: callers (rebuild.ts, reports/delete route) import it from here.
 export { projectOperatorPerformanceFull } from './projection-handlers';
@@ -81,6 +82,7 @@ export function getProjectionDate(event: ReportDomainEvent, fallbackDate?: strin
 }
 
 async function projectEvent(event: ReportDomainEvent) {
+  if (await consumeReadinessProjectionEvent(event)) return;
   const normalizedEvent = normalizeProjectionEvent(event);
   if (!normalizedEvent) {
     if (process.env.LOG_PROJECTION_SKIPS === 'true') {
