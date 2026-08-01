@@ -65,4 +65,31 @@ describe('readiness tenant transaction', () => {
     expect(work).toHaveBeenCalledTimes(1);
     expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   });
+
+  it('maps exhausted serialization conflicts to a stable 409 without exposing the database error', async () => {
+    const databaseError = {code: 'P2034', message: 'database transaction failed'};
+    const client = {$transaction: vi.fn().mockRejectedValue(databaseError)};
+    const resolveConflictDetails = vi.fn().mockResolvedValue({current: {
+      state: 'ACCEPTED', acceptedById: 'dispatcher-a', acceptedAt: '2026-08-01T09:00:00.000Z',
+    }});
+
+    await expect(runReadinessSerializableTransaction(
+      client as never,
+      'tenant-a',
+      vi.fn(),
+      {resolveConflictDetails},
+    )).rejects.toMatchObject({
+      code: 'VERSION_CONFLICT',
+      status: 409,
+      details: {current: {
+        state: 'ACCEPTED',
+        acceptedById: 'dispatcher-a',
+        acceptedAt: '2026-08-01T09:00:00.000Z',
+      }},
+      headers: {'Retry-After': '1'},
+    });
+
+    expect(client.$transaction).toHaveBeenCalledTimes(3);
+    expect(resolveConflictDetails).toHaveBeenCalledTimes(1);
+  });
 });

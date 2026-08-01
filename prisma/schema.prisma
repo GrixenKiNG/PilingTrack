@@ -542,6 +542,80 @@ enum WorkPermitApprovalRole {
   ADMIN
 }
 
+enum ShiftType {
+  DAY
+  NIGHT
+}
+
+enum ShiftState {
+  PLANNED
+  STARTED
+  HANDOVER_PENDING
+  CLOSED
+  CANCELLED
+}
+
+enum ShiftHandoverState {
+  DRAFT
+  SUBMITTED
+  REWORK_REQUIRED
+  ACCEPTED
+}
+
+model Shift {
+  id              String     @id @default(cuid())
+  tenantId        String
+  equipmentId     String
+  type            ShiftType
+  state           ShiftState @default(PLANNED)
+  productionDate  DateTime   @db.Date
+  timezone        String
+  plannedStartAt  DateTime?  @db.Timestamptz(3)
+  plannedEndAt    DateTime?  @db.Timestamptz(3)
+  createdById     String
+  lastEditedById  String
+  startedAt       DateTime?  @db.Timestamptz(3)
+  startedById     String?
+  closedAt        DateTime?  @db.Timestamptz(3)
+  closedById      String?
+  cancelledAt     DateTime?  @db.Timestamptz(3)
+  cancelledById   String?
+  cancelReason    String?
+  version         Int        @default(1)
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @db.Timestamptz(3)
+  handovers       ShiftHandover[]
+  permits         WorkPermit[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, equipmentId, productionDate])
+  @@index([tenantId, state, updatedAt])
+}
+
+model ShiftHandover {
+  id             String             @id @default(cuid())
+  tenantId       String
+  shiftId        String
+  state          ShiftHandoverState @default(DRAFT)
+  summary        String             @db.Text
+  evidence       Json               @default("{}")
+  submittedById  String
+  submittedAt    DateTime?          @db.Timestamptz(3)
+  acceptedById   String?
+  acceptedAt     DateTime?          @db.Timestamptz(3)
+  reworkedById   String?
+  reworkedAt     DateTime?          @db.Timestamptz(3)
+  reworkReason   String?
+  version        Int                @default(1)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @db.Timestamptz(3)
+  shift          Shift              @relation(fields: [tenantId, shiftId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, shiftId, state])
+  @@index([tenantId, state, updatedAt])
+}
+
 model WorkPermit {
   id             String          @id @default(cuid())
   tenantId       String
@@ -565,6 +639,7 @@ model WorkPermit {
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
   approvals      WorkPermitApproval[]
+  shift          Shift?          @relation(fields: [tenantId, shiftId], references: [tenantId, id], onDelete: Restrict)
 
   @@unique([tenantId, id])
   @@index([tenantId, equipmentId, state, validTo])

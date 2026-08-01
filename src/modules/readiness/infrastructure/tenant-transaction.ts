@@ -1,10 +1,14 @@
 import type { Prisma } from '@/generated/postgres-client/client';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import {ReadinessCommandError} from '../application/command-pipeline/errors';
 
 export type ReadinessTransaction = Prisma.TransactionClient;
 
 type TransactionClient = Pick<typeof db, '$transaction'>;
 type TenantWork<T> = (tx: ReadinessTransaction) => Promise<T>;
+type SerializableTransactionOptions = {
+  resolveConflictDetails?: () => Promise<Record<string, unknown> | undefined>;
+};
 
 function requireSessionTenantId(tenantId: string | null | undefined): string {
   const value = tenantId?.trim();
@@ -58,6 +62,7 @@ export async function runReadinessSerializableTransaction<T>(
   client: TransactionClient,
   tenantId: string | null | undefined,
   work: TenantWork<T>,
+  options: SerializableTransactionOptions = {},
 ): Promise<T> {
   const scopedTenantId = requireSessionTenantId(tenantId);
   for (let attempt = 1; attempt <= SERIALIZABLE_ATTEMPTS; attempt += 1) {
@@ -73,7 +78,22 @@ export async function runReadinessSerializableTransaction<T>(
         return work(tx);
       }, {...DEFAULT_TX_OPTIONS, isolationLevel: 'Serializable'});
     } catch (error) {
-      if (!isSerializableConflict(error) || attempt === SERIALIZABLE_ATTEMPTS) throw error;
+      if (!isSerializableConflict(error)) throw error;
+      if (attempt === SERIALIZABLE_ATTEMPTS) {
+        let details: Record<string, unknown> | undefined;
+        try {
+          details = await options.resolveConflictDetails?.();
+        } catch {
+          // Conflict diagnostics are best-effort and must never replace the stable API contract.
+        }
+        throw new ReadinessCommandError(
+          'VERSION_CONFLICT',
+          409,
+          'Concurrent readiness command conflict',
+          details,
+          {'Retry-After': '1'},
+        );
+      }
     }
   }
   throw new Error('Serializable readiness transaction retry exhausted');
@@ -82,6 +102,7 @@ export async function runReadinessSerializableTransaction<T>(
 export function withReadinessSerializableTransaction<T>(
   tenantId: string | null | undefined,
   work: TenantWork<T>,
+  options: SerializableTransactionOptions = {},
 ): Promise<T> {
-  return runReadinessSerializableTransaction(db, tenantId, work);
+  return runReadinessSerializableTransaction(db, tenantId, work, options);
 }
