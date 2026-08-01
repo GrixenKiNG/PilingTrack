@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runReadinessTenantTransaction } from '../tenant-transaction';
+import {
+  runReadinessSerializableTransaction,
+  runReadinessTenantTransaction,
+} from '../tenant-transaction';
 
 describe('readiness tenant transaction', () => {
   it('fails closed without a session-owned tenant', async () => {
@@ -40,5 +43,26 @@ describe('readiness tenant transaction', () => {
       runReadinessTenantTransaction(client as never, 'tenant-a', work)
     ).rejects.toThrow('could not be established');
     expect(work).not.toHaveBeenCalled();
+  });
+
+  it('retries a serializable approval/edit conflict with tenant context restored', async () => {
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi.fn().mockResolvedValue([{ tenant_id: 'tenant-a' }]),
+    };
+    const transaction = vi.fn()
+      .mockRejectedValueOnce({ code: 'P2034' })
+      .mockImplementationOnce(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx));
+    const work = vi.fn().mockResolvedValue('committed');
+
+    await expect(runReadinessSerializableTransaction(
+      { $transaction: transaction } as never,
+      'tenant-a',
+      work,
+    )).resolves.toBe('committed');
+
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   });
 });

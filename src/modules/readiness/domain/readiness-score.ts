@@ -148,6 +148,8 @@ function blockerTriggered(condition: BlockerCondition, facts: ReadinessFacts): b
       return facts.maintenanceOverdueHours > 50;
     case 'INSPECTION_BELOW_80':
       return clamp01(facts.inspectionProgress) < 0.8;
+    case 'VALID_WORK_PERMIT_REQUIRED':
+      return facts.permitValid !== true || facts.permitExpired;
   }
 }
 

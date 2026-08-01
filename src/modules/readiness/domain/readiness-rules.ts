@@ -24,6 +24,7 @@ export interface ReadinessCriterion {
 
 export const BLOCKER_CONDITIONS = [
   'CRITICAL_DEFECT',
+  'VALID_WORK_PERMIT_REQUIRED',
   'PERMIT_EXPIRED',
   'MAINTENANCE_OVERDUE_50H',
   'INSPECTION_BELOW_80',
@@ -40,6 +41,7 @@ export const BLOCKER_ACTIONS = [
 export type BlockerAction = (typeof BLOCKER_ACTIONS)[number];
 
 export const BLOCKER_LABELS: Record<BlockerCondition, string> = {
+  VALID_WORK_PERMIT_REQUIRED: 'Действующий наряд-допуск обязателен',
   CRITICAL_DEFECT: 'Критический дефект',
   PERMIT_EXPIRED: 'Просроченный наряд-допуск',
   MAINTENANCE_OVERDUE_50H: 'ТО просрочено более 50 м/ч',
@@ -82,6 +84,7 @@ export const DEFAULT_READINESS_RULES: ReadinessRuleSet = {
   ],
   blockers: [
     { condition: 'CRITICAL_DEFECT', action: 'DENY_START', isActive: true },
+    { condition: 'VALID_WORK_PERMIT_REQUIRED', action: 'DENY_START', isActive: false },
     { condition: 'PERMIT_EXPIRED', action: 'DENY_START', isActive: true },
     { condition: 'MAINTENANCE_OVERDUE_50H', action: 'REQUIRE_CONFIRMATION', isActive: true },
     { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', isActive: false },

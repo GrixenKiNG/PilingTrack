@@ -15,7 +15,7 @@ export interface ReadinessRequestContext {
 
 export async function resolveReadinessRequestContext(
   request: NextRequest,
-  actingAs: string | null = null,
+  actingAs: string | null = request.headers.get('x-readiness-acting-as'),
 ): Promise<{context?: ReadinessRequestContext; response?: NextResponse}> {
   const requestId = getRequestId(request);
   const {user, error} = await requireAuth(request);

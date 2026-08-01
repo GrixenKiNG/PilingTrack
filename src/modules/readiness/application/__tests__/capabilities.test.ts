@@ -14,7 +14,7 @@ describe('readiness capabilities', () => {
     expect(abilities).not.toContain('readiness.shift.manage');
     expect(abilities).not.toContain('readiness.handover.prepare');
     expect(abilities).not.toContain('readiness.handover.decide');
-    expect(abilities).not.toContain('readiness.permit.edit');
+    expect(abilities).toContain('readiness.permit.edit');
     expect(abilities).not.toContain('readiness.permit.approve_admin');
   });
 

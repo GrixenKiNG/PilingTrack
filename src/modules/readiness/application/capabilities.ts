@@ -40,6 +40,7 @@ const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
   ASSISTANT: [],
   MECHANIC: [
     'readiness.read',
+    'readiness.permit.edit',
     'readiness.inspection.manage',
     'readiness.defect.manage',
     'readiness.meter.manage',

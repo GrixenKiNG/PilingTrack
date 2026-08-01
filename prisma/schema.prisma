@@ -524,6 +524,73 @@ model ReadinessScoreSnapshot {
   @@index([tenantId, shiftId, calculatedAt])
 }
 
+enum WorkPermitRisk {
+  NORMAL
+  ELEVATED
+}
+
+enum WorkPermitState {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  EXPIRED
+  REVOKED
+}
+
+enum WorkPermitApprovalRole {
+  DISPATCHER
+  ADMIN
+}
+
+model WorkPermit {
+  id             String          @id @default(cuid())
+  tenantId       String
+  equipmentId    String
+  shiftId        String?
+  risk           WorkPermitRisk
+  state          WorkPermitState @default(DRAFT)
+  scope          String          @db.Text
+  validFrom      DateTime        @db.Timestamptz(3)
+  validTo        DateTime        @db.Timestamptz(3)
+  timezone       String
+  authorId       String
+  lastEditedById String
+  submittedAt    DateTime?       @db.Timestamptz(3)
+  approvedAt     DateTime?       @db.Timestamptz(3)
+  revokedAt      DateTime?       @db.Timestamptz(3)
+  revokedById    String?
+  revokeReason   String?
+  expiredAt      DateTime?       @db.Timestamptz(3)
+  version        Int             @default(1)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+  approvals      WorkPermitApproval[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, equipmentId, state, validTo])
+  @@index([tenantId, state, updatedAt])
+  @@index([tenantId, risk, updatedAt])
+  @@index([tenantId, shiftId])
+}
+
+model WorkPermitApproval {
+  id                 String                     @id @default(cuid())
+  tenantId           String
+  permitId           String
+  permitVersion      Int
+  role               WorkPermitApprovalRole
+  approvedById       String
+  approvedAt         DateTime                   @default(now()) @db.Timestamptz(3)
+  valid              Boolean                    @default(true)
+  invalidatedAt      DateTime?                  @db.Timestamptz(3)
+  invalidationReason String?
+  permit             WorkPermit                 @relation(fields: [tenantId, permitId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, permitId, permitVersion, role])
+  @@index([tenantId, permitId, permitVersion, valid])
+  @@index([tenantId, approvedById, approvedAt])
+}
+
 model ModuleLayoutTemplate {
   id        String   @id @default(cuid())
   tenantId  String

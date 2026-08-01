@@ -42,3 +42,46 @@ export function withReadinessTenantTransaction<T>(
 
 export const withReadinessRequestTransaction = withReadinessTenantTransaction;
 export const withReadinessWorkerTransaction = withReadinessTenantTransaction;
+
+const SERIALIZABLE_ATTEMPTS = 3;
+
+function isSerializableConflict(error: unknown): boolean {
+  const candidate = error as {code?: string; meta?: {code?: string}};
+  return candidate.code === 'P2034'
+    || candidate.code === '40001'
+    || candidate.code === '40P01'
+    || candidate.meta?.code === '40001'
+    || candidate.meta?.code === '40P01';
+}
+
+export async function runReadinessSerializableTransaction<T>(
+  client: TransactionClient,
+  tenantId: string | null | undefined,
+  work: TenantWork<T>,
+): Promise<T> {
+  const scopedTenantId = requireSessionTenantId(tenantId);
+  for (let attempt = 1; attempt <= SERIALIZABLE_ATTEMPTS; attempt += 1) {
+    try {
+      return await client.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.current_tenant', ${scopedTenantId}, true)`;
+        const context = await tx.$queryRaw<Array<{ tenant_id: string | null }>>`
+          SELECT current_setting('app.current_tenant', true) AS tenant_id
+        `;
+        if (context[0]?.tenant_id !== scopedTenantId) {
+          throw new Error('Readiness tenant context could not be established');
+        }
+        return work(tx);
+      }, {...DEFAULT_TX_OPTIONS, isolationLevel: 'Serializable'});
+    } catch (error) {
+      if (!isSerializableConflict(error) || attempt === SERIALIZABLE_ATTEMPTS) throw error;
+    }
+  }
+  throw new Error('Serializable readiness transaction retry exhausted');
+}
+
+export function withReadinessSerializableTransaction<T>(
+  tenantId: string | null | undefined,
+  work: TenantWork<T>,
+): Promise<T> {
+  return runReadinessSerializableTransaction(db, tenantId, work);
+}
