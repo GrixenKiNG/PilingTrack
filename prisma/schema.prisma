@@ -45,6 +45,7 @@ model Tenant {
   pileGrades         PileGrade[]
   drillingTypes      DrillingType[]
   downtimeReasons    DowntimeReason[]
+  auditChain         TenantAuditChain?
 
   @@index([slug])
   @@index([isActive])
@@ -494,6 +495,33 @@ model ReadinessRuleSet {
 
   @@index([tenantId])
   @@index([tenantId, status])
+}
+
+// Immutable readiness evidence projection. Workflow relations are added in
+// their owning migrations; this additive slice intentionally keeps shiftId
+// nullable so it can ship before Shift exists.
+model ReadinessScoreSnapshot {
+  id             String   @id @default(cuid())
+  tenantId       String
+  equipmentId    String
+  shiftId        String?
+  ruleSetId      String
+  ruleSetVersion String
+  triggerType    String
+  triggerId      String
+  status         String
+  score          Int
+  blockers       Json
+  warnings       Json
+  evidence       Json
+  factsHash      Bytes    @db.ByteA
+  calculatedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([tenantId, equipmentId, triggerType, triggerId])
+  @@unique([tenantId, id])
+  @@index([tenantId, equipmentId, calculatedAt])
+  @@index([tenantId, status, calculatedAt])
+  @@index([tenantId, shiftId, calculatedAt])
 }
 
 model ModuleLayoutTemplate {
@@ -999,11 +1027,17 @@ model OutboxEvent {
   // Earliest time a retry should be attempted. Used by the outbox publisher
   // to implement exponential backoff with jitter.
   nextRetryAt DateTime? @db.Timestamptz(3)
+  // Readiness v1 fields are nullable until legacy rows have an approved
+  // tenant/dedupe backfill. New readiness publishers always populate both.
+  tenantId    String?
+  dedupeKey   String?
 
   @@index([published, nextRetryAt])
   @@index([published, createdAt])
   @@index([projected, createdAt])
   @@index([aggregateId, aggregateType])
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, projected, createdAt])
 }
 
 // ============================================================
@@ -1386,6 +1420,21 @@ model AuditLog {
   userAgent   String?  // Client info
   timestamp   DateTime @default(now()) @db.Timestamptz(3)
 
+  // ADR-0043 v1 chain fields. They remain nullable while unmapped legacy rows
+  // are quarantined/backfilled; native readiness events populate every field.
+  sequence           BigInt?
+  occurredAt         DateTime? @db.Timestamptz(3)
+  recordedAt         DateTime? @db.Timestamptz(3)
+  actorId            String?
+  actingAs           String?
+  entityType         String?
+  entityVersion      Int?
+  correlationId      String?
+  idempotencyKeyHash Bytes? @db.ByteA
+  metadata           Json?
+  prevHash           Bytes? @db.ByteA
+  hash               Bytes? @db.ByteA
+
   // Immutable guarantee: no UPDATE, only INSERT
   // Soft-delete protection via application layer
 
@@ -1394,6 +1443,20 @@ model AuditLog {
   @@index([tenantId, timestamp])
   @@index([action, timestamp])
   @@index([timestamp])
+  @@unique([tenantId, sequence])
+  @@unique([tenantId, hash])
+  @@index([tenantId, occurredAt, id])
+  @@index([tenantId, entityType, entityId, occurredAt])
+  @@index([tenantId, actorId, occurredAt])
+  @@index([tenantId, action, occurredAt])
+}
+
+model TenantAuditChain {
+  tenantId     String   @id
+  lastSequence BigInt   @default(0)
+  headHash     Bytes?   @db.ByteA
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 }
 
 // ============================================================
@@ -1411,11 +1474,19 @@ model IdempotencyKey {
   expiresAt   DateTime @db.Timestamptz(3)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   completedAt DateTime? @db.Timestamptz(3)
+  // Readiness command-pipeline fields. Nullable for existing callers until a
+  // deterministic tenant/request-hash backfill can be approved.
+  tenantId        String?
+  actorId         String?
+  requestHash     Bytes? @db.ByteA
+  responseHeaders Json?
 
   @@unique([scope, key])
   @@index([scope, key])
   @@index([expiresAt])
   @@index([status, createdAt])
+  @@unique([tenantId, scope, key])
+  @@index([tenantId, actorId, createdAt])
 }
 
 // ============================================================

@@ -12,6 +12,10 @@
  */
 
 import { db } from '@/lib/db';
+import type { ReadinessTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
+import type { AppendAuditInput } from '@/modules/readiness/domain/audit/types';
+import { PrismaAuditRepository } from '@/modules/readiness/infrastructure/audit/audit-repository';
+import { appendAuditEvent } from '@/modules/readiness/infrastructure/audit/append-audit';
 
 export interface AuditLogEntry {
   entity: string;
@@ -26,6 +30,18 @@ export interface AuditLogEntry {
   requestId?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
+}
+
+/**
+ * Transaction-bound ADR-0043 adapter for new readiness commands.
+ * Legacy callers remain on recordAuditLog until the explicit reader/writer
+ * migration task switches them after shadow parity verification.
+ */
+export function recordChainedReadinessAudit(
+  tx: ReadinessTransaction,
+  entry: AppendAuditInput,
+) {
+  return appendAuditEvent(new PrismaAuditRepository(tx), entry);
 }
 
 /**

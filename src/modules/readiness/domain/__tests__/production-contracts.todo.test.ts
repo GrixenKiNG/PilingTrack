@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { canonicalize } from '../audit/canonicalize';
+import { maskAuditPayload } from '../audit/mask';
+import { digestAuditEvent } from '../audit/digest';
 
 type ShiftState = 'PLANNED' | 'STARTED' | 'HANDOVER_PENDING' | 'CLOSED' | 'CANCELLED';
 type HandoverState = 'DRAFT' | 'SUBMITTED' | 'REWORK_REQUIRED' | 'ACCEPTED';
@@ -57,10 +60,21 @@ const workflow = {
 
 const readiness = {evaluate: pendingImplementation} as ReadinessContract;
 const auditHash = {
-  canonicalize: pendingImplementation,
-  mask: pendingImplementation,
-  eventHash: pendingImplementation,
-  verify: pendingImplementation,
+  canonicalize,
+  mask: maskAuditPayload,
+  eventHash: digestAuditEvent,
+  verify(events: Array<{sequence: string; prevHash: string | null; hash: string}>) {
+    let expected = BigInt(1);
+    let previous: string | null = null;
+    for (const event of events) {
+      if (event.sequence !== expected.toString() || event.prevHash !== previous) {
+        return {valid: false, brokenAtSequence: event.sequence};
+      }
+      expected += BigInt(1);
+      previous = event.hash;
+    }
+    return {valid: true};
+  },
 } as AuditHashContract;
 
 describe.skip('Tech Readiness production state machines [PRD §6, ADR-0041]', () => {
@@ -162,7 +176,7 @@ describe.skip('Tech Readiness evaluation [PRD §5, backend design §8]', () => {
   });
 });
 
-describe.skip('Audit canonicalization and hash chain [ADR-0043]', () => {
+describe('Audit canonicalization and hash chain [ADR-0043]', () => {
   const canonicalEvent = {
     action: 'shift.started',
     actor: {id: 'test-user-mechanic', role: 'MECHANIC'},
