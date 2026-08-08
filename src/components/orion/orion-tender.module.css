@@ -1,0 +1,203 @@
+.siteShell {
+  --orion-background: #080c0e;
+  --orion-surface: #11191d;
+  --orion-paper: #e9e5da;
+  --orion-text: #f7f5ee;
+  --orion-text-muted: #a2adb1;
+  --orion-border: rgba(255, 255, 255, 0.15);
+  --orion-accent: #dca55b;
+  --orion-technical: #86bdd3;
+  --orion-motion-fast: 160ms;
+}
+.siteShell a, .siteShell button { min-height: 44px; }
+.siteShell input:not([type='checkbox']), .siteShell textarea { min-height: 48px; }
+.siteShell input[type='checkbox'] { width: 20px; height: 20px; }
+
+.qualification, .solutions, .tender, .stories {
+  padding: clamp(5rem, 9vw, 9rem) clamp(20px, 5vw, 5rem);
+}
+.qualification {
+  display: grid;
+  grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  gap: clamp(2.5rem, 6vw, 7rem);
+  border-bottom: 1px solid rgba(10, 16, 18, .2);
+  background: var(--orion-paper);
+  color: #14191b;
+}
+.sectionIntro { align-self: start; position: sticky; top: 7rem; }
+.sectionIntro h2 {
+  margin: .8rem 0 1.5rem;
+  font: 400 clamp(2.8rem, 6vw, 6.9rem)/.92 Georgia, serif;
+  letter-spacing: -.055em;
+}
+.sectionIntro > p:last-of-type {
+  max-width: 42rem;
+  margin: 0;
+  color: #58646a;
+  font-size: clamp(1rem, 1.4vw, 1.18rem);
+  line-height: 1.7;
+}
+.qualificationGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid rgba(10, 16, 18, .2);
+}
+.qualificationGrid article {
+  min-height: 18rem;
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(10, 16, 18, .2);
+}
+.qualificationGrid article:last-child { border-right: 0; }
+.qualificationGrid span, .solutionRow > span,
+.tenderColumns article > span, .storyPanels article > span {
+  color: #407990;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.qualificationGrid h3 {
+  margin: auto 0 .8rem;
+  font: 400 clamp(1.35rem, 2vw, 2rem)/1.15 Georgia, serif;
+}
+.qualificationGrid p { margin: 0; color: #58646a; font-size: .84rem; line-height: 1.55; }
+
+.solutions, .stories {
+  display: grid;
+  grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr);
+  gap: clamp(2.5rem, 6vw, 7rem);
+  background: var(--orion-background);
+  color: var(--orion-text);
+}
+.solutions .sectionIntro > p:last-of-type,
+.stories .sectionIntro > p:last-of-type { color: var(--orion-text-muted); }
+.solutionRows { border-bottom: 1px solid var(--orion-border); }
+.solutionRow {
+  min-height: 8rem;
+  padding: 1.4rem 0;
+  display: grid;
+  grid-template-columns: 3rem minmax(9rem, .72fr) minmax(12rem, 1fr) minmax(12rem, .9fr);
+  gap: 1.4rem;
+  align-items: center;
+  border-top: 1px solid var(--orion-border);
+}
+.solutionRow h3 { margin: 0; font: 400 clamp(1.25rem, 2vw, 1.8rem)/1.15 Georgia, serif; }
+.solutionRow p { margin: 0; color: var(--orion-text-muted); font-size: .82rem; line-height: 1.55; }
+.solutionRow p:last-child { color: var(--orion-technical); }
+
+.tender {
+  display: grid;
+  grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
+  gap: clamp(2.5rem, 6vw, 7rem);
+  border-top: 6px solid var(--orion-accent);
+  background: var(--orion-paper);
+  color: #151a1c;
+}
+.tenderCta {
+  width: fit-content;
+  min-height: 52px !important;
+  margin-top: 2rem;
+  padding: .9rem 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid #151a1c;
+  background: #151a1c;
+  color: var(--orion-paper);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  transition: transform var(--orion-motion-fast) ease;
+}
+.tenderCta:hover { transform: translateY(-2px); }
+.tenderColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid rgba(10, 16, 18, .22);
+}
+.tenderColumns article { padding: clamp(1.5rem, 3vw, 2.5rem); }
+.tenderColumns article + article { border-left: 1px solid rgba(10, 16, 18, .22); }
+.tenderColumns ul, .tenderColumns ol {
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: tender-input;
+}
+.tenderColumns li {
+  min-height: 4.5rem;
+  padding: 1.1rem 0;
+  border-top: 1px solid rgba(10, 16, 18, .17);
+  color: #4f5a5f;
+  line-height: 1.45;
+}
+.tenderColumns ol li {
+  counter-increment: tender-input;
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: .8rem;
+}
+.tenderColumns ol li::before {
+  content: counter(tender-input, decimal-leading-zero);
+  color: #407990;
+  font-size: .68rem;
+  font-weight: 900;
+}
+
+.storyPanels { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1rem; }
+.storyPanels article {
+  min-height: 32rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.storyPanels h3 {
+  margin: 1rem 0;
+  max-width: 36rem;
+  font: 400 clamp(2rem, 4vw, 4.4rem)/.98 Georgia, serif;
+  letter-spacing: -.04em;
+}
+.storyPanels p { max-width: 34rem; margin: 0; color: var(--orion-text-muted); line-height: 1.6; }
+.storyFormat {
+  border: 1px solid var(--orion-border);
+  background: linear-gradient(0deg, rgba(8,12,14,.96), rgba(8,12,14,.2)),
+    url('/icons/equipment-photos/rtg-rm20.jpg') center/cover;
+}
+.storyPending {
+  border: 1px dashed rgba(134,189,211,.55);
+  background: repeating-linear-gradient(135deg, rgba(134,189,211,.06) 0,
+    rgba(134,189,211,.06) 1px, transparent 1px, transparent 16px),
+    var(--orion-surface);
+}
+
+@media (max-width: 1000px) {
+  .qualification, .solutions, .tender, .stories { grid-template-columns: 1fr; }
+  .sectionIntro { position: static; }
+  .qualificationGrid { grid-template-columns: 1fr; }
+  .qualificationGrid article {
+    min-height: 12rem;
+    border-right: 0;
+    border-bottom: 1px solid rgba(10,16,18,.2);
+  }
+  .solutionRow { grid-template-columns: 3rem minmax(0,.8fr) minmax(0,1.2fr); }
+  .solutionRow p:last-child { grid-column: 2/-1; }
+}
+@media (max-width: 640px) {
+  .qualification, .solutions, .tender, .stories { padding: 4.5rem 20px; }
+  .solutionRow { grid-template-columns: 2.2rem 1fr; gap: .7rem; }
+  .solutionRow p { grid-column: 2; }
+  .tenderColumns, .storyPanels { grid-template-columns: 1fr; }
+  .tenderColumns article + article {
+    border-top: 1px solid rgba(10,16,18,.22);
+    border-left: 0;
+  }
+  .storyPanels article { min-height: 27rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tenderCta { transition: none; }
+}
+

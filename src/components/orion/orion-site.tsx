@@ -3,14 +3,8 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownRight, Menu, X } from '@/components/piling/icons/unified-icons';
 import {
-  orionCapabilities,
-  orionClients,
-  orionCompanyFacts,
-  orionCompanyIntro,
   orionDigitalControl,
   orionDigitalControlIntro,
-  orionGeneralEquipment,
-  orionObjects,
   orionProcessSteps,
   orionRequisites,
 } from './orion-content';
@@ -18,13 +12,34 @@ import { OrionContact } from './orion-contact';
 import { OrionFleet } from './orion-fleet';
 import { OrionHero } from './orion-hero';
 import styles from './orion-site.module.css';
+import tender from './orion-tender.module.css';
 
 const navigation = [
-  ['О компании', '#about'],
-  ['Компетенции', '#capabilities'],
-  ['Парк техники', '#fleet'],
-  ['Контроль', '#control'],
-  ['Объекты', '#stories'],
+  ['\u0420\u0435\u0448\u0435\u043d\u0438\u044f', '#solutions'],
+  ['\u041f\u0430\u0440\u043a \u0442\u0435\u0445\u043d\u0438\u043a\u0438', '#fleet'],
+  ['\u0422\u0435\u043d\u0434\u0435\u0440\u043d\u0430\u044f \u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c', '#tender'],
+  ['\u041a\u043e\u043d\u0442\u0440\u043e\u043b\u044c', '#control'],
+  ['\u0418\u0441\u0442\u043e\u0440\u0438\u0438 \u043e\u0431\u044a\u0435\u043a\u0442\u043e\u0432', '#stories'],
+] as const;
+
+const solutions = [
+  ['01', '\u041f\u043e\u0433\u0440\u0443\u0436\u0435\u043d\u0438\u0435 \u0441\u0432\u0430\u0439', '\u041f\u043e\u0434\u0431\u043e\u0440 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u0438 \u043f\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u0443, \u0433\u0440\u0443\u043d\u0442\u0430\u043c \u0438 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f\u043c \u043f\u043b\u043e\u0449\u0430\u0434\u043a\u0438.', '\u0422\u0435\u0445\u043d\u0438\u043a\u0430 \u2192 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c \u2192 \u0438\u0441\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435'],
+  ['02', '\u041b\u0438\u0434\u0435\u0440\u043d\u043e\u0435 \u0431\u0443\u0440\u0435\u043d\u0438\u0435', '\u041f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0430 \u0441\u043a\u0432\u0430\u0436\u0438\u043d \u0432 \u0441\u043e\u0441\u0442\u0430\u0432\u0435 \u0441\u043e\u0433\u043b\u0430\u0441\u043e\u0432\u0430\u043d\u043d\u043e\u0439 \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u0447\u0435\u0441\u043a\u043e\u0439 \u043f\u043e\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u0438.', '\u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435 \u2192 \u041f\u041f\u0420 \u2192 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u043e'],
+  ['03', '\u0428\u043f\u0443\u043d\u0442\u043e\u0432\u044b\u0435 \u0440\u0430\u0431\u043e\u0442\u044b', '\u0420\u0435\u0448\u0435\u043d\u0438\u0435 \u0443\u0442\u043e\u0447\u043d\u044f\u0435\u0442\u0441\u044f \u043f\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u0443 \u0438 \u0443\u0441\u043b\u043e\u0432\u0438\u044f\u043c \u043e\u0431\u044a\u0435\u043a\u0442\u0430.', '\u041f\u0440\u043e\u0435\u043a\u0442 \u2192 \u0441\u043f\u043e\u0441\u043e\u0431 \u043f\u043e\u0433\u0440\u0443\u0436\u0435\u043d\u0438\u044f \u2192 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c'],
+  ['04', '\u0410\u0440\u0435\u043d\u0434\u0430 \u0441 \u044d\u043a\u0438\u043f\u0430\u0436\u0435\u043c', '\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u0432\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f \u0432 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u043a\u043e\u043d\u0442\u0443\u0440 \u0432\u043c\u0435\u0441\u0442\u0435 \u0441 \u044d\u043a\u0438\u043f\u0430\u0436\u0435\u043c.', '\u041f\u0430\u0441\u043f\u043e\u0440\u0442 \u2192 \u0433\u0440\u0430\u0444\u0438\u043a \u2192 \u043c\u043e\u0431\u0438\u043b\u0438\u0437\u0430\u0446\u0438\u044f'],
+] as const;
+
+const tenderEvidence = [
+  ['01', '\u041f\u0430\u0440\u043a \u0438 \u043f\u0430\u0441\u043f\u043e\u0440\u0442\u0430', '8 \u0435\u0434\u0438\u043d\u0438\u0446 \u0442\u0435\u0445\u043d\u0438\u043a\u0438, \u0440\u0443\u0441\u0441\u043a\u043e\u044f\u0437\u044b\u0447\u043d\u044b\u0435 PDF \u0438 \u0441\u0441\u044b\u043b\u043a\u0438 \u043d\u0430 \u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b.'],
+  ['02', '\u0420\u0430\u0431\u043e\u0442\u0430 \u043f\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u0443 \u0438 \u041f\u041f\u0420', '\u0422\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u044f \u0443\u0442\u043e\u0447\u043d\u044f\u0435\u0442\u0441\u044f \u043f\u043e\u0441\u043b\u0435 \u0438\u0437\u0443\u0447\u0435\u043d\u0438\u044f \u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0445 \u0434\u0430\u043d\u043d\u044b\u0445 \u043e\u0431\u044a\u0435\u043a\u0442\u0430.'],
+  ['03', '\u0410\u0440\u0435\u043d\u0434\u0430 \u0441 \u044d\u043a\u0438\u043f\u0430\u0436\u0435\u043c', '\u0417\u0430\u043f\u0440\u043e\u0441 \u043e\u0446\u0435\u043d\u0438\u0432\u0430\u0435\u0442\u0441\u044f \u043f\u043e \u0441\u043e\u0441\u0442\u0430\u0432\u0443 \u0442\u0435\u0445\u043d\u0438\u043a\u0438, \u0441\u0440\u043e\u043a\u0430\u043c \u0438 \u0443\u0441\u043b\u043e\u0432\u0438\u044f\u043c \u043c\u043e\u0431\u0438\u043b\u0438\u0437\u0430\u0446\u0438\u0438.'],
+] as const;
+
+const tenderInputs = [
+  '\u0424\u0440\u0430\u0433\u043c\u0435\u043d\u0442 \u043f\u0440\u043e\u0435\u043a\u0442\u0430 \u0438\u043b\u0438 \u0432\u0435\u0434\u043e\u043c\u043e\u0441\u0442\u044c \u0441\u0432\u0430\u0439',
+  '\u0422\u0438\u043f, \u0441\u0435\u0447\u0435\u043d\u0438\u0435 \u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u043d\u0430\u044f \u0434\u043b\u0438\u043d\u0430 \u0441\u0432\u0430\u0439',
+  '\u0410\u0434\u0440\u0435\u0441 \u043f\u043b\u043e\u0449\u0430\u0434\u043a\u0438 \u0438 \u0443\u0441\u043b\u043e\u0432\u0438\u044f \u043f\u043e\u0434\u044a\u0435\u0437\u0434\u0430',
+  '\u0422\u0440\u0435\u0431\u0443\u0435\u043c\u044b\u0435 \u0434\u0430\u0442\u044b \u043d\u0430\u0447\u0430\u043b\u0430 \u0438 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0438\u044f',
 ] as const;
 
 export function OrionSite() {
@@ -32,26 +47,30 @@ export function OrionSite() {
 
   useEffect(() => {
     if (!menuOpen) return;
-
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setMenuOpen(false);
     };
-
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [menuOpen]);
 
   return (
-    <main className={styles.site}>
-      <a className={styles.skip} href="#content">Перейти к содержанию</a>
+    <main className={`${styles.site} ${tender.siteShell}`}>
+      <a className={styles.skip} href="#content">{'\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0441\u043e\u0434\u0435\u0440\u0436\u0430\u043d\u0438\u044e'}</a>
       <header className={styles.header}>
-        <a className={styles.brand} href="#top" aria-label="ОРИОН — на главную"><span>ОРИОН</span><i>основания для больших проектов</i></a>
-        <nav className={styles.nav} aria-label="Основная навигация">{navigation.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</nav>
-        <a className={styles.headerCta} href="#contact">Обсудить объект <ArrowDownRight size={17} /></a>
+        <a className={styles.brand} href="#top" aria-label={'\u041e\u0420\u0418\u041e\u041d \u2014 \u043d\u0430 \u0433\u043b\u0430\u0432\u043d\u0443\u044e'}>
+          <span>{'\u041e\u0420\u0418\u041e\u041d'}</span><i>{'\u043e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u044f \u0434\u043b\u044f \u0431\u043e\u043b\u044c\u0448\u0438\u0445 \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432'}</i>
+        </a>
+        <nav className={styles.nav} aria-label={'\u041e\u0441\u043d\u043e\u0432\u043d\u0430\u044f \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044f'}>
+          {navigation.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
+        </nav>
+        <a className={styles.headerCta} href="#contact">
+          {'\u041e\u0431\u0441\u0443\u0434\u0438\u0442\u044c \u043e\u0431\u044a\u0435\u043a\u0442'} <ArrowDownRight size={17} />
+        </a>
         <button
           className={styles.menuButton}
           type="button"
-          aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
+          aria-label={menuOpen ? '\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u043c\u0435\u043d\u044e' : '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043c\u0435\u043d\u044e'}
           aria-expanded={menuOpen}
           aria-controls="orion-mobile-nav"
           onClick={() => setMenuOpen((value) => !value)}
@@ -59,9 +78,11 @@ export function OrionSite() {
           {menuOpen ? <X /> : <Menu />}
         </button>
         {menuOpen && (
-          <nav className={styles.mobileNav} id="orion-mobile-nav" aria-label="Мобильная навигация">
-            {navigation.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)}>{label}</a>)}
-            <a href="#contact" onClick={() => setMenuOpen(false)}>Обсудить объект</a>
+          <nav className={styles.mobileNav} id="orion-mobile-nav" aria-label={'\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u0430\u044f \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044f'}>
+            {navigation.map(([label, href]) => (
+              <a key={href} href={href} onClick={() => setMenuOpen(false)}>{label}</a>
+            ))}
+            <a href="#contact" onClick={() => setMenuOpen(false)}>{'\u041e\u0431\u0441\u0443\u0434\u0438\u0442\u044c \u043e\u0431\u044a\u0435\u043a\u0442'}</a>
           </nav>
         )}
       </header>
@@ -69,46 +90,66 @@ export function OrionSite() {
       <div id="content">
         <OrionHero />
 
-        <section className={styles.about} id="about">
-          <div className={styles.aboutCopy}>
-            <p className={styles.kicker}>О компании</p>
-            <h2>Строительная компания<br /><em>полного цикла.</em></h2>
-            <p>{orionCompanyIntro}</p>
+        <section className={tender.qualification} aria-labelledby="qualification-title">
+          <div className={tender.sectionIntro}>
+            <p className={styles.kicker}>{'\u041a\u0432\u0430\u043b\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044f \u043f\u043e\u0434\u0440\u044f\u0434\u0447\u0438\u043a\u0430'}</p>
+            <h2 id="qualification-title">{'\u0413\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c \u043a \u043a\u0440\u0443\u043f\u043d\u043e\u043c\u0443 \u043f\u043e\u0434\u0440\u044f\u0434\u0443.'}</h2>
+            <p>{'\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c\u044b\u0435 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u0438 \u043f\u043e\u043d\u044f\u0442\u043d\u0430\u044f \u0438\u043d\u0436\u0435\u043d\u0435\u0440\u043d\u0430\u044f \u043a\u043e\u043c\u043c\u0443\u043d\u0438\u043a\u0430\u0446\u0438\u044f \u0432\u0430\u0436\u043d\u0435\u0435 \u0440\u0435\u043a\u043b\u0430\u043c\u043d\u044b\u0445 \u043e\u0431\u0435\u0449\u0430\u043d\u0438\u0439.'}</p>
           </div>
-          <dl className={styles.aboutFacts}>
-            {orionCompanyFacts.map((fact) => (
-              <div key={fact.label}><dt>{fact.value}</dt><dd>{fact.label}</dd></div>
+          <div className={tender.qualificationGrid}>
+            {tenderEvidence.map(([number, title, copy]) => (
+              <article key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p></article>
             ))}
-          </dl>
+          </div>
         </section>
 
-        <section className={styles.capabilities} id="capabilities">
-          <div className={styles.sectionHeading}>
-            <p className={styles.kicker}>Компетенции</p>
-            <h2>Техника важна.<br />Результат определяет <em>система работ.</em></h2>
+        <section className={tender.solutions} id="solutions">
+          <div className={tender.sectionIntro}>
+            <p className={styles.kicker}>{'\u0418\u043d\u0436\u0435\u043d\u0435\u0440\u043d\u0430\u044f \u043c\u0430\u0442\u0440\u0438\u0446\u0430'}</p>
+            <h2>{'\u041e\u0442 \u0437\u0430\u0434\u0430\u0447\u0438 \u2014 \u043a \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u0438.'}</h2>
+            <p>{'\u0420\u0435\u0448\u0435\u043d\u0438\u0435 \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u044f\u0435\u0442\u0441\u044f \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u043c, \u0433\u0440\u0443\u043d\u0442\u0430\u043c\u0438, \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f\u043c\u0438 \u043f\u043b\u043e\u0449\u0430\u0434\u043a\u0438 \u0438 \u0433\u0440\u0430\u0444\u0438\u043a\u043e\u043c \u0433\u0435\u043d\u043f\u043e\u0434\u0440\u044f\u0434\u0447\u0438\u043a\u0430.'}</p>
           </div>
-          <div className={styles.capabilityGrid}>
-            {orionCapabilities.map(([number, title, copy]) => (
-              <article key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p><ArrowDownRight aria-hidden="true" /></article>
+          <div className={tender.solutionRows}>
+            {solutions.map(([number, title, copy, evidence]) => (
+              <article className={tender.solutionRow} key={number}>
+                <span>{number}</span><h3>{title}</h3><p>{copy}</p><p>{evidence}</p>
+              </article>
             ))}
           </div>
         </section>
 
         <OrionFleet />
 
-        <section className={styles.generalFleet} aria-label="Общестроительная техника">
-          <p className={styles.kicker}>Общестроительная техника</p>
-          <ul>
-            {orionGeneralEquipment.map((unit) => (
-              <li key={unit.name}><strong>{unit.name}</strong><span>{unit.role}</span></li>
-            ))}
-          </ul>
+        <section className={tender.tender} id="tender" aria-labelledby="tender-title">
+          <div className={tender.sectionIntro}>
+            <p className={styles.kicker}>{'\u0422\u0435\u043d\u0434\u0435\u0440\u043d\u0430\u044f \u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c'}</p>
+            <h2 id="tender-title">{'\u0414\u0430\u043d\u043d\u044b\u0435 \u0434\u043b\u044f \u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0439 \u043e\u0446\u0435\u043d\u043a\u0438 \u2014 \u0432 \u043e\u0434\u043d\u043e\u043c \u043a\u043e\u043d\u0442\u0443\u0440\u0435.'}</h2>
+            <p>{'\u041e\u0420\u0418\u041e\u041d \u0433\u043e\u0442\u043e\u0432\u0438\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u044f\u0435\u043c\u044b\u0439 \u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0442 \u043f\u043e \u0442\u0435\u0445\u043d\u0438\u043a\u0435 \u0438 \u0443\u0442\u043e\u0447\u043d\u044f\u0435\u0442 \u0440\u0435\u0448\u0435\u043d\u0438\u0435 \u043f\u043e\u0441\u043b\u0435 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044f \u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0445 \u0434\u0430\u043d\u043d\u044b\u0445.'}</p>
+            <a className={tender.tenderCta} href="#contact">
+              {'\u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0442\u0435\u043d\u0434\u0435\u0440\u043d\u044b\u0439 \u043f\u0430\u043a\u0435\u0442'} <ArrowDownRight aria-hidden="true" />
+            </a>
+          </div>
+          <div className={tender.tenderColumns}>
+            <article>
+              <span>{'\u0412 \u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0442\u0435'}</span>
+              <ul>
+                <li>{'\u0421\u043e\u0441\u0442\u0430\u0432 \u043f\u0430\u0440\u043a\u0430 \u0438 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043e\u043a'}</li>
+                <li>{'\u0420\u0443\u0441\u0441\u043a\u043e\u044f\u0437\u044b\u0447\u043d\u044b\u0435 PDF-\u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u0442\u0435\u0445\u043d\u0438\u043a\u0438'}</li>
+                <li>{'\u0421\u0441\u044b\u043b\u043a\u0438 \u043d\u0430 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u044b \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u0435\u0439'}</li>
+                <li>{'\u041a\u043e\u043d\u0442\u0430\u043a\u0442 \u0434\u043b\u044f \u0438\u043d\u0436\u0435\u043d\u0435\u0440\u043d\u043e\u0433\u043e \u0443\u0442\u043e\u0447\u043d\u0435\u043d\u0438\u044f'}</li>
+              </ul>
+            </article>
+            <article>
+              <span>{'\u0414\u043b\u044f \u043f\u0435\u0440\u0432\u0438\u0447\u043d\u043e\u0439 \u043e\u0446\u0435\u043d\u043a\u0438 \u043d\u0443\u0436\u043d\u044b'}</span>
+              <ol>{tenderInputs.map((input) => <li key={input}>{input}</li>)}</ol>
+            </article>
+          </div>
         </section>
 
         <section className={styles.control} id="control">
           <div className={styles.controlIntro}>
-            <p className={styles.kicker}>Цифровой контроль</p>
-            <h2>Каждая свая —<br /><em>под контролем.</em></h2>
+            <p className={styles.kicker}>{'\u0426\u0438\u0444\u0440\u043e\u0432\u043e\u0439 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c'}</p>
+            <h2>{'\u041e\u0431\u044a\u0435\u043a\u0442 \u0432\u0438\u0434\u0435\u043d'}<br /><em>{'\u0432 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0445 \u0434\u0430\u043d\u043d\u044b\u0445.'}</em></h2>
             <p>{orionDigitalControlIntro}</p>
           </div>
           <ul className={styles.controlGrid}>
@@ -118,47 +159,35 @@ export function OrionSite() {
           </ul>
         </section>
 
-        <section className={styles.stories} id="stories">
-          <div>
-            <p className={styles.kicker}>Объекты</p>
-            <h2>Работа оставляет<br /><em>доказательства.</em></h2>
-            <p className={styles.storiesLead}>Объекты гражданского и промышленного строительства, в которых участвовала компания.</p>
+        <section className={tender.stories} id="stories" aria-labelledby="stories-title">
+          <div className={tender.sectionIntro}>
+            <p className={styles.kicker}>{'\u0418\u0441\u0442\u043e\u0440\u0438\u0438 \u043e\u0431\u044a\u0435\u043a\u0442\u043e\u0432'}</p>
+            <h2 id="stories-title">{'\u0414\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044c\u0441\u0442\u0432\u0430, \u0430 \u043d\u0435 \u0440\u0435\u043a\u043b\u0430\u043c\u043d\u044b\u0435 \u043a\u0435\u0439\u0441\u044b.'}</h2>
+            <p>{'\u0420\u0435\u0430\u043b\u044c\u043d\u044b\u0435 \u0444\u043e\u0442\u043e \u0438 \u0444\u0430\u043a\u0442\u044b \u043f\u043e \u043e\u0431\u044a\u0435\u043a\u0442\u0430\u043c \u0431\u0443\u0434\u0443\u0442 \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u044b \u043f\u043e\u0441\u043b\u0435 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0435\u0439 \u041e\u0420\u0418\u041e\u041d.'}</p>
           </div>
-          <ul className={styles.objectGrid}>
-            {orionObjects.map((object, index) => (
-              <li key={object.title}>
-                <span className={styles.objectPhoto} aria-hidden="true">
-                  {object.image
-                    ? <img src={object.image} alt="" loading="lazy" />
-                    : <span className={styles.objectPhotoEmpty}>фото готовится</span>}
-                </span>
-                <span className={styles.objectIndex}>{String(index + 1).padStart(2, '0')}</span>
-                <h3>{object.title}</h3>
-                <p>{object.kind}</p>
-              </li>
-            ))}
-          </ul>
-
-          <div className={styles.clients}>
-            <p className={styles.kicker}>Клиенты</p>
-            <ul>
-              {orionClients.map((client) => <li key={client}>{client}</li>)}
-            </ul>
+          <div className={tender.storyPanels}>
+            <article className={tender.storyFormat}>
+              <span>{'\u0424\u043e\u0440\u043c\u0430\u0442 \u0431\u0443\u0434\u0443\u0449\u0435\u0439 \u0438\u0441\u0442\u043e\u0440\u0438\u0438'}</span>
+              <h3>{'\u0417\u0430\u0434\u0430\u0447\u0430 \u2192 \u0440\u0435\u0448\u0435\u043d\u0438\u0435 \u2192 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d\u043d\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442'}</h3>
+              <p>{'\u0422\u0438\u043f \u0441\u0432\u0430\u0439, \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u044f, \u0442\u0435\u0445\u043d\u0438\u043a\u0430, \u0441\u0440\u043e\u043a\u0438 \u0438 \u043e\u0431\u044a\u0451\u043c \u043f\u0443\u0431\u043b\u0438\u043a\u0443\u044e\u0442\u0441\u044f \u0442\u043e\u043b\u044c\u043a\u043e \u0441 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u044e\u0449\u0438\u043c\u0438 \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u0430\u043c\u0438.'}</p>
+            </article>
+            <article className={tender.storyPending}>
+              <span>{'\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u044b \u0433\u043e\u0442\u043e\u0432\u044f\u0442\u0441\u044f'}</span>
+              <h3>{'\u041c\u0435\u0441\u0442\u043e \u0434\u043b\u044f \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0445 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u0439 \u043e\u0431\u044a\u0435\u043a\u0442\u0430'}</h3>
+              <p>{'\u0414\u043e \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u043e\u0432 \u0440\u0430\u0437\u0434\u0435\u043b \u043d\u0435 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f \u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a\u043e\u0432, \u043e\u0431\u044a\u0451\u043c\u044b \u0438\u043b\u0438 \u0434\u043e\u0441\u0442\u0438\u0436\u0435\u043d\u0438\u044f.'}</p>
+            </article>
           </div>
         </section>
 
         <section className={styles.process} id="process">
           <div className={styles.processIntro}>
-            <p className={styles.kicker}>Процесс / 01—05</p>
-            <h2>Предсказуемость начинается <em>до выхода на площадку.</em></h2>
-            <p>Последовательность уточняется под проект. Сайт показывает порядок работы, а не обещает результат без изучения исходных данных.</p>
+            <p className={styles.kicker}>{'\u041f\u0440\u043e\u0446\u0435\u0441\u0441 / 01\u201405'}</p>
+            <h2>{'\u041f\u0440\u0435\u0434\u0441\u043a\u0430\u0437\u0443\u0435\u043c\u043e\u0441\u0442\u044c \u043d\u0430\u0447\u0438\u043d\u0430\u0435\u0442\u0441\u044f'} <em>{'\u0434\u043e \u0432\u044b\u0445\u043e\u0434\u0430 \u043d\u0430 \u043f\u043b\u043e\u0449\u0430\u0434\u043a\u0443.'}</em></h2>
+            <p>{'\u041f\u043e\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u0443\u0442\u043e\u0447\u043d\u044f\u0435\u0442\u0441\u044f \u043f\u043e\u0434 \u043f\u0440\u043e\u0435\u043a\u0442. \u0421\u0430\u0439\u0442 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u043f\u043e\u0440\u044f\u0434\u043e\u043a \u0440\u0430\u0431\u043e\u0442\u044b, \u0430 \u043d\u0435 \u043e\u0431\u0435\u0449\u0430\u0435\u0442 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0431\u0435\u0437 \u0438\u0437\u0443\u0447\u0435\u043d\u0438\u044f \u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0445 \u0434\u0430\u043d\u043d\u044b\u0445.'}</p>
           </div>
           <ol className={styles.processSteps}>
             {orionProcessSteps.map((step) => (
-              <li key={step.number}>
-                <span>{step.number}</span>
-                <div><h3>{step.title}</h3><p>{step.copy}</p></div>
-              </li>
+              <li key={step.number}><span>{step.number}</span><div><h3>{step.title}</h3><p>{step.copy}</p></div></li>
             ))}
           </ol>
         </section>
@@ -169,7 +198,7 @@ export function OrionSite() {
       <footer className={styles.footer}>
         <div className={styles.footerRequisites}>
           <strong>{orionRequisites.legalName}</strong>
-          <span>ИНН {orionRequisites.inn} · КПП {orionRequisites.kpp}</span>
+          <span>{`\u0418\u041d\u041d ${orionRequisites.inn} \u00b7 \u041a\u041f\u041f ${orionRequisites.kpp}`}</span>
           <span>{orionRequisites.address}</span>
           <span>
             {orionRequisites.phones.map((phone, index) => (
@@ -182,8 +211,8 @@ export function OrionSite() {
           <a href={`mailto:${orionRequisites.email}`}>{orionRequisites.email}</a>
         </div>
         <div className={styles.footerBottom}>
-          <span>© ОРИОН · свайные работы и аренда техники</span>
-          <a href="#top">Наверх ↑</a>
+          <span>{'\u00a9 \u041e\u0420\u0418\u041e\u041d \u00b7 \u0441\u0432\u0430\u0439\u043d\u044b\u0435 \u0440\u0430\u0431\u043e\u0442\u044b \u0438 \u0430\u0440\u0435\u043d\u0434\u0430 \u0442\u0435\u0445\u043d\u0438\u043a\u0438'}</span>
+          <a href="#top">{'\u041d\u0430\u0432\u0435\u0440\u0445 \u2191'}</a>
         </div>
       </footer>
     </main>

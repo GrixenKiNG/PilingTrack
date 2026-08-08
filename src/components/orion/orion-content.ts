@@ -21,7 +21,7 @@ const pvePhotos: OrionEquipmentPhoto[] = [
   { src: '/orion/equipment/pve-50pr/02.jpg', alt: 'PVE 50PR в рабочей конфигурации', credit: 'Dieseko Group', sourceUrl: 'https://www.diesekogroup.com/our-brands/woltman/' },
   { src: '/orion/equipment/pve-50pr/03.jpg', alt: 'PVE 50PR, общий вид', credit: 'Imeco', sourceUrl: 'https://www.imeco.at/used-equipment/piling-rigs-with-impact-hammers/' },
   { src: '/orion/equipment/pve-50pr/04.jpg', alt: 'PVE 50PR, вид со стороны мачты', credit: 'Imeco', sourceUrl: 'https://www.imeco.at/used-equipment/piling-rigs-with-impact-hammers/' },
-  { src: 'https://i.ytimg.com/vi/Th_hQ_1Ty0I/hqdefault.jpg', alt: 'PVE 50PR в демонстрационном видео', credit: 'SMT Sweden / YouTube', sourceUrl: 'https://www.mascus.fr/construction/piling-rigs/pve-50-pr/en8q8rgq.html' },
+  { src: '/orion/equipment/pve-50pr/05.jpg', alt: 'PVE 50PR в демонстрационном видео', credit: 'SMT Sweden / YouTube', sourceUrl: 'https://www.mascus.fr/construction/piling-rigs/pve-50-pr/en8q8rgq.html' },
 ];
 
 const liebherrPhotos: OrionEquipmentPhoto[] = [

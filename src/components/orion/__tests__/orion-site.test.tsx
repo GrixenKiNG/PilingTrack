@@ -87,7 +87,7 @@ describe('ORION public site', () => {
     for (const link of screen.getAllByRole('link', { name: /обсудить объект/i })) {
       expect(link).toHaveAttribute('href', '#contact');
     }
-    expect(screen.getByText(/Верховный Суд Чувашской Республики/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Верховный Суд Чувашской Республики/i)).not.toBeInTheDocument();
     expect(screen.getAllByText(/проверено фото/i)).toHaveLength(8);
     expect(screen.getByText('единиц собственного парка')).toBeInTheDocument();
     expect(screen.getByText('работа по проекту')).toBeInTheDocument();
@@ -175,3 +175,30 @@ describe('ORION public site', () => {
     expect(secondToggle).toHaveAttribute('aria-expanded', 'true');
   });
 });
+
+describe('ORION tender evidence path', () => {
+  it('avoids unverified project proof and exposes procurement actions', () => {
+    render(<OrionSite />);
+
+    expect(screen.getByRole('heading', {
+      name: /\u0434\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044c\u0441\u0442\u0432\u0430, \u0430 \u043d\u0435 \u0440\u0435\u043a\u043b\u0430\u043c\u043d\u044b\u0435 \u043a\u0435\u0439\u0441\u044b/i,
+    })).toBeInTheDocument();
+    expect(screen.getByText(
+      /\u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0435 \u0444\u043e\u0442\u043e \u0438 \u0444\u0430\u043a\u0442\u044b \u043f\u043e \u043e\u0431\u044a\u0435\u043a\u0442\u0430\u043c \u0431\u0443\u0434\u0443\u0442 \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u044b \u043f\u043e\u0441\u043b\u0435 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f/i,
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/\u0412\u0435\u0440\u0445\u043e\u0432\u043d\u044b\u0439 \u0421\u0443\u0434 \u0427\u0443\u0432\u0430\u0448\u0441\u043a\u043e\u0439 \u0420\u0435\u0441\u043f\u0443\u0431\u043b\u0438\u043a\u0438/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', {
+      name: /\u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0442\u0435\u043d\u0434\u0435\u0440\u043d\u044b\u0439 \u043f\u0430\u043a\u0435\u0442/i,
+    }).length).toBeGreaterThan(0);
+    expect(screen.getByText(/8 \u0435\u0434\u0438\u043d\u0438\u0446 \u0442\u0435\u0445\u043d\u0438\u043a\u0438/i)).toBeInTheDocument();
+    expect(screen.getByText(/\u0440\u0430\u0431\u043e\u0442\u0430 \u043f\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u0443 \u0438 \u041f\u041f\u0420/i)).toBeInTheDocument();
+  });
+});
+
+vi.mock('../orion-tender.module.css', () => ({
+  default: new Proxy({}, {
+    get: (_target, property) => property === 'then' ? undefined : 'orion-tender-test-class',
+  }),
+}));
+
+

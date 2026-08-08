@@ -801,6 +801,12 @@
   color: var(--sand);
   flex-shrink: 0;
 }
+.contactChannels a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .contactChannels a:hover {
   color: var(--sand);
 }
@@ -978,6 +984,7 @@
   color: var(--sand);
 }
 .menuButton {
+  min-width: 44px;
   color: var(--paper);
 }
 
