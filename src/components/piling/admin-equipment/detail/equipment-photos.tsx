@@ -15,6 +15,7 @@ import Image from 'next/image';
 import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 interface MediaRecord {
   id: string;
@@ -43,6 +44,7 @@ export function EquipmentPhotos({ equipmentId }: Props) {
   const [photos, setPhotos] = useState<PhotoTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -118,7 +120,6 @@ export function EquipmentPhotos({ equipmentId }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Удалить фото?')) return;
     setBusy(true);
     try {
       const res = await authFetch(`/api/media/${id}`, { method: 'DELETE' });
@@ -129,6 +130,7 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
     } finally {
       setBusy(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -172,7 +174,7 @@ export function EquipmentPhotos({ equipmentId }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="w-full h-28 rounded-lg border-2 border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-slate-500 disabled:opacity-50"
+          className="flex h-28 w-full flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-orange-200 text-orange-700 transition-colors hover:border-orange-400 hover:bg-orange-50/50 disabled:opacity-50"
         >
           <Camera className="w-6 h-6" />
           <span className="text-sm">Загрузить первое фото</span>
@@ -197,9 +199,10 @@ export function EquipmentPhotos({ equipmentId }: Props) {
               )}
               <button
                 type="button"
-                onClick={() => handleDelete(p.id)}
+                onClick={() => setPendingDeleteId(p.id)}
                 disabled={busy}
-                className="absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100 hover:bg-white shadow-sm disabled:opacity-50"
+                aria-label={`Удалить фото «${p.fileName}»`}
+                className="absolute right-1.5 top-1.5 inline-flex h-11 w-11 items-center justify-center rounded-md bg-white/90 text-rose-600 opacity-100 shadow-sm hover:bg-white disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                 title="Удалить"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -218,6 +221,15 @@ export function EquipmentPhotos({ equipmentId }: Props) {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
+      />
+      <ConfirmActionDialog
+        open={Boolean(pendingDeleteId)}
+        onOpenChange={(open) => { if (!open && !busy) setPendingDeleteId(null); }}
+        title="Удалить фото установки?"
+        description="Фото будет удалено без возможности восстановления."
+        confirmLabel="Удалить фото"
+        busy={busy}
+        onConfirm={() => pendingDeleteId ? handleDelete(pendingDeleteId) : undefined}
       />
     </div>
   );

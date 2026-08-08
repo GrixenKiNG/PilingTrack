@@ -61,8 +61,8 @@ export function ReportHistory() {
       } else {
         // HTTP error does NOT throw — without this the list would render
         // empty as if the operator had no reports.
-        setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
-        toast.error('Ошибка загрузки отчётов');
+        setError('Сервис отчётов временно недоступен. Повторите попытку.');
+        toast.error('История отчётов не загрузилась');
       }
 
       if (sitesRes.ok) {
@@ -70,8 +70,8 @@ export function ReportHistory() {
         setSites(data.data || data.sites || []);
       }
     } catch {
-      setError('Не удалось загрузить отчёты. Проверьте соединение.');
-      toast.error('Ошибка загрузки отчётов');
+      setError('Проверьте подключение к интернету и повторите попытку.');
+      toast.error('История отчётов не загрузилась');
     } finally {
       setLoading(false);
     }
@@ -93,10 +93,10 @@ export function ReportHistory() {
         setReports((prev) => [...prev, ...more]);
         setNextCursor(data.nextCursor ?? null);
       } else {
-        toast.error('Не удалось загрузить ещё');
+        toast.error('Следующая часть истории не загрузилась. Повторите попытку.');
       }
     } catch {
-      toast.error('Не удалось загрузить ещё');
+      toast.error('Следующая часть истории не загрузилась. Проверьте подключение.');
     } finally {
       setLoadingMore(false);
     }
@@ -116,11 +116,13 @@ export function ReportHistory() {
         if (data.report) {
           setSelectedReport(data.report as ReportDTO);
         } else {
-          toast.error('Детали отчёта не найдены');
+          toast.error('Отчёт больше недоступен. Обновите список и попробуйте снова.');
         }
+      } else {
+        toast.error('Не удалось открыть отчёт. Повторите попытку.');
       }
     } catch {
-      toast.error('Ошибка загрузки');
+      toast.error('Не удалось открыть отчёт. Проверьте подключение.');
     } finally {
       setDetailLoading(false);
     }
@@ -176,7 +178,7 @@ export function ReportHistory() {
       );
 
       if (!res.ok) {
-        toast.error('Ошибка загрузки отчёта');
+        toast.error('Не удалось подготовить PDF. Повторите попытку.');
         return;
       }
 
@@ -184,13 +186,13 @@ export function ReportHistory() {
       const reportId = data.report?.reportId;
 
       if (!reportId) {
-        toast.error('reportId не найден');
+        toast.error('PDF для этого отчёта пока недоступен.');
         return;
       }
 
       setPreviewReportId(reportId);
     } catch {
-      toast.error('Ошибка загрузки отчёта');
+      toast.error('Не удалось подготовить PDF. Проверьте подключение.');
     }
   };
 
@@ -219,7 +221,7 @@ export function ReportHistory() {
           История отчётов
         </h1>
         <span className="text-xs text-slate-500 font-mono tabular-nums">
-          {filteredReports.length} записей
+          Отчётов: {filteredReports.length}
         </span>
       </div>
 
@@ -251,8 +253,23 @@ export function ReportHistory() {
       ) : filteredReports.length === 0 ? (
         <div className="text-center py-16">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Нет отчётов</p>
-          <p className="text-xs text-slate-400 mt-1">Создайте первый отчёт в разделе «Новый отчёт»</p>
+          <p className="text-sm font-medium text-slate-700">
+            {filterSiteId === 'all' ? 'Отчётов пока нет' : 'На выбранном объекте отчётов нет'}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {filterSiteId === 'all'
+              ? 'После сдачи смены отчёт появится в этом списке.'
+              : 'Выберите другой объект или покажите отчёты по всем объектам.'}
+          </p>
+          {filterSiteId !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setFilterSiteId('all')}
+              className="mt-4 text-sm font-medium text-orange-600 hover:text-orange-700"
+            >
+              Показать все отчёты
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -276,8 +293,9 @@ export function ReportHistory() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={(e) => handleOpenPreview(report, e)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700"
                         title="Предпросмотр PDF"
+                        aria-label={`Открыть PDF отчёта по объекту ${report.siteName} за ${formatDate(report.date)}`}
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -300,14 +318,14 @@ export function ReportHistory() {
                       <span className="text-sm font-mono font-semibold text-slate-900">
                         {report.totalPiles}/{(report.totalPileMeters ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-3xs text-slate-500">шт/м.п.</span>
+                      <span className="text-xs text-slate-500">шт/м.п.</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Drill className="w-3.5 h-3.5 text-blue-500" />
                       <span className="text-sm font-mono font-semibold text-slate-900">
                         {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-3xs text-slate-500">шт/м</span>
+                      <span className="text-xs text-slate-500">шт/м</span>
                     </div>
                     {report.totalDowntime > 0 && (
                       <div className="flex items-center gap-1.5">
@@ -315,7 +333,7 @@ export function ReportHistory() {
                         <span className="text-sm font-mono font-semibold text-amber-600">
                           {report.totalDowntime}
                         </span>
-                        <span className="text-3xs text-slate-500">ч</span>
+                        <span className="text-xs text-slate-500">ч</span>
                       </div>
                     )}
                   </div>

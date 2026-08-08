@@ -61,7 +61,8 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
       <button
         type="button"
         onClick={handleOpen}
-        className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 hover:border-orange-400 transition-colors flex-shrink-0"
+        aria-label="Открыть фото отчёта"
+        className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 transition-colors hover:border-orange-400"
         title="Открыть фото"
       >
         <Image src={thumbUrl} alt="" width={32} height={32} unoptimized className="w-full h-full object-cover" />
@@ -75,7 +76,8 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"
+            aria-label="Закрыть фото"
+            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
           >
             <X className="w-5 h-5" />
           </button>

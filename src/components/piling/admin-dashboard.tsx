@@ -225,7 +225,7 @@ export function AdminDashboard() {
       if (mt?.overdue) out.push({ id: `to-${c.id}`, tone: 'danger', icon: Wrench,
         text: `${c.name} — ТО просрочено`, hint: c.assignedSiteName || c.model, href: '/admin/to', rig: c.id, site });
       if (c.status === 'idle') out.push({ id: `idle-${c.id}`, tone: 'danger', icon: FileWarning,
-        text: `${c.name} — нет отчёта 3+ дн`, hint: c.assignedSiteName || 'простаивает', href: `/admin/equipment/${c.id}`, rig: c.id, site });
+        text: `${c.name} — нет отчётов более 3 дней`, hint: c.assignedSiteName || 'установка простаивает', href: `/admin/equipment/${c.id}`, rig: c.id, site });
       else if (c.status === 'expected') out.push({ id: `exp-${c.id}`, tone: 'warning', icon: Clock,
         text: `${c.name} — отчёт за смену ожидается`, hint: c.assignedSiteName || c.model, href: `/admin/equipment/${c.id}`, rig: c.id, site });
       const dt = c.todayTotals?.downtimeHours ?? 0;
@@ -235,7 +235,7 @@ export function AdminDashboard() {
     const today = getTodayInTimezone();
     for (const r of recent) {
       if (r.date === today && !r.hasPhoto) out.push({ id: `nophoto-${r.id}`, tone: 'warning', icon: CameraOff,
-        text: `${r.siteName} — отчёт без фото`, hint: 'нет доказательства работы', href: '/admin/reports', site: r.siteName });
+        text: `${r.siteName} — отчёт без фото`, hint: 'фото выполнения не приложено', href: '/admin/reports', site: r.siteName });
     }
     const rank: Record<Tone, number> = { danger: 0, warning: 1, info: 2, success: 3, muted: 4 };
     return out.sort((a, b) => rank[a.tone] - rank[b.tone]);
@@ -261,6 +261,12 @@ export function AdminDashboard() {
   const pileProgress = kpis.plannedPileMeters > 0 ? (kpis.actualPileMeters / kpis.plannedPileMeters) * 100 : 0;
   const drillingProgress = kpis.plannedDrilling > 0 ? (kpis.actualDrilling / kpis.plannedDrilling) * 100 : 0;
   const fleetProgress = kpis.rigsTotal > 0 ? (kpis.rigsWorking / kpis.rigsTotal) * 100 : 0;
+  const staleSourceNames = [
+    stale.fleet && 'парк установок',
+    stale.maint && 'техническое обслуживание',
+    stale.recent && 'отчёты',
+    stale.sites && 'объекты',
+  ].filter(Boolean).join(', ');
 
   if (showSkeleton) {
     return (
@@ -295,56 +301,65 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-4 p-4 lg:p-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Дашборд</h1>
           <p className="mt-0.5 text-sm text-slate-500">Оперативная сводка производства</p>
         </div>
 
         {/* Фильтры: период + Объект + Установка */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-md border border-slate-200">
-            {([['all', 'Весь период'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Период']] as const).map(([m, label]) => (
+        <div className="w-full space-y-2 lg:w-auto">
+          <span className="block text-xs font-medium text-slate-500">Период производственных показателей</span>
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 sm:grid-cols-4">
+            {([['all', 'Всё время'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Выбрать даты']] as const).map(([m, label]) => (
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
-                className={cn('px-2.5 py-1 text-xs font-medium', periodMode === m ? 'bg-blue-50 text-blue-700' : 'bg-white text-slate-500 hover:bg-slate-50')}>
+                className={cn(
+                  'min-h-11 border-slate-200 px-3 text-sm font-medium first:border-0 max-sm:border-t max-sm:odd:border-r sm:border-l',
+                  periodMode === m ? 'bg-blue-50 text-blue-700' : 'bg-white text-slate-600 hover:bg-slate-50',
+                )}>
                 {label}
               </button>
             ))}
           </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[auto_minmax(10rem,1fr)_minmax(10rem,1fr)_auto]">
           {periodMode === 'custom' && (
-            <div className="flex items-center gap-1">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:col-span-2 xl:col-span-1">
               <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700" />
-              <span className="text-xs text-slate-400">—</span>
+                aria-label="Начало периода"
+                className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" />
+              <span className="text-sm text-slate-400">—</span>
               <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700" />
+                aria-label="Конец периода"
+                className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" />
             </div>
           )}
           <select value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)} aria-label="Фильтр по объекту"
-            className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700">
+            className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
             <option value="all">Все объекты</option>
             {siteOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <select value={rigFilter} onChange={(e) => setRigFilter(e.target.value)} aria-label="Фильтр по установке"
-            className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700">
+            className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
             <option value="all">Все установки</option>
             {(fleet?.equipment ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button
             type="button"
             onClick={refreshAll}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+            className="flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
             aria-label="Обновить дашборд"
           >
             <RefreshCw className="h-4 w-4" />
+            <span>Обновить</span>
           </button>
+          </div>
         </div>
       </div>
 
       {(stale.fleet || stale.maint || stale.recent || stale.sites) && (
-        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-700">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          Часть источников не ответила{stale.fleet ? ' · парк' : ''}{stale.maint ? ' · ТО' : ''}{stale.recent ? ' · отчёты' : ''}{stale.sites ? ' · объекты' : ''} — сводка неполная.
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800" role="status">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          Сводка неполная: не удалось обновить данные по разделам — {staleSourceNames}. Нажмите «Обновить дашборд».
         </div>
       )}
 
@@ -355,7 +370,7 @@ export function AdminDashboard() {
       <div className="grid gap-3 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
           <Section icon={Building2} title="План-факт по объектам" footerLabel="Все объекты" onFooter={() => router.push('/admin/sites')}>
-            {planRows.length === 0 ? <Empty text="Нет объектов с планом" /> : (
+            {planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {planRows.map((a) => <PlanTile key={a.siteId} a={a} />)}
               </div>
@@ -364,7 +379,9 @@ export function AdminDashboard() {
 
           <Section icon={Truck} title="Парк установок" count={visibleFleet.length} footerLabel="Все установки" onFooter={() => router.push('/admin/equipment')}>
             {fleetRows.length === 0 ? (
-              (stale.fleet || stale.maint) ? <Empty text="Данные не загрузились" tone="warning" /> : <Empty text="Установки не найдены" />
+              (stale.fleet || stale.maint)
+                ? <Empty text="Не удалось загрузить парк установок. Обновите сводку." tone="warning" />
+                : <Empty text="По выбранным фильтрам установок нет" />
             ) : (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {fleetRows.map((r) => (

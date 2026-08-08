@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import {
   DictionaryTable,
   type DictionaryKind,
@@ -32,6 +33,20 @@ interface HistoryEntry {
 }
 interface FormState { mode: 'create' | 'rename'; kind: DictionaryKind; item?: RegistryItem }
 interface LengthState { item: RegistryItem; value: string }
+
+function useCompactInspector() {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const update = () => setCompact(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  return compact;
+}
 
 // `icon` — компактная линейная иконка для вкладок; `pilingIcon` — предметная
 // иконка для плиток сводки (тот же набор и тот же вид, что в дашборде).
@@ -71,6 +86,8 @@ export function AdminDictionaries() {
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [activeKind, setActiveKind] = useState<DictionaryKind>('pileGrade');
   const [panelWidth, setPanelWidth] = useState(380);
+  const compactInspector = useCompactInspector();
+  const InspectorShell: React.ElementType = compactInspector ? SheetContent : 'aside';
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -330,7 +347,7 @@ export function AdminDictionaries() {
       <div className="min-w-0 space-y-4">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight text-slate-950">Справочники</h1><p className="mt-1 text-sm text-slate-500">Рабочие значения вашей организации для отчётов и планирования</p></div>
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-2xs font-medium text-slate-400">Ctrl + K</kbd></div><div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 rounded-md border border-slate-200 bg-white py-0 pl-9 pr-3 text-sm"><option value="active">Активные / Архив / Все</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 bg-orange-500 text-white hover:bg-orange-600" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />Добавить</Button></div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-2xs font-medium text-slate-400 sm:block">Ctrl + K</kbd></div><div className="relative w-full sm:w-auto"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 w-full rounded-md border border-slate-200 bg-white py-0 pl-9 pr-3 text-sm sm:w-auto"><option value="active">Активные / Архив / Все</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 w-full bg-orange-500 text-white hover:bg-orange-600 sm:w-auto" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />Добавить</Button></div>
       </header>
 
       {loadError ? (
@@ -376,6 +393,7 @@ export function AdminDictionaries() {
                 onDelete={(item) => setConfirmDelete({ kind, item })}
                 onSelect={selectItem}
                 selectedId={selectedKind === kind ? selectedItem?.id : undefined}
+                compact={compactInspector}
               />
             </TabsContent>
           ))}
@@ -383,36 +401,75 @@ export function AdminDictionaries() {
       )}
       </div>
 
-      {/* Right: persistent, resizable inspector column — same pattern as admin-equipment */}
-      <aside className="relative">
+      {/* Desktop: persistent resizable column. Mobile/tablet: focused side sheet. */}
+      <Sheet
+        open={compactInspector && selectedItem !== null}
+        onOpenChange={(open) => {
+          if (!open) selectItem(null);
+        }}
+      >
+      <InspectorShell
+        {...(compactInspector ? { side: 'right' } : {})}
+        className={compactInspector
+          ? 'w-full gap-0 overflow-hidden p-0 sm:max-w-md [&>button]:hidden'
+          : 'relative hidden lg:block'}
+      >
+        {compactInspector && (
+          <SheetTitle className="sr-only">
+            {selectedItem ? `Сведения: ${selectedItem.name}` : 'Сведения из справочника'}
+          </SheetTitle>
+        )}
         {/* drag handle — widen the panel leftward */}
         <div
           onMouseDown={startResize}
+          onKeyDown={(event) => {
+            const step = event.shiftKey ? 40 : 16;
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault();
+              setPanelWidth((width) => Math.min(720, width + step));
+            } else if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              setPanelWidth((width) => Math.max(320, width - step));
+            } else if (event.key === 'Home') {
+              event.preventDefault();
+              setPanelWidth(320);
+            } else if (event.key === 'End') {
+              event.preventDefault();
+              setPanelWidth(720);
+            }
+          }}
+          role="separator"
+          aria-label="Изменить ширину панели сведений"
+          aria-orientation="vertical"
+          aria-valuemin={320}
+          aria-valuemax={720}
+          aria-valuenow={panelWidth}
+          tabIndex={0}
           title="Потяните, чтобы изменить ширину"
-          className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize lg:block"
+          className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:block"
         >
-          <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+          <div className="mx-auto h-full w-px bg-slate-300 transition-colors" />
         </div>
 
-        <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-        <div data-testid="dictionary-inspector" data-active-tab={inspectorTab} className={selectedItem ? 'flex min-h-[calc(100vh-7rem)] flex-col rounded-xl border border-slate-200 bg-white p-4' : 'flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center'}>
-          {selectedItem ? <><div className="flex items-start justify-between gap-3"><div><h2 className="mt-1 text-lg font-semibold text-slate-900">{selectedItem.name}</h2></div><div className="flex items-center gap-3"><Badge className={selectedItem.isActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : ''} variant={selectedItem.isActive ? 'default' : 'secondary'}>{selectedItem.isActive ? 'Активный' : 'Архив'}</Badge><button type="button" aria-label="Закрыть панель" onClick={() => selectItem(null)}><X className="h-4 w-4 text-slate-400" /></button></div></div>
-          <div className="mt-4 flex gap-5 border-b border-slate-200 text-sm"><button type="button" onClick={() => setInspectorTab('general')} className={inspectorTab === 'general' ? 'border-b-2 border-orange-500 pb-2 font-medium text-slate-900' : 'pb-2 text-slate-500'}>Общие</button><button type="button" onClick={() => setInspectorTab('history')} className={inspectorTab === 'history' ? 'border-b-2 border-orange-500 pb-2 font-medium text-slate-900' : 'pb-2 text-slate-500'}>История</button></div>{inspectorTab === 'general' ? <><div className="mt-5 space-y-3 text-sm">
+        <div className={compactInspector ? 'h-full overflow-y-auto' : 'lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto'}>
+        <div data-testid="dictionary-inspector" data-active-tab={inspectorTab} className={selectedItem ? (compactInspector ? 'flex min-h-full flex-col bg-white p-4' : 'flex min-h-[calc(100vh-7rem)] flex-col rounded-xl border border-slate-200 bg-white p-4') : 'flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center'}>
+          {selectedItem ? <><div className="flex items-start justify-between gap-3 pr-1"><div><h2 className="mt-1 text-lg font-semibold text-slate-900">{selectedItem.name}</h2></div><div className="flex items-center gap-2"><Badge className={selectedItem.isActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : ''} variant={selectedItem.isActive ? 'default' : 'secondary'}>{selectedItem.isActive ? 'Активный' : 'Архив'}</Badge><button type="button" aria-label="Закрыть панель" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-slate-100" onClick={() => selectItem(null)}><X className="h-4 w-4 text-slate-500" /></button></div></div>
+          <div className="mt-3 flex border-b border-slate-200 text-sm" role="tablist" aria-label="Сведения о значении"><button type="button" role="tab" aria-selected={inspectorTab === 'general'} onClick={() => setInspectorTab('general')} className={inspectorTab === 'general' ? 'min-h-11 border-b-2 border-orange-500 px-3 font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300' : 'min-h-11 px-3 text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300'}>Общие</button><button type="button" role="tab" aria-selected={inspectorTab === 'history'} onClick={() => setInspectorTab('history')} className={inspectorTab === 'history' ? 'min-h-11 border-b-2 border-orange-500 px-3 font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300' : 'min-h-11 px-3 text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300'}>История</button></div>{inspectorTab === 'general' ? <><div className="mt-5 space-y-3 text-sm">
           <label className="block"><span className="text-slate-500">Название</span>
-            <Input aria-label="Название" value={panelDraft?.name ?? ''} disabled={selectedUsed} title={selectedUsed ? 'Используемое значение нельзя переименовать' : undefined} onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, name: event.target.value }))} className="mt-1 font-medium" />
+            <Input aria-label="Название" value={panelDraft?.name ?? ''} disabled={selectedUsed} title={selectedUsed ? 'Используемое значение нельзя переименовать' : undefined} onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, name: event.target.value }))} className="mt-1 h-11 font-medium" />
           </label>
           {selectedKind === 'pileGrade' ? <>
           <label className="block"><span className="text-slate-500">Код/сечение</span>
-            <Input aria-label="Код/сечение" value={panelDraft?.section ?? ''} placeholder="120×120 мм" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, section: event.target.value }))} className="mt-1" />
+            <Input aria-label="Код/сечение" value={panelDraft?.section ?? ''} placeholder="120×120 мм" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, section: event.target.value }))} className="mt-1 h-11" />
           </label>
           <label className="block"><span className="text-slate-500">Длина, м</span>
-            <Input aria-label="Длина, м" value={panelDraft?.length ?? ''} inputMode="decimal" placeholder="35,00" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, length: event.target.value }))} className="mt-1" />
+            <Input aria-label="Длина, м" value={panelDraft?.length ?? ''} inputMode="decimal" placeholder="35,00" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, length: event.target.value }))} className="mt-1 h-11" />
             <p className="mt-1 text-xs text-slate-500">Указываются по проектной длине.</p>
           </label>
           </> : (selectedItem.code ? <div><span className="text-slate-500">Код</span><div className="mt-1 rounded-md border border-slate-200 bg-slate-50 p-2 font-medium text-slate-800">{selectedItem.code}</div></div> : null)}
           </div>
-          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Этот сортамент уже используется в {selectedItem.reportCount} отчётах и {selectedItem.planCount} планах.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-slate-800">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Планы</span><b>{selectedItem.planCount}</b></p></section>
-          <div className="mt-auto border-t border-slate-100 pt-5"><div className="grid grid-cols-2 gap-2"><Button className="bg-orange-500 text-white hover:bg-orange-600" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="border-orange-400 text-orange-600 hover:bg-orange-50" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-slate-500">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-slate-600">
+          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Использование: отчётов — {selectedItem.reportCount}, планов — {selectedItem.planCount}.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-slate-800">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-slate-600"><span>Планы</span><b>{selectedItem.planCount}</b></p></section>
+          <div className="mt-auto border-t border-slate-100 pt-5"><div className="grid grid-cols-2 gap-2"><Button className="min-h-11 bg-orange-500 text-white hover:bg-orange-600" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="min-h-11 border-orange-400 text-orange-600 hover:bg-orange-50" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-slate-500">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-slate-600">
             {history === null ? <p className="py-6 text-center text-slate-400">Загрузка истории…</p>
               : history.length === 0 ? <p className="py-6 text-center text-slate-400">Записей аудита по элементу нет.</p>
               : <ul className="space-y-3">
@@ -436,7 +493,8 @@ export function AdminDictionaries() {
           </div>}</> : <><Search className="mx-auto mb-3 h-10 w-10 text-slate-300" /><p className="text-sm text-slate-500">Выберите запись</p><p className="mt-1 text-xs text-slate-400">Сведения откроются здесь, в этом же окне</p></>}
         </div>
         </div>
-      </aside>
+      </InspectorShell>
+      </Sheet>
       </div>
 
       {form && (

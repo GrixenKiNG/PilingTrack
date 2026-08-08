@@ -105,14 +105,14 @@ export function PlanTile({ a }: { a: SiteAnalyticsDTO }) {
     <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-semibold text-slate-900">{a.siteName}</span>
-        <span className="shrink-0 text-2xs text-slate-500">{formatNumber(a.totalReports)} отч.</span>
+        <span className="shrink-0 text-xs text-slate-500">{formatNumber(a.totalReports)} отч.</span>
       </div>
       <div>
-        <div className="mb-0.5 text-2xs text-slate-500">Сваи · план {formatNumber(a.plannedPiles)} шт</div>
+        <div className="mb-0.5 text-xs text-slate-500">Сваи · план {formatNumber(a.plannedPiles)} шт</div>
         <MiniProgress value={`${formatNumber(a.actualPiles)} шт / ${formatNumber(a.actualPileMeters)} м.п.`} pct={a.pileProgress} tone="emerald" />
       </div>
       <div>
-        <div className="mb-0.5 text-2xs text-slate-500">Бурение · план {formatNumber(a.plannedDrilling)} м</div>
+        <div className="mb-0.5 text-xs text-slate-500">Бурение · план {formatNumber(a.plannedDrilling)} м</div>
         <MiniProgress value={`${formatNumber(a.actualDrilling)} м / ${formatNumber(a.actualDrillingCount)} шт`} pct={a.drillingProgress} tone="blue" />
       </div>
     </div>
@@ -129,15 +129,15 @@ export function RigTile({ r, status, onOpen }: { r: FleetCard; status: { tone: T
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-slate-900">{r.name}</div>
-          <div className="truncate text-2xs text-slate-500">{r.model || 'модель не указана'}</div>
+          <div className="truncate text-xs text-slate-500">{r.model || 'модель не указана'}</div>
         </div>
-        <span className={cn('shrink-0 rounded px-2 py-0.5 text-2xs font-medium', TONE_TAG[status.tone])}>{status.label}</span>
+        <span className={cn('shrink-0 rounded px-2 py-0.5 text-xs font-medium', TONE_TAG[status.tone])}>{status.label}</span>
       </div>
-      <div className="truncate text-2xs text-slate-500">{r.assignedSiteName ?? 'объект не привязан'}</div>
-      <div className="font-mono text-2xs text-slate-600">
+      <div className="truncate text-xs text-slate-500">{r.assignedSiteName ?? 'объект не привязан'}</div>
+      <div className="font-mono text-xs text-slate-600">
         {r.todayTotals ? `${formatNumber(r.todayTotals.piles)} шт / ${formatNumber(r.todayTotals.drillingMeters)} м` : 'нет данных за сегодня'}
       </div>
-      <div className="truncate text-2xs text-slate-500">
+      <div className="truncate text-xs text-slate-500">
         {r.assignedOperatorName ?? r.latestReport?.operatorName ?? '—'}{r.assignedCrewName ? ` · ${r.assignedCrewName}` : ''}
       </div>
     </button>
@@ -151,7 +151,7 @@ function MiniProgress({ value, pct, tone }: { value: string; pct: number; tone: 
       <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
         <div className={cn('h-full rounded-full', MINI_BAR[tone])} style={{ width: `${clampPct(pct)}%` }} />
       </div>
-      <div className="mt-0.5 font-mono text-2xs text-slate-400">{Math.round(clampPct(pct))}%</div>
+      <div className="mt-0.5 font-mono text-xs text-slate-500">{Math.round(clampPct(pct))}%</div>
     </div>
   );
 }
@@ -165,7 +165,7 @@ export function RiskGroup({ title, risks, onOpen }: { title: string; risks: Risk
 
   return (
     <div className="py-1">
-      <div className="px-3 py-1.5 text-2xs font-semibold uppercase text-slate-400">{title}</div>
+      <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</div>
       {risks.map((r) => {
         const Icon = r.icon;
         return (
@@ -178,7 +178,7 @@ export function RiskGroup({ title, risks, onOpen }: { title: string; risks: Risk
             <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', TONE_TEXT[r.tone])} />
             <span className="min-w-0 flex-1">
               <span className="block text-sm text-slate-900">{r.text}</span>
-              <span className="block truncate text-2xs text-slate-500">{r.hint}</span>
+              <span className="block truncate text-xs text-slate-500">{r.hint}</span>
             </span>
           </button>
         );
@@ -198,7 +198,7 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
         <span className="text-sm font-semibold">{title}</span>
         {count != null && (
           <span className={cn(
-            'ml-auto rounded-full px-2 py-0.5 text-2xs',
+            'ml-auto rounded-full px-2 py-0.5 text-xs',
             dominant ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500',
           )}>
             {count}
@@ -221,5 +221,5 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
 }
 
 export function Empty({ text, tone = 'muted' }: { text: string; tone?: Tone }) {
-  return <div className={cn('px-3 py-8 text-center text-2xs', TONE_TEXT[tone])}>{text}</div>;
+  return <div className={cn('px-3 py-8 text-center text-sm', TONE_TEXT[tone])}>{text}</div>;
 }

@@ -15,8 +15,10 @@ import { EquipmentDetail } from './detail/equipment-detail';
 import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
 import { CreateEquipmentDialog } from './equipment-dialogs';
 import { PilingIcon } from '@/components/piling/icons';
+import { usePilingStore } from '@/lib/store';
 
 export function AdminEquipment() {
+  const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const { snapshot, loading, error, refetch } = useFleet();
   // Display + KPI come from the single snapshot source; create still posts to
   // /api/equipment (edit lives inside the embedded full card).
@@ -102,11 +104,11 @@ export function AdminEquipment() {
           </h1>
           <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
         </div>
-        <div className="flex gap-2">
+        {canManage && <div className="flex gap-2">
           <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
             <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
           </Button>
-        </div>
+        </div>}
       </div>
 
       <EquipmentStatsBar totals={snapshot.totals} cards={cards} />
@@ -158,8 +160,31 @@ export function AdminEquipment() {
           {/* drag handle — widen the panel leftward */}
           <div
             onMouseDown={startResize}
+            onKeyDown={(event) => {
+              const step = event.shiftKey ? 40 : 16;
+              if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                setPanelWidth((width) => Math.min(900, width + step));
+              } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                setPanelWidth((width) => Math.max(360, width - step));
+              } else if (event.key === 'Home') {
+                event.preventDefault();
+                setPanelWidth(360);
+              } else if (event.key === 'End') {
+                event.preventDefault();
+                setPanelWidth(900);
+              }
+            }}
+            role="separator"
+            tabIndex={0}
+            aria-label="Изменить ширину панели установки"
+            aria-orientation="vertical"
+            aria-valuemin={360}
+            aria-valuemax={900}
+            aria-valuenow={panelWidth}
             title="Потяните, чтобы изменить ширину"
-            className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize lg:block"
+            className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:block"
           >
             <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
           </div>
@@ -171,7 +196,7 @@ export function AdminEquipment() {
                   <button
                     onClick={() => setSelectedId(null)}
                     aria-label="Закрыть карточку"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   >
                     <PilingIcon name="close" size={16} decorative />
                   </button>
@@ -189,14 +214,16 @@ export function AdminEquipment() {
         </aside>
       </div>
 
-      <CreateEquipmentDialog
-        open={showCreate}
-        onOpenChange={setShowCreate}
-        onSubmit={async (payload) => {
-          await create(payload);
-          refetch();
-        }}
-      />
+      {canManage && (
+        <CreateEquipmentDialog
+          open={showCreate}
+          onOpenChange={setShowCreate}
+          onSubmit={async (payload) => {
+            await create(payload);
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

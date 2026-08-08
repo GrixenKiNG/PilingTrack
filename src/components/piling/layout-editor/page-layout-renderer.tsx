@@ -16,8 +16,9 @@ export interface RenderablePageWidget {
 }
 
 // 12-column grid: size = how many tiles share a row (sm 4/row, md 3/row,
-// lg 2/row on desktop; always 2/row on mobile). Tiles in one row are equal
-// width and height — the earlier flex-basis layout produced ragged rows.
+// lg 2/row on desktop). On phones a KPI tile needs the full row: the shared
+// 80px subject icon plus readable value text cannot fit into half of 358px.
+// Two columns start at sm, where each tile has enough useful width.
 const SIZE_SPAN: Record<WidgetSize, string> = {
   sm: 'lg:col-span-3',
   md: 'lg:col-span-4',
@@ -38,7 +39,7 @@ export function PageLayoutRenderer({
     .sort((a, b) => a.order - b.order);
 
   return (
-    <div className={className ?? 'grid grid-cols-2 gap-3 lg:grid-cols-12'}>
+    <div className={className ?? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12'}>
       {visible.map((w) => (
         <div key={w.id} className={`col-span-1 ${SIZE_SPAN[w.size]} min-w-0 [&>*]:h-full`}>
           {widgets[w.id].render(w.settings ?? {})}

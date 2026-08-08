@@ -12,7 +12,7 @@ export const DOMAIN_ICON_NAMES = [
   'shift-start', 'inspection', 'engine-hours', 'pile-group', 'pile-driving',
   'drilling-auger', 'linear-meters', 'downtime', 'downtime-reason',
   'technical-readiness', 'maintenance-due', 'repair', 'defect', 'work-order',
-  'spare-parts', 'handoff', 'accepted', 'equipment-rig',
+  'spare-parts', 'handoff', 'accepted', 'equipment-rig', 'fuel',
 ] as const;
 
 export const STANDARD_ICON_NAMES = [
@@ -56,7 +56,7 @@ const approvedIconAssets: Partial<Record<PilingIconName, string>> = {
   downtime: 'downtime', 'downtime-reason': 'downtime-reason',
   'technical-readiness': 'technical-readiness', 'maintenance-due': 'maintenance-due',
   repair: 'repair', 'work-order': 'work-order', 'spare-parts': 'spare-parts',
-  accepted: 'accepted', site: 'site', 'equipment-rig': 'equipment-rig',
+  accepted: 'accepted', site: 'site', 'equipment-rig': 'equipment-rig', fuel: 'fuel',
   equipment: 'equipment-rig', crew: 'crew', operator: 'operator',
   monitoring: 'monitoring', reports: 'reports', history: 'history',
   analytics: 'analytics', risk: 'risk', notifications: 'notifications',

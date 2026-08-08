@@ -70,14 +70,14 @@ export function FleetDashboard() {
         : '/api/monitoring/fleet';
       const res = await authFetch(url);
       if (!res.ok) {
-        setError(`Сервер вернул ${res.status}`);
+        setError('Сервис мониторинга временно недоступен.');
         return;
       }
       const data: FleetSnapshot = await res.json();
       setSnap(data);
       setError(null);
-    } catch (err) {
-      setError((err as Error).message);
+    } catch {
+      setError('Нет соединения с сервисом мониторинга.');
     }
   }, []);
 
@@ -197,8 +197,16 @@ export function FleetDashboard() {
   if (error && !snap) {
     return (
       <div className="p-6">
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          Не удалось загрузить мониторинг: {error}
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
+          <p className="text-sm font-semibold">Мониторинг не загрузился</p>
+          <p className="mt-1 text-sm">{error} Проверьте подключение и повторите попытку.</p>
+          <button
+            type="button"
+            onClick={() => void fetchSnapshot({ bust: true })}
+            className="mt-3 text-sm font-semibold text-rose-800 underline underline-offset-2"
+          >
+            Повторить загрузку
+          </button>
         </div>
       </div>
     );
@@ -264,7 +272,9 @@ export function FleetDashboard() {
 
       {visibleCards.length === 0 && (
         <div className="rounded-xl border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-          {siteFilter ? 'Нет техники на этом объекте.' : 'Нет доступной техники.'}
+          {siteFilter
+            ? 'На выбранном объекте нет назначенных установок. Выберите другой объект.'
+            : 'Нет установок для отображения.'}
         </div>
       )}
     </div>
@@ -287,15 +297,15 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <div className={cn(
+          <div aria-live="polite" className={cn(
             'rounded-full bg-white/90 px-2.5 py-1 text-3xs uppercase tracking-wide',
             conn === 'live' && 'text-emerald-700',
             conn === 'connecting' && 'text-amber-700',
             conn === 'offline' && 'text-rose-700',
           )}>
-            {conn === 'live' ? 'live' : conn === 'connecting' ? '…' : 'offline'}
+            {conn === 'live' ? 'Данные онлайн' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
           </div>
-          <div className="text-3xs text-white/70">обновлено {formatRelative(snap.asOf)}</div>
+          <div className="text-3xs text-white/70">Данные обновлены {formatRelative(snap.asOf)}</div>
         </div>
       </div>
 
@@ -303,7 +313,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
         <Metric label="Свай" value={snap.totals.pilesToday} />
         <Metric label="Бурения, м" value={formatFixed(snap.totals.drillingToday, 1)} />
         <Metric label="Простой" value={formatHours(snap.totals.downtimeHoursToday)} />
-        <Metric label="Ждём отчёт" value={snap.totals.expected} muted />
+        <Metric label="Ожидаются отчёты" value={snap.totals.expected} muted />
         <Metric label="Бригад на смене" value={snap.totals.crewsOnShiftToday} muted />
         <Metric label="Операторов на смене" value={snap.totals.operatorsOnShiftToday} muted />
       </dl>

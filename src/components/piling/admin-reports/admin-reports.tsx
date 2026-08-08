@@ -18,6 +18,8 @@ import { useReportHistory } from './use-report-history';
 import { todayYmd, shiftYmd } from './report-list-format';
 import { EvidenceReportRow, EvidenceSummary, ReportsHeader } from './report-evidence-row';
 import { ReportEvidencePreview } from './report-evidence-preview';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { toast } from 'sonner';
 
 type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
 
@@ -49,6 +51,7 @@ export function AdminReports() {
   const [editReport, setEditReport] = useState<ReportDTO | null>(null);
   const [previewReportId, setPreviewReportId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   // The preview pane shows the user-selected report, falling back to the first
@@ -64,9 +67,6 @@ export function AdminReports() {
 
   const handleDelete = async (report: ReportDTO) => {
     if (!report.reportId) return;
-    if (!window.confirm(`Удалить отчёт от ${formatDate(report.date)} (${report.user?.name || 'Неизвестный'})? Действие необратимо.`)) {
-      return;
-    }
     setDeletingId(report.reportId);
     try {
       const { authFetch } = await import('@/lib/api');
@@ -82,9 +82,10 @@ export function AdminReports() {
       if (effectivePreview?.reportId === report.reportId) setPreviewReport(null);
       await loadReports();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
+      toast.error(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
     } finally {
       setDeletingId(null);
+      setPendingDeleteReport(null);
     }
   };
 
@@ -243,7 +244,7 @@ export function AdminReports() {
             </div>
 
             <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <div className="hidden border-b border-slate-200 bg-slate-100/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_112px]">
+              <div className="hidden border-b border-slate-200 bg-slate-100/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px]">
                 <span>Дата</span>
                 <span>Объект / установка</span>
                 <span>Оператор</span>
@@ -275,7 +276,7 @@ export function AdminReports() {
                         onOpenDetails={setDetailReport}
                         onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
                         onPreviewPdf={handlePreviewPdf}
-                        onDelete={handleDelete}
+                        onDelete={setPendingDeleteReport}
                       />
                     ))}
                   </div>
@@ -301,8 +302,31 @@ export function AdminReports() {
             {/* Потяните за левый край, чтобы изменить ширину панели. */}
             <div
               onMouseDown={startResize}
+              onKeyDown={(event) => {
+                const step = event.shiftKey ? 40 : 16;
+                if (event.key === 'ArrowLeft') {
+                  event.preventDefault();
+                  setPanelWidth((width) => Math.min(720, width + step));
+                } else if (event.key === 'ArrowRight') {
+                  event.preventDefault();
+                  setPanelWidth((width) => Math.max(320, width - step));
+                } else if (event.key === 'Home') {
+                  event.preventDefault();
+                  setPanelWidth(320);
+                } else if (event.key === 'End') {
+                  event.preventDefault();
+                  setPanelWidth(720);
+                }
+              }}
+              role="separator"
+              tabIndex={0}
+              aria-label="Изменить ширину панели отчёта"
+              aria-orientation="vertical"
+              aria-valuemin={320}
+              aria-valuemax={720}
+              aria-valuenow={panelWidth}
               title="Потяните, чтобы изменить ширину"
-              className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize xl:block"
+              className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:block"
             >
               <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
             </div>
@@ -326,6 +350,18 @@ export function AdminReports() {
         onPreviewPdf={handlePreviewPdf}
         formatDate={formatDate}
         formatLastEditor={formatLastEditor}
+      />
+
+      <ConfirmActionDialog
+        open={Boolean(pendingDeleteReport)}
+        onOpenChange={(open) => { if (!open && !deletingId) setPendingDeleteReport(null); }}
+        title="Удалить сменный отчёт?"
+        description={pendingDeleteReport
+          ? `Отчёт от ${formatDate(pendingDeleteReport.date)} (${pendingDeleteReport.user?.name || 'оператор не указан'}) будет удалён без возможности восстановления.`
+          : ''}
+        confirmLabel="Удалить отчёт"
+        busy={Boolean(deletingId)}
+        onConfirm={() => pendingDeleteReport ? handleDelete(pendingDeleteReport) : undefined}
       />
 
       <PdfPreviewDialog open={!!previewReportId} onOpenChange={(open) => { if (!open) setPreviewReportId(null); }}

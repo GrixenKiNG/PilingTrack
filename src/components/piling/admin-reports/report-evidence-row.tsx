@@ -119,14 +119,8 @@ export function EvidenceReportRow({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(report)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onSelect(report);
-      }}
       className={cn(
-        'grid cursor-pointer gap-3 px-3 py-3 text-sm outline-none transition-colors hover:bg-orange-50/30 lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_112px] lg:items-center',
+        'grid gap-3 px-3 py-3 text-sm transition-colors hover:bg-orange-50/30 lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px] lg:items-center',
         active && 'bg-orange-50/70 ring-1 ring-inset ring-orange-200',
       )}
     >
@@ -150,8 +144,10 @@ export function EvidenceReportRow({
         </div>
         <div className="mt-0.5 truncate text-2xs text-slate-400">{formatLastEditor(report)}</div>
         <span className={cn(
-          'mt-0.5 inline-block rounded px-1.5 py-0.5 text-3xs font-medium',
-          report.status === 'submitted' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+          'mt-0.5 inline-block rounded px-1.5 py-0.5 text-xs font-medium',
+          report.status === 'submitted'
+            ? 'bg-emerald-50 text-emerald-700'
+            : 'bg-slate-100 text-slate-700',
         )}>{statusLabel(report.status)}</span>
       </div>
 
@@ -159,8 +155,9 @@ export function EvidenceReportRow({
       <MetricCell value={formatNumber(totals.drillingCount)} sub={`${formatNumber(totals.drillingMeters)} м`} tone="blue" />
       <MetricCell value={formatHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} tone={totals.downtimeHours > 0 ? 'amber' : 'slate'} />
 
-      <div className="flex items-center justify-end gap-1">
+      <div className="grid grid-cols-3 justify-items-end gap-1">
         <ReportThumbnail reportId={report.reportId} mediaId={report.thumbnailMediaId ?? null} />
+        <IconButton label="Показать в правой панели" onClick={() => onSelect(report)} icon={FileText} />
         <IconButton label="Предпросмотр PDF" onClick={() => onPreviewPdf(report)} icon={Eye} />
         <IconButton label="Подробнее" onClick={() => onOpenDetails(report)} icon={ShieldCheck} />
         <IconButton label="Редактировать" onClick={() => onEdit(report)} icon={Pencil} />
@@ -209,7 +206,7 @@ function IconButton({
       title={label}
       aria-label={label}
       className={cn(
-        'grid h-8 w-8 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50',
+        'grid h-11 w-11 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50',
         danger && 'hover:bg-red-50 hover:text-red-500',
       )}
     >

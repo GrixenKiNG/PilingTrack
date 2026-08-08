@@ -52,11 +52,11 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
     >
       <Tabs defaultValue="overview" className="gap-3">
         <TabsList className="grid h-auto w-full grid-cols-5 rounded-md bg-slate-100 p-1">
-          <TabsTrigger value="overview" className="min-w-0 px-1 text-3xs">Обзор</TabsTrigger>
-          <TabsTrigger value="assignment" className="min-w-0 px-1 text-3xs">Закрепление</TabsTrigger>
-          <TabsTrigger value="activity" className="min-w-0 px-1 text-3xs">Активность</TabsTrigger>
-          <TabsTrigger value="access" className="min-w-0 px-1 text-3xs">Доступ</TabsTrigger>
-          <TabsTrigger value="history" className="min-w-0 px-1 text-3xs">История</TabsTrigger>
+          <TabsTrigger value="overview" className="min-w-0 px-1 text-xs">Обзор</TabsTrigger>
+          <TabsTrigger value="assignment" className="min-w-0 px-1 text-xs">Закрепление</TabsTrigger>
+          <TabsTrigger value="activity" className="min-w-0 px-1 text-xs">Активность</TabsTrigger>
+          <TabsTrigger value="access" className="min-w-0 px-1 text-xs">Доступ</TabsTrigger>
+          <TabsTrigger value="history" className="min-w-0 px-1 text-xs">История</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-2">

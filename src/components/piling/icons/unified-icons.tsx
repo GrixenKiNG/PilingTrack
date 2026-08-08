@@ -73,6 +73,7 @@ export const FileBarChart = createUnifiedIcon('reports');
 export const FileText = createUnifiedIcon('documents');
 export const FileX = createUnifiedIcon('documents');
 export const FolderOpen = createUnifiedIcon('folder');
+export const Fuel = createUnifiedIcon('fuel');
 export const Gauge = createUnifiedIcon('engine-hours');
 export const HardHat = createUnifiedIcon('equipment-rig');
 export const History = createUnifiedIcon('history');

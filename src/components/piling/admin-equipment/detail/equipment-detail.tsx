@@ -34,6 +34,7 @@ import {
   formatHours, formatRelative,
 } from './equipment-detail-parts';
 import { formatFixed } from '@/lib/format';
+import { usePilingStore } from '@/lib/store';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import {
   KIND_BADGE_STYLE,
@@ -52,6 +53,7 @@ interface Props {
 }
 
 export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
+  const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const [details, setDetails] = useState<DetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,9 +139,9 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {eq.registrationNumber && <span className="font-mono">{eq.registrationNumber}</span>}
         </div>
       </div>
-      <Button onClick={() => setEditOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
+      {canManage && <Button onClick={() => setEditOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
         <Pencil className="w-4 h-4 mr-1.5" /> Редактировать
-      </Button>
+      </Button>}
     </div>
   );
 
@@ -292,7 +294,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           )}
         </div>
 
-        {editDialog}
+        {canManage && editDialog}
       </div>
     );
   }
@@ -420,12 +422,12 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
         />
       </Section>
 
-      <EditEquipmentDialog
+      {canManage && <EditEquipmentDialog
         open={editOpen}
         item={eq as EquipmentDTO}
         onOpenChange={setEditOpen}
         onSubmit={handleEditSubmit}
-      />
+      />}
     </div>
   );
 }

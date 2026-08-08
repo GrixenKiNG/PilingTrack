@@ -20,8 +20,6 @@ const OPERATOR_ACTIONS: { label: string; icon: PilingIconName; target: string }[
   { label: 'Отправить', icon: 'send', target: 'submit' },
 ];
 
-const SHIFT_STEPS = ['Осмотр', 'Моточасы', 'Дефект', 'Передано диспетчеру'];
-
 export function OperatorDashboard() {
   const user = usePilingStore((s) => s.currentUser);
   const router = useRouter();
@@ -88,6 +86,16 @@ export function OperatorDashboard() {
   const ctaDisabled = noSite || !currentSite;
   const active = Boolean(todayReport);
   const submitted = todayReport?.status === 'submitted';
+  const hasRecordedWork = Boolean(
+    todayReport
+      && (todayReport.totalPiles > 0 || todayReport.totalDrilling > 0),
+  );
+  const shiftSteps = [
+    { label: 'Отчёт создан', complete: active },
+    { label: 'Работы внесены', complete: hasRecordedWork || submitted },
+    { label: 'Простои учтены', complete: Boolean((todayReport?.totalDowntime ?? 0) > 0 || submitted) },
+    { label: 'Передан диспетчеру', complete: submitted },
+  ];
   const displayName = user?.name?.trim() || 'Оператор';
   const openReport = (target?: string) => router.push(target ? `/report#${target}` : '/report');
 
@@ -95,7 +103,7 @@ export function OperatorDashboard() {
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-xl font-bold text-slate-900">Оператор</p>
+          <h1 className="text-xl font-bold text-slate-900">Операторская смена</h1>
           <p className="text-sm text-slate-500">{displayName}</p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white">
@@ -137,13 +145,13 @@ export function OperatorDashboard() {
 
       <section className="rounded-xl border border-slate-200 bg-white px-3 py-4" aria-label="Статус передачи смены">
         <div className="grid grid-cols-4 gap-1">
-          {SHIFT_STEPS.map((step, index) => {
-            const complete = submitted && index === SHIFT_STEPS.length - 1;
+          {shiftSteps.map((step, index) => {
             return (
-              <div key={step} className="relative flex flex-col items-center text-center">
-                {index > 0 && <span className={`absolute right-1/2 top-2 h-px w-full ${complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />}
-                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${complete ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-white'}`} />
-                <span className="mt-2 text-3xs leading-tight text-slate-600 sm:text-xs">{step}</span>
+              <div key={step.label} className="relative flex flex-col items-center text-center">
+                {index > 0 && <span className={`absolute right-1/2 top-2 h-px w-full ${step.complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />}
+                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${step.complete ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-white'}`} />
+                <span className="mt-2 text-xs leading-tight text-slate-600">{step.label}</span>
+                <span className="sr-only">{step.complete ? 'выполнено' : 'ожидается'}</span>
               </div>
             );
           })}
@@ -151,13 +159,13 @@ export function OperatorDashboard() {
       </section>
 
       <div className="space-y-1.5">
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <label id="operator-site-label" className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <PilingIcon name="site" size={24} decorative />
           Объект
         </label>
         {sites.length > 0 ? (
           <Select value={selectedSiteId || ''} onValueChange={setSelectedSite}>
-            <SelectTrigger className="h-12 w-full bg-white"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
+            <SelectTrigger aria-labelledby="operator-site-label" className="h-12 w-full bg-white"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
             <SelectContent>
               {sites.map((site) => <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>)}
             </SelectContent>

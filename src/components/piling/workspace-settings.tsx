@@ -104,9 +104,16 @@ export function WorkspaceSettings() {
     setSaving(true);
     try {
       const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
-      if (!res.ok) { toast.error(res.status === 403 ? 'Только администратор может сохранять настройки' : 'Не удалось сохранить'); return; }
+      if (!res.ok) {
+        toast.error(res.status === 403
+          ? 'Только администратор может изменять настройки рабочего пространства.'
+          : 'Настройки не сохранены. Повторите попытку.');
+        return;
+      }
       setSettings(await res.json());
       toast.success('Настройки сохранены');
+    } catch {
+      toast.error('Настройки не сохранены. Проверьте подключение и повторите попытку.');
     } finally {
       setSaving(false);
     }
@@ -243,7 +250,7 @@ export function WorkspaceSettings() {
 
       {activeTab === 'roles' && (
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UsersRound className="h-4 w-4 text-orange-500" />Пользователи и роли</CardTitle><CardDescription>Фактическое число пользователей по ролям.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UsersRound className="h-4 w-4 text-orange-500" />Пользователи и роли</CardTitle><CardDescription>Текущее количество пользователей с каждой ролью.</CardDescription></CardHeader>
           <CardContent className="space-y-3">
             {ROLE_ORDER.map((role) => (
               <div key={role} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 text-sm">
@@ -266,7 +273,7 @@ export function WorkspaceSettings() {
                 <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
               </div>
             ))}
-            {!isAdmin && <p className="text-xs text-slate-500">Изменение доступно администратору.</p>}
+            {!isAdmin && <p className="text-xs text-slate-500">Только администратор может изменять правила уведомлений.</p>}
           </CardContent>
         </Card>
       )}
@@ -275,11 +282,11 @@ export function WorkspaceSettings() {
 
       {activeTab === 'telegram' && (isAdmin
         ? <AdminTelegram />
-        : <p className="text-sm text-slate-500">Настройка Telegram-бота доступна администратору.</p>)}
+        : <p className="text-sm text-slate-500">Только администратор может настраивать Telegram-бота.</p>)}
 
       {activeTab === 'dlq' && (isAdmin
         ? <AdminDlq />
-        : <p className="text-sm text-slate-500">Очередь недоставленных сообщений доступна администратору.</p>)}
+        : <p className="text-sm text-slate-500">Только администратор может просматривать очередь недоставленных сообщений.</p>)}
     </div>
   );
 }
@@ -291,8 +298,8 @@ function TemplatesTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-orange-500" />Редактирование рабочего пространства</CardTitle>
-          <CardDescription>Состав, порядок и размер плиток на дашбордах.</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-orange-500" />Раскладка дашбордов</CardTitle>
+          <CardDescription>Выберите дашборд, затем настройте состав, порядок и размер его плиток.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 text-sm">

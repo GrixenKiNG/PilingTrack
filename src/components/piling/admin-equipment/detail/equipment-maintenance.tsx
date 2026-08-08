@@ -23,6 +23,7 @@ import {
 } from '@/components/piling/maintenance/maintenance-labels';
 import { resolveAssigneeName } from '@/components/piling/maintenance/maintenance-helpers';
 import { WorkOrderFormDialog } from '@/components/piling/maintenance/work-order-form-dialog';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 interface MaintenanceRow {
   id: string;
@@ -48,6 +49,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<MaintenanceRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,7 +109,6 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   };
 
   const remove = async (r: MaintenanceRow) => {
-    if (!confirm(`Удалить запись "${r.title}"?`)) return;
     setPendingId(r.id);
     try {
       const res = await authFetch(`/api/equipment/${equipmentId}/maintenance/${r.id}`, { method: 'DELETE' });
@@ -118,6 +119,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       toast.error(err instanceof Error ? err.message : 'Ошибка');
     } finally {
       setPendingId(null);
+      setPendingDelete(null);
     }
   };
 
@@ -165,22 +167,26 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                 <div className="flex items-center gap-0.5 shrink-0">
                   {st === 'PLANNED' && (
                     <button onClick={() => patchStatus(r, 'IN_PROGRESS')} disabled={pendingId === r.id}
-                      className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors disabled:opacity-50" title="В работу">
+                    aria-label={`Перевести «${r.title}» в работу`}
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50" title="В работу">
                       <PlayCircle className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {st !== 'DONE' && st !== 'CANCELLED' && (
                     <button onClick={() => patchStatus(r, 'DONE')} disabled={pendingId === r.id}
-                      className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-50" title="Выполнено">
+                    aria-label={`Отметить «${r.title}» выполненным`}
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50" title="Выполнено">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                   <button onClick={() => openEdit(r)}
-                    className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors" title="Редактировать">
+                    aria-label={`Редактировать запись «${r.title}»`}
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700" title="Редактировать">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => remove(r)} disabled={pendingId === r.id}
-                    className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50" title="Удалить">
+                  <button onClick={() => setPendingDelete(r)} disabled={pendingId === r.id}
+                    aria-label={`Удалить запись «${r.title}»`}
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50" title="Удалить">
                     {pendingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   </button>
                 </div>
@@ -196,6 +202,17 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
         equipmentId={equipmentId}
         editingId={editingId}
         onSaved={load}
+      />
+      <ConfirmActionDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => { if (!open && !pendingId) setPendingDelete(null); }}
+        title="Удалить запись обслуживания?"
+        description={pendingDelete
+          ? `Запись «${pendingDelete.title}» будет удалена из журнала без возможности восстановления.`
+          : ''}
+        confirmLabel="Удалить запись"
+        busy={Boolean(pendingId)}
+        onConfirm={() => pendingDelete ? remove(pendingDelete) : undefined}
       />
     </div>
   );

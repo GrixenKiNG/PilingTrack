@@ -34,8 +34,8 @@ export function EquipmentTable({
   const toggle = (key: SortKey) =>
     setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }));
 
-  const th = 'cursor-pointer select-none break-words px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500';
-  const staticTh = 'break-words px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500';
+  const th = 'cursor-pointer select-none break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-slate-500';
+  const staticTh = 'break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-slate-500';
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -48,9 +48,9 @@ export function EquipmentTable({
             <th className={staticTh}><StackedHeader words={['Оператор']} /></th>
             <th className={th} onClick={() => toggle('equipmentStatus')}>Статус техники ↕</th>
             <th className={th} onClick={() => toggle('reportStatus')}><StackedHeader words={['Статус', 'отчёта', '↕']} /></th>
-            <th className="px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Сваи', 'шт./м.п.']} align="right" /></th>
-            <th className="px-1.5 py-2 text-right text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Бурение', 'шт./м']} align="right" /></th>
-            <th className="px-1.5 py-2 text-left text-3xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Простой', 'ч', 'причина']} /></th>
+            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Сваи', 'шт./м.п.']} align="right" /></th>
+            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Бурение', 'шт./м']} align="right" /></th>
+            <th className="px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-slate-500"><StackedHeader words={['Простой', 'ч', 'причина']} /></th>
             <th className={th} onClick={() => toggle('engineHoursTotal')}>Моточасы ↕</th>
             <th className={staticTh}>ТО</th>
           </tr>
@@ -80,12 +80,12 @@ export function EquipmentTable({
                 <td className="text-slate-600"><WordStack value={c.assignedCrewName} /></td>
                 <td className="text-slate-600"><WordStack value={c.assignedOperatorName} /></td>
                 <td>
-                  <span className={cn('inline-block max-w-full truncate rounded border px-1 py-0.5 text-3xs font-medium', equipmentStatus.badge)}>
+                  <span className={cn('inline-block max-w-full truncate rounded border px-1 py-0.5 text-xs font-medium', equipmentStatus.badge)}>
                     {equipmentStatus.label}
                   </span>
                 </td>
                 <td>
-                  <span className={cn('inline-block max-w-full rounded border px-1 py-0.5 text-3xs font-medium leading-tight', reportStatus.badge)}>
+                  <span className={cn('inline-block max-w-full rounded border px-1 py-0.5 text-xs font-medium leading-tight', reportStatus.badge)}>
                     <WordStack value={reportStatus.label} />
                   </span>
                 </td>
@@ -97,12 +97,12 @@ export function EquipmentTable({
                 </td>
                 <td>
                   <div className="font-mono text-slate-800">{t ? `${formatNum(t.downtimeHours, 1)} ч` : '—'}</div>
-                  <div className="text-3xs leading-tight text-slate-500" title={c.downtimeReason ?? ''}>
+                  <div className="text-xs leading-tight text-slate-500" title={c.downtimeReason ?? ''}>
                     <WordStack value={c.downtimeReason} />
                   </div>
                 </td>
                 <td className="truncate font-mono text-slate-700">{c.engineHoursTotal?.toLocaleString('ru') ?? '—'}</td>
-                <td className="text-3xs">
+                <td className="text-xs">
                   {flag === 'overdue' ? (
                     <span className="text-destructive">Просрочено</span>
                   ) : flag === 'soon' ? (

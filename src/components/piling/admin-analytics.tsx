@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   BarChart3,
@@ -13,7 +14,6 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend,
 } from 'recharts';
-import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,11 +50,17 @@ export function AdminAnalytics() {
 
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [sitesError, setSitesError] = useState<string | null>(null);
+  const [fleetError, setFleetError] = useState<string | null>(null);
+  const [trendsError, setTrendsError] = useState<string | null>(null);
+  const [kpiError, setKpiError] = useState<string | null>(null);
   const [showAllOperators, setShowAllOperators] = useState(false);
   const [trendRows, setTrendRows] = useState<WeeklyTrendRow[]>([]);
   const [kpi, setKpi] = useState<FleetKpiData | null>(null);
   const [fleet, setFleet] = useState<FleetSnapshotSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [kpiLoading, setKpiLoading] = useState(false);
 
   // Load sites once
   useEffect(() => {
@@ -64,22 +70,36 @@ export function AdminAnalytics() {
         if (res.ok) {
           const data = await res.json();
           setSites(data.sites || []);
+          setSitesError(null);
+        } else {
+          setSitesError('Список объектов временно недоступен.');
         }
-      } catch { /* ignore */ }
+      } catch {
+        setSitesError('Список объектов временно недоступен.');
+      }
     })();
   }, []);
 
   useEffect(() => {
     void (async () => {
-      const response = await authFetch('/api/monitoring/fleet');
-      if (response.ok) setFleet(await response.json() as FleetSnapshotSummary);
+      try {
+        const response = await authFetch('/api/monitoring/fleet');
+        if (!response.ok) {
+          setFleetError('Показатели парка временно недоступны.');
+          return;
+        }
+        setFleet(await response.json() as FleetSnapshotSummary);
+        setFleetError(null);
+      } catch {
+        setFleetError('Показатели парка временно недоступны.');
+      }
     })();
   }, []);
 
   const overviewReqRef = useRef(0);
   const loadOverview = useCallback(async () => {
     const reqId = ++overviewReqRef.current;
-    setLoading(true);
+    setOverviewLoading(true);
     setOverviewError(null);
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
@@ -94,12 +114,13 @@ export function AdminAnalytics() {
     } catch {
       if (reqId === overviewReqRef.current) setOverviewError('Сеть недоступна. Проверьте соединение и повторите.');
     } finally {
-      if (reqId === overviewReqRef.current) setLoading(false);
+      if (reqId === overviewReqRef.current) setOverviewLoading(false);
     }
   }, [dateFrom, dateTo]);
 
   const loadTrends = useCallback(async () => {
-    setLoading(true);
+    setTrendsLoading(true);
+    setTrendsError(null);
     try {
       // «Тренд за месяц» — 4 недельных бакета (site-weekly-trend агрегирует по неделям).
       const params = new URLSearchParams({ weeks: '4' });
@@ -109,22 +130,31 @@ export function AdminAnalytics() {
         const data = await res.json();
         setTrendRows(data.rows || []);
       } else {
-        toast.error('Ошибка загрузки трендов');
+        setTrendsError('Не удалось загрузить тренды по объектам.');
       }
-    } catch { toast.error('Ошибка'); } finally { setLoading(false); }
+    } catch {
+      setTrendsError('Сеть недоступна. Проверьте соединение и повторите.');
+    } finally {
+      setTrendsLoading(false);
+    }
   }, [trendSiteId]);
 
   const loadKpi = useCallback(async () => {
-    setLoading(true);
+    setKpiLoading(true);
+    setKpiError(null);
     try {
       const params = new URLSearchParams({ from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` });
       const res = await authFetch(`/api/maintenance/kpi?${params}`);
       if (res.ok) {
         setKpi((await res.json()).kpi as FleetKpiData);
       } else {
-        toast.error('Ошибка загрузки KPI');
+        setKpiError('Не удалось загрузить показатели техготовности.');
       }
-    } catch { toast.error('Ошибка'); } finally { setLoading(false); }
+    } catch {
+      setKpiError('Сеть недоступна. Проверьте соединение и повторите.');
+    } finally {
+      setKpiLoading(false);
+    }
   }, [dateFrom, dateTo]);
 
   // Period overview feeds the KPI deltas, the overview sections and the
@@ -191,6 +221,12 @@ export function AdminAnalytics() {
         </div>
       </div>
 
+      {(sitesError || fleetError) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+          Часть источников недоступна: {[sitesError, fleetError].filter(Boolean).join(' ')}
+        </div>
+      )}
+
       {fleet && <PageLayoutRenderer template={layout.template} widgets={buildAnalyticsKpiWidgets({
         totalEquipment: fleet.totals.totalEquipment,
         sitesCount: sites.length,
@@ -211,8 +247,8 @@ export function AdminAnalytics() {
 
       {/* Overview data states: error (retry) / first-load skeleton / empty period */}
       {overviewError ? (
-        <QueryErrorBanner message={overviewError} onRetry={() => void loadOverview()} retrying={loading} />
-      ) : !overview && loading ? (
+        <QueryErrorBanner message={overviewError} onRetry={() => void loadOverview()} retrying={overviewLoading} />
+      ) : !overview && overviewLoading ? (
         <div className="grid gap-4 lg:grid-cols-3">
           <Skeleton className="h-64 w-full lg:col-span-2" />
           <Skeleton className="h-64 w-full" />
@@ -232,12 +268,12 @@ export function AdminAnalytics() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={155}>
                   <LineChart data={overview.daily.map((d) => ({ день: d.date.slice(8) + '.' + d.date.slice(5, 7), 'Погонные метры': d.meters }))} margin={{ top: 18, right: 16, bottom: 4, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="день" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="Погонные метры" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} label={{ position: 'top', fontSize: 10, fill: '#0369a1' }} />
+                    <Line type="monotone" dataKey="Погонные метры" stroke="var(--info)" strokeWidth={2} dot={{ r: 3 }} label={{ position: 'top', fontSize: 11, fill: 'var(--info)' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -289,7 +325,7 @@ export function AdminAnalytics() {
 
       {tab === 'operators' && (
         <>
-          {loading ? (
+          {overviewLoading ? (
             <Skeleton className="h-80 w-full" />
           ) : (overview?.operators.length ?? 0) === 0 ? (
             <EmptyState text="За выбранный период нет данных по операторам" />
@@ -351,7 +387,9 @@ export function AdminAnalytics() {
 
       {tab === 'trends' && (
         <>
-          {loading ? (
+          {trendsError ? (
+            <QueryErrorBanner message={trendsError} onRetry={() => void loadTrends()} retrying={trendsLoading} />
+          ) : trendsLoading ? (
             <Skeleton className="h-80 w-full" />
           ) : trendChartData.length === 0 ? (
             <EmptyState text="Нет данных по неделям. Проекция SiteWeeklyTrend заполняется автоматически по мере поступления отчётов." />
@@ -381,14 +419,14 @@ export function AdminAnalytics() {
                 </div>
                 <ResponsiveContainer width="100%" height={115}>
                   <LineChart data={trendChartData} margin={{ top: 10, right: 16, bottom: 10, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="Сваи" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Бурение" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Простои" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Сваи" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Бурение" stroke="var(--info)" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Простои" stroke="var(--warning)" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -399,7 +437,9 @@ export function AdminAnalytics() {
 
       {tab === 'kpi' && (
         <>
-          {loading ? (
+          {kpiError ? (
+            <QueryErrorBanner message={kpiError} onRetry={() => void loadKpi()} retrying={kpiLoading} />
+          ) : kpiLoading ? (
             <Skeleton className="h-80 w-full" />
           ) : !kpi ? (
             <EmptyState text="Нет данных ТО за период." />
@@ -476,7 +516,7 @@ export function AdminAnalytics() {
                     </div>
                   );
                 })}
-                <a href="/admin/reports" className="inline-block text-xs font-medium text-blue-600 hover:underline">Смотреть отчёт по объектам →</a>
+                <Link href="/admin/reports" className="inline-block text-xs font-medium text-blue-600 hover:underline">Смотреть отчёт по объектам →</Link>
               </div>
             )}
           </CardContent>

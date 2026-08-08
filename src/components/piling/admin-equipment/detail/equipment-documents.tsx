@@ -24,6 +24,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 export type DocumentTypeId =
   | 'PASSPORT' | 'OTS' | 'INSURANCE' | 'INSPECTION'
@@ -78,6 +79,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DocumentRow | null>(null);
 
   const openCreate = () => {
     setEditing(null);
@@ -134,7 +136,6 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
   };
 
   const remove = async (doc: DocumentRow) => {
-    if (!confirm(`Удалить документ "${doc.title}"?`)) return;
     setDeletingId(doc.id);
     try {
       const res = await authFetch(`/api/equipment/${equipmentId}/documents/${doc.id}`, {
@@ -147,6 +148,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
       toast.error(err instanceof Error ? err.message : 'Ошибка');
     } finally {
       setDeletingId(null);
+      setPendingDelete(null);
     }
   };
 
@@ -187,15 +189,17 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
               <div className="flex items-center gap-0.5 shrink-0">
                 <button
                   onClick={() => openEdit(d)}
-                  className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-orange-50 text-slate-400 hover:text-orange-600 transition-colors"
+                  aria-label={`Редактировать документ «${d.title}»`}
+                  className="flex h-11 w-11 items-center justify-center rounded-md text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700"
                   title="Редактировать"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => remove(d)}
+                  onClick={() => setPendingDelete(d)}
                   disabled={deletingId === d.id}
-                  className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                  aria-label={`Удалить документ «${d.title}»`}
+                  className="flex h-11 w-11 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                   title="Удалить"
                 >
                   {deletingId === d.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -281,6 +285,18 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => { if (!open && !deletingId) setPendingDelete(null); }}
+        title="Удалить документ?"
+        description={pendingDelete
+          ? `Документ «${pendingDelete.title}» будет удалён из карточки установки без возможности восстановления.`
+          : ''}
+        confirmLabel="Удалить документ"
+        busy={Boolean(deletingId)}
+        onConfirm={() => pendingDelete ? remove(pendingDelete) : undefined}
+      />
     </div>
   );
 }
@@ -292,4 +308,3 @@ function ExpiresIndicator({ iso }: { iso: string }) {
   if (days <= 30) return <span className={cn('rounded px-1.5 py-0.5 text-amber-700 bg-amber-100')}>истекает через {days} дн.</span>;
   return <span>до {formatRuDate(iso.slice(0, 10))}</span>;
 }
-
