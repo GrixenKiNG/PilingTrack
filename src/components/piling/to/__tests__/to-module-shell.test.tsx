@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { bootstrapEnvelope } from '../readiness/api/__tests__/fixtures';
 import {
   afterEach,
   beforeEach,
@@ -93,17 +94,34 @@ const equipment = [
     isActive: true,
     crewCount: 0,
   },
+  {
+    id: 'equipment-foreign',
+    name: 'Foreign rig',
+    model: null,
+    hammerKind: 'NONE',
+    isCombined: false,
+    isActive: true,
+    crewCount: 0,
+  },
 ];
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
+function jsonResponse(body: unknown, status = 200, requestId?: string): Response {
+  return new Response(JSON.stringify(body), {
     status,
-    json: async () => body,
-  } as Response;
+    headers: requestId ? { 'x-request-id': requestId } : undefined,
+  });
 }
 
-function responseFor(url: string): Response {
+function responseFor(url: string, options?: RequestInit): Response {
+  if (url === '/api/readiness/bootstrap') {
+    const requestId = new Headers(options?.headers).get('x-request-id') ?? 'request-test';
+    const envelope = bootstrapEnvelope(requestId);
+    envelope.data.selectors.equipment = equipment
+      .filter((item) => item.id !== 'equipment-foreign')
+      .map(({ id, name, model }) => ({ id, name, model }));
+    envelope.data.counts.equipment = envelope.data.selectors.equipment.length;
+    return jsonResponse(envelope, 200, requestId);
+  }
   if (url === '/api/equipment?limit=100') return jsonResponse({ data: equipment });
   if (url === '/api/crews?limit=100') return jsonResponse({ data: [] });
   if (url === '/api/maintenance') return jsonResponse({ records: [] });
@@ -137,7 +155,9 @@ describe('ToModule production shell integration', () => {
     vi.unstubAllEnvs();
     vi.resetModules();
     mocks.authFetch.mockReset();
-    mocks.authFetch.mockImplementation(async (url: string) => responseFor(url));
+    mocks.authFetch.mockImplementation(
+      async (url: string, options?: RequestInit) => responseFor(url, options),
+    );
   });
 
   afterEach(() => {
@@ -224,5 +244,15 @@ describe('ToModule production shell integration', () => {
 
     expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-view', 'fleet');
     expect(screen.queryByTestId('production-shell')).not.toBeInTheDocument();
+  });
+
+  it('does not select or render an equipment id absent from the tenant bootstrap', async () => {
+    await renderToModule('/admin/to?equipmentId=equipment-foreign');
+
+    expect(screen.getByTestId('reference-ui')).toHaveAttribute(
+      'data-equipment',
+      'equipment-1',
+    );
+    expect(document.body.textContent).not.toContain('equipment-foreign');
   });
 });

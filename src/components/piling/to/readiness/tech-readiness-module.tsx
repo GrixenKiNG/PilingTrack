@@ -7,6 +7,7 @@ import { BootstrapBoundary } from './boundaries/bootstrap-boundary';
 import { READY_QUERY_STATE, type QueryState } from './boundaries/query-state';
 import { LiveRegion } from './live-region';
 import { MODULE_TABS, ModuleTabList } from './module-tab-list';
+import type { ReadinessBootstrap } from './api/contracts';
 
 interface TechReadinessModuleProps {
   activeView: ReferenceView;
@@ -15,6 +16,26 @@ interface TechReadinessModuleProps {
   queryState?: QueryState;
   announcement?: string | null;
   onRetry?: () => void | Promise<void>;
+  bootstrap?: ReadinessBootstrap | null;
+}
+
+function activeViewState(
+  activeView: ReferenceView,
+  state: QueryState,
+  bootstrap: ReadinessBootstrap | null | undefined,
+): QueryState {
+  if (state.status !== 'ready' || !bootstrap) return state;
+  if (bootstrap.capabilities.screens[activeView]) return state;
+  if (activeView === 'shifts' && !bootstrap.featureFlags.readiness_shifts_v1) {
+    return { status: 'feature-off', message: 'Смены ещё не включены для этой организации.' };
+  }
+  if (activeView === 'permits' && !bootstrap.featureFlags.readiness_permits_v1) {
+    return { status: 'feature-off', message: 'Наряд-допуски ещё не включены для этой организации.' };
+  }
+  return {
+    status: 'forbidden',
+    message: 'Этот раздел недоступен согласно полномочиям, полученным от сервера.',
+  };
 }
 
 export function TechReadinessModule({
@@ -24,8 +45,10 @@ export function TechReadinessModule({
   queryState = READY_QUERY_STATE,
   announcement,
   onRetry,
+  bootstrap,
 }: TechReadinessModuleProps) {
   const activeTabRef = useRef<HTMLButtonElement>(null);
+  const resolvedQueryState = activeViewState(activeView, queryState, bootstrap);
 
   return (
     <section
@@ -52,7 +75,7 @@ export function TechReadinessModule({
           >
             {active && (
               <BootstrapBoundary
-                state={queryState}
+                state={resolvedQueryState}
                 onRetry={onRetry}
                 retryFocusRef={activeTabRef}
               >

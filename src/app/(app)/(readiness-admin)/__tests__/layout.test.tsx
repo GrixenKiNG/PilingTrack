@@ -33,7 +33,7 @@ describe('ReadinessAdminLayout', () => {
     });
   });
 
-  it.each(['ADMIN', 'DISPATCHER', 'MECHANIC'])(
+  it.each(['ADMIN', 'DISPATCHER', 'MECHANIC', 'OPERATOR'])(
     'allows %s to render only the isolated readiness route tree',
     async (role) => {
       withUser(role);
@@ -44,7 +44,8 @@ describe('ReadinessAdminLayout', () => {
     }
   );
 
-  it.each(['OPERATOR', 'ASSISTANT'])('redirects %s away from readiness admin routes', async (role) => {
+  it('redirects ASSISTANT away from readiness admin routes', async () => {
+    const role = 'ASSISTANT';
     withUser(role);
     await expect(
       ReadinessAdminLayout({ children: null })

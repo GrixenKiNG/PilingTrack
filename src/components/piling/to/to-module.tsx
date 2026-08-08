@@ -16,6 +16,27 @@ import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import { TechReadinessModule } from './readiness/tech-readiness-module';
 import type { QueryState } from './readiness/boundaries/query-state';
 import {
+  fetchCurrentReadiness,
+  fetchReadinessAudit,
+  fetchReadinessBootstrap,
+  fetchReadinessHistory,
+  fetchReadinessShifts,
+  fetchWorkPermits,
+  type ReadinessUrlFilters,
+} from './readiness/api/client';
+import type {
+  CurrentReadinessDto,
+  ReadinessAuditEnvelope,
+  ReadinessBootstrap,
+  ReadinessShiftDto,
+  ReadinessSnapshotDto,
+  WorkPermitDto,
+} from './readiness/api/contracts';
+import {
+  ReadinessApiError,
+  isReadinessRequestCancelled,
+} from './readiness/api/errors';
+import {
   ReadinessReferenceUi,
   type EquipmentDetailSnapshot,
   type ReferenceView,
@@ -125,8 +146,25 @@ async function readOptionalJsonWithIssue<T>(
   }
 }
 
+async function readAuthoritativeCollection<T>(
+  request: Promise<T[]>,
+): Promise<{data: T[]; error: string | null}> {
+  try {
+    return {data: await request, error: null};
+  } catch (error) {
+    return {
+      data: [],
+      error: error instanceof Error
+        ? error.message
+        : 'Авторитетная оценка недоступна.',
+    };
+  }
+}
+
 export function ToModule() {
-  const workspaceLoadStarted = useRef(false);
+  const workspaceRequest = useRef<AbortController | null>(null);
+  const [bootstrap, setBootstrap] = useState<ReadinessBootstrap | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<ReadinessApiError | null>(null);
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [equipmentId, setEquipmentId] = useState('');
   const [journals, setJournals] = useState<Record<string, JournalRecord[]>>({});
@@ -146,6 +184,13 @@ export function ToModule() {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [workspaceIssues, setWorkspaceIssues] = useState<WorkspaceIssue[]>([]);
   const [rulesAvailable, setRulesAvailable] = useState(false);
+  const [shifts, setShifts] = useState<ReadinessShiftDto[]>([]);
+  const [permits, setPermits] = useState<WorkPermitDto[]>([]);
+  const [currentReadiness, setCurrentReadiness] = useState<CurrentReadinessDto[]>([]);
+  const [readinessHistory, setReadinessHistory] = useState<ReadinessSnapshotDto[]>([]);
+  const [authoritativeReadinessError, setAuthoritativeReadinessError] = useState<string | null>(null);
+  const [audit, setAudit] = useState<ReadinessAuditEnvelope | null>(null);
+  const [readinessFilters, setReadinessFilters] = useState<ReadinessUrlFilters>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -154,42 +199,72 @@ export function ToModule() {
     setSettingsSection(parseSettingsSection(params.get('section')));
     const requestedEquipment = params.get('equipmentId');
     if (requestedEquipment) setEquipmentId(requestedEquipment);
+    const nextFilters: ReadinessUrlFilters = {};
+    for (const key of ['status', 'from', 'to', 'shiftType', 'risk', 'eventType', 'actor'] as const) {
+      const value = params.get(key);
+      if (value) (nextFilters as Record<string, string>)[key] = value;
+    }
+    setReadinessFilters(nextFilters);
   }, []);
 
   const loadWorkspace = useCallback(async () => {
+    workspaceRequest.current?.abort();
+    const controller = new AbortController();
+    workspaceRequest.current = controller;
     setLoading(true);
+    setBootstrapError(null);
     setWorkspaceError(null);
     setWorkspaceIssues([]);
+    setAuthoritativeReadinessError(null);
     setRulesAvailable(false);
     try {
+      let readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
+      if (readinessBootstrap.actor.role === 'ADMIN' && readinessBootstrap.capabilities.canActAsMechanic) {
+        readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal, actingAsMechanic: true });
+      }
+      if (controller.signal.aborted) return;
+      setBootstrap(readinessBootstrap);
+      const canReadLegacyAdminData = readinessBootstrap.actor.role !== 'OPERATOR';
       const [
         equipmentResponse,
         crewResult,
         maintenanceResult,
         fleetResult,
         readinessRulesResult,
+        shiftsResult,
+        permitsResult,
+        currentResult,
+        historyResult,
+        auditResult,
       ] = await Promise.all([
-        authFetch('/api/equipment?limit=100'),
-        readOptionalCollectionWithIssue<CrewSummary>(
+        canReadLegacyAdminData ? authFetch('/api/equipment?limit=100') : Promise.resolve(null),
+        canReadLegacyAdminData ? readOptionalCollectionWithIssue<CrewSummary>(
           '/api/crews?limit=100',
           'data',
           'Бригады',
-        ),
-        readOptionalCollectionWithIssue<MaintenanceSummary>(
+        ) : Promise.resolve({ data: [] as CrewSummary[], issue: null }),
+        canReadLegacyAdminData ? readOptionalCollectionWithIssue<MaintenanceSummary>(
           '/api/maintenance',
           'records',
           'Обслуживание',
-        ),
-        readOptionalJsonWithIssue<FleetSnapshot>(
+        ) : Promise.resolve({ data: [] as MaintenanceSummary[], issue: null }),
+        canReadLegacyAdminData ? readOptionalJsonWithIssue<FleetSnapshot>(
           '/api/monitoring/fleet',
           'Мониторинг парка',
-        ),
+        ) : Promise.resolve({ data: null, issue: null }),
         readOptionalJsonWithIssue<ReadinessRulesState>(
           '/api/readiness-rules',
           'Правила готовности',
         ),
+        fetchReadinessShifts(controller.signal, readinessFilters).catch(() => []),
+        fetchWorkPermits(controller.signal, readinessFilters).catch(() => []),
+        readAuthoritativeCollection(fetchCurrentReadiness(controller.signal, readinessFilters)),
+        readAuthoritativeCollection(fetchReadinessHistory(controller.signal, readinessFilters)),
+        readinessBootstrap.capabilities.entities.audit.read
+          ? fetchReadinessAudit(controller.signal, readinessFilters).catch(() => null)
+          : Promise.resolve(null),
       ]);
-      if (!equipmentResponse.ok) {
+      if (equipmentResponse && !equipmentResponse.ok) {
         const message = equipmentResponse.status === 403
           ? 'Недостаточно прав для просмотра установок.'
           : equipmentResponse.status === 429
@@ -199,15 +274,37 @@ export function ToModule() {
               : `Список установок временно недоступен (код ${equipmentResponse.status}).`;
         throw new Error(message);
       }
-      const equipmentBody = await equipmentResponse.json() as { data?: unknown };
-      const list = Array.isArray(equipmentBody.data)
+      const equipmentBody = equipmentResponse
+        ? await equipmentResponse.json() as { data?: unknown }
+        : { data: [] };
+      const allowedEquipmentIds = new Set(
+        readinessBootstrap.selectors.equipment.map((item) => item.id),
+      );
+      const equipmentFromModule = (Array.isArray(equipmentBody.data)
         ? equipmentBody.data as EquipmentOption[]
-        : [];
+        : []).filter((item) => allowedEquipmentIds.has(item.id));
+      const list = equipmentFromModule.length > 0
+        ? equipmentFromModule
+        : readinessBootstrap.selectors.equipment.map((item): EquipmentOption => ({
+            id: item.id,
+            name: item.name,
+            model: item.model,
+            hammerKind: 'NONE',
+            isCombined: false,
+            isActive: true,
+            crewCount: 0,
+          }));
       const crewList = crewResult.data;
       const maintenanceList = maintenanceResult.data;
       const fleetSnapshot = fleetResult.data;
       const readinessRules = readinessRulesResult.data;
       setRulesAvailable(readinessRules !== null);
+      setShifts(shiftsResult);
+      setPermits(permitsResult);
+      setCurrentReadiness(currentResult.data);
+      setReadinessHistory(historyResult.data);
+      setAuthoritativeReadinessError(currentResult.error ?? historyResult.error);
+      setAudit(auditResult);
       const initialIssues = [
         crewResult.issue,
         maintenanceResult.issue,
@@ -228,7 +325,7 @@ export function ToModule() {
         return;
       }
 
-      const [primaryJournal, primaryDetail] = await Promise.all([
+      const [primaryJournal, primaryDetail] = canReadLegacyAdminData ? await Promise.all([
         readOptionalJsonWithIssue<{ records?: JournalRecord[] }>(
           `/api/to/journal?equipmentId=${encodeURIComponent(primaryEquipment.id)}`,
           `Журнал «${primaryEquipment.name}»`,
@@ -237,7 +334,10 @@ export function ToModule() {
           `/api/equipment/${encodeURIComponent(primaryEquipment.id)}/details`,
           `Карточка «${primaryEquipment.name}»`,
         ),
-      ]);
+      ]) : [
+        { data: null, issue: null },
+        { data: null, issue: null },
+      ];
       const primaryIssues = [primaryJournal.issue, primaryDetail.issue]
         .filter((issue): issue is WorkspaceIssue => issue !== null);
       if (primaryIssues.length > 0) {
@@ -255,48 +355,9 @@ export function ToModule() {
       setJournalLoaded({ [primaryEquipment.id]: primaryJournal.data != null });
       setLoading(false);
 
-      const backgroundItems = list.filter((item) => item.id !== primaryEquipment.id);
-      const journalPairs: Array<readonly [string, JournalRecord[], boolean]> = [];
-      const detailPairs: Array<readonly [string, EquipmentDetailSnapshot | null]> = [];
-
-      for (let offset = 0; offset < backgroundItems.length; offset += 4) {
-        const batch = backgroundItems.slice(offset, offset + 4);
-        const batchPairs = await Promise.all(batch.map(async (item) => {
-          const [journal, detail] = await Promise.all([
-            readOptionalJson<{ records?: JournalRecord[] }>(
-              `/api/to/journal?equipmentId=${encodeURIComponent(item.id)}`,
-            ),
-            readOptionalJson<EquipmentDetailSnapshot>(
-              `/api/equipment/${encodeURIComponent(item.id)}/details`,
-            ),
-          ]);
-          return {
-            journal: [item.id, journal?.records ?? [], journal != null] as const,
-            detail: [item.id, detail] as const,
-          };
-        }));
-        journalPairs.push(...batchPairs.map((pair) => pair.journal));
-        detailPairs.push(...batchPairs.map((pair) => pair.detail));
-      }
-
-      setDetails((previous) => detailPairs.reduce<Record<string, EquipmentDetailSnapshot>>(
-        (result, [id, detail]) => {
-          if (detail) result[id] = detail;
-          return result;
-        },
-        { ...previous },
-      ));
-      setJournals((previous) => ({
-        ...previous,
-        ...Object.fromEntries(journalPairs.map(([id, records]) => [id, records])),
-      }));
-      setJournalLoaded((previous) => ({
-        ...previous,
-        ...Object.fromEntries(journalPairs.map(([id, , loaded]) => [id, loaded])),
-      }));
-      const failedJournals = journalPairs.filter(([, , loaded]) => !loaded).length;
-      if (failedJournals > 0) toast.warning(`Не удалось загрузить журналов: ${failedJournals}`);
     } catch (error) {
+      if (isReadinessRequestCancelled(error) || controller.signal.aborted) return;
+      if (error instanceof ReadinessApiError) setBootstrapError(error);
       setWorkspaceError(
         !navigator.onLine
           ? 'Нет подключения к сети. Подключитесь к интернету и повторите запрос.'
@@ -306,15 +367,31 @@ export function ToModule() {
       );
       toast.error('Не удалось загрузить центр технической готовности');
     } finally {
-      setLoading(false);
+      if (workspaceRequest.current === controller && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [readinessFilters]);
 
   useEffect(() => {
-    if (workspaceLoadStarted.current) return;
-    workspaceLoadStarted.current = true;
     void loadWorkspace();
+    return () => workspaceRequest.current?.abort();
   }, [loadWorkspace]);
+
+  useEffect(() => {
+    if (!equipmentId || bootstrap?.actor.role === 'OPERATOR' || journalLoaded[equipmentId] || details[equipmentId]) return;
+    let active = true;
+    void Promise.all([
+      readOptionalJson<{ records?: JournalRecord[] }>(`/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`),
+      readOptionalJson<EquipmentDetailSnapshot>(`/api/equipment/${encodeURIComponent(equipmentId)}/details`),
+    ]).then(([journal, detail]) => {
+      if (!active) return;
+      setJournals((previous) => ({ ...previous, [equipmentId]: journal?.records ?? [] }));
+      setJournalLoaded((previous) => ({ ...previous, [equipmentId]: true }));
+      if (detail) setDetails((previous) => ({ ...previous, [equipmentId]: detail }));
+    });
+    return () => { active = false; };
+  }, [bootstrap?.actor.role, details, equipmentId, journalLoaded]);
 
   const readinessByEquipment = useMemo(() => {
     const entries = equipment.map((item) => [
@@ -381,6 +458,17 @@ export function ToModule() {
     replaceUrlState(view, settingsSection, next);
   };
 
+  const changeReadinessFilters = (next: ReadinessUrlFilters) => {
+    setReadinessFilters(next);
+    const url = new URL(window.location.href);
+    for (const key of ['status', 'from', 'to', 'shiftType', 'risk', 'eventType', 'actor'] as const) {
+      const value = next[key];
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  };
+
   const referenceUi = (
     <ReadinessReferenceUi
       view={view}
@@ -404,25 +492,38 @@ export function ToModule() {
       workspaceError={workspaceError}
       workspaceIssues={workspaceIssues}
       rulesAvailable={rulesAvailable}
+      bootstrap={bootstrap}
+      shifts={shifts}
+      permits={permits}
+      currentReadiness={currentReadiness}
+      authoritativeReadinessError={authoritativeReadinessError}
+      readinessHistory={readinessHistory}
+      audit={audit}
+      filters={readinessFilters}
+      onFiltersChange={changeReadinessFilters}
+      showInternalNavigation={!TECH_READINESS_PRODUCTION_SHELL_ENABLED}
       onRetry={() => void loadWorkspace()}
     />
   );
 
   if (!TECH_READINESS_PRODUCTION_SHELL_ENABLED) return referenceUi;
 
-  const queryState: QueryState = loading
-    ? { status: 'loading' }
-    : workspaceError
-      ? workspaceError.includes('Недостаточно прав')
-        ? { status: 'forbidden', message: workspaceError }
-        : { status: 'error', message: workspaceError }
-      : { status: 'ready' };
+  const queryState: QueryState = bootstrapError
+    ? bootstrapError.code === 'FORBIDDEN' || bootstrapError.code === 'UNAUTHORIZED'
+      ? { status: 'forbidden', message: bootstrapError.message }
+      : { status: 'error', message: bootstrapError.message }
+    : loading || !bootstrap
+      ? { status: 'loading' }
+      : workspaceError
+        ? { status: 'error', message: workspaceError }
+        : { status: 'ready' };
 
   return (
     <TechReadinessModule
       activeView={view}
       onViewChange={changeView}
       queryState={queryState}
+      bootstrap={bootstrap}
       announcement={
         workspaceError
           ? `Ошибка загрузки: ${workspaceError}`
@@ -430,7 +531,7 @@ export function ToModule() {
             ? 'Загрузка центра технической готовности'
             : `Открыт раздел ${view}`
       }
-      onRetry={loadWorkspace}
+      onRetry={bootstrapError?.retryable === false ? undefined : loadWorkspace}
     >
       {referenceUi}
     </TechReadinessModule>

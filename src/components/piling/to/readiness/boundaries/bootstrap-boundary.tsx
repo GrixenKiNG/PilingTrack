@@ -35,6 +35,7 @@ export function BootstrapBoundary({
       <section
         aria-labelledby="readiness-loading-title"
         aria-busy="true"
+        data-query-state="loading"
         className="m-3 min-w-0 rounded-xl border border-border bg-card p-6"
       >
         <h2 id="readiness-loading-title" className="text-lg font-semibold">
@@ -51,6 +52,7 @@ export function BootstrapBoundary({
     return (
       <section
         role="alert"
+        data-query-state="forbidden"
         className="m-3 min-w-0 rounded-xl border border-destructive/30 bg-destructive/5 p-6"
       >
         <h2 className="text-lg font-semibold">Недостаточно прав</h2>
@@ -65,6 +67,7 @@ export function BootstrapBoundary({
     return (
       <section
         aria-labelledby="readiness-feature-off-title"
+        data-query-state="feature-off"
         className="m-3 min-w-0 rounded-xl border border-border bg-card p-6"
       >
         <h2 id="readiness-feature-off-title" className="text-lg font-semibold">
@@ -85,6 +88,7 @@ export function BootstrapBoundary({
   return (
     <section
       role="alert"
+      data-query-state="error"
       className="m-3 min-w-0 rounded-xl border border-destructive/30 bg-destructive/5 p-6"
     >
       <h2 ref={stateHeadingRef} tabIndex={-1} className="text-lg font-semibold outline-none">

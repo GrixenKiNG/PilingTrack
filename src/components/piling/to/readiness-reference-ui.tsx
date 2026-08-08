@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
@@ -34,6 +34,7 @@ import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
+import { formatDateInTimezone, formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import {
@@ -53,6 +54,25 @@ import type { EquipmentOption } from './to-module-bits';
 import type { JournalRecord } from './to-stats';
 import type { EquipmentReadiness, ReadinessStatus } from './readiness-model';
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
+import type {
+  CurrentReadinessDto,
+  ReadinessAuditEnvelope,
+  ReadinessBootstrap,
+  ReadinessShiftDto,
+  ReadinessSnapshotDto,
+  WorkPermitDto,
+} from './readiness/api/contracts';
+import { readinessFilterQuery, type ReadinessUrlFilters } from './readiness/api/client';
+import {
+  buildAuthoritativeReadinessPresentation,
+  buildUnavailableReadinessPresentation,
+} from './readiness/authoritative-presentation';
+import { CommandDialog } from './readiness/shared/command-dialog';
+import {
+  DEFAULT_WORKSPACE_SETTINGS,
+  NOTIFICATION_KEYS,
+  type WorkspaceSettings,
+} from '@/modules/settings/domain/settings';
 
 export type ReferenceView =
   | 'readiness'
@@ -120,6 +140,16 @@ interface ReferenceUiProps {
   workspaceError: string | null;
   workspaceIssues: Array<{ source: string; message: string }>;
   rulesAvailable: boolean;
+  bootstrap: ReadinessBootstrap | null;
+  shifts: ReadinessShiftDto[];
+  permits: WorkPermitDto[];
+  currentReadiness: CurrentReadinessDto[];
+  authoritativeReadinessError: string | null;
+  readinessHistory: ReadinessSnapshotDto[];
+  audit: ReadinessAuditEnvelope | null;
+  filters: ReadinessUrlFilters;
+  onFiltersChange: (filters: ReadinessUrlFilters) => void;
+  showInternalNavigation: boolean;
   onRetry: () => void;
 }
 
@@ -167,15 +197,85 @@ const COMPACT_KPI_GRID = cn(
   '[&>*]:!min-h-[84px] [&>*]:!rounded-[10px] [&>*]:!p-3 max-sm:!grid-cols-1',
 );
 
-function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
-  const escapeCell = (value: string | number | null | undefined) => `"${String(value ?? '').replaceAll('"', '""')}"`;
-  const csv = `\uFEFF${rows.map((row) => row.map(escapeCell).join(';')).join('\r\n')}`;
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+async function downloadReadinessExport(dataset: 'fleet' | 'permits' | 'reports' | 'dictionary' | 'audit', filters: ReadinessUrlFilters) {
+  const query = readinessFilterQuery(filters);
+  const response = await authFetch(`/api/readiness/export?dataset=${dataset}${query ? `&${query}` : ''}`);
+  if (!response.ok) throw new Error(response.status === 403 ? 'Недостаточно прав для экспорта' : 'Не удалось сформировать экспорт');
+  const url = URL.createObjectURL(await response.blob());
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = filename;
+  anchor.download = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]
+    ?? `pilingtrack-readiness-${dataset}.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadCsv(filename: string, _rows: Array<Array<string | number | null | undefined>>) {
+  const dataset = filename.includes('audit') ? 'audit'
+    : filename.includes('dictionary') ? 'dictionary'
+      : filename.includes('permit') ? 'permits'
+        : filename.includes('report') ? 'reports' : 'fleet';
+  const params = new URLSearchParams(window.location.search);
+  const filters: ReadinessUrlFilters = {};
+  for (const key of ['status', 'from', 'to', 'shiftType', 'risk', 'eventType', 'actor'] as const) {
+    const value = params.get(key);
+    if (value) (filters as Record<string, string>)[key] = value;
+  }
+  void downloadReadinessExport(dataset, filters)
+    .catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'));
+}
+
+async function commandFailure(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null) as {error?: {message?: string} | string} | null;
+  const serverMessage = typeof body?.error === 'string' ? body.error : body?.error?.message;
+  if (response.status === 409) return 'Кто-то уже изменил эту запись. Данные обновлены — повторите действие с актуальной версией.';
+  if (response.status === 422) return serverMessage || 'Условие операции не выполнено. Проверьте готовность, наряд и обязательные поля.';
+  return serverMessage || 'Операция не выполнена. Повторите попытку.';
+}
+
+function formatTimeInTimezone(value: Date | string, timezone: string) {
+  return formatDateInTimezone(value, timezone, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+}
+
+function decimalHourInTimezone(value: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(value);
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+  return hour + minute / 60;
+}
+
+function ReadinessFiltersBar({filters, onChange, mode}: {
+  filters: ReadinessUrlFilters;
+  onChange: (next: ReadinessUrlFilters) => void;
+  mode: 'shifts' | 'permits' | 'reports' | 'audit';
+}) {
+  const keys: Array<keyof ReadinessUrlFilters> = mode === 'shifts'
+    ? ['status', 'from', 'to', 'shiftType']
+    : mode === 'permits' ? ['status', 'from', 'to', 'risk']
+      : mode === 'audit' ? ['from', 'to', 'eventType', 'actor'] : ['status', 'from', 'to'];
+  const activeCount = keys.filter((key) => Boolean(filters[key])).length;
+  const update = (key: keyof ReadinessUrlFilters, value: string) => onChange({...filters, [key]: value || undefined});
+  return (
+    <div aria-label="Фильтры" className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <label className="grid gap-1 text-2xs text-muted-foreground">С даты<Input aria-label="С даты" type="date" value={filters.from ?? ''} onChange={(event) => update('from', event.target.value)} className="h-9 w-[150px]" /></label>
+      <label className="grid gap-1 text-2xs text-muted-foreground">По дату<Input aria-label="По дату" type="date" value={filters.to ?? ''} onChange={(event) => update('to', event.target.value)} className="h-9 w-[150px]" /></label>
+      {(mode === 'shifts' || mode === 'permits' || mode === 'reports') && <label className="grid gap-1 text-2xs text-muted-foreground">Статус<select aria-label="Статус" value={filters.status ?? ''} onChange={(event) => update('status', event.target.value)} className="h-9 min-w-[150px] rounded-md border border-input bg-background px-3 text-xs text-foreground"><option value="">Все статусы</option>{mode === 'shifts' ? <><option value="PLANNED">Запланирована</option><option value="STARTED">В работе</option><option value="HANDOVER_PENDING">Передача</option><option value="CLOSED">Закрыта</option><option value="CANCELLED">Отменена</option></> : mode === 'permits' ? <><option value="DRAFT">Черновик</option><option value="PENDING_APPROVAL">На согласовании</option><option value="APPROVED">Согласован</option><option value="EXPIRED">Истёк</option><option value="REVOKED">Отозван</option></> : <><option value="READY">Готово</option><option value="ATTENTION">Требует внимания</option><option value="BLOCKED">Заблокировано</option></>}</select></label>}
+      {mode === 'shifts' && <label className="grid gap-1 text-2xs text-muted-foreground">Тип смены<select aria-label="Тип смены" value={filters.shiftType ?? ''} onChange={(event) => update('shiftType', event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs"><option value="">Все</option><option value="DAY">Дневная</option><option value="NIGHT">Ночная</option></select></label>}
+      {mode === 'permits' && <label className="grid gap-1 text-2xs text-muted-foreground">Риск<select aria-label="Риск" value={filters.risk ?? ''} onChange={(event) => update('risk', event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs"><option value="">Все</option><option value="NORMAL">Обычный</option><option value="ELEVATED">Повышенный</option></select></label>}
+      {mode === 'audit' && <><label className="grid gap-1 text-2xs text-muted-foreground">Тип события<Input aria-label="Тип события" value={filters.eventType ?? ''} onChange={(event) => update('eventType', event.target.value)} className="h-9 w-[170px]" /></label><label className="grid gap-1 text-2xs text-muted-foreground">Актор<Input aria-label="Актор" value={filters.actor ?? ''} onChange={(event) => update('actor', event.target.value)} className="h-9 w-[170px]" /></label></>}
+      <span className="inline-flex h-9 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold">Фильтров: {activeCount}</span>
+      <Button type="button" variant="outline" className="h-9" disabled={activeCount === 0} onClick={() => onChange(Object.fromEntries(Object.entries(filters).filter(([key]) => !keys.includes(key as keyof ReadinessUrlFilters))))}>Сбросить</Button>
+    </div>
+  );
 }
 
 function StatusPill({ status }: { status: ReadinessStatus }) {
@@ -503,7 +603,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
       className="tech-readiness-module min-h-screen w-full min-w-0 overflow-x-hidden overflow-y-auto bg-background font-sans text-foreground"
     >
       <div className="min-h-screen w-full min-w-0">
-        <header
+        {props.showInternalNavigation && <header
           aria-label="Разделы модуля технической готовности"
           className="sticky top-0 z-20 flex h-12 w-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden bg-primary px-2 text-white sm:px-4"
         >
@@ -525,7 +625,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
               </button>
             );
           })}
-        </header>
+        </header>}
         {props.workspaceIssues.length > 0 && !fatalError && (
           <div
             role="status"
@@ -590,6 +690,9 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
           <SettingsWorkspace {...props} />
         ) : (
           <main className="min-w-0 px-2 sm:px-4">
+            {(props.view === 'shifts' || props.view === 'permits' || props.view === 'reports') && (
+              <ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode={props.view} />
+            )}
             {props.view === 'readiness' && <ReadinessCentre {...props} />}
             {props.view === 'fleet' && <FleetScreen {...props} />}
             {props.view === 'shifts' && <ShiftsScreen {...props} />}
@@ -622,23 +725,21 @@ function ReadinessCentre(props: ReferenceUiProps) {
       </div>
     );
   }
-  const readiness = props.readinessByEquipment[selected.id];
-  const scoreResult = props.scoresByEquipment[selected.id];
+  const authoritativeCurrent = props.currentReadiness.find((item) => item.equipmentId === selected.id) ?? null;
+  const presentation = props.authoritativeReadinessError
+    ? buildUnavailableReadinessPresentation(authoritativeCurrent)
+    : buildAuthoritativeReadinessPresentation(authoritativeCurrent);
   const detail = props.details[selected.id];
   const fleetCard = props.fleetCards.find((item) => item.id === selected.id);
   const selectedJournal = [...(props.journals[selected.id] ?? [])].sort(
     (left, right) => new Date(right.completedAt || right.createdAt).getTime() - new Date(left.completedAt || left.createdAt).getTime(),
   );
-  const blockers = scoreResult?.criticalBlockers
-    ?? readiness?.evidence.filter((item) => item.state === 'block').length
-    ?? 0;
-  const warnings = scoreResult?.findings
-    ?? readiness?.evidence.filter((item) => ['warning', 'missing'].includes(item.state)).length
-    ?? 0;
+  const blockers = presentation.blockers.length;
+  const warnings = presentation.warnings.length;
 
   return (
     <div>
-      <div className="grid min-h-0 grid-cols-1 gap-3 py-3 md:grid-cols-[260px_minmax(0,1fr)] xl:h-[calc(100vh-190px)] xl:min-h-[680px] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
+      <div className="grid min-h-0 grid-cols-1 gap-3 py-3 md:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-hidden')}>
         <div className="border-b border-border p-4">
           <div className={cn(muted, 'text-2xs')}>Выбранная установка</div>
@@ -657,13 +758,23 @@ function ReadinessCentre(props: ReferenceUiProps) {
         </div>
         <div className="border-b border-border p-4">
           <div className="text-2xs text-muted-foreground">Статус готовности</div>
-          <div className="mt-2">{readiness && <StatusPill status={readiness.status} />}</div>
+          <div className="mt-2">
+            <span className={cn(
+              'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold',
+              presentation.status === 'READY' && 'bg-success/10 text-success-strong',
+              presentation.status === 'BLOCKED' && 'bg-destructive/10 text-destructive-strong',
+              presentation.status === 'UNCONFIRMED' && 'bg-signal/10 text-signal-strong',
+            )}>
+              {presentation.status === 'READY' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+              {presentation.status === 'READY' ? 'Готово' : presentation.status === 'BLOCKED' ? 'Заблокировано' : 'Не подтверждено'}
+            </span>
+          </div>
           <div className="mt-3 rounded-lg border border-signal bg-signal/10 p-3">
             <div className="text-2xs text-muted-foreground">Следующее действие</div>
-            <div className="mt-2 font-bold">{readiness?.nextAction || 'Проверить данные'}</div>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{readiness?.reason}</p>
+            <div className="mt-2 font-bold">{presentation.nextAction}</div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{props.authoritativeReadinessError ?? presentation.description}</p>
             <Button asChild className="mt-3 h-10 w-full bg-signal-strong hover:bg-signal-strong">
-              <Link href={readiness?.nextActionHref || '/admin/to'}>
+              <Link href="/admin/to">
                 Перейти к действию <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -672,16 +783,16 @@ function ReadinessCentre(props: ReferenceUiProps) {
         <div className="p-4">
           <h3 className="font-bold">Чек-лист смены (5 шагов)</h3>
           <div className="mt-3 divide-y divide-border">
-            {readiness?.evidence.map((evidence, index) => (
-              <div key={evidence.key} className="flex items-center gap-3 py-2.5">
-                <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', evidence.state === 'pass' ? 'bg-success-strong text-white' : 'bg-signal-strong text-white')}>{index + 1}</span>
+            {presentation.stages.map((stage, index) => (
+              <div key={stage.key} className="flex items-center gap-3 py-2.5">
+                <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', stage.state === 'pass' ? 'bg-success-strong text-white' : stage.state === 'unknown' ? 'bg-muted text-muted-foreground' : 'bg-signal-strong text-white')}>{index + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold">{evidence.label}</div>
+                  <div className="text-xs font-semibold">{stage.label}</div>
                   <div
-                    title={evidence.value}
+                    title={stage.value}
                     className="line-clamp-2 break-words text-2xs text-muted-foreground"
                   >
-                    {evidence.value}
+                    {stage.value}
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -697,10 +808,10 @@ function ReadinessCentre(props: ReferenceUiProps) {
             <div>
               <h2 className="font-bold">Готовность к работе (доказательная)</h2>
               <div className="mt-4 flex flex-wrap items-center gap-4 sm:gap-8">
-                <ReadinessRing value={scoreResult?.score ?? readiness?.score ?? null} />
+                <ReadinessRing value={presentation.score} />
                 <div>
                   <div className="text-xs text-muted-foreground">Итоговый балл готовности</div>
-                  <div className="mt-1 font-mono text-2xl font-bold">{scoreResult?.score ?? readiness?.score ?? '—'} <span className="text-sm font-normal text-muted-foreground">/100</span></div>
+                  <div className="mt-1 font-mono text-2xl font-bold">{presentation.score ?? '—'} <span className="text-sm font-normal text-muted-foreground">/100</span></div>
                   <div className="mt-3 flex gap-4 text-xs">
                     <span>Критические блокеры <b className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-destructive-strong">{blockers}</b></span>
                     <span>Замечания <b className="ml-1 rounded bg-signal/10 px-1.5 py-0.5 text-signal-strong">{warnings}</b></span>
@@ -710,35 +821,31 @@ function ReadinessCentre(props: ReferenceUiProps) {
             </div>
             <div className="text-left text-xs text-muted-foreground sm:text-right">
               <div>Последнее обновление</div>
-              <div className="mt-2 font-semibold text-muted-foreground">{selectedJournal[0] ? new Date(selectedJournal[0].completedAt || selectedJournal[0].createdAt).toLocaleString('ru-RU') : 'Записей ещё нет'}</div>
+              <div className="mt-2 font-semibold text-muted-foreground">{presentation.calculatedAt ? formatDateTimeInTimezone(presentation.calculatedAt, props.bootstrap?.tenant.timezone) : 'Авторитетного снимка нет'}</div>
               <Button variant="outline" className="mt-3 h-9" onClick={() => props.onViewChange('reports')}><History className="mr-2 h-4 w-4" />История оценок</Button>
             </div>
           </div>
           <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-            Правила {scoreResult?.ruleVersion ?? props.rulesState.published.version}. Результат: {scoreResult?.verdictLabel ?? 'проверить комплект доказательств'}.
+            {presentation.ruleSetVersion ? `Правила ${presentation.ruleSetVersion}. ` : ''}{presentation.title}. {presentation.calculatedAt ? `Авторитетный снимок от ${formatDateTimeInTimezone(presentation.calculatedAt, props.bootstrap?.tenant.timezone)}.` : presentation.description}
           </div>
         </section>
         <section className={cn(card, 'overflow-hidden')}>
           <div className="p-4">
             <h2 className="font-bold">Цепочка состояния</h2>
             <div className="mt-4 flex items-center justify-between overflow-x-auto pb-2">
-              {[
-                ['Смена открыта', CheckCircle2],
-                ['Осмотр', Search],
-                ['Моточасы', Gauge],
-                ['Допуск', ShieldCheck],
-                ['Приёмка', User],
-              ].map(([label, Icon], index) => (
-                <div key={label as string} className="flex min-w-[118px] flex-1 items-center">
+              {presentation.stages.map((stage, index) => {
+                const Icon = [Search, Gauge, ShieldCheck, Wrench, User][index] ?? Search;
+                return (
+                <div key={stage.key} className="flex min-w-[118px] flex-1 items-center">
                   <div className="text-center">
-                    <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-full border', index === 0 ? 'border-success bg-success-strong text-white' : index === 1 ? 'border-signal bg-signal-strong text-white' : 'border-border bg-muted text-muted-foreground')}>
+                    <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-full border', stage.state === 'pass' ? 'border-success bg-success-strong text-white' : stage.state === 'unknown' ? 'border-border bg-muted text-muted-foreground' : 'border-signal bg-signal-strong text-white')}>
                       <Icon className="h-5 w-5" />
                     </span>
-                    <div className={cn('mt-2 text-2xs', index === 1 ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{label as string}</div>
+                    <div className={cn('mt-2 text-2xs', stage.state === 'fail' ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{stage.label}</div>
                   </div>
                   {index < 4 && <div className="mx-3 h-px flex-1 bg-border" />}
                 </div>
-              ))}
+              );})}
             </div>
           </div>
           <div className="border-t border-border p-4">
@@ -746,8 +853,8 @@ function ReadinessCentre(props: ReferenceUiProps) {
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3">
               <AlertTriangle className="h-7 w-7 text-destructive-strong" />
               <div className="flex-1">
-                <div className="font-semibold">{readiness?.activeRecord?.title || scoreResult?.blockers[0]?.label || 'Критических замечаний не обнаружено'}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{scoreResult?.blockers[0]?.actionLabel || (blockers ? 'Устраните блокер до запуска установки.' : 'Открытых блокирующих записей нет.')}</div>
+                <div className="font-semibold">{presentation.blockers[0]?.label ?? (presentation.status === 'UNCONFIRMED' ? presentation.title : 'Критических замечаний не обнаружено')}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{presentation.blockers[0]?.actionLabel ?? presentation.description}</div>
               </div>
               <span className="rounded border border-destructive px-2 py-1 text-xs text-destructive-strong">{blockers ? 'Критическое' : 'Нет блокеров'}</span>
             </div>
@@ -755,12 +862,13 @@ function ReadinessCentre(props: ReferenceUiProps) {
           <div className="border-t border-border p-4">
             <h3 className="font-bold">Доказательства готовности</h3>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-5">
-              {readiness?.evidence.map((evidence) => (
+              {presentation.evidence.map((evidence) => (
                 <div key={evidence.key} className="rounded-lg border border-border p-3">
                   <div className="text-xs font-semibold">{evidence.label}</div>
-                  <div className="mt-3"><EvidenceState state={evidence.state} /></div>
+                  <div className="mt-2 break-all text-2xs text-muted-foreground">{evidence.reference}</div>
                 </div>
               ))}
+              {presentation.evidence.length === 0 && <div className="rounded-lg border border-signal/30 bg-signal/10 p-3 text-xs text-signal-strong">{presentation.title}</div>}
             </div>
           </div>
         </section>
@@ -776,7 +884,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               <div key={label} className="relative">
                 <span className={cn('absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full', index === 0 ? 'bg-signal-strong' : 'bg-muted-foreground')} />
                 <div className="text-xs font-semibold">{label}</div>
-                <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">{event ? `${new Date(event.completedAt || event.createdAt).toLocaleString('ru-RU')} · ${event.title}` : 'Не зафиксировано'}</div>
+                <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">{event ? `${formatDateTimeInTimezone(event.completedAt || event.createdAt, props.bootstrap?.tenant.timezone)} · ${event.title}` : 'Не зафиксировано'}</div>
               </div>
               );
             })}
@@ -787,12 +895,15 @@ function ReadinessCentre(props: ReferenceUiProps) {
           <div className="flex items-center justify-between"><h2 className="font-bold">Входящие (диспетчер)</h2><span className="text-xs text-muted-foreground">{props.equipment.length}</span></div>
           <div className="mt-3 space-y-3">
             {props.equipment.slice(0, 3).map((item) => {
-              const itemState = props.readinessByEquipment[item.id];
+              const itemSnapshot = props.currentReadiness.find((entry) => entry.equipmentId === item.id) ?? null;
+              const itemPresentation = props.authoritativeReadinessError
+                ? buildUnavailableReadinessPresentation(itemSnapshot)
+                : buildAuthoritativeReadinessPresentation(itemSnapshot);
               const itemFleet = props.fleetCards.find((cardItem) => cardItem.id === item.id);
               return (
                 <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className="flex w-full gap-3 rounded-lg border border-border p-3 text-left hover:border-orange-300">
                   <EquipmentPhoto cardData={itemFleet} name={item.name} className="h-12 w-12 shrink-0" />
-                  <div className="min-w-0"><div className="truncate text-xs font-bold">{item.name}</div><div className="mt-1 text-2xs text-muted-foreground">{props.details[item.id]?.crew?.site?.name || 'Объект не назначен'}</div>{itemState && <div className="mt-2"><StatusPill status={itemState.status} /></div>}</div>
+                  <div className="min-w-0"><div className="truncate text-xs font-bold">{item.name}</div><div className="mt-1 text-2xs text-muted-foreground">{props.details[item.id]?.crew?.site?.name || 'Объект не назначен'}</div><div className="mt-2 text-2xs font-semibold">{itemPresentation.status === 'READY' ? 'Готово' : itemPresentation.status === 'BLOCKED' ? 'Заблокировано' : 'Не подтверждено'}</div></div>
                 </button>
               );
             })}
@@ -830,16 +941,8 @@ function FleetScreen(props: ReferenceUiProps) {
         actions={(
           <div className="flex gap-2">
             <Button asChild variant="outline"><Link href="/admin/equipment">+ Добавить технику</Link></Button>
-            <Button variant="outline" onClick={() => downloadCsv('tech-readiness-fleet.csv', [
-              ['Установка', 'Модель', 'Готовность', 'Статус', 'Моточасы'],
-              ...filtered.map((item) => [
-                item.name,
-                item.model,
-                props.readinessByEquipment[item.id]?.score,
-                props.readinessByEquipment[item.id]?.status,
-                item.engineHoursTotal,
-              ]),
-            ])}>↓ Экспорт</Button>
+            <Button variant="outline" onClick={() => void downloadReadinessExport('fleet', props.filters)
+              .catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>↓ Экспорт</Button>
           </div>
         )}
       />
@@ -975,70 +1078,151 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 function ShiftsScreen(props: ReferenceUiProps) {
+  const [period, setPeriod] = useState<'day' | 'week'>('day');
+  const [command, setCommand] = useState<{shift: ReadinessShiftDto; action: 'start' | 'handover'} | null>(null);
+  const [commandSummary, setCommandSummary] = useState('');
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const [commandPending, setCommandPending] = useState(false);
   const activeCrews = props.crews.filter((crew) => crew.isActive);
-  const ready = activeCrews.filter((crew) => crew.equipment && props.readinessByEquipment[crew.equipment.id]?.canOperate);
-  const blocked = activeCrews.filter((crew) => crew.equipment && ['IN_REPAIR', 'BLOCKED', 'OVERDUE'].includes(props.readinessByEquipment[crew.equipment.id]?.status));
-  const waiting = Math.max(0, activeCrews.length - ready.length - blocked.length);
+  const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+  const today = getTodayInTimezone(timezone);
+  const weekStart = Date.now() - 6 * 86_400_000;
+  const todayShifts = props.shifts.filter((shift) => period === 'day'
+    ? shift.productionDate.slice(0, 10) === today
+    : new Date(shift.productionDate).getTime() >= weekStart);
+  const ready = todayShifts.filter((shift) => shift.state === 'STARTED');
+  const waiting = todayShifts.filter((shift) => shift.state === 'HANDOVER_PENDING');
+  const blocked = todayShifts.filter((shift) => shift.state === 'CANCELLED');
   const hours = ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+  const createShift = async () => {
+    if (!props.selectedId || !props.bootstrap?.capabilities.entities.shift.manage) return;
+    const hour = new Date().getHours();
+    const response = await authFetch('/api/readiness/shifts', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        ...(props.bootstrap?.actor.actingAs === 'MECHANIC' ? { 'x-readiness-acting-as': 'MECHANIC' } : {}),
+      },
+      body: JSON.stringify({ equipmentId: props.selectedId, type: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY' }),
+    });
+    if (!response.ok) return toast.error((await response.json().catch(() => null))?.error?.message ?? 'Не удалось создать смену');
+    toast.success('Смена создана');
+    props.onRetry();
+  };
+  const acceptHandover = async (handover: ReadinessShiftDto['handovers'][number]) => {
+    const response = await authFetch(`/api/readiness/handovers/${handover.id}/accept`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        'if-match': `"handover-${handover.id}-v${handover.version}"`,
+      },
+      body: JSON.stringify({ expectedVersion: handover.version }),
+    });
+    if (!response.ok) return toast.error((await response.json().catch(() => null))?.error?.message ?? 'Не удалось принять смену');
+    toast.success('Передача смены принята');
+    props.onRetry();
+  };
+  const runShiftAction = async (shift: ReadinessShiftDto, action: 'start' | 'handover') => {
+    if (action === 'handover' && !commandSummary.trim()) {
+      setCommandError('Укажите состояние техники и незавершённые работы.');
+      return;
+    }
+    setCommandPending(true);
+    setCommandError(null);
+    const response = await authFetch(`/api/readiness/shifts/${shift.id}/${action}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        'if-match': `"shift-${shift.id}-v${shift.version}"`,
+      },
+      body: JSON.stringify(action === 'handover'
+        ? { expectedVersion: shift.version, summary: commandSummary.trim() }
+        : { expectedVersion: shift.version }),
+    });
+    setCommandPending(false);
+    if (!response.ok) {
+      const message = await commandFailure(response);
+      setCommandError(message);
+      if (response.status === 409) props.onRetry();
+      return;
+    }
+    toast.success(action === 'start' ? 'Смена запущена' : 'Смена передана диспетчеру');
+    setCommand(null);
+    setCommandSummary('');
+    props.onRetry();
+  };
 
   return (
     <>
       <ScreenTitle
         heading="Смены"
-        subtitle={`Сегодня, ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`}
-        actions={<div className="flex flex-wrap items-center gap-2"><div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white"><button type="button" aria-pressed className="px-5 py-2 text-xs font-semibold">День</button><button type="button" disabled title="Недельный график появится после накопления смен" className="border-l border-slate-200 px-5 py-2 text-xs text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50">Неделя</button></div><Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href={props.selectedId ? `/inspections/new?equipmentId=${props.selectedId}` : '/inspections/new'}>+ Открыть смену</Link></Button></div>}
+        subtitle={period === 'day' ? `Сегодня, ${formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone, {day: 'numeric', month: 'long'})}` : 'Последние 7 дней'}
+        actions={<div className="flex flex-wrap items-center gap-2"><div className="flex overflow-hidden rounded-lg border border-border bg-background"><button type="button" aria-pressed={period === 'day'} onClick={() => setPeriod('day')} className={cn('min-h-11 px-5 text-xs font-semibold', period === 'day' && 'bg-signal/10 text-signal-strong')}>День</button><button type="button" aria-pressed={period === 'week'} onClick={() => setPeriod('week')} className={cn('min-h-11 border-l border-border px-5 text-xs', period === 'week' ? 'bg-signal/10 font-semibold text-signal-strong' : 'text-muted-foreground')}>Неделя</button></div><Button type="button" disabled={!props.selectedId || !props.bootstrap?.capabilities.entities.shift.manage} onClick={() => void createShift()} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать смену</Button></div>}
       />
+      <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-white px-2 py-1">DAY 08:00–20:00</span><span className="rounded border border-border bg-white px-2 py-1">NIGHT 20:00–08:00</span><span className="rounded border border-border bg-white px-2 py-1">Часовой пояс: {timezone}</span></div>
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="shift-start" label="Смен сегодня" value={activeCrews.length} />
+        <RefKpi icon="shift-start" label="Смен сегодня" value={todayShifts.length} />
         <RefKpi icon="technical-readiness" label="Готовы к запуску" value={ready.length} />
-        <RefKpi icon="operator" label="Ждут приёмки" value={waiting} alert={waiting > 0} />
+        <RefKpi icon="operator" label="Ждут приёмки" value={waiting.length} alert={waiting.length > 0} />
         <RefKpi icon="defect" label="Заблокированы" value={blocked.length} alert={blocked.length > 0} />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-x-auto p-3')}>
           <h2 className="font-bold">График смен</h2>
-          <div className="mt-3 grid min-w-[760px] grid-cols-[220px_minmax(0,1fr)]">
+          <div className="mt-3 hidden min-w-[760px] grid-cols-[220px_minmax(0,1fr)] md:grid">
             <div />
             <div className="grid grid-cols-9 px-2 text-3xs text-muted-foreground">{hours.map((hour) => <span key={hour}>{hour}</span>)}</div>
           </div>
-          <div className="mt-2 min-w-[760px] divide-y divide-border">
-            {activeCrews.length > 0 ? activeCrews.slice(0, 5).map((crew, index) => {
-              const state = crew.equipment ? props.readinessByEquipment[crew.equipment.id] : null;
-              const equipmentCard = crew.equipment ? props.fleetCards.find((item) => item.id === crew.equipment?.id) : undefined;
-              const left = 3 + (index % 4) * 10;
-              const width = 48 + (index % 3) * 8;
+          <div className="mt-2 hidden min-w-[760px] divide-y divide-border md:block">
+            {todayShifts.length > 0 ? todayShifts.slice(0, 8).map((shift) => {
+              const equipment = props.equipment.find((item) => item.id === shift.equipmentId);
+              const crew = activeCrews.find((item) => item.equipment?.id === shift.equipmentId);
+              const equipmentCard = props.fleetCards.find((item) => item.id === shift.equipmentId);
+              const start = shift.plannedStartAt ? new Date(shift.plannedStartAt) : null;
+              const end = shift.plannedEndAt ? new Date(shift.plannedEndAt) : null;
+              const startHour = start ? decimalHourInTimezone(start, timezone) : shift.type === 'DAY' ? 8 : 20;
+              const duration = start && end ? Math.max(1, (end.getTime() - start.getTime()) / 3_600_000) : 8;
+              const left = Math.max(0, Math.min(94, (startHour - 6) / 16 * 100));
+              const width = Math.max(6, Math.min(100 - left, duration / 16 * 100));
               return (
-                <div key={crew.id} className="grid grid-cols-[220px_minmax(0,1fr)] items-center py-2">
+                <div key={shift.id} className="grid grid-cols-[220px_minmax(0,1fr)] items-center py-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <EquipmentPhoto cardData={equipmentCard} name={crew.equipment?.name || crew.name} className="h-9 w-9 shrink-0" />
-                    <div className="min-w-0 flex-1"><div className="truncate text-2xs font-semibold">{crew.equipment?.name || 'Техника не назначена'}</div><div className="mt-0.5 truncate text-3xs text-muted-foreground">{crew.site?.name || 'Объект не назначен'}</div><div className="truncate text-3xs text-muted-foreground">{crew.name}</div></div>
-                    {state && <span className={cn('mr-2 shrink-0 rounded px-1.5 py-1 text-3xs font-semibold', state.canOperate ? 'bg-success/10 text-success-strong' : 'bg-signal/10 text-signal-strong')}>{state.canOperate ? 'Готова' : 'Ожидает'}</span>}
+                    <EquipmentPhoto cardData={equipmentCard} name={equipment?.name || 'Установка'} className="h-9 w-9 shrink-0" />
+                    <div className="min-w-0 flex-1"><div className="truncate text-2xs font-semibold">{equipment?.name || 'Установка'}</div><div className="mt-0.5 truncate text-3xs text-muted-foreground">{crew?.site?.name || 'Объект не назначен'}</div><div className="truncate text-3xs text-muted-foreground">{shift.type === 'DAY' ? 'Дневная' : 'Ночная'} смена</div>{shift.state === 'PLANNED' && props.bootstrap?.capabilities.entities.shift.manage && <button type="button" onClick={() => { setCommand({shift, action: 'start'}); setCommandError(null); }} className="mt-1 min-h-11 rounded border border-success/30 px-2 text-3xs font-semibold text-success-strong">Запустить</button>}{shift.state === 'STARTED' && props.bootstrap?.capabilities.entities.shift.prepareHandover && <button type="button" onClick={() => { setCommand({shift, action: 'handover'}); setCommandError(null); }} className="mt-1 min-h-11 rounded border border-signal/30 px-2 text-3xs font-semibold text-signal-strong">Передать</button>}</div>
+                    <span className="mr-2 shrink-0 rounded bg-muted px-1.5 py-1 text-3xs font-semibold">{shift.state}</span>
                   </div>
                   <div className="relative h-7 rounded bg-muted">
-                    <div className={cn('absolute top-0.5 h-6 rounded px-3 py-1 text-3xs font-semibold text-white', state?.canOperate ? 'bg-success-strong' : state && ['IN_REPAIR', 'BLOCKED', 'OVERDUE'].includes(state.status) ? 'bg-destructive-strong' : 'bg-signal-strong')} style={{ left: `${left}%`, width: `${width}%` }}>
-                      График смены не задан
+                    <div className={cn('absolute top-0.5 h-6 overflow-hidden rounded px-3 py-1 text-3xs font-semibold text-white', shift.state === 'STARTED' ? 'bg-success-strong' : shift.state === 'CANCELLED' ? 'bg-destructive-strong' : 'bg-signal-strong')} style={{ left: `${left}%`, width: `${width}%` }}>
+                      {start ? formatTimeInTimezone(start, timezone) : '—'} – {end ? formatTimeInTimezone(end, timezone) : '—'}
                     </div>
                     <div className="absolute bottom-[-8px] top-[-8px] left-[23%] w-px bg-signal-strong"><span className="absolute -top-5 -translate-x-1/2 rounded bg-signal-strong px-1.5 py-0.5 text-3xs text-white">сейчас</span></div>
                   </div>
                 </div>
               );
-            }) : <div className="col-span-2 py-16 text-center text-sm text-muted-foreground">Активные назначения бригад отсутствуют.</div>}
+            }) : <div className="col-span-2 py-16 text-center text-sm text-muted-foreground">Смены на сегодня не созданы.</div>}
           </div>
+          <div className="mt-3 space-y-2 md:hidden">{todayShifts.slice(0, 8).map((shift) => { const equipment = props.equipment.find((item) => item.id === shift.equipmentId); return <article key={shift.id} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><b className="truncate text-sm">{equipment?.name || 'Установка'}</b><span className="rounded bg-muted px-2 py-1 text-2xs">{shift.state}</span></div><div className="mt-2 text-xs text-muted-foreground">{shift.type === 'DAY' ? 'Дневная 08:00–20:00' : 'Ночная 20:00–08:00'} · v{shift.version}</div><div className="mt-3 flex gap-2">{shift.state === 'PLANNED' && props.bootstrap?.capabilities.entities.shift.manage && <Button type="button" variant="outline" className="min-h-11 flex-1 text-xs" onClick={() => { setCommand({shift, action: 'start'}); setCommandError(null); }}>Запустить</Button>}{shift.state === 'STARTED' && props.bootstrap?.capabilities.entities.shift.prepareHandover && <Button type="button" variant="outline" className="min-h-11 flex-1 text-xs" onClick={() => { setCommand({shift, action: 'handover'}); setCommandError(null); }}>Передать</Button>}</div></article>; })}{todayShifts.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">Смены не найдены.</div>}</div>
         </section>
         <aside className={cn(card, 'p-3')}>
-          <div className="flex items-center justify-between"><h2 className="font-bold">Передача смены</h2><span className="rounded border border-border px-2 py-1 text-3xs text-muted-foreground">3 действия</span></div>
+          <div className="flex items-center justify-between"><h2 className="font-bold">Передача смены</h2><span className="rounded border border-border px-2 py-1 text-3xs text-muted-foreground">{waiting.length} действий</span></div>
           <div className="mt-2 space-y-2">
-            {activeCrews.slice(0, 3).map((crew, index) => {
-              const state = crew.equipment ? props.readinessByEquipment[crew.equipment.id] : null;
-              const fleet = crew.equipment ? props.fleetCards.find((item) => item.id === crew.equipment?.id) : undefined;
+            {waiting.slice(0, 3).map((shift, index) => {
+              const equipment = props.equipment.find((item) => item.id === shift.equipmentId);
+              const crew = activeCrews.find((item) => item.equipment?.id === shift.equipmentId);
+              const fleet = props.fleetCards.find((item) => item.id === shift.equipmentId);
+              const handover = shift.handovers.find((item) => item.state === 'SUBMITTED');
               return (
-                <div key={crew.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal' : 'border-border')}>
-                  <div className="flex gap-2"><EquipmentPhoto cardData={fleet} name={crew.equipment?.name || crew.name} className="h-11 w-11 shrink-0" /><div className="min-w-0"><div className="truncate text-xs font-bold">{crew.equipment?.name || 'Без техники'}</div><div className="mt-1 truncate text-3xs text-muted-foreground">{crew.site?.name || 'Объект не назначен'} · {crew.name}</div></div></div>
-                  {index === 0 && <div className="mt-2 line-clamp-2 text-3xs leading-relaxed text-muted-foreground">{state?.reason || 'Нет решения о готовности'}</div>}
-                  {index < 2 ? <Button asChild variant={index === 0 ? 'default' : 'outline'} className={cn('mt-2 h-8 w-full text-2xs', index === 0 && 'bg-signal-strong hover:bg-signal-strong')}><Link href={index === 0 ? '/admin/maintenance' : crew.equipment ? `/inspections/new?equipmentId=${crew.equipment.id}` : '/inspections/new'}>{index === 0 ? 'Назначить механика' : 'Принять смену'}</Link></Button> : state && <div className="mt-2 flex items-center justify-between text-3xs text-muted-foreground"><span>Готовность</span><StatusPill status={state.status} /></div>}
+                <div key={shift.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal' : 'border-border')}>
+                  <div className="flex gap-2"><EquipmentPhoto cardData={fleet} name={equipment?.name || 'Установка'} className="h-11 w-11 shrink-0" /><div className="min-w-0"><div className="truncate text-xs font-bold">{equipment?.name || 'Установка'}</div><div className="mt-1 truncate text-3xs text-muted-foreground">{crew?.site?.name || 'Объект не назначен'} · {crew?.name || 'Экипаж не назначен'}</div></div></div>
+                  <div className="mt-2 line-clamp-2 text-3xs leading-relaxed text-muted-foreground">{handover?.summary || 'Передача ожидает решения диспетчера'}</div>
+                  <Button type="button" disabled={!handover || !props.bootstrap?.capabilities.entities.shift.decideHandover} onClick={() => handover && void acceptHandover(handover)} className="mt-2 min-h-11 w-full bg-signal-strong text-2xs hover:bg-signal-strong">Принять смену</Button>
                 </div>
               );
             })}
+            {waiting.length === 0 && <div className="py-8 text-center text-xs text-muted-foreground">Передачи на приёмку отсутствуют.</div>}
           </div>
         </aside>
       </div>
@@ -1073,32 +1257,95 @@ function ShiftsScreen(props: ReferenceUiProps) {
           { label: 'Механик', icon: 'repair', tasks: ['Устранить дефект', 'Подтвердить выполнение', 'Вернуть технику'], tone: 'orange' },
         ]}
       />
+      <CommandDialog
+        open={command !== null}
+        pending={commandPending}
+        title={command?.action === 'start' ? 'Запустить смену' : 'Передать смену диспетчеру'}
+        description={command ? `Версия ${command.shift.version} · ${command.shift.type === 'DAY' ? 'дневная' : 'ночная'} смена · ${timezone}` : undefined}
+        onClose={() => { setCommand(null); setCommandSummary(''); setCommandError(null); }}
+        footer={<Button type="button" disabled={commandPending || (command?.action === 'handover' && !commandSummary.trim())} onClick={() => command && void runShiftAction(command.shift, command.action)} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
+      >
+        <div className="space-y-3 text-sm"><p>{command?.action === 'start' ? 'Будет создан новый снимок готовности. Запуск заблокируется, если опубликованные правила требуют действующий наряд.' : 'После передачи диспетчер получит неизменяемую запись и сможет принять смену либо вернуть её на доработку.'}</p>{command?.action === 'handover' && <label className="grid gap-1 font-medium">Состояние техники и незавершённые работы<textarea value={commandSummary} onChange={(event) => setCommandSummary(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" /></label>}{commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}</div>
+      </CommandDialog>
     </>
   );
 }
 
 function PermitsScreen(props: ReferenceUiProps) {
+  const [permitQuery, setPermitQuery] = useState('');
+  const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL'>('ALL');
+  const [command, setCommand] = useState<{kind: 'create'} | {kind: 'action'; permit: WorkPermitDto; action: 'submit' | 'approve' | 'revoke'} | null>(null);
+  const [commandText, setCommandText] = useState('');
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const [commandPending, setCommandPending] = useState(false);
   const states = Object.values(props.readinessByEquipment);
-  const active = states.filter((item) => item.canOperate).length;
-  const blocked = states.filter((item) => ['IN_REPAIR', 'BLOCKED', 'OVERDUE'].includes(item.status)).length;
-  const pending = Math.max(0, props.equipment.length - active - blocked);
+  const active = props.permits.filter((item) => item.state === 'APPROVED').length;
+  const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
+  const pending = props.permits.filter((item) => item.state === 'PENDING_APPROVAL').length;
   const crewByEquipment = new Map(props.crews.flatMap((crew) => crew.isActive && crew.equipment ? [[crew.equipment.id, crew] as const] : []));
+  const filteredPermits = props.permits.filter((permit) => {
+    if (permitFilter !== 'ALL' && permit.state !== permitFilter) return false;
+    const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
+    const query = permitQuery.trim().toLocaleLowerCase('ru-RU');
+    return !query || permit.id.toLocaleLowerCase('ru-RU').includes(query) || equipmentName.toLocaleLowerCase('ru-RU').includes(query) || permit.scope.toLocaleLowerCase('ru-RU').includes(query);
+  });
+  const createPermit = async (confirmed = false) => {
+    if (!props.selectedId || !props.bootstrap?.capabilities.entities.permit.edit) return;
+    if (!confirmed) { setCommand({kind: 'create'}); setCommandText(''); setCommandError(null); return; }
+    if (!commandText.trim()) { setCommandError('Укажите состав и границы работ.'); return; }
+    setCommandPending(true);
+    const validFrom = new Date();
+    const validTo = new Date(validFrom.getTime() + 12 * 3_600_000);
+    const response = await authFetch('/api/readiness/work-permits', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        ...(props.bootstrap?.actor.actingAs === 'MECHANIC' ? { 'x-readiness-acting-as': 'MECHANIC' } : {}),
+      },
+      body: JSON.stringify({ equipmentId: props.selectedId, shiftId: null, risk: props.filters.risk ?? 'NORMAL', scope: commandText.trim(), validFrom: validFrom.toISOString(), validTo: validTo.toISOString() }),
+    });
+    setCommandPending(false);
+    if (!response.ok) { setCommandError(await commandFailure(response)); if (response.status === 409) props.onRetry(); return; }
+    toast.success('Наряд создан');
+    setCommand(null);
+    props.onRetry();
+  };
+  const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
+    if (!confirmed) { setCommand({kind: 'action', permit, action}); setCommandText(''); setCommandError(null); return; }
+    if (action === 'revoke' && !commandText.trim()) { setCommandError('Укажите причину отзыва наряда.'); return; }
+    setCommandPending(true);
+    const response = await authFetch(`/api/readiness/work-permits/${permit.id}/${action}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        'if-match': `"work-permit-${permit.id}-v${permit.version}"`,
+        ...(action !== 'approve' && props.bootstrap?.actor.actingAs === 'MECHANIC' ? { 'x-readiness-acting-as': 'MECHANIC' } : {}),
+      },
+      body: JSON.stringify(action === 'revoke'
+        ? { expectedVersion: permit.version, reason: commandText.trim() }
+        : { expectedVersion: permit.version }),
+    });
+    setCommandPending(false);
+    if (!response.ok) { setCommandError(await commandFailure(response)); if (response.status === 409) props.onRetry(); return; }
+    toast.success(action === 'submit' ? 'Наряд отправлен на согласование' : action === 'approve' ? 'Наряд согласован' : 'Наряд отозван');
+    setCommand(null);
+    props.onRetry();
+  };
 
   return (
     <>
-      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => downloadCsv('work-permits.csv', [
-        ['Установка', 'Готовность', 'Статус', 'Причина'],
-        ...props.equipment.map((item) => [item.name, props.readinessByEquipment[item.id]?.score, props.readinessByEquipment[item.id]?.status, props.readinessByEquipment[item.id]?.reason]),
-      ])}>Экспорт</Button><Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href={props.selectedId ? `/inspections/new?equipmentId=${props.selectedId}` : '/inspections/new'}>+ Создать наряд</Link></Button></div>} />
+      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => void downloadReadinessExport('permits', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button><Button type="button" disabled={!props.selectedId || !props.bootstrap?.capabilities.entities.permit.edit} onClick={() => void createPermit()} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="documents" label="Всего нарядов" value={props.equipment.length} />
+        <RefKpi icon="documents" label="Всего нарядов" value={props.permits.length} />
         <RefKpi icon="accepted" label="Действуют" value={active} />
         <RefKpi icon="history" label="На согласовании" value={pending} alert={pending > 0} />
         <RefKpi icon="defect" label="Заблокированы" value={blocked} alert={blocked > 0} />
       </section>
       <section className={cn(card, 'mt-2 p-3')}>
-        <div className="flex items-center gap-2"><CheckCircle2 className="h-6 w-6 text-success-strong" /><h2 className="font-bold">Условия допуска подтверждены для {active} из {props.equipment.length} смен</h2></div>
-        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-border"><div className="bg-success-strong" style={{ width: `${props.equipment.length ? active / props.equipment.length * 100 : 0}%` }} /><div className="bg-signal-strong" style={{ width: `${props.equipment.length ? pending / props.equipment.length * 100 : 0}%` }} /><div className="flex-1 bg-destructive-strong" /></div>
+        <div className="flex items-center gap-2"><CheckCircle2 className="h-6 w-6 text-success-strong" /><h2 className="font-bold">Условия допуска подтверждены для {active} из {props.permits.length} нарядов</h2></div>
+        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-border"><div className="bg-success-strong" style={{ width: `${props.permits.length ? active / props.permits.length * 100 : 0}%` }} /><div className="bg-signal-strong" style={{ width: `${props.permits.length ? pending / props.permits.length * 100 : 0}%` }} /><div className="flex-1 bg-destructive-strong" /></div>
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted-foreground"><span>● <b>{active}</b> допущено</span><span className="text-signal-strong">● <b>{pending}</b> ожидают подтверждения</span><span className="text-destructive-strong">● <b>{blocked}</b> заблокировано</span><span className="xl:ml-auto text-muted-foreground">Фактическая проверка условий готовности</span></div>
       </section>
       <section className={cn(card, 'mt-2 p-3')}>
@@ -1119,24 +1366,42 @@ function PermitsScreen(props: ReferenceUiProps) {
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'overflow-x-auto')}>
-          <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input placeholder="Номер, установка, объект" className="h-8 bg-muted pl-9 text-xs" /></div>{['Все', 'Действующие', 'На согласовании'].map((label, index) => <button key={label} type="button" className={cn('rounded border px-3 text-2xs', index === 0 ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
-          <div className="grid min-w-[760px] grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_18px] border-y border-border bg-muted px-3 py-2 text-3xs uppercase tracking-wide text-muted-foreground"><span>№ наряда</span><span>Установка</span><span>Объект</span><span>Смена</span><span>Действует до</span><span>Готовность</span><span>Статус</span><span /></div>
-          <div className="max-h-[230px] min-w-[760px] divide-y divide-border overflow-y-auto">
-            {props.equipment.map((item, index) => {
-              const state = props.readinessByEquipment[item.id];
-              const crew = crewByEquipment.get(item.id);
-              const passed = state?.evidence.filter((entry) => entry.state === 'pass').length ?? 0;
+          <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
+          <div className="hidden min-w-[880px] grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] border-y border-border bg-muted px-3 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>№ наряда</span><span>Установка</span><span>Объект</span><span>Смена</span><span>Действует до</span><span>Готовность</span><span>Статус</span><span>Действие</span></div>
+          <div className="hidden max-h-[230px] min-w-[760px] divide-y divide-border overflow-y-auto md:block">
+            {filteredPermits.map((permit, index) => {
+              const item = props.equipment.find((entry) => entry.id === permit.equipmentId);
+              const crew = crewByEquipment.get(permit.equipmentId);
+              const current = props.currentReadiness.find((entry) => entry.equipmentId === permit.equipmentId);
               return (
-                <div key={item.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_18px] items-center px-3 py-2 text-2xs hover:bg-orange-50/30', index === 0 && 'bg-orange-50/70 ring-1 ring-inset ring-orange-200')}>
-                  <span className="font-bold">НД-{new Date().getFullYear()}-{String(index + 1).padStart(4, '0')}</span><span>{item.name}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{crew?.name || '—'}</span><span>Не установлен</span><span><b className="text-signal-strong">{passed} из 5</b></span><span>{state && <StatusPill status={state.status} />}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', index === 0 && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
+                  <span className="font-bold">НД-{permit.id.slice(-8).toUpperCase()}</span><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span><b className="text-signal-strong">{current?.score ?? '—'}%</b></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{permit.state}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
                 </div>
               );
             })}
+            {filteredPermits.length === 0 && <div className="py-12 text-center text-sm text-muted-foreground">По выбранным условиям наряды не найдены.</div>}
+          </div>
+          <div className="space-y-2 p-3 md:hidden">
+            {filteredPermits.map((permit) => {
+              const item = props.equipment.find((equipment) => equipment.id === permit.equipmentId);
+              const crew = crewByEquipment.get(permit.equipmentId);
+              const current = props.currentReadiness.find((entry) => entry.equipmentId === permit.equipmentId);
+              const action = permit.state === 'DRAFT' ? 'submit' : permit.state === 'PENDING_APPROVAL' ? 'approve' : permit.state === 'APPROVED' ? 'revoke' : null;
+              const canAct = action === 'submit' ? props.bootstrap?.capabilities.entities.permit.edit
+                : action === 'approve' ? (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin)
+                  : action === 'revoke' ? props.bootstrap?.capabilities.entities.permit.edit : false;
+              return <article key={permit.id} className="rounded-lg border border-border p-3 text-xs">
+                <div className="flex items-start justify-between gap-2"><div className="min-w-0"><b className="block truncate">НД-{permit.id.slice(-8).toUpperCase()}</b><span className="mt-1 block truncate text-muted-foreground">{item?.name || 'Установка'} · {crew?.site?.name || 'Объект не назначен'}</span></div><span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold', permit.state === 'APPROVED' ? 'bg-success/10 text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'bg-signal/10 text-signal-strong' : 'bg-muted text-muted-foreground')}>{permit.state}</span></div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-2xs"><span className="text-muted-foreground">Действует до<br /><b className="text-foreground">{formatDateTimeInTimezone(permit.validTo, props.bootstrap?.tenant.timezone)}</b></span><span className="text-muted-foreground">Готовность<br /><b className="text-signal-strong">{current?.score ?? '—'}%</b></span></div>
+                {action && canAct && <Button type="button" variant="outline" className="mt-3 min-h-11 w-full text-xs" onClick={() => void runPermitAction(permit, action)}>{action === 'submit' ? 'Отправить' : action === 'approve' ? 'Согласовать' : 'Отозвать'}</Button>}
+              </article>;
+            })}
+            {filteredPermits.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">По выбранным условиям наряды не найдены.</div>}
           </div>
         </section>
         <aside className={cn(card, 'p-3')}>
           <div className="flex items-center justify-between"><h2 className="font-bold">Ожидают согласования</h2><span className="text-xs text-muted-foreground">{pending}</span></div>
-          <div className="mt-2 space-y-2">{props.equipment.filter((item) => !props.readinessByEquipment[item.id]?.canOperate).slice(0, 2).map((item, index) => <div key={item.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal' : 'border-border')}><div className="text-xs font-bold">НД-{new Date().getFullYear()}-{String(index + 1).padStart(4, '0')}</div><div className="mt-1 text-3xs text-muted-foreground">{item.name}</div><div className="mt-1 line-clamp-2 text-3xs text-destructive-strong">⚠ {props.readinessByEquipment[item.id]?.reason}</div></div>)}</div>
+          <div className="mt-2 space-y-2">{props.permits.filter((item) => item.state === 'PENDING_APPROVAL').slice(0, 2).map((permit, index) => <div key={permit.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal' : 'border-border')}><div className="text-xs font-bold">НД-{permit.id.slice(-8).toUpperCase()}</div><div className="mt-1 text-3xs text-muted-foreground">{props.equipment.find((item) => item.id === permit.equipmentId)?.name || 'Установка'}</div><div className="mt-1 line-clamp-2 text-3xs text-signal-strong">{permit.risk === 'ELEVATED' ? 'Повышенный риск · требуется два согласования' : 'Ожидает решения диспетчера'}</div></div>)}</div>
           <div className="mt-3 border-t border-border pt-3"><h3 className="text-xs font-bold">Журнал согласования</h3><div className="mt-2 space-y-1.5 text-3xs"><div className="text-success-strong">● Создан мастером</div><div className="text-info-strong">● Проверен инженером ОТ</div><div className="text-signal-strong">● Ожидает диспетчера · {pending}</div></div></div>
         </aside>
       </div>
@@ -1148,19 +1413,38 @@ function PermitsScreen(props: ReferenceUiProps) {
           { label: 'Диспетчер', icon: 'crew', tasks: ['Проверяет условия', 'Подтверждает допуск', 'Разрешает начало работ'], tone: 'orange' },
         ]}
       />
+      <CommandDialog
+        open={command !== null}
+        pending={commandPending}
+        title={command?.kind === 'create' ? 'Создать наряд-допуск' : command?.action === 'submit' ? 'Отправить на согласование' : command?.action === 'approve' ? 'Согласовать наряд' : 'Отозвать наряд'}
+        description={command?.kind === 'action' ? `Версия ${command.permit.version} · риск ${command.permit.risk === 'ELEVATED' ? 'повышенный' : 'обычный'} · ${props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}` : `Срок действия: 12 часов · ${props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}`}
+        onClose={() => { setCommand(null); setCommandText(''); setCommandError(null); }}
+        footer={<Button type="button" disabled={commandPending || ((command?.kind === 'create' || (command?.kind === 'action' && command.action === 'revoke')) && !commandText.trim())} onClick={() => command?.kind === 'create' ? void createPermit(true) : command?.kind === 'action' ? void runPermitAction(command.permit, command.action, true) : undefined} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
+      >
+        <div className="space-y-3 text-sm"><p>{command?.kind === 'create' ? 'Наряд будет создан как черновик. Для повышенного риска потребуются решения диспетчера и администратора.' : command?.action === 'approve' ? 'Решение попадёт в доказательный журнал и вызовет новый снимок готовности.' : command?.action === 'submit' ? 'После отправки содержание нельзя менять без сброса согласований.' : 'Отзыв немедленно прекращает действие наряда и может заблокировать запуск смены.'}</p>{(command?.kind === 'create' || (command?.kind === 'action' && command.action === 'revoke')) && <label className="grid gap-1 font-medium">{command.kind === 'create' ? 'Состав и границы работ' : 'Причина отзыва'}<textarea value={commandText} onChange={(event) => setCommandText(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" /></label>}{commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}</div>
+      </CommandDialog>
     </>
   );
 }
 
 function MaintenanceScreen(props: ReferenceUiProps) {
+  const [maintenanceFilter, setMaintenanceFilter] = useState<'ALL' | 'CRITICAL' | 'ACTIVE' | 'PLANNED'>('ALL');
+  const [maintenanceQuery, setMaintenanceQuery] = useState('');
   const open = props.maintenance.filter((record) => !['DONE', 'CANCELLED'].includes(record.status));
   const critical = open.filter((record) => ['CRITICAL', 'HIGH'].includes(record.priority));
   const planned = open.filter((record) => ['PLANNED', 'ASSIGNED'].includes(record.status));
   const servicePercent = props.equipment.length ? Math.round(((props.equipment.length - critical.length) / props.equipment.length) * 100) : 0;
+  const displayedMaintenance = props.maintenance.filter((record) => {
+    if (maintenanceFilter === 'CRITICAL' && !['CRITICAL', 'HIGH'].includes(record.priority)) return false;
+    if (maintenanceFilter === 'ACTIVE' && !['IN_PROGRESS', 'ASSIGNED'].includes(record.status)) return false;
+    if (maintenanceFilter === 'PLANNED' && !['PLANNED', 'ASSIGNED'].includes(record.status)) return false;
+    const query = maintenanceQuery.trim().toLocaleLowerCase('ru-RU');
+    return !query || record.title.toLocaleLowerCase('ru-RU').includes(query) || record.equipment?.name.toLocaleLowerCase('ru-RU').includes(query);
+  });
 
   return (
     <>
-      <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><select className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs"><option>Все установки</option></select><select className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs"><option>Сегодня</option></select><Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance">+ Создать заявку</Link></Button></div>} />
+      <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance">+ Создать заявку</Link></Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="defect" label="Критические дефекты" value={critical.length} alert={critical.length > 0} />
         <RefKpi icon="work-order" label="Работы сегодня" value={open.length} />
@@ -1170,16 +1454,16 @@ function MaintenanceScreen(props: ReferenceUiProps) {
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'p-3')}>
           <h2 className="font-bold">Заявки и работы</h2>
-          <div className="mt-3 flex flex-wrap gap-2">{['Все', 'Критические', 'В работе', 'Плановые'].map((label, index) => <button key={label} type="button" className={cn('h-8 rounded border px-3 text-xs', index === 0 ? 'border-signal text-signal-strong' : 'border-border text-muted-foreground')}>{label}</button>)}<div className="relative min-w-[220px] flex-1 xl:ml-auto xl:max-w-64"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input placeholder="Поиск по технике или заявке" className="h-8 bg-muted pl-9 text-xs" /></div></div>
+          <div className="mt-3 flex flex-wrap gap-2">{([['ALL', 'Все'], ['CRITICAL', 'Критические'], ['ACTIVE', 'В работе'], ['PLANNED', 'Плановые']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={maintenanceFilter === value} onClick={() => setMaintenanceFilter(value)} className={cn('min-h-11 rounded border px-3 text-xs', maintenanceFilter === value ? 'border-signal bg-signal/10 text-signal-strong' : 'border-border text-muted-foreground')}>{label}</button>)}<div className="relative min-w-[220px] flex-1 xl:ml-auto xl:max-w-64"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск по обслуживанию" value={maintenanceQuery} onChange={(event) => setMaintenanceQuery(event.target.value)} placeholder="Поиск по технике или заявке" className="min-h-11 bg-muted pl-9 text-xs" /></div></div>
           <div className="mt-2 max-h-[364px] space-y-2 overflow-y-auto pr-1">
-            {props.maintenance.length > 0 ? props.maintenance.slice(0, 8).map((record, index) => {
+            {displayedMaintenance.length > 0 ? displayedMaintenance.slice(0, 8).map((record, index) => {
               const fleet = record.equipment ? props.fleetCards.find((item) => item.id === record.equipment?.id) : undefined;
               const criticalRecord = ['CRITICAL', 'HIGH'].includes(record.priority);
               return (
                 <article key={record.id} className={cn('flex min-h-[86px] flex-wrap items-center gap-3 rounded-lg border-l-[3px] p-2.5 sm:flex-nowrap', criticalRecord ? 'border-y border-r border-destructive/25 border-l-destructive bg-destructive/10' : index % 2 ? 'border-y border-r border-info/25 border-l-info bg-info/10' : 'border-y border-r border-signal/25 border-l-signal bg-signal/10')}>
                   <EquipmentPhoto cardData={fleet} name={record.equipment?.name || record.title} className="h-14 w-14 shrink-0" />
                   <span className={cn('grid h-9 w-9 place-items-center rounded-full', criticalRecord ? 'bg-destructive/10 text-destructive-strong' : 'bg-white text-signal-strong')}>{criticalRecord ? <AlertTriangle className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}</span>
-                  <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-bold">{record.title}</h3><div className="mt-0.5 text-2xs text-muted-foreground">{record.equipment?.name || 'Установка не указана'}</div><div className="mt-0.5 line-clamp-1 text-2xs text-muted-foreground">{record.description || 'Описание не заполнено'}</div><div className="mt-1 text-3xs text-muted-foreground">▣ {record.scheduledAt ? new Date(record.scheduledAt).toLocaleString('ru-RU') : 'Срок не задан'}</div></div>
+                  <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-bold">{record.title}</h3><div className="mt-0.5 text-2xs text-muted-foreground">{record.equipment?.name || 'Установка не указана'}</div><div className="mt-0.5 line-clamp-1 text-2xs text-muted-foreground">{record.description || 'Описание не заполнено'}</div><div className="mt-1 text-3xs text-muted-foreground">▣ {record.scheduledAt ? formatDateTimeInTimezone(record.scheduledAt, props.bootstrap?.tenant.timezone) : 'Срок не задан'}</div></div>
                   <div className="w-full text-left text-2xs sm:w-36 sm:text-right"><div className={cn('font-semibold', criticalRecord ? 'text-destructive-strong' : 'text-info-strong')}>{criticalRecord ? 'Критическое' : record.status}</div><div className="mt-1 text-muted-foreground">Приоритет · <b className="text-muted-foreground">{record.priority}</b></div><Button asChild className="mt-2 h-8 bg-signal-strong text-2xs hover:bg-signal-strong"><Link href={`/admin/maintenance/${record.id}`}>Открыть заявку</Link></Button></div>
                 </article>
               );
@@ -1234,16 +1518,39 @@ function MaintenanceScreen(props: ReferenceUiProps) {
 }
 
 function ReportsScreen(props: ReferenceUiProps) {
+  const [reportPeriod, setReportPeriod] = useState<'day' | 'week'>('day');
   const states = Object.values(props.readinessByEquipment);
-  const ready = states.filter((item) => item.canOperate).length;
-  const blocked = states.filter((item) => ['IN_REPAIR', 'BLOCKED', 'OVERDUE'].includes(item.status)).length;
-  const readinessPercent = states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
-  const allRecords = Object.values(props.journals).flat();
-  const journalRows = Object.entries(props.journals).flatMap(([equipmentId, records]) => records.map((record) => ({
-    ...record,
-    equipmentName: props.equipment.find((item) => item.id === equipmentId)?.name || 'Установка',
-  })));
-  const completed = allRecords.filter((record) => record.status === 'DONE').length;
+  const authoritative = props.currentReadiness.length > 0 ? props.currentReadiness : null;
+  const ready = authoritative
+    ? authoritative.filter((item) => item.status === 'READY').length
+    : states.filter((item) => item.canOperate).length;
+  const blocked = authoritative
+    ? authoritative.filter((item) => item.status === 'BLOCKED').length
+    : states.filter((item) => ['IN_REPAIR', 'BLOCKED', 'OVERDUE'].includes(item.status)).length;
+  const readinessPercent = authoritative?.length
+    ? Math.round(authoritative.reduce((sum, item) => sum + item.score, 0) / authoritative.length * 10) / 10
+    : states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
+  const snapshotRows = props.readinessHistory.map((snapshot) => ({
+    id: snapshot.id,
+    completedAt: snapshot.calculatedAt,
+    createdAt: snapshot.calculatedAt,
+    equipmentName: props.equipment.find((item) => item.id === snapshot.equipmentId)?.name || 'Установка',
+    title: `Снимок готовности · ${snapshot.triggerType ?? 'событие'}`,
+    type: 'READINESS_SNAPSHOT',
+    status: `${snapshot.status} · ${snapshot.score}%`,
+  }));
+  const decisionRows = (props.audit?.data ?? []).filter((event) => ['WorkPermit', 'ShiftHandover', 'Shift'].includes(event.entity.type)).map((event) => ({
+    id: event.id,
+    completedAt: event.occurredAt,
+    createdAt: event.occurredAt,
+    equipmentName: event.entity.type,
+    title: event.action,
+    type: 'AUDIT_DECISION',
+    status: `Зафиксировано · #${event.sequence}`,
+  }));
+  const journalRows = [...snapshotRows, ...decisionRows]
+    .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
+  const completed = journalRows.length;
   const blockerRows = [
     ['Ремонт и дефекты', blocked],
     ['Осмотр', states.filter((item) => item.evidence.find((e) => e.key === 'inspection')?.state !== 'pass').length],
@@ -1251,23 +1558,36 @@ function ReportsScreen(props: ReferenceUiProps) {
     ['Документы', states.filter((item) => item.evidence.find((e) => e.key === 'maintenance')?.state !== 'pass').length],
   ] as const;
   const maxBlocker = Math.max(1, ...blockerRows.map(([, value]) => value));
+  const dailyTrend = Object.entries(props.readinessHistory.reduce<Record<string, number[]>>((result, snapshot) => {
+    const date = new Date(snapshot.calculatedAt);
+    if (reportPeriod === 'week') date.setDate(date.getDate() - date.getDay());
+    const day = date.toISOString().slice(0, 10);
+    (result[day] ??= []).push(snapshot.score);
+    return result;
+  }, {})).sort(([left], [right]) => left.localeCompare(right)).slice(-30).map(([day, scores]) => ({
+    day,
+    score: Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length),
+  }));
+  const trendPoints = dailyTrend.length > 0
+    ? dailyTrend.map((item, index) => `${dailyTrend.length === 1 ? 300 : index / (dailyTrend.length - 1) * 600},${200 - item.score * 2}`).join(' ')
+    : '';
 
   return (
     <>
-      <ScreenTitle heading="Отчёты" subtitle="Аналитика доказательной готовности" actions={<div className="flex flex-wrap gap-2"><span className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs">▣ Текущий срез · {new Date().toLocaleDateString('ru-RU')}</span><Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => downloadCsv('readiness-report.csv', [['Дата', 'Установка', 'Событие', 'Тип', 'Статус'], ...journalRows.map((record) => [record.completedAt || record.createdAt, record.equipmentName, record.title, record.type, record.status])])}>Экспорт</Button></div>} />
+      <ScreenTitle heading="Отчёты" subtitle="Аналитика доказательной готовности" actions={<div className="flex flex-wrap gap-2"><span className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs">▣ Текущий срез · {formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone)}</span><Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
         <RefKpi icon="technical-readiness" label="Готовность парка" value={`${readinessPercent}%`} detail="текущий срез" />
         <RefKpi icon="shift-start" label="Смен допущено" value={ready} detail="по текущим доказательствам" />
         <RefKpi icon="defect" label="Заблокировано" value={blocked} alert={blocked > 0} />
         <RefKpi icon="history" label="Среднее решение" value="—" detail="нет истории решений" />
-        <RefKpi icon="documents" label="Доказательств" value={completed} detail={`из ${allRecords.length} записей`} />
+        <RefKpi icon="documents" label="Доказательств" value={completed} detail="снимки и решения audit-chain" />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
         <section className={cn(card, 'p-3')}>
-          <div className="flex items-center justify-between"><h2 className="font-bold">Динамика готовности за 30 дней</h2><div className="flex overflow-hidden rounded border border-border"><button className="bg-signal-strong px-3 py-1.5 text-xs text-white">День</button><button className="px-3 py-1.5 text-xs">Неделя</button></div></div>
+          <div className="flex items-center justify-between"><h2 className="font-bold">Динамика готовности за 30 дней</h2><div className="flex overflow-hidden rounded border border-border"><button type="button" aria-pressed={reportPeriod === 'day'} onClick={() => setReportPeriod('day')} className={cn('min-h-11 px-3 text-xs', reportPeriod === 'day' && 'bg-signal-strong text-white')}>День</button><button type="button" aria-pressed={reportPeriod === 'week'} onClick={() => setReportPeriod('week')} className={cn('min-h-11 px-3 text-xs', reportPeriod === 'week' && 'bg-signal-strong text-white')}>Неделя</button></div></div>
           <div className="relative mt-3 h-[150px] border-b border-l border-border">
             {[0, 1, 2, 3].map((line) => <div key={line} className="absolute inset-x-0 border-t border-dashed border-border" style={{ top: `${line * 33}%` }} />)}
-            <svg viewBox="0 0 600 200" preserveAspectRatio="none" className="absolute inset-0 h-full w-full"><defs><linearGradient id="readyFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--signal)" stopOpacity=".18" /><stop offset="100%" stopColor="var(--signal)" stopOpacity="0" /></linearGradient></defs><path d="M0 75 L45 68 L90 78 L135 55 L180 82 L225 64 L270 90 L315 110 L360 74 L405 82 L450 62 L495 76 L540 60 L600 72 L600 200 L0 200 Z" fill="url(#readyFill)" /><path d="M0 75 L45 68 L90 78 L135 55 L180 82 L225 64 L270 90 L315 110 L360 74 L405 82 L450 62 L495 76 L540 60 L600 72" fill="none" stroke="var(--signal)" strokeWidth="3" /></svg>
+            {trendPoints ? <svg viewBox="0 0 600 200" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label="Динамика средней готовности"><polyline points={trendPoints} fill="none" stroke="var(--signal)" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg> : <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">История снимков пока не накоплена</div>}
             <div className="absolute right-3 top-3 rounded border border-border bg-white px-3 py-2 text-xs"><b>{readinessPercent}%</b><br /><span className="text-muted-foreground">сегодня</span></div>
           </div>
         </section>
@@ -1292,17 +1612,20 @@ function ReportsScreen(props: ReferenceUiProps) {
           <div><h2 className="font-bold">Доказательный журнал</h2><p className="mt-1 text-xs text-muted-foreground">Неизменяемая история решений и подтверждений</p></div>
           <div className="flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1 sm:w-64"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input className="h-8 bg-muted pl-9 text-xs" placeholder="Поиск по установке или событию" /></div><Button variant="outline" className="h-8 text-xs">Фильтры</Button><Button variant="outline" className="h-8 text-xs" onClick={() => props.onViewChange('maintenance')}>Открыть полный журнал</Button></div>
         </div>
-        <div className="grid min-w-[760px] grid-cols-[160px_190px_minmax(0,1fr)_150px_120px] border-y border-border bg-muted px-4 py-2 text-3xs uppercase tracking-wide text-muted-foreground"><span>Дата и время</span><span>Установка</span><span>Событие</span><span>Тип</span><span>Статус</span></div>
-        <div className="min-w-[760px] divide-y divide-border">
+        <div className="hidden min-w-[760px] grid-cols-[160px_190px_minmax(0,1fr)_150px_120px] border-y border-border bg-muted px-4 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>Дата и время</span><span>Установка</span><span>Событие</span><span>Тип</span><span>Статус</span></div>
+        <div className="hidden min-w-[760px] divide-y divide-border md:block">
           {journalRows.length > 0 ? journalRows.slice(0, 4).map((record) => (
             <div key={record.id} className="grid grid-cols-[160px_190px_minmax(0,1fr)_150px_120px] items-center px-4 py-2 text-2xs">
-              <span className="text-muted-foreground">{new Date(record.completedAt || record.createdAt).toLocaleString('ru-RU')}</span>
+              <span className="text-muted-foreground">{formatDateTimeInTimezone(record.completedAt || record.createdAt, props.bootstrap?.tenant.timezone)}</span>
               <span className="font-semibold">{record.equipmentName}</span>
               <span className="truncate">{record.title}</span>
               <span className="text-muted-foreground">{record.type}</span>
               <span><span className={cn('rounded px-2 py-1 text-3xs font-semibold', record.status === 'DONE' ? 'bg-success/10 text-success-strong' : 'bg-signal/10 text-signal-strong')}>{record.status}</span></span>
             </div>
           )) : <div className="py-10 text-center text-sm text-muted-foreground">Записи доказательного журнала отсутствуют.</div>}
+        </div>
+        <div className="space-y-2 p-3 md:hidden">
+          {journalRows.length > 0 ? journalRows.slice(0, 10).map((record) => <article key={record.id} className="rounded-lg border border-border p-3 text-xs"><div className="flex items-start justify-between gap-2"><b className="min-w-0 truncate">{record.equipmentName}</b><span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold', record.status === 'DONE' ? 'bg-success/10 text-success-strong' : 'bg-signal/10 text-signal-strong')}>{record.status}</span></div><div className="mt-2 font-medium">{record.title}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground"><span>{formatDateTimeInTimezone(record.completedAt || record.createdAt, props.bootstrap?.tenant.timezone)}</span><span>{record.type}</span></div></article>) : <div className="py-8 text-center text-sm text-muted-foreground">Записи доказательного журнала отсутствуют.</div>}
         </div>
       </section>
       <section className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-signal/25 bg-signal/10 px-3 py-2">
@@ -1348,11 +1671,11 @@ function SettingsWorkspace(props: ReferenceUiProps) {
             {...props}
           />
         )}
-        {props.settingsSection === 'checklists' && <ChecklistsSettings {...props} />}
-        {props.settingsSection === 'roles' && <RolesSettings {...props} />}
-        {props.settingsSection === 'dictionaries' && <DictionariesSettings {...props} />}
-        {props.settingsSection === 'notifications' && <NotificationsSettings />}
-        {props.settingsSection === 'integrations' && <IntegrationsSettings {...props} />}
+        {props.settingsSection === 'checklists' && <LiveChecklistsSettings {...props} />}
+        {props.settingsSection === 'roles' && <LiveRolesSettings {...props} />}
+        {props.settingsSection === 'dictionaries' && <LiveDictionariesSettings {...props} />}
+        {props.settingsSection === 'notifications' && <NotificationsSettings props={props} />}
+        {props.settingsSection === 'integrations' && <LiveIntegrationsSettings {...props} />}
         {props.settingsSection === 'audit' && <AuditSettings {...props} />}
       </main>
     </div>
@@ -1367,10 +1690,10 @@ function SettingsKpis({ items }: { items: Array<{ icon: PilingIconName; label: s
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange?: (checked: boolean) => void }) {
+function Toggle({ checked, onChange, disabled = false, label = 'Переключатель' }: { checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; label?: string }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} disabled={!onChange} onClick={() => onChange?.(!checked)} className={cn('relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed', checked ? 'bg-success-strong' : 'bg-border')}>
-      <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition', checked ? 'left-[18px]' : 'left-0.5')} />
+    <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled || !onChange} onClick={() => onChange?.(!checked)} className="grid min-h-11 min-w-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed">
+      <span className={cn('relative block h-5 w-9 rounded-full transition', checked ? 'bg-success-strong' : 'bg-border')}><span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition', checked ? 'left-[18px]' : 'left-0.5')} /></span>
     </button>
   );
 }
@@ -1383,7 +1706,7 @@ function RulesSettings(props: ReferenceUiProps) {
   const [saving, setSaving] = useState(false);
 
   const total = draft.criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
-  const rulesUnavailable = !props.rulesAvailable;
+  const rulesUnavailable = !props.rulesAvailable || !props.bootstrap?.capabilities.entities.rules.manage;
   const previewFacts = props.factsByEquipment[props.selectedId];
   const preview = previewFacts ? computeReadinessScore(previewFacts, draft) : null;
   const pending = props.rulesState.pendingChanges + (dirty ? 1 : 0);
@@ -1494,7 +1817,7 @@ function RulesSettings(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle heading="Настройки системы" subtitle="Правила, доступы и конфигурация готовности" actions={<Button variant="outline"><History className="mr-2 h-4 w-4" />История изменений</Button>} />
+      <ScreenTitle heading="Настройки системы" subtitle="Правила, доступы и конфигурация готовности" actions={<Button variant="outline" onClick={() => props.onSettingsSectionChange('audit')}><History className="mr-2 h-4 w-4" />История изменений</Button>} />
       {rulesUnavailable && (
         <div role="alert" className="mb-3 flex flex-col gap-3 rounded-xl border border-signal/30 bg-signal/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1520,7 +1843,7 @@ function RulesSettings(props: ReferenceUiProps) {
                   {draft.criteria.map((criterion) => {
                     const meta = CRITERION_LABELS[criterion.key];
                     return (
-                      <div key={criterion.key} className="grid grid-cols-[minmax(0,1fr)_48px_76px_38px] items-center gap-2 py-2">
+                      <div key={criterion.key} className="grid grid-cols-[minmax(0,1fr)_48px_76px_44px] items-center gap-2 py-2">
                         <div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-muted-foreground" /><div><div className="text-xs font-semibold">{meta.title}</div><div className="text-3xs text-muted-foreground">{meta.hint}</div></div></div>
                         <input
                           type="number"
@@ -1553,23 +1876,29 @@ function RulesSettings(props: ReferenceUiProps) {
               </div>
               <div className="space-y-4">
                 <div className="rounded-xl border border-border p-3">
-                  <div className="flex items-center justify-between"><h3 className="font-bold">Критические блокеры</h3><span className="text-xs text-muted-foreground">{draft.blockers.filter((item) => item.isActive).length} из {draft.blockers.length} активны</span></div>
+                  <div className="flex items-center justify-between"><h3 className="font-bold">Блокеры и предупреждения</h3><span className="text-xs text-muted-foreground">{draft.blockers.filter((item) => item.isActive).length} из {draft.blockers.length} активны</span></div>
                   <div className="mt-2 grid grid-cols-[1fr_150px_36px] border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Условие</span><span>Действие</span><span /></div>
-                  {draft.blockers.map((blocker) => (
+                  {draft.blockers.map((blocker) => {
+                    // Предупреждение не останавливает работу — не красим его как критическое.
+                    const advisory = blocker.action === 'WARN_ONLY';
+                    return (
                     <div key={blocker.condition} className="grid grid-cols-[1fr_150px_36px] items-center border-b border-border py-2 text-2xs">
-                      <span className="flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5 text-destructive-strong" />{BLOCKER_LABELS[blocker.condition]}</span>
+                      <span className="flex items-center gap-2"><AlertTriangle className={cn('h-3.5 w-3.5', advisory ? 'text-warning-strong' : 'text-destructive-strong')} />{BLOCKER_LABELS[blocker.condition]}</span>
                       <select
                         value={blocker.action}
                         disabled={saving || rulesUnavailable}
                         onChange={(event) => patchBlocker(blocker.condition, { action: event.target.value as BlockerAction })}
-                        aria-label={`Действие блокера ${BLOCKER_LABELS[blocker.condition]}`}
-                        className="mr-2 w-[142px] min-w-0 rounded border border-destructive/25 bg-destructive/10 px-1 py-1 text-3xs text-destructive-strong"
+                        aria-label={`Действие правила ${BLOCKER_LABELS[blocker.condition]}`}
+                        className={cn('mr-2 w-[142px] min-w-0 rounded px-1 py-1 text-3xs', advisory
+                          ? 'border border-warning/25 bg-warning/10 text-warning-strong'
+                          : 'border border-destructive/25 bg-destructive/10 text-destructive-strong')}
                       >
                         {BLOCKER_ACTIONS.map((action) => <option key={action} value={action}>{BLOCKER_ACTION_LABELS[action]}</option>)}
                       </select>
                       <Toggle checked={blocker.isActive} onChange={saving || rulesUnavailable ? undefined : (isActive) => patchBlocker(blocker.condition, { isActive })} />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-border p-3"><h3 className="font-bold">Роли и доступы</h3><div className="mt-2 grid min-w-[420px] grid-cols-[1fr_repeat(4,60px)] text-3xs uppercase text-muted-foreground"><span /><span>Оператор</span><span>Диспетчер</span><span>Механик</span><span>Админ</span></div>{['Открывать смену', 'Принимать технику', 'Закрывать дефекты', 'Изменять правила'].map((permission, row) => <div key={permission} className="grid min-w-[420px] grid-cols-[1fr_repeat(4,60px)] items-center border-t border-border py-1.5 text-2xs"><span>{permission}</span>{[0, 1, 2, 3].map((column) => <span key={column} className="text-center">{column === 3 || (row < 2 && column < 2) || (row === 2 && column === 2) ? '✓' : '—'}</span>)}</div>)}</div>
               </div>
@@ -1577,7 +1906,7 @@ function RulesSettings(props: ReferenceUiProps) {
           </section>
         </div>
         <aside className="space-y-3">
-          <section className={cn(card, 'p-3')}><div className="rounded bg-success/10 px-3 py-2 text-sm font-bold text-success-strong">{props.rulesState.published.version} · Опубликована</div><div className="mt-2 text-2xs leading-relaxed text-muted-foreground">Последнее изменение: {props.rulesState.published.updatedAt ? new Date(props.rulesState.published.updatedAt).toLocaleString('ru-RU') : 'базовые правила'}<br />Установок затронуто: {props.equipment.length}</div></section>
+          <section className={cn(card, 'p-3')}><div className="rounded bg-success/10 px-3 py-2 text-sm font-bold text-success-strong">{props.rulesState.published.version} · Опубликована</div><div className="mt-2 text-2xs leading-relaxed text-muted-foreground">Последнее изменение: {props.rulesState.published.updatedAt ? formatDateTimeInTimezone(props.rulesState.published.updatedAt, props.bootstrap?.tenant.timezone) : 'базовые правила'}<br />Установок затронуто: {props.equipment.length}</div></section>
           <section className={cn(card, 'p-3')}><h3 className="font-bold">Действующая версия</h3><ul className="mt-2 space-y-1.5 text-2xs text-muted-foreground"><li>✓ Пять взвешенных критериев</li><li>✓ Версионирование публикаций</li><li>✓ Критические блокировки запуска</li></ul></section>
           <section className="rounded-[14px] border border-signal/25 bg-signal/10 p-3"><div className="flex items-center justify-between"><h3 className="font-bold">Неопубликованные изменения</h3><span className="rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive-strong">{pending}</span></div><ul className="mt-2 space-y-1.5 text-2xs text-muted-foreground"><li>• Изменения сохраняются как черновик</li><li>• После публикации создаётся новая версия</li></ul><Button onClick={() => void publishRules()} disabled={saving || rulesUnavailable || pending === 0} className="mt-3 h-9 w-full bg-signal-strong hover:bg-signal-strong">Опубликовать</Button><Button onClick={() => void saveDraft()} disabled={saving || rulesUnavailable || !dirty} variant="outline" className="mt-2 h-9 w-full">Сохранить черновик</Button></section>
         </aside>
@@ -1662,22 +1991,56 @@ function DictionariesSettings(props: ReferenceUiProps) {
   );
 }
 
-function NotificationsSettings() {
-  const toggles = [false, false, false, false, false];
+function NotificationsSettings({ props }: { props: ReferenceUiProps }) {
+  const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const isAdmin = props.bootstrap?.actor.role === 'ADMIN';
+  useEffect(() => {
+    let active = true;
+    void authFetch('/api/settings')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('settings');
+        const body = await response.json() as WorkspaceSettings;
+        if (active) setSettings(body);
+      })
+      .catch(() => active && toast.error('Не удалось загрузить настройки уведомлений'))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
   const rules = [
-    ['Критический дефект техники', 'Критический', 'Диспетчер, механик, мастер', 'Push · Telegram · SMS'],
-    ['Наряд-допуск ожидает согласования', 'Высокий', 'Ответственный за наряды', 'Push · Telegram · Email'],
-    ['ТО наступит через 50 м/ч', 'Средний', 'Механик', 'Push · Telegram · Email'],
-    ['Смена не передана до 20:15', 'Высокий', 'Старший смены, диспетчер', 'Push · Telegram · SMS'],
-    ['Потеря связи более 30 минут', 'Низкий', 'Диспетчер', 'Push · Email'],
+    ['downtime30', 'Простой установки более 30 минут', 'Критический', 'Диспетчер, механик', 'Telegram · Push'],
+    ['planDeviation', 'Отклонение от производственного плана', 'Высокий', 'Диспетчер, руководитель', 'Telegram · Email'],
+    ['maintenanceOverdue', 'Просроченное техническое обслуживание', 'Критический', 'Механик, администратор', 'Telegram · Push'],
+    ['newReports', 'Новый сменный отчёт или сводка', 'Средний', 'Диспетчер, администратор', 'Telegram · Email'],
   ] as const;
+  const toggleRule = async (key: string) => {
+    if (!isAdmin || savingKey) return;
+    const previous = settings;
+    const next = { ...settings, notifications: { ...settings.notifications, [key]: !settings.notifications[key] } };
+    setSettings(next);
+    setSavingKey(key);
+    const response = await authFetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(next),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setSettings(previous);
+      toast.error('Настройка не сохранена');
+    } else {
+      setSettings(await response.json() as WorkspaceSettings);
+      toast.success('Правило уведомления сохранено');
+    }
+    setSavingKey(null);
+  };
   return (
     <>
       <ScreenTitle heading="Уведомления" subtitle="Маршруты событий, приоритеты и контроль доставки" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/telegram">Создать правило</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'settings', label: 'Правил', value: rules.length }, { icon: 'accepted', label: 'Активных', value: toggles.filter(Boolean).length }, { icon: 'notifications', label: 'Доставлено сегодня', value: '—' }, { icon: 'risk', label: 'Ошибок', value: 0 }]} />
+      <SettingsKpis items={[{ icon: 'settings', label: 'Правил', value: NOTIFICATION_KEYS.length }, { icon: 'accepted', label: 'Активных', value: Object.values(settings.notifications).filter(Boolean).length }, { icon: 'notifications', label: 'Хранилище', value: loading ? 'Загрузка' : 'Сервер' }, { icon: 'risk', label: 'Ошибок', value: 0 }]} />
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-3">
-          <section className={cn(card, 'overflow-x-auto p-4')}><div className="flex items-center justify-between"><div><h2 className="font-bold">Маршрутизация событий</h2><p className="mt-1 text-2xs text-muted-foreground">Правила активируются в подключённом канале уведомлений.</p></div><Button asChild variant="outline"><Link href="/admin/telegram">Журнал доставки</Link></Button></div><div className="mt-4 grid min-w-[720px] grid-cols-[1.2fr_120px_1fr_1fr_50px] border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Событие</span><span>Приоритет</span><span>Получатели</span><span>Каналы</span><span>Статус</span></div>{rules.map(([event, priority, recipients, channels], index) => <div key={event} className="grid min-w-[720px] grid-cols-[1.2fr_120px_1fr_1fr_50px] items-center border-b border-border py-3 text-xs"><span>{event}</span><span className={cn('mr-4 rounded border px-2 py-1 font-semibold', priority === 'Критический' ? 'border-destructive/25 bg-destructive/10 text-destructive-strong' : priority === 'Высокий' ? 'border-signal/25 bg-signal/10 text-signal-strong' : priority === 'Средний' ? 'border-info/25 bg-info/10 text-info-strong' : 'border-border bg-muted text-muted-foreground')}>{priority}</span><span>{recipients}</span><span>{channels}</span><Toggle checked={toggles[index]} /></div>)}</section>
+          <section className={cn(card, 'overflow-x-auto p-4')}><div className="flex items-center justify-between"><div><h2 className="font-bold">Маршрутизация событий</h2><p className="mt-1 text-2xs text-muted-foreground">Изменения сохраняются в настройках организации.</p></div><Button asChild variant="outline"><Link href="/admin/telegram">Журнал доставки</Link></Button></div><div className="mt-4 grid min-w-[720px] grid-cols-[1.2fr_120px_1fr_1fr_50px] border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Событие</span><span>Приоритет</span><span>Получатели</span><span>Каналы</span><span>Статус</span></div>{rules.map(([key, event, priority, recipients, channels]) => <div key={key} className="grid min-w-[720px] grid-cols-[1.2fr_120px_1fr_1fr_50px] items-center border-b border-border py-3 text-xs"><span>{event}</span><span className={cn('mr-4 rounded border px-2 py-1 font-semibold', priority === 'Критический' ? 'border-destructive/25 bg-destructive/10 text-destructive-strong' : priority === 'Высокий' ? 'border-signal/25 bg-signal/10 text-signal-strong' : 'border-info/25 bg-info/10 text-info-strong')}>{priority}</span><span>{recipients}</span><span>{channels}</span><Toggle checked={settings.notifications[key] ?? false} disabled={loading || !isAdmin || savingKey !== null} label={event} onChange={() => void toggleRule(key)} /></div>)}</section>
           <section className={cn(card, 'p-4')}><h2 className="font-bold">Последние доставки</h2><div className="mt-4 grid grid-cols-5 border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Время</span><span>Канал</span><span>Событие</span><span>Получатель</span><span>Статус</span></div><div className="py-10 text-center text-xs text-muted-foreground">Доставок в текущем журнале нет. <Link href="/admin/telegram" className="font-semibold text-info-strong underline">Открыть Telegram</Link></div></section>
         </div>
         <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Каналы связи</h2><div className="mt-3 divide-y divide-border">{['Push PWA', 'Telegram', 'Email', 'SMS'].map((channel) => <div key={channel} className="flex items-center gap-3 py-3 text-xs"><Bell className="h-4 w-4 text-signal-strong" />{channel}</div>)}</div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Тихие часы</h2><div className="mt-3 flex items-center gap-2 text-sm font-bold text-foreground">☾ 22:00–06:00</div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">Уведомления низкого и среднего приоритета отправляются после окончания периода.</p></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Эскалация</h2><p className="mt-2 text-xs text-muted-foreground">Повторная отправка при отсутствии подтверждения.</p></section></aside>
@@ -1709,21 +2072,97 @@ function IntegrationsSettings(props: ReferenceUiProps) {
 }
 
 function AuditSettings(props: ReferenceUiProps) {
-  const events = useMemo(() => Object.values(props.journals).flat().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [props.journals]);
+  const events = props.audit?.data ?? [];
+  const verification = props.audit?.verification;
   return (
     <>
       <ScreenTitle heading="Аудит" subtitle="Неизменяемая история действий, решений и изменений данных" actions={<Button asChild variant="outline"><Link href="/admin/settings">Политика хранения</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'history', label: 'Событий за 24 ч', value: events.filter((event) => Date.now() - new Date(event.createdAt).getTime() < 86_400_000).length }, { icon: 'reports', label: 'Изменений данных', value: events.length }, { icon: 'risk', label: 'Критических действий', value: events.filter((event) => event.type === 'FAULT').length }, { icon: 'documents', label: 'Срок хранения', value: '—' }]} />
+      <ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode="audit" />
+      <SettingsKpis items={[{ icon: 'history', label: 'Событий за 24 ч', value: events.filter((event) => Date.now() - new Date(event.occurredAt).getTime() < 86_400_000).length }, { icon: 'reports', label: 'Изменений данных', value: events.length }, { icon: 'risk', label: 'Целостность', value: verification?.valid ? 'Подтверждена' : 'Нарушена' }, { icon: 'documents', label: 'Последовательность', value: verification?.lastSequence ?? '0' }]} />
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-x-auto')}>
-          <div className="p-4"><div className="flex items-center gap-3"><h2 className="text-lg font-bold">Доказательный журнал</h2><span className="rounded border border-success/25 bg-success/10 px-2 py-1 text-xs text-success-strong">Целостность не настроена</span></div><div className="mt-4 flex gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Поиск по действию, объекту, пользователю…" className="h-10 pl-9 text-xs" /></div><button className="rounded-lg border border-border px-3 text-xs">Диапазон дат</button><button className="rounded-lg border border-border px-3 text-xs">Все типы действий</button><button className="rounded-lg border border-border px-3 text-xs">Все объекты</button><Button variant="outline">⚱ Фильтры</Button></div></div>
-          <div className="grid min-w-[820px] grid-cols-[150px_150px_1fr_160px_110px_20px] border-y border-border px-4 py-2 text-3xs uppercase text-muted-foreground"><span>Время</span><span>Пользователь</span><span>Действие</span><span>Объект</span><span>Результат</span><span /></div>
-          <div className="max-h-[500px] min-w-[820px] divide-y divide-border overflow-y-auto">{events.slice(0, 12).map((event) => <div key={event.id} className="grid grid-cols-[150px_150px_1fr_160px_110px_20px] items-center px-4 py-2 text-xs hover:bg-signal/5"><span>{new Date(event.createdAt).toLocaleString('ru-RU')}</span><span><b>Система</b><br /><small className="text-muted-foreground">PilingTrack</small></span><span>{event.title}</span><span>{event.type}</span><span className={cn('font-semibold', event.type === 'FAULT' ? 'text-destructive-strong' : 'text-success-strong')}>{event.type === 'FAULT' ? 'Критично' : 'Успешно'}</span><ChevronRight className="h-4 w-4 text-muted-foreground" /></div>)}</div>
+          <div className="p-4"><div className="flex items-center gap-3"><h2 className="text-lg font-bold">Доказательный журнал</h2><span className={cn('rounded border px-2 py-1 text-xs', verification?.valid ? 'border-success/25 bg-success/10 text-success-strong' : 'border-destructive/25 bg-destructive/10 text-destructive-strong')}>{verification?.valid ? 'Hash-chain подтверждена' : 'Требуется проверка цепочки'}</span></div><div className="mt-4 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск по журналу аудита" placeholder="Поиск по действию, объекту, пользователю…" className="min-h-11 pl-9 text-xs" /></div><button className="min-h-11 rounded-lg border border-border px-3 text-xs">Диапазон дат</button><button className="min-h-11 rounded-lg border border-border px-3 text-xs">Все типы действий</button><button className="min-h-11 rounded-lg border border-border px-3 text-xs">Все объекты</button></div></div>
+          <div className="hidden min-w-[820px] grid-cols-[150px_150px_1fr_160px_110px_20px] border-y border-border px-4 py-2 text-3xs uppercase text-muted-foreground md:grid"><span>Время</span><span>Пользователь</span><span>Действие</span><span>Объект</span><span>Результат</span><span /></div>
+          <div className="hidden max-h-[500px] min-w-[820px] divide-y divide-border overflow-y-auto md:block">{events.slice(0, 20).map((event) => <div key={event.id} className="grid grid-cols-[150px_150px_1fr_160px_110px_20px] items-center px-4 py-2 text-xs hover:bg-signal/5"><span>{formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}</span><span><b>{event.actor.name || 'Система'}</b><br /><small className="text-muted-foreground">{event.actor.actingAs || event.actor.role || 'PilingTrack'}</small></span><span>{event.action}</span><span>{event.entity.type}<br /><small className="text-muted-foreground">{event.entity.id.slice(0, 12)}</small></span><span className="font-semibold text-success-strong">Зафиксировано</span><ChevronRight className="h-4 w-4 text-muted-foreground" /></div>)}</div>
+          <div className="space-y-2 p-3 md:hidden">{events.slice(0, 20).map((event) => <article key={event.id} className="rounded-lg border border-border p-3 text-xs"><div className="flex items-start justify-between gap-2"><b className="min-w-0 truncate">{event.action}</b><span className="shrink-0 rounded bg-success/10 px-2 py-1 text-3xs font-semibold text-success-strong">Зафиксировано</span></div><div className="mt-2 text-muted-foreground">{event.actor.name || 'Система'} · {event.actor.actingAs || event.actor.role || 'PilingTrack'}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground"><span>{formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}</span><span>{event.entity.type}:{event.entity.id.slice(0, 12)}</span></div></article>)}</div>
           {events.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground">События аудита недоступны в текущем источнике.</div>}
           <div className="flex items-center justify-between border-t border-border p-3 text-xs text-muted-foreground"><span>Показано 1–{Math.min(12, events.length)} из {events.length} событий</span><span>20 на странице · 1 2 3</span></div>
         </section>
-        <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Событие {events[0] ? `#${events[0].id.slice(0, 6)}` : '—'}</h2><div className="mt-4 space-y-3 text-xs"><InfoRow label="Автор" value="Система" /><InfoRow label="Дата и время" value={events[0] ? new Date(events[0].createdAt).toLocaleString('ru-RU') : '—'} /><InfoRow label="Действие" value={events[0]?.title || '—'} /></div><div className="mt-4 overflow-x-auto rounded-lg bg-primary p-3 font-mono text-3xs leading-relaxed text-border"><div className="text-muted-foreground">файл: readiness-state.json</div><div className="mt-2 text-success-foreground">+ &quot;status&quot;: &quot;{events[0]?.status || 'none'}&quot;</div><div className="text-border">  &quot;type&quot;: &quot;{events[0]?.type || 'none'}&quot;</div></div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Целостность журнала</h2><p className="mt-2 text-xs leading-relaxed text-muted-foreground">SHA-256 цепочка пока отсутствует в модели AuditLog, поэтому статус «Цепочка цела» не заявляется.</p></section><Button className="w-full bg-signal-strong hover:bg-signal-strong" onClick={() => downloadCsv('readiness-audit.csv', [['Дата', 'Действие', 'Тип', 'Статус'], ...events.map((event) => [event.createdAt, event.title, event.type, event.status])])}>Экспорт журнала</Button></aside>
+        <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Событие {events[0] ? `#${events[0].sequence}` : '—'}</h2><div className="mt-4 space-y-3 text-xs"><InfoRow label="Автор" value={events[0]?.actor.name || 'Система'} /><InfoRow label="Дата и время" value={events[0] ? formatDateTimeInTimezone(events[0].occurredAt, props.bootstrap?.tenant.timezone) : '—'} /><InfoRow label="Действие" value={events[0]?.action || '—'} /></div><div className="mt-4 overflow-x-auto rounded-lg bg-primary p-3 font-mono text-3xs leading-relaxed text-border"><div className="text-muted-foreground">SHA-256</div><div className="mt-2 break-all text-success-foreground">{events[0]?.hash || '—'}</div></div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Целостность журнала</h2><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{verification?.valid ? `Цепочка проверена: ${verification.eventCount} событий, разрывов не обнаружено.` : `Проверка не пройдена${verification?.reason ? `: ${verification.reason}` : '.'}`}</p></section><Button disabled={!props.bootstrap?.capabilities.entities.audit.export} className="min-h-11 w-full bg-signal-strong hover:bg-signal-strong" onClick={() => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, event.action, `${event.entity.type}:${event.entity.id}`, event.hash])])}>Экспорт журнала</Button></aside>
       </div>
     </>
   );
+}
+
+interface ChecklistTemplateSummary {
+  id: string;
+  name: string;
+  level: string;
+  blockType?: string | null;
+  isActive?: boolean;
+  sections?: Array<{items?: unknown[]}>;
+  updatedAt?: string;
+}
+
+function LiveChecklistsSettings(_props: ReferenceUiProps) {
+  const [templates, setTemplates] = useState<ChecklistTemplateSummary[]>([]);
+  const [query, setQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void authFetch('/api/checklist-templates').then(async (response) => {
+      if (!response.ok) throw new Error(await commandFailure(response));
+      const body = await response.json() as {templates?: ChecklistTemplateSummary[]};
+      if (active) setTemplates(Array.isArray(body.templates) ? body.templates : []);
+    }).catch((reason) => active && setError(reason instanceof Error ? reason.message : 'Не удалось загрузить чек-листы'));
+    return () => { active = false; };
+  }, []);
+  const filtered = templates.filter((template) => !query.trim() || `${template.name} ${template.level} ${template.blockType ?? ''}`.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
+  return <>
+    <ScreenTitle heading="Чек-листы" subtitle="Опубликованные серверные шаблоны осмотров и обслуживания" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/checklists">Управление шаблонами</Link></Button>} />
+    <SettingsKpis items={[{icon: 'inspection', label: 'Шаблонов', value: templates.length}, {icon: 'accepted', label: 'Активных', value: templates.filter((item) => item.isActive !== false).length}, {icon: 'documents', label: 'Пунктов', value: templates.reduce((sum, item) => sum + (item.sections ?? []).reduce((sectionSum, section) => sectionSum + (section.items?.length ?? 0), 0), 0)}, {icon: 'history', label: 'Источник', value: 'Сервер'}]} />
+    <section className={cn(card, 'mt-3 overflow-hidden')}><div className="flex flex-wrap items-center gap-2 border-b border-border p-4"><div className="relative min-w-[240px] flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск шаблонов" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Название, уровень или блок" className="min-h-11 pl-9" /></div><span className="text-xs text-muted-foreground">Найдено: {filtered.length}</span></div>{error ? <div role="alert" className="p-6 text-sm text-destructive-strong">{error}</div> : <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map((template) => <Link key={template.id} href={`/admin/checklists/${template.id}`} className="rounded-xl border border-border p-4 transition hover:border-signal hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"><div className="font-bold">{template.name}</div><div className="mt-2 text-xs text-muted-foreground">{template.level} · {template.blockType ?? 'BASE'} · {(template.sections ?? []).reduce((sum, section) => sum + (section.items?.length ?? 0), 0)} пунктов</div><span className={cn('mt-3 inline-flex rounded px-2 py-1 text-2xs font-semibold', template.isActive === false ? 'bg-muted text-muted-foreground' : 'bg-success/10 text-success-strong')}>{template.isActive === false ? 'Архивный' : 'Активный'}</span></Link>)}</div>}</section>
+  </>;
+}
+
+function LiveRolesSettings(props: ReferenceUiProps) {
+  const actors = props.bootstrap?.selectors.actors ?? [];
+  const roleCounts = actors.reduce<Record<string, number>>((result, actor) => ({...result, [actor.role]: (result[actor.role] ?? 0) + 1}), {});
+  const abilities = props.bootstrap?.capabilities.abilities ?? [];
+  return <>
+    <ScreenTitle heading="Роли и доступы" subtitle="Фактические пользователи и полномочия текущего контура" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/users">Управление пользователями</Link></Button>} />
+    <SettingsKpis items={[{icon: 'crew', label: 'Пользователей', value: actors.length}, {icon: 'accepted', label: 'Ролей', value: Object.keys(roleCounts).length}, {icon: 'operator', label: 'Текущая роль', value: props.bootstrap?.actor.actingAs ?? props.bootstrap?.actor.role ?? '—'}, {icon: 'risk', label: 'Полномочий', value: abilities.length}]} />
+    <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]"><section className={cn(card, 'overflow-hidden')}><div className="border-b border-border p-4"><h2 className="font-bold">Разрешения текущей роли</h2><p className="mt-1 text-xs text-muted-foreground">Данные получены из readiness bootstrap, а не из локального макета.</p></div><div className="grid grid-cols-1 gap-2 p-4 md:grid-cols-2">{abilities.map((ability) => <div key={ability} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 text-xs"><CheckCircle2 className="h-4 w-4 text-success-strong" /><span>{ability}</span></div>)}</div></section><aside className={cn(card, 'p-4')}><h2 className="font-bold">Пользователи по ролям</h2><div className="mt-3 divide-y divide-border">{Object.entries(roleCounts).map(([role, count]) => <div key={role} className="flex min-h-11 items-center justify-between text-xs"><span>{role}</span><b>{count}</b></div>)}</div></aside></div>
+  </>;
+}
+
+function LiveDictionariesSettings(props: ReferenceUiProps) {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
+  const rows = props.equipment.filter((item) => (status === 'ALL' || (status === 'ACTIVE' ? item.isActive : !item.isActive)) && (!query.trim() || `${item.name} ${item.model ?? ''}`.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU'))));
+  return <>
+    <ScreenTitle heading="Справочники" subtitle="Фактический справочник техники; остальные типы открываются в административном модуле" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/dictionaries">Открыть все справочники</Link></Button>} />
+    <SettingsKpis items={[{icon: 'equipment-rig', label: 'Техника', value: props.equipment.length}, {icon: 'accepted', label: 'Активных', value: props.equipment.filter((item) => item.isActive).length}, {icon: 'history', label: 'Архивных', value: props.equipment.filter((item) => !item.isActive).length}, {icon: 'site', label: 'Объектов', value: props.bootstrap?.counts.sites ?? 0}]} />
+    <section className={cn(card, 'mt-3 overflow-hidden')}><div className="flex flex-wrap gap-2 border-b border-border p-4"><div className="relative min-w-[230px] flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск в справочнике техники" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Наименование или модель" className="min-h-11 pl-9" /></div><select aria-label="Статус техники" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="min-h-11 rounded-md border border-input bg-background px-3 text-xs"><option value="ALL">Все статусы</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option></select><Button variant="outline" onClick={() => void downloadReadinessExport('dictionary', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div><div className="divide-y divide-border">{rows.map((item) => <Link key={item.id} href={`/admin/equipment/${item.id}`} className="grid min-h-14 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_90px] items-center gap-3 px-4 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal"><b className="truncate">{item.name}</b><span className="truncate text-muted-foreground">{item.model || 'Модель не указана'}</span><span className={item.isActive ? 'text-success-strong' : 'text-muted-foreground'}>{item.isActive ? 'Активна' : 'Архив'}</span></Link>)}</div>{rows.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">Записи не найдены.</div>}</section>
+  </>;
+}
+
+function LiveIntegrationsSettings(props: ReferenceUiProps) {
+  const devices = Object.values(props.details).flatMap((detail) => detail.telematicsDevices ?? []);
+  const [telegramCount, setTelegramCount] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    void authFetch('/api/telegram/configs').then(async (response) => {
+      if (!response.ok) return;
+      const body = await response.json() as {configs?: unknown[]};
+      if (active) setTelegramCount(Array.isArray(body.configs) ? body.configs.length : 0);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  const liveDevices = devices.filter((device) => device.status === 'ONLINE' || device.status === 'ACTIVE');
+  return <>
+    <ScreenTitle heading="Интеграции" subtitle="Фактические подключения телематики и каналов уведомлений" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/settings">Системные настройки</Link></Button>} />
+    <SettingsKpis items={[{icon: 'settings', label: 'Устройств', value: devices.length}, {icon: 'accepted', label: 'В сети', value: liveDevices.length}, {icon: 'notifications', label: 'Telegram-конфигураций', value: telegramCount ?? '—'}, {icon: 'history', label: 'Часовой пояс', value: props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}]} />
+    <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2"><section className={cn(card, 'p-4')}><div className="flex items-center justify-between"><h2 className="font-bold">Телематика</h2><Button asChild variant="outline"><Link href="/admin/equipment">Оборудование</Link></Button></div><div className="mt-3 divide-y divide-border">{devices.map((device) => <div key={device.id} className="grid min-h-14 grid-cols-[minmax(0,1fr)_100px] items-center gap-3 text-xs"><div><b>{device.label}</b><div className="mt-1 text-muted-foreground">{device.provider} · {device.lastSeenAt ? formatDateTimeInTimezone(device.lastSeenAt, props.bootstrap?.tenant.timezone) : 'нет сеансов'}</div></div><span className={liveDevices.includes(device) ? 'text-success-strong' : 'text-muted-foreground'}>{device.status}</span></div>)}{devices.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">Устройства телематики не зарегистрированы.</div>}</div></section><section className={cn(card, 'p-4')}><div className="flex items-center justify-between"><h2 className="font-bold">Telegram</h2><Button asChild variant="outline"><Link href="/admin/telegram">Настроить</Link></Button></div><p className="mt-4 text-sm text-muted-foreground">{telegramCount == null ? 'Проверяем доступный канал…' : telegramCount > 0 ? `Настроено конфигураций: ${telegramCount}.` : 'Telegram-конфигурации не созданы.'}</p></section></div>
+  </>;
 }

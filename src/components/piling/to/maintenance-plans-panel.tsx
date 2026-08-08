@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { CalendarClock, Loader2, Plus, Trash2, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -55,6 +56,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [trigger, setTrigger] = useState<'HOURS' | 'CALENDAR'>('HOURS');
   const [interval, setIntervalValue] = useState('');
@@ -80,10 +82,21 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
   }, [equipmentId, load]);
 
   const resetForm = () => {
+    setEditingId(null);
     setTitle('');
     setTrigger('HOURS');
     setIntervalValue('');
     setFormOpen(false);
+  };
+
+  const startEdit = (plan: Plan) => {
+    setEditingId(plan.id);
+    setTitle(plan.title);
+    setTrigger(plan.triggerType);
+    setIntervalValue(String(
+      plan.triggerType === 'HOURS' ? plan.intervalHours ?? '' : plan.intervalDays ?? '',
+    ));
+    setFormOpen(true);
   };
 
   const submit = async () => {
@@ -92,11 +105,13 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
     if (!Number.isInteger(n) || n <= 0) return toast.error('Интервал должен быть целым числом > 0');
     setSubmitting(true);
     try {
-      const res = await authFetch('/api/maintenance-plans', {
-        method: 'POST',
+      const res = await authFetch(
+        editingId ? `/api/maintenance-plans/${editingId}` : '/api/maintenance-plans',
+        {
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          equipmentId,
+          ...(editingId ? {} : { equipmentId }),
           title: title.trim(),
           triggerType: trigger,
           ...(trigger === 'HOURS' ? { intervalHours: n } : { intervalDays: n }),
@@ -106,7 +121,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
         const msg = (await res.json().catch(() => ({}))).error ?? 'Не удалось сохранить регламент';
         throw new Error(msg);
       }
-      toast.success('Регламент добавлен');
+      toast.success(editingId ? 'Регламент обновлён' : 'Регламент добавлен');
       resetForm();
       await load(equipmentId);
     } catch (err) {
@@ -144,7 +159,9 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       {formOpen && (
         <div className="mb-3 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">Новый регламент</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {editingId ? 'Редактирование регламента' : 'Новый регламент'}
+            </span>
             <button type="button" onClick={resetForm} className="text-slate-400 hover:text-slate-600">
               <X className="h-4 w-4" />
             </button>
@@ -176,7 +193,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
           />
           <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-            Сохранить
+            {editingId ? 'Сохранить изменения' : 'Сохранить'}
           </Button>
         </div>
       )}
@@ -205,6 +222,14 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className={cn('rounded border px-1.5 py-0.5 text-2xs font-medium', meta.cls)}>{meta.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(p)}
+                    aria-label="Редактировать регламент"
+                    className="text-slate-400 transition-colors hover:text-orange-600"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => remove(p.id)}

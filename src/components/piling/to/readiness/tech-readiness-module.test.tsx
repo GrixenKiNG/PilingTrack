@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { TechReadinessModule } from './tech-readiness-module';
+import { bootstrapEnvelope } from './api/__tests__/fixtures';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -46,5 +47,43 @@ describe('TechReadinessModule', () => {
     );
     expect(screen.getAllByRole('tab')).toHaveLength(7);
     expect(screen.getByText('Смены включаются поэтапно.')).toBeInTheDocument();
+  });
+
+  it('uses server capabilities without inferring access from the actor role', () => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.actor.role = 'ADMIN';
+    bootstrap.capabilities.screens.reports = false;
+
+    render(
+      <TechReadinessModule
+        activeView="reports"
+        onViewChange={() => undefined}
+        bootstrap={bootstrap}
+      >
+        <div>Секретный отчёт</div>
+      </TechReadinessModule>,
+    );
+
+    expect(screen.getByRole('heading', { name: /Недостаточно прав/ })).toBeInTheDocument();
+    expect(screen.queryByText('Секретный отчёт')).not.toBeInTheDocument();
+  });
+
+  it('uses the server feature flag for an unavailable screen', () => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.featureFlags.readiness_shifts_v1 = false;
+    bootstrap.capabilities.screens.shifts = false;
+
+    render(
+      <TechReadinessModule
+        activeView="shifts"
+        onViewChange={() => undefined}
+        bootstrap={bootstrap}
+      >
+        <div>Смены</div>
+      </TechReadinessModule>,
+    );
+
+    expect(screen.getByRole('heading', { name: /Раздел пока недоступен/ })).toBeInTheDocument();
+    expect(screen.queryByText('Смены', { selector: 'div' })).not.toBeInTheDocument();
   });
 });
