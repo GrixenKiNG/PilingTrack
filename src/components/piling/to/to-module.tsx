@@ -179,6 +179,7 @@ export function ToModule() {
     published: DEFAULT_READINESS_RULES,
     draft: null,
     pendingChanges: 0,
+    publishedInDb: false,
   });
   const [loading, setLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);

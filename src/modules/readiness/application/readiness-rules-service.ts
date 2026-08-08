@@ -11,6 +11,12 @@ export interface ReadinessRulesState {
   published: ReadinessRuleSet;
   draft: ReadinessRuleSet | null;
   pendingChanges: number;
+  /**
+   * Лежит ли действующая версия в базе. Если нет, `published` — это значения
+   * по умолчанию из кода: экран обязан показать их как непринятые, а вычислитель
+   * готовности такие правила не признаёт и блокирует расчёт.
+   */
+  publishedInDb: boolean;
 }
 
 function toRuleSet(
@@ -67,6 +73,7 @@ export async function getReadinessRules(tenantId: string): Promise<ReadinessRule
     published,
     draft,
     pendingChanges: draft ? diffCount(draft, published) : 0,
+    publishedInDb: Boolean(publishedRow),
   };
 }
 
@@ -114,6 +121,43 @@ export async function saveReadinessDraft(
   return getReadinessRules(tenantId);
 }
 
+async function publishBaseline(
+  tenantId: string,
+  baseline: ReadinessRuleSet,
+  actor: { id: string; name: string; role: string },
+): Promise<ReadinessRulesState> {
+  await db.$transaction(async (tx) => {
+    const published = await tx.readinessRuleSet.create({
+      data: {
+        tenantId,
+        status: 'PUBLISHED',
+        version: baseline.version,
+        criteria: baseline.criteria as unknown as Prisma.InputJsonValue,
+        blockers: baseline.blockers as unknown as Prisma.InputJsonValue,
+        publishedAt: new Date(),
+        updatedBy: actor.id,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        entity: 'ReadinessRuleSet',
+        action: 'published',
+        entityId: published.id,
+        after: {
+          version: published.version,
+          criteria: published.criteria,
+          blockers: published.blockers,
+        },
+        userId: actor.id,
+        userName: actor.name,
+        userRole: actor.role,
+        tenantId,
+      },
+    });
+  });
+  return getReadinessRules(tenantId);
+}
+
 export async function publishReadinessRules(
   tenantId: string,
   actor: { id: string; name: string; role: string },
@@ -123,7 +167,20 @@ export async function publishReadinessRules(
   const draftRow = await db.readinessRuleSet.findFirst({
     where: { tenantId, status: 'DRAFT' },
   });
-  if (!draftRow) return state;
+  if (!draftRow) {
+    // Публиковать нечего только если действующая версия уже лежит в базе.
+    // У нового тенанта её нет: getReadinessRules отдаёт значения по умолчанию
+    // из кода, экран рисует «Опубликована», а вычислитель готовности при этом
+    // считает правила неопубликованными и блокирует расчёт. Первое нажатие
+    // «Опубликовать» должно закрепить эти значения в базе, а не молча ничего
+    // не сделать.
+    const publishedRow = await db.readinessRuleSet.findFirst({
+      where: { tenantId, status: 'PUBLISHED' },
+      select: { id: true },
+    });
+    if (publishedRow) return state;
+    return publishBaseline(tenantId, state.published, actor);
+  }
 
   await db.$transaction(async (tx) => {
     await tx.readinessRuleSet.updateMany({
