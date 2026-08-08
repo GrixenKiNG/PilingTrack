@@ -138,3 +138,27 @@ public/prototypes/
 # root design-scratch mockups (not shipped)
 /design-vision.html
 /pilingtrack-*.html
+
+# Рабочие артефакты агентов: справочные выгрузки, дизайн-циклы, NotebookLM
+/output/
+/.impeccable/
+
+# Черновики Obsidian
+*.canvas
+*.base
+
+# Скриншоты и разовые выгрузки в корне репозитория
+/*.png
+/orion-current-css.txt
+/orion-final-log.txt
+/orion-final-review.diff
+/orion-tender-industrial-preview.html
+/readiness-modules-prototype.html
+/to-mobile-before-adapt.md
+/to-typeset-colorize-snapshot.md
+/2026-08-04.md
+
+# Дизайн-концепты сайта: лежат в public/, но приложением не используются
+# и не должны публиковаться на orionpiling.ru
+/public/orion-*-concept.html
+/public/orion-tender-industrial-preview.html
