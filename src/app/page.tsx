@@ -23,6 +23,9 @@ export default async function Home() {
   if (role === 'ADMIN' || role === 'DISPATCHER') {
     redirect('/admin');
   }
+  if (role === 'MECHANIC') {
+    redirect('/admin/to');
+  }
 
   redirect('/operator');
 }

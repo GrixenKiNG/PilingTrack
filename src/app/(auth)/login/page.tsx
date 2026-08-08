@@ -14,6 +14,8 @@ export default function LoginPageRoute() {
       const role = currentUser.role;
       if (role === 'ADMIN' || role === 'DISPATCHER') {
         router.replace('/admin');
+      } else if (role === 'MECHANIC') {
+        router.replace('/admin/to');
       } else {
         router.replace('/operator');
       }
