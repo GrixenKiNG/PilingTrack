@@ -13,6 +13,16 @@ import type { SiteWithTreeDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO,
 export interface PileEntry { id: string; picketId: string; pileGradeId: string; count: number; }
 export interface DrillingEntry { id: string; picketId: string; typeId: string; count: number; metersPerUnit: number; meters: number; }
 export interface DowntimeEntry { id: string; reasonId: string; duration: number; comment: string; }
+export interface ReportDraftTempState {
+  pileGrade: string;
+  pileCount: string;
+  drillingType: string;
+  drillingCount: string;
+  drillingMetersPerUnit: string;
+  downtimeReason: string;
+  downtimeDuration: string;
+  downtimeComment: string;
+}
 
 export interface UseReportFormReturn {
   reportId: string;
@@ -44,6 +54,9 @@ export interface UseReportFormReturn {
   submitting: boolean;
   loadingReport: boolean;
   submittedAt: string | null;
+  draftSavedAt: string | null;
+  restoredDraftTemp: ReportDraftTempState | null;
+  setDraftTempState: (value: ReportDraftTempState) => void;
   addPile: (gradeId: string, count: number) => void;
   addDrilling: (typeId: string, count: number, metersPerUnit: number) => void;
   addDowntime: (reasonId: string, duration: number, comment: string) => void;
@@ -114,6 +127,18 @@ export function useReportForm(): UseReportFormReturn {
   const [loadingReport, setLoadingReport] = useState(false);
   const [showDowntime, setShowDowntime] = useState(false);
   const [quickMode, setQuickMode] = useState(true);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [restoredDraftTemp, setRestoredDraftTemp] = useState<ReportDraftTempState | null>(null);
+  const [draftTempState, setDraftTempState] = useState<ReportDraftTempState>({
+    pileGrade: '',
+    pileCount: '',
+    drillingType: '',
+    drillingCount: '',
+    drillingMetersPerUnit: '',
+    downtimeReason: '',
+    downtimeDuration: '',
+    downtimeComment: '',
+  });
 
   // Length per pile comes from the grade's stored `lengthMm` via the single
   // resolver in lib/pile-length — the same source the server, history, dashboard
@@ -214,29 +239,48 @@ export function useReportForm(): UseReportFormReturn {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { if (!date) return; loadData(); }, [date, loadData]);
 
-  // Draft management — snapshot via ref so the interval isn't torn
-  // down/recreated on every keystroke.
-  const draftSnapshotRef = useRef({ piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId });
-  // Keep the snapshot fresh after each commit (not during render) so the
-  // 30s interval and beforeunload handlers read current values without being
-  // recreated on every keystroke.
+  // Preserve committed rows and values currently being typed. A field
+  // operator should not lose work because the final "+" tap was missed.
+  const draftSnapshotRef = useRef({
+    piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId,
+    selectedFieldId, selectedClusterId, selectedPicketId, engineHours,
+    quickMode, showDowntime, temp: draftTempState,
+  });
   useEffect(() => {
-    draftSnapshotRef.current = { piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId, selectedClusterId, selectedPicketId };
+    draftSnapshotRef.current = {
+      piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId,
+      selectedFieldId, selectedClusterId, selectedPicketId, engineHours,
+      quickMode, showDowntime, temp: draftTempState,
+    };
   });
 
   useEffect(() => {
-    if (!user || !selectedSiteId || !date) return;
+    if (!user || !selectedSiteId || !date || loading) return;
     const draftKey = `report-draft-${user.id}-${selectedSiteId}-${date}`;
     const saveDraft = () => {
       const s = draftSnapshotRef.current;
-      if (s.piles.length > 0 || s.drillings.length > 0 || s.downtimes.length > 0) {
-        localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt: new Date().toISOString() }));
-      }
+      const hasTypedValues = Object.values(s.temp).some((value) => value.trim() !== '');
+      const hasWork = s.piles.length > 0 || s.drillings.length > 0 || s.downtimes.length > 0
+        || hasTypedValues || s.engineHours.trim() !== '' || s.selectedEquipmentId !== ''
+        || s.selectedFieldId !== '' || s.selectedClusterId !== '' || s.selectedPicketId !== ''
+        || s.shiftStart !== '08:00' || s.shiftEnd !== '20:00' || s.showDowntime || !s.quickMode;
+      if (!hasWork) return;
+      const savedAt = new Date().toISOString();
+      localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt, schemaVersion: 2 }));
+      setDraftSavedAt(savedAt);
     };
-    const interval = setInterval(saveDraft, 30_000);
+    const debounce = window.setTimeout(saveDraft, 800);
     window.addEventListener('beforeunload', saveDraft);
-    return () => { clearInterval(interval); window.removeEventListener('beforeunload', saveDraft); saveDraft(); };
-  }, [user, selectedSiteId, date]);
+    return () => {
+      window.clearTimeout(debounce);
+      window.removeEventListener('beforeunload', saveDraft);
+    };
+  }, [
+    user, selectedSiteId, date, loading, piles, drillings, downtimes,
+    shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId,
+    selectedClusterId, selectedPicketId, engineHours, quickMode,
+    showDowntime, draftTempState,
+  ]);
 
   // Restore draft
   useEffect(() => {
@@ -259,6 +303,13 @@ export function useReportForm(): UseReportFormReturn {
         if (draft.selectedFieldId) setSelectedFieldId(draft.selectedFieldId);
         if (draft.selectedClusterId) setSelectedClusterId(draft.selectedClusterId);
         if (draft.selectedPicketId) setSelectedPicketId(draft.selectedPicketId);
+        if (typeof draft.engineHours === 'string') setEngineHours(draft.engineHours);
+        if (typeof draft.quickMode === 'boolean') setQuickMode(draft.quickMode);
+        if (typeof draft.showDowntime === 'boolean') setShowDowntime(draft.showDowntime);
+        if (draft.temp && typeof draft.temp === 'object') {
+          setRestoredDraftTemp(draft.temp as ReportDraftTempState);
+        }
+        setDraftSavedAt(draft.savedAt);
         toast.info('Восстановлен черновик', { description: `Сохранён ${savedAt.toLocaleString('ru-RU')}` });
       }
     } catch { localStorage.removeItem(draftKey); }
@@ -358,7 +409,10 @@ export function useReportForm(): UseReportFormReturn {
       // tell the operator without failing anything.
       if (result?.meterWarning) toast.warning(result.meterWarning);
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });
-      if (user && selectedSiteId && date) localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);
+      if (user && selectedSiteId && date) {
+        localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);
+        setDraftSavedAt(null);
+      }
       // Show the confirmation screen instead of redirecting silently; its
       // "Готово" button takes the operator back to /operator.
       setSubmittedAt(new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
@@ -378,6 +432,7 @@ export function useReportForm(): UseReportFormReturn {
     piles, setPiles, drillings, setDrillings, downtimes, setDowntimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
     loading, loadError, reloadData: loadData, submitting, submittedAt, loadingReport,
+    draftSavedAt, restoredDraftTemp, setDraftTempState,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,

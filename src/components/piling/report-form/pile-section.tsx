@@ -63,12 +63,12 @@ export function PileSection({
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Select value={tempGrade} onValueChange={onTempGradeChange}>
-                  <SelectTrigger className="flex-1 h-12 min-h-[48px]"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
+                  <SelectTrigger aria-label="Марка сваи" className="flex-1 h-12 min-h-[48px]"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
                   <SelectContent>{pileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
                 </Select>
-                <Input type="number" placeholder="Кол-во" value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
+                <Input type="number" aria-label="Количество свай, шт." placeholder="Кол-во" value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="w-24 h-12 min-h-[48px] font-mono text-lg" />
-                <Button onClick={onAdd} min-w={48} min-h={48} className="h-12 min-h-[48px] w-12 bg-orange-500 hover:bg-orange-600 text-white">
+                <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" min-w={48} min-h={48} className="h-12 min-h-[48px] w-12 bg-orange-500 hover:bg-orange-600 text-white">
                   <PilingIcon name="add" size={20} decorative className="!text-white" />
                 </Button>
               </div>
@@ -83,13 +83,13 @@ export function PileSection({
           ) : (
             <div className="space-y-2">
               <Select value={tempGrade} onValueChange={onTempGradeChange}>
-                <SelectTrigger className="w-full h-11"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
+                <SelectTrigger aria-label="Марка сваи" className="w-full h-11"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
                 <SelectContent>{pileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex gap-2">
-                <Input type="number" placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
+                <Input type="number" aria-label="Количество свай, шт." placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="h-11 font-mono" />
-                <Button onClick={onAdd} className="h-11 bg-orange-500 hover:bg-orange-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
+                <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" className="h-11 min-h-[44px] bg-orange-500 hover:bg-orange-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
               {(tempGrade || tempCount) && (
@@ -114,7 +114,8 @@ export function PileSection({
                       <span className="block text-sm font-semibold text-slate-700">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
                     </span>
                     <button onClick={() => onRemove(pile.id)}
-                      className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
+                      aria-label={`Удалить сваи ${getPileGradeName(pile.pileGradeId)} из отчёта`}
+                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700">
                       <PilingIcon name="delete" size={16} tone="danger" decorative />
                     </button>
                   </div>

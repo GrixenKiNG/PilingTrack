@@ -52,15 +52,15 @@ export function DrillingSection({
         <CardContent className="px-4 pb-4 space-y-3">
           <div className="space-y-2">
             <Select value={tempType} onValueChange={onTempTypeChange}>
-              <SelectTrigger className="w-full h-11"><SelectValue placeholder="Тип бурения..." /></SelectTrigger>
+              <SelectTrigger aria-label="Тип бурения" className="w-full h-11"><SelectValue placeholder="Тип бурения..." /></SelectTrigger>
               <SelectContent>{drillingTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
             </Select>
             <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-              <Input type="number" placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
+              <Input type="number" aria-label="Количество скважин, шт." placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                 min="1" className="h-11 font-mono" />
-              <Input type="number" step="0.1" placeholder="Метры на 1 шт." value={tempMetersPerUnit} onChange={(e) => onTempMetersPerUnitChange(e.target.value)}
+              <Input type="number" aria-label="Глубина одной скважины, м" step="0.1" placeholder="Метры на 1 шт." value={tempMetersPerUnit} onChange={(e) => onTempMetersPerUnitChange(e.target.value)}
                 min="0.1" className="h-11 font-mono" />
-              <Button onClick={onAdd} className="h-11 bg-blue-500 hover:bg-blue-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
+              <Button onClick={onAdd} aria-label="Добавить бурение в отчёт" className="h-11 min-h-[44px] bg-blue-500 hover:bg-blue-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
             </div>
             {(tempCount || tempMetersPerUnit) && (
               <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
@@ -83,7 +83,8 @@ export function DrillingSection({
                       <span className="block text-sm font-semibold text-slate-700">Объём: {formatNumber(drill.meters)} м</span>
                     </span>
                     <button onClick={() => onRemove(drill.id)}
-                      className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
+                      aria-label={`Удалить бурение ${getDrillTypeName(drill.typeId)} из отчёта`}
+                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700">
                       <PilingIcon name="delete" size={16} tone="danger" decorative />
                     </button>
                   </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 
@@ -25,6 +26,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -119,7 +121,6 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
 
   const handleDelete = async () => {
     if (!photo) return;
-    if (!confirm('Удалить фото?')) return;
     setBusy(true);
     try {
       const res = await authFetch(`/api/media/${photo.id}`, { method: 'DELETE' });
@@ -127,6 +128,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
       toast.success('Фото удалено');
       setPhoto(null);
       setThumbUrl(null);
+      setDeleteOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
     } finally {
@@ -141,11 +143,11 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
         {photo && canEdit && (
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => setDeleteOpen(true)}
             disabled={busy}
-            className="text-sm font-medium text-red-600 hover:text-red-700 flex items-center gap-1"
+            className="flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
           >
-            <Trash2 className="w-3 h-3" /> Удалить
+            <Trash2 className="h-4 w-4" /> Удалить
           </button>
         )}
       </div>
@@ -170,7 +172,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="w-full h-32 rounded-lg border-2 border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50/50 transition-colors flex flex-col items-center justify-center gap-2 text-slate-500 disabled:opacity-50"
+          className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-orange-200 text-orange-700 transition-colors hover:border-orange-400 hover:bg-orange-50/50 disabled:opacity-50"
         >
           {busy ? (
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -201,6 +203,16 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
+      />
+
+      <ConfirmActionDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Удалить фото отчёта?"
+        description="Фотография будет удалена без возможности восстановления. Остальные данные смены сохранятся."
+        confirmLabel="Удалить фото"
+        busy={busy}
+        onConfirm={handleDelete}
       />
     </div>
   );

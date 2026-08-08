@@ -68,6 +68,7 @@ export function ReportForm() {
     piles, drillings, downtimes,
     showDowntime, setShowDowntime, quickMode, setQuickMode,
     loading, loadError, reloadData, submitting, submittedAt,
+    draftSavedAt, restoredDraftTemp, setDraftTempState,
     addPile, addDrilling, addDowntime, removePile, removeDrilling, removeDowntime,
     handleSubmit, getPileMetersPerUnit, getPicketPath,
     getPileGradeName, getDrillTypeName, getDowntimeReasonName,
@@ -76,6 +77,51 @@ export function ReportForm() {
 
   const router = useRouter();
   const temp = useTempState();
+
+  useEffect(() => {
+    setDraftTempState({
+      pileGrade: temp.tempPileGrade,
+      pileCount: temp.tempPileCount,
+      drillingType: temp.tempDrillType,
+      drillingCount: temp.tempDrillCount,
+      drillingMetersPerUnit: temp.tempDrillMetersPerUnit,
+      downtimeReason: temp.tempDowntimeReason,
+      downtimeDuration: temp.tempDowntimeDuration,
+      downtimeComment: temp.tempDowntimeComment,
+    });
+  }, [
+    setDraftTempState,
+    temp.tempPileGrade,
+    temp.tempPileCount,
+    temp.tempDrillType,
+    temp.tempDrillCount,
+    temp.tempDrillMetersPerUnit,
+    temp.tempDowntimeReason,
+    temp.tempDowntimeDuration,
+    temp.tempDowntimeComment,
+  ]);
+
+  useEffect(() => {
+    if (!restoredDraftTemp) return;
+    temp.setTempPileGrade(restoredDraftTemp.pileGrade || '');
+    temp.setTempPileCount(restoredDraftTemp.pileCount || '');
+    temp.setTempDrillType(restoredDraftTemp.drillingType || '');
+    temp.setTempDrillCount(restoredDraftTemp.drillingCount || '');
+    temp.setTempDrillMetersPerUnit(restoredDraftTemp.drillingMetersPerUnit || '');
+    temp.setTempDowntimeReason(restoredDraftTemp.downtimeReason || '');
+    temp.setTempDowntimeDuration(restoredDraftTemp.downtimeDuration || '');
+    temp.setTempDowntimeComment(restoredDraftTemp.downtimeComment || '');
+  }, [
+    restoredDraftTemp,
+    temp.setTempPileGrade,
+    temp.setTempPileCount,
+    temp.setTempDrillType,
+    temp.setTempDrillCount,
+    temp.setTempDrillMetersPerUnit,
+    temp.setTempDowntimeReason,
+    temp.setTempDowntimeDuration,
+    temp.setTempDowntimeComment,
+  ]);
 
   useEffect(() => {
     if (loading || !window.location.hash) return;
@@ -169,12 +215,18 @@ export function ReportForm() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 pt-safe flex items-center gap-3">
         <button onClick={() => router.push('/operator')}
-          className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
+          aria-label="Вернуться к операторской смене"
+          className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
           <ArrowLeft className="w-5 h-5 text-slate-600" />
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold text-slate-900 truncate">Отчёт за смену</h1>
           <p className="text-sm font-medium text-slate-700 truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
+          <p className="text-xs text-slate-500" aria-live="polite">
+            {draftSavedAt
+              ? `Черновик сохранён в ${new Date(draftSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+              : 'Изменения сохраняются автоматически'}
+          </p>
         </div>
       </div>
 

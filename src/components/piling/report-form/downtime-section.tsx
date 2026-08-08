@@ -43,22 +43,22 @@ export function DowntimeSection({
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2"><PilingIcon name="downtime" size={18} tone="warning" decorative />Простой техники</CardTitle>
-            <button onClick={onToggle} className="text-sm text-orange-500 font-semibold">{show ? 'Скрыть' : '+ Добавить'}</button>
+            <button onClick={onToggle} className="min-h-[44px] rounded-md px-2 text-sm font-semibold text-orange-600 hover:bg-orange-50">{show ? 'Скрыть простой' : '+ Добавить простой'}</button>
           </div>
         </CardHeader>
         {show && (
           <CardContent className="px-4 pb-4 space-y-3">
             <div className="space-y-2">
               <Select value={tempReason} onValueChange={onTempReasonChange}>
-                <SelectTrigger className="w-full h-11"><SelectValue placeholder="Причина простоя..." /></SelectTrigger>
+                <SelectTrigger aria-label="Причина простоя" className="w-full h-11"><SelectValue placeholder="Причина простоя..." /></SelectTrigger>
                 <SelectContent>{downtimeReasons.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex gap-2">
-                <Input type="number" step="0.5" placeholder="Часы" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
+                <Input type="number" aria-label="Продолжительность простоя, ч" step="0.5" placeholder="Часы" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
                   min="0.5" className="h-11 font-mono flex-1" />
-                <Button onClick={onAdd} className="h-11 bg-amber-500 hover:bg-amber-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
+                <Button onClick={onAdd} aria-label="Добавить простой в отчёт" className="h-11 min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
-              <Input placeholder="Комментарий (необязательно)" value={tempComment} onChange={(e) => onTempCommentChange(e.target.value)} className="h-11" />
+              <Input aria-label="Комментарий к простою" placeholder="Комментарий (необязательно)" value={tempComment} onChange={(e) => onTempCommentChange(e.target.value)} className="h-11" />
             </div>
 
             {downtimes.length > 0 && (
@@ -72,7 +72,8 @@ export function DowntimeSection({
                     <div className="flex items-center gap-2">
                       <span className="text-base font-mono font-bold text-amber-600">{dt.duration} ч</span>
                       <button onClick={() => onRemove(dt.id)}
-                        className="min-w-[44px] min-h-[44px] p-2 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors">
+                        aria-label={`Удалить простой «${getDowntimeReasonName(dt.reasonId)}» из отчёта`}
+                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700">
                         <PilingIcon name="delete" size={16} tone="danger" decorative />
                       </button>
                     </div>
