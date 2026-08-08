@@ -1,5 +1,6 @@
 import { ServiceError } from '@/lib/service-error';
 import type { ReadinessTransaction } from '../infrastructure/tenant-transaction';
+import { normalizeTenantTimezone } from '../domain/shifts/tenant-production-date';
 import {
   hasReadinessCapability,
   resolveAuditedReadinessCapabilities,
@@ -27,19 +28,20 @@ export function readReadinessFeatureFlags(
   environment: Record<string, string | undefined> = process.env
 ): ReadinessFeatureFlags {
   return {
-    readiness_shifts_v1: enabled(environment.READINESS_SHIFTS_V1),
-    readiness_permits_v1: enabled(environment.READINESS_PERMITS_V1),
-    readiness_audit_chain_v1: enabled(environment.READINESS_AUDIT_CHAIN_V1),
+    readiness_shifts_v1: environment.READINESS_SHIFTS_V1 === undefined
+      ? true
+      : enabled(environment.READINESS_SHIFTS_V1),
+    readiness_permits_v1: environment.READINESS_PERMITS_V1 === undefined
+      ? true
+      : enabled(environment.READINESS_PERMITS_V1),
+    readiness_audit_chain_v1: environment.READINESS_AUDIT_CHAIN_V1 === undefined
+      ? true
+      : enabled(environment.READINESS_AUDIT_CHAIN_V1),
   };
 }
 
 function assertIanaTimezone(timezone: string): string {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
-    return timezone;
-  } catch {
-    throw new ServiceError('Tenant timezone is invalid', 503);
-  }
+  return normalizeTenantTimezone(timezone);
 }
 
 export async function queryReadinessBootstrap(

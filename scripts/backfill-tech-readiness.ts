@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import {db} from '../src/lib/db';
 import {backfillTenantReadiness} from '../src/modules/readiness/application/backfill/backfill-service';
 

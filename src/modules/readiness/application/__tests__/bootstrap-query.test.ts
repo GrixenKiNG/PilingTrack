@@ -27,6 +27,15 @@ function transaction() {
 }
 
 describe('readiness bootstrap query', () => {
+  it('enables the approved readiness workflows by default and supports an explicit kill switch', () => {
+    expect(readReadinessFeatureFlags({})).toEqual({
+      readiness_shifts_v1: true,
+      readiness_permits_v1: true,
+      readiness_audit_chain_v1: true,
+    });
+    expect(readReadinessFeatureFlags({ READINESS_SHIFTS_V1: 'false' }).readiness_shifts_v1).toBe(false);
+  });
+
   it('returns real tenant settings, flags, selectors, counts and mechanic capabilities', async () => {
     const tx = transaction();
     const result = await queryReadinessBootstrap(
@@ -129,5 +138,14 @@ describe('readiness bootstrap query', () => {
       transaction() as never,
       { ...TECH_READINESS_USERS.admin, role: 'OWNER' }
     )).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('uses the organization default when a legacy timezone value is invalid', async () => {
+    const tx = transaction();
+    tx.tenantSettings.findUnique.mockResolvedValue({ timezone: '(UTC+3) Moscow' });
+
+    const result = await queryReadinessBootstrap(tx as never, TECH_READINESS_USERS.admin);
+
+    expect(result.tenant.timezone).toBe('Europe/Moscow');
   });
 });

@@ -7,6 +7,8 @@ export interface PermitListFilters {
   equipmentId?: string;
   state?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED';
   risk?: 'NORMAL' | 'ELEVATED';
+  from?: Date;
+  to?: Date;
   limit: number;
   cursor?: string;
 }
@@ -34,7 +36,7 @@ export async function queryWorkPermits(
   const repository = new WorkPermitRepository(tx);
   const {rows, total} = await repository.list({
     tenantId, equipmentId: filters.equipmentId, state: filters.state,
-    risk: filters.risk, limit: filters.limit,
+    risk: filters.risk, from: filters.from, to: filters.to, limit: filters.limit,
     cursor: filters.cursor ? decodeCursor(filters.cursor) : undefined,
   });
   const hasMore = rows.length > filters.limit;

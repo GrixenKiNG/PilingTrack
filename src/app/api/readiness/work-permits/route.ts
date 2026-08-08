@@ -4,6 +4,7 @@ import {ReadinessCommandError} from '@/modules/readiness/application/command-pip
 import {createWorkPermitCommand} from '@/modules/readiness/application/permits/commands';
 import {queryWorkPermits, type PermitListFilters} from '@/modules/readiness/application/permits/queries';
 import {createWorkPermitSchema} from '@/modules/readiness/application/permits/schemas';
+import {parseReadinessReadFilters} from '@/modules/readiness/application/read-filters';
 import {withReadinessRequestTransaction, withReadinessSerializableTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Readiness access denied');
     }
     const params = request.nextUrl.searchParams;
-    const allowed = new Set(['equipmentId', 'state', 'risk', 'limit', 'cursor']);
+    const allowed = new Set(['equipmentId', 'state', 'risk', 'limit', 'cursor', 'status', 'from', 'to']);
     if ([...params.keys()].some((key) => !allowed.has(key))) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Unknown permit filter');
     }
@@ -33,22 +34,26 @@ export async function GET(request: NextRequest) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'limit must be between 1 and 200');
     }
-    const state = params.get('state');
-    const risk = params.get('risk');
-    if (state && !['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED', 'REVOKED'].includes(state)) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit state');
-    }
-    if (risk && !['NORMAL', 'ELEVATED'].includes(risk)) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit risk');
-    }
-    const filters: PermitListFilters = {
-      equipmentId: params.get('equipmentId') ?? undefined,
-      state: state as PermitListFilters['state'], risk: risk as PermitListFilters['risk'],
-      limit, cursor: params.get('cursor') ?? undefined,
-    };
-    const result = await withReadinessRequestTransaction(context.tenantId,
-      (tx) => queryWorkPermits(tx, context.tenantId, filters));
-    return readinessResponse({body: {...result, meta: {correlationId: context.correlationId, filters}},
+    const result = await withReadinessRequestTransaction(context.tenantId, async (tx) => {
+      const timezone = (await tx.tenantSettings.findUnique({where: {tenantId: context.tenantId}, select: {timezone: true}}))?.timezone;
+      const common = parseReadinessReadFilters(params, timezone ?? undefined);
+      const state = params.get('state') ?? common.status;
+      const risk = params.get('risk') ?? common.risk;
+      if (state && !['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED', 'REVOKED'].includes(state)) {
+        throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit state');
+      }
+      if (risk && !['NORMAL', 'ELEVATED'].includes(risk)) {
+        throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit risk');
+      }
+      const filters: PermitListFilters = {
+        equipmentId: params.get('equipmentId') ?? undefined,
+        state: state as PermitListFilters['state'], risk: risk as PermitListFilters['risk'],
+        from: common.from, to: common.to, limit, cursor: params.get('cursor') ?? undefined,
+      };
+      return queryWorkPermits(tx, context.tenantId, filters);
+    });
+    return readinessResponse({body: {...result, meta: {correlationId: context.correlationId,
+      filters: Object.fromEntries(params.entries())}},
       status: 200, correlationId: context.correlationId, requestId: context.requestId});
   } catch (error) {
     if (error instanceof ReadinessCommandError) return readinessErrorResponse(error, context.correlationId, context.requestId);

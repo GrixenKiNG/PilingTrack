@@ -30,8 +30,9 @@ export class ShiftRepository {
 
   create(input: {tenantId: string; equipmentId: string; type: ShiftType; productionDate: Date; timezone: string;
     plannedStartAt: Date | null; plannedEndAt: Date | null; actorId: string}) {
-    return this.tx.shift.create({data: {id: randomUUID(), ...input, createdById: input.actorId,
-      lastEditedById: input.actorId}, include: includeHandovers});
+    const {actorId, ...shift} = input;
+    return this.tx.shift.create({data: {id: randomUUID(), ...shift, createdById: actorId,
+      lastEditedById: actorId}, include: includeHandovers});
   }
 
   async get(tenantId: string, id: string): Promise<ShiftRow> {
@@ -40,9 +41,14 @@ export class ShiftRepository {
     return row;
   }
 
-  async list(input: {tenantId: string; equipmentId?: string; state?: ShiftState; type?: ShiftType; limit: number}) {
+  async list(input: {tenantId: string; equipmentId?: string; state?: ShiftState; type?: ShiftType;
+    from?: Date; to?: Date; limit: number}) {
     const where = {tenantId: input.tenantId, ...(input.equipmentId ? {equipmentId: input.equipmentId} : {}),
-      ...(input.state ? {state: input.state} : {}), ...(input.type ? {type: input.type} : {})};
+      ...(input.state ? {state: input.state} : {}), ...(input.type ? {type: input.type} : {}),
+      ...(input.from || input.to ? {productionDate: {
+        ...(input.from ? {gte: input.from} : {}),
+        ...(input.to ? {lte: input.to} : {}),
+      }} : {})};
     const [rows, total] = await Promise.all([
       this.tx.shift.findMany({where, include: includeHandovers, orderBy: [{productionDate: 'desc'}, {createdAt: 'desc'}], take: input.limit}),
       this.tx.shift.count({where}),

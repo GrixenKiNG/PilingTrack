@@ -5,7 +5,7 @@ import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction
 import {serializeHandover, serializeShift} from './commands';
 
 export async function queryShifts(tx: ReadinessTransaction, input: {tenantId: string; equipmentId?: string;
-  state?: ShiftState; type?: ShiftType; limit: number}) {
+  state?: ShiftState; type?: ShiftType; from?: Date; to?: Date; limit: number}) {
   const {rows, total} = await new ShiftRepository(tx).list(input);
   return {data: rows.map(serializeShift), page: {limit: input.limit, total}};
 }

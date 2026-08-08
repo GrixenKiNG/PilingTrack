@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import type {Prisma, WorkPermitApprovalRole} from '@/generated/postgres-client/client';
 import {ReadinessCommandError} from '../../application/command-pipeline/errors';
 import type {ReadinessTransaction} from '../tenant-transaction';
+import {normalizeTenantTimezone} from '../../domain/shifts/tenant-production-date';
 import type {
   WorkPermitApprovalRecord,
   WorkPermitContent,
@@ -56,7 +57,7 @@ export class WorkPermitRepository {
       where: {tenantId}, select: {timezone: true},
     });
     if (!settings?.timezone) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Tenant timezone is unavailable');
-    return settings.timezone;
+    return normalizeTenantTimezone(settings.timezone);
   }
 
   async create(input: WorkPermitContent & {tenantId: string; timezone: string; actorId: string}): Promise<PermitRow> {
@@ -79,13 +80,17 @@ export class WorkPermitRepository {
 
   async list(input: {
     tenantId: string; equipmentId?: string; state?: WorkPermitRecord['state'];
-    risk?: WorkPermitRecord['risk']; limit: number; cursor?: {updatedAt: Date; id: string};
+    risk?: WorkPermitRecord['risk']; from?: Date; to?: Date; limit: number; cursor?: {updatedAt: Date; id: string};
   }): Promise<{rows: PermitRow[]; total: number}> {
     const where: Prisma.WorkPermitWhereInput = {
       tenantId: input.tenantId,
       ...(input.equipmentId ? {equipmentId: input.equipmentId} : {}),
       ...(input.state ? {state: input.state} : {}),
       ...(input.risk ? {risk: input.risk} : {}),
+      ...(input.from || input.to ? {
+        validFrom: {...(input.to ? {lte: input.to} : {})},
+        validTo: {...(input.from ? {gte: input.from} : {})},
+      } : {}),
       ...(input.cursor ? {OR: [
         {updatedAt: {lt: input.cursor.updatedAt}},
         {updatedAt: input.cursor.updatedAt, id: {lt: input.cursor.id}},
