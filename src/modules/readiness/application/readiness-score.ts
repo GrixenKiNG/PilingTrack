@@ -16,7 +16,9 @@ export async function evaluateAuthoritativeReadiness(input: {
   clock: EvaluationClock;
 }) {
   const now = input.clock.now();
-  const [equipment, inspection, openRecords, permit, publishedRow, acceptedHandover] = await Promise.all([
+  const [
+    equipment, inspection, openRecords, permit, publishedRow, acceptedHandover, blockingDefect,
+  ] = await Promise.all([
     input.tx.equipment.findFirst({
       where: {tenantId: input.tenantId, id: input.equipmentId, isActive: true},
       select: {id: true, engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true},
@@ -44,6 +46,16 @@ export async function evaluateAuthoritativeReadiness(input: {
     input.shiftId ? input.tx.shiftHandover.findFirst({
       where: {tenantId: input.tenantId, shiftId: input.shiftId, state: 'ACCEPTED'}, select: {id: true},
     }) : Promise.resolve(null),
+    // Незакрытый критичный дефект из журнала. Без него запись в журнале
+    // ничего не меняла бы в оценке: блокировка держалась только на нарядах
+    // ремонта с приоритетом CRITICAL, а дефект — отдельная сущность.
+    input.tx.equipmentDefect.findFirst({
+      where: {
+        tenantId: input.tenantId, equipmentId: input.equipmentId,
+        severity: 'CRITICAL', status: {in: ['OPEN', 'IN_WORK']},
+      },
+      select: {id: true},
+    }),
   ]);
   if (!equipment) throw new Error('Authoritative equipment row is unavailable');
 
@@ -67,7 +79,7 @@ export async function evaluateAuthoritativeReadiness(input: {
     maintenanceOverdueHours: overdueHours,
     maintenanceOverdueDays: overdueDays,
     accepted: Boolean(acceptedHandover),
-    criticalDefect: openRecords.some((row) =>
+    criticalDefect: blockingDefect != null || openRecords.some((row) =>
       (row.type === 'FAULT' || row.type === 'REPAIR') && row.priority === 'CRITICAL'),
     findings: healthScore == null ? 0 : Math.max(0, Math.ceil((100 - healthScore) / 10)),
   } as const;
