@@ -56,7 +56,11 @@ export async function appendAuditEvent(
         : null,
       before: maskOptionalAuditPayload(input.before),
       after: maskOptionalAuditPayload(input.after),
-      metadata: maskOptionalAuditPayload(input.metadata),
+      // Пустой объект, а не null: проверка AuditLog_native_chain_complete
+      // требует метаданные у каждого звена цепочки, а ни одна команда модуля
+      // их пока не передаёт. Подставляем здесь, до вычисления хеша, иначе
+      // подпись разойдётся с тем, что легло в базу.
+      metadata: maskOptionalAuditPayload(input.metadata) ?? {},
     };
     const hash = digestAuditEvent({
       tenantId,
