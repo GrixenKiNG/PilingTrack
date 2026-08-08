@@ -17,6 +17,7 @@ const connectionString = process.env.DATABASE_URL_POSTGRES;
 const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730105500_readiness_snapshot_immutability/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730106000_readiness_backfill_progress/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260808130000_readiness_snapshot_facts/migration.sql'),
 ];
 
 describe.runIf(Boolean(connectionString))('readiness snapshot projection on disposable PostgreSQL', () => {
@@ -63,6 +64,25 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     expect(await prisma.readinessScoreSnapshot.count({where: {tenantId, triggerId: 'inspection-1'}})).toBe(1);
     await expect(prisma.readinessScoreSnapshot.update({where: {id: first.id}, data: {score: 1}})).rejects.toThrow();
     await expect(prisma.readinessScoreSnapshot.delete({where: {id: first.id}})).rejects.toThrow();
+  });
+
+  it('adds nullable jsonb facts without rewriting historical snapshots', async () => {
+    await sql.query(`INSERT INTO "ReadinessScoreSnapshot" (
+      "id", "tenantId", "equipmentId", "ruleSetId", "ruleSetVersion", "triggerType", "triggerId",
+      "status", "score", "blockers", "warnings", "evidence", "factsHash", "calculatedAt"
+    ) VALUES (
+      'legacy-no-facts', $1, 'eq-legacy', 'rules-1', 'v1', 'LEGACY', 'legacy-1',
+      'READY', 100, '[]', '[]', '{}', decode(repeat('00', 32), 'hex'), NOW()
+    )`, [tenantId]);
+    const columns = await sql.query<{is_nullable: string; data_type: string}>(`
+      SELECT is_nullable, data_type
+      FROM information_schema.columns
+      WHERE table_name = 'ReadinessScoreSnapshot' AND column_name = 'facts'
+    `);
+    expect(columns.rows).toEqual([{is_nullable: 'YES', data_type: 'jsonb'}]);
+    expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
+      where: {id: 'legacy-no-facts'}, select: {facts: true},
+    })).toEqual({facts: null});
   });
 
   it('does not let delayed delivery regress the current projection', async () => {

@@ -514,6 +514,7 @@ model ReadinessScoreSnapshot {
   blockers       Json
   warnings       Json
   evidence       Json
+  facts          Json?
   factsHash      Bytes    @db.ByteA
   calculatedAt   DateTime @default(now()) @db.Timestamptz(3)
 
