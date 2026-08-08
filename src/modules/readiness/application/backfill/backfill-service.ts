@@ -38,7 +38,11 @@ export async function backfillTenantReadiness(input: {
           });
           const snapshot = await createDeduplicatedSnapshot(tx, {
             tenantId: input.tenantId, equipmentId: row.id, ruleSetId: evaluation.ruleSetId,
-            triggerType: 'MIGRATION', triggerId: `tech-readiness-v1:${row.id}`,
+            // Ключ дедупликации включает набор правил: повторный прогон по тем
+            // же правилам ничего не задваивает, а после публикации новой
+            // редакции даёт свежий снимок вместо тихого возврата старого.
+            triggerType: 'MIGRATION',
+            triggerId: `tech-readiness-v1:${evaluation.ruleSetId}:${row.id}`,
           }, evaluation);
           await advanceCurrentReadiness({
             tx, tenantId: input.tenantId, equipmentId: row.id, snapshotId: snapshot.id,
@@ -73,9 +77,13 @@ export async function backfillTenantReadiness(input: {
         return {activeEquipment: 0, migrationSnapshots: 0, currentRows: 0};
       }
       const [migrationSnapshots, currentRows] = await Promise.all([
-        tx.readinessScoreSnapshot.count({where: {
-          tenantId: input.tenantId, equipmentId: {in: activeIds}, triggerType: 'MIGRATION',
-        }}),
+        // Считаем технику, а не снимки: после второго прогона по новым правилам
+        // снимков больше, чем установок, и сверка по их числу давала бы ложную
+        // ошибку.
+        tx.readinessScoreSnapshot.groupBy({
+          by: ['equipmentId'],
+          where: {tenantId: input.tenantId, equipmentId: {in: activeIds}, triggerType: 'MIGRATION'},
+        }).then((rows) => rows.length),
         tx.currentReadiness.count({where: {tenantId: input.tenantId, equipmentId: {in: activeIds}}}),
       ]);
       return {activeEquipment: activeIds.length, migrationSnapshots, currentRows};

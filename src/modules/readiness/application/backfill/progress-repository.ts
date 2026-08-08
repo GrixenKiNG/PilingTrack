@@ -11,7 +11,12 @@ export class ReadinessBackfillProgressRepository {
     return this.tx.readinessBackfillProgress.upsert({
       where: {tenantId},
       create: {tenantId, status: 'RUNNING'},
-      update: {status: 'RUNNING', completedAt: null, lastError: null},
+      // Позицию и счётчик сбрасываем: без этого повторный прогон продолжает
+      // с прошлого lastEquipmentId и молча пропускает всю технику до него.
+      update: {
+        status: 'RUNNING', completedAt: null, lastError: null,
+        lastEquipmentId: null, processedCount: 0,
+      },
     });
   }
 
