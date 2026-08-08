@@ -16,6 +16,7 @@ const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730105500_readiness_snapshot_immutability/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730106000_readiness_backfill_progress/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730107000_readiness_start_snapshot_fk/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260808130000_readiness_snapshot_facts/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
@@ -174,6 +175,11 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     expect(await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'},
       select: {state: true, startSnapshotId: true}})).toEqual({state: 'PLANNED', startSnapshotId: null});
     expect(await prisma.readinessScoreSnapshot.count({where: {tenantId, shiftId: 'blocked-shift', status: 'BLOCKED'}})).toBe(1);
+    expect(await prisma.readinessScoreSnapshot.findFirstOrThrow({
+      where: {tenantId, shiftId: 'blocked-shift', status: 'BLOCKED'}, select: {facts: true},
+    })).toMatchObject({facts: {
+      permitValid: false, permitExpired: false, criticalDefect: false,
+    }});
     expect(await prisma.auditLog.count({where: {tenantId, entityId: 'blocked-shift', action: 'shift.start-blocked'}})).toBe(1);
     expect(await prisma.outboxEvent.count({where: {tenantId, aggregateId: 'blocked-shift'}})).toBe(1);
     expect(await prisma.idempotencyKey.count({where: {tenantId, key: 'task04-blocked-start', status: 'completed'}})).toBe(1);
@@ -195,8 +201,11 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       select: {state: true, startSnapshotId: true}});
     expect(started).toMatchObject({state: 'STARTED', startSnapshotId: expect.any(String)});
     expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
-      where: {id: started.startSnapshotId!}, select: {status: true, triggerId: true},
-    })).toEqual({status: 'READY', triggerId: 'blocked-shift:start:2026-08-01T12:00:00.000Z'});
+      where: {id: started.startSnapshotId!}, select: {status: true, triggerId: true, facts: true},
+    })).toMatchObject({
+      status: 'READY', triggerId: 'blocked-shift:start:2026-08-01T12:00:00.000Z',
+      facts: {permitValid: true, permitExpired: false, criticalDefect: false},
+    });
     expect(await prisma.readinessScoreSnapshot.count({
       where: {tenantId, shiftId: 'blocked-shift', triggerType: 'SHIFT_START_DECISION'},
     })).toBe(2);

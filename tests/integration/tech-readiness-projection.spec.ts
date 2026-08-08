@@ -62,6 +62,9 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     });
     expect(duplicate.id).toBe(first.id);
     expect(await prisma.readinessScoreSnapshot.count({where: {tenantId, triggerId: 'inspection-1'}})).toBe(1);
+    expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
+      where: {id: first.id}, select: {facts: true},
+    })).toEqual({facts});
     await expect(prisma.readinessScoreSnapshot.update({where: {id: first.id}, data: {score: 1}})).rejects.toThrow();
     await expect(prisma.readinessScoreSnapshot.delete({where: {id: first.id}})).rejects.toThrow();
   });

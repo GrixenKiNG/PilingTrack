@@ -25,13 +25,13 @@ export async function createDeduplicatedSnapshot(
     INSERT INTO "ReadinessScoreSnapshot"
       ("id", "tenantId", "equipmentId", "shiftId", "ruleSetId", "ruleSetVersion",
        "triggerType", "triggerId", "status", "score", "blockers", "warnings",
-       "evidence", "factsHash", "calculatedAt")
+       "evidence", "facts", "factsHash", "calculatedAt")
     VALUES
       (${id}, ${identity.tenantId}, ${identity.equipmentId}, ${identity.shiftId ?? null},
        ${identity.ruleSetId}, ${evaluation.ruleSetVersion}, ${identity.triggerType}, ${identity.triggerId},
        ${evaluation.status}, ${evaluation.score}, ${JSON.stringify(evaluation.blockers)}::jsonb,
        ${JSON.stringify(evaluation.warnings)}::jsonb, ${JSON.stringify(evaluation.evidence)}::jsonb,
-       ${factsHash}, ${evaluation.calculatedAt})
+       ${JSON.stringify(evaluation.facts)}::jsonb, ${factsHash}, ${evaluation.calculatedAt})
     ON CONFLICT ("tenantId", "equipmentId", "triggerType", "triggerId") DO NOTHING
     RETURNING "id"
   `;
