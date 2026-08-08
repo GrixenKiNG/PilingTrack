@@ -4,6 +4,9 @@ export const READINESS_ABILITIES = [
   'readiness.handover.prepare',
   'readiness.handover.decide',
   'readiness.inspection.manage',
+  // Зафиксировать замечание может любой, кто работает со сменой; разбирать,
+  // закрывать и отклонять — только диспетчер, механик и администратор.
+  'readiness.defect.report',
   'readiness.defect.manage',
   'readiness.meter.manage',
   'readiness.maintenance.manage',
@@ -21,6 +24,10 @@ export type ReadinessRole = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT' | 
 const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
   ADMIN: [
     'readiness.read',
+    // В ОРИОНе обязанности механика исполняет администратор, поэтому разбор
+    // дефектов у него прямой, а не только через режим «действую за механика».
+    'readiness.defect.report',
+    'readiness.defect.manage',
     'readiness.permit.approve_admin',
     'readiness.rules.manage',
     'readiness.audit.read',
@@ -28,6 +35,8 @@ const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
   ],
   DISPATCHER: [
     'readiness.read',
+    'readiness.defect.report',
+    'readiness.defect.manage',
     'readiness.handover.decide',
     'readiness.permit.approve_dispatcher',
     'readiness.audit.read',
@@ -36,12 +45,14 @@ const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
     'readiness.read',
     'readiness.shift.manage',
     'readiness.handover.prepare',
+    'readiness.defect.report',
   ],
-  ASSISTANT: [],
+  ASSISTANT: ['readiness.defect.report'],
   MECHANIC: [
     'readiness.read',
     'readiness.permit.edit',
     'readiness.inspection.manage',
+    'readiness.defect.report',
     'readiness.defect.manage',
     'readiness.meter.manage',
     'readiness.maintenance.manage',

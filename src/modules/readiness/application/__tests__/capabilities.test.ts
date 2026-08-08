@@ -28,6 +28,19 @@ describe('readiness capabilities', () => {
     expect(dispatcher).not.toContain('readiness.handover.prepare');
   });
 
+  // Замечание с поля не должно упираться в права: потерянная неисправность
+  // дороже лишней записи. Разбор при этом остаётся за офисом и механиком.
+  it('lets every shift role report a defect but keeps triage with dispatch', () => {
+    for (const role of ['OPERATOR', 'ASSISTANT', 'DISPATCHER', 'MECHANIC', 'ADMIN']) {
+      expect(resolveReadinessCapabilities(role)).toContain('readiness.defect.report');
+    }
+    expect(resolveReadinessCapabilities('OPERATOR')).not.toContain('readiness.defect.manage');
+    expect(resolveReadinessCapabilities('ASSISTANT')).not.toContain('readiness.defect.manage');
+    expect(resolveReadinessCapabilities('DISPATCHER')).toContain('readiness.defect.manage');
+    // В ОРИОНе обязанности механика исполняет администратор.
+    expect(resolveReadinessCapabilities('ADMIN')).toContain('readiness.defect.manage');
+  });
+
   it('fails closed for an unknown role', () => {
     expect([...resolveReadinessCapabilities('OWNER')]).toEqual([]);
   });
