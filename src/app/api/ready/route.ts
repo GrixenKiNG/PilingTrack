@@ -1,8 +1,9 @@
 /**
  * GET /api/ready
  *
- * Legacy readiness endpoint — now delegates to the new health check system.
- * Kept for backward compatibility with existing clients.
+ * Canonical infrastructure readiness endpoint.
+ * `/api/readiness` is a deprecated compatibility alias because that namespace
+ * is reserved for the technical-readiness business API.
  */
 
 import { NextRequest } from 'next/server';

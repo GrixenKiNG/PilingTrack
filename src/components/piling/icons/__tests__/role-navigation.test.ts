@@ -16,6 +16,7 @@ describe('ROLE_NAVIGATION', () => {
   it('covers the operator workflow routes', () => {
     expect(ROLE_NAVIGATION.OPERATOR.map(({ href, icon }) => [href, icon])).toEqual([
       ['/operator', 'home'],
+      ['/admin/to', 'technical-readiness'],
       ['/report', 'shift-start'],
       ['/monitoring', 'monitoring'],
       ['/history', 'history'],

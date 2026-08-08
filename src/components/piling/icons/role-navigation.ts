@@ -10,6 +10,7 @@ export interface NavigationItem {
 
 const operatorNavigation: NavigationItem[] = [
   { label: 'Главная', href: '/operator', icon: 'home' },
+  { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
   { label: 'Отчёт', href: '/report', icon: 'shift-start', tone: 'primary' },
   { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring', tone: 'info' },
   { label: 'История', href: '/history', icon: 'history' },
