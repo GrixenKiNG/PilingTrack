@@ -187,13 +187,14 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
           isDeleted: false,
         },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, entityId: true, cdnUrl: true },
+        select: { id: true, entityId: true, cdnUrl: true, thumbnailKey: true },
       })
     : [];
   const photoByEquipment = new Map<string, string>();
   for (const m of photoRows) {
     if (m.entityId && !photoByEquipment.has(m.entityId)) {
-      photoByEquipment.set(m.entityId, m.cdnUrl ?? `/api/media/${m.id}/download`);
+      const downloadUrl = `/api/media/${m.id}/download${m.thumbnailKey ? '?thumb=1' : ''}`;
+      photoByEquipment.set(m.entityId, m.cdnUrl ?? downloadUrl);
     }
   }
 

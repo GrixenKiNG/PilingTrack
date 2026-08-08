@@ -231,8 +231,9 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
     // Rows arrive pre-sorted newest-first (orderBy: createdAt desc), matching
     // the real Prisma query — the map keeps the first row seen per entity.
     mediaFindMany.mockResolvedValue([
-      { id: 'media-1', entityId: 'eq-1', cdnUrl: 'https://cdn.example.com/photo.jpg', createdAt: new Date('2026-06-15T00:00:00.000Z') },
-      { id: 'media-2', entityId: 'eq-1', cdnUrl: null, createdAt: new Date('2026-06-01T00:00:00.000Z') },
+      { id: 'media-1', entityId: 'eq-1', cdnUrl: 'https://cdn.example.com/photo.jpg', thumbnailKey: 'media-1.thumb.jpg', createdAt: new Date('2026-06-15T00:00:00.000Z') },
+      { id: 'media-2', entityId: 'eq-1', cdnUrl: null, thumbnailKey: null, createdAt: new Date('2026-06-01T00:00:00.000Z') },
+      { id: 'media-3', entityId: 'eq-2', cdnUrl: null, thumbnailKey: 'media-3.thumb.jpg', createdAt: new Date('2026-06-10T00:00:00.000Z') },
     ]);
 
     const snap = await getFleetSnapshot({ tenantId: 'orion' });
@@ -247,6 +248,6 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
     const eq1 = snap.equipment.find((c) => c.id === 'eq-1');
     const eq2 = snap.equipment.find((c) => c.id === 'eq-2');
     expect(eq1?.photoUrl).toBe('https://cdn.example.com/photo.jpg');
-    expect(eq2?.photoUrl).toBeNull();
+    expect(eq2?.photoUrl).toBe('/api/media/media-3/download?thumb=1');
   });
 });
