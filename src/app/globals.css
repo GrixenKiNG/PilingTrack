@@ -31,10 +31,17 @@
      Доступны как bg-success / text-warning / border-info и т.д. */
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-strong: var(--success-strong);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-strong: var(--warning-strong);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-info-strong: var(--info-strong);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-strong: var(--signal-strong);
+  --color-destructive-strong: var(--destructive-strong);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -80,12 +87,19 @@
   --accent: oklch(0.965 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-strong: oklch(0.52 0.2 27.325);
   --success: oklch(0.627 0.17 149);
   --success-foreground: oklch(0.985 0 0);
+  --success-strong: oklch(0.48 0.14 149);
   --warning: oklch(0.705 0.16 70);
   --warning-foreground: oklch(0.21 0.02 70);
+  --warning-strong: oklch(0.45 0.12 70);
   --info: oklch(0.56 0.18 256);
   --info-foreground: oklch(0.985 0 0);
+  --info-strong: oklch(0.5 0.16 256);
+  --signal: oklch(0.67 0.2 48);
+  --signal-foreground: oklch(0.985 0 0);
+  --signal-strong: oklch(0.48 0.16 48);
   --icon-neutral: oklch(0.36 0.025 240);
   --icon-primary: oklch(0.67 0.2 48);
   --icon-info: oklch(0.56 0.18 256);
@@ -126,12 +140,19 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-strong: oklch(0.78 0.14 22.216);
   --success: oklch(0.696 0.17 162);
   --success-foreground: oklch(0.145 0 0);
+  --success-strong: oklch(0.78 0.13 162);
   --warning: oklch(0.769 0.188 70);
   --warning-foreground: oklch(0.145 0 0);
+  --warning-strong: oklch(0.82 0.12 70);
   --info: oklch(0.62 0.19 256);
   --info-foreground: oklch(0.985 0 0);
+  --info-strong: oklch(0.78 0.12 256);
+  --signal: oklch(0.73 0.19 48);
+  --signal-foreground: oklch(0.145 0 0);
+  --signal-strong: oklch(0.8 0.13 48);
   --icon-neutral: oklch(0.78 0.02 240);
   --icon-primary: oklch(0.73 0.19 48);
   --icon-info: oklch(0.7 0.16 256);
@@ -248,7 +269,7 @@
 /* Notion-like checkbox */
 .notion-checkbox {
   @apply w-4 h-4 rounded border-2 border-muted-foreground/30 flex-shrink-0 cursor-pointer;
-  transition: all 0.15s ease;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 .notion-checkbox:hover {
   @apply border-foreground/50;
@@ -282,7 +303,7 @@
 /* Schedule block */
 .schedule-block {
   @apply rounded-lg p-2 text-xs overflow-hidden;
-  transition: all 0.15s ease;
+  transition: box-shadow 150ms ease, transform 150ms ease;
 }
 .schedule-block:hover {
   @apply shadow-md;
@@ -310,6 +331,32 @@
 .kpi-animated:nth-child(2n) { animation-delay: -8s; }
 .kpi-animated:nth-child(3n) { animation-delay: -16s; }
 .kpi-animated:nth-child(4n) { animation-delay: -24s; }
+
+/* Technical-readiness adaptation: the desktop information architecture stays
+   intact, while field tablets and phones receive reliable touch targets and a
+   readable metadata floor. */
+@media (max-width: 767px), (pointer: coarse) {
+  .tech-readiness-module :where(button, select, input, a.inline-flex) {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 639px) {
+  .tech-readiness-module :where(.text-3xs, .text-2xs) {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kpi-animated { animation: none; }
+  .card-hover,
+  .schedule-block,
+  .piling-icon-tile {
+    transition-duration: 0.01ms;
+  }
+  .card-hover:hover,
+  .schedule-block:hover {
+    transform: none;
+  }
 }

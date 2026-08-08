@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { usePilingStore } from '@/lib/store';
 import { AppErrorBoundary } from '@/components/piling/app-error-boundary';
 import { FeedbackCenter } from '@/components/piling/feedback-center';
@@ -41,17 +42,18 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
           const isActive = isActivePath(pathname, item.href);
 
           return (
-            <a
+            <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all min-w-[64px] no-underline',
+                'flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 no-underline transition-colors',
                 isActive ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'
               )}
             >
               <div
                 className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center transition-all relative',
+                  'relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
                   isActive ? 'bg-orange-100' : ''
                 )}
               >
@@ -63,8 +65,8 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
                   className={cn('relative z-10', isActive && '!text-orange-700')}
                 />
               </div>
-              <span className="text-3xs font-medium">{item.label}</span>
-            </a>
+              <span className="text-xs font-medium">{item.label}</span>
+            </Link>
           );
         })}
       </div>
@@ -78,7 +80,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2.5">
             <PilingIcon name="equipment-rig" size={34} tone="primary" decorative />
             <div>
-              <h1 className="text-sm font-bold text-slate-900">PilingTrack</h1>
+              <span className="text-sm font-bold text-slate-900">PilingTrack</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -88,7 +90,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="sm"
               onClick={() => void logoutClient()}
-              className="h-8 text-slate-400 hover:text-red-500"
+              className="h-11 w-11 text-slate-400 hover:text-red-500"
               aria-label="Выйти"
             >
               <PilingIcon name="logout" size={16} tone="danger" decorative />
@@ -127,8 +129,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex items-center gap-3 px-5 py-5">
         <PilingIcon name="equipment-rig" size={38} tone="primary" decorative />
         <div>
-          <h1 className="text-lg font-bold tracking-tight text-slate-900">PilingTrack</h1>
-          <p className="text-3xs text-slate-500">
+          <span className="text-lg font-bold tracking-tight text-slate-900">PilingTrack</span>
+          <p className="text-xs text-slate-500">
             {isDispatcher ? 'Панель диспетчера' : 'Панель администратора'}
           </p>
         </div>
@@ -141,12 +143,13 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           const isActive = isActivePath(pathname, item.href);
 
           return (
-            <a
+            <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all no-underline',
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors',
                 isActive
                   ? 'border-l-2 border-orange-500 bg-orange-50 text-orange-700'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -160,7 +163,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
                 className={isActive ? '!text-orange-700' : undefined}
               />
               {item.label}
-            </a>
+            </Link>
           );
         })}
       </nav>
@@ -175,7 +178,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-            <p className="text-3xs text-slate-500">{user?.email}</p>
+            <p className="truncate text-xs text-slate-500">{user?.email}</p>
           </div>
         </div>
         <Button
@@ -201,7 +204,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3 px-4 py-3">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <button aria-label="Открыть меню навигации" className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100">
+              <button aria-label="Открыть меню навигации" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-slate-100">
                 <PilingIcon name="menu" size={20} decorative />
               </button>
             </SheetTrigger>
@@ -218,7 +221,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="lg:ml-64 min-h-screen bg-[#f7f8fa]">
+      <main className="min-h-screen bg-background lg:ml-64">
         <AnimatePresence mode="wait">
           <motion.div
             key={user?.id}
@@ -326,5 +329,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  return <AppLayoutContent>{children}</AppLayoutContent>;
+  return (
+    <MotionConfig reducedMotion="user">
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </MotionConfig>
+  );
 }
