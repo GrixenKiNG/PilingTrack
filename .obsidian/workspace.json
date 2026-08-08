@@ -11,14 +11,13 @@
             "id": "1ccd2413fedec4b8",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "bases",
               "state": {
-                "file": "node_modules/protobufjs/README.md",
-                "mode": "source",
-                "source": false
+                "file": "Без названия 4.base",
+                "viewName": "Таблица"
               },
-              "icon": "lucide-file",
-              "title": "README"
+              "icon": "lucide-table",
+              "title": "Без названия 4"
             }
           }
         ]
@@ -186,14 +185,26 @@
   },
   "active": "1ccd2413fedec4b8",
   "lastOpenFiles": [
+    "Без названия 3.base",
+    "Без названия 4.base",
+    "Без названия 2.base",
+    "Без названия 1.base",
+    "Без названия.base",
+    "2026-08-04.md",
+    "Без названия 1.canvas",
+    "Без названия.canvas",
+    "node_modules/sharp/README.md",
+    "node_modules/next/dist/docs/01-app/02-guides/migrating/app-router-migration.md",
+    "node_modules/tailwindcss-animate/README.md",
+    "node_modules/eslint-config-next/node_modules/eslint-plugin-react/README.md",
+    "node_modules/@babel/helper-module-imports/README.md",
+    "node_modules/protobufjs/README.md",
     "node_modules/@smithy/hash-blob-browser/README.md",
     "node_modules/@opentelemetry/propagator-jaeger/README.md",
     "docs/archive/DETAILED-REMEDIATION-GUIDE-2026-04-14.md",
     "node_modules/eslint-config-next/node_modules/eslint-plugin-import/docs/rules/no-deprecated.md",
     "node_modules/ms/license.md",
-    "node_modules/eslint-config-next/node_modules/eslint-plugin-react/README.md",
     "node_modules/eslint-config-next/node_modules/eslint-plugin-jsx-a11y/README.md",
-    "node_modules/next/dist/docs/01-app/02-guides/migrating/app-router-migration.md",
     "node_modules/eslint-config-next/node_modules/eslint-plugin-jsx-a11y/CHANGELOG.md",
     "tmp-screenshots/03-telegram.png",
     "tmp-screenshots/04-admin-dashboard.png",
