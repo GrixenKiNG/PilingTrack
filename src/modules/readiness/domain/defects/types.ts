@@ -7,10 +7,22 @@ export type DefectStatus = (typeof DEFECT_STATUSES)[number];
 /** Что делают с дефектом: разобрали, устранили, отклонили. */
 export type DefectAction = 'TRIAGE' | 'RESOLVE' | 'REJECT';
 
+/**
+ * Словарь тот же, что у приоритетов нарядов (PRIORITY_LABEL): в одном модуле
+ * не должно быть двух наборов слов для одной и той же шкалы.
+ */
 export const DEFECT_SEVERITY_LABELS: Record<DefectSeverity, string> = {
-  LOW: 'Наблюдение',
-  NORMAL: 'Устранить планово',
-  HIGH: 'Устранить срочно',
+  LOW: 'Низкий',
+  NORMAL: 'Обычный',
+  HIGH: 'Высокий',
+  CRITICAL: 'Критичный',
+};
+
+/** Что уровень означает на практике — подсказка рядом с выбором. */
+export const DEFECT_SEVERITY_HINTS: Record<DefectSeverity, string> = {
+  LOW: 'Наблюдение, работе не мешает',
+  NORMAL: 'Устранить в плановом порядке',
+  HIGH: 'Устранить как можно скорее',
   CRITICAL: 'Эксплуатация запрещена',
 };
 
