@@ -182,6 +182,56 @@ export function sanitizeRuleSet(
   };
 }
 
+/**
+ * Человекочитаемый список различий между наборами правил.
+ *
+ * Одна строка — одно изменение, и ровно на этом счёте держится счётчик
+ * неопубликованных изменений: если критерий поменял и вес, и закрепление,
+ * это по-прежнему одно изменение, а не два.
+ */
+export function describeRuleSetChanges(
+  before: ReadinessRuleSet,
+  after: ReadinessRuleSet,
+): string[] {
+  const changes: string[] = [];
+
+  after.criteria.forEach((criterion) => {
+    const previous = before.criteria.find((item) => item.key === criterion.key);
+    const title = CRITERION_LABELS[criterion.key].title;
+    if (!previous) {
+      changes.push(`Добавлен критерий «${title}» — ${criterion.weight}%`);
+      return;
+    }
+    const parts: string[] = [];
+    if (previous.weight !== criterion.weight) {
+      parts.push(`вес ${previous.weight} → ${criterion.weight}%`);
+    }
+    if (previous.locked !== criterion.locked) {
+      parts.push(criterion.locked ? 'вес закреплён' : 'закрепление снято');
+    }
+    if (parts.length) changes.push(`${title}: ${parts.join(', ')}`);
+  });
+
+  after.blockers.forEach((blocker) => {
+    const previous = before.blockers.find((item) => item.condition === blocker.condition);
+    const label = BLOCKER_LABELS[blocker.condition];
+    if (!previous) {
+      changes.push(`Добавлено правило «${label}»`);
+      return;
+    }
+    const parts: string[] = [];
+    if (previous.isActive !== blocker.isActive) {
+      parts.push(blocker.isActive ? 'включено' : 'отключено');
+    }
+    if (previous.action !== blocker.action) {
+      parts.push(`${BLOCKER_ACTION_LABELS[previous.action]} → ${BLOCKER_ACTION_LABELS[blocker.action]}`);
+    }
+    if (parts.length) changes.push(`«${label}»: ${parts.join(', ')}`);
+  });
+
+  return changes;
+}
+
 export function bumpVersion(version: string): string {
   const match = /^v(\d+)\.(\d+)$/.exec(version);
   if (!match) return 'v1.0';

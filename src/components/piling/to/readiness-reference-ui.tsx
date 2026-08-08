@@ -48,8 +48,10 @@ import {
   BLOCKER_LABELS,
   CRITERION_LABELS,
   computeReadinessScore,
+  describeRuleSetChanges,
   normalizeWeights,
   type BlockerAction,
+  type ReadinessCriterionKey,
   type ReadinessFacts,
   type ReadinessRuleSet,
   type ReadinessRulesState,
@@ -1697,6 +1699,28 @@ function SettingsKpis({ items }: { items: Array<{ icon: PilingIconName; label: s
   );
 }
 
+/** Своя иконка на критерий — по макету, но из общего набора модуля. */
+const CRITERION_ICONS: Record<ReadinessCriterionKey, typeof ClipboardCheck> = {
+  INSPECTION: ClipboardCheck,
+  ENGINE_HOURS: Gauge,
+  PERMIT: FileText,
+  MAINTENANCE: Wrench,
+  ACCEPTANCE: CheckCircle2,
+};
+
+const ROLE_COLUMNS = ['Оператор', 'Диспетчер', 'Механик', 'Админ'] as const;
+
+/**
+ * Сводка матрицы доступов. Полная и авторитетная живёт в разделе «Роли и
+ * доступы»; здесь — витрина на четыре строки, как в макете.
+ */
+const ROLE_MATRIX: Array<{ permission: string; allowed: [boolean, boolean, boolean, boolean] }> = [
+  { permission: 'Открывать смену', allowed: [true, true, false, true] },
+  { permission: 'Принимать технику', allowed: [false, true, false, true] },
+  { permission: 'Закрывать дефекты', allowed: [false, false, true, true] },
+  { permission: 'Изменять правила', allowed: [false, false, false, true] },
+];
+
 function Toggle({ checked, onChange, disabled = false, label = 'Переключатель' }: { checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; label?: string }) {
   return (
     <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled || !onChange} onClick={() => onChange?.(!checked)} className="grid min-h-11 min-w-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed">
@@ -1716,7 +1740,18 @@ function RulesSettings(props: ReferenceUiProps) {
   const rulesUnavailable = !props.rulesAvailable || !props.bootstrap?.capabilities.entities.rules.manage;
   const previewFacts = props.factsByEquipment[props.selectedId];
   const preview = previewFacts ? computeReadinessScore(previewFacts, draft) : null;
-  const pending = props.rulesState.pendingChanges + (dirty ? 1 : 0);
+  const previewEquipment = props.equipment.find((item) => item.id === props.selectedId);
+  const previewFleet = props.fleetCards.find((item) => item.id === props.selectedId);
+  // Список правок показываем от действующей версии к тому, что сейчас в форме,
+  // чтобы несохранённые изменения были видны до нажатия «Сохранить черновик».
+  const pendingChanges = describeRuleSetChanges(props.rulesState.published, draft);
+  const pending = pendingChanges.length;
+  const activeRules = draft.blockers.filter((blocker) => blocker.isActive);
+  // updatedBy хранит идентификатор, а не имя: без обратного поиска в списке
+  // участников на экран попал бы сырой id.
+  const publishedAuthor = props.bootstrap?.selectors.actors
+    .find((actor) => actor.id === props.rulesState.published.updatedBy)?.name
+    ?? (props.rulesState.publishedInDb ? 'не указан' : '—');
 
   const patchCriterion = (
     key: ReadinessRuleSet['criteria'][number]['key'],
@@ -1824,7 +1859,7 @@ function RulesSettings(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle heading="Настройки системы" subtitle="Правила, доступы и конфигурация готовности" actions={<Button variant="outline" onClick={() => props.onSettingsSectionChange('audit')}><History className="mr-2 h-4 w-4" />История изменений</Button>} />
+      <ScreenTitle heading="Правила готовности" subtitle="Вес критериев, блокеры и матрица доступов" actions={<Button variant="outline" onClick={() => props.onSettingsSectionChange('audit')}><History className="mr-2 h-4 w-4" />История изменений</Button>} />
       {rulesUnavailable && (
         <div role="alert" className="mb-3 flex flex-col gap-3 rounded-xl border border-signal/30 bg-signal/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1838,20 +1873,29 @@ function RulesSettings(props: ReferenceUiProps) {
           </Button>
         </div>
       )}
-      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div>
-          <section className={cn(card, 'overflow-hidden')}>
-            <div className="border-b border-border p-3"><h2 className="text-lg font-bold">Правила готовности</h2><p className="mt-0.5 text-2xs text-muted-foreground">Вес критериев и критические блокеры</p></div>
-            <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2">
-              <div className="rounded-xl border border-border p-3">
-                <div className="flex items-center justify-between"><h3 className="font-bold">Вес критериев</h3><span className="text-xs text-muted-foreground">Итого <b className={cn('ml-2 rounded px-2 py-1', total === 100 ? 'bg-success/10 text-success-strong' : 'bg-destructive/10 text-destructive-strong')}>{total}%</b></span></div>
-                <p className="mt-1 text-xs text-muted-foreground">Перетащите, чтобы изменить приоритет</p>
-                <div className="mt-2 divide-y divide-border">
-                  {draft.criteria.map((criterion) => {
-                    const meta = CRITERION_LABELS[criterion.key];
-                    return (
-                      <div key={criterion.key} className="grid grid-cols-[minmax(0,1fr)_48px_76px_44px] items-center gap-2 py-2">
-                        <div className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-muted-foreground" /><div><div className="text-xs font-semibold">{meta.title}</div><div className="text-3xs text-muted-foreground">{meta.hint}</div></div></div>
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className={cn(card, 'overflow-hidden')}>
+          <div className="border-b border-border p-3">
+            <h2 className="text-lg font-bold">Вес критериев и критические блокеры</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-bold">Вес критериев</h3>
+                <span className="text-xs text-muted-foreground">Итого <b className={cn('ml-1 rounded px-2 py-1 font-mono', total === 100 ? 'bg-success/10 text-success-strong' : 'bg-destructive/10 text-destructive-strong')}>{total}%</b></span>
+              </div>
+              <div className="mt-2 divide-y divide-border">
+                {draft.criteria.map((criterion) => {
+                  const meta = CRITERION_LABELS[criterion.key];
+                  const Icon = CRITERION_ICONS[criterion.key];
+                  return (
+                    <div key={criterion.key} className="grid grid-cols-[34px_minmax(0,1fr)_66px_1fr_44px] items-center gap-2 py-2">
+                      <span className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-success/10 text-success-strong"><Icon className="h-4 w-4" /></span>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold">{meta.title}</div>
+                        <div className="truncate text-3xs text-muted-foreground">{meta.hint}</div>
+                      </div>
+                      <label className="flex h-8 items-center gap-0.5 rounded-md border border-border bg-background px-1.5 focus-within:ring-2 focus-within:ring-ring">
                         <input
                           type="number"
                           min={0}
@@ -1860,75 +1904,224 @@ function RulesSettings(props: ReferenceUiProps) {
                           disabled={saving || rulesUnavailable || criterion.locked}
                           onChange={(event) => patchCriterion(criterion.key, { weight: Number(event.target.value) })}
                           aria-label={`Вес критерия ${meta.title}`}
-                          className="h-8 rounded border border-border px-2 text-right text-xs disabled:bg-muted"
+                          className="w-full min-w-0 border-none bg-transparent text-right font-mono text-xs font-bold outline-none disabled:text-muted-foreground"
                         />
-                        <input
-                          type="range"
-                          min="0"
-                          max="50"
-                          value={criterion.weight}
-                          disabled={saving || rulesUnavailable || criterion.locked}
-                          onChange={(event) => patchCriterion(criterion.key, { weight: Number(event.target.value) })}
-                          aria-label={`Ползунок веса ${meta.title}`}
-                          className="accent-signal disabled:opacity-50"
-                        />
-                        <span className="flex items-center gap-1">
-                          <Toggle checked={criterion.locked} onChange={saving || rulesUnavailable ? undefined : (locked) => patchCriterion(criterion.key, { locked })} />
-                          <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                        <span className="text-3xs text-muted-foreground">%</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="60"
+                        value={criterion.weight}
+                        disabled={saving || rulesUnavailable || criterion.locked}
+                        onChange={(event) => patchCriterion(criterion.key, { weight: Number(event.target.value) })}
+                        aria-label={`Ползунок веса ${meta.title}`}
+                        className="min-w-0 accent-signal disabled:opacity-50"
+                      />
+                      <span className="flex items-center justify-end gap-1">
+                        <Lock className={cn('h-3.5 w-3.5', criterion.locked ? 'text-success-strong' : 'text-muted-foreground')} />
+                        <Toggle checked={criterion.locked} onChange={saving || rulesUnavailable ? undefined : (locked) => patchCriterion(criterion.key, { locked })} label={`Закрепить вес критерия ${meta.title}`} />
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="space-y-4">
-                <div className="rounded-xl border border-border p-3">
-                  <div className="flex items-center justify-between"><h3 className="font-bold">Блокеры и предупреждения</h3><span className="text-xs text-muted-foreground">{draft.blockers.filter((item) => item.isActive).length} из {draft.blockers.length} активны</span></div>
-                  <div className="mt-2 grid grid-cols-[1fr_150px_36px] border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Условие</span><span>Действие</span><span /></div>
-                  {draft.blockers.map((blocker) => {
-                    // Предупреждение не останавливает работу — не красим его как критическое.
-                    const advisory = blocker.action === 'WARN_ONLY';
-                    return (
-                    <div key={blocker.condition} className="grid grid-cols-[1fr_150px_36px] items-center border-b border-border py-2 text-2xs">
-                      <span className="flex items-center gap-2"><AlertTriangle className={cn('h-3.5 w-3.5', advisory ? 'text-warning-strong' : 'text-destructive-strong')} />{BLOCKER_LABELS[blocker.condition]}</span>
+              <p className="mt-2 border-t border-border pt-2 text-2xs text-muted-foreground">
+                Сумма весов автоматически нормируется до 100%. Закреплённый вес при этом не меняется.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-xl border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-bold">Блокеры и предупреждения</h3>
+                  <span className="text-xs text-muted-foreground">{draft.blockers.filter((item) => item.isActive).length} из {draft.blockers.length} активны</span>
+                </div>
+                <div className="mt-2 grid grid-cols-[minmax(0,1fr)_150px_44px] items-end gap-2 border-b border-border pb-1.5 text-3xs uppercase text-muted-foreground">
+                  <span>Условие</span><span>Действие</span><span className="text-right">Активно</span>
+                </div>
+                {draft.blockers.map((blocker) => {
+                  // Предупреждение не останавливает работу — не красим его как критическое.
+                  const advisory = blocker.action === 'WARN_ONLY';
+                  return (
+                    <div key={blocker.condition} className="grid grid-cols-[minmax(0,1fr)_150px_44px] items-center gap-2 border-b border-border py-2 text-2xs last:border-b-0">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <AlertTriangle className={cn('h-3.5 w-3.5 shrink-0', blocker.isActive ? (advisory ? 'text-warning-strong' : 'text-destructive-strong') : 'text-muted-foreground')} />
+                        <span className="leading-tight">{BLOCKER_LABELS[blocker.condition]}</span>
+                      </span>
                       <select
                         value={blocker.action}
                         disabled={saving || rulesUnavailable}
                         onChange={(event) => patchBlocker(blocker.condition, { action: event.target.value as BlockerAction })}
                         aria-label={`Действие правила ${BLOCKER_LABELS[blocker.condition]}`}
-                        className={cn('mr-2 w-[142px] min-w-0 rounded px-1 py-1 text-3xs', advisory
+                        className={cn('w-full min-w-0 rounded px-1 py-1 text-3xs', advisory
                           ? 'border border-warning/25 bg-warning/10 text-warning-strong'
                           : 'border border-destructive/25 bg-destructive/10 text-destructive-strong')}
                       >
                         {BLOCKER_ACTIONS.map((action) => <option key={action} value={action}>{BLOCKER_ACTION_LABELS[action]}</option>)}
                       </select>
-                      <Toggle checked={blocker.isActive} onChange={saving || rulesUnavailable ? undefined : (isActive) => patchBlocker(blocker.condition, { isActive })} />
+                      <span className="flex justify-end">
+                        <Toggle checked={blocker.isActive} onChange={saving || rulesUnavailable ? undefined : (isActive) => patchBlocker(blocker.condition, { isActive })} label={`Включить правило ${BLOCKER_LABELS[blocker.condition]}`} />
+                      </span>
                     </div>
-                    );
-                  })}
+                  );
+                })}
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-border p-3">
+                <h3 className="font-bold">Роли и доступы</h3>
+                <div className="mt-2 grid min-w-[420px] grid-cols-[minmax(0,1fr)_repeat(4,64px)] text-3xs uppercase text-muted-foreground">
+                  <span />{ROLE_COLUMNS.map((role) => <span key={role} className="text-center">{role}</span>)}
                 </div>
-                <div className="overflow-x-auto rounded-xl border border-border p-3"><h3 className="font-bold">Роли и доступы</h3><div className="mt-2 grid min-w-[420px] grid-cols-[1fr_repeat(4,60px)] text-3xs uppercase text-muted-foreground"><span /><span>Оператор</span><span>Диспетчер</span><span>Механик</span><span>Админ</span></div>{['Открывать смену', 'Принимать технику', 'Закрывать дефекты', 'Изменять правила'].map((permission, row) => <div key={permission} className="grid min-w-[420px] grid-cols-[1fr_repeat(4,60px)] items-center border-t border-border py-1.5 text-2xs"><span>{permission}</span>{[0, 1, 2, 3].map((column) => <span key={column} className="text-center">{column === 3 || (row < 2 && column < 2) || (row === 2 && column === 2) ? '✓' : '—'}</span>)}</div>)}</div>
+                {ROLE_MATRIX.map((row) => (
+                  <div key={row.permission} className="grid min-w-[420px] grid-cols-[minmax(0,1fr)_repeat(4,64px)] items-center border-t border-border py-1.5 text-2xs">
+                    <span>{row.permission}</span>
+                    {row.allowed.map((allowed, column) => (
+                      <span key={ROLE_COLUMNS[column]} className="flex justify-center">
+                        {allowed
+                          ? <CheckCircle2 className="h-4 w-4 text-success-strong" aria-label="Разрешено" />
+                          : <span className="text-muted-foreground" aria-label="Недоступно">—</span>}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+                <button type="button" onClick={() => props.onSettingsSectionChange('roles')} className="mt-2 flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
+                  Открыть полную матрицу <ArrowRight className="h-3 w-3" />
+                </button>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
         <aside className="space-y-3">
-          <section className={cn(card, 'p-3')}><div className={cn('rounded px-3 py-2 text-sm font-bold', props.rulesState.publishedInDb ? 'bg-success/10 text-success-strong' : 'bg-signal/10 text-signal-strong')}>{props.rulesState.published.version} {'·'} {props.rulesState.publishedInDb ? 'Опубликована' : 'Не опубликована'}</div><div className="mt-2 text-2xs leading-relaxed text-muted-foreground">Последнее изменение: {props.rulesState.published.updatedAt ? formatDateTimeInTimezone(props.rulesState.published.updatedAt, props.bootstrap?.tenant.timezone) : 'базовые правила'}<br />Установок затронуто: {props.equipment.length}</div></section>
-          <section className={cn(card, 'p-3')}><h3 className="font-bold">Действующая версия</h3><ul className="mt-2 space-y-1.5 text-2xs text-muted-foreground"><li>✓ Пять взвешенных критериев</li><li>✓ Версионирование публикаций</li><li>✓ Критические блокировки запуска</li></ul></section>
-          <section className="rounded-[14px] border border-signal/25 bg-signal/10 p-3"><div className="flex items-center justify-between"><h3 className="font-bold">{props.rulesState.publishedInDb ? 'Неопубликованные изменения' : 'Правила ещё не приняты'}</h3>{props.rulesState.publishedInDb && (<span className="rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive-strong">{pending}</span>)}</div><ul className="mt-2 space-y-1.5 text-2xs text-muted-foreground">{props.rulesState.publishedInDb ? (<><li>• Изменения сохраняются как черновик</li><li>• После публикации создаётся новая версия</li></>) : (<><li>• Пока правила не приняты, готовность установок не рассчитывается</li><li>• Публикация закрепит показанные веса и блокеры как действующие</li></>)}</ul><Button onClick={() => void publishRules()} disabled={saving || rulesUnavailable || (pending === 0 && props.rulesState.publishedInDb)} className="mt-3 h-9 w-full bg-signal-strong hover:bg-signal-strong">Опубликовать</Button><Button onClick={() => void saveDraft()} disabled={saving || rulesUnavailable || !dirty} variant="outline" className="mt-2 h-9 w-full">Сохранить черновик</Button></section>
+          <section className={cn(card, 'p-3')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn('rounded-md border px-2.5 py-1 font-mono text-sm font-bold', props.rulesState.publishedInDb
+                ? 'border-success/25 bg-success/10 text-success-strong'
+                : 'border-signal/25 bg-signal/10 text-signal-strong')}>
+                {props.rulesState.published.version} {'·'} {props.rulesState.publishedInDb ? 'Опубликована' : 'Не опубликована'}
+              </span>
+              {props.rulesState.publishedInDb
+                ? <span className="flex items-center gap-1 text-2xs font-semibold text-success-strong"><CheckCircle2 className="h-3.5 w-3.5" />Действует</span>
+                : <span className="flex items-center gap-1 text-2xs font-semibold text-signal-strong"><AlertTriangle className="h-3.5 w-3.5" />Не применяется</span>}
+            </div>
+            <dl className="mt-3 space-y-1 text-2xs leading-relaxed text-muted-foreground">
+              <div className="flex justify-between gap-2"><dt>Последнее изменение</dt><dd className="text-right font-semibold text-foreground">{props.rulesState.published.updatedAt ? formatDateTimeInTimezone(props.rulesState.published.updatedAt, props.bootstrap?.tenant.timezone) : 'базовые значения'}</dd></div>
+              <div className="flex justify-between gap-2"><dt>Автор</dt><dd className="text-right font-semibold text-foreground">{publishedAuthor}</dd></div>
+              <div className="flex justify-between gap-2"><dt>Установок затронуто</dt><dd className="text-right font-mono font-semibold text-foreground">{props.equipment.length}</dd></div>
+            </dl>
+            <h3 className="mt-3 text-xs font-bold">Что сейчас действует</h3>
+            <ul className="mt-1.5 space-y-1.5">
+              {activeRules.length === 0
+                ? <li className="text-2xs text-muted-foreground">Ни одно правило не включено — запуск ничем не ограничен.</li>
+                : activeRules.map((rule) => (
+                  <li key={rule.condition} className="flex items-start gap-2 text-2xs leading-relaxed">
+                    <span className={cn('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md', rule.action === 'WARN_ONLY' ? 'bg-warning/10 text-warning-strong' : 'bg-destructive/10 text-destructive-strong')}><AlertTriangle className="h-3 w-3" /></span>
+                    <span><b className="font-semibold text-foreground">{BLOCKER_LABELS[rule.condition]}</b> — {BLOCKER_ACTION_LABELS[rule.action].toLowerCase()}</span>
+                  </li>
+                ))}
+            </ul>
+          </section>
+          <section className="rounded-[14px] border border-signal/25 bg-signal/10 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-bold">{props.rulesState.publishedInDb ? 'Неопубликованные изменения' : 'Правила ещё не приняты'}</h3>
+              {pending > 0 && <span className="rounded bg-signal/20 px-2 py-1 text-xs font-bold text-signal-strong">{pending}</span>}
+            </div>
+            <ul className="mt-2 space-y-1.5">
+              {!props.rulesState.publishedInDb ? (
+                <>
+                  <li className="text-2xs leading-relaxed text-muted-foreground">Пока правила не приняты, готовность установок не рассчитывается.</li>
+                  <li className="text-2xs leading-relaxed text-muted-foreground">Публикация закрепит показанные веса и блокеры как действующие.</li>
+                </>
+              ) : pendingChanges.length === 0 ? (
+                <li className="text-2xs leading-relaxed text-muted-foreground">Черновик совпадает с действующей версией.</li>
+              ) : pendingChanges.map((change) => (
+                <li key={change} className="flex items-start gap-2 text-2xs leading-relaxed">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-signal-strong" />
+                  <span>{change}</span>
+                </li>
+              ))}
+            </ul>
+            <Button onClick={() => void publishRules()} disabled={saving || rulesUnavailable || (pending === 0 && props.rulesState.publishedInDb)} className="mt-3 h-9 w-full bg-signal-strong hover:bg-signal-strong">
+              {props.rulesState.publishedInDb ? 'Опубликовать изменения' : 'Опубликовать правила'}
+            </Button>
+            <Button onClick={() => void saveDraft()} disabled={saving || rulesUnavailable || !dirty} variant="outline" className="mt-2 h-9 w-full">Сохранить черновик</Button>
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 p-2.5 text-3xs font-semibold leading-relaxed text-warning-strong">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              После публикации правила применятся ко всем новым сменам. Уже открытые смены досчитываются по прежней версии.
+            </p>
+          </section>
         </aside>
       </div>
       <section className={cn(card, 'mt-2 p-3')}>
         <h2 className="font-bold">Предпросмотр расчёта готовности</h2>
-        <div className="mt-2 flex items-center gap-5">
-          <ReadinessRing value={preview?.score ?? null} size={88} />
-          <div className="grid flex-1 grid-cols-2 gap-2 md:grid-cols-5">
-            {draft.criteria.map((criterion) => {
-              const result = preview?.criteria.find((item) => item.key === criterion.key);
-              return <div key={criterion.key} className="rounded-lg border border-border p-2 text-center"><div className="text-3xs font-semibold">{CRITERION_LABELS[criterion.key].title}</div><div className="mt-1 font-mono text-base font-bold">{result?.earned ?? 0}/{criterion.weight}</div></div>;
-            })}
+        <div className="mt-3 grid grid-cols-1 items-start gap-4 xl:grid-cols-[240px_minmax(0,1.3fr)_minmax(0,1fr)_210px]">
+          <div className="flex items-center gap-3">
+            <EquipmentPhoto cardData={previewFleet} name={previewEquipment?.name ?? ''} className="h-[74px] w-[68px] shrink-0" />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold">{previewEquipment?.name ?? 'Установка не выбрана'}</div>
+              <div className="truncate text-xs text-muted-foreground">{previewFleet?.assignedSiteName || 'Объект не назначен'}</div>
+            </div>
+            <ReadinessRing value={preview?.score ?? null} size={74} />
           </div>
-          <div className="w-44 rounded-lg border border-border p-3 text-xs text-muted-foreground">Результат:<br /><b className="mt-1 block text-destructive-strong">{preview?.verdictLabel ?? 'выберите установку'}</b></div>
+          <div>
+            <div className="mb-2 text-xs font-semibold text-muted-foreground">Расчёт по критериям</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {draft.criteria.map((criterion) => {
+                const result = preview?.criteria.find((item) => item.key === criterion.key);
+                const ratio = result?.ratio ?? 0;
+                return (
+                  <div key={criterion.key}>
+                    <div className="flex min-h-8 items-end text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].title}</div>
+                    <div className="mt-1 font-mono text-sm font-bold">{result?.earned ?? 0} <span className="text-2xs font-semibold text-muted-foreground">/ {criterion.weight}</span></div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <span className={cn('block h-full rounded-full', ratio >= 0.999 ? 'bg-success-strong' : ratio > 0 ? 'bg-signal-strong' : 'bg-destructive-strong')} style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 3)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-semibold text-muted-foreground">Блокеры</div>
+            {preview && preview.blockers.length > 0 ? (
+              <ul className="space-y-2">
+                {preview.blockers.map((blocker) => {
+                  const advisory = blocker.action === 'WARN_ONLY';
+                  return (
+                    <li key={blocker.condition} className={cn('flex items-start gap-2.5 rounded-lg border p-2.5', advisory ? 'border-warning/25 bg-warning/10' : 'border-destructive/25 bg-destructive/10')}>
+                      <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', advisory ? 'bg-warning/20 text-warning-strong' : 'bg-destructive/20 text-destructive-strong')}><AlertTriangle className="h-3.5 w-3.5" /></span>
+                      <div className="min-w-0">
+                        <b className="text-xs font-bold">{blocker.label}</b>
+                        <div className="mt-0.5 text-3xs leading-relaxed text-muted-foreground">{blocker.actionLabel}</div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{preview ? 'Ни одно правило не сработало.' : 'Выберите тестовую установку.'}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="rules-preview-equipment" className="mb-1.5 block text-xs font-semibold text-muted-foreground">Тестовая установка</label>
+            <select
+              id="rules-preview-equipment"
+              value={props.selectedId}
+              onChange={(event) => props.onSelect(event.target.value)}
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs"
+            >
+              {props.equipment.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <Button type="button" variant="outline" disabled={props.loading} onClick={props.onRetry} className="mt-2 h-9 w-full">
+              {props.loading ? 'Обновляем…' : 'Пересчитать по свежим данным'}
+            </Button>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-end gap-2.5 border-t border-border pt-3 text-xs text-muted-foreground">
+          Результат
+          <span className={cn('rounded-md px-2.5 py-1 text-xs font-bold', preview?.canStart
+            ? 'bg-success/10 text-success-strong'
+            : preview ? 'bg-destructive/10 text-destructive-strong' : 'bg-muted text-muted-foreground')}>
+            {preview?.verdictLabel ?? 'выберите установку'}
+          </span>
         </div>
       </section>
     </>

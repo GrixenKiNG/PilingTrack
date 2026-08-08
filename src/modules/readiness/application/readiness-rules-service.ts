@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import {
   DEFAULT_READINESS_RULES,
   bumpVersion,
+  describeRuleSetChanges,
   sanitizeRuleSet,
   type ReadinessRuleSet,
 } from '../domain/readiness-rules';
@@ -42,22 +43,8 @@ function toRuleSet(
   }, fallback);
 }
 
-function diffCount(draft: ReadinessRuleSet, published: ReadinessRuleSet): number {
-  let changes = 0;
-  draft.criteria.forEach((criterion) => {
-    const before = published.criteria.find((item) => item.key === criterion.key);
-    if (!before || before.weight !== criterion.weight || before.locked !== criterion.locked) {
-      changes += 1;
-    }
-  });
-  draft.blockers.forEach((blocker) => {
-    const before = published.blockers.find((item) => item.condition === blocker.condition);
-    if (!before || before.action !== blocker.action || before.isActive !== blocker.isActive) {
-      changes += 1;
-    }
-  });
-  return changes;
-}
+const diffCount = (draft: ReadinessRuleSet, published: ReadinessRuleSet): number =>
+  describeRuleSetChanges(published, draft).length;
 
 export async function getReadinessRules(tenantId: string): Promise<ReadinessRulesState> {
   if (!tenantId) throw new Error('getReadinessRules: tenantId is required');
