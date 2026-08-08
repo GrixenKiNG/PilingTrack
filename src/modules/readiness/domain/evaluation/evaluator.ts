@@ -4,7 +4,7 @@ import type {EvaluationClock} from './clock';
 import type {ReadinessEvidence} from './evidence';
 import type {AuthoritativeReadinessFacts} from './facts';
 
-export interface EvaluationWarning { code: string; message: string }
+export interface EvaluationWarning { code: string; message: string; actionLabel?: string }
 
 export interface AuthoritativeEvaluation {
   allowed: boolean;
@@ -44,15 +44,21 @@ export function evaluateReadiness(input: {
   const result = computeReadinessScore(input.facts, input.rules as ReadinessRuleSet);
   const permitRequired = input.rules.blockers.some((item) =>
     item.condition === 'VALID_WORK_PERMIT_REQUIRED' && item.isActive);
-  const warnings = input.facts.permitValid !== true && !permitRequired
+  const permitWarnings = input.facts.permitValid !== true && !permitRequired
     ? [{code: 'WORK_PERMIT_MISSING_OPTIONAL', message: 'Valid work permit is not required by published rules'}]
     : [];
+  // Сработавшее правило с действием WARN_ONLY — это замечание, а не блокировка.
+  // Держим их врозь, иначе интерфейс посчитает предупреждение критическим блокером.
+  const blockers = result.blockers.filter((item) => item.action !== 'WARN_ONLY');
+  const advisory: EvaluationWarning[] = result.blockers
+    .filter((item) => item.action === 'WARN_ONLY')
+    .map((item) => ({code: item.condition, message: item.label, actionLabel: item.actionLabel}));
   return {
     allowed: result.canStart,
     status: result.canStart ? 'READY' : 'BLOCKED',
     score: result.score,
-    blockers: result.blockers,
-    warnings,
+    blockers,
+    warnings: [...advisory, ...permitWarnings],
     evidence,
     facts: input.facts,
     calculatedAt,

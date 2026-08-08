@@ -49,8 +49,16 @@ describe('readiness rules', () => {
   it('restores missing criteria and blockers', () => {
     const result = sanitizeRuleSet({ criteria: [{ key: 'INSPECTION', weight: 999 }] });
     expect(result.criteria).toHaveLength(5);
-    expect(result.blockers).toHaveLength(4);
+    expect(result.blockers).toHaveLength(5);
     expect(result.criteria.reduce((sum, item) => sum + item.weight, 0)).toBe(100);
+  });
+
+  it('keeps a stored warning-only action instead of falling back to a hard stop', () => {
+    const result = sanitizeRuleSet({
+      blockers: [{ condition: 'MAINTENANCE_OVERDUE_50H', action: 'WARN_ONLY', isActive: true }],
+    });
+    const maintenance = result.blockers.find((item) => item.condition === 'MAINTENANCE_OVERDUE_50H');
+    expect(maintenance?.action).toBe('WARN_ONLY');
   });
 
   it('bumps the minor version', () => {
@@ -73,10 +81,30 @@ describe('readiness score', () => {
     expect(result.criticalBlockers).toBe(1);
   });
 
-  it('requires confirmation after more than 50 overdue engine hours', () => {
+  // Решение владельца 2026-08-08: просроченное ТО предупреждает, но не останавливает
+  // установку. Балл снижается, замечание видно, запуск разрешён.
+  it('warns without stopping the rig when maintenance is overdue', () => {
     const result = computeReadinessScore(facts({ maintenanceOverdueHours: 60 }));
-    expect(result.verdict).toBe('CONFIRMATION_REQUIRED');
+    expect(result.verdict).toBe('ALLOWED');
+    expect(result.canStart).toBe(true);
+    expect(result.criticalBlockers).toBe(0);
+    expect(result.blockers.map((item) => item.condition)).toContain('MAINTENANCE_OVERDUE_50H');
     expect(result.score).toBeLessThan(100);
+  });
+
+  // Решение владельца 2026-08-08: если утром не было связи, смена начинается,
+  // а осмотр и моточасы досдаются позже. Отсутствие данных бьёт по баллу, но не
+  // запрещает работу — иначе бригада начнёт работать в обход системы.
+  it('allows the shift to start when morning evidence has not arrived yet', () => {
+    const result = computeReadinessScore(facts({
+      inspectionCompleted: false,
+      inspectionProgress: 0,
+      meterKnown: false,
+      accepted: false,
+    }));
+    expect(result.verdict).toBe('ALLOWED');
+    expect(result.canStart).toBe(true);
+    expect(result.score).toBeLessThan(50);
   });
 
   it('uses configured criterion weights', () => {

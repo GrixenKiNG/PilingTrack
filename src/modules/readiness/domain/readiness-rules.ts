@@ -36,6 +36,8 @@ export const BLOCKER_ACTIONS = [
   'DENY_START',
   'REQUIRE_CONFIRMATION',
   'RETURN_TO_OPERATOR',
+  // Замечание видно оператору и диспетчеру, но запуск не останавливает.
+  'WARN_ONLY',
 ] as const;
 
 export type BlockerAction = (typeof BLOCKER_ACTIONS)[number];
@@ -52,6 +54,7 @@ export const BLOCKER_ACTION_LABELS: Record<BlockerAction, string> = {
   DENY_START: 'Запретить запуск',
   REQUIRE_CONFIRMATION: 'Требовать подтверждение',
   RETURN_TO_OPERATOR: 'Вернуть оператору',
+  WARN_ONLY: 'Предупредить, работу не останавливать',
 };
 
 export interface ReadinessBlockerRule {
@@ -86,7 +89,10 @@ export const DEFAULT_READINESS_RULES: ReadinessRuleSet = {
     { condition: 'CRITICAL_DEFECT', action: 'DENY_START', isActive: true },
     { condition: 'VALID_WORK_PERMIT_REQUIRED', action: 'DENY_START', isActive: false },
     { condition: 'PERMIT_EXPIRED', action: 'DENY_START', isActive: true },
-    { condition: 'MAINTENANCE_OVERDUE_50H', action: 'REQUIRE_CONFIRMATION', isActive: true },
+    // Просроченное ТО снижает балл и показывает замечание, но установку не
+    // останавливает — решение владельца от 2026-08-08. Тенант может ужесточить
+    // правило в «Настройки → Правила готовности», не трогая код.
+    { condition: 'MAINTENANCE_OVERDUE_50H', action: 'WARN_ONLY', isActive: true },
     { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', isActive: false },
   ],
 };

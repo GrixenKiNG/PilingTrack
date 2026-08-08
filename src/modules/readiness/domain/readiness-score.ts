@@ -81,6 +81,8 @@ const ACTION_VERDICT: Record<BlockerAction, ReadinessVerdict> = {
   REQUIRE_CONFIRMATION: 'CONFIRMATION_REQUIRED',
   RETURN_TO_OPERATOR: 'RETURN_TO_OPERATOR',
   DENY_START: 'DENIED',
+  // Предупреждение попадает в список замечаний, но вердикт не ухудшает.
+  WARN_ONLY: 'ALLOWED',
 };
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));

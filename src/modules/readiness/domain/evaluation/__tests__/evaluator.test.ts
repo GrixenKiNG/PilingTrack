@@ -28,6 +28,18 @@ describe('authoritative readiness evaluator', () => {
     expect(result.warnings).toContainEqual(expect.objectContaining({code: 'WORK_PERMIT_MISSING_OPTIONAL'}));
   });
 
+  // Просроченное ТО остаётся замечанием: оно не должно попасть в блокеры, иначе
+  // интерфейс покажет предупреждение как критическое и остановит смену.
+  it('reports overdue maintenance as a warning, never as a blocker', () => {
+    const rules = immutablePublishedRules(DEFAULT_READINESS_RULES)!;
+    const result = evaluateReadiness({facts: {...facts, permitValid: true, maintenanceOverdueHours: 60},
+      rules, evidence, clock: capturedClock(new Date('2026-08-08T05:00:00.000Z'))});
+    expect(result.allowed).toBe(true);
+    expect(result.status).toBe('READY');
+    expect(result.warnings).toContainEqual(expect.objectContaining({code: 'MAINTENANCE_OVERDUE_50H'}));
+    expect(result.blockers).toHaveLength(0);
+  });
+
   it('blocks a missing permit when the published rule enables it', () => {
     const rules = immutablePublishedRules({...DEFAULT_READINESS_RULES,
       blockers: DEFAULT_READINESS_RULES.blockers.map((item) => item.condition === 'VALID_WORK_PERMIT_REQUIRED'
