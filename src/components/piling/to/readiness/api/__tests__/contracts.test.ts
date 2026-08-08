@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  READINESS_ABILITIES,
   isReadinessBootstrapEnvelope,
   parseCurrentReadinessResponse,
   parseReadinessHistoryResponse,
 } from '../contracts';
+import { READINESS_ABILITIES as SERVER_ABILITIES } from '@/modules/readiness/application/capabilities';
 import { bootstrapEnvelope } from './fixtures';
 
 describe('readiness bootstrap contract', () => {
   it('accepts the complete server envelope', () => {
     expect(isReadinessBootstrapEnvelope(bootstrapEnvelope())).toBe(true);
+  });
+
+  // Клиент отвергает весь ответ, встретив незнакомое право, и модуль
+  // не открывается совсем. Списки обязаны совпадать до последнего значения.
+  it('knows exactly the abilities the server can send', () => {
+    expect([...READINESS_ABILITIES].sort()).toEqual([...SERVER_ABILITIES].sort());
   });
 
   it('rejects missing capabilities and unknown abilities', () => {

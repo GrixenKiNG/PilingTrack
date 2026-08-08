@@ -23,6 +23,7 @@ import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { PRIORITY_LABEL, type MaintenancePriority } from '@/components/piling/maintenance/maintenance-labels';
 import { MaintenancePlansPanel } from './maintenance-plans-panel';
 import { MeterReadingsPanel } from './meter-readings-panel';
 import {
@@ -419,7 +420,7 @@ export function ReadinessMaintenanceView({
                   <article key={record.id} className="rounded-lg border border-slate-200 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div><h3 className="font-semibold text-slate-950">{record.title}</h3><p className="mt-1 text-xs text-slate-500">{record.equipment?.name}</p></div>
-                      <span className={cn('rounded-full px-2 py-1 text-xs font-bold', ['CRITICAL', 'HIGH'].includes(record.priority) ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600')}>{record.priority}</span>
+                      <span className={cn('rounded-full px-2 py-1 text-xs font-bold', ['CRITICAL', 'HIGH'].includes(record.priority) ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600')}>{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</span>
                     </div>
                     <p className="mt-3 text-sm leading-relaxed text-slate-600">{record.description || 'Описание не заполнено'}</p>
                     <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-xs text-slate-500"><span>{TYPE_LABEL[record.type] ?? record.type}</span><span>{STATUS_LABEL[record.status] ?? record.status}</span></div>
