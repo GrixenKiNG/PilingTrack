@@ -90,8 +90,15 @@ export interface ReadinessHandoverDto {
   state: 'DRAFT' | 'SUBMITTED' | 'ACCEPTED' | 'REWORK_REQUESTED';
   summary: string | null;
   version: number;
+  // Кто и когда выполнил каждый переход. Без этих полей журнал передач
+  // нечем наполнить: раньше на их месте подставлялись записи ТО.
+  submittedById: string | null;
   submittedAt: string | null;
+  acceptedById: string | null;
   acceptedAt: string | null;
+  reworkedById: string | null;
+  reworkedAt: string | null;
+  reworkReason: string | null;
 }
 
 export interface ReadinessShiftDto {

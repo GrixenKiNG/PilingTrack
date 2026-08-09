@@ -102,12 +102,11 @@ export async function queryReadinessBootstrap(
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),
+    // Все действующие пользователи тенанта, а не только принимающие решения:
+    // по этому списку журнал передач разворачивает идентификатор автора в имя,
+    // а операторы и помощники тоже совершают действия.
     tx.user.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        isActive: true,
-        role: { in: ['ADMIN', 'DISPATCHER', 'MECHANIC'] },
-      },
+      where: { tenantId: actor.tenantId, isActive: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, role: true },
     }),

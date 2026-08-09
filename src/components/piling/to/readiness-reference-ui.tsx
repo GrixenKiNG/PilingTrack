@@ -41,6 +41,7 @@ import {
   type MaintenancePriority, type MaintenanceStatus, type MaintenanceType,
 } from '@/components/piling/maintenance/maintenance-labels';
 import { PERMIT_STATE_LABEL, SHIFT_STATE_LABEL } from './readiness/readiness-labels';
+import { buildHandoverJournal, handoverRoleLabel } from './readiness/handover-journal';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import {
   BLOCKER_ACTIONS,
@@ -738,9 +739,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
     : buildAuthoritativeReadinessPresentation(authoritativeCurrent);
   const detail = props.details[selected.id];
   const fleetCard = props.fleetCards.find((item) => item.id === selected.id);
-  const selectedJournal = [...(props.journals[selected.id] ?? [])].sort(
-    (left, right) => new Date(right.completedAt || right.createdAt).getTime() - new Date(left.completedAt || left.createdAt).getTime(),
-  );
+  const handoverJournal = buildHandoverJournal(props.shifts, selected.id, props.bootstrap?.selectors.actors);
   const blockers = presentation.blockers.length;
   const warnings = presentation.warnings.length;
 
@@ -886,18 +885,30 @@ function ReadinessCentre(props: ReferenceUiProps) {
       <aside className="space-y-3 md:col-span-2 xl:col-span-1">
         <section className={cn(card, 'p-4')}>
           <div className="flex items-center justify-between"><h2 className="font-bold">Передача и приёмка</h2><span className="text-2xs text-muted-foreground">неизменяемый журнал</span></div>
-          <div className="mt-4 space-y-5 border-l border-border pl-5">
-            {['Передано диспетчеру', 'Просмотрено диспетчером', 'Запрошены доработки', 'Повторно передано', 'Принято диспетчером'].map((label, index) => {
-              const event = selectedJournal[index];
-              return (
-              <div key={label} className="relative">
-                <span className={cn('absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full', index === 0 ? 'bg-signal-strong' : 'bg-muted-foreground')} />
-                <div className="text-xs font-semibold">{label}</div>
-                <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">{event ? `${formatDateTimeInTimezone(event.completedAt || event.createdAt, props.bootstrap?.tenant.timezone)} · ${event.title}` : 'Не зафиксировано'}</div>
-              </div>
-              );
-            })}
-          </div>
+          {handoverJournal.length === 0 ? (
+            <p className="mt-3 rounded-lg border border-border p-3 text-2xs leading-relaxed text-muted-foreground">
+              По этой установке ещё не было передач смены. Записи появятся, когда оператор передаст смену диспетчеру.
+            </p>
+          ) : (
+            <ol className="mt-4 space-y-5 border-l border-border pl-5">
+              {handoverJournal.map((event, index) => (
+                <li key={event.id} className="relative">
+                  <span className={cn('absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full',
+                    index === 0 ? 'bg-signal-strong' : event.kind === 'REWORKED' ? 'bg-warning-strong' : 'bg-muted-foreground')} />
+                  <div className="text-xs font-semibold">{event.label}</div>
+                  <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+                    {formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}
+                    {event.actorName ? ` · ${event.actorName}` : ''}
+                    {handoverRoleLabel(event.actorRole) ? ` (${handoverRoleLabel(event.actorRole)})` : ''}
+                    {` · пакет v${event.packageVersion}`}
+                  </div>
+                  {event.comment && (
+                    <p className="mt-1 rounded border border-border bg-muted/40 p-2 text-2xs leading-relaxed">{event.comment}</p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
           <button type="button" onClick={() => props.onViewChange('reports')} className="mt-4 text-xs font-semibold text-signal-strong">Открыть полный журнал →</button>
         </section>
         <section className={cn(card, 'p-4')}>
@@ -2331,8 +2342,8 @@ function LiveRolesSettings(props: ReferenceUiProps) {
   const abilities = props.bootstrap?.capabilities.abilities ?? [];
   return <>
     <ScreenTitle heading="Роли и доступы" subtitle="Фактические пользователи и полномочия текущего контура" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/users">Управление пользователями</Link></Button>} />
-    <SettingsKpis items={[{icon: 'crew', label: 'Пользователей', value: actors.length}, {icon: 'accepted', label: 'Ролей', value: Object.keys(roleCounts).length}, {icon: 'operator', label: 'Текущая роль', value: props.bootstrap?.actor.actingAs ?? props.bootstrap?.actor.role ?? '—'}, {icon: 'risk', label: 'Полномочий', value: abilities.length}]} />
-    <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]"><section className={cn(card, 'overflow-hidden')}><div className="border-b border-border p-4"><h2 className="font-bold">Разрешения текущей роли</h2><p className="mt-1 text-xs text-muted-foreground">Данные получены из readiness bootstrap, а не из локального макета.</p></div><div className="grid grid-cols-1 gap-2 p-4 md:grid-cols-2">{abilities.map((ability) => <div key={ability} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 text-xs"><CheckCircle2 className="h-4 w-4 text-success-strong" /><span>{ability}</span></div>)}</div></section><aside className={cn(card, 'p-4')}><h2 className="font-bold">Пользователи по ролям</h2><div className="mt-3 divide-y divide-border">{Object.entries(roleCounts).map(([role, count]) => <div key={role} className="flex min-h-11 items-center justify-between text-xs"><span>{role}</span><b>{count}</b></div>)}</div></aside></div>
+    <SettingsKpis items={[{icon: 'crew', label: 'Пользователей', value: actors.length}, {icon: 'accepted', label: 'Ролей', value: Object.keys(roleCounts).length}, {icon: 'operator', label: 'Текущая роль', value: handoverRoleLabel(props.bootstrap?.actor.actingAs ?? props.bootstrap?.actor.role ?? null) ?? '—'}, {icon: 'risk', label: 'Полномочий', value: abilities.length}]} />
+    <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]"><section className={cn(card, 'overflow-hidden')}><div className="border-b border-border p-4"><h2 className="font-bold">Разрешения текущей роли</h2><p className="mt-1 text-xs text-muted-foreground">Данные получены из readiness bootstrap, а не из локального макета.</p></div><div className="grid grid-cols-1 gap-2 p-4 md:grid-cols-2">{abilities.map((ability) => <div key={ability} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 text-xs"><CheckCircle2 className="h-4 w-4 text-success-strong" /><span>{ability}</span></div>)}</div></section><aside className={cn(card, 'p-4')}><h2 className="font-bold">Пользователи по ролям</h2><div className="mt-3 divide-y divide-border">{Object.entries(roleCounts).map(([role, count]) => <div key={role} className="flex min-h-11 items-center justify-between text-xs"><span>{handoverRoleLabel(role)}</span><b>{count}</b></div>)}</div></aside></div>
   </>;
 }
 
