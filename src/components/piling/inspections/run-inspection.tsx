@@ -410,7 +410,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
             <Button
               onClick={() => setShowSign(true)}
               disabled={isBusy}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+              className="w-full bg-signal hover:bg-signal-strong text-white"
             >
               Завершить осмотр
             </Button>
@@ -437,7 +437,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
                 <Button
                   onClick={complete}
                   disabled={completing || !signedByName.trim()}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+                  className="flex-1 bg-signal hover:bg-signal-strong text-white"
                 >
                   {completing && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
                   Подтвердить

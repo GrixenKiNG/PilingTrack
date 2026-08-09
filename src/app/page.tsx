@@ -20,10 +20,10 @@ export default async function Home() {
   }
 
   const role = payload.role;
-  if (role === 'ADMIN' || role === 'DISPATCHER') {
+  if (role === 'ADMIN' || role === 'DISPATCHER' || role === 'FOREMAN') {
     redirect('/admin');
   }
-  if (role === 'MECHANIC') {
+  if (role === 'MECHANIC' || role === 'SAFETY_ENGINEER') {
     redirect('/admin/to');
   }
 

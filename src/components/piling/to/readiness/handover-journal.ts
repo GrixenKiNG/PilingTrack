@@ -35,6 +35,8 @@ const ROLE_LABEL: Record<string, string> = {
   OPERATOR: 'Оператор',
   ASSISTANT: 'Помощник',
   MECHANIC: 'Механик',
+  FOREMAN: 'Мастер',
+  SAFETY_ENGINEER: 'Инженер ОТ',
 };
 
 export function handoverRoleLabel(role: string | null): string | null {

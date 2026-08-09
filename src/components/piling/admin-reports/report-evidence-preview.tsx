@@ -187,7 +187,7 @@ export function ReportEvidencePreview({
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Button onClick={() => onPreviewPdf(report)} className="h-9 min-w-0 bg-orange-500 px-2 text-xs text-white hover:bg-orange-600">
+          <Button onClick={() => onPreviewPdf(report)} className="h-9 min-w-0 bg-signal px-2 text-xs text-white hover:bg-signal-strong">
             <FileDown className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Открыть PDF</span>
           </Button>
@@ -241,7 +241,7 @@ function ProgressLine({ label, value, pct, tone }: { label: string; value: strin
             'h-full rounded-full',
             tone === 'amber' && 'bg-amber-500',
             tone === 'blue' && 'bg-blue-500',
-            tone === 'orange' && 'bg-orange-500',
+            tone === 'orange' && 'bg-signal',
           )}
           style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
         />

@@ -2,8 +2,14 @@
 // Piling Platform - Shared Types
 // ============================================================
 
-// Enums — 4 roles
-export type UserRole = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT' | 'MECHANIC';
+export type UserRole =
+  | 'ADMIN'
+  | 'DISPATCHER'
+  | 'OPERATOR'
+  | 'ASSISTANT'
+  | 'MECHANIC'
+  | 'FOREMAN'
+  | 'SAFETY_ENGINEER';
 export type ReportStatus = 'draft' | 'submitted';
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -12,7 +18,38 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   OPERATOR: 'Оператор',
   ASSISTANT: 'Помощник',
   MECHANIC: 'Механик',
+  FOREMAN: 'Мастер',
+  SAFETY_ENGINEER: 'Инженер ОТ',
 };
+
+/**
+ * Роли, которые администратор может исполнять временно, не выходя из своей
+ * учётной записи. Пока «Механика», «Мастера» и «Инженера ОТ» в организации
+ * физически нет, их работу делает администратор: он переключается на роль,
+ * и действие уходит в журнал с пометкой, от чьего имени оно совершено
+ * (`actingAs`), а не как обычное действие администратора.
+ *
+ * Когда появится живой человек, ему заводят учётную запись с этой ролью —
+ * права переходят к нему, а список ниже трогать не нужно.
+ *
+ * Это единственный источник правды: и серверная проверка
+ * (`api/readiness/_shared/request-context.ts`), и загрузка модуля
+ * (`api/readiness/bootstrap`) сверяются с ним. Строковых сравнений
+ * с 'MECHANIC' в коде быть не должно — так режим и разъезжался.
+ */
+export const ACTING_ROLES = ['MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER'] as const;
+export type ActingRole = (typeof ACTING_ROLES)[number];
+
+/** Принимает `unknown`: используется и как валидатор ответа сервера. */
+export function isActingRole(value: unknown): value is ActingRole {
+  return typeof value === 'string' && (ACTING_ROLES as readonly string[]).includes(value);
+}
+
+/** Администратор видит всё и может исполнять любую из ролей выше. */
+export function canActAs(role: string, actingAs: string | null | undefined): boolean {
+  if (actingAs === null || actingAs === undefined) return true;
+  return role === 'ADMIN' && isActingRole(actingAs);
+}
 
 // ============================================================
 // AUTH

@@ -293,7 +293,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         <Button
           onClick={() => void submit()}
           disabled={busy}
-          className="bg-orange-500 hover:bg-orange-600 text-white"
+          className="bg-signal hover:bg-signal-strong text-white"
         >
           {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
           {isNew ? 'Создать шаблон' : 'Сохранить'}

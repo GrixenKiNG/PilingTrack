@@ -198,7 +198,7 @@ export function EditSiteDialog({
           <Button
             onClick={submit}
             disabled={saving || loadingPileGrades || detailState !== 'ready' || !name.trim()}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-signal hover:bg-signal-strong text-white"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Сохранить'}
           </Button>

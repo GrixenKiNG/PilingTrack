@@ -39,7 +39,7 @@ export function ReportDetailDialog({
               <DialogTitle className="text-base">Отчёт от {formatDate(report.date)}</DialogTitle>
             </DialogHeader>
             <button onClick={() => onPreviewPdf(report)}
-              className="flex items-center gap-1.5 text-xs font-medium text-signal-strong hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors">
+              className="flex items-center gap-1.5 text-xs font-medium text-signal-strong hover:text-signal-strong bg-signal/10 hover:bg-signal/10 px-3 py-1.5 rounded-lg transition-colors">
               <Eye className="w-3.5 h-3.5" />Предпросмотр PDF
             </button>
           </div>

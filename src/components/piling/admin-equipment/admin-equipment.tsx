@@ -105,7 +105,7 @@ export function AdminEquipment() {
           <p className="mt-0.5 text-xs text-muted-foreground">Центр управления парком техники · данные из отчётов</p>
         </div>
         {canManage && <div className="flex gap-2">
-          <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
+          <Button onClick={() => setShowCreate(true)} className="bg-signal text-white hover:bg-signal-strong">
             <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
           </Button>
         </div>}

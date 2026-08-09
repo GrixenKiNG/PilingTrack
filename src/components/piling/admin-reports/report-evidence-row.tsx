@@ -66,7 +66,7 @@ export function ReportsHeader({
         </Button>
         <Button
           onClick={onCreate}
-          className="h-10 bg-orange-500 text-white hover:bg-orange-600"
+          className="h-10 bg-signal text-white hover:bg-signal-strong"
         >
           <Plus className="mr-1.5 h-4 w-4" />
           Новый отчёт
@@ -120,8 +120,8 @@ export function EvidenceReportRow({
   return (
     <div
       className={cn(
-        'grid gap-3 px-3 py-3 text-sm transition-colors hover:bg-orange-50/30 lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px] lg:items-center',
-        active && 'bg-orange-50/70 ring-1 ring-inset ring-orange-200',
+        'grid gap-3 px-3 py-3 text-sm transition-colors hover:bg-signal/10/30 lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px] lg:items-center',
+        active && 'bg-signal/10/70 ring-1 ring-inset ring-signal/30',
       )}
     >
       <div className="flex items-center justify-between gap-3 lg:block">
@@ -172,7 +172,7 @@ function MetricCell({ value, sub, tone }: { value: string; sub: string; tone: 'o
     <div className="flex items-baseline justify-between gap-2 lg:block lg:text-right">
       <span className={cn(
         'font-mono font-semibold tabular-nums',
-        tone === 'orange' && 'text-orange-700',
+        tone === 'orange' && 'text-signal-strong',
         tone === 'blue' && 'text-blue-700',
         tone === 'amber' && 'text-amber-700',
         tone === 'slate' && 'text-foreground',

@@ -265,7 +265,7 @@ export function ReportHistory() {
             <button
               type="button"
               onClick={() => setFilterSiteId('all')}
-              className="mt-4 text-sm font-medium text-signal-strong hover:text-orange-700"
+              className="mt-4 text-sm font-medium text-signal-strong hover:text-signal-strong"
             >
               Показать все отчёты
             </button>
@@ -293,7 +293,7 @@ export function ReportHistory() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={(e) => handleOpenPreview(report, e)}
-                        className="flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong transition-colors hover:bg-orange-50 hover:text-orange-700"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong transition-colors hover:bg-signal/10 hover:text-signal-strong"
                         title="Предпросмотр PDF"
                         aria-label={`Открыть PDF отчёта по объекту ${report.siteName} за ${formatDate(report.date)}`}
                       >

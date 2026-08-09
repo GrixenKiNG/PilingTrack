@@ -54,7 +54,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
               <div
                 className={cn(
                   'relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
-                  isActive ? 'bg-orange-100' : ''
+                  isActive ? 'bg-signal/10' : ''
                 )}
               >
                 <PilingIcon
@@ -62,7 +62,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
                   tone={isActive ? (item.tone ?? 'primary') : 'neutral'}
                   size={24}
                   decorative
-                  className={cn('relative z-10', isActive && '!text-orange-700')}
+                  className={cn('relative z-10', isActive && '!text-signal-strong')}
                 />
               </div>
               <span className="text-xs font-medium">{item.label}</span>
@@ -151,7 +151,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors',
                 isActive
-                  ? 'border-l-2 border-orange-500 bg-orange-50 text-orange-700'
+                  ? 'border-l-2 border-signal/30 bg-signal/10 text-signal-strong'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
@@ -160,7 +160,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
                 tone={isActive ? (item.tone ?? 'primary') : 'neutral'}
                 size={30}
                 decorative
-                className={isActive ? '!text-orange-700' : undefined}
+                className={isActive ? '!text-signal-strong' : undefined}
               />
               {item.label}
             </Link>
@@ -245,6 +245,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     currentUser?.role === 'ADMIN'
     || currentUser?.role === 'DISPATCHER'
     || currentUser?.role === 'MECHANIC'
+    || currentUser?.role === 'FOREMAN'
+    || currentUser?.role === 'SAFETY_ENGINEER'
   ) {
     return (
       <AppErrorBoundary>

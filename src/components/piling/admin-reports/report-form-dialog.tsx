@@ -253,7 +253,7 @@ export function ReportFormDialog({
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2"><HardHat className="w-4 h-4 text-signal-strong" />Забитые сваи</h4>
               {formTotalPiles > 0 && (
-                <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-mono font-bold text-signal-strong bg-signal/10 px-2 py-0.5 rounded-full">
                   {formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п.
                 </span>
               )}
@@ -265,10 +265,10 @@ export function ReportFormDialog({
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempPileCount} onChange={(e) => setTempPileCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
-              <Button onClick={addPile} size="sm" className="h-9 bg-orange-500 hover:bg-orange-600 text-white px-3"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={addPile} size="sm" className="h-9 bg-signal hover:bg-signal-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
             </div>
             {tempPileGrade && Number(tempPileCount) > 0 && (
-              <p className="mb-2 rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+              <p className="mb-2 rounded-md border border-signal/30 bg-signal/10 px-3 py-2 text-xs text-signal-strong">
                 Автоподсчёт: {getPileGradeName(tempPileGrade)} → {getPileLengthMeters(tempPileGrade).toFixed(1)} м × {Number(tempPileCount)} шт. = {tempPileMeters.toFixed(1)} м.п.
               </p>
             )}
@@ -394,7 +394,7 @@ export function ReportFormDialog({
         )}
         <DialogFooter className="pt-2">
           <Button variant="outline" onClick={handleClose} className="h-10">Отмена</Button>
-          <Button onClick={handleSubmit} disabled={submitting || loadingReferenceData} className="h-10 bg-orange-500 hover:bg-orange-600 text-white">
+          <Button onClick={handleSubmit} disabled={submitting || loadingReferenceData} className="h-10 bg-signal hover:bg-signal-strong text-white">
             {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохранение...</>
               : <>{editReport ? <Pencil className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}{editReport ? 'Сохранить' : 'Создать'}</>}
           </Button>

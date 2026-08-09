@@ -82,7 +82,7 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
         <Button
           onClick={() => window.open(url(true), '_blank')}
           disabled={invalid}
-          className="bg-orange-500 hover:bg-orange-600 text-white"
+          className="bg-signal hover:bg-signal-strong text-white"
         >
           <Printer className="mr-1.5 h-4 w-4" /> Открыть / печать
         </Button>

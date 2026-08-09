@@ -242,14 +242,14 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
                 {STATUS_LABEL[s]}
               </Button>
             ))}
-            <Button size="sm" className="ml-auto bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
           </div>
         )}
         {actions.length === 0 && (
           <div className="mt-3 flex border-t border-border pt-3">
-            <Button size="sm" className="ml-auto bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
           </div>
@@ -304,7 +304,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Назначено: {resolveAssigneeName(record.assigneeId, names)}</span>
-          <Button size="sm" disabled={savingQuick} className="bg-orange-500 hover:bg-orange-600 text-white" onClick={saveQuick}>
+          <Button size="sm" disabled={savingQuick} className="bg-signal hover:bg-signal-strong text-white" onClick={saveQuick}>
             {savingQuick && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
             Сохранить
           </Button>

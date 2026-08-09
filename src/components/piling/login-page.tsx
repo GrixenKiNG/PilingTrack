@@ -79,7 +79,7 @@ export function LoginPage() {
       >
         <div className="bg-slate-900/50 backdrop-blur-xl rounded-3xl border border-white/15 shadow-2xl p-6 md:p-10 md:pt-12 md:pb-16">
           <div className="flex items-center justify-center md:justify-start gap-4 mb-6 md:mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-500/30 shrink-0">
+            <div className="inline-flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-signal text-white shadow-lg shadow-signal/30 shrink-0">
               <HardHat className="w-7 h-7 md:w-8 md:h-8" />
             </div>
             <div>

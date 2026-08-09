@@ -159,7 +159,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
           Паспорт, ОТС, страховка, акты ТО. Срок действия отслеживается отдельно
           и подсвечивается, если истекает.
         </p>
-        <Button onClick={openCreate} size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
           <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
         </Button>
       </div>
@@ -190,7 +190,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
                 <button
                   onClick={() => openEdit(d)}
                   aria-label={`Редактировать документ «${d.title}»`}
-                  className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-orange-50 hover:text-orange-700"
+                  className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-signal/10 hover:text-signal-strong"
                   title="Редактировать"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -278,7 +278,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>
               Отмена
             </Button>
-            <Button onClick={submit} disabled={busy} className="bg-orange-500 hover:bg-orange-600 text-white">
+            <Button onClick={submit} disabled={busy} className="bg-signal hover:bg-signal-strong text-white">
               {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               {editing ? 'Сохранить' : 'Добавить'}
             </Button>

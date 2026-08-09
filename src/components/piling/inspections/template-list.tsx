@@ -69,7 +69,7 @@ export function TemplateList() {
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">Шаблоны чек-листов</h1>
-        <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button asChild size="sm" className="bg-signal hover:bg-signal-strong text-white">
           <Link href="/admin/checklists/new">
             <Plus className="w-3.5 h-3.5 mr-1" /> Новый шаблон
           </Link>
@@ -88,7 +88,7 @@ export function TemplateList() {
             <li key={t.id}>
               <Link
                 href={`/admin/checklists/${t.id}`}
-                className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm transition-colors hover:border-orange-300 hover:bg-orange-50/30"
+                className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm transition-colors hover:border-signal/30 hover:bg-signal/10/30"
               >
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />

@@ -83,7 +83,7 @@ export const STATUS_LABEL: Record<string, string> = {
 export const STATUS_STYLE: Record<string, string> = {
   PLANNED: 'border-border bg-muted text-foreground',
   ASSIGNED: 'border-sky-200 bg-sky-50 text-sky-700',
-  IN_PROGRESS: 'border-orange-200 bg-orange-50 text-orange-700',
+  IN_PROGRESS: 'border-signal/30 bg-signal/10 text-signal-strong',
   ON_HOLD: 'border-amber-200 bg-amber-50 text-amber-700',
   DONE: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   CANCELLED: 'border-border bg-muted text-muted-foreground',
@@ -109,9 +109,9 @@ export function TabButton({ active, onClick, children }: { active: boolean; onCl
       type="button"
       onClick={onClick}
       className={cn(
-        'h-8 rounded-md border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500',
+        'h-8 rounded-md border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/30',
         active
-          ? 'border-orange-200 bg-orange-50 text-orange-700'
+          ? 'border-signal/30 bg-signal/10 text-signal-strong'
           : 'border-border bg-card text-muted-foreground hover:bg-muted',
       )}
     >
@@ -131,7 +131,7 @@ export function JournalRow({ record }: { record: JournalRecord }) {
   const staleDays = staleOpenOrderDays(record);
 
   return (
-    <tr className="align-top hover:bg-orange-50/30">
+    <tr className="align-top hover:bg-signal/10/30">
       <td className="px-3 py-3 font-mono text-xs text-foreground">
         <div>{fmtDate(recordDate(record))}</div>
         <div className="mt-1 text-2xs text-muted-foreground">{dueText(record.scheduledAt)}</div>

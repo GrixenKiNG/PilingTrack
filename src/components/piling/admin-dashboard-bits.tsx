@@ -61,7 +61,7 @@ export function KpiTile({ icon, label, value, sub, progress }: {
   icon: PilingIconName; tone: KpiTone; label: string; value: ReactNode; sub?: string; progress?: number;
 }) {
   return (
-    <div className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card px-4 py-4 shadow-sm transition hover:border-orange-200 hover:shadow-md">
+    <div className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card px-4 py-4 shadow-sm transition hover:border-signal/30 hover:shadow-md">
       {/* Иконка тянется во всю высоту плитки, описание — рядом. Высоту задаёт
           плитка (flex-1), а иконка позиционируется абсолютно, поэтому её
           собственный размер не раздувает плитку и не выходит за рамку.

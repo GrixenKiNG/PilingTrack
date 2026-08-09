@@ -322,7 +322,7 @@ export function MaintenanceBoard() {
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </div>
 
-            <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-9 bg-orange-500 text-white hover:bg-orange-600">
+            <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-9 bg-signal text-white hover:bg-signal-strong">
               <Plus className="mr-1.5 h-4 w-4" /> Задача ТО
             </Button>
             <Button variant="outline" size="sm" className="h-9" asChild>

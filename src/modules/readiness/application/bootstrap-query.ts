@@ -1,4 +1,5 @@
 import { ServiceError } from '@/lib/service-error';
+import type { ActingRole } from '@/lib/types';
 import type { ReadinessTransaction } from '../infrastructure/tenant-transaction';
 import { normalizeTenantTimezone } from '../domain/shifts/tenant-production-date';
 import {
@@ -48,7 +49,7 @@ export async function queryReadinessBootstrap(
   tx: ReadinessTransaction,
   actor: ReadinessBootstrapActor,
   flags = readReadinessFeatureFlags(),
-  actingAs: 'MECHANIC' | null = null,
+  actingAs: ActingRole | null = null,
   requestId: string | null = null,
 ) {
   const capabilities = await resolveAuditedReadinessCapabilities(

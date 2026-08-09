@@ -127,7 +127,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
     <div className="mt-4 border-t border-border pt-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Журнал ТО, ремонтов и неисправностей.</p>
-        <Button onClick={openCreate} size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
           <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
         </Button>
       </div>
@@ -181,7 +181,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                   )}
                   <button onClick={() => openEdit(r)}
                     aria-label={`Редактировать запись «${r.title}»`}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-orange-50 hover:text-orange-700" title="Редактировать">
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-signal/10 hover:text-signal-strong" title="Редактировать">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => setPendingDelete(r)} disabled={pendingId === r.id}

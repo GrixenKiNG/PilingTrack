@@ -35,7 +35,7 @@ function Toggle({ checked, label, disabled, onClick }: { checked: boolean; label
     // содержимое, поэтому отсчёт шёл от середины и включённый кружок вылезал
     // на 8px за правый край дорожки.
     <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled} onClick={onClick}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-orange-500' : 'bg-slate-200'}`}>
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-signal' : 'bg-slate-200'}`}>
       <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-card shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );

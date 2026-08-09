@@ -7,7 +7,7 @@ export default function Loading() {
       <div className="sticky top-0 z-30 border-b bg-card pt-safe">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-signal">
               <HardHat className="h-4 w-4 text-white" />
             </div>
             <div>
@@ -33,7 +33,7 @@ export default function Loading() {
               className="rounded-2xl border border-border bg-card p-5 shadow-sm"
             >
               <div className="mb-4 flex items-center gap-2">
-                <Skeleton className="h-9 w-9 rounded-xl bg-orange-100" />
+                <Skeleton className="h-9 w-9 rounded-xl bg-signal/10" />
                 <Skeleton className="h-4 w-24 bg-slate-200" />
               </div>
               <Skeleton className="h-8 w-16 bg-slate-200" />

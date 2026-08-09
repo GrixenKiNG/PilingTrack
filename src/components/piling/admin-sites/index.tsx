@@ -236,7 +236,7 @@ export function AdminSites() {
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['объект', 'объекта', 'объектов'])}`}
       subtitle="План/факт стройки: прогресс, бригады, простои, отчёты"
       actions={
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-orange-500 text-white hover:bg-orange-600">
+        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
           <Plus className="mr-1.5 h-4 w-4" />
           Новый объект
         </Button>
@@ -409,7 +409,7 @@ function SiteDetail({
 function ProgressBar({ pct: value, tone }: { pct: number; tone: 'orange' | 'blue' }) {
   return (
     <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
-      <div className={tone === 'orange' ? 'h-full rounded-full bg-orange-500' : 'h-full rounded-full bg-blue-500'} style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
+      <div className={tone === 'orange' ? 'h-full rounded-full bg-signal' : 'h-full rounded-full bg-blue-500'} style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
     </div>
   );
 }

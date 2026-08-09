@@ -305,7 +305,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
           )}>
             {conn === 'live' ? 'Данные онлайн' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
           </div>
-          <div className="text-3xs text-white/70">Данные обновлены {formatRelative(snap.asOf)}</div>
+          <div className="text-3xs text-white">Данные обновлены {formatRelative(snap.asOf)}</div>
         </div>
       </div>
 
@@ -324,7 +324,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
 function Metric({ label, value, muted = false }: { label: string; value: string | number; muted?: boolean }) {
   return (
     <div>
-      <dt className="text-2xs uppercase tracking-wide text-white/70">{label}</dt>
+      <dt className="text-2xs uppercase tracking-wide text-white">{label}</dt>
       <dd className={cn('mt-0.5 font-mono text-lg tabular-nums text-white', muted && 'text-white/80')}>{value}</dd>
     </div>
   );

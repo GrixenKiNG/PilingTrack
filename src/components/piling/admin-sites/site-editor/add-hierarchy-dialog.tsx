@@ -75,7 +75,7 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
           <Button
             onClick={submit}
             disabled={adding || !name.trim()}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-signal hover:bg-signal-strong text-white"
           >
             {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Добавить'}
           </Button>

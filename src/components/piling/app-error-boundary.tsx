@@ -28,7 +28,7 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
         <div className="flex gap-3 justify-center">
           <button
             onClick={resetErrorBoundary}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-signal text-white hover:bg-signal-strong transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Попробовать снова

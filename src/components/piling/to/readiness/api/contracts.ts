@@ -1,3 +1,5 @@
+import { isActingRole, type ActingRole } from '@/lib/types';
+
 export const READINESS_ABILITIES = [
   'readiness.read',
   'readiness.shift.manage',
@@ -26,7 +28,7 @@ export interface ReadinessBootstrap {
   actor: {
     id: string;
     role: string;
-    actingAs: 'MECHANIC' | null;
+    actingAs: ActingRole | null;
   };
   featureFlags: {
     readiness_shifts_v1: boolean;
@@ -254,7 +256,7 @@ export function isReadinessBootstrapEnvelope(
     !record(data.actor)
     || !stringValue(data.actor.id)
     || !stringValue(data.actor.role)
-    || (data.actor.actingAs !== null && data.actor.actingAs !== 'MECHANIC')
+    || (data.actor.actingAs !== null && !isActingRole(data.actor.actingAs))
   ) return false;
   if (!booleanRecord(data.featureFlags, [
     'readiness_shifts_v1',

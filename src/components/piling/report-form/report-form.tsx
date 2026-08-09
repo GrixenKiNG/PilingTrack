@@ -190,7 +190,7 @@ export function ReportForm() {
         <p className="text-base font-semibold text-foreground mb-2">Не удалось загрузить данные формы</p>
         <p className="text-sm text-muted-foreground mb-6">Проверьте интернет и попробуйте ещё раз.</p>
         <button onClick={reloadData}
-          className="h-11 px-6 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold">
+          className="h-11 px-6 rounded-lg bg-signal hover:bg-signal-strong text-white font-semibold">
           Повторить
         </button>
       </div>

@@ -43,7 +43,7 @@ export function DowntimeSection({
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2"><PilingIcon name="downtime" size={18} tone="warning" decorative />Простой техники</CardTitle>
-            <button onClick={onToggle} className="min-h-[44px] rounded-md px-2 text-sm font-semibold text-signal-strong hover:bg-orange-50">{show ? 'Скрыть простой' : '+ Добавить простой'}</button>
+            <button onClick={onToggle} className="min-h-[44px] rounded-md px-2 text-sm font-semibold text-signal-strong hover:bg-signal/10">{show ? 'Скрыть простой' : '+ Добавить простой'}</button>
           </div>
         </CardHeader>
         {show && (

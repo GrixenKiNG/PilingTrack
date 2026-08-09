@@ -139,7 +139,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {eq.registrationNumber && <span className="font-mono">{eq.registrationNumber}</span>}
         </div>
       </div>
-      {canManage && <Button onClick={() => setEditOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
+      {canManage && <Button onClick={() => setEditOpen(true)} className="bg-signal hover:bg-signal-strong text-white">
         <Pencil className="w-4 h-4 mr-1.5" /> Редактировать
       </Button>}
     </div>

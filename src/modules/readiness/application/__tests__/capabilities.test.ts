@@ -73,4 +73,37 @@ describe('readiness capabilities', () => {
     expect(audit).not.toHaveBeenCalled();
     expect([...abilities]).toEqual([]);
   });
+  // Роли «Мастер» и «Инженер ОТ» заведены 2026-08-09 и пока исполняются
+  // администратором. Проверка защищает две вещи: расширение прав получает
+  // именно выбранная роль (а не всегда механик), и чужим ролям исполнение
+  // по-прежнему запрещено.
+  it.each([
+    ['FOREMAN', 'readiness.defect.report', 'readiness.maintenance.manage'],
+    ['SAFETY_ENGINEER', 'readiness.inspection.manage', 'readiness.handover.decide'],
+  ] as const)('администратор в роли %s получает её права и только их', async (actingAs, granted, denied) => {
+    const audit = vi.fn();
+    const abilities = await resolveAuditedReadinessCapabilities(
+      { id: 'admin-1', role: 'ADMIN' },
+      actingAs,
+      audit
+    );
+
+    expect(audit).toHaveBeenCalledWith({ actorId: 'admin-1', actualRole: 'ADMIN', actingAs });
+    expect(abilities).toContain(granted);
+    expect(abilities).not.toContain(denied);
+  });
+
+  it.each(['FOREMAN', 'SAFETY_ENGINEER'] as const)(
+    'диспетчер не может исполнять роль %s',
+    async (actingAs) => {
+      const audit = vi.fn();
+      const abilities = await resolveAuditedReadinessCapabilities(
+        { id: 'dispatcher-1', role: 'DISPATCHER' },
+        actingAs,
+        audit
+      );
+      expect(audit).not.toHaveBeenCalled();
+      expect([...abilities]).toEqual([]);
+    }
+  );
 });

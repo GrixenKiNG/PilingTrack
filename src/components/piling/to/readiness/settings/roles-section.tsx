@@ -19,7 +19,9 @@ import { ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
  * Матрица строится из того же источника, что и серверная проверка прав
  * (`resolveReadinessCapabilities`), поэтому расходиться с реальностью не может.
  */
-const MATRIX_ROLES: ReadinessRole[] = ['OPERATOR', 'ASSISTANT', 'DISPATCHER', 'MECHANIC', 'ADMIN'];
+const MATRIX_ROLES: ReadinessRole[] = [
+  'OPERATOR', 'ASSISTANT', 'DISPATCHER', 'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER', 'ADMIN',
+];
 
 const ABILITY_LABEL: Record<ReadinessAbility, string> = {
   'readiness.read': 'Видеть модуль',
@@ -82,12 +84,12 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
             <p className="mt-1 text-xs text-muted-foreground">Что роль может сделать в модуле. Ровно те правила, по которым сервер пропускает или отклоняет команду.</p>
           </div>
           <div className="overflow-x-auto">
-            <div className="grid min-w-[680px] grid-cols-[minmax(0,1fr)_repeat(5,90px)] items-end gap-1 border-b border-border px-4 py-2 text-3xs font-semibold text-muted-foreground">
+            <div className="grid min-w-[820px] grid-cols-[minmax(0,1fr)_repeat(7,90px)] items-end gap-1 border-b border-border px-4 py-2 text-3xs font-semibold text-muted-foreground">
               <span>Полномочие</span>
               {MATRIX_ROLES.map((role) => <span key={role} className="text-center">{handoverRoleLabel(role)}</span>)}
             </div>
             {READINESS_ABILITIES.map((ability) => (
-              <div key={ability} className="grid min-w-[680px] grid-cols-[minmax(0,1fr)_repeat(5,90px)] items-center gap-1 border-b border-border px-4 py-2 text-2xs last:border-b-0 hover:bg-signal/5">
+              <div key={ability} className="grid min-w-[820px] grid-cols-[minmax(0,1fr)_repeat(7,90px)] items-center gap-1 border-b border-border px-4 py-2 text-2xs last:border-b-0 hover:bg-signal/5">
                 <span className="min-w-0">
                   <span className="block font-medium">{ABILITY_LABEL[ability]}</span>
                   <span className="block font-mono text-3xs text-muted-foreground">{ability}</span>
@@ -105,7 +107,11 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
           <div className="flex flex-wrap items-center gap-4 border-t border-border p-4 text-3xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success-strong" />Полный доступ</span>
             <span className="flex items-center gap-1.5"><span>—</span>Нет доступа</span>
-            <span className="ml-auto">Механик — режим «действую за механика»: его включает администратор, отдельной учётной записи для него нет.</span>
+            <span className="ml-auto">
+              Механик, Мастер и Инженер ОТ — роли, которые пока исполняет администратор:
+              он переключается на роль, и действие уходит в журнал от её имени. Как только
+              появится человек, ему заводят учётную запись с этой ролью, и права переходят к нему.
+            </span>
           </div>
         </section>
 

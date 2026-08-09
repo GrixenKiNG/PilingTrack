@@ -24,6 +24,8 @@ export default async function ReadinessAdminLayout({ children }: { children: Rea
     && user.role !== 'DISPATCHER'
     && user.role !== 'MECHANIC'
     && user.role !== 'OPERATOR'
+    && user.role !== 'FOREMAN'
+    && user.role !== 'SAFETY_ENGINEER'
   ) {
     redirect('/operator');
   }

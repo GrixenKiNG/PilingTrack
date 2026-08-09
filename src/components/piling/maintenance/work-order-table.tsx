@@ -74,7 +74,7 @@ export function WorkOrderTable({
                 key={record.id}
                 onClick={() => onSelect(record.id)}
                 className={cn(
-                  'cursor-pointer align-top transition-colors hover:bg-orange-50/30',
+                  'cursor-pointer align-top transition-colors hover:bg-signal/10/30',
                   selectedRow && 'bg-sky-50/80 outline outline-1 -outline-offset-1 outline-sky-200',
                 )}
               >
@@ -124,7 +124,7 @@ export function WorkOrderTable({
                     <button
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onEdit(record); }}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-orange-50 hover:text-signal-strong"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal-strong"
                       title="Редактировать"
                     >
                       <PenLine className="h-3.5 w-3.5" />

@@ -1,6 +1,15 @@
 import { ServiceError } from '@/services/service-error';
 
-export type Role = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT';
+/**
+ * FOREMAN («Мастер») и SAFETY_ENGINEER («Инженер ОТ») заведены 2026-08-09.
+ * Живых людей в этих ролях пока нет — работу делает администратор через
+ * временное исполнение роли (`ACTING_ROLES` в `lib/types.ts`). Набор прав
+ * ниже намеренно узкий: расширить его, когда роль получит человека, —
+ * безопасно, а раздать лишнее сразу — нет. MECHANIC в этом перечислении
+ * отсутствует исторически и поэтому не имеет ни одного права: проверка
+ * `can()` для него всегда false, что и есть отказ по умолчанию.
+ */
+export type Role = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT' | 'FOREMAN' | 'SAFETY_ENGINEER';
 
 export type Ability =
   | 'analytics.read'
@@ -31,25 +40,27 @@ export interface SessionActor {
 }
 
 const abilityRoles: Record<Ability, Role[]> = {
-  'analytics.read': ['ADMIN', 'DISPATCHER'],
-  'reports.read_all': ['ADMIN', 'DISPATCHER'],
-  'reports.read_cross_user': ['ADMIN', 'DISPATCHER'],
+  'analytics.read': ['ADMIN', 'DISPATCHER', 'FOREMAN'],
+  'reports.read_all': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
+  'reports.read_cross_user': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'reports.export': ['ADMIN'],
   'reports.manage_all': ['ADMIN', 'DISPATCHER'],
-  'sites.read_all': ['ADMIN', 'DISPATCHER'],
+  'sites.read_all': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'sites.manage': ['ADMIN', 'DISPATCHER'],
   'sites.assign_users': ['ADMIN', 'DISPATCHER'],
   'sites.manage_hierarchy': ['ADMIN', 'DISPATCHER'],
   'users.manage': ['ADMIN'],
   'equipment.manage': ['ADMIN'],
-  'maintenance.manage': ['ADMIN', 'DISPATCHER'],
-  'crews.read': ['ADMIN', 'DISPATCHER'],
+  // Инженер ОТ ведёт осмотры и наряды-допуски — они живут в контуре
+  // обслуживания. Мастеру запись сюда не нужна: он смотрит и распределяет.
+  'maintenance.manage': ['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER'],
+  'crews.read': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'crews.manage': ['ADMIN', 'DISPATCHER'],
   'crews.legacy_manage': ['ADMIN'],
   'dictionary.manage': ['ADMIN'],
   'telegram.manage': ['ADMIN'],
   'system.read': ['ADMIN', 'DISPATCHER'],
-  'media.upload': ['ADMIN', 'DISPATCHER', 'OPERATOR'],
+  'media.upload': ['ADMIN', 'DISPATCHER', 'OPERATOR', 'FOREMAN', 'SAFETY_ENGINEER'],
   'dlq.manage': ['ADMIN'],
   'projections.rebuild': ['ADMIN'],
 };

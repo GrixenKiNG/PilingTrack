@@ -39,6 +39,8 @@ const RoleOptions = () => (
     <SelectItem value="OPERATOR">Оператор</SelectItem>
     <SelectItem value="ASSISTANT">Помощник</SelectItem>
     <SelectItem value="MECHANIC">Механик</SelectItem>
+    <SelectItem value="FOREMAN">Мастер</SelectItem>
+    <SelectItem value="SAFETY_ENGINEER">Инженер ОТ</SelectItem>
     <SelectItem value="DISPATCHER">Диспетчер</SelectItem>
     <SelectItem value="ADMIN">Администратор</SelectItem>
   </>
@@ -185,7 +187,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
           <Button
             onClick={submit}
             disabled={submitting}
-            className="bg-orange-500 text-white hover:bg-orange-600"
+            className="bg-signal text-white hover:bg-signal-strong"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Создать'}
           </Button>
@@ -335,7 +337,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
           <Button
             onClick={submit}
             disabled={submitting}
-            className="bg-orange-500 text-white hover:bg-orange-600"
+            className="bg-signal text-white hover:bg-signal-strong"
           >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />

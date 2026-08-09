@@ -104,7 +104,7 @@ function ViewHeading({
   return (
     <header className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-50">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-signal/10">
           <Icon className="h-6 w-6 text-signal-strong" />
         </span>
         <div>
@@ -126,7 +126,7 @@ function StatusBadge({ status }: { status: ReadinessStatus }) {
   );
 }
 
-function ProgressBar({ value, tone = 'bg-orange-500' }: { value: number; tone?: string }) {
+function ProgressBar({ value, tone = 'bg-signal' }: { value: number; tone?: string }) {
   return (
     <div className="h-2 overflow-hidden rounded-full bg-muted" aria-label={`${value}%`}>
       <div className={cn('h-full rounded-full', tone)} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
@@ -192,7 +192,7 @@ export function ReadinessFleetView({
                 onClick={() => setFilter(id)}
                 className={cn(
                   'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold',
-                  filter === id ? 'bg-orange-50 text-orange-700' : 'text-muted-foreground hover:bg-muted',
+                  filter === id ? 'bg-signal/10 text-signal-strong' : 'text-muted-foreground hover:bg-muted',
                 )}
               >
                 <span>{label}</span><span className="font-mono">{count}</span>
@@ -209,8 +209,8 @@ export function ReadinessFleetView({
                 type="button"
                 onClick={() => onSelect(item.id)}
                 className={cn(
-                  'rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-orange-300 hover:shadow-md',
-                  item.id === selectedId ? 'border-orange-400 ring-2 ring-orange-100' : 'border-border',
+                  'rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-signal/30 hover:shadow-md',
+                  item.id === selectedId ? 'border-signal/30 ring-2 ring-signal/30' : 'border-border',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -231,7 +231,7 @@ export function ReadinessFleetView({
                     {item.crewCount > 0 ? `Бригад: ${item.crewCount}` : 'Бригада не назначена'}
                   </div>
                 </div>
-                <div className="mt-3"><ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-orange-500'} /></div>
+                <div className="mt-3"><ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-signal'} /></div>
                 <p className="mt-3 min-h-10 text-xs leading-relaxed text-muted-foreground">{state?.reason}</p>
               </button>
             );
@@ -483,7 +483,7 @@ export function ReadinessReportsView({
               return (
                 <div key={item.id} className="grid items-center gap-3 sm:grid-cols-[180px_minmax(0,1fr)_110px]">
                   <div className="truncate text-sm font-semibold text-foreground">{item.name}</div>
-                  <ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-orange-500'} />
+                  <ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-signal'} />
                   <div className="text-right">{state && <StatusBadge status={state.status} />}</div>
                 </div>
               );
@@ -497,7 +497,7 @@ export function ReadinessReportsView({
             {blockerRows.map(([label, count]) => (
               <div key={label}>
                 <div className="mb-2 flex items-center justify-between text-sm"><span className="text-muted-foreground">{label}</span><strong className="font-mono text-foreground">{count}</strong></div>
-                <ProgressBar value={(count / maxBlockers) * 100} tone={count > 0 ? 'bg-orange-500' : 'bg-emerald-500'} />
+                <ProgressBar value={(count / maxBlockers) * 100} tone={count > 0 ? 'bg-signal' : 'bg-emerald-500'} />
               </div>
             ))}
           </div>
@@ -531,7 +531,7 @@ export function ReadinessSettingsView() {
           <h3 className="px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Разделы</h3>
           <nav className="mt-2 space-y-1">
             {links.map(([href, label, Icon], index) => (
-              <Link key={href} href={href} className={cn('flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold', index === 0 ? 'bg-orange-50 text-orange-700' : 'text-muted-foreground hover:bg-muted')}>
+              <Link key={href} href={href} className={cn('flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold', index === 0 ? 'bg-signal/10 text-signal-strong' : 'text-muted-foreground hover:bg-muted')}>
                 <Icon className="h-4 w-4" />{label}
               </Link>
             ))}

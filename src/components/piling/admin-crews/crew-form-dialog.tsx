@@ -299,7 +299,7 @@ export function CrewFormDialog({
             <Button
               onClick={handleSubmit}
               disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId}
-              className="bg-orange-500 text-white hover:bg-orange-600"
+              className="bg-signal text-white hover:bg-signal-strong"
             >
               {submitting
                 ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -446,7 +446,7 @@ function AssistantSelectorModal({
           <Button variant="outline" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={onConfirm} className="bg-orange-500 text-white hover:bg-orange-600">
+          <Button onClick={onConfirm} className="bg-signal text-white hover:bg-signal-strong">
             Применить
           </Button>
         </DialogFooter>

@@ -300,7 +300,7 @@ export function StartInspectionForm() {
             <Button variant="outline" asChild disabled={busy}>
               <Link href="/inspections">Отмена</Link>
             </Button>
-            <Button onClick={submit} disabled={busy || loading || (!!selected && !hasBase)} className="bg-orange-500 hover:bg-orange-600 text-white flex-1">
+            <Button onClick={submit} disabled={busy || loading || (!!selected && !hasBase)} className="bg-signal hover:bg-signal-strong text-white flex-1">
               {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Начать осмотр
             </Button>

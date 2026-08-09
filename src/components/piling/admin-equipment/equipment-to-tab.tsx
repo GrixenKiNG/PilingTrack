@@ -52,7 +52,7 @@ export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Link href="/inspections/new" className="inline-flex items-center gap-1 rounded-md bg-orange-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-600 no-underline">
+        <Link href="/inspections/new" className="inline-flex items-center gap-1 rounded-md bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-strong no-underline">
           <PilingIcon name="inspection" size={16} tone="success" decorative className="!text-white" /> Начать осмотр / ТО
         </Link>
         <Link href="/admin/to" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-signal-strong">

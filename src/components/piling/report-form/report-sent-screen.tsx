@@ -45,7 +45,7 @@ export function ReportSentScreen({
 
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-sm border-t px-4 py-3 pb-safe">
         <button onClick={onDone}
-          className="w-full h-14 rounded-lg font-semibold text-base bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white transition-all">
+          className="w-full h-14 rounded-lg font-semibold text-base bg-signal hover:bg-signal-strong active:scale-[0.98] text-white transition-all">
           Готово
         </button>
       </div>

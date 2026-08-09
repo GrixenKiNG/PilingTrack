@@ -62,7 +62,7 @@ export function InspectionsList() {
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground"><PilingIcon name="inspection" size={24} tone="success" decorative />Осмотры</h1>
-        <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button asChild size="sm" className="bg-signal hover:bg-signal-strong text-white">
           <Link href="/inspections/new">
             <PilingIcon name="inspection" size={16} tone="success" decorative className="mr-1 !text-white" /> Провести осмотр
           </Link>
@@ -91,7 +91,7 @@ export function InspectionsList() {
             <li key={r.id}>
               <Link
                 href={`/inspections/${r.id}`}
-                className="flex flex-wrap items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm transition-colors hover:border-orange-300 hover:bg-orange-50/30"
+                className="flex flex-wrap items-start justify-between gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm transition-colors hover:border-signal/30 hover:bg-signal/10/30"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">

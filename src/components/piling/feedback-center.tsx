@@ -375,7 +375,7 @@ export function FeedbackCenter() {
                   <div
                     key={`${event.source}-${event.id}`}
                     className={`rounded-xl border bg-card p-3 shadow-sm transition-opacity ${
-                      event.unread ? 'border-orange-200' : 'opacity-90'
+                      event.unread ? 'border-signal/30' : 'opacity-90'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -389,7 +389,7 @@ export function FeedbackCenter() {
                               {event.source === 'client' ? 'локально' : event.scope}
                             </Badge>
                             {event.unread && (
-                              <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Новое</Badge>
+                              <Badge className="bg-signal/10 text-signal-strong hover:bg-signal/10">Новое</Badge>
                             )}
                             {event.acknowledgedAt && (
                               <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">

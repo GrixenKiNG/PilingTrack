@@ -12,9 +12,9 @@ export default function LoginPageRoute() {
   useEffect(() => {
     if (currentUser) {
       const role = currentUser.role;
-      if (role === 'ADMIN' || role === 'DISPATCHER') {
+      if (role === 'ADMIN' || role === 'DISPATCHER' || role === 'FOREMAN') {
         router.replace('/admin');
-      } else if (role === 'MECHANIC') {
+      } else if (role === 'MECHANIC' || role === 'SAFETY_ENGINEER') {
         router.replace('/admin/to');
       } else {
         router.replace('/operator');

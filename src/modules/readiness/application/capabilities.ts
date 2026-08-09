@@ -1,3 +1,5 @@
+import type { ActingRole } from '@/lib/types';
+
 export const READINESS_ABILITIES = [
   'readiness.read',
   'readiness.shift.manage',
@@ -19,7 +21,9 @@ export const READINESS_ABILITIES = [
 ] as const;
 
 export type ReadinessAbility = (typeof READINESS_ABILITIES)[number];
-export type ReadinessRole = 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT' | 'MECHANIC';
+export type ReadinessRole =
+  | 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT'
+  | 'MECHANIC' | 'FOREMAN' | 'SAFETY_ENGINEER';
 
 const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
   ADMIN: [
@@ -57,6 +61,24 @@ const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
     'readiness.meter.manage',
     'readiness.maintenance.manage',
   ],
+  // Мастер отвечает за ход работ на участке: видит контур и фиксирует
+  // замечания, но не закрывает дефекты и не решает по допуску — это
+  // диспетчер и механик.
+  FOREMAN: [
+    'readiness.read',
+    'readiness.defect.report',
+    'readiness.audit.read',
+  ],
+  // Инженер ОТ — охрана труда: осмотры и наряды-допуски, разбор замечаний
+  // по безопасности. Смену не запускает и не принимает.
+  SAFETY_ENGINEER: [
+    'readiness.read',
+    'readiness.permit.edit',
+    'readiness.inspection.manage',
+    'readiness.defect.report',
+    'readiness.defect.manage',
+    'readiness.audit.read',
+  ],
 };
 
 const READINESS_ROLES = new Set<ReadinessRole>([
@@ -65,6 +87,8 @@ const READINESS_ROLES = new Set<ReadinessRole>([
   'OPERATOR',
   'ASSISTANT',
   'MECHANIC',
+  'FOREMAN',
+  'SAFETY_ENGINEER',
 ]);
 
 export interface ReadinessActor {
@@ -75,7 +99,7 @@ export interface ReadinessActor {
 export interface ReadinessActingAudit {
   actorId: string;
   actualRole: 'ADMIN';
-  actingAs: 'MECHANIC';
+  actingAs: ActingRole;
 }
 
 export function isReadinessRole(role: string): role is ReadinessRole {
@@ -91,7 +115,7 @@ export function resolveReadinessCapabilities(role: string): ReadonlySet<Readines
 
 export async function resolveAuditedReadinessCapabilities(
   actor: ReadinessActor,
-  actingAs: 'MECHANIC' | null,
+  actingAs: ActingRole | null,
   recordAudit: (entry: ReadinessActingAudit) => Promise<void>
 ): Promise<ReadonlySet<ReadinessAbility>> {
   const actual = resolveReadinessCapabilities(actor.role);
@@ -102,13 +126,16 @@ export async function resolveAuditedReadinessCapabilities(
     return new Set();
   }
 
+  // В журнал уходит именно та роль, которую администратор исполняет, а не
+  // всегда «механик»: иначе действия мастера и инженера ОТ были бы неотличимы
+  // от механических, и доказательный журнал врал бы.
   await recordAudit({
     actorId: actor.id,
     actualRole: 'ADMIN',
-    actingAs: 'MECHANIC',
+    actingAs,
   });
 
-  return new Set([...actual, ...ROLE_ABILITIES.MECHANIC]);
+  return new Set([...actual, ...ROLE_ABILITIES[actingAs]]);
 }
 
 export function hasReadinessCapability(

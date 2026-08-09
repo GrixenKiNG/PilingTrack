@@ -71,7 +71,7 @@ export function DictionaryTable({
           <div className="flex w-full flex-wrap items-center gap-2 text-xs sm:ml-auto sm:w-auto">
             <span className="text-muted-foreground">Выбрано: {checkedItems.length}</span>
             {checkedItems.some((item) => item.isActive) && (
-              <button type="button" onClick={() => bulkStatus(false)} className="min-h-11 rounded-md border border-orange-300 px-3 font-medium text-signal-strong hover:bg-orange-50 sm:min-h-9">Архивировать</button>
+              <button type="button" onClick={() => bulkStatus(false)} className="min-h-11 rounded-md border border-signal/30 px-3 font-medium text-signal-strong hover:bg-signal/10 sm:min-h-9">Архивировать</button>
             )}
             {checkedItems.some((item) => !item.isActive) && (
               <button type="button" onClick={() => bulkStatus(true)} className="min-h-11 rounded-md border border-border px-3 font-medium text-foreground hover:bg-muted sm:min-h-9">Восстановить</button>

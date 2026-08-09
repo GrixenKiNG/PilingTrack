@@ -208,7 +208,7 @@ export function AdminUsers() {
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['запись', 'записи', 'записей'])}`}
       subtitle="Доступы, закрепления и фактическая активность сотрудников"
       actions={
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-orange-500 text-white hover:bg-orange-600">
+        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
           <Plus className="h-4 w-4" />Новый пользователь
         </Button>
       }

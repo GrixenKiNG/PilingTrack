@@ -138,7 +138,7 @@ export function ReadinessCenter({
                 'rounded-md border px-3 py-2 text-xs font-semibold transition-colors',
                 statusFilter === status
                   ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-border bg-card text-muted-foreground hover:border-orange-300',
+                  : 'border-border bg-card text-muted-foreground hover:border-signal/30',
               )}
             >
               {status === 'ALL' ? 'Все' : STATUS_META[status].label}
@@ -179,8 +179,8 @@ export function ReadinessCenter({
                     type="button"
                     onClick={() => onSelect(item.id)}
                     className={cn(
-                      'w-full px-4 py-3 text-left transition-colors hover:bg-orange-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500',
-                      active && 'bg-orange-50/70 ring-1 ring-inset ring-orange-200',
+                      'w-full px-4 py-3 text-left transition-colors hover:bg-signal/10/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal/30',
+                      active && 'bg-signal/10/70 ring-1 ring-inset ring-signal/30',
                     )}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -260,7 +260,7 @@ export function ReadinessCenter({
                       {readiness.canOperate ? 'Работа разрешена' : 'Запуск не подтверждён'}
                     </div>
                     <p className="mt-1 text-sm leading-relaxed text-foreground">{readiness.reason}</p>
-                    <Button asChild size="sm" className="mt-3 bg-orange-500 text-white hover:bg-orange-600">
+                    <Button asChild size="sm" className="mt-3 bg-signal text-white hover:bg-signal-strong">
                       <Link href={readiness.nextActionHref}>{readiness.nextAction}</Link>
                     </Button>
                   </div>
@@ -298,7 +298,7 @@ export function ReadinessCenter({
                   </div>
                 );
                 return item.href ? (
-                  <Link key={item.key} href={item.href} className="block hover:bg-orange-50/30">
+                  <Link key={item.key} href={item.href} className="block hover:bg-signal/10/30">
                     {content}
                   </Link>
                 ) : (
@@ -335,7 +335,7 @@ export function ReadinessCenter({
                     href={isInspectionRecord(record) && record.inspection
                       ? `/inspections/${record.inspection.id}`
                       : '/admin/maintenance'}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-orange-50/30"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-signal/10/30"
                   >
                     <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">
                       {fmtDate(record.completedAt ?? record.scheduledAt ?? record.createdAt)}
@@ -403,7 +403,7 @@ export function ReadinessCenter({
           <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <h3 className="text-sm font-bold text-foreground">Рабочие действия</h3>
             <div className="mt-3 grid gap-2">
-              <Button asChild className="justify-start bg-orange-500 text-white hover:bg-orange-600">
+              <Button asChild className="justify-start bg-signal text-white hover:bg-signal-strong">
                 <Link href={selected ? `/inspections/new?equipmentId=${selected.id}` : '/inspections/new'}>
                   <CheckCircle2 className="mr-2 h-4 w-4" /> Начать осмотр
                 </Link>

@@ -201,7 +201,7 @@ export function AdminCrews() {
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['бригада', 'бригады', 'бригад'])}`}
       subtitle="Сменные назначения: оператор, помощники, установка, объект"
       actions={
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-orange-500 text-white hover:bg-orange-600">
+        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
           <Plus className="mr-1.5 h-4 w-4" />Добавить
         </Button>
       }

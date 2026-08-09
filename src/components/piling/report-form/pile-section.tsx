@@ -48,7 +48,7 @@ export function PileSection({
             <h3 className="text-base font-bold flex items-center gap-2"><PilingIcon name="pile-driving" size={18} tone="primary" decorative />Забитые сваи</h3>
             <div className="flex items-center gap-2">
               {totalPiles > 0 && (
-                <span className="text-sm font-mono font-bold text-signal-strong bg-orange-50 px-2 py-0.5 rounded-full">
+                <span className="text-sm font-mono font-bold text-signal-strong bg-signal/10 px-2 py-0.5 rounded-full">
                   {totalPiles} шт. / {formatNumber(totalMeters)} м.п.
                 </span>
               )}
@@ -68,14 +68,14 @@ export function PileSection({
                 </Select>
                 <Input type="number" aria-label="Количество свай, шт." placeholder="Кол-во" value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="w-24 h-12 min-h-[48px] font-mono text-lg" />
-                <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" min-w={48} min-h={48} className="h-12 min-h-[48px] w-12 bg-orange-500 hover:bg-orange-600 text-white">
+                <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" min-w={48} min-h={48} className="h-12 min-h-[48px] w-12 bg-signal hover:bg-signal-strong text-white">
                   <PilingIcon name="add" size={20} decorative className="!text-white" />
                 </Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
               {!tempGrade && <p className="text-muted-foreground text-sm font-medium">Выберите марку сваи</p>}
               {(tempGrade || tempCount) && Number(tempCount) > 0 && (
-                <div className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700">
+                <div className="rounded-lg bg-signal/10 px-3 py-2 text-sm font-medium text-signal-strong">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
                 </div>
               )}
@@ -89,11 +89,11 @@ export function PileSection({
               <div className="flex gap-2">
                 <Input type="number" aria-label="Количество свай, шт." placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="h-11 font-mono" />
-                <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" className="h-11 min-h-[44px] bg-orange-500 hover:bg-orange-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
+                <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" className="h-11 min-h-[44px] bg-signal hover:bg-signal-strong text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
               {(tempGrade || tempCount) && (
-                <div className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700">
+                <div className="rounded-lg bg-signal/10 px-3 py-2 text-sm font-medium text-signal-strong">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
                 </div>
               )}

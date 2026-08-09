@@ -70,7 +70,7 @@ export function KpiTile({ icon, label, value, detail, alert, children, className
       onClick={onClick}
       className={cn(
         'flex h-full min-h-28 min-w-0 flex-col rounded-xl border border-border bg-card p-4 text-left shadow-sm transition',
-        onClick && 'hover:border-orange-300 hover:shadow-md',
+        onClick && 'hover:border-signal/30 hover:shadow-md',
         className,
       )}
     >
@@ -79,7 +79,7 @@ export function KpiTile({ icon, label, value, detail, alert, children, className
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <span className="min-w-0 break-words">{label}</span>
-            {alert && <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-label="Требует внимания" />}
+            {alert && <span className="h-2 w-2 shrink-0 rounded-full bg-signal" aria-label="Требует внимания" />}
           </span>
           <span className="mt-1 break-words font-mono text-xl font-bold tabular-nums leading-tight text-foreground">{value}</span>
           {detail && <span className="mt-1 break-words text-xs text-muted-foreground">{detail}</span>}

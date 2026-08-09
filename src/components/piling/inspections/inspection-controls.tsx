@@ -68,7 +68,7 @@ export function DoneControl({ value, onChange, disabled }: { value: string; onCh
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked ? 'DONE' : 'NOT_DONE')}
-        className="h-4 w-4 rounded border-border accent-orange-500"
+        className="h-4 w-4 rounded border-border accent-signal"
       />
       <span className="text-sm text-foreground">{checked ? 'Выполнено' : 'Не выполнено'}</span>
     </label>

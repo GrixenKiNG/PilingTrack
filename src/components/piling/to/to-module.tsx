@@ -13,6 +13,8 @@ import {
   type ReadinessScoreResult,
 } from '@/modules/readiness';
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
+import type { ActingRole } from '@/lib/types';
+import { ActingRoleSwitch } from './readiness/acting-role-switch';
 import { TechReadinessModule } from './readiness/tech-readiness-module';
 import type { QueryState } from './readiness/boundaries/query-state';
 import {
@@ -164,6 +166,10 @@ async function readAuthoritativeCollection<T>(
 export function ToModule() {
   const workspaceRequest = useRef<AbortController | null>(null);
   const [bootstrap, setBootstrap] = useState<ReadinessBootstrap | null>(null);
+  // Роль, которую администратор исполняет. null — работает как администратор.
+  // MECHANIC по умолчанию сохраняет прежнее поведение: раньше модуль включал
+  // этот режим сам, без ведома пользователя.
+  const [actingAs, setActingAs] = useState<ActingRole | null>('MECHANIC');
   const [bootstrapError, setBootstrapError] = useState<ReadinessApiError | null>(null);
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [equipmentId, setEquipmentId] = useState('');
@@ -220,8 +226,8 @@ export function ToModule() {
     setRulesAvailable(false);
     try {
       let readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
-      if (readinessBootstrap.actor.role === 'ADMIN' && readinessBootstrap.capabilities.canActAsMechanic) {
-        readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal, actingAsMechanic: true });
+      if (actingAs && readinessBootstrap.actor.role === 'ADMIN') {
+        readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal, actingAs });
       }
       if (controller.signal.aborted) return;
       setBootstrap(readinessBootstrap);
@@ -372,7 +378,7 @@ export function ToModule() {
         setLoading(false);
       }
     }
-  }, [readinessFilters]);
+  }, [readinessFilters, actingAs]);
 
   useEffect(() => {
     void loadWorkspace();
@@ -533,6 +539,14 @@ export function ToModule() {
             : `Открыт раздел ${view}`
       }
       onRetry={bootstrapError?.retryable === false ? undefined : loadWorkspace}
+      tabStripTrailing={
+        <ActingRoleSwitch
+          actorRole={bootstrap?.actor.role ?? ''}
+          value={actingAs}
+          onChange={setActingAs}
+          disabled={loading}
+        />
+      }
     >
       {referenceUi}
     </TechReadinessModule>

@@ -54,7 +54,7 @@ export function ReportHistoryDetailDialog({
               <button
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- reportId is set for every persisted report shown here
                 onClick={() => onPreviewPdf(report.reportId!)}
-                className="flex items-center gap-1.5 text-xs font-medium text-signal-strong hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs font-medium text-signal-strong hover:text-signal-strong bg-signal/10 hover:bg-signal/10 px-3 py-1.5 rounded-lg transition-colors"
               >
                 <Eye className="w-3.5 h-3.5" />
                 Предпросмотр PDF

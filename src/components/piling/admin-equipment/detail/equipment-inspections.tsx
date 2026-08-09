@@ -52,7 +52,7 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
     <div>
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Чек-листы осмотров этой установки.</p>
-        <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button asChild size="sm" className="bg-signal hover:bg-signal-strong text-white">
           <Link href="/inspections/new">
             <Plus className="w-3.5 h-3.5 mr-1" /> Провести осмотр
           </Link>
@@ -69,7 +69,7 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
             <li key={r.id}>
               <Link
                 href={`/inspections/${r.id}`}
-                className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:border-orange-300 hover:bg-orange-50/30"
+                className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:border-signal/30 hover:bg-signal/10/30"
               >
                 <span className="font-mono text-xs text-muted-foreground shrink-0">
                   {formatRuDate(r.inspectionDate)}

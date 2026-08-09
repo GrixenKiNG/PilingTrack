@@ -87,7 +87,7 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
           {active && (
             <div className="mb-2 rounded-md border border-amber-200 bg-card p-2.5">
               <div className="flex items-center gap-2">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-orange-500 text-2xs font-bold text-white">{active.n}</span>
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-signal text-2xs font-bold text-white">{active.n}</span>
                 <span className="text-sm font-semibold text-foreground">{active.label}</span>
               </div>
               <dl className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
@@ -109,7 +109,7 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
                 )}
               >
                 <span className={cn('grid h-4 w-4 shrink-0 place-items-center rounded-full text-2xs leading-none font-bold text-white',
-                  p.n === sel ? 'bg-orange-500' : 'bg-amber-400')}>{p.n}</span>
+                  p.n === sel ? 'bg-signal' : 'bg-amber-400')}>{p.n}</span>
                 <span className="flex-1 truncate text-foreground">{p.label}</span>
                 <span className="shrink-0 text-2xs text-muted-foreground">{p.interval}</span>
               </button>

@@ -1,4 +1,5 @@
 import { authFetch } from '@/lib/api';
+import type { ActingRole } from '@/lib/types';
 import {
   isReadinessBootstrapEnvelope,
   parseCurrentReadinessResponse,
@@ -23,7 +24,8 @@ import {
 interface FetchReadinessBootstrapOptions {
   signal?: AbortSignal;
   requestId?: string;
-  actingAsMechanic?: boolean;
+  /** Роль, от имени которой администратор временно работает. */
+  actingAs?: ActingRole;
 }
 
 export interface ReadinessUrlFilters {
@@ -74,7 +76,7 @@ export async function fetchReadinessBootstrap(
   const requestId = options.requestId ?? createReadinessRequestId();
   let response: Response;
   try {
-    response = await authFetch(`/api/readiness/bootstrap${options.actingAsMechanic ? '?actingAs=MECHANIC' : ''}`, {
+    response = await authFetch(`/api/readiness/bootstrap${options.actingAs ? `?actingAs=${options.actingAs}` : ''}`, {
       method: 'GET',
       signal: options.signal,
       headers: { [READINESS_REQUEST_ID_HEADER]: requestId },

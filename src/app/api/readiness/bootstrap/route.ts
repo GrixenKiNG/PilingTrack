@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/lib/service-error';
 import { attachRequestIdHeader, getRequestId } from '@/lib/request-context';
+import { canActAs, isActingRole } from '@/lib/types';
 import { queryReadinessBootstrap } from '@/modules/readiness/application/bootstrap-query';
 import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
 
@@ -24,11 +25,11 @@ export async function GET(request: NextRequest) {
   const actingAs = searchParams.get('actingAs');
   if (
     searchParams.size > (actingAs === null ? 0 : 1)
-    || (actingAs !== null && actingAs !== 'MECHANIC')
+    || (actingAs !== null && !isActingRole(actingAs))
   ) {
     return response({ error: 'Client-controlled readiness context is not accepted' }, 400, requestId);
   }
-  if (actingAs === 'MECHANIC' && user.role !== 'ADMIN') {
+  if (!canActAs(user.role, actingAs)) {
     return response({ error: 'Нет доступа к контуру технической готовности' }, 403, requestId);
   }
 

@@ -212,7 +212,7 @@ export function AdminTelegram() {
         </div>
         <Button
           onClick={openCreate}
-          className="bg-orange-500 hover:bg-orange-600 text-white"
+          className="bg-signal hover:bg-signal-strong text-white"
         >
           <Plus className="w-4 h-4 mr-1" />
           Добавить
@@ -299,7 +299,7 @@ export function AdminTelegram() {
                     <button
                       onClick={() => handleToggle(config)}
                       disabled={togglingId === config.id}
-                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-signal-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-signal-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-signal/10 disabled:opacity-50"
                     >
                       {togglingId === config.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -372,7 +372,7 @@ export function AdminTelegram() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-orange-500 hover:bg-orange-600 text-white"
+              className="bg-signal hover:bg-signal-strong text-white"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

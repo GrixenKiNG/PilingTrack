@@ -66,7 +66,7 @@ const MACHINE_STATES: Record<number, { label: string; cls: string }> = {
   5: { label: 'Забивка свай', cls: 'bg-indigo-100 text-indigo-700' },
   6: { label: 'Извлечение', cls: 'bg-violet-100 text-violet-700' },
   7: { label: 'Ошибка', cls: 'bg-rose-100 text-rose-700' },
-  8: { label: 'Обслуживание', cls: 'bg-orange-100 text-orange-700' },
+  8: { label: 'Обслуживание', cls: 'bg-signal/10 text-signal-strong' },
 };
 
 function classifyByKeyword(type: string): Subsystem {

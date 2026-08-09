@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
 } from 'react';
+import { cn } from '@/lib/utils';
 import type { ReferenceView } from '../readiness-reference-ui';
 
 export const MODULE_TABS = [
@@ -28,6 +29,8 @@ interface ModuleTabListProps {
    * «Недостаточно прав». Пока прав нет, показываем весь список.
    */
   screens?: Record<ReferenceView, boolean> | null;
+  /** Контрол в правом конце полосы (переключатель исполняемой роли). */
+  trailing?: React.ReactNode;
 }
 
 export function ModuleTabList({
@@ -35,6 +38,7 @@ export function ModuleTabList({
   onViewChange,
   activeTabRef,
   screens,
+  trailing,
 }: ModuleTabListProps) {
   const localRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const tabs = screens ? MODULE_TABS.filter((tab) => screens[tab.id] !== false) : MODULE_TABS;
@@ -70,14 +74,18 @@ export function ModuleTabList({
   return (
     <nav
       aria-label="Разделы технической готовности"
-      className="h-12 min-w-0 overflow-hidden bg-primary text-white"
+      // Полоса вкладок светлая, как везде в приложении. Раньше здесь была
+      // тёмная `bg-primary text-white` — она пришла из макета, где модуль был
+      // отдельным приложением со своим чёрным топбаром. Внутри нашей
+      // администраторской оболочки это читалось как вторая, чужая навигация.
+      className="flex h-12 min-w-0 items-center overflow-hidden border-b border-border bg-card"
     >
       <div
         role="tablist"
         aria-label="Техническая готовность"
         data-testid="module-tabs"
         data-scroll-region="module-tabs"
-        className="flex h-12 w-full min-w-0 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
+        className="flex h-12 min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
       >
         {tabs.map((tab, index) => {
           const selected = tab.id === activeView;
@@ -99,7 +107,12 @@ export function ModuleTabList({
               data-testid={`module-tab-${tab.id}`}
               onClick={() => onViewChange(tab.id)}
               onKeyDown={(event) => handleKeyDown(event, index)}
-              className="relative flex h-12 min-h-9 flex-none items-center whitespace-nowrap px-3 text-sm font-semibold text-white/80 outline-none transition-colors hover:bg-card/10 hover:text-white focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal sm:px-4 max-sm:min-h-11"
+              className={cn(
+                'relative flex h-12 min-h-9 flex-none items-center whitespace-nowrap px-3 text-sm outline-none transition-colors focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-4 max-sm:min-h-11',
+                selected
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
             >
               {tab.label}
               {selected && (
@@ -112,6 +125,7 @@ export function ModuleTabList({
           );
         })}
       </div>
+      {trailing}
     </nav>
   );
 }

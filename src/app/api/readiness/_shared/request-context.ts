@@ -1,6 +1,7 @@
 import type {NextRequest, NextResponse} from 'next/server';
 import {requireAuth} from '@/lib/auth';
 import {getRequestId} from '@/lib/request-context';
+import {canActAs} from '@/lib/types';
 import {resolveCorrelationId} from '@/modules/readiness/application/command-pipeline/correlation';
 
 export interface ReadinessRequestContext {
@@ -24,7 +25,7 @@ export async function resolveReadinessRequestContext(
     const {NextResponse} = await import('next/server');
     return {response: NextResponse.json({error: {code: 'FORBIDDEN', message: 'Tenant context is required'}}, {status: 403})};
   }
-  if (actingAs && !(user.role === 'ADMIN' && actingAs === 'MECHANIC')) {
+  if (!canActAs(user.role, actingAs)) {
     const {NextResponse} = await import('next/server');
     return {response: NextResponse.json({error: {code: 'FORBIDDEN', message: 'Acting role is not allowed'}}, {status: 403})};
   }

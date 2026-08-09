@@ -81,7 +81,7 @@ export function MaintenanceDetailPanel({
               <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м.ч.` : '—'} />
               <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м.ч.` : '—'} />
               <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                <div className="h-full rounded-full bg-orange-500" style={{ width: `${progress}%` }} />
+                <div className="h-full rounded-full bg-signal" style={{ width: `${progress}%` }} />
               </div>
               <MetricLine label="Порог ТО" value={interval != null ? `${interval} м.ч.` : 'не задан'} />
               <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м.ч.)` : 'не закрывалось'} />
@@ -138,7 +138,7 @@ export function MaintenanceDetailPanel({
         <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3">
           <Button
             size="sm"
-            className="h-9 bg-orange-500 px-2 text-white hover:bg-orange-600"
+            className="h-9 bg-signal px-2 text-white hover:bg-signal-strong"
             disabled={closeBusy || record.status === 'DONE'}
             onClick={() => void onClose(record)}
           >
@@ -198,7 +198,7 @@ function FactRow({ label, value }: { label: string; value: string | null | undef
 function RemarkLine({ tone, text }: { tone: 'orange' | 'red'; text: string }) {
   return (
     <div className="flex items-center gap-2 text-xs text-foreground">
-      <span className={cn('h-2 w-2 rounded-full', tone === 'orange' ? 'bg-orange-500' : 'bg-red-500')} />
+      <span className={cn('h-2 w-2 rounded-full', tone === 'orange' ? 'bg-signal' : 'bg-red-500')} />
       <span className="min-w-0 flex-1 truncate">{text}</span>
     </div>
   );
@@ -207,7 +207,7 @@ function RemarkLine({ tone, text }: { tone: 'orange' | 'red'; text: string }) {
 function TimelineLine({ tone, date, text, actor }: { tone: 'green' | 'orange'; date: string; text: string; actor: string }) {
   return (
     <div className="grid grid-cols-[12px_112px_1fr_88px] items-start gap-2">
-      <span className={cn('mt-1.5 h-2 w-2 rounded-full', tone === 'green' ? 'bg-emerald-500' : 'bg-orange-500')} />
+      <span className={cn('mt-1.5 h-2 w-2 rounded-full', tone === 'green' ? 'bg-emerald-500' : 'bg-signal')} />
       <span className="font-mono text-2xs text-muted-foreground">{date}</span>
       <span className="text-foreground">{text}</span>
       <span className="truncate text-right text-2xs text-muted-foreground">{actor}</span>

@@ -17,6 +17,8 @@ interface TechReadinessModuleProps {
   announcement?: string | null;
   onRetry?: () => void | Promise<void>;
   bootstrap?: ReadinessBootstrap | null;
+  /** Контрол в правом конце полосы вкладок. */
+  tabStripTrailing?: ReactNode;
 }
 
 function activeViewState(
@@ -46,6 +48,7 @@ export function TechReadinessModule({
   announcement,
   onRetry,
   bootstrap,
+  tabStripTrailing,
 }: TechReadinessModuleProps) {
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const resolvedQueryState = activeViewState(activeView, queryState, bootstrap);
@@ -61,6 +64,7 @@ export function TechReadinessModule({
         onViewChange={onViewChange}
         activeTabRef={activeTabRef}
         screens={bootstrap?.capabilities.screens ?? null}
+        trailing={tabStripTrailing}
       />
       {MODULE_TABS.map((tab) => {
         const active = tab.id === activeView;

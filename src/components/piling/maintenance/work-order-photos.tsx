@@ -161,7 +161,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md bg-orange-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-strong disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
           Добавить фото
@@ -177,7 +177,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="w-full h-28 rounded-lg border-2 border-dashed border-border hover:border-orange-400 hover:bg-orange-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground disabled:opacity-50"
+          className="w-full h-28 rounded-lg border-2 border-dashed border-border hover:border-signal/30 hover:bg-signal/10/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground disabled:opacity-50"
         >
           <Camera className="w-6 h-6" />
           <span className="text-sm">Загрузить первое фото</span>

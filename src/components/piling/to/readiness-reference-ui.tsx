@@ -602,7 +602,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
       <div className="min-h-screen w-full min-w-0">
         {props.showInternalNavigation && <header
           aria-label="Разделы модуля технической готовности"
-          className="sticky top-0 z-20 flex h-12 w-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden bg-primary px-2 text-white sm:px-4"
+          className="sticky top-0 z-20 flex h-12 w-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden border-b border-border bg-card px-2 sm:px-4"
         >
           {VIEW_ITEMS.filter((item) => props.bootstrap?.capabilities.screens[item.id] !== false).map((item) => {
             const Icon = item.icon;
@@ -613,8 +613,8 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
                 aria-pressed={props.view === item.id}
                 onClick={() => props.onViewChange(item.id)}
                 className={cn(
-                  'relative inline-flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs font-semibold text-white/70 transition hover:bg-card/10 hover:text-white',
-                  props.view === item.id && 'text-white after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-signal-strong',
+                  'relative inline-flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground',
+                  props.view === item.id && 'font-semibold text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-signal',
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -956,7 +956,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 : buildAuthoritativeReadinessPresentation(itemSnapshot);
               const itemFleet = props.fleetCards.find((cardItem) => cardItem.id === item.id);
               return (
-                <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className="flex w-full gap-3 rounded-lg border border-border p-3 text-left hover:border-orange-300">
+                <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className="flex w-full gap-3 rounded-lg border border-border p-3 text-left hover:border-signal/30">
                   <EquipmentPhoto cardData={itemFleet} name={item.name} className="h-12 w-12 shrink-0" />
                   <div className="min-w-0"><div className="truncate text-xs font-bold">{item.name}</div><div className="mt-1 text-2xs text-muted-foreground">{props.details[item.id]?.crew?.site?.name || 'Объект не назначен'}</div><div className="mt-2 text-2xs font-semibold">{itemPresentation.status === 'READY' ? 'Готово' : itemPresentation.status === 'BLOCKED' ? 'Заблокировано' : 'Не подтверждено'}</div></div>
                 </button>
@@ -1044,7 +1044,7 @@ function FleetScreen(props: ReferenceUiProps) {
               const state = props.readinessByEquipment[item.id];
               const fleet = props.fleetCards.find((entry) => entry.id === item.id);
               return (
-                <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className={cn(card, 'flex min-h-[140px] gap-2 p-2 text-left transition hover:border-orange-300', item.id === props.selectedId && 'border-signal')}>
+                <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className={cn(card, 'flex min-h-[140px] gap-2 p-2 text-left transition hover:border-signal/30', item.id === props.selectedId && 'border-signal')}>
                   <EquipmentPhoto cardData={fleet} name={item.name} className="h-[72px] w-[72px] shrink-0 self-center" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between"><div><h3 className="font-bold">{item.name}</h3><div className="mt-1 text-xs text-muted-foreground">{fleet?.assignedSiteName || 'Объект не назначен'}</div></div><ChevronRight className="h-4 w-4 text-muted-foreground" /></div>
@@ -1198,7 +1198,7 @@ function ShiftsScreen(props: ReferenceUiProps) {
       headers: {
         'content-type': 'application/json',
         'idempotency-key': crypto.randomUUID(),
-        ...(props.bootstrap?.actor.actingAs === 'MECHANIC' ? { 'x-readiness-acting-as': 'MECHANIC' } : {}),
+        ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
       },
       body: JSON.stringify({ equipmentId: props.selectedId, type: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY' }),
     });
@@ -1459,7 +1459,7 @@ function PermitsScreen(props: ReferenceUiProps) {
       headers: {
         'content-type': 'application/json',
         'idempotency-key': crypto.randomUUID(),
-        ...(props.bootstrap?.actor.actingAs === 'MECHANIC' ? { 'x-readiness-acting-as': 'MECHANIC' } : {}),
+        ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
       },
       body: JSON.stringify({ equipmentId: props.selectedId, shiftId: null, risk: props.filters.risk ?? 'NORMAL', scope: commandText.trim(), validFrom: validFrom.toISOString(), validTo: validTo.toISOString() }),
     });
@@ -1479,7 +1479,7 @@ function PermitsScreen(props: ReferenceUiProps) {
         'content-type': 'application/json',
         'idempotency-key': crypto.randomUUID(),
         'if-match': `"work-permit-${permit.id}-v${permit.version}"`,
-        ...(action !== 'approve' && props.bootstrap?.actor.actingAs === 'MECHANIC' ? { 'x-readiness-acting-as': 'MECHANIC' } : {}),
+        ...(action !== 'approve' && props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
       },
       body: JSON.stringify(action === 'revoke'
         ? { expectedVersion: permit.version, reason: commandText.trim() }

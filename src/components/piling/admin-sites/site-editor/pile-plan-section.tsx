@@ -33,7 +33,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 text-xs text-signal-strong hover:text-orange-700 hover:bg-orange-50"
+          className="h-7 text-xs text-signal-strong hover:text-signal-strong hover:bg-signal/10"
           onClick={() => setPlans([...plans, emptyPilePlanRow()])}
         >
           <Plus className="w-3 h-3 mr-1" />
@@ -106,7 +106,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
       )}
 
       {plans.length > 0 && (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-orange-50 rounded-lg text-xs">
+        <div className="flex items-center justify-between px-2 py-1.5 bg-signal/10 rounded-lg text-xs">
           <span className="font-medium text-muted-foreground">Итого</span>
           <div className="flex items-center gap-3">
             <span className="text-foreground">

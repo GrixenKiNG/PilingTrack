@@ -90,7 +90,7 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Отмена</Button>
-          <Button onClick={submit} disabled={saving || !valid} className="bg-orange-500 text-white hover:bg-orange-600">
+          <Button onClick={submit} disabled={saving || !valid} className="bg-signal text-white hover:bg-signal-strong">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Сохранить'}
           </Button>
         </DialogFooter>

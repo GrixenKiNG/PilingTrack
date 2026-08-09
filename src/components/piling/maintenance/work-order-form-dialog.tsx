@@ -357,7 +357,7 @@ export function WorkOrderFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Отмена</Button>
-          <Button onClick={submit} disabled={busy || loading} className="bg-orange-500 hover:bg-orange-600 text-white">
+          <Button onClick={submit} disabled={busy || loading} className="bg-signal hover:bg-signal-strong text-white">
             {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
             {editingId ? 'Сохранить' : 'Создать'}
           </Button>

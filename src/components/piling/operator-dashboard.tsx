@@ -126,7 +126,7 @@ export function OperatorDashboard() {
         type="button"
         onClick={() => openReport()}
         disabled={ctaDisabled}
-        className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-orange-500 bg-card px-6 py-5 text-center shadow-sm transition hover:bg-orange-50/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-border disabled:opacity-60"
+        className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-signal/30 bg-card px-6 py-5 text-center shadow-sm transition hover:bg-signal/10/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-border disabled:opacity-60"
       >
         <PilingIcon name={active ? 'reports' : 'shift-start'} size={126} decorative />
         <span className="mt-1 text-xl font-semibold text-foreground">
@@ -144,7 +144,7 @@ export function OperatorDashboard() {
             type="button"
             onClick={() => openReport(action.target)}
             disabled={ctaDisabled}
-            className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-border bg-card p-3 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
+            className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-border bg-card p-3 shadow-sm transition hover:border-signal/30 hover:bg-signal/10/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
           >
             <PilingIcon name={action.icon} size={82} decorative />
             <span className="mt-1 text-base font-semibold text-foreground">{action.label}</span>

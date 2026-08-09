@@ -75,7 +75,7 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
           <Button
             onClick={submit}
             disabled={submitting || !state.name.trim()}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-signal hover:bg-signal-strong text-white"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Создать'}
           </Button>
@@ -137,7 +137,7 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
           <Button
             onClick={submit}
             disabled={submitting || !state.name.trim()}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-signal hover:bg-signal-strong text-white"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Сохранить'}
           </Button>
