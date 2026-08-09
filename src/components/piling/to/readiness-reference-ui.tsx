@@ -89,6 +89,7 @@ import { readinessFilterQuery, type ReadinessUrlFilters } from './readiness/api/
 import {
   buildAuthoritativeReadinessPresentation,
   buildUnavailableReadinessPresentation,
+  type PresentationEvidence,
   type PresentationStage,
 } from './readiness/authoritative-presentation';
 import { CommandDialog } from './readiness/shared/command-dialog';
@@ -898,7 +899,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               {presentation.evidence.map((evidence) => (
                 <div key={evidence.key} className="rounded-lg border border-border p-3">
                   <div className="text-xs font-semibold">{evidence.label}</div>
-                  <div className="mt-2 break-all text-2xs text-muted-foreground">{evidence.reference}</div>
+                  <div className="mt-2 text-2xs">{evidenceMetric(evidence, presentation.stages, props.bootstrap?.tenant.timezone)}</div>
                   {evidence.links && evidence.links.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                       {evidence.links.map((link) => (
@@ -1883,6 +1884,35 @@ const ROLE_MATRIX: Array<{ permission: string; allowed: [boolean, boolean, boole
   { permission: 'Закрывать дефекты', allowed: [false, false, true, true] },
   { permission: 'Изменять правила', allowed: [false, false, false, true] },
 ];
+
+/**
+ * Что показать в карточке доказательства. `reference` — это внутренний
+ * идентификатор записи; сам по себе он диспетчеру ничего не говорит, поэтому
+ * на видном месте стоит состояние соответствующего критерия, а ссылка ниже
+ * ведёт к самой записи.
+ */
+const EVIDENCE_STAGE: Partial<Record<PresentationEvidence['key'], PresentationStage['key']>> = {
+  inspection: 'INSPECTION',
+  permit: 'PERMIT',
+  maintenance: 'MAINTENANCE',
+};
+
+function evidenceMetric(
+  evidence: PresentationEvidence,
+  stages: readonly PresentationStage[],
+  timezone: string | undefined,
+): string {
+  if (evidence.key === 'evaluation') {
+    return formatDateTimeInTimezone(evidence.reference, timezone);
+  }
+  if (evidence.key === 'equipment') return 'Запись справочника техники';
+  const stageKey = EVIDENCE_STAGE[evidence.key];
+  const stage = stageKey ? stages.find((item) => item.key === stageKey) : undefined;
+  if (!stage) return evidence.reference;
+  return evidence.key === 'maintenance' && evidence.links
+    ? `${stage.value} · записей: ${evidence.links.length}`
+    : stage.value;
+}
 
 /** Ползунок веса: 60% — практический потолок одного критерия. */
 const WEIGHT_SLIDER_MAX = 60;
