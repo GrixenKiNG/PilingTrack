@@ -35,7 +35,7 @@ const REPORT_STATUS_OPTIONS: { value: ReportStatus; label: string }[] = [
 ];
 
 const selectCls =
-  'rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15';
+  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15';
 
 export function EquipmentFilters({
   sites,
@@ -53,8 +53,8 @@ export function EquipmentFilters({
   const set = (patch: Partial<FleetFilterState>) => onChange({ ...value, ...patch });
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-      <span className="text-xs font-medium text-slate-400">Фильтры:</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
+      <span className="text-xs font-medium text-muted-foreground">Фильтры:</span>
 
       <select className={selectCls} value={value.site} onChange={(e) => set({ site: e.target.value })}>
         <option value="">Все объекты</option>

@@ -137,9 +137,9 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4">
+    <div className="bg-card rounded-2xl border border-border p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-bold text-slate-900">Фото отчёта</h3>
+        <h3 className="text-base font-bold text-foreground">Фото отчёта</h3>
         {photo && canEdit && (
           <button
             type="button"
@@ -153,7 +153,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
       </div>
 
       {loading ? (
-        <div className="h-32 flex items-center justify-center text-slate-400">
+        <div className="h-32 flex items-center justify-center text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       ) : photo && thumbUrl ? (
@@ -164,7 +164,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
             width={400}
             height={300}
             unoptimized
-            className="w-full max-h-64 object-contain rounded-lg bg-slate-50"
+            className="w-full max-h-64 object-contain rounded-lg bg-muted"
           />
         </a>
       ) : canEdit ? (
@@ -184,7 +184,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           )}
         </button>
       ) : (
-        <p className="text-sm font-medium text-slate-600 text-center py-6">Фото не прикреплено</p>
+        <p className="text-sm font-medium text-muted-foreground text-center py-6">Фото не прикреплено</p>
       )}
 
       {/* No `capture` — iOS Safari forces camera-only when it's set and the

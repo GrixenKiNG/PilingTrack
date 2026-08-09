@@ -16,7 +16,7 @@ export function YesNoControl({ value, onChange, disabled }: { value: string; onC
       onClick={() => onChange(value === v ? '' : v)}
       className={cn(
         'flex-1 rounded-md border py-1.5 text-sm font-medium transition-colors',
-        value === v ? activeClass : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+        value === v ? activeClass : 'border-border bg-card text-muted-foreground hover:bg-muted',
         'disabled:opacity-50'
       )}
     >
@@ -36,7 +36,7 @@ export function Status4Control({ value, onChange, disabled }: { value: string; o
     { v: 'OK', label: 'Исправно', cls: 'border-emerald-500 bg-emerald-50 text-emerald-700' },
     { v: 'REMARK', label: 'Замечание', cls: 'border-amber-500 bg-amber-50 text-amber-700' },
     { v: 'FAULT', label: 'Неисправно', cls: 'border-rose-500 bg-rose-50 text-rose-700' },
-    { v: 'NA', label: 'Не проверено', cls: 'border-slate-400 bg-slate-100 text-slate-600' },
+    { v: 'NA', label: 'Не проверено', cls: 'border-slate-400 bg-muted text-muted-foreground' },
   ];
   return (
     <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -48,7 +48,7 @@ export function Status4Control({ value, onChange, disabled }: { value: string; o
           onClick={() => onChange(value === v ? '' : v)}
           className={cn(
             'rounded-md border py-1.5 text-xs font-medium transition-colors',
-            value === v ? cls : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+            value === v ? cls : 'border-border bg-card text-muted-foreground hover:bg-muted',
             'disabled:opacity-50'
           )}
         >
@@ -68,9 +68,9 @@ export function DoneControl({ value, onChange, disabled }: { value: string; onCh
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked ? 'DONE' : 'NOT_DONE')}
-        className="h-4 w-4 rounded border-slate-300 accent-orange-500"
+        className="h-4 w-4 rounded border-border accent-orange-500"
       />
-      <span className="text-sm text-slate-700">{checked ? 'Выполнено' : 'Не выполнено'}</span>
+      <span className="text-sm text-foreground">{checked ? 'Выполнено' : 'Не выполнено'}</span>
     </label>
   );
 }
@@ -90,8 +90,8 @@ export function MeasureControl({
         placeholder="Значение"
         className="w-28"
       />
-      {unit && <span className="text-sm text-slate-500">{unit}</span>}
-      {norm && <span className="text-xs text-slate-400">норма: {norm}</span>}
+      {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+      {norm && <span className="text-xs text-muted-foreground">норма: {norm}</span>}
     </div>
   );
 }

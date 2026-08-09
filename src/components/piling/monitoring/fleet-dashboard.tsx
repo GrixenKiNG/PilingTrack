@@ -282,7 +282,7 @@ export function FleetDashboard() {
 }
 
 const selectCls =
-  'rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15';
+  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15';
 
 // ----------------------------------------------------------------------------
 
@@ -298,7 +298,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
         </div>
         <div className="flex flex-col items-end gap-1">
           <div aria-live="polite" className={cn(
-            'rounded-full bg-white/90 px-2.5 py-1 text-3xs uppercase tracking-wide',
+            'rounded-full bg-card/90 px-2.5 py-1 text-3xs uppercase tracking-wide',
             conn === 'live' && 'text-emerald-700',
             conn === 'connecting' && 'text-amber-700',
             conn === 'offline' && 'text-rose-700',

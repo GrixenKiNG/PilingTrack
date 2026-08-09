@@ -101,8 +101,8 @@ export function AdminCrews() {
       width: 'minmax(160px,1.4fr)',
       cell: (c) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-slate-950">{c.name || 'Без названия'}</div>
-          <div className="mt-0.5 flex items-center gap-1.5 truncate text-2xs text-slate-400">
+          <div className="truncate font-medium text-foreground">{c.name || 'Без названия'}</div>
+          <div className="mt-0.5 flex items-center gap-1.5 truncate text-2xs text-muted-foreground">
             <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{c.site?.name ?? '—'}</span>
           </div>
         </div>
@@ -114,8 +114,8 @@ export function AdminCrews() {
       width: 'minmax(140px,1fr)',
       cell: (c) => (
         <div className="min-w-0">
-          <div className="truncate text-slate-800">{c.operator?.name ?? '—'}</div>
-          <div className="mt-0.5 text-2xs text-slate-400">{c.assistants.length} {pluralizeRu(c.assistants.length, ['помощник', 'помощника', 'помощников'])}</div>
+          <div className="truncate text-foreground">{c.operator?.name ?? '—'}</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground">{c.assistants.length} {pluralizeRu(c.assistants.length, ['помощник', 'помощника', 'помощников'])}</div>
         </div>
       ),
     },
@@ -124,8 +124,8 @@ export function AdminCrews() {
       header: 'Установка',
       width: 'minmax(130px,1fr)',
       cell: (c) => (
-        <div className="flex items-center gap-1.5 truncate text-slate-700">
-          <Wrench className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate">{c.equipment?.name ?? '—'}</span>
+        <div className="flex items-center gap-1.5 truncate text-foreground">
+          <Wrench className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{c.equipment?.name ?? '—'}</span>
         </div>
       ),
     },
@@ -265,19 +265,19 @@ function CrewDetail({ crew, onEdit, onDelete, onToggle }: { crew: Crew; onEdit: 
         <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-red-600 hover:bg-red-50"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
       </div>
 
-      <div className="grid grid-cols-2 divide-x rounded-md border border-slate-200 bg-slate-50">
+      <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
         <OpsFact label="Оператор" value={crew.operator?.name ?? '—'} />
         <OpsFact label="Помощники" value={String(crew.assistants.length)} />
       </div>
-      <div className="grid grid-cols-2 divide-x rounded-md border border-slate-200">
+      <div className="grid grid-cols-2 divide-x rounded-md border border-border">
         <OpsFact label="Установка" value={crew.equipment?.name ?? '—'} />
         <OpsFact label="Объект" value={crew.site?.name ?? '—'} />
       </div>
 
       {crew.assistants.length > 0 && (
-        <div className="rounded-md border border-slate-200 p-2.5">
-          <h3 className="mb-1 text-xs font-semibold text-slate-900">Состав</h3>
-          <p className="text-2xs text-slate-600">{crew.assistants.map((a) => a.name).join(', ')}</p>
+        <div className="rounded-md border border-border p-2.5">
+          <h3 className="mb-1 text-xs font-semibold text-foreground">Состав</h3>
+          <p className="text-2xs text-muted-foreground">{crew.assistants.map((a) => a.name).join(', ')}</p>
         </div>
       )}
 

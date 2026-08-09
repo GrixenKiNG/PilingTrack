@@ -51,7 +51,7 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
 
       <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
         {/* Схема */}
-        <div className="rounded-md border border-amber-100 bg-white p-2">
+        <div className="rounded-md border border-amber-100 bg-card p-2">
           <svg viewBox="0 0 200 240" className="h-56 w-full select-none">
             <CrawlerRig />
             {map.points.map((p) => {
@@ -85,19 +85,19 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
         {/* Список + деталь активной точки */}
         <div className="min-w-0">
           {active && (
-            <div className="mb-2 rounded-md border border-amber-200 bg-white p-2.5">
+            <div className="mb-2 rounded-md border border-amber-200 bg-card p-2.5">
               <div className="flex items-center gap-2">
                 <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-orange-500 text-2xs font-bold text-white">{active.n}</span>
-                <span className="text-sm font-semibold text-slate-800">{active.label}</span>
+                <span className="text-sm font-semibold text-foreground">{active.label}</span>
               </div>
-              <dl className="mt-1.5 space-y-0.5 text-xs text-slate-600">
-                <div><dt className="inline text-slate-400">Чем: </dt><dd className="inline font-medium text-teal-700">{active.lubricant}</dd></div>
-                <div><dt className="inline text-slate-400">Как: </dt><dd className="inline">{active.method}</dd></div>
-                <div><dt className="inline text-slate-400">Когда: </dt><dd className="inline font-medium text-slate-800">{active.interval}</dd></div>
+              <dl className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                <div><dt className="inline text-muted-foreground">Чем: </dt><dd className="inline font-medium text-teal-700">{active.lubricant}</dd></div>
+                <div><dt className="inline text-muted-foreground">Как: </dt><dd className="inline">{active.method}</dd></div>
+                <div><dt className="inline text-muted-foreground">Когда: </dt><dd className="inline font-medium text-foreground">{active.interval}</dd></div>
               </dl>
             </div>
           )}
-          <div className="max-h-44 overflow-y-auto rounded-md border border-slate-100 bg-white">
+          <div className="max-h-44 overflow-y-auto rounded-md border border-border bg-card">
             {map.points.map((p) => (
               <button
                 key={p.n}
@@ -105,19 +105,19 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
                 onClick={() => setSel(p.n)}
                 className={cn(
                   'flex w-full items-center gap-2 border-b border-slate-50 px-2 py-1.5 text-left text-xs last:border-0',
-                  p.n === sel ? 'bg-amber-50' : 'hover:bg-slate-50',
+                  p.n === sel ? 'bg-amber-50' : 'hover:bg-muted',
                 )}
               >
                 <span className={cn('grid h-4 w-4 shrink-0 place-items-center rounded-full text-2xs leading-none font-bold text-white',
                   p.n === sel ? 'bg-orange-500' : 'bg-amber-400')}>{p.n}</span>
-                <span className="flex-1 truncate text-slate-700">{p.label}</span>
-                <span className="shrink-0 text-2xs text-slate-400">{p.interval}</span>
+                <span className="flex-1 truncate text-foreground">{p.label}</span>
+                <span className="shrink-0 text-2xs text-muted-foreground">{p.interval}</span>
               </button>
             ))}
           </div>
         </div>
       </div>
-      <p className="mt-2 text-2xs text-slate-400">Тап по точке на схеме или в списке — подробности. Данные из таблицы смазки руководства.</p>
+      <p className="mt-2 text-2xs text-muted-foreground">Тап по точке на схеме или в списке — подробности. Данные из таблицы смазки руководства.</p>
     </div>
   );
 }

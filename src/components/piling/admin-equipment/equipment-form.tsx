@@ -295,7 +295,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function ActiveToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-slate-50 p-3">
+    <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-muted p-3">
       <Label className="text-sm">Активна</Label>
       <button
         type="button"
@@ -306,7 +306,7 @@ function ActiveToggle({ value, onChange }: { value: boolean; onChange: (v: boole
         )}
       >
         <span className={cn(
-          'absolute top-1 w-4 h-4 rounded-full bg-white transition-transform',
+          'absolute top-1 w-4 h-4 rounded-full bg-card transition-transform',
           value ? 'translate-x-5' : 'translate-x-1',
         )} />
       </button>

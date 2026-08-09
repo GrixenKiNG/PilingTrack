@@ -16,13 +16,13 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-500 text-white mb-4 shadow-lg shadow-red-500/25">
           <HardHat className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
+        <h1 className="text-2xl font-bold text-foreground tracking-tight mb-2">
           Произошла ошибка
         </h1>
-        <p className="text-sm text-slate-500 mb-6">
+        <p className="text-sm text-muted-foreground mb-6">
           Приложение столкнулось с непредвиденной ошибкой. Попробуйте обновить страницу.
         </p>
-        <details className="text-left bg-white rounded-lg p-4 mb-6 text-xs font-mono text-slate-600 max-h-40 overflow-auto">
+        <details className="text-left bg-card rounded-lg p-4 mb-6 text-xs font-mono text-muted-foreground max-h-40 overflow-auto">
           {(error as Error).message}
         </details>
         <div className="flex gap-3 justify-center">
@@ -35,7 +35,7 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
           </button>
           <button
             onClick={handleReload}
-            className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
+            className="px-4 py-2 rounded-lg bg-slate-200 text-foreground hover:bg-slate-300 transition-colors"
           >
             Обновить страницу
           </button>

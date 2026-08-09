@@ -127,17 +127,17 @@ export function EquipmentAnalytics() {
   };
 
   // Тач-таргеты ≥40px на мобильном, компактно на десктопе.
-  const chip = 'min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 sm:min-h-0 sm:py-1 sm:text-xs';
-  const dateInput = 'min-h-10 rounded-md border border-slate-200 bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
+  const chip = 'min-h-10 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
+  const dateInput = 'min-h-10 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
 
   return (
     <div className="space-y-5 p-4 lg:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
             <Gauge className="h-5 w-5 text-teal-600" /> Аналитика по установкам
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Выработка, утилизация, простои и обслуживание парка за период</p>
+          <p className="mt-1 text-sm text-muted-foreground">Выработка, утилизация, простои и обслуживание парка за период</p>
         </div>
         <Button variant="outline" onClick={() => window.print()}>
           <Printer className="mr-1.5 h-4 w-4" /> Печать
@@ -147,11 +147,11 @@ export function EquipmentAnalytics() {
       {/* Period */}
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="block text-2xs uppercase tracking-wide text-slate-400">С</span>
+          <span className="block text-2xs uppercase tracking-wide text-muted-foreground">С</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={dateInput} />
         </label>
         <label className="text-sm">
-          <span className="block text-2xs uppercase tracking-wide text-slate-400">По</span>
+          <span className="block text-2xs uppercase tracking-wide text-muted-foreground">По</span>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={dateInput} />
         </label>
         <div className="flex gap-1">
@@ -221,7 +221,7 @@ function FleetTh({
   const { k, label, right } = column;
   return (
     <th className={cn('px-3 py-2', right ? 'text-right' : 'text-left')}>
-      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex min-h-[44px] items-center gap-1 hover:text-slate-700', sortKey === k && 'text-slate-900')}>
+      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex min-h-[44px] items-center gap-1 hover:text-foreground', sortKey === k && 'text-foreground')}>
         {label}
         <ArrowUpDown className="h-3 w-3 opacity-50" />
         {sortKey === k && <span className="text-3xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
@@ -241,18 +241,18 @@ function FleetTable({
   onOpen: (id: string) => void;
 }) {
   if (rows.length === 0) {
-    return <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">Нет установок за выбранный период.</p>;
+    return <p className="rounded-lg bg-muted px-3 py-4 text-center text-sm text-muted-foreground">Нет установок за выбранный период.</p>;
   }
   return (
     <>
       {/* Мобильный: карточки + сортировка (таблица из 8 колонок не помещается) */}
       <div className="md:hidden">
-        <label className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+        <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
           Сортировка:
           <select
             value={sortKey}
             onChange={(e) => onSort(e.target.value as SortKey)}
-            className="min-h-10 flex-1 rounded-md border border-slate-200 bg-card px-2 py-2 text-sm text-slate-700"
+            className="min-h-10 flex-1 rounded-md border border-border bg-card px-2 py-2 text-sm text-foreground"
           >
             {FLEET_COLUMNS.map((c) => (
               <option key={c.k} value={c.k}>{c.label}{sortKey === c.k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</option>
@@ -265,12 +265,12 @@ function FleetTable({
               key={r.equipmentId}
               type="button"
               onClick={() => onOpen(r.equipmentId)}
-              className="block w-full rounded-lg border bg-card p-3 text-left active:bg-slate-50"
+              className="block w-full rounded-lg border bg-card p-3 text-left active:bg-muted"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-medium text-slate-900">{r.name}</div>
-                  <div className="text-2xs text-slate-400">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
+                  <div className="font-medium text-foreground">{r.name}</div>
+                  <div className="text-2xs text-muted-foreground">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
                 </div>
                 {r.maintenanceDue && (
                   <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">ТО скоро</span>
@@ -292,7 +292,7 @@ function FleetTable({
       {/* Десктоп: полная таблица */}
       <div className="hidden overflow-x-auto rounded-lg border md:block">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-muted text-xs uppercase text-muted-foreground">
           <tr>
             {FLEET_COLUMNS.map((column) => (
               <FleetTh key={column.k} column={column} sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
@@ -306,7 +306,7 @@ function FleetTable({
               key={r.equipmentId}
               role="button"
               tabIndex={0}
-              className="cursor-pointer border-t hover:bg-slate-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="cursor-pointer border-t hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               onClick={() => onOpen(r.equipmentId)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -316,22 +316,22 @@ function FleetTable({
               }}
             >
               <td className="px-3 py-2">
-                <div className="font-medium text-slate-900">{r.name}</div>
-                <div className="text-2xs text-slate-400">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
+                <div className="font-medium text-foreground">{r.name}</div>
+                <div className="text-2xs text-muted-foreground">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
               </td>
-              <td className="px-3 py-2 text-right font-mono">{fmt(r.piles)}<span className="text-2xs text-slate-400"> / {fmt(r.pileMeters)} м</span></td>
-              <td className="px-3 py-2 text-right font-mono">{fmt(r.drillingCount)}<span className="text-2xs text-slate-400"> / {fmt(r.drillingMeters)} м</span></td>
+              <td className="px-3 py-2 text-right font-mono">{fmt(r.piles)}<span className="text-2xs text-muted-foreground"> / {fmt(r.pileMeters)} м</span></td>
+              <td className="px-3 py-2 text-right font-mono">{fmt(r.drillingCount)}<span className="text-2xs text-muted-foreground"> / {fmt(r.drillingMeters)} м</span></td>
               <td className="px-3 py-2 text-right font-mono">{r.reportCount}</td>
               <td className="px-3 py-2 text-right font-mono">
                 {Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%
-                <span className="text-2xs text-slate-400"> ({r.activeDays}/{periodDays} дн)</span>
+                <span className="text-2xs text-muted-foreground"> ({r.activeDays}/{periodDays} дн)</span>
               </td>
               <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeHours)}</td>
               <td className="px-3 py-2 text-right font-mono">{r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'}</td>
               <td className="px-3 py-2 text-right">
                 {r.maintenanceDue
                   ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">скоро</span>
-                  : <span className="text-2xs text-slate-300">—</span>}
+                  : <span className="text-2xs text-muted-foreground">—</span>}
               </td>
             </tr>
           ))}
@@ -345,10 +345,10 @@ function FleetTable({
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-2xs uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="font-mono tabular-nums text-slate-900">
+      <dt className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="font-mono tabular-nums text-foreground">
         {value}
-        {sub && <span className="text-2xs font-sans text-slate-400"> / {sub}</span>}
+        {sub && <span className="text-2xs font-sans text-muted-foreground"> / {sub}</span>}
       </dd>
     </div>
   );
@@ -358,23 +358,23 @@ function DowntimePareto({ rows }: { rows: AnalyticsResult['downtimePareto'] }) {
   if (rows.length === 0) {
     return (
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-700">Простои по причинам</h2>
-        <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Простоев за период нет.</p>
+        <h2 className="mb-2 text-sm font-semibold text-foreground">Простои по причинам</h2>
+        <p className="rounded-lg bg-muted px-3 py-3 text-sm text-muted-foreground">Простоев за период нет.</p>
       </div>
     );
   }
   const max = Math.max(...rows.map((r) => r.hours), 1);
   return (
     <div>
-      <h2 className="mb-2 text-sm font-semibold text-slate-700">Простои по причинам</h2>
+      <h2 className="mb-2 text-sm font-semibold text-foreground">Простои по причинам</h2>
       <div className="space-y-2 rounded-lg border p-3">
         {rows.map((r) => (
           <div key={r.reasonId}>
             <div className="mb-0.5 flex items-baseline justify-between gap-2 text-sm">
-              <span className="truncate text-slate-700">{r.reasonName}</span>
-              <span className="font-mono text-xs text-slate-500">{fmtHours(r.hours)} · {r.pct}%</span>
+              <span className="truncate text-foreground">{r.reasonName}</span>
+              <span className="font-mono text-xs text-muted-foreground">{fmtHours(r.hours)} · {r.pct}%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded bg-slate-100">
+            <div className="h-2 overflow-hidden rounded bg-muted">
               <div className="h-full rounded bg-amber-400" style={{ width: `${(r.hours / max) * 100}%` }} />
             </div>
           </div>

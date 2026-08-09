@@ -115,9 +115,9 @@ export function AdminUsers() {
       width: 'minmax(155px,1.35fr)',
       cell: (user) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-slate-950">{user.name}</div>
-          <div className="mt-0.5 truncate text-2xs text-slate-400">{user.email}</div>
-          {user.phone && <div className="truncate text-3xs text-slate-400">{user.phone}</div>}
+          <div className="truncate font-medium text-foreground">{user.name}</div>
+          <div className="mt-0.5 truncate text-2xs text-muted-foreground">{user.email}</div>
+          {user.phone && <div className="truncate text-3xs text-muted-foreground">{user.phone}</div>}
         </div>
       ),
     },
@@ -125,7 +125,7 @@ export function AdminUsers() {
       key: 'role',
       header: 'Роль',
       width: '100px',
-      cell: (user) => <span className="text-xs text-slate-700">{ROLE_LABELS[user.role]}</span>,
+      cell: (user) => <span className="text-xs text-foreground">{ROLE_LABELS[user.role]}</span>,
     },
     {
       key: 'site',
@@ -133,9 +133,9 @@ export function AdminUsers() {
       width: 'minmax(105px,0.9fr)',
       cell: (user) => user.assignedSites.length > 0 ? (
         <div className="min-w-0">
-          <div className="truncate text-xs font-medium text-slate-800">{user.assignedSites[0]?.name}</div>
+          <div className="truncate text-xs font-medium text-foreground">{user.assignedSites[0]?.name}</div>
           {user.assignedSites.length > 1 && (
-            <div className="text-3xs text-slate-400">+ ещё {user.assignedSites.length - 1}</div>
+            <div className="text-3xs text-muted-foreground">+ ещё {user.assignedSites.length - 1}</div>
           )}
         </div>
       ) : <span className="text-2xs text-amber-600">Не назначен</span>,
@@ -146,8 +146,8 @@ export function AdminUsers() {
       width: 'minmax(130px,1.1fr)',
       cell: (user) => user.activeCrew ? (
         <div className="min-w-0">
-          <div className="truncate text-xs font-medium text-slate-800">{user.activeCrew.name || 'Экипаж'}</div>
-          <div className="truncate text-3xs text-slate-400">{user.activeCrew.equipmentName || 'Без установки'}</div>
+          <div className="truncate text-xs font-medium text-foreground">{user.activeCrew.name || 'Экипаж'}</div>
+          <div className="truncate text-3xs text-muted-foreground">{user.activeCrew.equipmentName || 'Без установки'}</div>
         </div>
       ) : <span className="text-2xs text-amber-600">Не назначена</span>,
     },
@@ -159,8 +159,8 @@ export function AdminUsers() {
         const activity = formatActivity(user);
         return (
           <div>
-            <div className="text-2xs font-medium text-slate-700">{activity.value}</div>
-            <div className="text-3xs text-slate-400">{activity.source}</div>
+            <div className="text-2xs font-medium text-foreground">{activity.value}</div>
+            <div className="text-3xs text-muted-foreground">{activity.source}</div>
           </div>
         );
       },
@@ -191,8 +191,8 @@ export function AdminUsers() {
       <div className="grid min-h-72 place-items-center p-6 text-center">
         <div>
           <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
-          <p className="text-sm font-semibold text-slate-900">Не удалось загрузить пользователей</p>
-          <p className="mt-1 text-xs text-slate-500">{error}</p>
+          <p className="text-sm font-semibold text-foreground">Не удалось загрузить пользователей</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error}</p>
           <Button variant="outline" onClick={retry} className="mt-4">
             <RefreshCw className="h-4 w-4" /> Повторить
           </Button>
@@ -236,7 +236,7 @@ export function AdminUsers() {
           onSelect={setQuick}
           extra={(
             <label className="relative block w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}

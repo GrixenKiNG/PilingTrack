@@ -202,11 +202,11 @@ export function AdminTelegram() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Send className="w-5 h-5 text-orange-500" />
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Send className="w-5 h-5 text-signal-strong" />
             Telegram
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Настройка уведомлений в Telegram
           </p>
         </div>
@@ -222,9 +222,9 @@ export function AdminTelegram() {
       {/* Configs List */}
       {configs.length === 0 ? (
         <div className="text-center py-16">
-          <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Нет конфигураций Telegram</p>
-          <p className="text-xs text-slate-400 mt-1">
+          <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Нет конфигураций Telegram</p>
+          <p className="text-xs text-muted-foreground mt-1">
             Добавьте конфигурацию для получения уведомлений
           </p>
         </div>
@@ -246,19 +246,19 @@ export function AdminTelegram() {
                           'w-10 h-10 rounded-xl flex items-center justify-center',
                           config.enabled
                             ? 'bg-sky-100 text-sky-600'
-                            : 'bg-slate-100 text-slate-400'
+                            : 'bg-muted text-muted-foreground'
                         )}
                       >
                         <Bot className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {config.label}
                         </p>
-                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">
                           Chat ID: {config.chatId}
                         </p>
-                        <p className="text-3xs text-slate-400 font-mono">
+                        <p className="text-3xs text-muted-foreground font-mono">
                           Token: ••••{config.botToken.slice(-6)}
                         </p>
                       </div>
@@ -269,7 +269,7 @@ export function AdminTelegram() {
                         className={
                           config.enabled
                             ? 'bg-green-100 text-green-700 border-green-200'
-                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                            : 'bg-muted text-muted-foreground border-border'
                         }
                       >
                         {config.enabled ? 'Включено' : 'Выключено'}
@@ -280,7 +280,7 @@ export function AdminTelegram() {
                     <button
                       onClick={handleTest}
                       disabled={testing || !config.enabled}
-                      className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-sky-50 disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-sky-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-sky-50 disabled:opacity-50"
                     >
                       {testing ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -291,7 +291,7 @@ export function AdminTelegram() {
                     </button>
                     <button
                       onClick={() => openEdit(config)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       Редактировать
@@ -299,7 +299,7 @@ export function AdminTelegram() {
                     <button
                       onClick={() => handleToggle(config)}
                       disabled={togglingId === config.id}
-                      className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-orange-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-signal-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-50"
                     >
                       {togglingId === config.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -312,7 +312,7 @@ export function AdminTelegram() {
                     </button>
                     <button
                       onClick={() => handleDelete(config.id)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Удалить

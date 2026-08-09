@@ -181,12 +181,12 @@ export function AdminSites() {
       cell: (r) => (
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-medium text-slate-950">{r.siteName}</span>
+            <span className="truncate font-medium text-foreground">{r.siteName}</span>
             {r.completionDate ? (
               <span className="shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-2xs font-medium text-green-700">Выполнен</span>
             ) : null}
           </div>
-          <div className="mt-0.5 truncate text-2xs text-slate-400">
+          <div className="mt-0.5 truncate text-2xs text-muted-foreground">
             {r.crewCount} {pluralizeRu(r.crewCount, ['бригада', 'бригады', 'бригад'])}
             {r.rigNames.length > 0 ? ` · ${r.rigNames.join(', ')}` : ''}
           </div>
@@ -199,15 +199,15 @@ export function AdminSites() {
       width: 'minmax(120px,1fr)',
       cell: (r) => (
         <div className="min-w-0">
-          <span className="font-mono text-sm font-semibold tabular-nums text-slate-900">{formatNumber(r.actualPiles)}</span>
-          <span className="text-2xs text-slate-400"> / {formatNumber(r.plannedPiles)}</span>
+          <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{formatNumber(r.actualPiles)}</span>
+          <span className="text-2xs text-muted-foreground"> / {formatNumber(r.plannedPiles)}</span>
           <ProgressBar pct={r.pileProgress} tone="orange" />
         </div>
       ),
     },
-    { key: 'progress', header: 'Прогресс', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm font-semibold tabular-nums text-slate-700">{r.plannedPiles > 0 ? pct(r.pileProgress) : '—'}</span> },
-    { key: 'reports', header: 'Отчёты', width: '80px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-slate-700">{r.totalReports}</span> },
-    { key: 'downtime', header: 'Простой', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-slate-700">{r.totalDowntime > 0 ? `${formatNumber(r.totalDowntime)} ч` : '—'}</span> },
+    { key: 'progress', header: 'Прогресс', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{r.plannedPiles > 0 ? pct(r.pileProgress) : '—'}</span> },
+    { key: 'reports', header: 'Отчёты', width: '80px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-foreground">{r.totalReports}</span> },
+    { key: 'downtime', header: 'Простой', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-foreground">{r.totalDowntime > 0 ? `${formatNumber(r.totalDowntime)} ч` : '—'}</span> },
     {
       key: 'status',
       header: 'Статус',
@@ -246,7 +246,7 @@ export function AdminSites() {
 
   if (error) {
     return (
-      <div className="min-h-full bg-slate-50/60 p-4 lg:p-6">
+      <div className="min-h-full bg-muted/60 p-4 lg:p-6">
         <div className="space-y-4">
           {header}
           <QueryErrorBanner title="Не удалось загрузить объекты" message={error} onRetry={reload} />
@@ -378,27 +378,27 @@ function SiteDetail({
         <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-red-600 hover:bg-red-50"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
       </div>
 
-      <div className="grid grid-cols-2 divide-x rounded-md border border-slate-200 bg-slate-50">
+      <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
         <OpsFact label="Сваи план" value={`${formatNumber(row.plannedPiles)} шт.`} sub={`${formatNumber(row.plannedPileMeters)} м.п.`} />
         <OpsFact label="Сваи факт" value={`${formatNumber(row.actualPiles)} шт.`} sub={`${formatNumber(row.actualPileMeters)} м.п.`} />
       </div>
-      <div className="grid grid-cols-3 divide-x rounded-md border border-slate-200">
+      <div className="grid grid-cols-3 divide-x rounded-md border border-border">
         <OpsFact label="Бурение план" value={formatNumber(row.plannedDrilling)} sub="м" />
         <OpsFact label="Бурение факт" value={formatNumber(row.actualDrilling)} sub="м" />
         <OpsFact label="Простой" value={row.totalDowntime > 0 ? `${formatNumber(row.totalDowntime)} ч` : '—'} />
       </div>
 
-      <div className="rounded-md border border-slate-200 p-2.5">
-        <h3 className="mb-1.5 text-xs font-semibold text-slate-900">Прогресс</h3>
+      <div className="rounded-md border border-border p-2.5">
+        <h3 className="mb-1.5 text-xs font-semibold text-foreground">Прогресс</h3>
         <LabeledProgress label="Сваи" pct={row.pileProgress} planned={row.plannedPiles} tone="orange" />
         <LabeledProgress label="Бурение" pct={row.drillingProgress} planned={row.plannedDrilling} tone="blue" />
       </div>
 
-      <div className="rounded-md border border-slate-200 p-2.5">
-        <h3 className="mb-1.5 text-xs font-semibold text-slate-900">Иерархия</h3>
+      <div className="rounded-md border border-border p-2.5">
+        <h3 className="mb-1.5 text-xs font-semibold text-foreground">Иерархия</h3>
         {tree
           ? <HierarchyTree siteId={row.siteId} tree={tree} onAdd={onAddHierarchy} onDelete={onDeleteHierarchy} />
-          : <p className="text-2xs text-slate-400">Загрузка структуры…</p>}
+          : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}
       </div>
 
       <OpsHistoryList entries={history.entries} loading={history.loading} error={history.error} title="История изменений" />
@@ -408,7 +408,7 @@ function SiteDetail({
 
 function ProgressBar({ pct: value, tone }: { pct: number; tone: 'orange' | 'blue' }) {
   return (
-    <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
+    <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
       <div className={tone === 'orange' ? 'h-full rounded-full bg-orange-500' : 'h-full rounded-full bg-blue-500'} style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
     </div>
   );
@@ -420,8 +420,8 @@ function LabeledProgress({ label, pct: value, planned, tone }: { label: string; 
   return (
     <div className="mb-1.5 last:mb-0">
       <div className="mb-0.5 flex items-center justify-between text-2xs">
-        <span className="text-slate-600">{label}</span>
-        <span className="font-mono text-slate-500">{noPlan ? 'план не задан' : pct(value)}</span>
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono text-muted-foreground">{noPlan ? 'план не задан' : pct(value)}</span>
       </div>
       <ProgressBar pct={noPlan ? 0 : value} tone={tone} />
     </div>

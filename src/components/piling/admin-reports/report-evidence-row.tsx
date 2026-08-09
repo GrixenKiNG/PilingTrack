@@ -44,22 +44,22 @@ export function ReportsHeader({
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-950">
-            <FileText className="h-5 w-5 text-orange-500" />
+          <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
+            <FileText className="h-5 w-5 text-signal-strong" />
             Отчёты
           </h1>
-          <Badge variant="outline" className="border-slate-300 bg-white font-mono text-3xs text-slate-500">
+          <Badge variant="outline" className="border-border bg-card font-mono text-3xs text-muted-foreground">
             {reportWord}
           </Badge>
         </div>
-        <p className="mt-1 text-sm text-slate-500">Журнал смен, работ, простоев и подтверждений</p>
+        <p className="mt-1 text-sm text-muted-foreground">Журнал смен, работ, простоев и подтверждений</p>
       </div>
 
       <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         <Button
           onClick={onPrint}
           variant="outline"
-          className="h-10 border-slate-300 bg-white text-slate-700"
+          className="h-10 border-border bg-card text-foreground"
         >
           <Printer className="mr-1.5 h-4 w-4" />
           Печать
@@ -125,29 +125,29 @@ export function EvidenceReportRow({
       )}
     >
       <div className="flex items-center justify-between gap-3 lg:block">
-        <div className="font-mono text-sm font-semibold tabular-nums text-slate-900">{shortDate(report.date)}</div>
-        <div className="mt-0.5 text-2xs text-slate-400">{shiftLabel(report)}</div>
+        <div className="font-mono text-sm font-semibold tabular-nums text-foreground">{shortDate(report.date)}</div>
+        <div className="mt-0.5 text-2xs text-muted-foreground">{shiftLabel(report)}</div>
       </div>
 
       <div className="min-w-0">
-        <div className="truncate font-medium text-slate-950">{report.site?.name || 'Объект не указан'}</div>
-        <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-slate-500">
-          <Wrench className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <div className="truncate font-medium text-foreground">{report.site?.name || 'Объект не указан'}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+          <Wrench className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate">{report.equipment?.name || 'Установка не указана'}</span>
         </div>
       </div>
 
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 truncate">
-          <UserRound className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="truncate font-medium text-slate-800">{report.user?.name || 'Неизвестный'}</span>
+          <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium text-foreground">{report.user?.name || 'Неизвестный'}</span>
         </div>
-        <div className="mt-0.5 truncate text-2xs text-slate-400">{formatLastEditor(report)}</div>
+        <div className="mt-0.5 truncate text-2xs text-muted-foreground">{formatLastEditor(report)}</div>
         <span className={cn(
           'mt-0.5 inline-block rounded px-1.5 py-0.5 text-xs font-medium',
           report.status === 'submitted'
             ? 'bg-emerald-50 text-emerald-700'
-            : 'bg-slate-100 text-slate-700',
+            : 'bg-muted text-foreground',
         )}>{statusLabel(report.status)}</span>
       </div>
 
@@ -175,9 +175,9 @@ function MetricCell({ value, sub, tone }: { value: string; sub: string; tone: 'o
         tone === 'orange' && 'text-orange-700',
         tone === 'blue' && 'text-blue-700',
         tone === 'amber' && 'text-amber-700',
-        tone === 'slate' && 'text-slate-700',
+        tone === 'slate' && 'text-foreground',
       )}>{value}</span>
-      <span className="text-2xs text-slate-400 lg:mt-0.5 lg:block">{sub}</span>
+      <span className="text-2xs text-muted-foreground lg:mt-0.5 lg:block">{sub}</span>
     </div>
   );
 }
@@ -206,7 +206,7 @@ function IconButton({
       title={label}
       aria-label={label}
       className={cn(
-        'grid h-11 w-11 place-items-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50',
+        'grid h-11 w-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50',
         danger && 'hover:bg-red-50 hover:text-red-500',
       )}
     >

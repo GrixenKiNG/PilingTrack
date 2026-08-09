@@ -23,19 +23,19 @@ export function OpsDetailPanel({
   children: ReactNode;
 }) {
   return (
-    <aside className="self-start rounded-lg border border-slate-200 bg-white shadow-sm xl:sticky xl:top-4">
-      <div className="border-b border-slate-200 bg-white p-3">
+    <aside className="self-start rounded-lg border border-border bg-card shadow-sm xl:sticky xl:top-4">
+      <div className="border-b border-border bg-card p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-slate-950">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-2xs text-slate-500">{subtitle}</p>}
+            <h2 className="truncate text-base font-semibold text-foreground">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-2xs text-muted-foreground">{subtitle}</p>}
             {status && <div className="mt-1">{status}</div>}
           </div>
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Закрыть панель"
               title="Закрыть"
             >
@@ -52,7 +52,7 @@ export function OpsDetailPanel({
 /** Placeholder shown in the right column when nothing is selected. */
 export function OpsDetailEmpty({ message }: { message: string }) {
   return (
-    <aside className="min-h-56 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500 shadow-sm xl:sticky xl:top-4">
+    <aside className="min-h-56 rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground shadow-sm xl:sticky xl:top-4">
       {message}
     </aside>
   );
@@ -62,9 +62,9 @@ export function OpsDetailEmpty({ message }: { message: string }) {
 export function OpsFact({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
   return (
     <div className="min-w-0 p-2">
-      <p className="mb-0.5 text-3xs uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="truncate text-xs font-semibold text-slate-900">{value}</div>
-      {sub && <p className="mt-0.5 truncate text-3xs text-slate-400">{sub}</p>}
+      <p className="mb-0.5 text-3xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="truncate text-xs font-semibold text-foreground">{value}</div>
+      {sub && <p className="mt-0.5 truncate text-3xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
@@ -96,33 +96,33 @@ export function OpsHistoryList({
 }) {
   return (
     <div>
-      <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-900">
-        <Icon className="h-4 w-4 text-slate-400" />
+      <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
+        <Icon className="h-4 w-4 text-muted-foreground" />
         {title}
       </h3>
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-border">
         {loading ? (
-          <div className="px-2.5 py-3 text-2xs text-slate-400">Загрузка истории…</div>
+          <div className="px-2.5 py-3 text-2xs text-muted-foreground">Загрузка истории…</div>
         ) : error ? (
           <div className="px-2.5 py-3 text-2xs text-red-500">Не удалось загрузить историю</div>
         ) : !entries || entries.length === 0 ? (
-          <div className="px-2.5 py-3 text-2xs text-slate-400">Событий пока нет</div>
+          <div className="px-2.5 py-3 text-2xs text-muted-foreground">Событий пока нет</div>
         ) : (
           entries.map((entry) => (
-            <div key={entry.id} className="border-b border-slate-100 px-2.5 py-2 last:border-b-0">
+            <div key={entry.id} className="border-b border-border px-2.5 py-2 last:border-b-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-slate-700">{entry.title}</span>
-                <span className="text-3xs text-slate-400">{entry.at}</span>
+                <span className="text-xs font-medium text-foreground">{entry.title}</span>
+                <span className="text-3xs text-muted-foreground">{entry.at}</span>
               </div>
-              {entry.meta && <p className="mt-0.5 text-2xs text-slate-500">{entry.meta}</p>}
+              {entry.meta && <p className="mt-0.5 text-2xs text-muted-foreground">{entry.meta}</p>}
               {entry.changes && entry.changes.length > 0 && (
                 <ul className="mt-1 space-y-0.5">
                   {entry.changes.map((change, i) => (
-                    <li key={i} className="text-2xs text-slate-600">
-                      <span className="text-slate-400">{change.label}:</span>{' '}
+                    <li key={i} className="text-2xs text-muted-foreground">
+                      <span className="text-muted-foreground">{change.label}:</span>{' '}
                       <span className="line-through decoration-slate-300">{change.before}</span>
                       {' → '}
-                      <span className="font-medium text-slate-800">{change.after}</span>
+                      <span className="font-medium text-foreground">{change.after}</span>
                     </li>
                   ))}
                 </ul>

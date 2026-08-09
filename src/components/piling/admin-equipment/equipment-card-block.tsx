@@ -20,7 +20,7 @@ import type { FleetCard } from './fleet-types';
 
 function BrandLogoBlock({ card }: { card: FleetCard }) {
   const brand = getEquipmentBrand(card.model);
-  if (!brand) return <span className="text-xs text-slate-400">{card.model || '—'}</span>;
+  if (!brand) return <span className="text-xs text-muted-foreground">{card.model || '—'}</span>;
   return (
     <div
       className={cn('flex max-h-full items-center justify-center', brand.logoBg && 'rounded-xl px-4 py-3')}
@@ -41,7 +41,7 @@ function BrandLogoBlock({ card }: { card: FleetCard }) {
 }
 
 function QuickLinksBlock({ card }: { card: FleetCard }) {
-  const linkClass = 'flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900';
+  const linkClass = 'flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
   return (
     <div className="flex w-full gap-2" onClick={(event) => event.stopPropagation()}>
       <Link href={`/admin/equipment/${card.id}`} className={linkClass}>
@@ -53,7 +53,7 @@ function QuickLinksBlock({ card }: { card: FleetCard }) {
       <Link
         href={`/admin/equipment/${card.id}`}
         aria-label="Открыть карточку"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <ExternalLink className="h-3.5 w-3.5" />
       </Link>

@@ -19,7 +19,7 @@ export function QuickChip({ active, onClick, children }: { active: boolean; onCl
         'h-8 rounded-md border px-3 text-xs font-medium transition-colors',
         active
           ? 'border-blue-200 bg-blue-50 text-blue-700'
-          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+          : 'border-border bg-card text-foreground hover:bg-muted',
       )}
     >
       {children}
@@ -32,7 +32,7 @@ export function ActionIcon({ href, label, icon: Icon }: { href: string; label: s
     <Link
       href={href}
       onClick={(event) => event.stopPropagation()}
-      className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-orange-50 hover:text-orange-600"
+      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-orange-50 hover:text-signal-strong"
       title={label}
     >
       <Icon className="h-3.5 w-3.5" />

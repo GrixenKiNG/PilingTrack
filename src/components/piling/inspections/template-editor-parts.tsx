@@ -89,10 +89,10 @@ interface ItemRowProps {
 
 function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
   return (
-    <div className="rounded-md border bg-slate-50 p-3 space-y-2">
+    <div className="rounded-md border bg-muted p-3 space-y-2">
       <div className="flex gap-2">
         <div className="flex-1">
-          <Label className="text-xs text-slate-500">Текст пункта *</Label>
+          <Label className="text-xs text-muted-foreground">Текст пункта *</Label>
           <Textarea
             rows={2}
             value={item.text}
@@ -105,7 +105,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           <button
             type="button"
             onClick={onRemove}
-            className="shrink-0 self-start mt-5 rounded p-1 text-slate-400 hover:text-red-500"
+            className="shrink-0 self-start mt-5 rounded p-1 text-muted-foreground hover:text-red-500"
             aria-label="Удалить пункт"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -115,7 +115,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div>
-          <Label className="text-xs text-slate-500">Тип ответа</Label>
+          <Label className="text-xs text-muted-foreground">Тип ответа</Label>
           <Select value={item.answerType} onValueChange={(v) => onChange({ answerType: v as AnswerType })}>
             <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -126,7 +126,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           </Select>
         </div>
         <div>
-          <Label className="text-xs text-slate-500">Ед. изм.</Label>
+          <Label className="text-xs text-muted-foreground">Ед. изм.</Label>
           <Input
             value={item.unit}
             onChange={(e) => onChange({ unit: e.target.value })}
@@ -135,7 +135,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           />
         </div>
         <div>
-          <Label className="text-xs text-slate-500">Норма</Label>
+          <Label className="text-xs text-muted-foreground">Норма</Label>
           <Input
             value={item.norm}
             onChange={(e) => onChange({ norm: e.target.value })}
@@ -144,7 +144,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           />
         </div>
         <div>
-          <Label className="text-xs text-slate-500">Источник</Label>
+          <Label className="text-xs text-muted-foreground">Источник</Label>
           <Input
             value={item.provenance}
             onChange={(e) => onChange({ provenance: e.target.value })}
@@ -203,11 +203,11 @@ export function SectionEditor({
   };
 
   return (
-    <div className="rounded-lg border bg-white p-4 space-y-3">
+    <div className="rounded-lg border bg-card p-4 space-y-3">
       {/* Section header */}
       <div className="flex items-start gap-2">
         <div className="flex-1">
-          <Label className="text-xs text-slate-500">Раздел {index + 1} — заголовок *</Label>
+          <Label className="text-xs text-muted-foreground">Раздел {index + 1} — заголовок *</Label>
           <Input
             value={section.title}
             onChange={(e) => onChange({ title: e.target.value })}
@@ -220,7 +220,7 @@ export function SectionEditor({
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
-            className="rounded p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
+            className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"
             aria-label="Переместить вверх"
           >
             <ChevronUp className="w-4 h-4" />
@@ -229,7 +229,7 @@ export function SectionEditor({
             type="button"
             onClick={onMoveDown}
             disabled={index === total - 1}
-            className="rounded p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
+            className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"
             aria-label="Переместить вниз"
           >
             <ChevronDown className="w-4 h-4" />
@@ -238,7 +238,7 @@ export function SectionEditor({
             type="button"
             onClick={onRemove}
             disabled={total === 1}
-            className="rounded p-1 text-slate-400 hover:text-red-500 disabled:opacity-30"
+            className="rounded p-1 text-muted-foreground hover:text-red-500 disabled:opacity-30"
             aria-label="Удалить раздел"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -247,7 +247,7 @@ export function SectionEditor({
       </div>
 
       {/* Items */}
-      <div className="space-y-2 pl-2 border-l-2 border-slate-100">
+      <div className="space-y-2 pl-2 border-l-2 border-border">
         {section.items.map((item, i) => (
           <ItemRow
             key={item._key}

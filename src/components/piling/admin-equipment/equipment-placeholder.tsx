@@ -20,12 +20,12 @@ export function EquipmentPlaceholder({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2 text-xs text-slate-400',
+        'flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-2 text-xs text-muted-foreground',
         className,
       )}
     >
       <WifiOff className="h-3.5 w-3.5 shrink-0" />
-      <span className="font-medium text-slate-500">{label}</span>
+      <span className="font-medium text-muted-foreground">{label}</span>
       <span className="ml-auto">{hint}</span>
     </div>
   );

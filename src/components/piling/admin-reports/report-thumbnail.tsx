@@ -62,7 +62,7 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
         type="button"
         onClick={handleOpen}
         aria-label="Открыть фото отчёта"
-        className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 transition-colors hover:border-orange-400"
+        className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg border border-border transition-colors hover:border-orange-400"
         title="Открыть фото"
       >
         <Image src={thumbUrl} alt="" width={32} height={32} unoptimized className="w-full h-full object-cover" />
@@ -77,7 +77,7 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Закрыть фото"
-            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-card/10 text-white hover:bg-card/20"
           >
             <X className="w-5 h-5" />
           </button>

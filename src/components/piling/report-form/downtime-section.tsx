@@ -43,7 +43,7 @@ export function DowntimeSection({
         <CardHeader className="pb-3 pt-4 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2"><PilingIcon name="downtime" size={18} tone="warning" decorative />Простой техники</CardTitle>
-            <button onClick={onToggle} className="min-h-[44px] rounded-md px-2 text-sm font-semibold text-orange-600 hover:bg-orange-50">{show ? 'Скрыть простой' : '+ Добавить простой'}</button>
+            <button onClick={onToggle} className="min-h-[44px] rounded-md px-2 text-sm font-semibold text-signal-strong hover:bg-orange-50">{show ? 'Скрыть простой' : '+ Добавить простой'}</button>
           </div>
         </CardHeader>
         {show && (
@@ -64,10 +64,10 @@ export function DowntimeSection({
             {downtimes.length > 0 && (
               <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
                 {downtimes.map((dt) => (
-                  <div key={dt.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div key={dt.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex-1 min-w-0">
-                      <p className="text-base font-semibold text-slate-900">{getDowntimeReasonName(dt.reasonId)}</p>
-                      {dt.comment && <p className="text-xs font-medium text-slate-600 truncate">{dt.comment}</p>}
+                      <p className="text-base font-semibold text-foreground">{getDowntimeReasonName(dt.reasonId)}</p>
+                      {dt.comment && <p className="text-xs font-medium text-muted-foreground truncate">{dt.comment}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-base font-mono font-bold text-amber-600">{dt.duration} ч</span>
@@ -83,7 +83,7 @@ export function DowntimeSection({
             )}
 
             {totalDowntime > 0 && (
-              <div className="text-sm font-medium text-slate-700 text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
+              <div className="text-sm font-medium text-foreground text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
             )}
           </CardContent>
         )}

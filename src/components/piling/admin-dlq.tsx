@@ -45,7 +45,7 @@ interface DlqStats {
 const STATUS_FILTERS: Array<{ key: DlqStatus; label: string; color: string }> = [
   { key: 'pending', label: 'В очереди', color: 'bg-amber-100 text-amber-700 border-amber-200' },
   { key: 'resolved', label: 'Решено', color: 'bg-green-100 text-green-700 border-green-200' },
-  { key: 'discarded', label: 'Отброшено', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+  { key: 'discarded', label: 'Отброшено', color: 'bg-muted text-muted-foreground border-border' },
   { key: 'all', label: 'Все', color: 'bg-blue-100 text-blue-700 border-blue-200' },
 ];
 
@@ -117,11 +117,11 @@ export function AdminDlq() {
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
             Dead Letter Queue
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             События, упавшие после исчерпания попыток. Можно отправить повторно или отбросить.
           </p>
         </div>
@@ -135,7 +135,7 @@ export function AdminDlq() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard icon={Clock} label="В очереди" value={stats.pending} color="text-amber-600" bg="bg-amber-50" />
           <StatCard icon={CheckCircle2} label="Решено" value={stats.resolved} color="text-green-600" bg="bg-green-50" />
-          <StatCard icon={XCircle} label="Отброшено" value={stats.discarded} color="text-slate-500" bg="bg-slate-50" />
+          <StatCard icon={XCircle} label="Отброшено" value={stats.discarded} color="text-muted-foreground" bg="bg-muted" />
           <StatCard icon={AlertTriangle} label="Всего" value={stats.total} color="text-blue-600" bg="bg-blue-50" />
         </div>
       )}
@@ -147,7 +147,7 @@ export function AdminDlq() {
             onClick={() => setStatus(f.key)}
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors',
-              status === f.key ? f.color : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+              status === f.key ? f.color : 'bg-card text-muted-foreground border-border hover:bg-muted'
             )}
           >
             {f.label}
@@ -172,8 +172,8 @@ export function AdminDlq() {
       ) : entries.length === 0 ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">DLQ пуст</p>
-          <p className="text-xs text-slate-400 mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
+          <p className="text-sm text-muted-foreground">DLQ пуст</p>
+          <p className="text-xs text-muted-foreground mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -189,23 +189,23 @@ export function AdminDlq() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded font-mono">{entry.eventType}</code>
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">{entry.eventType}</code>
                         <Badge variant="secondary" className={STATUS_FILTERS.find(f=>f.key===entry.status)?.color}>
                           {STATUS_FILTERS.find(f=>f.key===entry.status)?.label || entry.status}
                         </Badge>
-                        <span className="text-xs text-slate-500">попыток: {entry.attempts}</span>
+                        <span className="text-xs text-muted-foreground">попыток: {entry.attempts}</span>
                       </div>
                       {entry.aggregateId && (
-                        <p className="text-xs text-slate-500 mt-1 font-mono truncate">
+                        <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
                           aggregateId: {entry.aggregateId}
                         </p>
                       )}
                       {entry.sourceOutboxId && (
-                        <p className="text-xs text-slate-400 mt-0.5 font-mono truncate">
+                        <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">
                           outboxId: {entry.sourceOutboxId}
                         </p>
                       )}
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Создано: {formatDate(entry.createdAt)}
                         {entry.updatedAt !== entry.createdAt && (
                           <span className="ml-2">· Обновлено: {formatDate(entry.updatedAt)}</span>
@@ -219,7 +219,7 @@ export function AdminDlq() {
                         {expandedId === entry.id ? 'Скрыть payload' : 'Показать payload'}
                       </button>
                       {expandedId === entry.id && (
-                        <pre className="mt-2 text-3xs bg-slate-50 border border-slate-200 rounded p-2 overflow-x-auto max-h-60">
+                        <pre className="mt-2 text-3xs bg-muted border border-border rounded p-2 overflow-x-auto max-h-60">
                           {JSON.stringify(entry.payload, null, 2)}
                         </pre>
                       )}
@@ -272,7 +272,7 @@ function StatCard({
     <div className={cn('rounded-xl p-3 flex items-center gap-3', bg)}>
       <Icon className={cn('w-5 h-5', color)} />
       <div>
-        <p className="text-3xs text-slate-500 uppercase tracking-wide">{label}</p>
+        <p className="text-3xs text-muted-foreground uppercase tracking-wide">{label}</p>
         <p className={cn('text-xl font-bold', color)}>{value}</p>
       </div>
     </div>

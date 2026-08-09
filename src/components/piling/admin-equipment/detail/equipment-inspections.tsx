@@ -51,7 +51,7 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-slate-500">Чек-листы осмотров этой установки.</p>
+        <p className="text-xs text-muted-foreground">Чек-листы осмотров этой установки.</p>
         <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
           <Link href="/inspections/new">
             <Plus className="w-3.5 h-3.5 mr-1" /> Провести осмотр
@@ -60,9 +60,9 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
       </div>
 
       {loading ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-400">Загрузка…</p>
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Загрузка…</p>
       ) : records.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">Осмотров по этой установке пока нет.</p>
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Осмотров по этой установке пока нет.</p>
       ) : (
         <ul className="space-y-1.5">
           {records.map((r) => (
@@ -71,7 +71,7 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
                 href={`/inspections/${r.id}`}
                 className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:border-orange-300 hover:bg-orange-50/30"
               >
-                <span className="font-mono text-xs text-slate-500 shrink-0">
+                <span className="font-mono text-xs text-muted-foreground shrink-0">
                   {formatRuDate(r.inspectionDate)}
                 </span>
                 <span className={cn('rounded px-1.5 py-0.5 text-2xs font-medium', LEVEL_STYLE[r.level])}>

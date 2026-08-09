@@ -48,27 +48,27 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
     setFrom(shiftYmd(-(days - 1)));
   };
 
-  const chip = 'rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50';
+  const chip = 'rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted';
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="block text-2xs uppercase tracking-wide text-slate-400">С</span>
+          <span className="block text-2xs uppercase tracking-wide text-muted-foreground">С</span>
           <input
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm"
+            className="rounded-md border border-border bg-card px-2 py-1 text-sm"
           />
         </label>
         <label className="text-sm">
-          <span className="block text-2xs uppercase tracking-wide text-slate-400">По</span>
+          <span className="block text-2xs uppercase tracking-wide text-muted-foreground">По</span>
           <input
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm"
+            className="rounded-md border border-border bg-card px-2 py-1 text-sm"
           />
         </label>
         <div className="flex gap-1">
@@ -95,7 +95,7 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
         </Button>
       </div>
 
-      <p className={cn('text-xs', invalid ? 'text-rose-500' : 'text-slate-400')}>
+      <p className={cn('text-xs', invalid ? 'text-rose-500' : 'text-muted-foreground')}>
         {invalid
           ? 'Дата «С» позже даты «По».'
           : 'Отчёт по этой установке за период: смены, сваи, бурение, простои. «Открыть» — печать или сохранение из просмотрщика браузера.'}

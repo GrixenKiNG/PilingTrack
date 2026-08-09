@@ -99,7 +99,7 @@ export function ModuleTabList({
               data-testid={`module-tab-${tab.id}`}
               onClick={() => onViewChange(tab.id)}
               onKeyDown={(event) => handleKeyDown(event, index)}
-              className="relative flex h-12 min-h-9 flex-none items-center whitespace-nowrap px-3 text-sm font-semibold text-white/80 outline-none transition-colors hover:bg-white/10 hover:text-white focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal sm:px-4 max-sm:min-h-11"
+              className="relative flex h-12 min-h-9 flex-none items-center whitespace-nowrap px-3 text-sm font-semibold text-white/80 outline-none transition-colors hover:bg-card/10 hover:text-white focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal sm:px-4 max-sm:min-h-11"
             >
               {tab.label}
               {selected && (

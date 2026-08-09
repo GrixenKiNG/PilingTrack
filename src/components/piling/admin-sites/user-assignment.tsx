@@ -92,14 +92,14 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
       </DialogHeader>
       {loadingAssign || loadingUsers ? (
         <div className="py-8 flex justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+          <Loader2 className="w-6 h-6 animate-spin text-signal-strong" />
         </div>
       ) : (
         <div className="space-y-3">
           {/* Currently assigned */}
           {assignedUsers.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
                 Назначены
               </p>
               <div className="space-y-1">
@@ -111,13 +111,13 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{a.user.name}</p>
-                        <p className="text-3xs text-slate-500">{a.user.email}</p>
+                        <p className="text-sm font-medium text-foreground">{a.user.name}</p>
+                        <p className="text-3xs text-muted-foreground">{a.user.email}</p>
                       </div>
                     </div>
                     <button
                       onClick={() => handleUnassignUser(a.userId)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
                       title="Снять назначение"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -130,7 +130,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
 
           {/* Available to assign */}
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
+            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
               Доступные операторы
             </p>
             <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
@@ -139,11 +139,11 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                 .map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50"
+                    className="flex items-center justify-between p-2 rounded-lg hover:bg-muted"
                   >
                     <div>
                       <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-slate-500">{user.email}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                     <Button
                       size="sm"
@@ -157,7 +157,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                   </div>
                 ))}
               {operators.filter((u) => u.isActive && !assignedIds.has(u.id)).length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-4">
+                <p className="text-sm text-muted-foreground text-center py-4">
                   {assignedUsers.length > 0
                     ? 'Все операторы уже назначены'
                     : 'Нет активных операторов'}

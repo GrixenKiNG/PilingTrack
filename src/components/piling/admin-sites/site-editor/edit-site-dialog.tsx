@@ -157,7 +157,7 @@ export function EditSiteDialog({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <Label className="text-sm">Активен</Label>
                 <button
                   onClick={() => setActive(!active)}
@@ -168,7 +168,7 @@ export function EditSiteDialog({
                 >
                   <div
                     className={cn(
-                      'w-4 h-4 rounded-full bg-white absolute top-1 transition-transform',
+                      'w-4 h-4 rounded-full bg-card absolute top-1 transition-transform',
                       active ? 'translate-x-5' : 'translate-x-1'
                     )}
                   />

@@ -84,7 +84,7 @@ const STATUS_META: Record<
 > = {
   READY: { label: 'Готово', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
   ATTENTION: { label: 'Требует решения', className: 'border-amber-200 bg-amber-50 text-amber-800' },
-  NO_DATA: { label: 'Нет данных', className: 'border-slate-200 bg-slate-50 text-slate-600' },
+  NO_DATA: { label: 'Нет данных', className: 'border-border bg-muted text-muted-foreground' },
   IN_REPAIR: { label: 'В ремонте', className: 'border-rose-200 bg-rose-50 text-rose-700' },
   BLOCKED: { label: 'Недоступно', className: 'border-rose-200 bg-rose-50 text-rose-700' },
   OVERDUE: { label: 'ТО просрочено', className: 'border-rose-200 bg-rose-50 text-rose-700' },
@@ -102,14 +102,14 @@ function ViewHeading({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <header className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-50">
-          <Icon className="h-6 w-6 text-orange-600" />
+          <Icon className="h-6 w-6 text-signal-strong" />
         </span>
         <div>
-          <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-          <p className="mt-0.5 text-sm text-slate-500">{description}</p>
+          <h2 className="text-lg font-bold text-foreground">{title}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
       {actions}
@@ -128,7 +128,7 @@ function StatusBadge({ status }: { status: ReadinessStatus }) {
 
 function ProgressBar({ value, tone = 'bg-orange-500' }: { value: number; tone?: string }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-label={`${value}%`}>
+    <div className="h-2 overflow-hidden rounded-full bg-muted" aria-label={`${value}%`}>
       <div className={cn('h-full rounded-full', tone)} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );
@@ -165,7 +165,7 @@ export function ReadinessFleetView({
         icon={HardHat}
         actions={(
           <div className="relative w-full lg:w-80">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Установка или модель" className="h-10 pl-9" />
           </div>
         )}
@@ -177,8 +177,8 @@ export function ReadinessFleetView({
         <KpiTile icon="defect" label="Недоступно" value={summary.blocked} detail="ремонт, блокировка или просроченное ТО" alert={summary.blocked > 0} />
       </section>
       <div className="grid gap-3 xl:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <h3 className="px-2 text-xs font-bold uppercase tracking-wide text-slate-500">Состояние</h3>
+        <aside className="rounded-xl border border-border bg-card p-3 shadow-sm">
+          <h3 className="px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Состояние</h3>
           <div className="mt-2 space-y-1">
             {([
               ['all', 'Все установки', summary.total],
@@ -192,7 +192,7 @@ export function ReadinessFleetView({
                 onClick={() => setFilter(id)}
                 className={cn(
                   'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold',
-                  filter === id ? 'bg-orange-50 text-orange-700' : 'text-slate-600 hover:bg-slate-50',
+                  filter === id ? 'bg-orange-50 text-orange-700' : 'text-muted-foreground hover:bg-muted',
                 )}
               >
                 <span>{label}</span><span className="font-mono">{count}</span>
@@ -209,30 +209,30 @@ export function ReadinessFleetView({
                 type="button"
                 onClick={() => onSelect(item.id)}
                 className={cn(
-                  'rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-orange-300 hover:shadow-md',
-                  item.id === selectedId ? 'border-orange-400 ring-2 ring-orange-100' : 'border-slate-200',
+                  'rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-orange-300 hover:shadow-md',
+                  item.id === selectedId ? 'border-orange-400 ring-2 ring-orange-100' : 'border-border',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-slate-950">{item.name}</h3>
-                    <p className="mt-1 text-xs text-slate-500">{item.model || 'Модель не указана'}</p>
+                    <h3 className="font-bold text-foreground">{item.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.model || 'Модель не указана'}</p>
                   </div>
                   {state && <StatusBadge status={state.status} />}
                 </div>
                 <div className="mt-5 flex items-end justify-between gap-4">
                   <div>
-                    <div className="text-xs text-slate-500">Индекс готовности</div>
-                    <div className="mt-1 font-mono text-2xl font-bold text-slate-950">{state?.score ?? '—'}</div>
+                    <div className="text-xs text-muted-foreground">Индекс готовности</div>
+                    <div className="mt-1 font-mono text-2xl font-bold text-foreground">{state?.score ?? '—'}</div>
                   </div>
-                  <div className="text-right text-xs text-slate-500">
+                  <div className="text-right text-xs text-muted-foreground">
                     {item.engineHoursTotal != null ? `${item.engineHoursTotal.toLocaleString('ru-RU')} м.ч.` : 'Нет моточасов'}
                     <br />
                     {item.crewCount > 0 ? `Бригад: ${item.crewCount}` : 'Бригада не назначена'}
                   </div>
                 </div>
                 <div className="mt-3"><ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-orange-500'} /></div>
-                <p className="mt-3 min-h-10 text-xs leading-relaxed text-slate-600">{state?.reason}</p>
+                <p className="mt-3 min-h-10 text-xs leading-relaxed text-muted-foreground">{state?.reason}</p>
               </button>
             );
           })}
@@ -262,30 +262,30 @@ export function ReadinessShiftsView({
         <KpiTile icon="risk" label="Ожидают решения" value={Math.max(0, activeCrews.length - readyCrews.length - blockedCrews.length)} detail="не хватает подтверждений" alert={activeCrews.length > readyCrews.length} />
         <KpiTile icon="defect" label="Блокированы" value={blockedCrews.length} detail="техника недоступна" alert={blockedCrews.length > 0} />
       </section>
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-2 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-bold text-slate-950">Текущие назначения</h3>
-            <p className="mt-1 text-xs text-slate-500">Время смены не показывается, пока в проекте нет сущности сменного графика.</p>
+            <h3 className="font-bold text-foreground">Текущие назначения</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Время смены не показывается, пока в проекте нет сущности сменного графика.</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Сегодня · {new Date().toLocaleDateString('ru-RU')}</span>
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">Сегодня · {new Date().toLocaleDateString('ru-RU')}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+            <thead className="bg-muted text-xs text-muted-foreground">
               <tr><th className="px-4 py-3">Бригада</th><th className="px-4 py-3">Оператор</th><th className="px-4 py-3">Объект</th><th className="px-4 py-3">Установка</th><th className="px-4 py-3">Состав</th><th className="px-4 py-3 text-right">Готовность</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {activeCrews.map((crew) => {
                 const state = crew.equipment ? readinessByEquipment[crew.equipment.id] : null;
                 return (
-                  <tr key={crew.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-semibold text-slate-950">{crew.name}</td>
-                    <td className="px-4 py-3 text-slate-700">{crew.operator?.name ?? 'Не назначен'}</td>
-                    <td className="px-4 py-3 text-slate-600">{crew.site?.name ?? 'Не указан'}</td>
-                    <td className="px-4 py-3 text-slate-700">{crew.equipment?.name ?? 'Не назначена'}</td>
-                    <td className="px-4 py-3 text-slate-600">{1 + crew.assistants.length} чел.</td>
-                    <td className="px-4 py-3 text-right">{state ? <StatusBadge status={state.status} /> : <span className="text-xs text-slate-500">Нет техники</span>}</td>
+                  <tr key={crew.id} className="hover:bg-muted">
+                    <td className="px-4 py-3 font-semibold text-foreground">{crew.name}</td>
+                    <td className="px-4 py-3 text-foreground">{crew.operator?.name ?? 'Не назначен'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{crew.site?.name ?? 'Не указан'}</td>
+                    <td className="px-4 py-3 text-foreground">{crew.equipment?.name ?? 'Не назначена'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{1 + crew.assistants.length} чел.</td>
+                    <td className="px-4 py-3 text-right">{state ? <StatusBadge status={state.status} /> : <span className="text-xs text-muted-foreground">Нет техники</span>}</td>
                   </tr>
                 );
               })}
@@ -328,14 +328,14 @@ export function ReadinessPermitsView({
         <ShieldAlert className="h-5 w-5 shrink-0" />
         <div><strong>Контур предварительный.</strong> В текущей базе нет отдельной сущности наряд-допуска, его номера, срока действия и маршрута согласования. Экран не подменяет документ и не выдаёт допуск автоматически.</div>
       </div>
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-4"><h3 className="font-bold text-slate-950">Реестр условий допуска</h3></div>
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border p-4"><h3 className="font-bold text-foreground">Реестр условий допуска</h3></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[940px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+            <thead className="bg-muted text-xs text-muted-foreground">
               <tr><th className="px-4 py-3">Установка</th><th className="px-4 py-3">Объект</th><th className="px-4 py-3">Бригада</th><th className="px-4 py-3">Осмотр</th><th className="px-4 py-3">ТО</th><th className="px-4 py-3">Комплектность</th><th className="px-4 py-3 text-right">Решение</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {equipment.map((item) => {
                 const state = readinessByEquipment[item.id];
                 const crew = crewByEquipment.get(item.id);
@@ -343,13 +343,13 @@ export function ReadinessPermitsView({
                 const maintenance = state?.evidence.find((entry) => entry.key === 'maintenance');
                 const completed = state?.evidence.filter((entry) => entry.state === 'pass').length ?? 0;
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3"><div className="font-semibold text-slate-950">{item.name}</div><div className="text-xs text-slate-500">{item.model || 'Модель не указана'}</div></td>
-                    <td className="px-4 py-3 text-slate-600">{crew?.site?.name ?? 'Не назначен'}</td>
-                    <td className="px-4 py-3 text-slate-600">{crew?.name ?? 'Не назначена'}</td>
-                    <td className="px-4 py-3 text-xs text-slate-600">{inspection?.value ?? 'Нет данных'}</td>
-                    <td className="px-4 py-3 text-xs text-slate-600">{maintenance?.value ?? 'Нет данных'}</td>
-                    <td className="px-4 py-3"><span className="font-mono font-bold text-slate-900">{completed}/5</span></td>
+                  <tr key={item.id} className="hover:bg-muted">
+                    <td className="px-4 py-3"><div className="font-semibold text-foreground">{item.name}</div><div className="text-xs text-muted-foreground">{item.model || 'Модель не указана'}</div></td>
+                    <td className="px-4 py-3 text-muted-foreground">{crew?.site?.name ?? 'Не назначен'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{crew?.name ?? 'Не назначена'}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{inspection?.value ?? 'Нет данных'}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{maintenance?.value ?? 'Нет данных'}</td>
+                    <td className="px-4 py-3"><span className="font-mono font-bold text-foreground">{completed}/5</span></td>
                     <td className="px-4 py-3 text-right">{state && <StatusBadge status={state.status} />}</td>
                   </tr>
                 );
@@ -399,15 +399,15 @@ export function ReadinessMaintenanceView({
         <KpiTile icon={History} label="Записи журнала" value={records.length} detail={`${stats.open} незакрытых`} />
         <KpiTile icon={Gauge} label="Наработка" value={selected?.engineHoursTotal != null ? `${selected.engineHoursTotal.toLocaleString('ru-RU')} м.ч.` : '—'} detail="последнее показание" />
       </section>
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 p-2">
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex gap-1 overflow-x-auto border-b border-border p-2">
           {([
             ['orders', 'Наряды', ClipboardList],
             ['journal', 'Журнал ТО', History],
             ['meters', 'Моточасы', Gauge],
             ['plans', 'Регламенты', CalendarClock],
           ] as Array<[MaintenanceTab, string, typeof History]>).map(([id, label, Icon]) => (
-            <button key={id} type="button" onClick={() => setTab(id)} className={cn('inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold', tab === id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100')}>
+            <button key={id} type="button" onClick={() => setTab(id)} className={cn('inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold', tab === id ? 'bg-slate-900 text-white' : 'text-muted-foreground hover:bg-muted')}>
               <Icon className="h-4 w-4" />{label}
             </button>
           ))}
@@ -417,13 +417,13 @@ export function ReadinessMaintenanceView({
             {selectedOrders.length === 0 ? <EmptyBlock label="По установке нет нарядов обслуживания" tall /> : (
               <div className="grid gap-3 lg:grid-cols-2">
                 {selectedOrders.map((record) => (
-                  <article key={record.id} className="rounded-lg border border-slate-200 p-4">
+                  <article key={record.id} className="rounded-lg border border-border p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div><h3 className="font-semibold text-slate-950">{record.title}</h3><p className="mt-1 text-xs text-slate-500">{record.equipment?.name}</p></div>
-                      <span className={cn('rounded-full px-2 py-1 text-xs font-bold', ['CRITICAL', 'HIGH'].includes(record.priority) ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600')}>{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</span>
+                      <div><h3 className="font-semibold text-foreground">{record.title}</h3><p className="mt-1 text-xs text-muted-foreground">{record.equipment?.name}</p></div>
+                      <span className={cn('rounded-full px-2 py-1 text-xs font-bold', ['CRITICAL', 'HIGH'].includes(record.priority) ? 'bg-rose-50 text-rose-700' : 'bg-muted text-muted-foreground')}>{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</span>
                     </div>
-                    <p className="mt-3 text-sm leading-relaxed text-slate-600">{record.description || 'Описание не заполнено'}</p>
-                    <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-xs text-slate-500"><span>{TYPE_LABEL[record.type] ?? record.type}</span><span>{STATUS_LABEL[record.status] ?? record.status}</span></div>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{record.description || 'Описание не заполнено'}</p>
+                    <div className="mt-4 flex justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>{TYPE_LABEL[record.type] ?? record.type}</span><span>{STATUS_LABEL[record.status] ?? record.status}</span></div>
                   </article>
                 ))}
               </div>
@@ -432,9 +432,9 @@ export function ReadinessMaintenanceView({
         )}
         {tab === 'journal' && (
           <>
-            <div className="border-b border-slate-200 p-3"><div className="relative max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по журналу" className="pl-9" /></div></div>
+            <div className="border-b border-border p-3"><div className="relative max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по журналу" className="pl-9" /></div></div>
             {loading ? <LoadingBlock label="Загрузка журнала" tall /> : filtered.length === 0 ? <EmptyBlock label="По установке нет записей журнала" tall /> : (
-              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-3 py-2">Дата</th><th className="px-3 py-2">Тип</th><th className="px-3 py-2">Запись</th><th className="px-3 py-2">Наработка</th><th className="px-3 py-2">Оценка</th><th className="px-3 py-2 text-right">Статус</th></tr></thead><tbody className="divide-y divide-slate-100">{filtered.map((record) => <JournalRow key={record.id} record={record} />)}</tbody></table></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-muted text-xs text-muted-foreground"><tr><th className="px-3 py-2">Дата</th><th className="px-3 py-2">Тип</th><th className="px-3 py-2">Запись</th><th className="px-3 py-2">Наработка</th><th className="px-3 py-2">Оценка</th><th className="px-3 py-2 text-right">Статус</th></tr></thead><tbody className="divide-y divide-border">{filtered.map((record) => <JournalRow key={record.id} record={record} />)}</tbody></table></div>
             )}
           </>
         )}
@@ -466,7 +466,7 @@ export function ReadinessReportsView({
 
   return (
     <div className="space-y-3">
-      <ViewHeading title="Отчёты" description="Фактический срез готовности и доказательств на текущий момент" icon={BarChart3} actions={<span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">Срез · {new Date().toLocaleString('ru-RU')}</span>} />
+      <ViewHeading title="Отчёты" description="Фактический срез готовности и доказательств на текущий момент" icon={BarChart3} actions={<span className="rounded-lg border border-border bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">Срез · {new Date().toLocaleString('ru-RU')}</span>} />
       <section className={KPI_GRID} style={kpiGridStyle(5)}>
         <KpiTile icon="technical-readiness" label="Готовность парка" value={`${summary.readinessPercent}%`} detail={`${summary.ready} из ${summary.total}`} />
         <KpiTile icon="accepted" label="Допущено установок" value={summary.ready} detail="по текущим доказательствам" />
@@ -475,14 +475,14 @@ export function ReadinessReportsView({
         <KpiTile icon={Gauge} label="Средняя оценка" value={averageScore ?? '—'} detail="по завершённым осмотрам" />
       </section>
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.7fr)]">
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between"><h3 className="font-bold text-slate-950">Готовность по установкам</h3><span className="text-xs text-slate-500">текущий срез</span></div>
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between"><h3 className="font-bold text-foreground">Готовность по установкам</h3><span className="text-xs text-muted-foreground">текущий срез</span></div>
           <div className="mt-4 space-y-3">
             {equipment.map((item) => {
               const state = readinessByEquipment[item.id];
               return (
                 <div key={item.id} className="grid items-center gap-3 sm:grid-cols-[180px_minmax(0,1fr)_110px]">
-                  <div className="truncate text-sm font-semibold text-slate-700">{item.name}</div>
+                  <div className="truncate text-sm font-semibold text-foreground">{item.name}</div>
                   <ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-orange-500'} />
                   <div className="text-right">{state && <StatusBadge status={state.status} />}</div>
                 </div>
@@ -490,13 +490,13 @@ export function ReadinessReportsView({
             })}
           </div>
         </section>
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="font-bold text-slate-950">Структура ограничений</h3>
-          <p className="mt-1 text-xs text-slate-500">Без искусственной истории: только текущие причины.</p>
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <h3 className="font-bold text-foreground">Структура ограничений</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Без искусственной истории: только текущие причины.</p>
           <div className="mt-5 space-y-5">
             {blockerRows.map(([label, count]) => (
               <div key={label}>
-                <div className="mb-2 flex items-center justify-between text-sm"><span className="text-slate-600">{label}</span><strong className="font-mono text-slate-950">{count}</strong></div>
+                <div className="mb-2 flex items-center justify-between text-sm"><span className="text-muted-foreground">{label}</span><strong className="font-mono text-foreground">{count}</strong></div>
                 <ProgressBar value={(count / maxBlockers) * 100} tone={count > 0 ? 'bg-orange-500' : 'bg-emerald-500'} />
               </div>
             ))}
@@ -527,27 +527,27 @@ export function ReadinessSettingsView() {
     <div className="space-y-3">
       <ViewHeading title="Настройки техготовности" description="Действующие правила принятия решения и связанные административные разделы" icon={Settings2} />
       <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <h3 className="px-2 text-xs font-bold uppercase tracking-wide text-slate-500">Разделы</h3>
+        <aside className="rounded-xl border border-border bg-card p-3 shadow-sm">
+          <h3 className="px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Разделы</h3>
           <nav className="mt-2 space-y-1">
             {links.map(([href, label, Icon], index) => (
-              <Link key={href} href={href} className={cn('flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold', index === 0 ? 'bg-orange-50 text-orange-700' : 'text-slate-600 hover:bg-slate-50')}>
+              <Link key={href} href={href} className={cn('flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold', index === 0 ? 'bg-orange-50 text-orange-700' : 'text-muted-foreground hover:bg-muted')}>
                 <Icon className="h-4 w-4" />{label}
               </Link>
             ))}
           </nav>
         </aside>
         <div className="space-y-3">
-          <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-4">
-              <h3 className="font-bold text-slate-950">Правила решения о готовности</h3>
-              <p className="mt-1 text-xs text-slate-500">Консервативная модель: отсутствие данных не считается успешной проверкой.</p>
+          <section className="rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border p-4">
+              <h3 className="font-bold text-foreground">Правила решения о готовности</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Консервативная модель: отсутствие данных не считается успешной проверкой.</p>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               {rules.map(([name, condition, effect]) => (
                 <div key={name} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] sm:items-center">
-                  <div className="font-semibold text-slate-800">{name}</div>
-                  <div className="text-sm text-slate-500">{condition}</div>
+                  <div className="font-semibold text-foreground">{name}</div>
+                  <div className="text-sm text-muted-foreground">{condition}</div>
                   <div className="text-right"><span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700">{effect}</span></div>
                 </div>
               ))}

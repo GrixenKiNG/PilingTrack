@@ -162,15 +162,15 @@ export function StartInspectionForm() {
   return (
     <div className="mx-auto w-full max-w-lg px-4 py-6">
       <div className="mb-5 flex items-center gap-2">
-        <Link href="/inspections" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/inspections" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
         </Link>
       </div>
 
-      <h1 className="mb-5 text-lg font-semibold text-slate-800">Провести осмотр / ТО</h1>
+      <h1 className="mb-5 text-lg font-semibold text-foreground">Провести осмотр / ТО</h1>
 
       {loading ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">Загрузка…</p>
+        <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
       ) : (
         <div className="space-y-4">
           <div>
@@ -203,12 +203,12 @@ export function StartInspectionForm() {
 
           {/* Block composition preview */}
           {selected && (
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="mb-2 text-xs font-medium text-slate-500">Чек-лист соберётся из блоков:</div>
+            <div className="rounded-lg border bg-muted p-3">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">Чек-лист соберётся из блоков:</div>
               <div className="space-y-1.5">
                 {blocks.map((b) => (
-                  <div key={b.key} className="flex items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm">
-                    <b.icon className="w-3.5 h-3.5 text-orange-500" />
+                  <div key={b.key} className="flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-sm">
+                    <b.icon className="w-3.5 h-3.5 text-signal-strong" />
                     <span className="flex-1">{b.label}</span>
                     {b.ok
                       ? <span className="text-2xs text-emerald-600">✓ шаблон есть</span>
@@ -223,7 +223,7 @@ export function StartInspectionForm() {
                   (тип «База», применимость «{selected.model || '—'}» или без модели — общий для всех).
                 </p>
               )}
-              <p className="mt-2 text-2xs text-slate-400">
+              <p className="mt-2 text-2xs text-muted-foreground">
                 Молот: {HAMMER_LABEL[selected.hammerKind]} · {selected.isCombined ? 'комбинированная (есть вращатель)' : 'без вращателя'}.
                 Атрибуты меняются в карточке техники.
               </p>
@@ -241,10 +241,10 @@ export function StartInspectionForm() {
                   <Copy className="h-3 w-3" /> Скопировать
                 </Button>
               </div>
-              <div className="overflow-hidden rounded-md border border-teal-100 bg-white">
+              <div className="overflow-hidden rounded-md border border-teal-100 bg-card">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-left text-2xs uppercase tracking-wide text-slate-400">
+                    <tr className="text-left text-2xs uppercase tracking-wide text-muted-foreground">
                       <th className="px-2 py-1.5 font-medium">Материал</th>
                       <th className="px-2 py-1.5 font-medium">Маркировка</th>
                       <th className="px-2 py-1.5 font-medium">Кол-во</th>
@@ -252,19 +252,19 @@ export function StartInspectionForm() {
                   </thead>
                   <tbody>
                     {consumables.map((c, i) => (
-                      <tr key={i} className="border-t border-slate-100 align-top">
-                        <td className="px-2 py-1.5 text-slate-800">
+                      <tr key={i} className="border-t border-border align-top">
+                        <td className="px-2 py-1.5 text-foreground">
                           {c.name}
-                          {c.note && <span className="block text-2xs text-slate-400">{c.note}</span>}
+                          {c.note && <span className="block text-2xs text-muted-foreground">{c.note}</span>}
                         </td>
                         <td className="px-2 py-1.5 font-medium text-teal-700">{c.marking}</td>
-                        <td className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-900">{c.qty}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 font-semibold text-foreground">{c.qty}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="mt-2 text-2xs text-slate-400">
+              <p className="mt-2 text-2xs text-muted-foreground">
                 Полный комплект расходников (база + молот + вращатель) — механик отмечает нужное при заказе. Интервал каждой позиции — в примечании. Где марка/объём не заданы производителем — «по руководству».
               </p>
             </div>

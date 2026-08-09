@@ -24,9 +24,9 @@ export function OpsFilterBar<K extends string>({
   footer?: ReactNode;
 }) {
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="space-y-3 rounded-lg border border-border bg-card p-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <Filter className="hidden h-4 w-4 text-slate-400 sm:block" />
+        <Filter className="hidden h-4 w-4 text-muted-foreground sm:block" />
         {quickFilters.map((filter) => (
           <button
             key={filter.key}
@@ -36,7 +36,7 @@ export function OpsFilterBar<K extends string>({
               'min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
               active === filter.key
                 ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white',
+                : 'border-border bg-muted text-muted-foreground hover:border-border hover:bg-card',
             )}
           >
             {filter.label}
@@ -44,7 +44,7 @@ export function OpsFilterBar<K extends string>({
         ))}
         {extra && <div className="ml-auto flex flex-wrap items-center gap-2">{extra}</div>}
       </div>
-      {footer && <div className="text-xs text-slate-500">{footer}</div>}
+      {footer && <div className="text-xs text-muted-foreground">{footer}</div>}
     </div>
   );
 }

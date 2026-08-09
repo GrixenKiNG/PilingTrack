@@ -54,18 +54,18 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
           <DialogTitle>{mode === 'create' ? 'Добавить элемент' : 'Переименовать элемент'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 py-1">
-          <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+          <label className="grid gap-1.5 text-sm font-medium text-foreground">
             Название
             <Input aria-label="Название" value={name} onChange={(event) => setName(event.target.value)} autoFocus />
           </label>
           {isPileCreate && (
             <>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                <label className="grid gap-1.5 text-sm font-medium text-foreground">
                   Код
                   <Input aria-label="Код" value={code} onChange={(event) => setCode(event.target.value)} placeholder="СВ120" />
                 </label>
-                <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                <label className="grid gap-1.5 text-sm font-medium text-foreground">
                   Длина, м
                   <Input
                     aria-label="Длина, м"
@@ -77,11 +77,11 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
                   />
                 </label>
               </div>
-              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+              <label className="grid gap-1.5 text-sm font-medium text-foreground">
                 Сечение или диаметр
                 <Input aria-label="Сечение или диаметр" value={sectionOrDiameter} onChange={(event) => setSectionOrDiameter(event.target.value)} placeholder="350×350 мм" />
               </label>
-              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+              <label className="grid gap-1.5 text-sm font-medium text-foreground">
                 Примечание
                 <Input aria-label="Примечание" value={notes} onChange={(event) => setNotes(event.target.value)} />
               </label>

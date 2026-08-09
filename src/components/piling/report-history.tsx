@@ -216,18 +216,18 @@ export function ReportHistory() {
   return (
     <div className="space-y-4 p-4 pb-24">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <History className="w-5 h-5 text-orange-500" />
+        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+          <History className="w-5 h-5 text-signal-strong" />
           История отчётов
         </h1>
-        <span className="text-xs text-slate-500 font-mono tabular-nums">
+        <span className="text-xs text-muted-foreground font-mono tabular-nums">
           Отчётов: {filteredReports.length}
         </span>
       </div>
 
       {sites.length > 0 && (
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
+          <Filter className="w-4 h-4 text-muted-foreground" />
           <Select value={filterSiteId} onValueChange={setFilterSiteId}>
             <SelectTrigger className="w-full h-10">
               <SelectValue placeholder="Все объекты" />
@@ -252,11 +252,11 @@ export function ReportHistory() {
         />
       ) : filteredReports.length === 0 ? (
         <div className="text-center py-16">
-          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-700">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm font-medium text-foreground">
             {filterSiteId === 'all' ? 'Отчётов пока нет' : 'На выбранном объекте отчётов нет'}
           </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {filterSiteId === 'all'
               ? 'После сдачи смены отчёт появится в этом списке.'
               : 'Выберите другой объект или покажите отчёты по всем объектам.'}
@@ -265,7 +265,7 @@ export function ReportHistory() {
             <button
               type="button"
               onClick={() => setFilterSiteId('all')}
-              className="mt-4 text-sm font-medium text-orange-600 hover:text-orange-700"
+              className="mt-4 text-sm font-medium text-signal-strong hover:text-orange-700"
             >
               Показать все отчёты
             </button>
@@ -284,8 +284,8 @@ export function ReportHistory() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{report.siteName}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500">
+                      <p className="text-sm font-medium text-foreground">{report.siteName}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
                         <CalendarDays className="w-3 h-3" />
                         {formatDate(report.date)}
                       </div>
@@ -293,7 +293,7 @@ export function ReportHistory() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={(e) => handleOpenPreview(report, e)}
-                        className="flex h-11 w-11 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong transition-colors hover:bg-orange-50 hover:text-orange-700"
                         title="Предпросмотр PDF"
                         aria-label={`Открыть PDF отчёта по объекту ${report.siteName} за ${formatDate(report.date)}`}
                       >
@@ -314,18 +314,18 @@ export function ReportHistory() {
 
                   <div className="grid grid-cols-3 gap-3 mt-3">
                     <div className="flex items-center gap-1.5">
-                      <HardHat className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-sm font-mono font-semibold text-slate-900">
+                      <HardHat className="w-3.5 h-3.5 text-signal-strong" />
+                      <span className="text-sm font-mono font-semibold text-foreground">
                         {report.totalPiles}/{(report.totalPileMeters ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-xs text-slate-500">шт/м.п.</span>
+                      <span className="text-xs text-muted-foreground">шт/м.п.</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Drill className="w-3.5 h-3.5 text-blue-500" />
-                      <span className="text-sm font-mono font-semibold text-slate-900">
+                      <span className="text-sm font-mono font-semibold text-foreground">
                         {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-xs text-slate-500">шт/м</span>
+                      <span className="text-xs text-muted-foreground">шт/м</span>
                     </div>
                     {report.totalDowntime > 0 && (
                       <div className="flex items-center gap-1.5">
@@ -333,7 +333,7 @@ export function ReportHistory() {
                         <span className="text-sm font-mono font-semibold text-amber-600">
                           {report.totalDowntime}
                         </span>
-                        <span className="text-xs text-slate-500">ч</span>
+                        <span className="text-xs text-muted-foreground">ч</span>
                       </div>
                     )}
                   </div>
@@ -346,7 +346,7 @@ export function ReportHistory() {
             <button
               onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="w-full h-11 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-xl border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {loadingMore ? 'Загрузка…' : 'Показать ещё'}

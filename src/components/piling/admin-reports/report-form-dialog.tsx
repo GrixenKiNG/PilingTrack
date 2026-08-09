@@ -198,8 +198,8 @@ export function ReportFormDialog({
         </DialogHeader>
         {loadingReferenceData ? (
           <div className="flex min-h-[280px] items-center justify-center">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-signal-strong" />
               Загрузка справочников формы...
             </div>
           </div>
@@ -208,7 +208,7 @@ export function ReportFormDialog({
           {/* Operator, Site, Date, Shift, Equipment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Оператор</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Оператор</Label>
               <Select value={formUserId} onValueChange={setFormUserId}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Выберите оператора" /></SelectTrigger>
                 <SelectContent>
@@ -217,7 +217,7 @@ export function ReportFormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Объект</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Объект</Label>
               <Select value={formSiteId} onValueChange={setFormSiteId}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
                 <SelectContent>
@@ -226,17 +226,17 @@ export function ReportFormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Дата</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Дата</Label>
               <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-10 font-mono" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5"><Label className="text-xs font-medium text-slate-600">Начало</Label>
+              <div className="space-y-1.5"><Label className="text-xs font-medium text-muted-foreground">Начало</Label>
                 <Input type="time" value={formShiftStart} onChange={(e) => setFormShiftStart(e.target.value)} className="h-10 font-mono" /></div>
-              <div className="space-y-1.5"><Label className="text-xs font-medium text-slate-600">Конец</Label>
+              <div className="space-y-1.5"><Label className="text-xs font-medium text-muted-foreground">Конец</Label>
                 <Input type="time" value={formShiftEnd} onChange={(e) => setFormShiftEnd(e.target.value)} className="h-10 font-mono" /></div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
+              <Label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
               <Select value={formEquipmentId} onValueChange={setFormEquipmentId}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
                 <SelectContent>
@@ -251,7 +251,7 @@ export function ReportFormDialog({
           {/* Piles */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" />Забитые сваи</h4>
+              <h4 className="text-sm font-semibold flex items-center gap-2"><HardHat className="w-4 h-4 text-signal-strong" />Забитые сваи</h4>
               {formTotalPiles > 0 && (
                 <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">
                   {formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п.
@@ -275,20 +275,20 @@ export function ReportFormDialog({
             {formPiles.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
                 {formPiles.map((pile) => (
-                  <div key={pile.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
+                  <div key={pile.id} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
                     <div className="min-w-0">
                       <span className="font-medium">{getPileGradeName(pile.pileGradeId)}</span>
-                      <p className="text-3xs text-slate-500">
+                      <p className="text-3xs text-muted-foreground">
                         {getPileLengthMeters(pile.pileGradeId).toFixed(1)} м × {pile.count} шт. = {getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-right font-mono font-semibold">
                         <span className="block">{pile.count} шт.</span>
-                        <span className="block text-xs text-slate-500">{getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.</span>
+                        <span className="block text-xs text-muted-foreground">{getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.</span>
                       </span>
                       <button onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -318,15 +318,15 @@ export function ReportFormDialog({
             {formDrillings.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
                 {formDrillings.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
+                  <div key={d.id} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
                     <span className="font-medium">{getDrillTypeName(d.typeId)}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-right font-mono font-semibold">
                         <span className="block">{d.count} шт. x {d.metersPerUnit} м</span>
-                        <span className="block text-xs text-slate-500">{d.meters} м</span>
+                        <span className="block text-xs text-muted-foreground">{d.meters} м</span>
                       </span>
                       <button onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -340,7 +340,7 @@ export function ReportFormDialog({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2"><Clock className="w-4 h-4 text-amber-500" />Простой техники</h4>
-              <button onClick={() => setShowFormDowntime(!showFormDowntime)} className="text-xs text-orange-500 font-medium">
+              <button onClick={() => setShowFormDowntime(!showFormDowntime)} className="text-xs text-signal-strong font-medium">
                 {showFormDowntime ? 'Скрыть' : '+ Добавить'}
               </button>
             </div>
@@ -359,15 +359,15 @@ export function ReportFormDialog({
                 {formDowntimes.length > 0 && (
                   <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
                     {formDowntimes.map((dt) => (
-                      <div key={dt.id} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
+                      <div key={dt.id} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
                         <div className="min-w-0">
                           <span className="font-medium">{getDtReasonName(dt.reasonId)}</span>
-                          {dt.comment && <p className="text-3xs text-slate-500 truncate">{dt.comment}</p>}
+                          {dt.comment && <p className="text-3xs text-muted-foreground truncate">{dt.comment}</p>}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-semibold text-amber-600">{dt.duration} ч</span>
                           <button onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
-                            className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                            className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       </div>
                     ))}
@@ -382,7 +382,7 @@ export function ReportFormDialog({
           {/* Summary */}
           {(formPiles.length > 0 || formDrillings.length > 0 || formDowntimes.length > 0) && (
             <div className="bg-slate-900 rounded-lg p-3 text-white">
-              <p className="text-3xs font-medium text-slate-400 mb-2">Итого</p>
+              <p className="text-3xs font-medium text-muted-foreground mb-2">Итого</p>
               <div className="flex items-center gap-4 text-sm">
                 <span className="font-mono font-bold">{formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п. сваи</span>
                 <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м.п. бурение</span>

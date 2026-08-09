@@ -211,11 +211,11 @@ export function AdminAnalytics() {
     <div data-testid="operations-analytics" className="space-y-4 p-4 lg:p-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-blue-600" />
             Аналитика
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Производительность операторов и тренды по объектам
           </p>
         </div>
@@ -286,17 +286,17 @@ export function AdminAnalytics() {
               </CardHeader>
               <CardContent className="max-h-[195px] space-y-2.5 overflow-y-auto">
                 {overview.equipmentUsage.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-slate-500">Нет активных установок.</p>
+                  <p className="py-4 text-center text-sm text-muted-foreground">Нет активных установок.</p>
                 ) : overview.equipmentUsage.map((e) => (
                   <div key={e.id} className="flex items-center gap-2 text-xs" title={`Дней с отчётом: ${e.activeDays} из ${overview.period.days}`}>
-                    <span className="w-36 truncate text-slate-700">{e.name}</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <span className="w-36 truncate text-foreground">{e.name}</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-sky-500" style={{ width: `${e.usagePct}%` }} />
                     </div>
-                    <span className="w-9 text-right font-medium tabular-nums text-slate-700">{e.usagePct}%</span>
+                    <span className="w-9 text-right font-medium tabular-nums text-foreground">{e.usagePct}%</span>
                   </div>
                 ))}
-                <p className="pt-1 text-2xs text-slate-400">Доля дней периода, когда по установке был отчёт.</p>
+                <p className="pt-1 text-2xs text-muted-foreground">Доля дней периода, когда по установке был отчёт.</p>
               </CardContent>
             </Card>
           )}
@@ -314,7 +314,7 @@ export function AdminAnalytics() {
               'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors flex items-center gap-1.5',
               tab === t.key
                 ? 'bg-blue-100 text-blue-700 border-blue-200'
-                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                : 'bg-card text-muted-foreground border-border hover:bg-muted'
             )}
           >
             <t.icon className="w-3.5 h-3.5" />
@@ -335,12 +335,12 @@ export function AdminAnalytics() {
                 { id: 'table-operators', node: (
               <Card className="gap-2 py-3">
                 <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2"><HardHat className="w-4 h-4 text-orange-500" /> Топ-10 по забитым сваям</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><HardHat className="w-4 h-4 text-signal-strong" /> Топ-10 по забитым сваям</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b text-left text-xs text-slate-500">
+                      <tr className="border-b text-left text-xs text-muted-foreground">
                         <th className="py-2 pr-3">Оператор</th>
                         <th className="py-2 px-3 text-right">Отработано, ч</th>
                         <th className="py-2 px-3 text-right">Погонные метры, м</th>
@@ -356,20 +356,20 @@ export function AdminAnalytics() {
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i < 20 ? i * 0.02 : 0 }}
-                          className="border-b last:border-b-0 hover:bg-slate-50"
+                          className="border-b last:border-b-0 hover:bg-muted"
                         >
                           <td className="py-2 pr-3 font-medium">{o.userName}</td>
                           <td className="py-2 px-3 text-right font-mono">{o.workedHours != null ? o.workedHours.toLocaleString('ru-RU', { maximumFractionDigits: 1 }) : '—'}</td>
                           <td className="py-2 px-3 text-right font-mono">{Math.round(o.meters).toLocaleString('ru-RU')}</td>
                           <td className="py-2 px-3 text-right font-mono">{o.piles}</td>
                           <td className="py-2 px-3 text-right font-mono">{o.downtimePct != null ? `${o.downtimePct.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}` : '—'}</td>
-                          <td className="py-2 pl-3 text-right font-mono text-slate-500">{o.reports}</td>
+                          <td className="py-2 pl-3 text-right font-mono text-muted-foreground">{o.reports}</td>
                         </motion.tr>
                       ))}
                     </tbody>
                   </table>
                   {operators.length > 5 && (
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Показано {showAllOperators ? operators.length : 5} из {operators.length} операторов</span>
                       <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="font-medium text-blue-600 hover:underline">
                         {showAllOperators ? 'Свернуть' : 'Смотреть всех'}
@@ -400,7 +400,7 @@ export function AdminAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-2xs text-slate-500">Объект:</span>
+                  <span className="mr-1 text-2xs text-muted-foreground">Объект:</span>
                   {[{ id: 'all', name: 'Все объекты' }, ...sites].map((site) => (
                     <button
                       key={site.id}
@@ -410,7 +410,7 @@ export function AdminAnalytics() {
                         'rounded-md border px-2 py-0.5 text-2xs transition-colors',
                         trendSiteId === site.id
                           ? 'border-blue-200 bg-blue-50 font-semibold text-blue-700'
-                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50',
+                          : 'border-border bg-card text-muted-foreground hover:bg-muted',
                       )}
                     >
                       {site.name}
@@ -456,11 +456,11 @@ export function AdminAnalytics() {
                 </CardHeader>
                 <CardContent className="max-h-[92px] overflow-y-auto">
                   {kpi.topProblemRigs.length === 0 ? (
-                    <p className="text-sm text-slate-500 py-4 text-center">Отказов за период не зафиксировано.</p>
+                    <p className="text-sm text-muted-foreground py-4 text-center">Отказов за период не зафиксировано.</p>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left text-xs text-slate-500 border-b">
+                        <tr className="text-left text-xs text-muted-foreground border-b">
                           <th className="py-2">Установка</th>
                           <th className="py-2 text-right">Отказов</th>
                           <th className="py-2 text-right">Затраты, ₽</th>
@@ -469,7 +469,7 @@ export function AdminAnalytics() {
                       <tbody>
                         {kpi.topProblemRigs.map((r) => (
                           <tr key={r.equipmentId} className="border-b last:border-0">
-                            <td className="py-2 font-medium text-slate-800">{r.equipmentName}</td>
+                            <td className="py-2 font-medium text-foreground">{r.equipmentName}</td>
                             <td className="py-2 text-right font-mono">{r.failures}</td>
                             <td className="py-2 text-right font-mono">{r.cost.toLocaleString('ru')}</td>
                           </tr>
@@ -495,10 +495,10 @@ export function AdminAnalytics() {
           </CardHeader>
           <CardContent className="max-h-[195px] overflow-y-auto">
             {overview.siteRating.length === 0 ? (
-              <p className="py-4 text-center text-sm text-slate-500">За период нет отчётов.</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">За период нет отчётов.</p>
             ) : (
               <div className="space-y-4">
-                <div className="flex justify-between text-xs text-slate-500">
+                <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Объект</span>
                   <span>Погонные метры, м · Сваи, шт</span>
                 </div>
@@ -507,10 +507,10 @@ export function AdminAnalytics() {
                   return (
                     <div key={s.id}>
                       <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <span className="truncate font-medium text-slate-800">{s.name}</span>
-                        <span className="shrink-0 font-mono text-slate-700">{Math.round(s.meters).toLocaleString('ru-RU')} <span className="text-xs text-slate-400">· {s.piles}</span></span>
+                        <span className="truncate font-medium text-foreground">{s.name}</span>
+                        <span className="shrink-0 font-mono text-foreground">{Math.round(s.meters).toLocaleString('ru-RU')} <span className="text-xs text-muted-foreground">· {s.piles}</span></span>
                       </div>
-                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
                         <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(4, Math.round((s.meters / max) * 100))}%` }} />
                       </div>
                     </div>

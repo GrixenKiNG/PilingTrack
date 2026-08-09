@@ -37,7 +37,7 @@ export function MaintenanceDetailPanel({
 }) {
   if (!record) {
     return (
-      <aside className="border-l border-slate-200 bg-white p-5 text-sm text-slate-500">
+      <aside className="border-l border-border bg-card p-5 text-sm text-muted-foreground">
         Выберите наряд ТО в журнале.
       </aside>
     );
@@ -53,12 +53,12 @@ export function MaintenanceDetailPanel({
   const closeBusy = busyAction === `${record.id}:DONE`;
 
   return (
-    <aside className="min-h-screen border-l border-slate-200 bg-white">
+    <aside className="min-h-screen border-l border-border bg-card">
       <div className="flex h-full flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <h2 className="truncate text-lg font-bold text-slate-950">ТО {record.equipment?.name ?? record.title}</h2>
+              <h2 className="truncate text-lg font-bold text-foreground">ТО {record.equipment?.name ?? record.title}</h2>
               <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold', badge.className)}>
                 {badge.label}
               </span>
@@ -89,7 +89,7 @@ export function MaintenanceDetailPanel({
           </PanelSection>
 
           <PanelSection title="Исполнение">
-            <div className="overflow-hidden rounded-md border border-slate-200">
+            <div className="overflow-hidden rounded-md border border-border">
               <FactRow label="Диагностика" value={record.faultCause} />
               <FactRow label="Выполнено" value={record.workDone} />
               <FactRow label="Запчасти" value={record.partsUsedText} />
@@ -106,7 +106,7 @@ export function MaintenanceDetailPanel({
                   {record.partsUsedText && <RemarkLine tone="red" text={record.partsUsedText} />}
                 </>
               ) : (
-                <p className="text-xs text-slate-500">Замечания не заполнены.</p>
+                <p className="text-xs text-muted-foreground">Замечания не заполнены.</p>
               )}
             </div>
           </PanelSection>
@@ -135,7 +135,7 @@ export function MaintenanceDetailPanel({
           </PanelSection>
         </div>
 
-        <footer className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+        <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3">
           <Button
             size="sm"
             className="h-9 bg-orange-500 px-2 text-white hover:bg-orange-600"
@@ -161,8 +161,8 @@ export function MaintenanceDetailPanel({
 
 function PanelSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-b border-slate-200 pb-4 last:border-b-0">
-      <h3 className="mb-3 text-sm font-bold text-slate-900">{title}</h3>
+    <section className="border-b border-border pb-4 last:border-b-0">
+      <h3 className="mb-3 text-sm font-bold text-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -171,8 +171,8 @@ function PanelSection({ title, children }: { title: string; children: React.Reac
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-2xs text-slate-500">{label}</div>
-      <div className="mt-1 line-clamp-2 text-xs font-semibold text-slate-800">{value}</div>
+      <div className="text-2xs text-muted-foreground">{label}</div>
+      <div className="mt-1 line-clamp-2 text-xs font-semibold text-foreground">{value}</div>
     </div>
   );
 }
@@ -180,24 +180,24 @@ function InfoCell({ label, value }: { label: string; value: string }) {
 function MetricLine({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-2xs text-slate-500">{label}</div>
-      <div className="mt-1 font-mono text-sm font-bold text-slate-900">{value}</div>
+      <div className="text-2xs text-muted-foreground">{label}</div>
+      <div className="mt-1 font-mono text-sm font-bold text-foreground">{value}</div>
     </div>
   );
 }
 
 function FactRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div className="grid grid-cols-[112px_1fr] border-b border-slate-100 text-xs last:border-b-0">
-      <div className="bg-slate-50 px-2 py-1.5 font-medium text-slate-600">{label}</div>
-      <div className="px-2 py-1.5 text-slate-700">{value?.toString().trim() || 'Не заполнено'}</div>
+    <div className="grid grid-cols-[112px_1fr] border-b border-border text-xs last:border-b-0">
+      <div className="bg-muted px-2 py-1.5 font-medium text-muted-foreground">{label}</div>
+      <div className="px-2 py-1.5 text-foreground">{value?.toString().trim() || 'Не заполнено'}</div>
     </div>
   );
 }
 
 function RemarkLine({ tone, text }: { tone: 'orange' | 'red'; text: string }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-700">
+    <div className="flex items-center gap-2 text-xs text-foreground">
       <span className={cn('h-2 w-2 rounded-full', tone === 'orange' ? 'bg-orange-500' : 'bg-red-500')} />
       <span className="min-w-0 flex-1 truncate">{text}</span>
     </div>
@@ -208,9 +208,9 @@ function TimelineLine({ tone, date, text, actor }: { tone: 'green' | 'orange'; d
   return (
     <div className="grid grid-cols-[12px_112px_1fr_88px] items-start gap-2">
       <span className={cn('mt-1.5 h-2 w-2 rounded-full', tone === 'green' ? 'bg-emerald-500' : 'bg-orange-500')} />
-      <span className="font-mono text-2xs text-slate-500">{date}</span>
-      <span className="text-slate-700">{text}</span>
-      <span className="truncate text-right text-2xs text-slate-500">{actor}</span>
+      <span className="font-mono text-2xs text-muted-foreground">{date}</span>
+      <span className="text-foreground">{text}</span>
+      <span className="truncate text-right text-2xs text-muted-foreground">{actor}</span>
     </div>
   );
 }

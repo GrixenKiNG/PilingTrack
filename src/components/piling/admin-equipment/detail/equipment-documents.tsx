@@ -155,7 +155,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           Паспорт, ОТС, страховка, акты ТО. Срок действия отслеживается отдельно
           и подсвечивается, если истекает.
         </p>
@@ -165,7 +165,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
       </div>
 
       {documents.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
           Документы не загружены.
         </p>
       ) : (
@@ -174,23 +174,23 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
             <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                   <span className="font-medium truncate">{d.title}</span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
-                  <span className="font-medium text-slate-600">
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                  <span className="font-medium text-muted-foreground">
                     {TYPE_LABEL[d.type as DocumentTypeId] ?? d.type}
                   </span>
                   {d.issuedAt && <span>выдан {formatRuDate(d.issuedAt.slice(0, 10))}</span>}
                   {d.expiresAt && <ExpiresIndicator iso={d.expiresAt} />}
                 </div>
-                {d.notes && <p className="text-xs text-slate-400 mt-0.5">{d.notes}</p>}
+                {d.notes && <p className="text-xs text-muted-foreground mt-0.5">{d.notes}</p>}
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
                 <button
                   onClick={() => openEdit(d)}
                   aria-label={`Редактировать документ «${d.title}»`}
-                  className="flex h-11 w-11 items-center justify-center rounded-md text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700"
+                  className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-orange-50 hover:text-orange-700"
                   title="Редактировать"
                 >
                   <Pencil className="w-3.5 h-3.5" />

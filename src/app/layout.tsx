@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 // Sonner, not the Radix toaster: every toast.* call in the app goes through
 // sonner, and without its <Toaster/> mounted they all silently no-op (login
 // errors and report-submit errors were invisible to users).
@@ -12,6 +13,31 @@ import './globals.css';
 // that blocks every one of those tags, yielding a blank screen on first
 // load (most visible on mobile where Ctrl+Shift+R isn't an option).
 export const dynamic = 'force-dynamic';
+
+/**
+ * Шрифты продукта. До 2026-08-09 `globals.css` объявлял `Inter` и
+ * `JetBrains Mono`, но НИ ОДИН шрифт не загружался: ни next/font, ни
+ * @font-face, ни ссылки на Google Fonts. Замер это подтвердил — строка
+ * рисовалась шириной Segoe UI (781px), а не Inter (731px). То есть шрифт
+ * был «что найдётся в системе»: Segoe UI у диспетчера, Roboto у оператора
+ * на Android, SF на iPhone.
+ *
+ * next/font скачивает файлы на этапе сборки и раздаёт их со своего домена —
+ * в рантайме обращений к Google нет, поэтому CSP и приватность не страдают.
+ * Подмножество `cyrillic` обязательно: без него кириллица уедет в fallback,
+ * и мы вернёмся к той же разнице между устройствами.
+ */
+const inter = Inter({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-jetbrains',
+  display: 'swap',
+});
 
 const APP_TITLE = 'PilingTrack';
 const APP_DESCRIPTION =
@@ -76,7 +102,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
         {process.env.NODE_ENV === 'development' && (
           <script

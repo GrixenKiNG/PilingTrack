@@ -124,18 +124,18 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   };
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-4">
+    <div className="mt-4 border-t border-border pt-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-slate-500">Журнал ТО, ремонтов и неисправностей.</p>
+        <p className="text-xs text-muted-foreground">Журнал ТО, ремонтов и неисправностей.</p>
         <Button onClick={openCreate} size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
           <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
         </Button>
       </div>
 
       {loading ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-400">Загрузка…</p>
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Загрузка…</p>
       ) : records.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">Записей по обслуживанию пока нет.</p>
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Записей по обслуживанию пока нет.</p>
       ) : (
         <ul className="space-y-2">
           {records.map((r) => {
@@ -146,23 +146,23 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={cn('h-2 w-2 shrink-0 rounded-full', PRIORITY_STYLE[pr])} title={PRIORITY_LABEL[pr]} />
-                    <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <Link href={`/admin/maintenance/${r.id}`} className="font-medium truncate hover:text-orange-600 hover:underline">
+                    <Wrench className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <Link href={`/admin/maintenance/${r.id}`} className="font-medium truncate hover:text-signal-strong hover:underline">
                       {r.title}
                     </Link>
                     <span className={cn('rounded px-1.5 py-0.5 text-2xs font-medium', STATUS_STYLE[st])}>
                       {STATUS_LABEL[st]}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
-                    <span className="font-medium text-slate-600">{TYPE_LABEL[r.type as MaintenanceType] ?? r.type}</span>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                    <span className="font-medium text-muted-foreground">{TYPE_LABEL[r.type as MaintenanceType] ?? r.type}</span>
                     <span>исполнитель: {r.assigneeId ? resolveAssigneeName(r.assigneeId, names) : (r.performedBy || '—')}</span>
                     {r.scheduledAt && <span>план {formatRuDate(r.scheduledAt.slice(0, 10))}</span>}
                     {r.completedAt && <span>факт {formatRuDate(r.completedAt.slice(0, 10))}</span>}
                     {r.engineHoursAtService != null && <span>{r.engineHoursAtService} м.ч.</span>}
                     {r.cost != null && <span>{formatCost(r.cost)}</span>}
                   </div>
-                  {r.description && <p className="mt-0.5 text-xs text-slate-400">{r.description}</p>}
+                  {r.description && <p className="mt-0.5 text-xs text-muted-foreground">{r.description}</p>}
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
                   {st === 'PLANNED' && (
@@ -181,7 +181,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                   )}
                   <button onClick={() => openEdit(r)}
                     aria-label={`Редактировать запись «${r.title}»`}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700" title="Редактировать">
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-orange-50 hover:text-orange-700" title="Редактировать">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => setPendingDelete(r)} disabled={pendingId === r.id}

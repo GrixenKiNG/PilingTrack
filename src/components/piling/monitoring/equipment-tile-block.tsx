@@ -13,9 +13,18 @@ import type { EquipmentTileBlock } from './equipment-tile-template';
 function Value({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
-      {icon && <span className="shrink-0 text-slate-400">{icon}</span>}
+      {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
       <span className="min-w-0">
-        <span className="block text-[0.65em] font-medium uppercase tracking-wide opacity-55">{label}</span>
+        {/* Размер в em масштабировался вместе с плиткой, но при её обычных
+            11–12px давал 7.15px — нечитаемо в цеху. Нижняя граница 10px
+            через max() сохраняет масштабирование на крупных плитках.
+            opacity-55 убрана: с ней подпись давала контраст 2.06. */}
+        <span
+          className="block font-medium uppercase tracking-wide text-muted-foreground"
+          style={{ fontSize: 'max(10px, 0.65em)' }}
+        >
+          {label}
+        </span>
         <span className="block truncate font-semibold">{value}</span>
       </span>
     </div>
@@ -55,7 +64,7 @@ function useResolvedPhotoUrl(photoUrl: string | null | undefined): string | null
 
 function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
   const url = useResolvedPhotoUrl(photoUrl);
-  if (!url) return <span className="text-xs text-slate-400">Фото не загружено</span>;
+  if (!url) return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
   return <img src={url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
 }
 
@@ -73,7 +82,7 @@ function PhotoBlock({ card }: { card: FleetCard }) {
         ? { label: 'В работе', classes: 'bg-emerald-100 text-emerald-700' }
         : card.status === 'expected'
           ? { label: 'Ждём отчёт', classes: 'bg-amber-100 text-amber-700' }
-          : { label: 'Нет отчёта', classes: 'bg-slate-200 text-slate-700' };
+          : { label: 'Нет отчёта', classes: 'bg-slate-200 text-foreground' };
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: brand?.tint ?? '#cbd5e1' }}>
@@ -97,7 +106,7 @@ function PhotoBlock({ card }: { card: FleetCard }) {
         </p>
       </div>
       {card.inventoryNumber && (
-        <span className="absolute right-3 top-3 rounded-md bg-white/20 px-2 py-1 text-3xs font-semibold text-white backdrop-blur">
+        <span className="absolute right-3 top-3 rounded-md bg-card/20 px-2 py-1 text-3xs font-semibold text-white backdrop-blur">
           {card.inventoryNumber}
         </span>
       )}
@@ -120,7 +129,7 @@ export function EquipmentTileBlockContent({
   if (block.kind === 'text') return <span className="whitespace-pre-wrap break-words">{block.text}</span>;
   if (block.kind === 'divider') return <span className="block h-px w-full bg-current opacity-20" />;
   if (block.kind === 'image') {
-    if (!card.photoUrl) return <span className="text-xs text-slate-400">Фото не загружено</span>;
+    if (!card.photoUrl) return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
     return <ServerPhoto photoUrl={card.photoUrl} alt={block.alt ?? card.name} fit={block.imageFit ?? 'cover'} />;
   }
   if (block.dataKey === 'photo') return <PhotoBlock card={card} />;

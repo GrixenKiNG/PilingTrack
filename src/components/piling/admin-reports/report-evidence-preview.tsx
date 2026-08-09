@@ -54,7 +54,7 @@ export function ReportEvidencePreview({
 }) {
   if (!report) {
     return (
-      <aside className="min-h-56 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500 shadow-sm xl:sticky xl:top-4">
+      <aside className="min-h-56 rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground shadow-sm xl:sticky xl:top-4">
         Выберите отчёт в журнале, чтобы увидеть доказательства смены.
       </aside>
     );
@@ -66,21 +66,21 @@ export function ReportEvidencePreview({
   const downtimeMax = Math.max(...report.downtimes.map((item) => item.duration), 1);
   const workTotal = Math.max(totals.pileMeters + totals.drillingMeters, 1);
   return (
-    <aside className="self-start rounded-lg border border-slate-200 bg-white shadow-sm xl:sticky xl:top-4">
-      <div className="border-b border-slate-200 bg-white p-3">
+    <aside className="self-start rounded-lg border border-border bg-card shadow-sm xl:sticky xl:top-4">
+      <div className="border-b border-border bg-card p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-slate-950">Отчёт #{report.reportId}</h2>
-            <p className="mt-0.5 text-2xs text-slate-500">Доказательства смены · {formatDate(report.date)}</p>
+            <h2 className="truncate text-base font-semibold text-foreground">Отчёт #{report.reportId}</h2>
+            <p className="mt-0.5 text-2xs text-muted-foreground">Доказательства смены · {formatDate(report.date)}</p>
             <span className={cn(
               'mt-1 inline-block rounded px-2 py-0.5 text-3xs font-medium',
-              report.status === 'submitted' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+              report.status === 'submitted' ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground',
             )}>{statusLabel(report.status)}</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Закрыть доказательства смены"
             title="Закрыть"
           >
@@ -90,47 +90,47 @@ export function ReportEvidencePreview({
       </div>
 
       <div className="space-y-2 p-3">
-        <div className="grid grid-cols-2 divide-x rounded-md border border-slate-200 bg-slate-50">
+        <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
           <HeaderFact label="Смена" value={shiftLabel(report)} sub={report.date} />
           <HeaderFact label="Изменено" value={formatIsoDateTime(report.updatedAt)} sub={report.lastEditedByName || '-'} />
         </div>
 
-        <div className="grid grid-cols-3 divide-x rounded-md border border-slate-200">
+        <div className="grid grid-cols-3 divide-x rounded-md border border-border">
           <HeaderFact label="Объект" value={report.site?.name || '-'} sub="-" />
           <HeaderFact label="Установка" value={report.equipment?.name || '-'} sub="-" />
           <HeaderFact label="Оператор" value={report.user?.name || '-'} sub="-" />
         </div>
 
         <div>
-          <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-900">
-            <History className="h-4 w-4 text-slate-400" />
+          <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
+            <History className="h-4 w-4 text-muted-foreground" />
             История изменений
           </h3>
-          <div className="rounded-md border border-slate-200">
+          <div className="rounded-md border border-border">
             {history.loading ? (
-              <div className="px-2.5 py-3 text-2xs text-slate-400">Загрузка истории…</div>
+              <div className="px-2.5 py-3 text-2xs text-muted-foreground">Загрузка истории…</div>
             ) : history.error ? (
               <div className="px-2.5 py-3 text-2xs text-red-500">Не удалось загрузить историю изменений</div>
             ) : !history.data || history.data.events.length === 0 ? (
-              <div className="px-2.5 py-3 text-2xs text-slate-400">Событий пока нет</div>
+              <div className="px-2.5 py-3 text-2xs text-muted-foreground">Событий пока нет</div>
             ) : (
               history.data.events.map((event) => (
-                <div key={event.id} className="border-b border-slate-100 px-2.5 py-2 last:border-b-0">
+                <div key={event.id} className="border-b border-border px-2.5 py-2 last:border-b-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-slate-700">{event.actionLabel}</span>
-                    <span className="text-3xs text-slate-400">{formatIsoDateTime(event.createdAt)}</span>
+                    <span className="text-xs font-medium text-foreground">{event.actionLabel}</span>
+                    <span className="text-3xs text-muted-foreground">{formatIsoDateTime(event.createdAt)}</span>
                   </div>
-                  <p className="mt-0.5 text-2xs text-slate-500">
+                  <p className="mt-0.5 text-2xs text-muted-foreground">
                     {event.actorName || 'Неизвестный'}{event.actorRole ? ` · ${roleLabel(event.actorRole)}` : ''}
                   </p>
                   {event.changes.length > 0 && (
                     <ul className="mt-1 space-y-0.5">
                       {event.changes.map((change, i) => (
-                        <li key={i} className="text-2xs text-slate-600">
-                          <span className="text-slate-400">{change.label}:</span>{' '}
+                        <li key={i} className="text-2xs text-muted-foreground">
+                          <span className="text-muted-foreground">{change.label}:</span>{' '}
                           <span className="line-through decoration-slate-300">{change.before}</span>
                           {' → '}
-                          <span className="font-medium text-slate-800">{change.after}</span>
+                          <span className="font-medium text-foreground">{change.after}</span>
                         </li>
                       ))}
                     </ul>
@@ -145,14 +145,14 @@ export function ReportEvidencePreview({
           <PhotoSection reportId={report.reportId} canEdit={false} />
         </div>
 
-        <div className="grid grid-cols-4 divide-x rounded-md border border-slate-200">
+        <div className="grid grid-cols-4 divide-x rounded-md border border-border">
           <PreviewMetric icon={HardHat} label="Сваи" value={`${formatNumber(totals.piles)} шт.`} sub={`${formatNumber(totals.pileMeters)} м.п.`} />
           <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м`} />
           <PreviewMetric icon={Clock} label="Простой" value={formatHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} />
           <PreviewMetric icon={CheckCircle2} label="Эффективность" value={efficiency == null ? '-' : formatPercentValue(efficiency)} sub="без простоев" />
         </div>
 
-        <div className="grid grid-cols-4 divide-x rounded-md border border-slate-200">
+        <div className="grid grid-cols-4 divide-x rounded-md border border-border">
           <PlainFact label="Начало смены" value={report.shiftStart || '-'} />
           <PlainFact label="Окончание" value={report.shiftEnd || '-'} />
           <PlainFact label="Отработано" value={duration == null ? '-' : formatHours(duration)} />
@@ -161,8 +161,8 @@ export function ReportEvidencePreview({
 
         <div className="grid gap-2 md:grid-cols-2">
           {report.downtimes.length > 0 && (
-            <div className="rounded-md border border-slate-200 p-2.5">
-              <h3 className="mb-1.5 text-xs font-semibold text-slate-900">Простои по причинам</h3>
+            <div className="rounded-md border border-border p-2.5">
+              <h3 className="mb-1.5 text-xs font-semibold text-foreground">Простои по причинам</h3>
               <div className="space-y-1">
                 {report.downtimes.slice(0, 3).map((downtime) => (
                   <ProgressLine
@@ -177,8 +177,8 @@ export function ReportEvidencePreview({
             </div>
           )}
 
-          <div className="rounded-md border border-slate-200 p-2.5">
-            <h3 className="mb-1.5 text-xs font-semibold text-slate-900">Типы работ</h3>
+          <div className="rounded-md border border-border p-2.5">
+            <h3 className="mb-1.5 text-xs font-semibold text-foreground">Типы работ</h3>
             <div className="space-y-1">
               <ProgressLine label="Сваи" value={`${formatNumber(totals.pileMeters)} м.п.`} pct={(totals.pileMeters / workTotal) * 100} tone="orange" />
               <ProgressLine label="Бурение" value={`${formatNumber(totals.drillingMeters)} м`} pct={(totals.drillingMeters / workTotal) * 100} tone="blue" />
@@ -212,9 +212,9 @@ export function ReportEvidencePreview({
 function HeaderFact({ label, value, sub }: { label: string; value: ReactNode; sub: string }) {
   return (
     <div className="min-w-0 p-2">
-      <p className="mb-0.5 text-3xs uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="truncate text-xs font-semibold text-slate-900">{value}</div>
-      <p className="mt-0.5 truncate text-3xs text-slate-400">{sub}</p>
+      <p className="mb-0.5 text-3xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="truncate text-xs font-semibold text-foreground">{value}</div>
+      <p className="mt-0.5 truncate text-3xs text-muted-foreground">{sub}</p>
     </div>
   );
 }
@@ -222,8 +222,8 @@ function HeaderFact({ label, value, sub }: { label: string; value: ReactNode; su
 function PlainFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 p-2">
-      <p className="mb-0.5 text-3xs uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="truncate font-mono text-xs font-semibold text-slate-900">{value}</p>
+      <p className="mb-0.5 text-3xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="truncate font-mono text-xs font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -232,10 +232,10 @@ function ProgressLine({ label, value, pct, tone }: { label: string; value: strin
   return (
     <div>
       <div className="mb-0.5 flex items-center justify-between gap-2 text-2xs">
-        <span className="truncate text-slate-600">{label}</span>
-        <span className="font-mono text-slate-500">{value}</span>
+        <span className="truncate text-muted-foreground">{label}</span>
+        <span className="font-mono text-muted-foreground">{value}</span>
       </div>
-      <div className="h-1 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-1 overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
             'h-full rounded-full',
@@ -262,13 +262,13 @@ function PreviewMetric({
   sub: string;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 p-2">
+    <div className="rounded-md border border-border p-2">
       <div className="mb-0.5 flex items-center justify-between gap-2">
-        <span className="text-3xs uppercase tracking-wide text-slate-400">{label}</span>
-        <Icon className="h-3.5 w-3.5 text-slate-400" />
+        <span className="text-3xs uppercase tracking-wide text-muted-foreground">{label}</span>
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
       </div>
-      <div className="font-mono text-sm font-semibold tabular-nums text-slate-950">{value}</div>
-      <div className="text-3xs text-slate-400">{sub}</div>
+      <div className="font-mono text-sm font-semibold tabular-nums text-foreground">{value}</div>
+      <div className="text-3xs text-muted-foreground">{sub}</div>
     </div>
   );
 }

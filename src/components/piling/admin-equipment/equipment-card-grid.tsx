@@ -70,11 +70,11 @@ function ScopeEditor({
   if (!previewCard) return null;
 
   const switcher = (
-    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
+    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-muted px-3 text-xs font-medium text-muted-foreground">
       <span className="hidden sm:inline">Что редактируем</span>
       <select
         aria-label="Что редактируем"
-        className="max-w-48 bg-transparent font-semibold text-slate-900 focus:outline-none"
+        className="max-w-48 bg-transparent font-semibold text-foreground focus:outline-none"
         value={scope}
         onChange={(event) => onSwitch(event.target.value)}
       >
@@ -172,7 +172,7 @@ export function EquipmentCardGrid({
                     'absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border px-2 py-1 text-2xs font-semibold shadow-sm backdrop-blur transition-colors',
                     customized
                       ? 'border-blue-200 bg-blue-50/90 text-blue-700 hover:bg-blue-100'
-                      : 'border-slate-200 bg-white/90 text-slate-600 opacity-0 hover:bg-slate-50 group-hover:opacity-100',
+                      : 'border-border bg-card/90 text-muted-foreground opacity-0 hover:bg-muted group-hover:opacity-100',
                   )}
                 >
                   <Pencil className="h-3.5 w-3.5" /> {customized ? 'Изменена' : 'Эта плитка'}
@@ -187,7 +187,7 @@ export function EquipmentCardGrid({
         <button
           type="button"
           onClick={() => setEditScope(BASE_SCOPE)}
-          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted"
         >
           <Pencil className="h-4 w-4" /> Редактировать все плитки (база)
         </button>

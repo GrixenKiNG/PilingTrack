@@ -33,16 +33,16 @@ export function SubmitBar({
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalPiles} шт. / {formatNumber(totalPileMeters)} м.п.</p>
-                <p className="text-xs font-medium text-slate-300">Сваи, шт. / м.п.</p>
+                <p className="text-xs font-medium text-muted-foreground">Сваи, шт. / м.п.</p>
               </div>
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalDrillingCount} шт. / {formatNumber(totalMeters)} м.п.</p>
-                <p className="text-xs font-medium text-slate-300">Бурение, шт. / м.п.</p>
+                <p className="text-xs font-medium text-muted-foreground">Бурение, шт. / м.п.</p>
               </div>
               {hasDowntime && (
                 <div>
                   <p className="text-lg font-bold font-mono tabular-nums text-amber-400">{formatNumber(totalDowntime)} ч</p>
-                  <p className="text-xs font-medium text-slate-300">Простой</p>
+                  <p className="text-xs font-medium text-muted-foreground">Простой</p>
                 </div>
               )}
             </div>
@@ -50,7 +50,7 @@ export function SubmitBar({
         </Card>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t px-4 py-3 pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-sm border-t px-4 py-3 pb-safe">
         {showHint && (
           <div className="flex items-center gap-1.5 mb-2 justify-center">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
@@ -63,7 +63,7 @@ export function SubmitBar({
           className={cn(
             'w-full h-14 rounded-lg font-semibold text-base flex items-center justify-center transition-all',
             submitting ? 'bg-orange-400 text-white cursor-wait'
-              : (!selectedSiteId || !hasEntries) ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+              : (!selectedSiteId || !hasEntries) ? 'bg-slate-200 text-muted-foreground cursor-not-allowed'
               : 'bg-orange-500 hover:bg-orange-600 text-white active:scale-[0.98]'
           )}>
           {submitting ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Отправка...</>

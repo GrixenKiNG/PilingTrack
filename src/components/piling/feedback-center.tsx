@@ -54,7 +54,7 @@ function getLevelIcon(level: FeedbackEventDTO['level']) {
     case 'error':
       return <XCircle className="h-4 w-4 text-red-600" />;
     case 'audit':
-      return <ShieldCheck className="h-4 w-4 text-slate-500" />;
+      return <ShieldCheck className="h-4 w-4 text-muted-foreground" />;
     default:
       return <Info className="h-4 w-4 text-blue-600" />;
   }
@@ -67,7 +67,7 @@ function getPriorityBadge(priority: FeedbackEventPriority) {
     case 'HIGH':
       return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Высокий</Badge>;
     case 'LOW':
-      return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">Низкий</Badge>;
+      return <Badge className="bg-muted text-foreground hover:bg-muted">Низкий</Badge>;
     default:
       return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Средний</Badge>;
   }
@@ -284,10 +284,12 @@ export function FeedbackCenter() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100">
-          <Bell className="h-4.5 w-4.5 text-slate-600" />
+        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-muted">
+          <Bell className="h-4.5 w-4.5 text-muted-foreground" />
+          {/* destructive-strong, а не red-500: белым по red-500 на 10px
+              контраст 3.81 — ниже нормы для мелкого текста. */}
           {unreadCount > 0 && (
-            <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-red-500 px-1 text-3xs font-bold text-white">
+            <span className="absolute right-1 top-1 min-w-[16px] rounded-full bg-destructive-strong px-1 text-3xs font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -298,7 +300,7 @@ export function FeedbackCenter() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <SheetTitle className="text-left">{isPrivileged ? 'Контур обратной связи' : 'Уведомления'}</SheetTitle>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {isPrivileged
                   ? 'События, ошибки, подтверждения операций и эксплуатационные сигналы.'
                   : 'Ваши отчёты, входы в систему и важные сообщения.'}
@@ -316,20 +318,20 @@ export function FeedbackCenter() {
         <div className="space-y-4 p-5">
           <div className={`grid gap-3 ${isPrivileged ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {isPrivileged && (
-              <div className="rounded-xl border bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">Состояние платформы</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
+              <div className="rounded-xl border bg-muted p-3">
+                <p className="text-xs text-muted-foreground">Состояние платформы</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
                   {health?.ready ? 'Система готова' : 'Проверка состояния'}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   База: {health?.checks?.database?.status === 'pass' ? 'в норме' : 'нет ответа'} / Окружение: {health?.checks?.environment?.status === 'pass' ? 'в норме' : 'проблема'}
                 </p>
               </div>
             )}
-            <div className="rounded-xl border bg-slate-50 p-3">
-              <p className="text-xs text-slate-500">Активные сигналы</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{warningCount}</p>
-              <p className="mt-1 text-xs text-slate-500">
+            <div className="rounded-xl border bg-muted p-3">
+              <p className="text-xs text-muted-foreground">Активные сигналы</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">{warningCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Непрочитанные: {unreadCount} / Критичные: {summary?.critical || 0}
               </p>
             </div>
@@ -357,7 +359,7 @@ export function FeedbackCenter() {
           </div>
 
           {mergedEvents.length === 0 ? (
-            <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500">
+            <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
               Событий пока нет. Когда появятся ошибки, подтверждения операций или аудиторские записи, они будут видны здесь.
             </div>
           ) : (
@@ -372,7 +374,7 @@ export function FeedbackCenter() {
                 return (
                   <div
                     key={`${event.source}-${event.id}`}
-                    className={`rounded-xl border bg-white p-3 shadow-sm transition-opacity ${
+                    className={`rounded-xl border bg-card p-3 shadow-sm transition-opacity ${
                       event.unread ? 'border-orange-200' : 'opacity-90'
                     }`}
                   >
@@ -381,7 +383,7 @@ export function FeedbackCenter() {
                         {getLevelIcon(event.level)}
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                            <p className="text-sm font-semibold text-foreground">{event.title}</p>
                             {getPriorityBadge(event.priority)}
                             <Badge variant="secondary" className="text-3xs">
                               {event.source === 'client' ? 'локально' : event.scope}
@@ -395,8 +397,8 @@ export function FeedbackCenter() {
                               </Badge>
                             )}
                           </div>
-                          <p className="mt-1 text-sm text-slate-600">{event.message}</p>
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-slate-500">
+                          <p className="mt-1 text-sm text-muted-foreground">{event.message}</p>
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground">
                             <span>{formatEventDate(event.createdAt)}</span>
                             {isPrivileged && event.requestId && <span>requestId: {event.requestId}</span>}
                             {event.actorName && <span>Инициатор: {event.actorName}</span>}
@@ -428,7 +430,7 @@ export function FeedbackCenter() {
                       {event.source === 'client' && (
                         <button
                           onClick={() => dismissLocalFeedbackEvent(event.id)}
-                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
                         >
                           <X className="h-4 w-4" />
                         </button>

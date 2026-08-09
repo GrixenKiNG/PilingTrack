@@ -98,11 +98,11 @@ export function AdminEquipment() {
           плитки в один ряд ужимались до ~128px и текст обрезался. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
             <PilingIcon name="equipment-rig" size={24} tone="primary" decorative />
             Установки
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500">Центр управления парком техники · данные из отчётов</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Центр управления парком техники · данные из отчётов</p>
         </div>
         {canManage && <div className="flex gap-2">
           <Button onClick={() => setShowCreate(true)} className="bg-orange-500 text-white hover:bg-orange-600">
@@ -133,7 +133,7 @@ export function AdminEquipment() {
           {filtered.length === 0 ? (
             <div className="py-16 text-center">
               <PilingIcon name="equipment-rig" size={48} decorative className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
               {cards.length > 0 && (
@@ -191,12 +191,12 @@ export function AdminEquipment() {
 
           <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             {selectedId ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="rounded-xl border border-border bg-card p-4">
                 <div className="mb-2 flex justify-end">
                   <button
                     onClick={() => setSelectedId(null)}
                     aria-label="Закрыть карточку"
-                    className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     <PilingIcon name="close" size={16} decorative />
                   </button>
@@ -204,10 +204,10 @@ export function AdminEquipment() {
                 <EquipmentDetail equipmentId={selectedId} embedded />
               </div>
             ) : (
-              <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
+              <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 p-8 text-center">
                 <PilingIcon name="equipment-rig" size={40} decorative className="mb-3 opacity-40" />
-                <p className="text-sm text-slate-500">Выберите установку</p>
-                <p className="mt-1 text-xs text-slate-400">Карточка откроется здесь, в этом же окне</p>
+                <p className="text-sm text-muted-foreground">Выберите установку</p>
+                <p className="mt-1 text-xs text-muted-foreground">Карточка откроется здесь, в этом же окне</p>
               </div>
             )}
           </div>

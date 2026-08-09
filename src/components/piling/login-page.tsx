@@ -87,7 +87,7 @@ export function LoginPage() {
                 <span className="text-white">Piling</span>
                 <span className="text-sky-400">Track</span>
               </h1>
-              <p className="text-xs md:text-sm text-slate-300 mt-0.5">Управление свайными работами</p>
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5">Управление свайными работами</p>
             </div>
           </div>
 
@@ -95,14 +95,14 @@ export function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-200 text-sm">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                 <Input
                   id="email"
                   type="email"
                   placeholder="operator@piling.ru"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 md:h-13 bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus-visible:border-sky-400 focus-visible:ring-sky-400/30"
+                  className="pl-10 h-12 md:h-13 bg-card/10 border-white/20 text-white placeholder:text-muted-foreground focus-visible:border-sky-400 focus-visible:ring-sky-400/30"
                   autoComplete="email"
                   autoFocus
                 />
@@ -112,14 +112,14 @@ export function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="password" className="text-slate-200 text-sm">Пароль</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 md:h-13 bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus-visible:border-sky-400 focus-visible:ring-sky-400/30"
+                  className="pl-10 pr-10 h-12 md:h-13 bg-card/10 border-white/20 text-white placeholder:text-muted-foreground focus-visible:border-sky-400 focus-visible:ring-sky-400/30"
                   autoComplete="current-password"
                 />
                 {/* 44×44 hit-target + accessible name (audit A-5): полевые
@@ -128,7 +128,7 @@ export function LoginPage() {
                   type="button"
                   aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center text-slate-400 hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 rounded-md"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 rounded-md"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>

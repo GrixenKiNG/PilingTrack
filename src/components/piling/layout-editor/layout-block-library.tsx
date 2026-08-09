@@ -23,10 +23,10 @@ export function LayoutBlockLibrary({
   onUploadImage?: (file: File) => Promise<void>;
   uploadError?: string | null;
 }) {
-  const buttonClass = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+  const buttonClass = 'min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
   return (
     <section aria-label="Библиотека блоков" className="space-y-2">
-      <h3 className="text-sm font-semibold text-slate-900">Добавить блок</h3>
+      <h3 className="text-sm font-semibold text-foreground">Добавить блок</h3>
       <button type="button" className={buttonClass} onClick={() => onAdd('text')}>Добавить текст</button>
       <button type="button" className={buttonClass} onClick={() => onAdd('divider')}>Добавить разделитель</button>
       {onUploadImage && (

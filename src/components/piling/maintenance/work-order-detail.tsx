@@ -192,7 +192,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <BackLink />
-        <div className="mt-6 flex justify-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        <div className="mt-6 flex justify-center text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin" /></div>
       </div>
     );
   }
@@ -201,7 +201,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <BackLink />
-        <p className="mt-6 rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Наряд не найден.</p>
+        <p className="mt-6 rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Наряд не найден.</p>
       </div>
     );
   }
@@ -215,14 +215,14 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       <div className="mt-4 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', PRIORITY_STYLE[record.priority])} title={PRIORITY_LABEL[record.priority]} />
-          <h1 className="text-lg font-semibold text-slate-800">{record.title}</h1>
+          <h1 className="text-lg font-semibold text-foreground">{record.title}</h1>
           <span className={cn('rounded px-1.5 py-0.5 text-2xs font-medium', STATUS_STYLE[record.status])}>
             {STATUS_LABEL[record.status]}
           </span>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm text-slate-500">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
           {record.equipment && (
-            <Link href={`/admin/equipment/${record.equipmentId}`} className="font-medium text-orange-600 hover:underline">
+            <Link href={`/admin/equipment/${record.equipmentId}`} className="font-medium text-signal-strong hover:underline">
               {record.equipment.name}
             </Link>
           )}
@@ -231,10 +231,10 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           {record.scheduledAt && <span>план {formatRuDate(record.scheduledAt)}</span>}
           {record.completedAt && <span>факт {formatRuDate(record.completedAt)}</span>}
         </div>
-        {record.description && <p className="mt-2 text-sm text-slate-600">{record.description}</p>}
+        {record.description && <p className="mt-2 text-sm text-muted-foreground">{record.description}</p>}
 
         {actions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
             {actions.map((s) => (
               <Button key={s} size="sm" variant="outline" disabled={savingStatus !== null}
                 onClick={() => changeStatus(s)}>
@@ -248,7 +248,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           </div>
         )}
         {actions.length === 0 && (
-          <div className="mt-3 flex border-t border-slate-100 pt-3">
+          <div className="mt-3 flex border-t border-border pt-3">
             <Button size="sm" className="ml-auto bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
@@ -257,7 +257,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       </div>
 
       <div className="mt-4 rounded-xl border bg-card p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Исполнение</h2>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Исполнение</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="col-span-2 sm:col-span-1">
             <Label htmlFor="q-assignee">Исполнитель</Label>
@@ -303,7 +303,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-slate-400">Назначено: {resolveAssigneeName(record.assigneeId, names)}</span>
+          <span className="text-xs text-muted-foreground">Назначено: {resolveAssigneeName(record.assigneeId, names)}</span>
           <Button size="sm" disabled={savingQuick} className="bg-orange-500 hover:bg-orange-600 text-white" onClick={saveQuick}>
             {savingQuick && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
             Сохранить
@@ -313,32 +313,32 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-700">Фото — диагностика</h2>
+          <h2 className="mb-3 text-sm font-semibold text-foreground">Фото — диагностика</h2>
           <WorkOrderPhotos recordId={recordId} entityId={recordId} />
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-700">Фото — выполненные работы</h2>
+          <h2 className="mb-3 text-sm font-semibold text-foreground">Фото — выполненные работы</h2>
           <WorkOrderPhotos recordId={recordId} entityId={`${recordId}__work`} />
         </div>
       </div>
 
       {/* Приёмка работ администратором */}
       <div className="mt-4 rounded-xl border bg-card p-4">
-        <h2 className="mb-2 text-sm font-semibold text-slate-700">Приёмка</h2>
+        <h2 className="mb-2 text-sm font-semibold text-foreground">Приёмка</h2>
         {record.acceptedAt ? (
           <p className="text-sm text-emerald-700">
             ✓ Принято {formatRuDate(record.acceptedAt)}
           </p>
         ) : isAdmin ? (
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-slate-500">Работа ещё не принята.</span>
+            <span className="text-sm text-muted-foreground">Работа ещё не принята.</span>
             <Button size="sm" disabled={accepting} className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={accept}>
               {accepting && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
               Принять
             </Button>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">Ожидает приёмки администратором.</p>
+          <p className="text-sm text-muted-foreground">Ожидает приёмки администратором.</p>
         )}
       </div>
 
@@ -355,7 +355,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
 
 function BackLink() {
   return (
-    <Link href="/admin/maintenance" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-orange-600">
+    <Link href="/admin/maintenance" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong">
       <ArrowLeft className="w-3 h-3" /> К списку нарядов
     </Link>
   );

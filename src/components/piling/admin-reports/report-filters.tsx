@@ -41,7 +41,7 @@ export function ReportFilters({
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <Filter className="hidden h-4 w-4 flex-shrink-0 text-slate-400 sm:block" />
+      <Filter className="hidden h-4 w-4 flex-shrink-0 text-muted-foreground sm:block" />
       {sites.length > 0 && (
         <Select value={filterSiteId} onValueChange={onFilterSiteChange}>
           <SelectTrigger className="h-10 w-full sm:max-w-xs">

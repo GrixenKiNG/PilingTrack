@@ -112,10 +112,10 @@ export function OperatorDashboard() {
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Операторская смена</h1>
-          <p className="text-sm text-slate-500">{displayName}</p>
+          <h1 className="text-xl font-bold text-foreground">Операторская смена</h1>
+          <p className="text-sm text-muted-foreground">{displayName}</p>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card">
           <PilingIcon name="operator" size={34} decorative />
         </div>
       </header>
@@ -126,13 +126,13 @@ export function OperatorDashboard() {
         type="button"
         onClick={() => openReport()}
         disabled={ctaDisabled}
-        className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-orange-500 bg-white px-6 py-5 text-center shadow-sm transition hover:bg-orange-50/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-slate-300 disabled:opacity-60"
+        className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-orange-500 bg-card px-6 py-5 text-center shadow-sm transition hover:bg-orange-50/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-border disabled:opacity-60"
       >
         <PilingIcon name={active ? 'reports' : 'shift-start'} size={126} decorative />
-        <span className="mt-1 text-xl font-semibold text-slate-900">
+        <span className="mt-1 text-xl font-semibold text-foreground">
           {active ? 'Редактировать отчёт' : 'Начало смены'}
         </span>
-        <span className="mt-1 text-xs text-slate-500">
+        <span className="mt-1 text-xs text-muted-foreground">
           {currentSite?.name || 'Нет назначенного объекта'}
         </span>
       </motion.button>
@@ -144,22 +144,22 @@ export function OperatorDashboard() {
             type="button"
             onClick={() => openReport(action.target)}
             disabled={ctaDisabled}
-            className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
+            className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-border bg-card p-3 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
           >
             <PilingIcon name={action.icon} size={82} decorative />
-            <span className="mt-1 text-base font-semibold text-slate-800">{action.label}</span>
+            <span className="mt-1 text-base font-semibold text-foreground">{action.label}</span>
           </button>
         ))}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white px-3 py-4" aria-label="Статус передачи смены">
+      <section className="rounded-xl border border-border bg-card px-3 py-4" aria-label="Статус передачи смены">
         <div className="grid grid-cols-4 gap-1">
           {shiftSteps.map((step, index) => {
             return (
               <div key={step.label} className="relative flex flex-col items-center text-center">
                 {index > 0 && <span className={`absolute right-1/2 top-2 h-px w-full ${step.complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />}
-                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${step.complete ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-white'}`} />
-                <span className="mt-2 text-xs leading-tight text-slate-600">{step.label}</span>
+                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${step.complete ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-card'}`} />
+                <span className="mt-2 text-xs leading-tight text-muted-foreground">{step.label}</span>
                 <span className="sr-only">{step.complete ? 'выполнено' : 'ожидается'}</span>
               </div>
             );
@@ -168,39 +168,39 @@ export function OperatorDashboard() {
       </section>
 
       <div className="space-y-1.5">
-        <label id="operator-site-label" className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <label id="operator-site-label" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <PilingIcon name="site" size={24} decorative />
           Объект
         </label>
         {sites.length > 0 ? (
           <Select value={selectedSiteId || ''} onValueChange={setSelectedSite}>
-            <SelectTrigger aria-labelledby="operator-site-label" className="h-12 w-full bg-white"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
+            <SelectTrigger aria-labelledby="operator-site-label" className="h-12 w-full bg-card"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
             <SelectContent>
               {sites.map((site) => <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>)}
             </SelectContent>
           </Select>
         ) : (
-          <div className="flex h-12 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-sm text-slate-400">
+          <div className="flex h-12 items-center justify-center rounded-md border border-dashed border-border bg-card text-sm text-muted-foreground">
             Нет назначенных объектов
           </div>
         )}
       </div>
 
       {reports.length > 0 && (
-        <section className="rounded-xl border border-slate-200 bg-white p-3">
+        <section className="rounded-xl border border-border bg-card p-3">
           <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Последние отчёты</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Последние отчёты</h2>
             <button type="button" onClick={() => router.push('/history')} className="text-xs font-medium text-blue-700">История</button>
           </div>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-border">
             {reports.slice(0, 3).map((report) => (
               <li key={report.id}>
                 <button type="button" onClick={() => router.push(`/history?reportId=${report.id}`)} className="flex w-full items-center justify-between py-3 text-left">
                   <span>
-                    <span className="block text-sm font-medium text-slate-900">{report.siteName}</span>
-                    <span className="block text-xs text-slate-500">{new Date(report.date).toLocaleDateString('ru-RU')}</span>
+                    <span className="block text-sm font-medium text-foreground">{report.siteName}</span>
+                    <span className="block text-xs text-muted-foreground">{new Date(report.date).toLocaleDateString('ru-RU')}</span>
                   </span>
-                  <span className="flex items-center gap-2 text-xs text-slate-600">
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
                     {report.totalPiles} св. · {report.totalDrilling} м
                     <PilingIcon name="external" size={16} decorative />
                   </span>

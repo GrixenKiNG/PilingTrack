@@ -72,15 +72,15 @@ export function DrillingSection({
           {drillings.length > 0 && (
             <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
               {drillings.map((drill) => (
-                <div key={drill.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div key={drill.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-slate-900">{getDrillTypeName(drill.typeId)}</p>
-                    {drill.picketId && <p className="text-xs font-medium text-slate-600 truncate">{getPicketPath(drill.picketId)}</p>}
+                    <p className="text-base font-semibold text-foreground">{getDrillTypeName(drill.typeId)}</p>
+                    {drill.picketId && <p className="text-xs font-medium text-muted-foreground truncate">{getPicketPath(drill.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-right text-base font-bold text-slate-900">
+                    <span className="text-right text-base font-bold text-foreground">
                       <span className="block font-mono">{drill.count} шт. × {formatNumber(drill.metersPerUnit)} м</span>
-                      <span className="block text-sm font-semibold text-slate-700">Объём: {formatNumber(drill.meters)} м</span>
+                      <span className="block text-sm font-semibold text-foreground">Объём: {formatNumber(drill.meters)} м</span>
                     </span>
                     <button onClick={() => onRemove(drill.id)}
                       aria-label={`Удалить бурение ${getDrillTypeName(drill.typeId)} из отчёта`}

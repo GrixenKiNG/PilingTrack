@@ -36,7 +36,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
   const navItems = ROLE_NAVIGATION[user?.role || 'OPERATOR'];
 
   const nav = (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t safe-area-bottom">
       <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
           const isActive = isActivePath(pathname, item.href);
@@ -48,7 +48,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 no-underline transition-colors',
-                isActive ? 'text-orange-600' : 'text-slate-400 hover:text-slate-600'
+                isActive ? 'text-signal-strong' : 'text-muted-foreground hover:text-muted-foreground'
               )}
             >
               <div
@@ -74,23 +74,23 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="sticky top-0 z-30 bg-white border-b pt-safe">
+    <div className="min-h-screen bg-muted">
+      <div className="sticky top-0 z-30 bg-card border-b pt-safe">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
             <PilingIcon name="equipment-rig" size={34} tone="primary" decorative />
             <div>
-              <span className="text-sm font-bold text-slate-900">PilingTrack</span>
+              <span className="text-sm font-bold text-foreground">PilingTrack</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <FeedbackCenter />
-            <span className="text-xs text-slate-500 hidden sm:block">{user?.name}</span>
+            <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => void logoutClient()}
-              className="h-11 w-11 text-slate-400 hover:text-red-500"
+              className="h-11 w-11 text-muted-foreground hover:text-red-500"
               aria-label="Выйти"
             >
               <PilingIcon name="logout" size={16} tone="danger" decorative />
@@ -129,8 +129,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex items-center gap-3 px-5 py-5">
         <PilingIcon name="equipment-rig" size={38} tone="primary" decorative />
         <div>
-          <span className="text-lg font-bold tracking-tight text-slate-900">PilingTrack</span>
-          <p className="text-xs text-slate-500">
+          <span className="text-lg font-bold tracking-tight text-foreground">PilingTrack</span>
+          <p className="text-xs text-muted-foreground">
             {isDispatcher ? 'Панель диспетчера' : 'Панель администратора'}
           </p>
         </div>
@@ -152,7 +152,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
                 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors',
                 isActive
                   ? 'border-l-2 border-orange-500 bg-orange-50 text-orange-700'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
               <PilingIcon
@@ -177,15 +177,15 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
             <span className="text-xs font-bold text-purple-600">{user?.name?.charAt(0) || 'A'}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-            <p className="truncate text-xs text-slate-500">{user?.email}</p>
+            <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
           </div>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={() => void logoutClient()}
-          className="w-full justify-start text-slate-500 hover:text-red-600 hover:border-red-200"
+          className="w-full justify-start text-muted-foreground hover:text-red-600 hover:border-red-200"
         >
           <PilingIcon name="logout" size={16} tone="danger" decorative className="mr-2" />
           Выйти
@@ -195,16 +195,16 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white border-r z-30">
+    <div className="min-h-screen bg-muted">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-card border-r z-30">
         {sidebarContent}
       </aside>
 
-      <div className="lg:hidden sticky top-0 z-30 bg-white border-b pt-safe">
+      <div className="lg:hidden sticky top-0 z-30 bg-card border-b pt-safe">
         <div className="flex items-center gap-3 px-4 py-3">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <button aria-label="Открыть меню навигации" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-slate-100">
+              <button aria-label="Открыть меню навигации" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted">
                 <PilingIcon name="menu" size={20} decorative />
               </button>
             </SheetTrigger>
@@ -216,7 +216,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <FeedbackCenter />
             <PilingIcon name="equipment-rig" size={30} tone="primary" decorative />
-            <span className="text-sm font-bold text-slate-900">PilingTrack</span>
+            <span className="text-sm font-bold text-foreground">PilingTrack</span>
           </div>
         </div>
       </div>
@@ -316,8 +316,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (bootstrapping) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex items-center gap-3 text-slate-500">
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <div className="flex items-center gap-3 text-muted-foreground">
           <PilingIcon name="equipment-rig" size={38} tone="primary" decorative />
           <span className="text-sm font-medium">Проверка сессии...</span>
         </div>

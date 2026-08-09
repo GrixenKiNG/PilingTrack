@@ -157,7 +157,7 @@ export function AdminReports() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50/60 p-4 lg:p-6">
+    <div className="min-h-full bg-muted/60 p-4 lg:p-6">
       {error ? (
         <div className="space-y-4">
           <ReportsHeader
@@ -189,9 +189,9 @@ export function AdminReports() {
           >
           <div className="min-w-0 space-y-4">
 
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="space-y-3 rounded-lg border border-border bg-card p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <Filter className="hidden h-4 w-4 text-slate-400 sm:block" />
+                <Filter className="hidden h-4 w-4 text-muted-foreground sm:block" />
                 {QUICK_FILTERS.map((filter) => (
                   <button
                     key={filter.key}
@@ -201,7 +201,7 @@ export function AdminReports() {
                       'min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
                       quickFilter === filter.key
                         ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white',
+                        : 'border-border bg-muted text-muted-foreground hover:border-border hover:bg-card',
                     )}
                   >
                     {filter.label}
@@ -212,20 +212,20 @@ export function AdminReports() {
                     type="date"
                     value={periodFrom}
                     onChange={(event) => setPeriodFrom(event.target.value)}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-mono text-slate-700 outline-none focus:border-slate-400"
+                    className="h-9 rounded-md border border-border bg-card px-2 text-xs font-mono text-foreground outline-none focus:border-slate-400"
                   />
-                  <span className="text-xs text-slate-400">-</span>
+                  <span className="text-xs text-muted-foreground">-</span>
                   <input
                     type="date"
                     value={periodTo}
                     onChange={(event) => setPeriodTo(event.target.value)}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-mono text-slate-700 outline-none focus:border-slate-400"
+                    className="h-9 rounded-md border border-border bg-card px-2 text-xs font-mono text-foreground outline-none focus:border-slate-400"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={periodActive ? handleResetPeriod : handleApplyPeriod}
-                    className="h-9 border-slate-200 bg-white px-3 text-xs text-slate-600 hover:bg-slate-50"
+                    className="h-9 border-border bg-card px-3 text-xs text-muted-foreground hover:bg-muted"
                   >
                     {periodActive ? 'Сбросить' : 'Применить'}
                   </Button>
@@ -238,13 +238,13 @@ export function AdminReports() {
                 operators={operators} filterUserId={filterUserId} onFilterUserChange={setFilterUserId}
               />
 
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-muted-foreground">
                 Загружено {reports.length}{hasMore ? '+ ' : ' '}· показано {filteredReports.length}
               </div>
             </div>
 
-            <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <div className="hidden border-b border-slate-200 bg-slate-100/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px]">
+            <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              <div className="hidden border-b border-border bg-muted/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px]">
                 <span>Дата</span>
                 <span>Объект / установка</span>
                 <span>Оператор</span>
@@ -256,15 +256,15 @@ export function AdminReports() {
 
               {filteredReports.length === 0 ? (
                 <div className="grid place-items-center px-4 py-16 text-center">
-                  <FileText className="mb-3 h-12 w-12 text-slate-300" />
-                  <p className="text-sm font-medium text-slate-600">Отчёты не найдены</p>
-                  <p className="mt-1 max-w-sm text-xs text-slate-400">
+                  <FileText className="mb-3 h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm font-medium text-muted-foreground">Отчёты не найдены</p>
+                  <p className="mt-1 max-w-sm text-xs text-muted-foreground">
                     Попробуйте изменить быстрые фильтры, период, объект, установку или оператора.
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-border">
                     {filteredReports.map((report) => (
                       <EvidenceReportRow
                         key={report.id}
@@ -281,13 +281,13 @@ export function AdminReports() {
                     ))}
                   </div>
                   {hasMore && (
-                    <div className="border-t border-slate-200 bg-slate-50/80 p-3 text-center">
+                    <div className="border-t border-border bg-muted/80 p-3 text-center">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => void loadMoreReports()}
                         disabled={loadingMore}
-                        className="border-slate-300 bg-white"
+                        className="border-border bg-card"
                       >
                         {loadingMore ? 'Загрузка...' : 'Загрузить ещё отчёты'}
                       </Button>

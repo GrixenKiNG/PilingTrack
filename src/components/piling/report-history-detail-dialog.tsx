@@ -43,7 +43,7 @@ export function ReportHistoryDetailDialog({
 
         {loading ? (
           <div className="py-8 flex justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-signal-strong" />
           </div>
         ) : report ? (
           <>
@@ -54,7 +54,7 @@ export function ReportHistoryDetailDialog({
               <button
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- reportId is set for every persisted report shown here
                 onClick={() => onPreviewPdf(report.reportId!)}
-                className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs font-medium text-signal-strong hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
               >
                 <Eye className="w-3.5 h-3.5" />
                 Предпросмотр PDF
@@ -64,11 +64,11 @@ export function ReportHistoryDetailDialog({
             <div className="space-y-4 mt-2">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-xs text-slate-500">Объект</p>
+                  <p className="text-xs text-muted-foreground">Объект</p>
                   <p className="font-medium">{report.site.name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Статус</p>
+                  <p className="text-xs text-muted-foreground">Статус</p>
                   <Badge
                     variant="secondary"
                     className={
@@ -81,15 +81,15 @@ export function ReportHistoryDetailDialog({
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Начало смены</p>
+                  <p className="text-xs text-muted-foreground">Начало смены</p>
                   <p className="font-mono">{report.shiftStart || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Конец смены</p>
+                  <p className="text-xs text-muted-foreground">Конец смены</p>
                   <p className="font-mono">{report.shiftEnd || '-'}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-xs text-slate-500">Последнее редактирование</p>
+                  <p className="text-xs text-muted-foreground">Последнее редактирование</p>
                   <p className="font-medium">{formatLastEditor(report)}</p>
                 </div>
               </div>
@@ -99,14 +99,14 @@ export function ReportHistoryDetailDialog({
                   <Separator />
                   <div>
                     <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <HardHat className="w-4 h-4 text-orange-500" />
+                      <HardHat className="w-4 h-4 text-signal-strong" />
                       Забитые сваи ({report.piles.length})
                     </h4>
                     <div className="space-y-1">
                       {report.piles.map((pile) => (
                         <div
                           key={pile.id}
-                          className="flex justify-between text-sm p-2 bg-slate-50 rounded"
+                          className="flex justify-between text-sm p-2 bg-muted rounded"
                         >
                           <span>{pile.pileGrade?.name || '-'}</span>
                           <span className="font-mono font-semibold">{pile.count} шт.</span>
@@ -129,12 +129,12 @@ export function ReportHistoryDetailDialog({
                       {report.drillings.map((drilling) => (
                         <div
                           key={drilling.id}
-                          className="flex justify-between text-sm p-2 bg-slate-50 rounded"
+                          className="flex justify-between text-sm p-2 bg-muted rounded"
                         >
                           <span>{drilling.type?.name || '-'}</span>
                           <span className="text-right font-mono font-semibold">
                             <span className="block">{drilling.count || 1} шт.</span>
-                            <span className="block text-xs text-slate-500">{drilling.meters} м.п.</span>
+                            <span className="block text-xs text-muted-foreground">{drilling.meters} м.п.</span>
                           </span>
                         </div>
                       ))}
@@ -155,12 +155,12 @@ export function ReportHistoryDetailDialog({
                       {report.downtimes.map((downtime) => (
                         <div
                           key={downtime.id}
-                          className="flex justify-between text-sm p-2 bg-slate-50 rounded"
+                          className="flex justify-between text-sm p-2 bg-muted rounded"
                         >
                           <div>
                             <span>{downtime.reason?.name || '-'}</span>
                             {downtime.comment && (
-                              <p className="text-3xs text-slate-500">{downtime.comment}</p>
+                              <p className="text-3xs text-muted-foreground">{downtime.comment}</p>
                             )}
                           </div>
                           <span className="font-mono font-semibold text-amber-600">

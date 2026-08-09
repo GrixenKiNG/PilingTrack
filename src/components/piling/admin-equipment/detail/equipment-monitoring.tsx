@@ -58,7 +58,7 @@ const PARAM_SPECS: Record<string, ParamSpec> = {
 };
 
 const MACHINE_STATES: Record<number, { label: string; cls: string }> = {
-  0: { label: 'Выключена', cls: 'bg-slate-200 text-slate-700' },
+  0: { label: 'Выключена', cls: 'bg-slate-200 text-foreground' },
   1: { label: 'Простой', cls: 'bg-amber-100 text-amber-700' },
   2: { label: 'Движение', cls: 'bg-sky-100 text-sky-700' },
   3: { label: 'Работа', cls: 'bg-emerald-100 text-emerald-700' },
@@ -102,7 +102,7 @@ const STATUS_CARD: Record<Status, string> = {
   alarm: 'border-rose-300 bg-rose-50',
 };
 const STATUS_VALUE: Record<Status, string> = {
-  ok: 'text-slate-900',
+  ok: 'text-foreground',
   warn: 'text-amber-600',
   alarm: 'text-rose-600',
 };
@@ -205,7 +205,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
     arr.sort((a, b) => orderOf(a.type) - orderOf(b.type) || a.type.localeCompare(b.type));
   }
 
-  const chip = 'rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50';
+  const chip = 'rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted';
 
   return (
     <div className="space-y-4">
@@ -213,12 +213,12 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="block text-2xs uppercase tracking-wide text-slate-400">С</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm" />
+          <span className="block text-2xs uppercase tracking-wide text-muted-foreground">С</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-sm" />
         </label>
         <label className="text-sm">
-          <span className="block text-2xs uppercase tracking-wide text-slate-400">По</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-slate-200 bg-card px-2 py-1 text-sm" />
+          <span className="block text-2xs uppercase tracking-wide text-muted-foreground">По</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-sm" />
         </label>
         <div className="flex gap-1">
           <button type="button" onClick={() => { const t = todayYmd(); setFrom(t); setTo(t); }} className={chip}>Сегодня</button>
@@ -232,9 +232,9 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
       ) : error ? (
         <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Не удалось загрузить телеметрию: {error}</p>
       ) : records === null ? (
-        <p className="text-sm text-slate-400">Загрузка…</p>
+        <p className="text-sm text-muted-foreground">Загрузка…</p>
       ) : seriesByType.size === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
           Телеметрия за этот период не поступала. Подключите телематический бокс
           (Teltonika / Galileosky) — данные о двигателе и гидравлике появятся здесь автоматически.
         </p>
@@ -245,7 +245,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
             if (!items || items.length === 0) return null;
             return (
               <div key={key}>
-                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <Icon className="h-3.5 w-3.5" /> {title}
                 </h3>
                 <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -254,7 +254,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
               </div>
             );
           })}
-          <p className="text-3xs text-slate-400">Цветовые пороги — ориентировочные, калибруются по установке.</p>
+          <p className="text-3xs text-muted-foreground">Цветовые пороги — ориентировочные, калибруются по установке.</p>
         </>
       )}
     </div>
@@ -265,16 +265,16 @@ function MachineStateBadge({ rec, loading }: { rec: TelemetryRecord | null; load
   const state = rec ? MACHINE_STATES[Math.round(rec.value)] : null;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Состояние машины</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Состояние машины</span>
       {loading ? (
-        <span className="text-sm text-slate-400">…</span>
+        <span className="text-sm text-muted-foreground">…</span>
       ) : state ? (
         <>
           <span className={cn('rounded-full px-2.5 py-0.5 text-sm font-medium', state.cls)}>{state.label}</span>
-          <span className="text-3xs text-slate-400">{rec && formatRelative(rec.timestamp)}</span>
+          <span className="text-3xs text-muted-foreground">{rec && formatRelative(rec.timestamp)}</span>
         </>
       ) : (
-        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-sm text-slate-400">Нет данных</span>
+        <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm text-muted-foreground">Нет данных</span>
       )}
     </div>
   );
@@ -287,14 +287,14 @@ function ParamCard({ s }: { s: ParamSeries }) {
   const showSpark = spec?.kind !== 'bool' && spec?.kind !== 'count' && s.values.length >= 2;
   return (
     <div className={cn('rounded-lg border bg-card px-3 py-2', STATUS_CARD[status])}>
-      <dt className="truncate text-2xs text-slate-500" title={s.type}>{spec?.label ?? s.type}</dt>
+      <dt className="truncate text-2xs text-muted-foreground" title={s.type}>{spec?.label ?? s.type}</dt>
       <div className="mt-0.5 flex items-end justify-between gap-2">
         <dd className={cn('font-mono text-lg leading-none tabular-nums', STATUS_VALUE[status])}>
-          {text}{unit ? <span className="ml-1 text-xs text-slate-400">{unit}</span> : null}
+          {text}{unit ? <span className="ml-1 text-xs text-muted-foreground">{unit}</span> : null}
         </dd>
         {showSpark && <Sparkline values={s.values} status={status} />}
       </div>
-      <div className="mt-1 font-mono text-3xs text-slate-400">
+      <div className="mt-1 font-mono text-3xs text-muted-foreground">
         мин {formatNum(s.min)} · макс {formatNum(s.max)} · {formatRelative(s.lastTs)}
       </div>
     </div>

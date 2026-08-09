@@ -161,7 +161,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        <p className="rounded-lg bg-slate-50 px-3 py-8 text-center text-sm text-slate-400">Загрузка…</p>
+        <p className="rounded-lg bg-muted px-3 py-8 text-center text-sm text-muted-foreground">Загрузка…</p>
       </div>
     );
   }
@@ -170,7 +170,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-6">
       {/* Heading */}
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-800">
+        <h1 className="text-lg font-semibold text-foreground">
           {isNew ? 'Новый шаблон' : 'Редактировать шаблон'}
         </h1>
         <Button
@@ -184,8 +184,8 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       </div>
 
       {/* General fields */}
-      <div className="rounded-lg border bg-white p-4 space-y-3">
-        <h2 className="text-sm font-medium text-slate-700">Основные параметры</h2>
+      <div className="rounded-lg border bg-card p-4 space-y-3">
+        <h2 className="text-sm font-medium text-foreground">Основные параметры</h2>
 
         <div>
           <Label htmlFor="tpl-name">Название *</Label>
@@ -248,13 +248,13 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           </div>
         )}
         {blockType === 'ROTARY' && (
-          <p className="text-xs text-slate-500">Блок вращателя подбирается для комбинированных установок автоматически.</p>
+          <p className="text-xs text-muted-foreground">Блок вращателя подбирается для комбинированных установок автоматически.</p>
         )}
       </div>
 
       {/* Sections */}
       <div className="space-y-3">
-        <h2 className="text-sm font-medium text-slate-700">
+        <h2 className="text-sm font-medium text-foreground">
           Разделы ({sections.length})
         </h2>
         {sections.map((s, i) => (
@@ -275,7 +275,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           variant="outline"
           size="sm"
           onClick={addSection}
-          className={cn('border-dashed w-full text-slate-500')}
+          className={cn('border-dashed w-full text-muted-foreground')}
         >
           <Plus className="w-3.5 h-3.5 mr-1" /> Добавить раздел
         </Button>

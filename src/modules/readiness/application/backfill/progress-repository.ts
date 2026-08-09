@@ -7,15 +7,29 @@ export class ReadinessBackfillProgressRepository {
     return this.tx.readinessBackfillProgress.findUnique({where: {tenantId}});
   }
 
-  start(tenantId: string) {
+  /**
+   * Начать или продолжить прогон.
+   *
+   * Здесь два разных случая, и различать их обязательно:
+   *
+   * • прошлый прогон оборвался (RUNNING или FAILED) — это ПРОДОЛЖЕНИЕ.
+   *   Контрольную точку трогать нельзя, иначе после сбоя на середине парка
+   *   всё пересчитывается заново;
+   * • прошлый прогон завершился (COMPLETED) либо его не было — это НОВЫЙ
+   *   прогон, обычно после публикации новых правил. Здесь точку наоборот
+   *   надо сбросить: иначе прогон стартует с прошлого lastEquipmentId и
+   *   молча пропускает всю технику до него, а новые правила до неё не
+   *   доезжают.
+   */
+  async start(tenantId: string) {
+    const previous = await this.get(tenantId);
+    const resuming = previous?.status === 'RUNNING' || previous?.status === 'FAILED';
     return this.tx.readinessBackfillProgress.upsert({
       where: {tenantId},
       create: {tenantId, status: 'RUNNING'},
-      // Позицию и счётчик сбрасываем: без этого повторный прогон продолжает
-      // с прошлого lastEquipmentId и молча пропускает всю технику до него.
       update: {
         status: 'RUNNING', completedAt: null, lastError: null,
-        lastEquipmentId: null, processedCount: 0,
+        ...(resuming ? {} : {lastEquipmentId: null, processedCount: 0}),
       },
     });
   }

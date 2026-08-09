@@ -231,7 +231,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-slate-400">
+      <div className="flex h-40 items-center justify-center text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin" />
       </div>
     );
@@ -239,9 +239,9 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
 
   if (!inspection) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-8 text-center text-sm text-slate-500">
+      <div className="mx-auto max-w-xl px-4 py-8 text-center text-sm text-muted-foreground">
         Осмотр не найден.{' '}
-        <Link href="/inspections" className="text-orange-600 underline">К списку</Link>
+        <Link href="/inspections" className="text-signal-strong underline">К списку</Link>
       </div>
     );
   }
@@ -252,7 +252,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
       <div className="mb-4 flex items-center gap-2">
         <Link
           href="/inspections"
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
         </Link>
@@ -260,10 +260,10 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800">
+          <h1 className="text-lg font-semibold text-foreground">
             {inspection.equipment?.name ?? '—'}
           </h1>
-          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{LEVEL_LABEL[inspection.level]}</span>
             <span>{inspection.inspectionDate.slice(0, 10).split('-').reverse().join('.')}</span>
             {inspection.shift && <span>Смена: {inspection.shift}</span>}
@@ -279,7 +279,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
           <div className={cn('text-3xl font-bold tabular-nums', healthScoreColor(healthScore))}>
             {healthScore}
           </div>
-          <div className="text-xs text-slate-400">Оценка состояния</div>
+          <div className="text-xs text-muted-foreground">Оценка состояния</div>
         </div>
       </div>
 
@@ -288,7 +288,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
         {sections.map(([sectionTitle, items]) => (
           <div key={sectionTitle}>
             {sectionTitle && (
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {sectionTitle}
               </h2>
             )}
@@ -301,12 +301,12 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
                     className="rounded-lg border bg-card px-3 py-3"
                   >
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-slate-800 leading-snug">
+                      <p className="text-sm font-medium text-foreground leading-snug">
                         {item.text}
                         {item.required && <span className="ml-1 text-rose-500">*</span>}
                       </p>
                       {item.provenance && (
-                        <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-2xs text-slate-500">
+                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">
                           {item.provenance}
                         </span>
                       )}
@@ -356,7 +356,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
                             type="button"
                             disabled={isDone}
                             onClick={() => setExpandedExtras((p) => ({ ...p, [item.id]: true }))}
-                            className="mt-2 text-2xs text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                            className="mt-2 text-2xs text-muted-foreground hover:text-muted-foreground disabled:opacity-50"
                           >
                             + замечание / фото
                           </button>
@@ -415,7 +415,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
               Завершить осмотр
             </Button>
           ) : (
-            <div className="rounded-lg border bg-slate-50 p-4 space-y-3">
+            <div className="rounded-lg border bg-muted p-4 space-y-3">
               <div>
                 <Label htmlFor="ri-sign">Подписал</Label>
                 <Input

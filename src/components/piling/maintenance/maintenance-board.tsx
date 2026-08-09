@@ -234,14 +234,14 @@ export function MaintenanceBoard() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-1px)] w-full bg-slate-50/40">
+    <div className="min-h-[calc(100vh-1px)] w-full bg-muted/40">
       {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
           (рядом панель 420px) плиткам достаётся ~100px и они распухают. */}
       <div className="space-y-3 px-4 pt-4 lg:px-5">
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/admin/to" className="text-sm font-medium text-slate-500 hover:text-slate-700">← ТО</Link>
-          <h1 className="text-2xl font-bold tracking-normal text-slate-950">Наряды ТО</h1>
-          <p className="text-sm text-slate-600">Техническая готовность установок, регламенты и замечания</p>
+          <Link href="/admin/to" className="text-sm font-medium text-muted-foreground hover:text-foreground">← ТО</Link>
+          <h1 className="text-2xl font-bold tracking-normal text-foreground">Наряды ТО</h1>
+          <p className="text-sm text-muted-foreground">Техническая готовность установок, регламенты и замечания</p>
         </div>
 
         {/* Единые KPI-плитки (kpi-tile.tsx) — как в объектах/установках/отчётах. */}
@@ -256,7 +256,7 @@ export function MaintenanceBoard() {
 
       <div className="grid w-full lg:grid-cols-[minmax(0,1fr)_420px]">
       <main className="min-w-0 space-y-3 px-4 py-4 lg:px-5">
-        <section className="rounded-lg border border-slate-200 bg-white p-3">
+        <section className="rounded-lg border border-border bg-card p-3">
           <div className="flex flex-wrap items-center gap-2">
             <QuickChip active={quickFilter === 'all'} onClick={() => setQuickFilter('all')}>Все</QuickChip>
             <QuickChip active={quickFilter === 'requires'} onClick={() => setQuickFilter('requires')}>Требуют ТО</QuickChip>
@@ -317,9 +317,9 @@ export function MaintenanceBoard() {
               </SelectContent>
             </Select>
 
-            <div className="ml-auto flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs text-slate-700">
+            <div className="ml-auto flex h-9 items-center gap-2 rounded-md border border-border px-3 text-xs text-foreground">
               <span>Все даты</span>
-              <CalendarDays className="h-4 w-4 text-slate-500" />
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </div>
 
             <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-9 bg-orange-500 text-white hover:bg-orange-600">
@@ -331,11 +331,11 @@ export function MaintenanceBoard() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="overflow-hidden rounded-lg border border-border bg-card">
           {loading ? (
-            <div className="px-3 py-10 text-center text-sm text-slate-400">Загрузка…</div>
+            <div className="px-3 py-10 text-center text-sm text-muted-foreground">Загрузка…</div>
           ) : shownRecords.length === 0 ? (
-            <div className="px-3 py-10 text-center text-sm text-slate-500">Нарядов по выбранным фильтрам не найдено.</div>
+            <div className="px-3 py-10 text-center text-sm text-muted-foreground">Нарядов по выбранным фильтрам не найдено.</div>
           ) : (
             <WorkOrderTable
               records={pagedRecords}
@@ -350,11 +350,11 @@ export function MaintenanceBoard() {
           )}
         </section>
 
-        <div className="flex items-center justify-between px-1 pb-2 text-xs text-slate-600">
+        <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Показать по:</span>
             <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
-              <SelectTrigger className="h-8 w-[74px] bg-white font-mono">
+              <SelectTrigger className="h-8 w-[74px] bg-card font-mono">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -370,7 +370,7 @@ export function MaintenanceBoard() {
               type="button"
               disabled={safePage <= 1}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
-              className="h-8 w-8 rounded-md border border-slate-200 bg-white text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-8 w-8 rounded-md border border-border bg-card text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
               ‹
             </button>
@@ -383,7 +383,7 @@ export function MaintenanceBoard() {
                   'h-8 w-8 rounded-md border font-mono',
                   pageNumber === safePage
                     ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-700',
+                    : 'border-border bg-card text-foreground',
                 )}
               >
                 {pageNumber}
@@ -393,7 +393,7 @@ export function MaintenanceBoard() {
               type="button"
               disabled={safePage >= pageCount}
               onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-              className="h-8 w-8 rounded-md border border-slate-200 bg-white text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-8 w-8 rounded-md border border-border bg-card text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
               ›
             </button>

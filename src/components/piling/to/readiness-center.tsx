@@ -58,7 +58,7 @@ const STATUS_META: Record<ReadinessStatus, { label: string; cls: string; dot: st
   },
   NO_DATA: {
     label: 'Нет данных',
-    cls: 'border-slate-200 bg-slate-100 text-slate-600',
+    cls: 'border-border bg-muted text-muted-foreground',
     dot: 'bg-slate-400',
   },
   ATTENTION: {
@@ -76,7 +76,7 @@ const STATUS_META: Record<ReadinessStatus, { label: string; cls: string; dot: st
 const EVIDENCE_META: Record<EvidenceState, { icon: typeof CheckCircle2; cls: string }> = {
   pass: { icon: CheckCircle2, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
   warning: { icon: AlertTriangle, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-  missing: { icon: Clock, cls: 'border-slate-200 bg-slate-50 text-slate-500' },
+  missing: { icon: Clock, cls: 'border-border bg-muted text-muted-foreground' },
   block: { icon: ShieldAlert, cls: 'border-rose-200 bg-rose-50 text-rose-700' },
 };
 
@@ -118,9 +118,9 @@ export function ReadinessCenter({
 
   return (
     <div className="space-y-3">
-      <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center">
+      <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-sm lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -138,7 +138,7 @@ export function ReadinessCenter({
                 'rounded-md border px-3 py-2 text-xs font-semibold transition-colors',
                 statusFilter === status
                   ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-orange-300',
+                  : 'border-border bg-card text-muted-foreground hover:border-orange-300',
               )}
             >
               {status === 'ALL' ? 'Все' : STATUS_META[status].label}
@@ -148,23 +148,23 @@ export function ReadinessCenter({
       </section>
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-        <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
-              <h2 className="text-sm font-bold text-slate-950">Парк установок</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <h2 className="text-sm font-bold text-foreground">Парк установок</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {filteredEquipment.length} из {equipment.length}
               </p>
             </div>
             <PilingIcon name="equipment-rig" size={32} decorative />
           </div>
-          <div className="max-h-[650px] divide-y divide-slate-100 overflow-y-auto">
+          <div className="max-h-[650px] divide-y divide-border overflow-y-auto">
             {loading ? (
-              <div className="grid min-h-40 place-items-center text-sm text-slate-500">
+              <div className="grid min-h-40 place-items-center text-sm text-muted-foreground">
                 Сбор подтверждений…
               </div>
             ) : filteredEquipment.length === 0 ? (
-              <div className="grid min-h-40 place-items-center px-6 text-center text-sm text-slate-500">
+              <div className="grid min-h-40 place-items-center px-6 text-center text-sm text-muted-foreground">
                 Установки по фильтру не найдены
               </div>
             ) : (
@@ -185,8 +185,8 @@ export function ReadinessCenter({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-bold text-slate-900">{item.name}</div>
-                        <div className="mt-0.5 truncate text-xs text-slate-500">
+                        <div className="truncate text-sm font-bold text-foreground">{item.name}</div>
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
                           {item.model || 'модель не указана'}
                         </div>
                       </div>
@@ -196,11 +196,11 @@ export function ReadinessCenter({
                       <span className={cn('rounded border px-2 py-1 text-2xs font-semibold', meta.cls)}>
                         {meta.label}
                       </span>
-                      <span className="font-mono text-xs text-slate-500">
+                      <span className="font-mono text-xs text-muted-foreground">
                         {itemReadiness?.score != null ? `${itemReadiness.score}/100` : '—'}
                       </span>
                     </div>
-                    <div className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                    <div className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                       {itemReadiness?.nextAction ?? 'Данные ещё загружаются'}
                     </div>
                   </button>
@@ -211,20 +211,20 @@ export function ReadinessCenter({
         </section>
 
         <main className="min-w-0 space-y-3">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-xl font-bold text-slate-950">
+                  <h2 className="truncate text-xl font-bold text-foreground">
                     {selected?.name ?? 'Установка не выбрана'}
                   </h2>
                   {selected?.model && (
-                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+                    <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
                       {selected.model}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Решение строится только на фактически загруженных подтверждениях.
                 </p>
               </div>
@@ -253,13 +253,13 @@ export function ReadinessCenter({
                     <ShieldAlert className="h-10 w-10 shrink-0 text-rose-600" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Решение на текущий момент
                     </div>
-                    <div className="mt-1 text-xl font-bold text-slate-950">
+                    <div className="mt-1 text-xl font-bold text-foreground">
                       {readiness.canOperate ? 'Работа разрешена' : 'Запуск не подтверждён'}
                     </div>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-700">{readiness.reason}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground">{readiness.reason}</p>
                     <Button asChild size="sm" className="mt-3 bg-orange-500 text-white hover:bg-orange-600">
                       <Link href={readiness.nextActionHref}>{readiness.nextAction}</Link>
                     </Button>
@@ -267,21 +267,21 @@ export function ReadinessCenter({
                 </div>
               </div>
             ) : (
-              <div className="mt-4 grid min-h-40 place-items-center rounded-xl bg-slate-50 text-sm text-slate-500">
+              <div className="mt-4 grid min-h-40 place-items-center rounded-xl bg-muted text-sm text-muted-foreground">
                 Выберите установку
               </div>
             )}
           </section>
 
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-950">Доказательства решения</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Факт, состояние и переход к источнику</p>
+                <h3 className="text-sm font-bold text-foreground">Доказательства решения</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">Факт, состояние и переход к источнику</p>
               </div>
               <FileText className="h-5 w-5 text-blue-600" />
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               {readiness?.evidence.map((item) => {
                 const meta = EVIDENCE_META[item.state];
                 const Icon = meta.icon;
@@ -291,10 +291,10 @@ export function ReadinessCenter({
                       <Icon className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-medium text-slate-500">{item.label}</div>
-                      <div className="mt-0.5 text-sm font-semibold text-slate-900">{item.value}</div>
+                      <div className="text-xs font-medium text-muted-foreground">{item.label}</div>
+                      <div className="mt-0.5 text-sm font-semibold text-foreground">{item.value}</div>
                     </div>
-                    {item.href && <span className="text-xs font-semibold text-orange-600">Открыть</span>}
+                    {item.href && <span className="text-xs font-semibold text-signal-strong">Открыть</span>}
                   </div>
                 );
                 return item.href ? (
@@ -306,29 +306,29 @@ export function ReadinessCenter({
                 );
               })}
               {!readiness && (
-                <div className="grid min-h-32 place-items-center text-sm text-slate-500">
+                <div className="grid min-h-32 place-items-center text-sm text-muted-foreground">
                   Нет выбранной установки
                 </div>
               )}
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-950">Последние записи</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Осмотры, ТО, ремонты и неисправности</p>
+                <h3 className="text-sm font-bold text-foreground">Последние записи</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">Осмотры, ТО, ремонты и неисправности</p>
               </div>
               <Button asChild variant="outline" size="sm">
                 <Link href="/admin/to?view=journal">Весь журнал</Link>
               </Button>
             </div>
             {latestRecords.length === 0 ? (
-              <div className="grid min-h-28 place-items-center px-6 text-center text-sm text-slate-500">
+              <div className="grid min-h-28 place-items-center px-6 text-center text-sm text-muted-foreground">
                 Записей по выбранной установке нет
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-border">
                 {latestRecords.map((record) => (
                   <Link
                     key={record.id}
@@ -337,16 +337,16 @@ export function ReadinessCenter({
                       : '/admin/maintenance'}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-orange-50/30"
                   >
-                    <span className="w-20 shrink-0 font-mono text-xs text-slate-500">
+                    <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">
                       {fmtDate(record.completedAt ?? record.scheduledAt ?? record.createdAt)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{record.title}</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">
+                      <span className="block truncate text-sm font-semibold text-foreground">{record.title}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
                         {TYPE_LABEL[record.type] ?? record.type} · {dueText(record.scheduledAt)}
                       </span>
                     </span>
-                    <span className="shrink-0 text-xs text-slate-500">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {STATUS_LABEL[record.status] ?? record.status}
                     </span>
                   </Link>
@@ -357,11 +357,11 @@ export function ReadinessCenter({
         </main>
 
         <aside className="min-w-0 space-y-3">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-950">Цепочка статуса</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Приоритет правил сверху вниз</p>
+                <h3 className="text-sm font-bold text-foreground">Цепочка статуса</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">Приоритет правил сверху вниз</p>
               </div>
               <Gauge className="h-5 w-5 text-blue-600" />
             </div>
@@ -374,7 +374,7 @@ export function ReadinessCenter({
                     key={status}
                     className={cn(
                       'flex items-center gap-3 rounded-lg border px-3 py-2.5',
-                      active ? meta.cls : 'border-slate-100 bg-slate-50/60 text-slate-400',
+                      active ? meta.cls : 'border-border bg-muted/60 text-muted-foreground',
                     )}
                   >
                     <span className="grid h-6 w-6 place-items-center rounded-full border border-current font-mono text-2xs font-bold">
@@ -388,9 +388,9 @@ export function ReadinessCenter({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-950">Границы решения</h3>
-            <div className="mt-3 space-y-2 text-xs leading-relaxed text-slate-600">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-foreground">Границы решения</h3>
+            <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                 «Готово» означает, что обязательные данные на текущую смену собраны и явных блокеров нет.
               </div>
@@ -400,8 +400,8 @@ export function ReadinessCenter({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-950">Рабочие действия</h3>
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-foreground">Рабочие действия</h3>
             <div className="mt-3 grid gap-2">
               <Button asChild className="justify-start bg-orange-500 text-white hover:bg-orange-600">
                 <Link href={selected ? `/inspections/new?equipmentId=${selected.id}` : '/inspections/new'}>

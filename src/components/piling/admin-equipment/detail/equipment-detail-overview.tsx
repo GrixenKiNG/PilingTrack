@@ -54,7 +54,7 @@ export const KIND_BADGE_STYLE: Record<EquipmentKindDTO, string> = {
   DRILLING_RIG: 'bg-blue-100 text-blue-700 border-blue-200',
   VIBRO_HAMMER: 'bg-violet-100 text-violet-700 border-violet-200',
   HYBRID: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  OTHER: 'bg-slate-100 text-slate-600 border-slate-200',
+  OTHER: 'bg-muted text-muted-foreground border-border',
 };
 
 export type TabKey =
@@ -83,7 +83,7 @@ export function OverviewHero({
   const kind = ((eq.kind as EquipmentKindDTO) || 'OTHER');
   return (
     <div
-      className="relative min-h-44 overflow-hidden rounded-lg border border-slate-200 bg-slate-900 bg-cover bg-center p-4 text-white"
+      className="relative min-h-44 overflow-hidden rounded-lg border border-border bg-slate-900 bg-cover bg-center p-4 text-white"
       style={{ backgroundImage: "linear-gradient(90deg, rgba(15,23,42,.92), rgba(15,23,42,.48), rgba(15,23,42,.14)), url('/login-bg/bg-3.png')" }}
     >
       <div className="relative z-10 flex h-full min-h-36 flex-col justify-between">
@@ -176,13 +176,13 @@ export function OverviewTiles({
 
 function OverviewTile({ title, rows }: { title: string; rows: Array<[string, ReactNode]> }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+    <section className="rounded-lg border border-border bg-card p-3">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
       <dl className="space-y-1.5">
         {rows.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-2 text-xs">
-            <dt className="truncate text-slate-400">{label}</dt>
-            <dd className="truncate text-right font-medium text-slate-900">{value}</dd>
+            <dt className="truncate text-muted-foreground">{label}</dt>
+            <dd className="truncate text-right font-medium text-foreground">{value}</dd>
           </div>
         ))}
       </dl>

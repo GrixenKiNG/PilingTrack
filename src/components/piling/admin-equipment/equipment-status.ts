@@ -41,7 +41,7 @@ export const REPORT_STATUS_META: Record<ReportStatus, { label: string; badge: st
   },
   missing: {
     label: 'Нет отчёта',
-    badge: 'bg-slate-50 text-slate-500 border-slate-200',
+    badge: 'bg-muted text-muted-foreground border-border',
   },
 };
 

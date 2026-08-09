@@ -215,7 +215,7 @@ export function WorkOrderFormDialog({
         </DialogHeader>
 
         {loading ? (
-          <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">Загрузка…</p>
+          <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
         ) : (
           <div className="space-y-3">
             {!equipmentId && (

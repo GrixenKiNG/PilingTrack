@@ -15,7 +15,7 @@ export default function MonitoringPage() {
       <FleetDashboard />
       {canSeeAnalytics && (
         <>
-          <div className="mx-4 border-t border-slate-200 lg:mx-6" />
+          <div className="mx-4 border-t border-border lg:mx-6" />
           <EquipmentAnalytics />
         </>
       )}

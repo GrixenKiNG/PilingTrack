@@ -67,7 +67,7 @@ export function PdfPreviewDialog({
           )}
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white/80">
-              <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+              <Loader2 className="h-5 w-5 animate-spin text-signal-strong" />
               <span className="text-sm text-slate-500">Загрузка PDF…</span>
             </div>
           )}

@@ -35,9 +35,9 @@ export function OpsTable<T>({
   const colsVar = { '--ops-cols': columns.map((c) => c.width).join(' ') } as React.CSSProperties;
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <div
-        className="hidden border-b border-slate-200 bg-slate-100/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:[grid-template-columns:var(--ops-cols)]"
+        className="hidden border-b border-border bg-muted/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground lg:grid lg:[grid-template-columns:var(--ops-cols)]"
         style={colsVar}
       >
         {columns.map((col) => (
@@ -51,7 +51,7 @@ export function OpsTable<T>({
         <div className="px-4 py-16">{empty}</div>
       ) : (
         <>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {rows.map((row) => {
               const id = getRowId(row);
               const active = activeId === id;
@@ -80,7 +80,7 @@ export function OpsTable<T>({
             })}
           </div>
           {footer && (
-            <div className="border-t border-slate-200 bg-slate-50/80 p-3 text-center">{footer}</div>
+            <div className="border-t border-border bg-muted/80 p-3 text-center">{footer}</div>
           )}
         </>
       )}
@@ -100,9 +100,9 @@ export function OpsTableEmpty({
 }) {
   return (
     <div className="grid place-items-center text-center">
-      <Icon className="mb-3 h-12 w-12 text-slate-300" />
-      <p className="text-sm font-medium text-slate-600">{title}</p>
-      {hint && <p className="mt-1 max-w-sm text-xs text-slate-400">{hint}</p>}
+      <Icon className="mb-3 h-12 w-12 text-muted-foreground" />
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      {hint && <p className="mt-1 max-w-sm text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

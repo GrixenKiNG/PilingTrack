@@ -61,7 +61,7 @@ export function InspectionsList() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-slate-800"><PilingIcon name="inspection" size={24} tone="success" decorative />Осмотры</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground"><PilingIcon name="inspection" size={24} tone="success" decorative />Осмотры</h1>
         <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
           <Link href="/inspections/new">
             <PilingIcon name="inspection" size={16} tone="success" decorative className="mr-1 !text-white" /> Провести осмотр
@@ -82,9 +82,9 @@ export function InspectionsList() {
       </div>
 
       {loading ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">Загрузка…</p>
+        <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
       ) : records.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Осмотров не найдено.</p>
+        <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Осмотров не найдено.</p>
       ) : (
         <ul className="space-y-2">
           {records.map((r) => (
@@ -106,7 +106,7 @@ export function InspectionsList() {
                       {STATUS_LABEL[r.status]}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                     <span>{formatRuDate(r.inspectionDate)}</span>
                     {r.equipment?.model && <span>{r.equipment.model}</span>}
                     <span className={cn('font-mono font-medium', healthScoreColor(r.healthScore))}>

@@ -60,7 +60,7 @@ export const TYPE_LABEL: Record<string, string> = {
 };
 
 export const TYPE_STYLE: Record<string, string> = {
-  EO: 'border-slate-200 bg-slate-50 text-slate-700',
+  EO: 'border-border bg-muted text-foreground',
   TO1: 'border-blue-200 bg-blue-50 text-blue-700',
   TO2: 'border-blue-200 bg-blue-50 text-blue-700',
   TO3: 'border-indigo-200 bg-indigo-50 text-indigo-700',
@@ -68,7 +68,7 @@ export const TYPE_STYLE: Record<string, string> = {
   REPAIR: 'border-rose-200 bg-rose-50 text-rose-700',
   FAULT: 'border-amber-200 bg-amber-50 text-amber-700',
   SCHEDULED: 'border-blue-200 bg-blue-50 text-blue-700',
-  INSPECTION: 'border-slate-200 bg-slate-50 text-slate-700',
+  INSPECTION: 'border-border bg-muted text-foreground',
 };
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -81,12 +81,12 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 
 export const STATUS_STYLE: Record<string, string> = {
-  PLANNED: 'border-slate-200 bg-slate-50 text-slate-700',
+  PLANNED: 'border-border bg-muted text-foreground',
   ASSIGNED: 'border-sky-200 bg-sky-50 text-sky-700',
   IN_PROGRESS: 'border-orange-200 bg-orange-50 text-orange-700',
   ON_HOLD: 'border-amber-200 bg-amber-50 text-amber-700',
   DONE: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  CANCELLED: 'border-slate-200 bg-slate-50 text-slate-400',
+  CANCELLED: 'border-border bg-muted text-muted-foreground',
 };
 
 export const fmtDate = (value: string | null | undefined) => {
@@ -99,7 +99,7 @@ export const fmtDate = (value: string | null | undefined) => {
 export const recordDate = (record: JournalRecord) => record.completedAt ?? record.scheduledAt ?? record.createdAt;
 
 export const scoreTone = (score: number | null | undefined) => {
-  if (typeof score !== 'number') return 'text-slate-400';
+  if (typeof score !== 'number') return 'text-muted-foreground';
   return healthScoreColor(score);
 };
 
@@ -112,7 +112,7 @@ export function TabButton({ active, onClick, children }: { active: boolean; onCl
         'h-8 rounded-md border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500',
         active
           ? 'border-orange-200 bg-orange-50 text-orange-700'
-          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+          : 'border-border bg-card text-muted-foreground hover:bg-muted',
       )}
     >
       {children}
@@ -132,9 +132,9 @@ export function JournalRow({ record }: { record: JournalRecord }) {
 
   return (
     <tr className="align-top hover:bg-orange-50/30">
-      <td className="px-3 py-3 font-mono text-xs text-slate-700">
+      <td className="px-3 py-3 font-mono text-xs text-foreground">
         <div>{fmtDate(recordDate(record))}</div>
-        <div className="mt-1 text-2xs text-slate-400">{dueText(record.scheduledAt)}</div>
+        <div className="mt-1 text-2xs text-muted-foreground">{dueText(record.scheduledAt)}</div>
       </td>
       <td className="px-3 py-3">
         <span className={cn('inline-flex rounded border px-2 py-1 text-2xs font-semibold', TYPE_STYLE[record.type] ?? TYPE_STYLE.INSPECTION)}>
@@ -142,18 +142,18 @@ export function JournalRow({ record }: { record: JournalRecord }) {
         </span>
       </td>
       <td className="px-3 py-3">
-        <Link href={href} className="font-semibold text-slate-900 hover:text-orange-600">
+        <Link href={href} className="font-semibold text-foreground hover:text-signal-strong">
           {record.title}
         </Link>
-        <div className="mt-1 text-xs text-slate-500">
+        <div className="mt-1 text-xs text-muted-foreground">
           {isInspection ? 'чек-лист / доказательная запись' : 'наряд / ремонтная запись'}
         </div>
       </td>
-      <td className="px-3 py-3 font-mono text-sm text-slate-800">
+      <td className="px-3 py-3 font-mono text-sm text-foreground">
         {record.engineHoursAtService != null ? `${record.engineHoursAtService} м.ч.` : '—'}
       </td>
       <td className="px-3 py-3">
-        <span className={cn('inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-50 px-2 font-mono text-sm font-bold', scoreTone(score))}>
+        <span className={cn('inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-2 font-mono text-sm font-bold', scoreTone(score))}>
           {typeof score === 'number' ? score : '—'}
         </span>
       </td>
@@ -175,8 +175,8 @@ export function JournalRow({ record }: { record: JournalRecord }) {
 
 export function ChecklistBlock({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-      <Icon className="h-4 w-4 shrink-0 text-orange-500" />
+    <div className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
+      <Icon className="h-4 w-4 shrink-0 text-signal-strong" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
     </div>
@@ -185,11 +185,11 @@ export function ChecklistBlock({ icon: Icon, label }: { icon: LucideIcon; label:
 
 export function InfoLine({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="grid grid-cols-[118px_1fr] gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="min-w-0 text-sm font-semibold text-slate-800">
+    <div className="grid grid-cols-[118px_1fr] gap-3 border-b border-border pb-2 last:border-b-0 last:pb-0">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="min-w-0 text-sm font-semibold text-foreground">
         <div className="truncate">{value}</div>
-        {hint && <div className="mt-0.5 text-xs font-normal text-slate-500">{hint}</div>}
+        {hint && <div className="mt-0.5 text-xs font-normal text-muted-foreground">{hint}</div>}
       </div>
     </div>
   );
@@ -197,7 +197,7 @@ export function InfoLine({ label, value, hint }: { label: string; value: string;
 
 export function LoadingBlock({ label, tall = false }: { label: string; tall?: boolean }) {
   return (
-    <div className={cn('grid place-items-center rounded-md bg-slate-50 text-sm text-slate-400', tall ? 'h-56' : 'h-24')}>
+    <div className={cn('grid place-items-center rounded-md bg-muted text-sm text-muted-foreground', tall ? 'h-56' : 'h-24')}>
       <span className="inline-flex items-center gap-2">
         <Loader2 className="h-4 w-4 animate-spin" /> {label}
       </span>
@@ -207,7 +207,7 @@ export function LoadingBlock({ label, tall = false }: { label: string; tall?: bo
 
 export function EmptyBlock({ label, tall = false }: { label: string; tall?: boolean }) {
   return (
-    <div className={cn('grid place-items-center rounded-md bg-slate-50 px-3 text-center text-sm text-slate-500', tall ? 'h-56' : 'min-h-20 py-4')}>
+    <div className={cn('grid place-items-center rounded-md bg-muted px-3 text-center text-sm text-muted-foreground', tall ? 'h-56' : 'min-h-20 py-4')}>
       {label}
     </div>
   );

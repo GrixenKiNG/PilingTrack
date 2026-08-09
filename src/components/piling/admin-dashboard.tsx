@@ -303,19 +303,19 @@ export function AdminDashboard() {
     <div className="space-y-4 p-4 lg:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Дашборд</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Оперативная сводка производства</p>
+          <h1 className="text-xl font-bold text-foreground">Дашборд</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Оперативная сводка производства</p>
         </div>
 
         {/* Фильтры: период + Объект + Установка */}
         <div className="w-full space-y-2 lg:w-auto">
-          <span className="block text-xs font-medium text-slate-500">Период производственных показателей</span>
-          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 sm:grid-cols-4">
+          <span className="block text-xs font-medium text-muted-foreground">Период производственных показателей</span>
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border sm:grid-cols-4">
             {([['all', 'Всё время'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Выбрать даты']] as const).map(([m, label]) => (
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
                 className={cn(
-                  'min-h-11 border-slate-200 px-3 text-sm font-medium first:border-0 max-sm:border-t max-sm:odd:border-r sm:border-l',
-                  periodMode === m ? 'bg-blue-50 text-blue-700' : 'bg-white text-slate-600 hover:bg-slate-50',
+                  'min-h-11 border-border px-3 text-sm font-medium first:border-0 max-sm:border-t max-sm:odd:border-r sm:border-l',
+                  periodMode === m ? 'bg-blue-50 text-blue-700' : 'bg-card text-muted-foreground hover:bg-muted',
                 )}>
                 {label}
               </button>
@@ -326,27 +326,27 @@ export function AdminDashboard() {
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:col-span-2 xl:col-span-1">
               <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
                 aria-label="Начало периода"
-                className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" />
-              <span className="text-sm text-slate-400">—</span>
+                className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground" />
+              <span className="text-sm text-muted-foreground">—</span>
               <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                 aria-label="Конец периода"
-                className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" />
+                className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground" />
             </div>
           )}
           <select value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)} aria-label="Фильтр по объекту"
-            className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground">
             <option value="all">Все объекты</option>
             {siteOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <select value={rigFilter} onChange={(e) => setRigFilter(e.target.value)} aria-label="Фильтр по установке"
-            className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground">
             <option value="all">Все установки</option>
             {(fleet?.equipment ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button
             type="button"
             onClick={refreshAll}
-            className="flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+            className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
             aria-label="Обновить дашборд"
           >
             <RefreshCw className="h-4 w-4" />
@@ -396,7 +396,7 @@ export function AdminDashboard() {
           {visibleRisks.length === 0 ? (
             (stale.fleet || stale.maint || stale.recent) ? <Empty text="Часть данных не загрузилась" tone="warning" /> : <Empty text="Рисков нет" tone="success" />
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               <RiskGroup title="Критично" risks={groupedRisks.critical} onOpen={(href) => router.push(href)} />
               <RiskGroup title="Внимание" risks={groupedRisks.warning} onOpen={(href) => router.push(href)} />
               <RiskGroup title="Инфо" risks={groupedRisks.info} onOpen={(href) => router.push(href)} />

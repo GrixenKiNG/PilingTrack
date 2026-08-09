@@ -280,14 +280,14 @@ function ReadinessFiltersBar({filters, onChange, mode}: {
   const activeCount = keys.filter((key) => Boolean(filters[key])).length;
   const update = (key: keyof ReadinessUrlFilters, value: string) => onChange({...filters, [key]: value || undefined});
   return (
-    <div aria-label="Фильтры" className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div aria-label="Фильтры" className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
       <label className="grid gap-1 text-2xs text-muted-foreground">С даты<Input aria-label="С даты" type="date" value={filters.from ?? ''} onChange={(event) => update('from', event.target.value)} className="h-9 w-[150px]" /></label>
       <label className="grid gap-1 text-2xs text-muted-foreground">По дату<Input aria-label="По дату" type="date" value={filters.to ?? ''} onChange={(event) => update('to', event.target.value)} className="h-9 w-[150px]" /></label>
       {(mode === 'shifts' || mode === 'permits' || mode === 'reports') && <label className="grid gap-1 text-2xs text-muted-foreground">Статус<select aria-label="Статус" value={filters.status ?? ''} onChange={(event) => update('status', event.target.value)} className="h-9 min-w-[150px] rounded-md border border-input bg-background px-3 text-xs text-foreground"><option value="">Все статусы</option>{mode === 'shifts' ? <><option value="PLANNED">Запланирована</option><option value="STARTED">В работе</option><option value="HANDOVER_PENDING">Передача</option><option value="CLOSED">Закрыта</option><option value="CANCELLED">Отменена</option></> : mode === 'permits' ? <><option value="DRAFT">Черновик</option><option value="PENDING_APPROVAL">На согласовании</option><option value="APPROVED">Согласован</option><option value="EXPIRED">Истёк</option><option value="REVOKED">Отозван</option></> : <><option value="READY">Готово</option><option value="ATTENTION">Требует внимания</option><option value="BLOCKED">Заблокировано</option></>}</select></label>}
       {mode === 'shifts' && <label className="grid gap-1 text-2xs text-muted-foreground">Тип смены<select aria-label="Тип смены" value={filters.shiftType ?? ''} onChange={(event) => update('shiftType', event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs"><option value="">Все</option><option value="DAY">Дневная</option><option value="NIGHT">Ночная</option></select></label>}
       {mode === 'permits' && <label className="grid gap-1 text-2xs text-muted-foreground">Риск<select aria-label="Риск" value={filters.risk ?? ''} onChange={(event) => update('risk', event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs"><option value="">Все</option><option value="NORMAL">Обычный</option><option value="ELEVATED">Повышенный</option></select></label>}
       {mode === 'audit' && <><label className="grid gap-1 text-2xs text-muted-foreground">Тип события<Input aria-label="Тип события" value={filters.eventType ?? ''} onChange={(event) => update('eventType', event.target.value)} className="h-9 w-[170px]" /></label><label className="grid gap-1 text-2xs text-muted-foreground">Актор<Input aria-label="Актор" value={filters.actor ?? ''} onChange={(event) => update('actor', event.target.value)} className="h-9 w-[170px]" /></label></>}
-      <span className="inline-flex h-9 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold">Фильтров: {activeCount}</span>
+      <span className="inline-flex h-9 items-center rounded-md bg-muted px-3 text-xs font-semibold">Фильтров: {activeCount}</span>
       <Button type="button" variant="outline" className="h-9" disabled={activeCount === 0} onClick={() => onChange(Object.fromEntries(Object.entries(filters).filter(([key]) => !keys.includes(key as keyof ReadinessUrlFilters))))}>Сбросить</Button>
     </div>
   );
@@ -312,7 +312,7 @@ function StatusPill({ status }: { status: ReadinessStatus }) {
 
 function EmptyPhoto({ className }: { className?: string }) {
   return (
-    <div className={cn('grid place-items-center rounded bg-slate-100', className)}>
+    <div className={cn('grid place-items-center rounded bg-muted', className)}>
       <PilingIcon name="equipment-rig" decorative fill className="h-full w-full opacity-65" />
     </div>
   );
@@ -394,7 +394,7 @@ function EquipmentPhoto({
   const photoUrl = useResolvedEquipmentPhoto(cardData?.photoUrl ?? modelPhoto);
   if (!photoUrl || failed) return <EmptyPhoto className={className} />;
   return (
-    <div className={cn('relative overflow-hidden rounded bg-slate-100', className)}>
+    <div className={cn('relative overflow-hidden rounded bg-muted', className)}>
       {/* Signed equipment media is resolved before rendering; model photos are only a fallback. */}
       { }
       <img
@@ -458,7 +458,7 @@ function RoleFlowFooter() {
         const RoleIcon = role.lucide;
         return (
           <div key={role.label} className="contents">
-            <article className={cn('flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm', role.border)}>
+            <article className={cn('flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm', role.border)}>
               <header className={cn('flex items-center gap-2 border-b px-3 py-1.5', role.header)}>
                 <RoleIcon className="h-4 w-4" />
                 <h2 className="text-sm font-extrabold">{role.label}</h2>
@@ -509,7 +509,7 @@ function ProcessRoleStrip({
       {roles.map((role, index) => (
         <div key={role.label} className="contents">
           {index > 0 && <div aria-hidden className="hidden w-7 shrink-0 items-center justify-center text-xl text-muted-foreground 2xl:flex">→</div>}
-          <article className="min-w-0 flex-1 overflow-hidden rounded-lg border bg-white shadow-sm">
+          <article className="min-w-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
             <header className={cn('flex items-center gap-2 border-b px-3.5 py-2', tones[role.tone])}>
               <PilingIcon name={role.icon} decorative className="h-4 w-4" />
               <h2 className="text-sm font-extrabold">{role.label}</h2>
@@ -613,7 +613,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
                 aria-pressed={props.view === item.id}
                 onClick={() => props.onViewChange(item.id)}
                 className={cn(
-                  'relative inline-flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white',
+                  'relative inline-flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs font-semibold text-white/70 transition hover:bg-card/10 hover:text-white',
                   props.view === item.id && 'text-white after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-signal-strong',
                 )}
               >
@@ -666,7 +666,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
           <div className="grid min-h-[420px] place-items-center px-4">
             <section
               role="alert"
-              className="w-full max-w-lg rounded-[14px] border border-destructive/30 bg-white p-6 text-center shadow-sm"
+              className="w-full max-w-lg rounded-[14px] border border-destructive/30 bg-card p-6 text-center shadow-sm"
             >
               <WifiOff className="mx-auto h-9 w-9 text-destructive-strong" />
               <h1 className="mt-3 text-lg font-bold">Центр готовности не загрузился</h1>
@@ -1113,7 +1113,7 @@ function FleetScreen(props: ReferenceUiProps) {
         </aside>
       </div>
       <section className="mt-2 grid grid-cols-2 overflow-hidden rounded-lg shadow-sm md:grid-cols-4">
-        <div className="border-r border-border bg-white p-3">
+        <div className="border-r border-border bg-card p-3">
           <div className="text-xs text-muted-foreground">Готовность парка</div>
           <div className="mt-1 flex items-center gap-3">
             <ReadinessRing value={averageReadiness} size={48} />
@@ -1125,10 +1125,10 @@ function FleetScreen(props: ReferenceUiProps) {
           ['На обслуживании', inMaintenance, 'repair' as const],
           ['Без экипажа', withoutCrew, 'crew' as const],
         ].map(([label, value, icon], index) => (
-          <div key={label} className={cn('bg-white p-3', index < 2 && 'md:border-r md:border-border')}>
+          <div key={label} className={cn('bg-card p-3', index < 2 && 'md:border-r md:border-border')}>
             <div className="text-xs text-muted-foreground">{label}</div>
             <div className="mt-1 flex items-center justify-between">
-              <span className="font-mono text-xl font-bold tabular-nums text-slate-900">{value}</span>
+              <span className="font-mono text-xl font-bold tabular-nums text-foreground">{value}</span>
               { }
               <img src={`/icons/pilingtrack/${icon}.png`} alt="" className="h-[34px] w-[34px] object-contain" />
             </div>
@@ -1293,7 +1293,7 @@ function ShiftsScreen(props: ReferenceUiProps) {
         subtitle={period === 'day' ? `Сегодня, ${formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone, {day: 'numeric', month: 'long'})}` : 'Последние 7 дней'}
         actions={<div className="flex flex-wrap items-center gap-2"><div className="flex overflow-hidden rounded-lg border border-border bg-background"><button type="button" aria-pressed={period === 'day'} onClick={() => setPeriod('day')} className={cn('min-h-11 px-5 text-xs font-semibold', period === 'day' && 'bg-signal/10 text-signal-strong')}>День</button><button type="button" aria-pressed={period === 'week'} onClick={() => setPeriod('week')} className={cn('min-h-11 border-l border-border px-5 text-xs', period === 'week' ? 'bg-signal/10 font-semibold text-signal-strong' : 'text-muted-foreground')}>Неделя</button></div><Button type="button" disabled={!props.selectedId || !props.bootstrap?.capabilities.entities.shift.manage} onClick={() => void createShift()} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать смену</Button></div>}
       />
-      <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-white px-2 py-1">Дневная 08:00–20:00</span><span className="rounded border border-border bg-white px-2 py-1">Ночная 20:00–08:00</span><span className="rounded border border-border bg-white px-2 py-1">Часовой пояс: {timezone}</span></div>
+      <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-card px-2 py-1">Дневная 08:00–20:00</span><span className="rounded border border-border bg-card px-2 py-1">Ночная 20:00–08:00</span><span className="rounded border border-border bg-card px-2 py-1">Часовой пояс: {timezone}</span></div>
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="shift-start" label="Смен сегодня" value={todayShifts.length} />
         <RefKpi icon="technical-readiness" label="Готовы к запуску" value={ready.length} />
@@ -1620,7 +1620,7 @@ function MaintenanceScreen(props: ReferenceUiProps) {
               return (
                 <article key={record.id} className={cn('flex min-h-[86px] flex-wrap items-center gap-3 rounded-lg border-l-[3px] p-2.5 sm:flex-nowrap', criticalRecord ? 'border-y border-r border-destructive/25 border-l-destructive bg-destructive/10' : index % 2 ? 'border-y border-r border-info/25 border-l-info bg-info/10' : 'border-y border-r border-signal/25 border-l-signal bg-signal/10')}>
                   <EquipmentPhoto cardData={fleet} name={record.equipment?.name || record.title} className="h-14 w-14 shrink-0" />
-                  <span className={cn('grid h-9 w-9 place-items-center rounded-full', criticalRecord ? 'bg-destructive/10 text-destructive-strong' : 'bg-white text-signal-strong')}>{criticalRecord ? <AlertTriangle className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}</span>
+                  <span className={cn('grid h-9 w-9 place-items-center rounded-full', criticalRecord ? 'bg-destructive/10 text-destructive-strong' : 'bg-card text-signal-strong')}>{criticalRecord ? <AlertTriangle className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}</span>
                   <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-bold">{record.title}</h3><div className="mt-0.5 text-2xs text-muted-foreground">{record.equipment?.name || 'Установка не указана'}</div><div className="mt-0.5 line-clamp-1 text-2xs text-muted-foreground">{record.description || 'Описание не заполнено'}</div><div className="mt-1 text-3xs text-muted-foreground">▣ {record.scheduledAt ? formatDateTimeInTimezone(record.scheduledAt, props.bootstrap?.tenant.timezone) : 'Срок не задан'}</div></div>
                   <div className="w-full text-left text-2xs sm:w-36 sm:text-right"><div className={cn('font-semibold', criticalRecord ? 'text-destructive-strong' : 'text-info-strong')}>{criticalRecord ? 'Критическое' : STATUS_LABEL[record.status as MaintenanceStatus] ?? record.status}</div><div className="mt-1 text-muted-foreground">Приоритет · <b className="text-muted-foreground">{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</b></div><Button asChild className="mt-2 h-8 bg-signal-strong text-2xs hover:bg-signal-strong"><Link href={`/admin/maintenance/${record.id}`}>Открыть заявку</Link></Button></div>
                 </article>
@@ -1732,7 +1732,7 @@ function ReportsScreen(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle heading="Отчёты" subtitle="Аналитика доказательной готовности" actions={<div className="flex flex-wrap gap-2"><span className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs">▣ Текущий срез · {formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone)}</span><Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div>} />
+      <ScreenTitle heading="Отчёты" subtitle="Аналитика доказательной готовности" actions={<div className="flex flex-wrap gap-2"><span className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs">▣ Текущий срез · {formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone)}</span><Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
         <RefKpi icon="technical-readiness" label="Готовность парка" value={`${readinessPercent}%`} detail="текущий срез" />
         <RefKpi icon="shift-start" label="Смен допущено" value={ready} detail="по текущим доказательствам" />
@@ -1746,7 +1746,7 @@ function ReportsScreen(props: ReferenceUiProps) {
           <div className="relative mt-3 h-[150px] border-b border-l border-border">
             {[0, 1, 2, 3].map((line) => <div key={line} className="absolute inset-x-0 border-t border-dashed border-border" style={{ top: `${line * 33}%` }} />)}
             {trendPoints ? <svg viewBox="0 0 600 200" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label="Динамика средней готовности"><polyline points={trendPoints} fill="none" stroke="var(--signal)" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg> : <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">История снимков пока не накоплена</div>}
-            <div className="absolute right-3 top-3 rounded border border-border bg-white px-3 py-2 text-xs"><b>{readinessPercent}%</b><br /><span className="text-muted-foreground">сегодня</span></div>
+            <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{readinessPercent}%</b><br /><span className="text-muted-foreground">сегодня</span></div>
           </div>
         </section>
         <section className={cn(card, 'p-3')}>
@@ -1760,7 +1760,7 @@ function ReportsScreen(props: ReferenceUiProps) {
         <section className={cn(card, 'p-3')}>
           <h2 className="font-bold">Результат допуска</h2>
           <div className="mt-3 flex items-center gap-6">
-            <div className="relative h-24 w-24 rounded-full" style={{ background: `conic-gradient(var(--success) 0 ${readinessPercent}%, var(--signal) ${readinessPercent}% ${Math.min(100, readinessPercent + 10)}%, var(--destructive) ${Math.min(100, readinessPercent + 10)}% 100%)` }}><div className="absolute inset-3 grid place-items-center rounded-full bg-white text-center"><div><b className="font-mono text-xl">{states.length}</b><div className="text-3xs text-muted-foreground">установок</div></div></div></div>
+            <div className="relative h-24 w-24 rounded-full" style={{ background: `conic-gradient(var(--success) 0 ${readinessPercent}%, var(--signal) ${readinessPercent}% ${Math.min(100, readinessPercent + 10)}%, var(--destructive) ${Math.min(100, readinessPercent + 10)}% 100%)` }}><div className="absolute inset-3 grid place-items-center rounded-full bg-card text-center"><div><b className="font-mono text-xl">{states.length}</b><div className="text-3xs text-muted-foreground">установок</div></div></div></div>
             <div className="space-y-3 text-xs"><div><span className="text-success-strong">●</span> Допущено <b className="ml-3">{ready}</b></div><div><span className="text-signal-strong">●</span> С замечаниями <b className="ml-3">{states.length - ready - blocked}</b></div><div><span className="text-destructive-strong">●</span> Заблокировано <b className="ml-3">{blocked}</b></div></div>
           </div>
         </section>

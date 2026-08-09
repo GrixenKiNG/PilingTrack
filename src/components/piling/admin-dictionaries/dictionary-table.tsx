@@ -65,16 +65,16 @@ export function DictionaryTable({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-semibold text-slate-900">{title} — {statusLabel}</h2>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{items.length}</span>
+        <h2 className="text-base font-semibold text-foreground">{title} — {statusLabel}</h2>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{items.length}</span>
         {checkedItems.length > 0 && (
           <div className="flex w-full flex-wrap items-center gap-2 text-xs sm:ml-auto sm:w-auto">
-            <span className="text-slate-500">Выбрано: {checkedItems.length}</span>
+            <span className="text-muted-foreground">Выбрано: {checkedItems.length}</span>
             {checkedItems.some((item) => item.isActive) && (
-              <button type="button" onClick={() => bulkStatus(false)} className="min-h-11 rounded-md border border-orange-300 px-3 font-medium text-orange-600 hover:bg-orange-50 sm:min-h-9">Архивировать</button>
+              <button type="button" onClick={() => bulkStatus(false)} className="min-h-11 rounded-md border border-orange-300 px-3 font-medium text-signal-strong hover:bg-orange-50 sm:min-h-9">Архивировать</button>
             )}
             {checkedItems.some((item) => !item.isActive) && (
-              <button type="button" onClick={() => bulkStatus(true)} className="min-h-11 rounded-md border border-slate-300 px-3 font-medium text-slate-700 hover:bg-slate-50 sm:min-h-9">Восстановить</button>
+              <button type="button" onClick={() => bulkStatus(true)} className="min-h-11 rounded-md border border-border px-3 font-medium text-foreground hover:bg-muted sm:min-h-9">Восстановить</button>
             )}
           </div>
         )}
@@ -85,7 +85,7 @@ export function DictionaryTable({
         return (
           <article
             key={item.id}
-            className={`overflow-hidden rounded-xl border bg-white ${selectedId === item.id ? 'border-sky-400 ring-1 ring-sky-200' : 'border-slate-200'}`}
+            className={`overflow-hidden rounded-xl border bg-card ${selectedId === item.id ? 'border-sky-400 ring-1 ring-sky-200' : 'border-border'}`}
           >
             <div className="flex items-start gap-2 p-3">
               <label className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
@@ -98,36 +98,36 @@ export function DictionaryTable({
               <button type="button" onClick={() => onSelect(item)} className="min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className={`truncate text-base font-semibold ${item.isActive ? 'text-slate-900' : 'text-slate-500'}`}>{item.name}</p>
+                    <p className={`truncate text-base font-semibold ${item.isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{item.name}</p>
                     {isPileGrade && (
-                      <p className="mt-1 text-sm text-slate-600">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         {item.sectionOrDiameter || item.code || 'Сечение не указано'}
                         {' · '}
                         {item.lengthMm == null ? 'Длина не задана' : `${lengthLabel(item.lengthMm)} м`}
                       </p>
                     )}
-                    {!isPileGrade && item.code && <p className="mt-1 text-sm text-slate-600">{item.code}</p>}
+                    {!isPileGrade && item.code && <p className="mt-1 text-sm text-muted-foreground">{item.code}</p>}
                   </div>
                   <Badge variant={item.isActive ? 'default' : 'secondary'} className={item.isActive ? 'shrink-0 bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'shrink-0'}>
                     {item.isActive ? 'Активен' : 'Архив'}
                   </Badge>
                 </div>
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                  <div><dt className="text-slate-500">Отчёты</dt><dd className="mt-0.5 font-semibold tabular-nums text-slate-800">{item.reportCount}</dd></div>
-                  <div><dt className="text-slate-500">Планы</dt><dd className="mt-0.5 font-semibold tabular-nums text-slate-800">{item.planCount}</dd></div>
-                  <div><dt className="text-slate-500">Обновлено</dt><dd className="mt-0.5 font-medium text-slate-700">{new Date(item.updatedAt).toLocaleDateString('ru-RU')}</dd></div>
+                  <div><dt className="text-muted-foreground">Отчёты</dt><dd className="mt-0.5 font-semibold tabular-nums text-foreground">{item.reportCount}</dd></div>
+                  <div><dt className="text-muted-foreground">Планы</dt><dd className="mt-0.5 font-semibold tabular-nums text-foreground">{item.planCount}</dd></div>
+                  <div><dt className="text-muted-foreground">Обновлено</dt><dd className="mt-0.5 font-medium text-foreground">{new Date(item.updatedAt).toLocaleDateString('ru-RU')}</dd></div>
                 </dl>
                 <span className="mt-3 inline-flex text-sm font-medium text-sky-700">Открыть сведения</span>
               </button>
             </div>
-            <div className="grid grid-cols-4 border-t border-slate-100 bg-slate-50/70 p-1">
+            <div className="grid grid-cols-4 border-t border-border bg-muted/70 p-1">
               <button
                 type="button"
                 aria-label={`Переименовать ${item.name}`}
                 title={used ? 'Используемое значение нельзя переименовать' : 'Переименовать'}
                 disabled={used}
                 onClick={() => onRename(item)}
-                className="flex min-h-11 items-center justify-center rounded-lg text-slate-500 enabled:hover:bg-white enabled:hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-35"
+                className="flex min-h-11 items-center justify-center rounded-lg text-muted-foreground enabled:hover:bg-card enabled:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-35"
               ><Pencil className="h-4 w-4" /></button>
               {isPileGrade ? (
                 <button
@@ -135,7 +135,7 @@ export function DictionaryTable({
                   aria-label={`Изменить длину ${item.name}`}
                   title="Изменить длину"
                   onClick={() => onLength(item)}
-                  className="flex min-h-11 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                  className="flex min-h-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                 ><Ruler className="h-4 w-4" /></button>
               ) : <span aria-hidden />}
               <button
@@ -143,7 +143,7 @@ export function DictionaryTable({
                 aria-label={`${item.isActive ? 'Архивировать' : 'Восстановить'} ${item.name}`}
                 title={item.isActive ? 'Архивировать' : 'Восстановить'}
                 onClick={() => onStatus(item, !item.isActive)}
-                className="flex min-h-11 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                className="flex min-h-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
               >{item.isActive ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button>
               <button
                 type="button"
@@ -151,7 +151,7 @@ export function DictionaryTable({
                 title={used ? 'Используемое значение можно только архивировать' : 'Удалить навсегда'}
                 disabled={used}
                 onClick={() => onDelete(item)}
-                className="flex min-h-11 items-center justify-center rounded-lg text-red-600 enabled:hover:bg-red-50 enabled:hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-35"
+                className="flex min-h-11 items-center justify-center rounded-lg text-red-600 enabled:hover:bg-red-50 enabled:hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-35"
               ><Trash2 className="h-4 w-4" /></button>
             </div>
           </article>
@@ -161,8 +161,8 @@ export function DictionaryTable({
     {!compact && <Card className="overflow-hidden rounded-lg">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] table-auto text-sm">
-          <thead className="bg-slate-50">
-            <tr className="border-b text-left text-xs text-slate-500">
+          <thead className="bg-muted">
+            <tr className="border-b text-left text-xs text-muted-foreground">
               <th className="w-10 px-3 py-2.5"><Checkbox aria-label="Выбрать все" checked={checkedAll} onCheckedChange={(checked) => toggleAll(checked === true)} /></th>
               <th className="px-3 py-2 font-medium">Название</th>
               {isPileGrade && <th className="px-3 py-2 font-medium">Код / сечение</th>}
@@ -177,7 +177,7 @@ export function DictionaryTable({
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={isPileGrade ? 9 : 7} className="px-3 py-8 text-center text-xs text-slate-400">
+                <td colSpan={isPileGrade ? 9 : 7} className="px-3 py-8 text-center text-xs text-muted-foreground">
                   {title}: ничего не найдено
                 </td>
               </tr>
@@ -186,23 +186,23 @@ export function DictionaryTable({
               return (
                 <tr key={item.id} onClick={() => onSelect(item)} className={`cursor-pointer border-b last:border-0 hover:bg-sky-50/70 ${selectedId === item.id ? 'bg-sky-50/70 ring-1 ring-inset ring-sky-400' : ''}`}>
                   <td className="px-3 py-2"><Checkbox aria-label={`Выбрать ${item.name}`} checked={checkedIds.includes(item.id)} onClick={(event) => event.stopPropagation()} onCheckedChange={(checked) => toggleItem(item.id, checked === true)} /></td>
-                  <td className={`px-3 py-2 font-medium ${item.isActive ? 'text-slate-800' : 'text-slate-400'}`}>
+                  <td className={`px-3 py-2 font-medium ${item.isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {item.name}
                   </td>
                   {isPileGrade && (
-                    <td className="px-3 py-2 text-xs text-slate-600">
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
                       {item.sectionOrDiameter || item.code || '—'}
                     </td>
                   )}
                   {isPileGrade && (
-                    <td className={`px-3 py-2 ${item.lengthMm == null ? 'font-medium text-amber-600' : 'text-slate-600'}`}>
+                    <td className={`px-3 py-2 ${item.lengthMm == null ? 'font-medium text-amber-600' : 'text-muted-foreground'}`}>
                       {lengthLabel(item.lengthMm)}
                     </td>
                   )}
-                  <td className={`px-3 py-2 text-center tabular-nums ${item.reportCount ? 'font-medium text-blue-600' : 'text-slate-300'}`}>
+                  <td className={`px-3 py-2 text-center tabular-nums ${item.reportCount ? 'font-medium text-blue-600' : 'text-muted-foreground'}`}>
                     {item.reportCount}
                   </td>
-                  <td className={`px-3 py-2 text-center tabular-nums ${item.planCount ? 'font-medium text-emerald-600' : 'text-slate-300'}`}>
+                  <td className={`px-3 py-2 text-center tabular-nums ${item.planCount ? 'font-medium text-emerald-600' : 'text-muted-foreground'}`}>
                     {item.planCount}
                   </td>
                   <td className="px-3 py-2">
@@ -210,7 +210,7 @@ export function DictionaryTable({
                       {item.isActive ? 'Активен' : 'Архив'}
                     </Badge>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-500">
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
                     {new Date(item.updatedAt).toLocaleDateString('ru-RU')}
                   </td>
                   <td className="px-3 py-2">
@@ -221,7 +221,7 @@ export function DictionaryTable({
                         title={used ? 'Используемое значение нельзя переименовать' : 'Переименовать'}
                         disabled={used}
                         onClick={(event) => { event.stopPropagation(); onRename(item); }}
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 enabled:hover:bg-slate-100 enabled:hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-35"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
                       ><Pencil className="h-3.5 w-3.5" /></button>
                       {isPileGrade && (
                         <button
@@ -229,7 +229,7 @@ export function DictionaryTable({
                           aria-label={`Изменить длину ${item.name}`}
                           title="Изменить длину"
                           onClick={(event) => { event.stopPropagation(); onLength(item); }}
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                         ><Ruler className="h-3.5 w-3.5" /></button>
                       )}
                       <button
@@ -237,7 +237,7 @@ export function DictionaryTable({
                         aria-label={`${item.isActive ? 'Архивировать' : 'Восстановить'} ${item.name}`}
                         title={item.isActive ? 'Архивировать' : 'Восстановить'}
                         onClick={(event) => { event.stopPropagation(); onStatus(item, !item.isActive); }}
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                       >{item.isActive ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}</button>
                       <button
                         type="button"
@@ -245,7 +245,7 @@ export function DictionaryTable({
                         title={used ? 'Используемое значение можно только архивировать' : 'Удалить навсегда'}
                         disabled={used}
                         onClick={(event) => { event.stopPropagation(); onDelete(item); }}
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 enabled:hover:bg-red-50 enabled:hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground enabled:hover:bg-red-50 enabled:hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35"
                       ><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
@@ -256,7 +256,7 @@ export function DictionaryTable({
         </table>
       </div>
     </Card>}
-    {items.length === 0 && <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500"><p className="font-medium text-slate-700">Ничего не найдено</p><p className="mt-1 text-xs">Попробуйте изменить параметры поиска или фильтра.</p></div>}
+    {items.length === 0 && <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground"><p className="font-medium text-foreground">Ничего не найдено</p><p className="mt-1 text-xs">Попробуйте изменить параметры поиска или фильтра.</p></div>}
     </div>
   );
 }

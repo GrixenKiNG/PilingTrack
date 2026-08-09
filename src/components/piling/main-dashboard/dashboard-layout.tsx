@@ -36,7 +36,7 @@ function placeholders(): Record<string, RenderablePageWidget> {
       id: w.id,
       title: w.title,
       render: () => (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm font-medium text-slate-600">{w.title}</div>
+        <div className="rounded-lg border border-dashed border-border bg-card p-4 text-sm font-medium text-muted-foreground">{w.title}</div>
       ),
     };
   }

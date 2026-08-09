@@ -35,10 +35,10 @@ export function EquipmentTileImageBlock({
   }, [assetId, revision, storage]);
 
   if (loaded?.assetId !== assetId) {
-    return <span className="text-xs text-slate-400">Загрузка изображения…</span>;
+    return <span className="text-xs text-muted-foreground">Загрузка изображения…</span>;
   }
   if (!loaded.src) {
-    return <span className="text-xs text-slate-400">Фото не загружено</span>;
+    return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
   }
 
   return <img src={loaded.src} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;

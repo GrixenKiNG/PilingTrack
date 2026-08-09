@@ -17,6 +17,7 @@ const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730106000_readiness_backfill_progress/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730107000_readiness_start_snapshot_fk/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260808130000_readiness_snapshot_facts/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260809120000_shift_pre_start_acceptance/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
@@ -51,6 +52,8 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       CREATE TYPE "MaintenanceStatus" AS ENUM ('PLANNED','ASSIGNED','IN_PROGRESS','ON_HOLD','DONE','CANCELLED');
       CREATE TYPE "MaintenancePriority" AS ENUM ('LOW','NORMAL','HIGH','CRITICAL');
       CREATE TYPE "InspectionStatus" AS ENUM ('DRAFT','IN_PROGRESS','COMPLETED','CANCELLED');
+      CREATE TYPE "DefectSeverity" AS ENUM ('LOW','NORMAL','HIGH','CRITICAL');
+      CREATE TYPE "DefectStatus" AS ENUM ('OPEN','IN_WORK','CLOSED','REJECTED');
       CREATE TABLE "Tenant" ("id" TEXT PRIMARY KEY, "slug" TEXT NOT NULL UNIQUE);
       CREATE TABLE "User" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
         UNIQUE ("tenantId", "id"));
@@ -64,6 +67,10 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       CREATE TABLE "MaintenanceRecord" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "equipmentId" TEXT NOT NULL,
         "type" "MaintenanceType" NOT NULL, "status" "MaintenanceStatus" NOT NULL,
         "priority" "MaintenancePriority" NOT NULL, "scheduledAt" TIMESTAMPTZ(3));
+      CREATE TABLE "EquipmentDefect" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "equipmentId" TEXT NOT NULL,
+        "severity" "DefectSeverity" NOT NULL DEFAULT 'NORMAL', "status" "DefectStatus" NOT NULL DEFAULT 'OPEN',
+        "title" TEXT NOT NULL DEFAULT '', "reportedById" TEXT NOT NULL DEFAULT 'operator-a',
+        "reportedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW());
       CREATE TABLE "ReadinessRuleSet" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "status" TEXT NOT NULL,
         "version" TEXT NOT NULL, "criteria" JSONB NOT NULL, "blockers" JSONB NOT NULL, "updatedBy" TEXT,
         "publishedAt" TIMESTAMPTZ(3), "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW());
@@ -111,9 +118,11 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
 
   it('allows exactly one of 20 parallel starts and commits one atomic evidence set', async () => {
     const ids = Array.from({length: 20}, (_, index) => `parallel-shift-${index}`);
-    for (const id of ids) await insertShift(id);
+    // Запуск смены — решение диспетчера о допуске, а не действие оператора,
+    // поэтому смена ждёт в PENDING_ACCEPTANCE и команду шлёт DISPATCHER.
+    for (const id of ids) await insertShift(id, 'PENDING_ACCEPTANCE');
     const outcomes = await Promise.allSettled(ids.map((id, index) => transaction((tx) => startShiftCommand({tx,
-      context: context('operator-a', 'OPERATOR', `start-${index}`), id, key: `task04-start-${index}-request`,
+      context: context('dispatcher-a', 'DISPATCHER', `start-${index}`), id, key: `task04-start-${index}-request`,
       ifMatch: `"shift-${id}-v1"`, expectedVersion: 1}))));
     const successes = outcomes.filter((result) => result.status === 'fulfilled');
     const failures = outcomes.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
@@ -157,7 +166,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
   });
 
   it('ignores a stale READY snapshot and commits an explainable blocked decision from authoritative rows', async () => {
-    await insertShift('blocked-shift');
+    await insertShift('blocked-shift', 'PENDING_ACCEPTANCE');
     const rules = {...DEFAULT_READINESS_RULES, blockers: DEFAULT_READINESS_RULES.blockers.map((item) =>
       item.condition === 'VALID_WORK_PERMIT_REQUIRED' ? {...item, isActive: true} : {...item, isActive: false})};
     await sql.query(`INSERT INTO "ReadinessRuleSet" ("id","tenantId","status","version","criteria","blockers","publishedAt")
@@ -166,14 +175,14 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       "triggerType","triggerId","status","score","blockers","warnings","evidence","factsHash")
       VALUES ('stale-ready',$1,$2,'blocked-shift','old','v1','LEGACY','stale','READY',100,'[]','[]','{}',decode(repeat('00',32),'hex'))`,
       [tenantId, equipmentId]);
-    const result = await transaction((tx) => startShiftCommand({tx, context: context('operator-a', 'OPERATOR', 'blocked-start'),
+    const result = await transaction((tx) => startShiftCommand({tx, context: context('dispatcher-a', 'DISPATCHER', 'blocked-start'),
       id: 'blocked-shift', key: 'task04-blocked-start', ifMatch: '"shift-blocked-shift-v1"', expectedVersion: 1}));
     expect(result.status).toBe(422);
     expect(result.body).toMatchObject({error: {code: 'SHIFT_START_BLOCKED', details: {blockers: [
       expect.objectContaining({condition: 'VALID_WORK_PERMIT_REQUIRED', actionLabel: expect.any(String)}),
     ]}}});
     expect(await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'},
-      select: {state: true, startSnapshotId: true}})).toEqual({state: 'PLANNED', startSnapshotId: null});
+      select: {state: true, startSnapshotId: true}})).toEqual({state: 'PENDING_ACCEPTANCE', startSnapshotId: null});
     expect(await prisma.readinessScoreSnapshot.count({where: {tenantId, shiftId: 'blocked-shift', status: 'BLOCKED'}})).toBe(1);
     expect(await prisma.readinessScoreSnapshot.findFirstOrThrow({
       where: {tenantId, shiftId: 'blocked-shift', status: 'BLOCKED'}, select: {facts: true},
@@ -191,7 +200,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
        '2026-08-01T00:00:00Z','2026-08-02T00:00:00Z','Europe/Moscow',
        'operator-a','operator-a',NOW(),NOW())`, [tenantId, equipmentId]);
     const retried = await transaction((tx) => startShiftCommand({tx,
-      context: context('operator-a', 'OPERATOR', 'corrected-start'),
+      context: context('dispatcher-a', 'DISPATCHER', 'corrected-start'),
       id: 'blocked-shift', key: 'task05-corrected-start',
       ifMatch: '"shift-blocked-shift-v1"', expectedVersion: 1,
       now: new Date('2026-08-01T12:00:00.000Z'),

@@ -128,9 +128,9 @@ export function MeterReadingsPanel({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900">Журнал наработки</h3>
+        <h3 className="text-sm font-bold text-foreground">Журнал наработки</h3>
         <Gauge className="h-5 w-5 text-blue-600" />
       </div>
 
@@ -141,15 +141,15 @@ export function MeterReadingsPanel({
       )}
 
       {formOpen && (
-        <div className="mb-3 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="mb-3 space-y-2 rounded-md border border-border bg-muted p-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">Новое показание</span>
-            <button type="button" onClick={resetForm} className="text-slate-400 hover:text-slate-600">
+            <span className="text-xs font-semibold text-muted-foreground">Новое показание</span>
+            <button type="button" onClick={resetForm} className="text-muted-foreground hover:text-muted-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
           <div>
-            <label className="mb-1 block text-2xs text-slate-500">Моточасы *</label>
+            <label className="mb-1 block text-2xs text-muted-foreground">Моточасы *</label>
             <Input
               type="number"
               min={0}
@@ -160,11 +160,11 @@ export function MeterReadingsPanel({
             />
           </div>
           <div>
-            <label className="mb-1 block text-2xs text-slate-500">Дата снятия</label>
+            <label className="mb-1 block text-2xs text-muted-foreground">Дата снятия</label>
             <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-9" />
           </div>
           <div>
-            <label className="mb-1 block text-2xs text-slate-500">Примечание</label>
+            <label className="mb-1 block text-2xs text-muted-foreground">Примечание</label>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-9" />
           </div>
           <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
@@ -175,13 +175,13 @@ export function MeterReadingsPanel({
       )}
 
       {loading ? (
-        <div className="grid h-24 place-items-center rounded-md bg-slate-50 text-sm text-slate-400">
+        <div className="grid h-24 place-items-center rounded-md bg-muted text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
         </div>
       ) : readings.length === 0 ? (
-        <div className="grid min-h-20 place-items-center rounded-md bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">
+        <div className="grid min-h-20 place-items-center rounded-md bg-muted px-3 py-4 text-center text-sm text-muted-foreground">
           Показаний пока нет
         </div>
       ) : (
@@ -189,13 +189,13 @@ export function MeterReadingsPanel({
           {readings.map((r) => (
             <li
               key={r.id}
-              className="flex items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
             >
               <div className="min-w-0">
-                <div className="font-mono text-sm font-semibold text-slate-800">
+                <div className="font-mono text-sm font-semibold text-foreground">
                   {r.engineHours.toLocaleString('ru')} м.ч.
                 </div>
-                <div className="text-2xs text-slate-500">
+                <div className="text-2xs text-muted-foreground">
                   {fmtDate(r.recordedAt)}
                   {r.source === 'TELEMETRY' ? ' · телеметрия' : ''}
                   {r.note ? ` · ${r.note}` : ''}
@@ -206,7 +206,7 @@ export function MeterReadingsPanel({
                   type="button"
                   onClick={() => remove(r.id)}
                   aria-label="Удалить показание"
-                  className="shrink-0 text-slate-400 transition-colors hover:text-rose-600"
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-rose-600"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

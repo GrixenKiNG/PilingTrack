@@ -18,25 +18,25 @@ export const STATUS_LABEL: Record<MaintenanceStatus, string> = {
   ON_HOLD: 'Приостановлено', DONE: 'Выполнено', CANCELLED: 'Отменено',
 };
 export const STATUS_STYLE: Record<MaintenanceStatus, string> = {
-  PLANNED: 'bg-slate-100 text-slate-600',
+  PLANNED: 'bg-muted text-muted-foreground',
   ASSIGNED: 'bg-sky-100 text-sky-700',
   IN_PROGRESS: 'bg-amber-100 text-amber-700',
   ON_HOLD: 'bg-orange-100 text-orange-700',
   DONE: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-slate-100 text-slate-400 line-through',
+  CANCELLED: 'bg-muted text-muted-foreground line-through',
 };
 export const PRIORITY_LABEL: Record<MaintenancePriority, string> = {
   LOW: 'Низкий', NORMAL: 'Обычный', HIGH: 'Высокий', CRITICAL: 'Критичный',
 };
 export const PRIORITY_STYLE: Record<MaintenancePriority, string> = {
-  LOW: 'bg-slate-100 text-slate-500',
-  NORMAL: 'bg-slate-100 text-slate-600',
+  LOW: 'bg-muted text-muted-foreground',
+  NORMAL: 'bg-muted text-muted-foreground',
   HIGH: 'bg-amber-100 text-amber-700',
   CRITICAL: 'bg-rose-100 text-rose-700',
 };
 
 export const TYPE_STYLE: Record<MaintenanceType, string> = {
-  EO: 'bg-slate-100 text-slate-600',
+  EO: 'bg-muted text-muted-foreground',
   TO1: 'bg-blue-100 text-blue-700',
   TO2: 'bg-blue-100 text-blue-700',
   TO3: 'bg-indigo-100 text-indigo-700',
@@ -44,7 +44,7 @@ export const TYPE_STYLE: Record<MaintenanceType, string> = {
   REPAIR: 'bg-rose-100 text-rose-700',
   FAULT: 'bg-amber-100 text-amber-700',
   SCHEDULED: 'bg-blue-100 text-blue-700',
-  INSPECTION: 'bg-slate-100 text-slate-600',
+  INSPECTION: 'bg-muted text-muted-foreground',
 };
 
 export const MAINTENANCE_TYPE_OPTIONS: MaintenanceType[] = [

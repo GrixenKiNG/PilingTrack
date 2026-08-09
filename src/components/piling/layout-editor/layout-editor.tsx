@@ -16,7 +16,7 @@ import type { RenderBlockContent } from './layout-renderer';
 import type { LayoutBlock, LayoutBlockKind } from './layout-template';
 import type { LayoutController } from './use-layout-template';
 
-const toolbarButton = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const toolbarButton = 'min-h-11 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
 
 export interface LayoutEditorImageSupport {
   /** Shown in the inspector next to the photo tools. */
@@ -145,8 +145,8 @@ export function LayoutEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-slate-100 text-slate-950" role="dialog" aria-label="Редактор шаблона плитки">
-      <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 shadow-sm">
+    <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-muted text-foreground" role="dialog" aria-label="Редактор шаблона плитки">
+      <header className="relative z-40 flex flex-wrap items-center gap-2 border-b border-border bg-card p-3 shadow-sm">
         <strong className="mr-auto text-sm">{title}</strong>
         {headerControl}
         {imageSupport?.headerControl}
@@ -161,7 +161,7 @@ export function LayoutEditor({
       </header>
       <div className={`relative grid min-h-0 flex-1 ${preview ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[240px_minmax(320px,1fr)_300px]'}`}>
         {!preview && (
-          <aside className={`${mobilePanel === 'library' ? 'absolute inset-y-0 left-0 z-30 block w-[min(90vw,320px)] shadow-2xl' : 'hidden'} overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 lg:static lg:block lg:w-auto lg:shadow-none`}>
+          <aside className={`${mobilePanel === 'library' ? 'absolute inset-y-0 left-0 z-30 block w-[min(90vw,320px)] shadow-2xl' : 'hidden'} overflow-y-auto border-r border-border bg-muted p-4 lg:static lg:block lg:w-auto lg:shadow-none`}>
             <button type="button" className={`${toolbarButton} mb-3 w-full lg:hidden`} onClick={() => setMobilePanel(null)}>Закрыть панель</button>
             <LayoutBlockLibrary dataBlocks={dataBlocks} onAdd={addBlock} onUploadImage={uploadImage} uploadError={imageError} />
           </aside>
@@ -178,7 +178,7 @@ export function LayoutEditor({
           />
         </main>
         {!preview && (
-          <aside className={`${mobilePanel === 'inspector' ? 'absolute inset-y-0 right-0 z-30 block w-[min(90vw,340px)] shadow-2xl' : 'hidden'} overflow-y-auto border-l border-slate-200 bg-slate-50 p-4 lg:static lg:block lg:w-auto lg:shadow-none`}>
+          <aside className={`${mobilePanel === 'inspector' ? 'absolute inset-y-0 right-0 z-30 block w-[min(90vw,340px)] shadow-2xl' : 'hidden'} overflow-y-auto border-l border-border bg-muted p-4 lg:static lg:block lg:w-auto lg:shadow-none`}>
             <button type="button" className={`${toolbarButton} mb-3 w-full lg:hidden`} onClick={() => setMobilePanel(null)}>Закрыть панель</button>
             <LayoutInspector
               block={selectedBlock}

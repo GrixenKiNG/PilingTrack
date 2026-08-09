@@ -49,7 +49,7 @@ export function EquipmentTile({
         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
         : card.status === 'expected'
           ? 'border-sky-200 bg-sky-50 text-sky-700'
-          : 'border-slate-200 bg-slate-50 text-slate-500';
+          : 'border-border bg-muted text-muted-foreground';
   const barClass = flag === 'overdue' ? 'bg-rose-500' : flag === 'soon' ? 'bg-amber-500' : st.bar;
 
   return (
@@ -83,8 +83,8 @@ export function EquipmentTile({
         )}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900">{card.name}</p>
-            <p className="text-xs text-slate-500">
+            <p className="truncate text-sm font-semibold text-foreground">{card.name}</p>
+            <p className="text-xs text-muted-foreground">
               {KIND_LABEL[card.kind]}
               {card.manufactureYear ? ` · ${card.manufactureYear} г.` : ''}
               {card.serialNumber ? ` · зав. ${card.serialNumber}` : ''}
@@ -95,7 +95,7 @@ export function EquipmentTile({
           </Badge>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           {card.assignedSiteName && <span className="truncate">{card.assignedSiteName}</span>}
           {card.assignedOperatorName && (
             <span className="flex items-center gap-1">
@@ -131,7 +131,7 @@ export function EquipmentTile({
         ) : (
           card.status === 'idle' &&
           !t && (
-            <span className="mt-2 flex items-center gap-1 text-2xs text-slate-400">
+            <span className="mt-2 flex items-center gap-1 text-2xs text-muted-foreground">
               <FileX className="h-3 w-3" /> Нет отчёта
             </span>
           )
@@ -143,7 +143,7 @@ export function EquipmentTile({
           <Link
             href={`/admin/equipment/${card.id}`}
             aria-label="Открыть карточку"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
@@ -155,9 +155,9 @@ export function EquipmentTile({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-center">
-      <div className="font-mono text-sm font-semibold text-slate-900">{value}</div>
-      <div className="text-3xs text-slate-400">{label}</div>
+    <div className="rounded-lg bg-muted px-2 py-1.5 text-center">
+      <div className="font-mono text-sm font-semibold text-foreground">{value}</div>
+      <div className="text-3xs text-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -166,7 +166,7 @@ function QuickLink({ href, icon, label }: { href: string; icon: React.ReactNode;
   return (
     <Link
       href={href}
-      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-200 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >
       {icon}
       {label}

@@ -163,7 +163,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
 
   if (loading) {
     return (
-      <div className="h-10 flex items-center gap-1.5 text-slate-400 text-xs">
+      <div className="h-10 flex items-center gap-1.5 text-muted-foreground text-xs">
         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Загрузка фото…
       </div>
     );
@@ -174,7 +174,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       {photos.length > 0 && (
         <div className="mb-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
           {photos.map((p) => (
-            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg bg-slate-50 border">
+            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg bg-muted border">
               {p.thumbUrl ? (
                 <Image
                   src={p.thumbUrl}
@@ -185,7 +185,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
                   onClick={() => handleOpen(p)}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                   <Camera className="w-6 h-6" />
                 </div>
               )}
@@ -193,7 +193,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
                 type="button"
                 onClick={() => handleDelete(p.id)}
                 disabled={busy}
-                className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100 shadow-sm disabled:opacity-50"
+                className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded bg-card/90 text-rose-600 opacity-0 group-hover:opacity-100 shadow-sm disabled:opacity-50"
                 title="Удалить"
               >
                 <Trash2 className="w-3 h-3" />
@@ -206,7 +206,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-orange-600 disabled:opacity-50"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong disabled:opacity-50"
       >
         {busy
           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -85,12 +85,12 @@ export function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
     { label: 'ППР закрыто', value: `${kpi.pmClosed} / ${kpi.pmPlanned}` },
   ];
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
+    <div className="rounded-lg border border-border bg-card p-2.5 shadow-sm">
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-4">
         {metrics.map((m) => (
           <div key={m.label} className="min-w-0">
-            <div className="truncate text-2xs text-slate-500">{m.label}</div>
-            <div className={cn('font-mono text-sm font-bold', m.tone ?? 'text-slate-900')}>{m.value}</div>
+            <div className="truncate text-2xs text-muted-foreground">{m.label}</div>
+            <div className={cn('font-mono text-sm font-bold', m.tone ?? 'text-foreground')}>{m.value}</div>
           </div>
         ))}
       </div>
@@ -100,9 +100,9 @@ export function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
 
 export function EmptyState({ text }: { text: string }) {
   return (
-    <div className="text-center py-16 bg-white rounded-xl border border-slate-100">
-      <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-      <p className="text-sm text-slate-500 max-w-md mx-auto">{text}</p>
+    <div className="text-center py-16 bg-card rounded-xl border border-border">
+      <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+      <p className="text-sm text-muted-foreground max-w-md mx-auto">{text}</p>
     </div>
   );
 }

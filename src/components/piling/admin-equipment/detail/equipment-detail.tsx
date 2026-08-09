@@ -122,17 +122,17 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className={cn('font-bold tracking-tight text-slate-900', embedded ? 'text-lg' : 'text-2xl')}>{eq.name}</h1>
+          <h1 className={cn('font-bold tracking-tight text-foreground', embedded ? 'text-lg' : 'text-2xl')}>{eq.name}</h1>
           <Badge variant="outline" className={cn('font-normal', KIND_BADGE_STYLE[kind])}>
             {KIND_LABELS[kind]}
           </Badge>
           {!eq.isActive && (
-            <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-slate-200">
+            <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
               Неактивна
             </Badge>
           )}
         </div>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-slate-500">
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
           {eq.model && <span>{eq.model}</span>}
           {eq.manufactureYear && <span className="font-mono">{eq.manufactureYear} г.в.</span>}
           {eq.inventoryNumber && <span className="font-mono">инв. {eq.inventoryNumber}</span>}
@@ -159,7 +159,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       <div className="space-y-4">
         {header}
 
-        <div className="grid grid-cols-4 border-b border-slate-200">
+        <div className="grid grid-cols-4 border-b border-border">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -168,7 +168,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                 '-mb-px min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors',
                 tab === t.key
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700',
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {t.label}
@@ -188,7 +188,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                     label="Объект"
                     value={
                       <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                         {details.crew.site.name}
                       </span>
                     }
@@ -225,13 +225,13 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                     <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
                       <div>
                         <div className="font-medium">{d.label}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-muted-foreground">
                           {d.provider}{d.model ? ` · ${d.model}` : ''}{d.imei ? ` · IMEI ${d.imei}` : ''}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <TelematicsStatusBadge status={d.status} />
-                        {d.lastSeenAt && <span className="text-slate-500">last seen {formatRelative(d.lastSeenAt)}</span>}
+                        {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
                       </div>
                     </div>
                   ))}
@@ -247,8 +247,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {tab === 'assignment' && (
             <div className="space-y-4">
               {details.crew ? (
-                <section className="rounded-lg border border-slate-200 bg-white p-3">
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Текущее закрепление</h3>
+                <section className="rounded-lg border border-border bg-card p-3">
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Текущее закрепление</h3>
                   <dl className="grid grid-cols-1 gap-3 text-sm">
                     <KV label="Объект" value={details.crew.site.name} />
                     <KV label="Бригада" value={details.crew.name || '—'} />
@@ -312,7 +312,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
             <KV label="Бригада" value={details.crew.name || '—'} />
             <KV label="Объект" value={
               <span className="inline-flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
                 {details.crew.site.name}
               </span>
             } />
@@ -392,13 +392,13 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
               <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
                 <div>
                   <div className="font-medium">{d.label}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     {d.provider}{d.model ? ` · ${d.model}` : ''}{d.imei ? ` · IMEI ${d.imei}` : ''}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <TelematicsStatusBadge status={d.status} />
-                  {d.lastSeenAt && <span className="text-slate-500">last seen {formatRelative(d.lastSeenAt)}</span>}
+                  {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
                 </div>
               </div>
             ))}

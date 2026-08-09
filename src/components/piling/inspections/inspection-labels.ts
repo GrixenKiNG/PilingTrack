@@ -10,7 +10,7 @@ export const LEVEL_LABEL: Record<InspectionLevel, string> = {
 };
 
 export const LEVEL_STYLE: Record<InspectionLevel, string> = {
-  EO: 'bg-slate-100 text-slate-600',
+  EO: 'bg-muted text-muted-foreground',
   TO1: 'bg-sky-100 text-sky-700',
   TO2: 'bg-blue-100 text-blue-700',
   TO3: 'bg-violet-100 text-violet-700',
@@ -28,7 +28,7 @@ export const STATUS_STYLE: Record<InspectionStatus, string> = {
 };
 
 export function healthScoreColor(score: number | null): string {
-  if (score === null) return 'text-slate-400';
+  if (score === null) return 'text-muted-foreground';
   if (score >= 90) return 'text-emerald-600';
   if (score >= 75) return 'text-amber-600';
   if (score >= 50) return 'text-orange-600';

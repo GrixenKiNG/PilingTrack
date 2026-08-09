@@ -154,7 +154,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           Фото по наряду: до/после работ, дефекты. До 10 МБ, jpg/png/heic.
         </p>
         <button
@@ -169,7 +169,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       </div>
 
       {loading ? (
-        <div className="h-24 flex items-center justify-center text-slate-400">
+        <div className="h-24 flex items-center justify-center text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       ) : photos.length === 0 ? (
@@ -177,7 +177,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="w-full h-28 rounded-lg border-2 border-dashed border-slate-300 hover:border-orange-400 hover:bg-orange-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-slate-500 disabled:opacity-50"
+          className="w-full h-28 rounded-lg border-2 border-dashed border-border hover:border-orange-400 hover:bg-orange-50/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground disabled:opacity-50"
         >
           <Camera className="w-6 h-6" />
           <span className="text-sm">Загрузить первое фото</span>
@@ -185,7 +185,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {photos.map((p) => (
-            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg bg-slate-50 border">
+            <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg bg-muted border">
               {p.thumbUrl ? (
                 <Image
                   src={p.thumbUrl}
@@ -196,7 +196,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
                   onClick={() => handleOpen(p)}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                   <Camera className="w-8 h-8" />
                 </div>
               )}
@@ -204,7 +204,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
                 type="button"
                 onClick={() => handleDelete(p.id)}
                 disabled={busy}
-                className="absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100 hover:bg-white shadow-sm disabled:opacity-50"
+                className="absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-card/90 text-rose-600 opacity-0 group-hover:opacity-100 hover:bg-card shadow-sm disabled:opacity-50"
                 title="Удалить"
               >
                 <Trash2 className="w-3.5 h-3.5" />

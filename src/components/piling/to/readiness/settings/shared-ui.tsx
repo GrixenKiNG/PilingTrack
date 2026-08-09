@@ -6,7 +6,7 @@ import type { PilingIconName } from '@/components/piling/icons';
 import { cn } from '@/lib/utils';
 
 /** Базовая карточка модуля: одна константа на все экраны техготовности. */
-export const card = 'rounded-[14px] border border-slate-200 bg-white shadow-sm';
+export const card = 'rounded-[14px] border border-border bg-card shadow-sm';
 
 export const COMPACT_KPI_GRID = cn(
   KPI_GRID,

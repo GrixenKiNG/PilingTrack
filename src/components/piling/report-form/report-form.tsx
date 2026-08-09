@@ -187,8 +187,8 @@ export function ReportForm() {
   if (loadError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
-        <p className="text-base font-semibold text-slate-900 mb-2">Не удалось загрузить данные формы</p>
-        <p className="text-sm text-slate-500 mb-6">Проверьте интернет и попробуйте ещё раз.</p>
+        <p className="text-base font-semibold text-foreground mb-2">Не удалось загрузить данные формы</p>
+        <p className="text-sm text-muted-foreground mb-6">Проверьте интернет и попробуйте ещё раз.</p>
         <button onClick={reloadData}
           className="h-11 px-6 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold">
           Повторить
@@ -211,18 +211,18 @@ export function ReportForm() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-muted">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 pt-safe flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-card border-b px-4 py-3 pt-safe flex items-center gap-3">
         <button onClick={() => router.push('/operator')}
           aria-label="Вернуться к операторской смене"
-          className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
+          className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
+          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-slate-900 truncate">Отчёт за смену</h1>
-          <p className="text-sm font-medium text-slate-700 truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
-          <p className="text-xs text-slate-500" aria-live="polite">
+          <h1 className="text-lg font-bold text-foreground truncate">Отчёт за смену</h1>
+          <p className="text-sm font-medium text-foreground truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
             {draftSavedAt
               ? `Черновик сохранён в ${new Date(draftSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
               : 'Изменения сохраняются автоматически'}

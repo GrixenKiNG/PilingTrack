@@ -25,7 +25,7 @@ export function EquipmentStatsBar({
     { label: 'Простой', value: idle, tone: 'text-warning' },
     { label: 'В ремонте', value: repair, tone: 'text-info' },
     { label: 'Операторы на смене', value: totals.operatorsOnShiftToday, tone: 'text-info' },
-    { label: 'ТО', value: maintenanceRisks, tone: maintenanceRisks > 0 ? 'text-orange-600' : 'text-success' },
+    { label: 'ТО', value: maintenanceRisks, tone: maintenanceRisks > 0 ? 'text-signal-strong' : 'text-success' },
   ];
 
   // Плитки повторяют раскладку OpsKpiBar (модуль «Объекты»): иконка в правом

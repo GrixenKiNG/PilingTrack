@@ -45,11 +45,11 @@ export function EquipmentTileEditor({ cards, controller }: { cards: FleetCard[];
       imageSupport={{
         subjectName: selectedCard.name,
         headerControl: (
-          <label className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
+          <label className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-muted px-3 text-xs font-medium text-muted-foreground">
             <span className="hidden sm:inline">Установка для фото</span>
             <select
               aria-label="Установка для фото"
-              className="max-w-48 bg-transparent font-semibold text-slate-900 focus:outline-none"
+              className="max-w-48 bg-transparent font-semibold text-foreground focus:outline-none"
               value={selectedCard.id}
               onChange={(event) => setSelectedCardId(event.target.value)}
             >

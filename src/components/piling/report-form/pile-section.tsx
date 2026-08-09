@@ -48,7 +48,7 @@ export function PileSection({
             <h3 className="text-base font-bold flex items-center gap-2"><PilingIcon name="pile-driving" size={18} tone="primary" decorative />Забитые сваи</h3>
             <div className="flex items-center gap-2">
               {totalPiles > 0 && (
-                <span className="text-sm font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                <span className="text-sm font-mono font-bold text-signal-strong bg-orange-50 px-2 py-0.5 rounded-full">
                   {totalPiles} шт. / {formatNumber(totalMeters)} м.п.
                 </span>
               )}
@@ -73,7 +73,7 @@ export function PileSection({
                 </Button>
               </div>
               {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
-              {!tempGrade && <p className="text-slate-600 text-sm font-medium">Выберите марку сваи</p>}
+              {!tempGrade && <p className="text-muted-foreground text-sm font-medium">Выберите марку сваи</p>}
               {(tempGrade || tempCount) && Number(tempCount) > 0 && (
                 <div className="rounded-lg bg-orange-50 px-3 py-2 text-sm font-medium text-orange-700">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
@@ -103,15 +103,15 @@ export function PileSection({
           {piles.length > 0 && (
             <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
               {piles.map((pile) => (
-                <div key={pile.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div key={pile.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-slate-900">{getPileGradeName(pile.pileGradeId)}</p>
-                    {pile.picketId && <p className="text-xs font-medium text-slate-600 truncate">{getPicketPath(pile.picketId)}</p>}
+                    <p className="text-base font-semibold text-foreground">{getPileGradeName(pile.pileGradeId)}</p>
+                    {pile.picketId && <p className="text-xs font-medium text-muted-foreground truncate">{getPicketPath(pile.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-right text-base font-bold text-slate-900">
+                    <span className="text-right text-base font-bold text-foreground">
                       <span className="block font-mono">{pile.count} шт.</span>
-                      <span className="block text-sm font-semibold text-slate-700">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
+                      <span className="block text-sm font-semibold text-foreground">{formatNumber(pile.count * getPileMetersPerUnit(pile.pileGradeId))} м.п.</span>
                     </span>
                     <button onClick={() => onRemove(pile.id)}
                       aria-label={`Удалить сваи ${getPileGradeName(pile.pileGradeId)} из отчёта`}

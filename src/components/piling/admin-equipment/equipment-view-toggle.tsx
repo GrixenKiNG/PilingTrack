@@ -19,14 +19,14 @@ export function EquipmentViewToggle({
   onChange: (v: FleetView) => void;
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted p-1">
       {VIEWS.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           onClick={() => onChange(id)}
           className={cn(
             'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-            view === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+            view === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
           )}
         >
           <Icon className="h-3.5 w-3.5" /> {label}

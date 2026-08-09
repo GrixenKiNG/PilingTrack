@@ -68,7 +68,7 @@ export function TemplateList() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-800">Шаблоны чек-листов</h1>
+        <h1 className="text-lg font-semibold text-foreground">Шаблоны чек-листов</h1>
         <Button asChild size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
           <Link href="/admin/checklists/new">
             <Plus className="w-3.5 h-3.5 mr-1" /> Новый шаблон
@@ -77,9 +77,9 @@ export function TemplateList() {
       </div>
 
       {loading ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">Загрузка…</p>
+        <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
       ) : templates.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
           Шаблонов пока нет.
         </p>
       ) : (
@@ -91,13 +91,13 @@ export function TemplateList() {
                 className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm transition-colors hover:border-orange-300 hover:bg-orange-50/30"
               >
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                  <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 font-medium truncate">{t.name}</span>
                   <span className={cn('rounded px-1.5 py-0.5 text-2xs font-medium', LEVEL_STYLE[t.level])}>
                     {LEVEL_LABEL[t.level]}
                   </span>
                   {t.appliesToModel && (
-                    <span className="text-xs text-slate-500 truncate">{t.appliesToModel}</span>
+                    <span className="text-xs text-muted-foreground truncate">{t.appliesToModel}</span>
                   )}
                 </div>
                 <button
@@ -105,7 +105,7 @@ export function TemplateList() {
                   aria-label="Деактивировать"
                   disabled={deletingId === t.id}
                   onClick={(e) => void handleDelete(e, t.id)}
-                  className="shrink-0 rounded p-1 text-slate-400 hover:text-red-500 disabled:opacity-40"
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:text-red-500 disabled:opacity-40"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

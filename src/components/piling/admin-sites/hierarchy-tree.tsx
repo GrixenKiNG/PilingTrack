@@ -20,7 +20,7 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
     <div className="pl-4 border-l-2 border-orange-200 space-y-2">
       {/* Fields */}
       {tree.fields.length === 0 ? (
-        <p className="text-xs text-slate-400 py-2">
+        <p className="text-xs text-muted-foreground py-2">
           Нет свайных полей. Нажмите + чтобы добавить.
         </p>
       ) : (
@@ -28,22 +28,22 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
           <div key={field.id}>
             <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2">
-                <FolderTree className="w-3.5 h-3.5 text-orange-500" />
-                <span className="text-sm font-medium text-slate-800">
+                <FolderTree className="w-3.5 h-3.5 text-signal-strong" />
+                <span className="text-sm font-medium text-foreground">
                   {field.name}
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => onAdd('cluster', siteId, field.id)}
-                  className="w-6 h-6 rounded flex items-center justify-center hover:bg-orange-50 text-orange-400 hover:text-orange-600"
+                  className="w-6 h-6 rounded flex items-center justify-center hover:bg-orange-50 text-orange-400 hover:text-signal-strong"
                   title="Добавить куст"
                 >
                   <Plus className="w-3 h-3" />
                 </button>
                 <button
                   onClick={() => onDelete(siteId, 'field', field.id)}
-                  className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 text-slate-300 hover:text-red-500"
+                  className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-500"
                   title="Удалить поле"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -51,24 +51,24 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
               </div>
             </div>
             {/* Clusters */}
-            <div className="pl-4 border-l border-slate-200 space-y-1">
+            <div className="pl-4 border-l border-border space-y-1">
               {field.clusters.length === 0 ? (
-                <p className="text-3xs text-slate-400 py-0.5">Нет кустов</p>
+                <p className="text-3xs text-muted-foreground py-0.5">Нет кустов</p>
               ) : (
                 field.clusters.map((cluster) => (
                   <div key={cluster.id}>
                     <div className="flex items-center justify-between py-0.5">
-                      <span className="text-xs text-slate-700">{cluster.name}</span>
+                      <span className="text-xs text-foreground">{cluster.name}</span>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => onAdd('picket', siteId, cluster.id)}
-                          className="w-5 h-5 rounded flex items-center justify-center hover:bg-orange-50 text-orange-400 hover:text-orange-600"
+                          className="w-5 h-5 rounded flex items-center justify-center hover:bg-orange-50 text-orange-400 hover:text-signal-strong"
                         >
                           <Plus className="w-2.5 h-2.5" />
                         </button>
                         <button
                           onClick={() => onDelete(siteId, 'cluster', cluster.id)}
-                          className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-50 text-slate-300 hover:text-red-500"
+                          className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-500"
                         >
                           <Trash2 className="w-2.5 h-2.5" />
                         </button>
@@ -77,19 +77,19 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
                     {/* Pickets */}
                     <div className="pl-3 space-y-0.5">
                       {cluster.pickets.length === 0 ? (
-                        <p className="text-3xs text-slate-400 py-0.5">Нет пикетов</p>
+                        <p className="text-3xs text-muted-foreground py-0.5">Нет пикетов</p>
                       ) : (
                         cluster.pickets.map((picket) => (
                           <div
                             key={picket.id}
                             className="flex items-center justify-between py-0.5"
                           >
-                            <span className="text-2xs text-slate-500">
+                            <span className="text-2xs text-muted-foreground">
                               {'\ud83d\udccd'} {picket.name}
                             </span>
                             <button
                               onClick={() => onDelete(siteId, 'picket', picket.id)}
-                              className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-50 text-slate-300 hover:text-red-500"
+                              className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-500"
                             >
                               <Trash2 className="w-2.5 h-2.5" />
                             </button>
@@ -106,7 +106,7 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
       )}
       <button
         onClick={() => onAdd('field', siteId, siteId)}
-        className="flex items-center gap-1.5 text-xs text-orange-500 hover:text-orange-600 font-medium py-1"
+        className="flex items-center gap-1.5 text-xs text-signal-strong hover:text-signal-strong font-medium py-1"
       >
         <Plus className="w-3 h-3" />
         Добавить свайное поле
@@ -139,9 +139,9 @@ export function PlansSummary({ tree }: PlansSummaryProps) {
           <div className="space-y-1">
             {tree.pilePlans.map((plan) => (
               <div key={plan.id} className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">{plan.pileGrade.name}</span>
+                <span className="text-muted-foreground">{plan.pileGrade.name}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-slate-500 font-mono">
+                  <span className="text-muted-foreground font-mono">
                     {plan.count} шт × {plan.metersPerUnit} м
                   </span>
                   <span className="font-mono font-semibold text-orange-700">
@@ -174,9 +174,9 @@ export function PlansSummary({ tree }: PlansSummaryProps) {
           <div className="space-y-1">
             {tree.drillingPlans.map((plan) => (
               <div key={plan.id} className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">{'\u2300'}{plan.diameter} мм</span>
+                <span className="text-muted-foreground">{'\u2300'}{plan.diameter} мм</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-slate-500 font-mono">
+                  <span className="text-muted-foreground font-mono">
                     {plan.count} шт × {plan.metersPerUnit} м
                   </span>
                   <span className="font-mono font-semibold text-blue-700">

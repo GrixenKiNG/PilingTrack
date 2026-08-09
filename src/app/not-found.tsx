@@ -8,12 +8,12 @@ import { HardHat, ArrowLeft } from '@/components/piling/icons/unified-icons';
 export default function NotFound() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-signal-strong">
         <HardHat className="h-8 w-8" />
       </div>
-      <p className="mt-6 font-mono text-5xl font-bold text-slate-900">404</p>
-      <h1 className="mt-2 text-lg font-semibold text-slate-800">Страница не найдена</h1>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">
+      <p className="mt-6 font-mono text-5xl font-bold text-foreground">404</p>
+      <h1 className="mt-2 text-lg font-semibold text-foreground">Страница не найдена</h1>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
         Такой страницы нет или она была перемещена. Проверьте адрес или вернитесь на главную.
       </p>
       <Link

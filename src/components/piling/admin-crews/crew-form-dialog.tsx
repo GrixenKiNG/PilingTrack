@@ -66,7 +66,7 @@ function AssistantSelector({
   return (
     <div className="space-y-1.5">
       <Label className="flex items-center gap-1.5">
-        <UserPlus className="h-3.5 w-3.5 text-slate-500" />
+        <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
         {label}
       </Label>
       <Button
@@ -79,7 +79,7 @@ function AssistantSelector({
         {names.length > 0 ? 'Изменить состав помощников' : 'Выбрать помощников'}
       </Button>
       {names.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+        <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted p-2.5">
           {names.map(name => (
             <span
               key={name}
@@ -90,9 +90,9 @@ function AssistantSelector({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-slate-400">Помощники не выбраны</p>
+        <p className="text-xs text-muted-foreground">Помощники не выбраны</p>
       )}
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-muted-foreground">
         {names.length} помощник(ов) в составе бригады
       </p>
     </div>
@@ -200,7 +200,7 @@ export function CrewFormDialog({
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-11 w-full" />
               </div>
-              <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 py-6 text-sm text-slate-500">
+              <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted py-6 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Загрузка справочников формы...
               </div>
@@ -385,7 +385,7 @@ function AssistantSelectorModal({
             {filteredUsers.map(user => (
               <label
                 key={user.id}
-                className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-slate-50"
+                className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted"
               >
                 <Checkbox
                   checked={selectedIds.includes(user.id)}
@@ -393,20 +393,20 @@ function AssistantSelectorModal({
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-slate-500">{user.email}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
                 </div>
               </label>
             ))}
 
             {filteredUsers.length === 0 && (
-              <p className="py-4 text-center text-sm text-slate-500">
+              <p className="py-4 text-center text-sm text-muted-foreground">
                 Пользователи не найдены
               </p>
             )}
           </div>
 
           {selectedIds.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted p-2.5">
               {selectedIds.map(id => (
                 <span
                   key={id}
@@ -437,7 +437,7 @@ function AssistantSelectorModal({
             </div>
           )}
 
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             {selectedIds.length} помощник(ов) выбрано
           </p>
         </div>

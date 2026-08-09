@@ -56,11 +56,11 @@ function KpiTile({ id, label, value, hint, delta }: { id: string; label: string;
           <PilingIcon name={ANALYTICS_KPI_ICONS[id] ?? 'analytics'} fill decorative className="absolute inset-0" />
         </span>
         <div className="min-w-0">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
         {delta
           ? <p className={`mt-1 text-xs font-medium ${delta.good ? 'text-emerald-600' : 'text-red-500'}`}>{delta.text}</p>
-          : <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+          : <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
         </div>
       </CardContent>
     </Card>
@@ -110,7 +110,7 @@ function buildSectionPlaceholders(): Record<string, RenderablePageWidget> {
       id: w.id,
       title: w.title,
       render: () => (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">{w.title}</div>
+        <div className="rounded-lg border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">{w.title}</div>
       ),
     };
   }

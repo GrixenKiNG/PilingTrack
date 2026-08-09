@@ -36,7 +36,7 @@ interface Plan {
 }
 
 const DUE_META: Record<PmDueStatus, { label: string; cls: string }> = {
-  ok: { label: 'норма', cls: 'border-slate-200 bg-slate-50 text-slate-500' },
+  ok: { label: 'норма', cls: 'border-border bg-muted text-muted-foreground' },
   due_soon: { label: 'скоро ТО', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
   overdue: { label: 'просрочено', cls: 'border-rose-200 bg-rose-50 text-rose-700' },
 };
@@ -144,9 +144,9 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900">Регламенты ТО</h3>
+        <h3 className="text-sm font-bold text-foreground">Регламенты ТО</h3>
         <CalendarClock className="h-5 w-5 text-blue-600" />
       </div>
 
@@ -157,28 +157,28 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       )}
 
       {formOpen && (
-        <div className="mb-3 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="mb-3 space-y-2 rounded-md border border-border bg-muted p-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">
+            <span className="text-xs font-semibold text-muted-foreground">
               {editingId ? 'Редактирование регламента' : 'Новый регламент'}
             </span>
-            <button type="button" onClick={resetForm} className="text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={resetForm} className="text-muted-foreground hover:text-muted-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. ТО-1 по моточасам" className="h-9" />
-          <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
+          <div className="flex gap-1 rounded-md border border-border bg-card p-1">
             <button
               type="button"
               onClick={() => setTrigger('HOURS')}
-              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'HOURS' ? 'bg-blue-100 text-blue-700' : 'text-slate-500')}
+              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'HOURS' ? 'bg-blue-100 text-blue-700' : 'text-muted-foreground')}
             >
               По моточасам
             </button>
             <button
               type="button"
               onClick={() => setTrigger('CALENDAR')}
-              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'CALENDAR' ? 'bg-blue-100 text-blue-700' : 'text-slate-500')}
+              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'CALENDAR' ? 'bg-blue-100 text-blue-700' : 'text-muted-foreground')}
             >
               По календарю
             </button>
@@ -199,13 +199,13 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       )}
 
       {loading ? (
-        <div className="grid h-20 place-items-center rounded-md bg-slate-50 text-sm text-slate-400">
+        <div className="grid h-20 place-items-center rounded-md bg-muted text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
         </div>
       ) : plans.length === 0 ? (
-        <div className="grid min-h-16 place-items-center rounded-md bg-slate-50 px-3 py-3 text-center text-sm text-slate-500">
+        <div className="grid min-h-16 place-items-center rounded-md bg-muted px-3 py-3 text-center text-sm text-muted-foreground">
           Регламентов пока нет
         </div>
       ) : (
@@ -213,10 +213,10 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
           {plans.map((p) => {
             const meta = DUE_META[p.due.status];
             return (
-              <li key={p.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
+              <li key={p.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-800">{p.title}</div>
-                  <div className="text-2xs text-slate-500">
+                  <div className="truncate text-sm font-semibold text-foreground">{p.title}</div>
+                  <div className="text-2xs text-muted-foreground">
                     {p.triggerType === 'HOURS' ? 'моточасы' : 'календарь'} · {dueDetail(p)}
                   </div>
                 </div>
@@ -226,7 +226,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
                     type="button"
                     onClick={() => startEdit(p)}
                     aria-label="Редактировать регламент"
-                    className="text-slate-400 transition-colors hover:text-orange-600"
+                    className="text-muted-foreground transition-colors hover:text-signal-strong"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -234,7 +234,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
                     type="button"
                     onClick={() => remove(p.id)}
                     aria-label="Удалить регламент"
-                    className="text-slate-400 transition-colors hover:text-rose-600"
+                    className="text-muted-foreground transition-colors hover:text-rose-600"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

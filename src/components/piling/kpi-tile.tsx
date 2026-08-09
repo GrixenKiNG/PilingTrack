@@ -55,7 +55,7 @@ export function kpiGridStyle(count: number): CSSProperties {
 }
 
 function renderIcon(Icon: IconComponent) {
-  return <Icon className="absolute inset-0 h-full w-full text-slate-500" />;
+  return <Icon className="absolute inset-0 h-full w-full text-muted-foreground" />;
 }
 
 export function KpiTile({ icon, label, value, detail, alert, children, className, onClick }: KpiTileProps) {
@@ -69,7 +69,7 @@ export function KpiTile({ icon, label, value, detail, alert, children, className
       type={onClick ? 'button' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-full min-h-28 min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition',
+        'flex h-full min-h-28 min-w-0 flex-col rounded-xl border border-border bg-card p-4 text-left shadow-sm transition',
         onClick && 'hover:border-orange-300 hover:shadow-md',
         className,
       )}
@@ -77,12 +77,12 @@ export function KpiTile({ icon, label, value, detail, alert, children, className
       <div className="flex flex-1 items-stretch gap-4">
         <span className="relative w-20 shrink-0 self-stretch">{iconNode}</span>
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <span className="min-w-0 break-words">{label}</span>
             {alert && <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-label="Требует внимания" />}
           </span>
-          <span className="mt-1 break-words font-mono text-xl font-bold tabular-nums leading-tight text-slate-900">{value}</span>
-          {detail && <span className="mt-1 break-words text-xs text-slate-500">{detail}</span>}
+          <span className="mt-1 break-words font-mono text-xl font-bold tabular-nums leading-tight text-foreground">{value}</span>
+          {detail && <span className="mt-1 break-words text-xs text-muted-foreground">{detail}</span>}
           {children}
         </div>
       </div>
