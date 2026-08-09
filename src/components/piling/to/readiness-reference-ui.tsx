@@ -74,6 +74,7 @@ import { readinessFilterQuery, type ReadinessUrlFilters } from './readiness/api/
 import {
   buildAuthoritativeReadinessPresentation,
   buildUnavailableReadinessPresentation,
+  type PresentationStage,
 } from './readiness/authoritative-presentation';
 import { CommandDialog } from './readiness/shared/command-dialog';
 import {
@@ -591,14 +592,16 @@ function RefKpi({
   value,
   detail,
   alert,
+  onClick,
 }: {
   icon: PilingIconName;
   label: string;
   value: React.ReactNode;
   detail?: string;
   alert?: boolean;
+  onClick?: () => void;
 }) {
-  return <KpiTile icon={icon} label={label} value={value} detail={detail} alert={alert} />;
+  return <KpiTile icon={icon} label={label} value={value} detail={detail} alert={alert} onClick={onClick} />;
 }
 
 export function ReadinessReferenceUi(props: ReferenceUiProps) {
@@ -714,6 +717,19 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
   );
 }
 
+/** Этап цепочки: ведёт либо на страницу другого модуля, либо на вкладку контура. */
+function StageLink({target, label, onViewChange, children}: {
+  target: {href?: string; view?: ReferenceView};
+  label: string;
+  onViewChange: (view: ReferenceView) => void;
+  children: React.ReactNode;
+}) {
+  const shared = 'block min-h-11 rounded-lg px-2 py-1 text-center transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  return target.href
+    ? <Link href={target.href} className={shared} aria-label={`${label}: открыть`}>{children}</Link>
+    : <button type="button" onClick={() => target.view && onViewChange(target.view)} className={shared} aria-label={`${label}: открыть`}>{children}</button>;
+}
+
 function ReadinessCentre(props: ReferenceUiProps) {
   const selected = props.equipment.find((item) => item.id === props.selectedId) ?? props.equipment[0];
   if (!selected) {
@@ -740,6 +756,19 @@ function ReadinessCentre(props: ReferenceUiProps) {
   const detail = props.details[selected.id];
   const fleetCard = props.fleetCards.find((item) => item.id === selected.id);
   const handoverJournal = buildHandoverJournal(props.shifts, selected.id, props.bootstrap?.selectors.actors);
+  const inspectionEvidenceId = presentation.evidence.find((item) => item.key === 'inspection')?.reference ?? null;
+  /**
+   * Куда ведёт шаг чек-листа. Осмотр и моточасы живут в других модулях,
+   * остальные шаги — вкладки этого же контура. Раньше строки показывали
+   * шеврон, но не открывали ничего.
+   */
+  const stageTargets: Record<PresentationStage['key'], {href?: string; view?: ReferenceView}> = {
+    INSPECTION: {href: inspectionEvidenceId ? `/inspections/${inspectionEvidenceId}` : '/inspections'},
+    ENGINE_HOURS: {href: `/admin/equipment/${selected.id}`},
+    PERMIT: {view: 'permits'},
+    MAINTENANCE: {view: 'maintenance'},
+    ACCEPTANCE: {view: 'shifts'},
+  };
   const blockers = presentation.blockers.length;
   const warnings = presentation.warnings.length;
 
@@ -793,21 +822,28 @@ function ReadinessCentre(props: ReferenceUiProps) {
         <div className="p-4">
           <h3 className="font-bold">Чек-лист смены (5 шагов)</h3>
           <div className="mt-3 divide-y divide-border">
-            {presentation.stages.map((stage, index) => (
-              <div key={stage.key} className="flex items-center gap-3 py-2.5">
-                <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', stage.state === 'pass' ? 'bg-success-strong text-white' : stage.state === 'unknown' ? 'bg-muted text-muted-foreground' : 'bg-signal-strong text-white')}>{index + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold">{stage.label}</div>
-                  <div
-                    title={stage.value}
-                    className="line-clamp-2 break-words text-2xs text-muted-foreground"
-                  >
-                    {stage.value}
+            {presentation.stages.map((stage, index) => {
+              const target = stageTargets[stage.key];
+              const body = (
+                <>
+                  <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', stage.state === 'pass' ? 'bg-success-strong text-white' : stage.state === 'unknown' ? 'bg-muted text-muted-foreground' : 'bg-signal-strong text-white')}>{index + 1}</span>
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-xs font-semibold">{stage.label}</div>
+                    <div
+                      title={stage.value}
+                      className="line-clamp-2 break-words text-2xs text-muted-foreground"
+                    >
+                      {stage.value}
+                    </div>
                   </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            ))}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </>
+              );
+              const shared = 'flex w-full min-h-11 items-center gap-3 py-2.5 text-left transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+              return target.href
+                ? <Link key={stage.key} href={target.href} className={shared} aria-label={`${stage.label}: открыть`}>{body}</Link>
+                : <button key={stage.key} type="button" onClick={() => target.view && props.onViewChange(target.view)} className={shared} aria-label={`${stage.label}: открыть`}>{body}</button>;
+            })}
           </div>
         </div>
       </section>
@@ -849,12 +885,12 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 const Icon = [Search, Gauge, ShieldCheck, Wrench, User][index] ?? Search;
                 return (
                 <div key={stage.key} className="flex min-w-[118px] flex-1 items-center">
-                  <div className="text-center">
+                  <StageLink target={stageTargets[stage.key]} label={stage.label} onViewChange={props.onViewChange}>
                     <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-full border', stage.state === 'pass' ? 'border-success bg-success-strong text-white' : stage.state === 'unknown' ? 'border-border bg-muted text-muted-foreground' : 'border-signal bg-signal-strong text-white')}>
                       <Icon className="h-5 w-5" />
                     </span>
                     <div className={cn('mt-2 text-2xs', stage.state === 'fail' ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{stage.label}</div>
-                  </div>
+                  </StageLink>
                   {index < 4 && <div className="mx-3 h-px flex-1 bg-border" />}
                 </div>
               );})}
@@ -949,6 +985,17 @@ function ReadinessCentre(props: ReferenceUiProps) {
   );
 }
 
+type FleetStatusFilter = 'all' | 'ready' | 'attention' | 'blocked';
+
+/** Группа, в которую попадает установка по своему статусу готовности. */
+function matchesFleetStatus(status: ReadinessStatus | undefined, filter: FleetStatusFilter): boolean {
+  if (filter === 'all') return true;
+  if (!status) return filter === 'attention';
+  if (filter === 'ready') return status === 'READY';
+  if (filter === 'attention') return status === 'ATTENTION' || status === 'NO_DATA';
+  return status === 'IN_REPAIR' || status === 'BLOCKED' || status === 'OVERDUE';
+}
+
 function FleetScreen(props: ReferenceUiProps) {
   const readinessItems = Object.values(props.readinessByEquipment);
   const ready = readinessItems.filter((item) => item.status === 'READY').length;
@@ -961,7 +1008,13 @@ function FleetScreen(props: ReferenceUiProps) {
   const inMaintenance = props.fleetCards.filter((item) => item.equipmentStatus === 'repair').length;
   const withoutCrew = props.fleetCards.filter((item) => !item.assignedCrewName).length;
   const [query, setQuery] = useState('');
-  const filtered = props.equipment.filter((item) => `${item.name} ${item.model ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()));
+  // Плитки и левая панель раньше только показывали числа. Один фильтр на всех,
+  // чтобы клик по «Недоступно» действительно сужал список.
+  const [statusFilter, setStatusFilter] = useState<FleetStatusFilter>('all');
+  const filtered = props.equipment.filter((item) => {
+    const matchesQuery = `${item.name} ${item.model ?? ''}`.toLowerCase().includes(query.trim().toLowerCase());
+    return matchesQuery && matchesFleetStatus(props.readinessByEquipment[item.id]?.status, statusFilter);
+  });
   const selected = props.equipment.find((item) => item.id === props.selectedId) ?? props.equipment[0];
   const selectedReadiness = selected ? props.readinessByEquipment[selected.id] : null;
   const selectedFleet = selected ? props.fleetCards.find((item) => item.id === selected.id) : undefined;
@@ -980,16 +1033,21 @@ function FleetScreen(props: ReferenceUiProps) {
         )}
       />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="equipment-rig" label="Всего" value={props.equipment.length} />
-        <RefKpi icon="accepted" label="Готово" value={ready} />
-        <RefKpi icon="risk" label="Требует внимания" value={attention} alert={attention > 0} />
-        <RefKpi icon="defect" label="Недоступно" value={blocked} alert={blocked > 0} />
+        <RefKpi icon="equipment-rig" label="Всего" value={props.equipment.length} onClick={() => setStatusFilter('all')} />
+        <RefKpi icon="accepted" label="Готово" value={ready} onClick={() => setStatusFilter('ready')} />
+        <RefKpi icon="risk" label="Требует внимания" value={attention} alert={attention > 0} onClick={() => setStatusFilter('attention')} />
+        <RefKpi icon="defect" label="Недоступно" value={blocked} alert={blocked > 0} onClick={() => setStatusFilter('blocked')} />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
         <aside className={cn(card, 'p-3')}>
           <h2 className="font-bold">Парк техники</h2>
           <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск установки" className="h-9 bg-muted pl-9" /></div>
-          <FilterGroup title="Статус готовности" rows={[['Все установки', props.equipment.length], ['Готово', ready], ['Требует внимания', attention], ['Недоступно', blocked]]} />
+          <FilterGroup
+            title="Статус готовности"
+            active={statusFilter}
+            onSelect={setStatusFilter}
+            rows={[['all', 'Все установки', props.equipment.length], ['ready', 'Готово', ready], ['attention', 'Требует внимания', attention], ['blocked', 'Недоступно', blocked]]}
+          />
           <FilterGroup title="Объект" rows={Array.from(new Set(props.fleetCards.map((item) => item.assignedSiteName || 'Без объекта'))).slice(0, 5).map((name) => [name, props.fleetCards.filter((item) => (item.assignedSiteName || 'Без объекта') === name).length])} />
           <FilterGroup title="Загрузка парка" rows={[['Высокая (≥75%)', ready], ['Средняя (35–74%)', attention], ['Низкая (<35%)', blocked]]} />
         </aside>
@@ -1095,12 +1153,33 @@ function FleetScreen(props: ReferenceUiProps) {
   );
 }
 
-function FilterGroup({ title: groupTitle, rows }: { title: string; rows: Array<readonly [string, number]> }) {
+function FilterGroup({ title: groupTitle, rows, active, onSelect }: {
+  title: string;
+  /** Без onSelect — просто сводка, с ним каждая строка выбирает фильтр. */
+  rows: Array<readonly [string, number]> | Array<readonly [FleetStatusFilter, string, number]>;
+  active?: FleetStatusFilter;
+  onSelect?: (value: FleetStatusFilter) => void;
+}) {
   return (
     <div className="mt-4">
       <h3 className="text-xs font-bold">{groupTitle}</h3>
       <div className="mt-2 space-y-1.5">
-        {rows.map(([label, count], index) => <div key={label} className="flex items-center justify-between text-xs text-muted-foreground"><span><span className={cn('mr-2 inline-block h-2 w-2 rounded-full border', index === 0 ? 'border-signal bg-signal-strong' : 'border-border')} />{label}</span><b>{count}</b></div>)}
+        {rows.map((row, index) => {
+          const selectable = onSelect != null && row.length === 3;
+          const [value, label, count] = row.length === 3
+            ? row as readonly [FleetStatusFilter, string, number]
+            : ['all' as FleetStatusFilter, ...(row as readonly [string, number])] as const;
+          const isActive = selectable ? active === value : index === 0;
+          const inner = (
+            <>
+              <span><span className={cn('mr-2 inline-block h-2 w-2 rounded-full border', isActive ? 'border-signal bg-signal-strong' : 'border-border')} />{label}</span>
+              <b>{count}</b>
+            </>
+          );
+          return selectable
+            ? <button key={label} type="button" aria-pressed={isActive} onClick={() => onSelect?.(value)} className={cn('flex min-h-11 w-full items-center justify-between rounded px-1 text-left text-xs transition hover:bg-muted/60', isActive ? 'font-semibold text-foreground' : 'text-muted-foreground')}>{inner}</button>
+            : <div key={label} className="flex items-center justify-between text-xs text-muted-foreground">{inner}</div>;
+        })}
       </div>
     </div>
   );
