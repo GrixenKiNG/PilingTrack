@@ -9,6 +9,7 @@ import {
   BarChart3,
   Bell,
   BookText,
+  Building2,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
@@ -29,8 +30,22 @@ import {
   Wrench,
 } from '@/components/piling/icons/unified-icons';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
+import {
+  COMPACT_KPI_GRID,
+  InfoRow,
+  ScreenTitle,
+  Toggle,
+  card,
+} from './readiness/settings/shared-ui';
+import { ChecklistsSettings } from './readiness/settings/checklists-section';
+import { RolesSettings } from './readiness/settings/roles-section';
+import { DictionariesSettings } from './readiness/settings/dictionaries-section';
+import { NotificationsSettings } from './readiness/settings/notifications-section';
+import { IntegrationsSettings } from './readiness/settings/integrations-section';
+import { AuditSettings } from './readiness/settings/audit-section';
+import { auditActionLabel, auditEntityLabel } from './readiness/settings/audit-labels';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
-import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
+import { KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
@@ -77,11 +92,6 @@ import {
   type PresentationStage,
 } from './readiness/authoritative-presentation';
 import { CommandDialog } from './readiness/shared/command-dialog';
-import {
-  DEFAULT_WORKSPACE_SETTINGS,
-  NOTIFICATION_KEYS,
-  type WorkspaceSettings,
-} from '@/modules/settings/domain/settings';
 
 export type ReferenceView =
   | 'readiness'
@@ -199,12 +209,7 @@ const STATUS_META: Record<ReadinessStatus, { label: string; tone: string }> = {
   OVERDUE: { label: 'ТО просрочено', tone: 'red' },
 };
 
-const card = 'rounded-[14px] border border-slate-200 bg-white shadow-sm';
 const muted = 'text-muted-foreground';
-const COMPACT_KPI_GRID = cn(
-  KPI_GRID,
-  '[&>*]:!min-h-[84px] [&>*]:!rounded-[10px] [&>*]:!p-3 max-sm:!grid-cols-1',
-);
 
 async function downloadReadinessExport(dataset: 'fleet' | 'permits' | 'reports' | 'dictionary' | 'audit', filters: ReadinessUrlFilters) {
   const query = readinessFilterQuery(filters);
@@ -301,26 +306,6 @@ function StatusPill({ status }: { status: ReadinessStatus }) {
       {meta.tone === 'green' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
       {meta.label}
     </span>
-  );
-}
-
-function ScreenTitle({
-  heading,
-  subtitle,
-  actions,
-}: {
-  heading: string;
-  subtitle?: string;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-h-[58px] flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between sm:py-0">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">{heading}</h1>
-        {subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}
-      </div>
-      {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
-    </div>
   );
 }
 
@@ -1185,10 +1170,6 @@ function FilterGroup({ title: groupTitle, rows, active, onSelect }: {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-3xs text-muted-foreground">{label}</div><div className="mt-0.5 font-semibold text-foreground">{value}</div></div>;
-}
-
 function ShiftsScreen(props: ReferenceUiProps) {
   const [period, setPeriod] = useState<'day' | 'week'>('day');
   const [command, setCommand] = useState<{shift: ReadinessShiftDto; action: 'request-acceptance' | 'start' | 'handover' | 'decline'} | null>(null);
@@ -1815,8 +1796,8 @@ function ReportsScreen(props: ReferenceUiProps) {
 
 function SettingsWorkspace(props: ReferenceUiProps) {
   return (
-    <div className="grid min-h-[calc(100vh-48px)] grid-cols-1 xl:grid-cols-[180px_minmax(0,1fr)]">
-      <aside className="sticky top-12 z-20 border-b border-border bg-white px-2 py-2 xl:static xl:border-b-0 xl:border-r xl:px-3 xl:py-4">
+    <div className="grid min-h-[calc(100vh-48px)] grid-cols-1 xl:grid-cols-[200px_minmax(0,1fr)]">
+      <aside className="sticky top-12 z-20 flex flex-col border-b border-border bg-card px-2 py-2 xl:static xl:border-b-0 xl:border-r xl:px-3 xl:py-4">
         <div className="mb-3 hidden text-xs font-bold text-muted-foreground xl:block">Разделы</div>
         <nav className="flex gap-1 overflow-x-auto xl:block xl:space-y-1">
           {SETTINGS_ITEMS.map((item) => {
@@ -1827,18 +1808,22 @@ function SettingsWorkspace(props: ReferenceUiProps) {
                 type="button"
                 onClick={() => props.onSettingsSectionChange(item.id)}
                 className={cn(
-                  'flex h-9 shrink-0 items-center gap-2.5 border-l-2 px-3 text-left text-xs transition xl:w-full',
+                  'flex h-9 shrink-0 items-center gap-2.5 whitespace-nowrap border-l-2 px-3 text-left text-xs transition xl:w-full',
                   props.settingsSection === item.id
                     ? 'border-signal bg-signal/10 font-semibold text-signal-strong'
                     : 'border-transparent text-muted-foreground hover:bg-muted',
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </button>
             );
           })}
         </nav>
+        <div className="mt-auto hidden items-center gap-2 border-t border-border pt-3 text-3xs text-muted-foreground xl:flex">
+          <Building2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{props.bootstrap?.tenant.name?.trim() || 'Организация'} · Основной контур</span>
+        </div>
       </aside>
       <main className="min-w-0 px-2 sm:px-4">
         {props.settingsSection === 'rules' && (
@@ -1847,22 +1832,33 @@ function SettingsWorkspace(props: ReferenceUiProps) {
             {...props}
           />
         )}
-        {props.settingsSection === 'checklists' && <LiveChecklistsSettings {...props} />}
-        {props.settingsSection === 'roles' && <LiveRolesSettings {...props} />}
-        {props.settingsSection === 'dictionaries' && <LiveDictionariesSettings {...props} />}
-        {props.settingsSection === 'notifications' && <NotificationsSettings props={props} />}
-        {props.settingsSection === 'integrations' && <LiveIntegrationsSettings {...props} />}
-        {props.settingsSection === 'audit' && <AuditSettings {...props} />}
+        {props.settingsSection === 'checklists' && <ChecklistsSettings />}
+        {props.settingsSection === 'roles' && <RolesSettings bootstrap={props.bootstrap} />}
+        {props.settingsSection === 'dictionaries' && (
+          <DictionariesSettings
+            equipment={props.equipment}
+            bootstrap={props.bootstrap}
+            onExport={() => void downloadReadinessExport('dictionary', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}
+          />
+        )}
+        {props.settingsSection === 'notifications' && <NotificationsSettings isAdmin={props.bootstrap?.actor.role === 'ADMIN'} />}
+        {props.settingsSection === 'integrations' && (
+          <IntegrationsSettings
+            devices={Object.values(props.details).flatMap((detail) => detail.telematicsDevices ?? [])}
+            bootstrap={props.bootstrap}
+          />
+        )}
+        {props.settingsSection === 'audit' && (
+          <AuditSettings
+            audit={props.audit}
+            bootstrap={props.bootstrap}
+            canExport={Boolean(props.bootstrap?.capabilities.entities.audit.export)}
+            filtersBar={<ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode="audit" />}
+            onExport={(events) => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, auditActionLabel(event.action), `${auditEntityLabel(event.entity.type)}:${event.entity.id}`, event.hash])])}
+          />
+        )}
       </main>
     </div>
-  );
-}
-
-function SettingsKpis({ items }: { items: Array<{ icon: PilingIconName; label: string; value: React.ReactNode; alert?: boolean }> }) {
-  return (
-    <section className={COMPACT_KPI_GRID} style={kpiGridStyle(items.length)}>
-      {items.map((item) => <RefKpi key={item.label} {...item} />)}
-    </section>
   );
 }
 
@@ -1888,13 +1884,12 @@ const ROLE_MATRIX: Array<{ permission: string; allowed: [boolean, boolean, boole
   { permission: 'Изменять правила', allowed: [false, false, false, true] },
 ];
 
-function Toggle({ checked, onChange, disabled = false, label = 'Переключатель' }: { checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; label?: string }) {
-  return (
-    <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled || !onChange} onClick={() => onChange?.(!checked)} className="grid min-h-11 min-w-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed">
-      <span className={cn('relative block h-5 w-9 rounded-full transition', checked ? 'bg-success-strong' : 'bg-border')}><span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition', checked ? 'left-[18px]' : 'left-0.5')} /></span>
-    </button>
-  );
-}
+/** Ползунок веса: 60% — практический потолок одного критерия. */
+const WEIGHT_SLIDER_MAX = 60;
+
+const WEIGHT_SLIDER_CLASS = 'h-1.5 min-w-0 cursor-pointer appearance-none rounded-full disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  + ' [&::-webkit-slider-thumb]:h-[13px] [&::-webkit-slider-thumb]:w-[13px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-signal-strong [&::-webkit-slider-thumb]:bg-background'
+  + ' [&::-moz-range-thumb]:h-[13px] [&::-moz-range-thumb]:w-[13px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-signal-strong [&::-moz-range-thumb]:bg-background';
 
 function RulesSettings(props: ReferenceUiProps) {
   const [draft, setDraft] = useState<ReadinessRuleSet>(
@@ -2045,7 +2040,7 @@ function RulesSettings(props: ReferenceUiProps) {
           <div className="border-b border-border p-3">
             <h2 className="text-lg font-bold">Вес критериев и критические блокеры</h2>
           </div>
-          <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <div className="rounded-xl border border-border p-3">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-bold">Вес критериев</h3>
@@ -2056,7 +2051,7 @@ function RulesSettings(props: ReferenceUiProps) {
                   const meta = CRITERION_LABELS[criterion.key];
                   const Icon = CRITERION_ICONS[criterion.key];
                   return (
-                    <div key={criterion.key} className="grid grid-cols-[34px_minmax(0,1fr)_66px_1fr_44px] items-center gap-2 py-2">
+                    <div key={criterion.key} className="grid grid-cols-[32px_minmax(0,1fr)_54px_80px_44px] items-center gap-1.5 py-2">
                       <span className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-success/10 text-success-strong"><Icon className="h-4 w-4" /></span>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-semibold">{meta.title}</div>
@@ -2078,16 +2073,23 @@ function RulesSettings(props: ReferenceUiProps) {
                       <input
                         type="range"
                         min="0"
-                        max="60"
+                        max={WEIGHT_SLIDER_MAX}
                         value={criterion.weight}
                         disabled={saving || rulesUnavailable || criterion.locked}
                         onChange={(event) => patchCriterion(criterion.key, { weight: Number(event.target.value) })}
                         aria-label={`Ползунок веса ${meta.title}`}
-                        className="min-w-0 accent-signal disabled:opacity-50"
+                        // Трек рисуем сами: у Chrome незаполненная часть при accent-color
+                        // получается почти чёрной, а по макету она светло-серая.
+                        style={{ backgroundImage: `linear-gradient(to right, var(--signal) 0 ${criterion.weight / WEIGHT_SLIDER_MAX * 100}%, var(--muted) ${criterion.weight / WEIGHT_SLIDER_MAX * 100}% 100%)` }}
+                        className={WEIGHT_SLIDER_CLASS}
                       />
-                      <span className="flex items-center justify-end gap-1">
-                        <Lock className={cn('h-3.5 w-3.5', criterion.locked ? 'text-success-strong' : 'text-muted-foreground')} />
-                        <Toggle checked={criterion.locked} onChange={saving || rulesUnavailable ? undefined : (locked) => patchCriterion(criterion.key, { locked })} label={`Закрепить вес критерия ${meta.title}`} />
+                      <span className="flex items-center justify-end">
+                        <Toggle
+                          checked={criterion.locked}
+                          icon={<Lock className="h-2.5 w-2.5" />}
+                          onChange={saving || rulesUnavailable ? undefined : (locked) => patchCriterion(criterion.key, { locked })}
+                          label={`Закрепить вес критерия ${meta.title}`}
+                        />
                       </span>
                     </div>
                   );
@@ -2103,14 +2105,14 @@ function RulesSettings(props: ReferenceUiProps) {
                   <h3 className="font-bold">Блокеры и предупреждения</h3>
                   <span className="text-xs text-muted-foreground">{draft.blockers.filter((item) => item.isActive).length} из {draft.blockers.length} активны</span>
                 </div>
-                <div className="mt-2 grid grid-cols-[minmax(0,1fr)_150px_44px] items-end gap-2 border-b border-border pb-1.5 text-3xs uppercase text-muted-foreground">
+                <div className="mt-2 grid grid-cols-[minmax(0,1fr)_128px_44px] items-end gap-2 border-b border-border pb-1.5 text-3xs uppercase text-muted-foreground">
                   <span>Условие</span><span>Действие</span><span className="text-right">Активно</span>
                 </div>
                 {draft.blockers.map((blocker) => {
                   // Предупреждение не останавливает работу — не красим его как критическое.
                   const advisory = blocker.action === 'WARN_ONLY';
                   return (
-                    <div key={blocker.condition} className="grid grid-cols-[minmax(0,1fr)_150px_44px] items-center gap-2 border-b border-border py-2 text-2xs last:border-b-0">
+                    <div key={blocker.condition} className="grid grid-cols-[minmax(0,1fr)_128px_44px] items-center gap-2 border-b border-border py-2 text-2xs last:border-b-0">
                       <span className="flex min-w-0 items-center gap-2">
                         <AlertTriangle className={cn('h-3.5 w-3.5 shrink-0', blocker.isActive ? (advisory ? 'text-warning-strong' : 'text-destructive-strong') : 'text-muted-foreground')} />
                         <span className="leading-tight">{BLOCKER_LABELS[blocker.condition]}</span>
@@ -2135,11 +2137,11 @@ function RulesSettings(props: ReferenceUiProps) {
               </div>
               <div className="overflow-x-auto rounded-xl border border-border p-3">
                 <h3 className="font-bold">Роли и доступы</h3>
-                <div className="mt-2 grid min-w-[420px] grid-cols-[minmax(0,1fr)_repeat(4,64px)] text-3xs uppercase text-muted-foreground">
-                  <span />{ROLE_COLUMNS.map((role) => <span key={role} className="text-center">{role}</span>)}
+                <div className="mt-2 grid min-w-[286px] grid-cols-[104px_repeat(4,minmax(0,1fr))] text-3xs font-semibold text-muted-foreground">
+                  <span />{ROLE_COLUMNS.map((role) => <span key={role} className="truncate text-center">{role}</span>)}
                 </div>
                 {ROLE_MATRIX.map((row) => (
-                  <div key={row.permission} className="grid min-w-[420px] grid-cols-[minmax(0,1fr)_repeat(4,64px)] items-center border-t border-border py-1.5 text-2xs">
+                  <div key={row.permission} className="grid min-w-[286px] grid-cols-[104px_repeat(4,minmax(0,1fr))] items-center border-t border-border py-1.5 text-2xs">
                     <span>{row.permission}</span>
                     {row.allowed.map((allowed, column) => (
                       <span key={ROLE_COLUMNS[column]} className="flex justify-center">
@@ -2219,7 +2221,7 @@ function RulesSettings(props: ReferenceUiProps) {
       </div>
       <section className={cn(card, 'mt-2 p-3')}>
         <h2 className="font-bold">Предпросмотр расчёта готовности</h2>
-        <div className="mt-3 grid grid-cols-1 items-start gap-4 xl:grid-cols-[240px_minmax(0,1.3fr)_minmax(0,1fr)_210px]">
+        <div className="mt-3 grid grid-cols-1 items-start gap-4 xl:grid-cols-[270px_minmax(0,1.5fr)_minmax(0,1fr)_200px]">
           <div className="flex items-center gap-3">
             <EquipmentPhoto cardData={previewFleet} name={previewEquipment?.name ?? ''} className="h-[74px] w-[68px] shrink-0" />
             <div className="min-w-0">
@@ -2236,7 +2238,7 @@ function RulesSettings(props: ReferenceUiProps) {
                 const ratio = result?.ratio ?? 0;
                 return (
                   <div key={criterion.key}>
-                    <div className="flex min-h-8 items-end text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].title}</div>
+                    <div title={CRITERION_LABELS[criterion.key].title} className="flex min-h-8 min-w-0 items-end break-words text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].short}</div>
                     <div className="mt-1 font-mono text-sm font-bold">{result?.earned ?? 0} <span className="text-2xs font-semibold text-muted-foreground">/ {criterion.weight}</span></div>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                       <span className={cn('block h-full rounded-full', ratio >= 0.999 ? 'bg-success-strong' : ratio > 0 ? 'bg-signal-strong' : 'bg-destructive-strong')} style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 3)}%` }} />
@@ -2293,243 +2295,4 @@ function RulesSettings(props: ReferenceUiProps) {
       </section>
     </>
   );
-}
-
-function ChecklistsSettings(props: ReferenceUiProps) {
-  const templates = ['Ежесменный осмотр', 'Закрытие смены', 'ТО-500', 'Приёмка ремонта', 'Осмотр молота'];
-  const rows = [
-    ['Осмотреть рукава и соединения', 'Да / Нет', true, true],
-    ['Проверить уровень гидравлического масла', 'Да / Нет', true, false],
-    ['Проверить наличие подтеканий', 'Да / Нет', true, true],
-    ['Температура масла после запуска', 'Число (°C)', true, false],
-  ] as const;
-  return (
-    <>
-      <ScreenTitle heading="Чек-листы" subtitle="Конструктор проверок для смены, техники и обслуживания" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/checklists/new">+ Создать шаблон</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'inspection', label: 'Всего шаблонов', value: templates.length }, { icon: 'accepted', label: 'Опубликовано', value: 4 }, { icon: 'documents', label: 'Черновики', value: 1 }, { icon: 'history', label: 'Требуют обновления', value: props.equipment.length ? 1 : 0 }]} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[184px_minmax(0,1fr)_240px]">
-        <aside className={cn(card, 'overflow-hidden')}><div className="p-3"><h2 className="font-bold">Шаблоны чек-листов</h2><div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Поиск по шаблонам" className="h-9 pl-9 text-xs" /></div></div><div>{templates.map((template, index) => <button key={template} type="button" className={cn('w-full border-t border-border p-3 text-left', index === 0 && 'border-l-2 border-l-signal bg-signal/10')}><div className={cn('text-xs font-semibold', index === 0 && 'text-signal-strong')}>{template}</div><div className="mt-1 text-3xs text-muted-foreground">v{index + 1}.2 · Опубликован</div></button>)}</div></aside>
-        <section className={cn(card, 'overflow-x-auto p-4')}>
-          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Ежесменный осмотр сваебойной установки <span className="font-normal text-muted-foreground">v3.2</span></h2><span className="mt-2 inline-flex rounded bg-success/10 px-2 py-1 text-xs text-success-strong">Опубликован</span></div><div className="flex gap-2"><Button variant="outline">••• Ещё</Button><Button variant="outline">◉ Предпросмотр</Button></div></div>
-          <div className="mt-4 rounded-xl border border-border p-3">
-            <div className="flex items-center justify-between"><div><h3 className="font-bold">Гидравлическая система</h3><div className="mt-1 text-xs text-muted-foreground">Проверьте состояние гидравлических компонентов установки.</div></div><Button variant="outline">+ Добавить пункт</Button></div>
-            <div className="mt-4 grid min-w-[680px] grid-cols-[40px_minmax(0,1fr)_90px_92px_70px] gap-2 border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>№</span><span>Пункт проверки</span><span>Тип ответа</span><span>Обязат.</span><span>Блокер</span></div>
-            {rows.map(([name, answer, required, blocker], index) => <div key={name} className="grid min-w-[680px] grid-cols-[40px_minmax(0,1fr)_90px_92px_70px] items-center gap-2 border-b border-border py-3 text-xs"><span className="rounded border border-border p-2 text-center font-bold">{index + 1}</span><span className="rounded border border-border p-2">{name}</span><span className="rounded border border-border p-2">{answer}</span><span>{required && <span className="rounded bg-signal/10 px-1.5 py-1 text-3xs text-signal-strong">Обязательно</span>}</span><span>{blocker && <span className="rounded bg-destructive/10 px-2 py-1 text-destructive-strong">Блокер</span>}</span></div>)}
-          </div>
-        </section>
-        <aside className={cn(card, 'p-4')}><div className="flex items-center justify-between"><h2 className="font-bold">Настройки пункта</h2><span>×</span></div><label className="mt-4 block text-2xs text-muted-foreground">Текст пункта<textarea className="mt-2 h-20 w-full rounded-lg border border-border p-3 text-xs" defaultValue="Осмотреть рукава и соединения" /></label><label className="mt-4 block text-2xs text-muted-foreground">Описание (необязательно)<textarea className="mt-2 h-20 w-full rounded-lg border border-border p-3 text-xs" placeholder="Дополнительные пояснения для оператора" /></label><label className="mt-4 block text-2xs text-muted-foreground">Тип ответа<select className="mt-2 h-10 w-full rounded-lg border border-border px-3 text-xs"><option>Да / Нет</option></select></label><div className="mt-5 space-y-3 text-xs">{['Обязательный ответ', 'Требовать фото', 'Создавать дефект при «Нет»'].map((label) => <div key={label} className="flex min-w-0 items-center justify-between gap-2"><span className="min-w-0">{label}</span><span className="shrink-0"><Toggle checked /></span></div>)}</div></aside>
-      </div>
-    </>
-  );
-}
-
-function RolesSettings(props: ReferenceUiProps) {
-  const roles = ['Оператор', 'Диспетчер', 'Механик', 'Мастер', 'Инженер ОТ', 'Администратор'];
-  const permissions = ['Открывать смену', 'Принимать технику', 'Закрывать дефекты', 'Подтверждать наряд-допуск', 'Изменять правила', 'Экспортировать отчёты'];
-  const users = props.crews.flatMap((crew) => [crew.operator?.name, ...crew.assistants.map((assistant) => assistant.name)]).filter(Boolean);
-  return (
-    <>
-      <ScreenTitle heading="Роли и доступы" subtitle="Полномочия пользователей, контур объектов и временные замещения" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/users">+ Добавить пользователя</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'crew', label: 'Пользователи', value: users.length }, { icon: 'accepted', label: 'Активные', value: users.length }, { icon: 'operator', label: 'Вне системы', value: 0 }, { icon: 'risk', label: 'Требуют внимания', value: 0 }]} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className={cn(card, 'overflow-x-auto p-4')}><h2 className="font-bold">Матрица полномочий</h2><div className="mt-4 min-w-[760px] overflow-hidden rounded-lg border border-border"><div className="grid grid-cols-[210px_repeat(6,1fr)] bg-muted text-center text-3xs text-muted-foreground"><span className="p-3" />{roles.map((role) => <span key={role} className="border-l border-border p-3">{role}</span>)}</div>{permissions.map((permission, row) => <div key={permission} className="grid grid-cols-[210px_repeat(6,1fr)] border-t border-border text-xs"><span className="p-3">{permission}</span>{roles.map((role, column) => <span key={role} className="grid place-items-center border-l border-border p-3">{column === 5 || (row < 2 && column < 2) || (row === 2 && column === 2) ? <span className="grid h-6 w-6 place-items-center rounded-full bg-success-strong text-white">✓</span> : <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground">—</span>}</span>)}</div>)}</div></section>
-        <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Роли</h2><div className="mt-3 divide-y divide-border">{roles.map((role, index) => <div key={role} className="flex items-center gap-3 py-3 text-xs"><ShieldCheck className={cn('h-4 w-4', index === 0 ? 'text-info-strong' : 'text-muted-foreground')} />{role}</div>)}</div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Пользователи роли</h2><div className="mt-3 space-y-2">{users.slice(0, 6).map((name) => <div key={name as string} className="flex items-center justify-between rounded-lg border border-border p-3 text-xs"><span>{name as string}</span><span className="rounded bg-success/10 px-2 py-1 text-success-strong">Активен</span></div>)}</div></section></aside>
-      </div>
-    </>
-  );
-}
-
-function DictionariesSettings(props: ReferenceUiProps) {
-  const categories = ['Техника', 'Объекты и площадки', 'Типы работ', 'Причины простоев', 'Дефекты и узлы', 'Документы и допуски', 'Единицы измерения'];
-  return (
-    <>
-      <ScreenTitle heading="Справочники" subtitle="Единые нормативные данные для техники, объектов и отчётности" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/dictionaries">+ Добавить запись</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'documents', label: 'Справочников', value: categories.length }, { icon: 'reports', label: 'Записей', value: props.equipment.length }, { icon: 'history', label: 'Черновиков', value: 0 }, { icon: 'risk', label: 'Конфликтов', value: 0 }]} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className={cn(card, 'overflow-x-auto')}>
-          <div className="p-4"><h2 className="font-bold">Справочник «Техника»</h2><div className="mt-3 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Поиск по наименованию, типу или №" className="h-9 pl-9 text-xs" /></div><button className="h-9 rounded-lg border border-border px-3 text-xs">Тип: Все</button><button className="h-9 rounded-lg border border-border px-3 text-xs">Статус: Все</button><Button asChild variant="outline" className="h-9 text-success-strong"><Link href="/admin/dictionaries">Импорт XLSX</Link></Button><Button variant="outline" className="h-9" onClick={() => downloadCsv('equipment-dictionary.csv', [['Наименование', 'Тип', 'Заводской №', 'Норматив ТО'], ...props.equipment.map((item) => [item.name, item.model, props.details[item.id]?.equipment?.serialNumber, item.nextMaintenanceAtHours])])}>Экспорт</Button></div></div>
-          <div className="grid min-w-[760px] grid-cols-[1.3fr_1fr_1fr_0.8fr_0.7fr_20px] border-y border-border px-4 py-2 text-3xs uppercase text-muted-foreground"><span>Наименование</span><span>Тип</span><span>Заводской №</span><span>Норматив ТО</span><span>Используется</span><span /></div>
-          <div className="min-w-[760px] divide-y divide-border">{props.equipment.map((item) => <div key={item.id} className="grid grid-cols-[1.3fr_1fr_1fr_0.8fr_0.7fr_20px] items-center px-4 py-3 text-xs hover:bg-signal/5"><span className="font-semibold">{item.name}</span><span>{item.model || 'Установка'}</span><span>{props.details[item.id]?.equipment?.serialNumber || '—'}</span><span>{item.nextMaintenanceAtHours != null ? `${item.nextMaintenanceAtHours.toLocaleString('ru-RU')} м/ч` : '—'}</span><span className="text-success-strong">◉ Да</span><span>⋮</span></div>)}</div>
-          <div className="flex items-center justify-between border-t border-border p-4 text-xs text-muted-foreground"><span>Показывать по: <b className="rounded border border-border px-3 py-2">25⌄</b></span><span>1–{props.equipment.length} из {props.equipment.length} ›</span></div>
-        </section>
-        <aside className={cn(card, 'overflow-hidden')}><div className="p-4"><h2 className="font-bold">Категории справочников</h2></div>{categories.map((category, index) => <button key={category} type="button" className={cn('flex h-11 w-full items-center gap-3 border-t border-border px-4 text-left text-xs', index === 0 && 'border-l-2 border-l-signal bg-signal/10 font-semibold text-signal-strong')}><BookText className="h-4 w-4" />{category}</button>)}</aside>
-      </div>
-    </>
-  );
-}
-
-function NotificationsSettings({ props }: { props: ReferenceUiProps }) {
-  const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-  const isAdmin = props.bootstrap?.actor.role === 'ADMIN';
-  useEffect(() => {
-    let active = true;
-    void authFetch('/api/settings')
-      .then(async (response) => {
-        if (!response.ok) throw new Error('settings');
-        const body = await response.json() as WorkspaceSettings;
-        if (active) setSettings(body);
-      })
-      .catch(() => active && toast.error('Не удалось загрузить настройки уведомлений'))
-      .finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, []);
-  const rules = [
-    ['downtime30', 'Простой установки более 30 минут', 'Критический', 'Диспетчер, механик', 'Telegram · Push'],
-    ['planDeviation', 'Отклонение от производственного плана', 'Высокий', 'Диспетчер, руководитель', 'Telegram · Email'],
-    ['maintenanceOverdue', 'Просроченное техническое обслуживание', 'Критический', 'Механик, администратор', 'Telegram · Push'],
-    ['newReports', 'Новый сменный отчёт или сводка', 'Средний', 'Диспетчер, администратор', 'Telegram · Email'],
-  ] as const;
-  const toggleRule = async (key: string) => {
-    if (!isAdmin || savingKey) return;
-    const previous = settings;
-    const next = { ...settings, notifications: { ...settings.notifications, [key]: !settings.notifications[key] } };
-    setSettings(next);
-    setSavingKey(key);
-    const response = await authFetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(next),
-    }).catch(() => null);
-    if (!response?.ok) {
-      setSettings(previous);
-      toast.error('Настройка не сохранена');
-    } else {
-      setSettings(await response.json() as WorkspaceSettings);
-      toast.success('Правило уведомления сохранено');
-    }
-    setSavingKey(null);
-  };
-  return (
-    <>
-      <ScreenTitle heading="Уведомления" subtitle="Маршруты событий, приоритеты и контроль доставки" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/telegram">Создать правило</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'settings', label: 'Правил', value: NOTIFICATION_KEYS.length }, { icon: 'accepted', label: 'Активных', value: Object.values(settings.notifications).filter(Boolean).length }, { icon: 'notifications', label: 'Хранилище', value: loading ? 'Загрузка' : 'Сервер' }, { icon: 'risk', label: 'Ошибок', value: 0 }]} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-3">
-          <section className={cn(card, 'overflow-x-auto p-4')}><div className="flex items-center justify-between"><div><h2 className="font-bold">Маршрутизация событий</h2><p className="mt-1 text-2xs text-muted-foreground">Изменения сохраняются в настройках организации.</p></div><Button asChild variant="outline"><Link href="/admin/telegram">Журнал доставки</Link></Button></div><div className="mt-4 grid min-w-[720px] grid-cols-[1.2fr_120px_1fr_1fr_50px] border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Событие</span><span>Приоритет</span><span>Получатели</span><span>Каналы</span><span>Статус</span></div>{rules.map(([key, event, priority, recipients, channels]) => <div key={key} className="grid min-w-[720px] grid-cols-[1.2fr_120px_1fr_1fr_50px] items-center border-b border-border py-3 text-xs"><span>{event}</span><span className={cn('mr-4 rounded border px-2 py-1 font-semibold', priority === 'Критический' ? 'border-destructive/25 bg-destructive/10 text-destructive-strong' : priority === 'Высокий' ? 'border-signal/25 bg-signal/10 text-signal-strong' : 'border-info/25 bg-info/10 text-info-strong')}>{priority}</span><span>{recipients}</span><span>{channels}</span><Toggle checked={settings.notifications[key] ?? false} disabled={loading || !isAdmin || savingKey !== null} label={event} onChange={() => void toggleRule(key)} /></div>)}</section>
-          <section className={cn(card, 'p-4')}><h2 className="font-bold">Последние доставки</h2><div className="mt-4 grid grid-cols-5 border-b border-border pb-2 text-3xs uppercase text-muted-foreground"><span>Время</span><span>Канал</span><span>Событие</span><span>Получатель</span><span>Статус</span></div><div className="py-10 text-center text-xs text-muted-foreground">Доставок в текущем журнале нет. <Link href="/admin/telegram" className="font-semibold text-info-strong underline">Открыть Telegram</Link></div></section>
-        </div>
-        <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Каналы связи</h2><div className="mt-3 divide-y divide-border">{['Push PWA', 'Telegram', 'Email', 'SMS'].map((channel) => <div key={channel} className="flex items-center gap-3 py-3 text-xs"><Bell className="h-4 w-4 text-signal-strong" />{channel}</div>)}</div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Тихие часы</h2><div className="mt-3 flex items-center gap-2 text-sm font-bold text-foreground">☾ 22:00–06:00</div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">Уведомления низкого и среднего приоритета отправляются после окончания периода.</p></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Эскалация</h2><p className="mt-2 text-xs text-muted-foreground">Повторная отправка при отсутствии подтверждения.</p></section></aside>
-      </div>
-    </>
-  );
-}
-
-function IntegrationsSettings(props: ReferenceUiProps) {
-  const devices = Object.values(props.details).flatMap((detail) => detail.telematicsDevices ?? []);
-  const systems = [
-    ['Телематика', devices.length ? `${devices.length} устройств` : 'Не подключена', devices.length > 0],
-    ['Telegram Bot', 'Уведомления и команды', false],
-    ['1С:ТОИР', 'Заявки и выполненные работы', false],
-    ['REST API PilingTrack', 'Внешние клиенты', false],
-    ['SMTP', 'Почтовые уведомления', false],
-    ['Webhooks заказчика', 'Вебхуки и события', false],
-  ] as const;
-  return (
-    <>
-      <ScreenTitle heading="Интеграции" subtitle="Обмен с телематикой, Telegram и корпоративными системами" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/settings">Подключить систему</Link></Button>} />
-      <SettingsKpis items={[{ icon: 'settings', label: 'Подключено', value: systems.filter(([, , active]) => active).length }, { icon: 'reports', label: 'Передано сегодня', value: '—' }, { icon: 'history', label: 'В очереди', value: 0 }, { icon: 'risk', label: 'Ошибок', value: 0 }]} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Подключённые системы</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">{systems.map(([name, description, active], index) => <div key={name} className={cn('flex items-center gap-3 rounded-lg border p-3', index === 0 ? 'border-info/25 bg-info/10' : 'border-border')}><div className={cn('grid h-12 w-[72px] shrink-0 place-items-center rounded-lg px-1 text-center text-3xs font-extrabold leading-tight text-white', index % 3 === 0 ? 'bg-primary' : index % 3 === 1 ? 'bg-info-strong' : 'bg-warning-strong')}>{name.split(' ')[0]}</div><div className="min-w-0 flex-1"><div className="text-xs font-bold">{name}</div><div className="mt-1 text-2xs text-muted-foreground">{description}</div><div className={cn('mt-2 text-2xs font-semibold', active ? 'text-success-strong' : 'text-muted-foreground')}>● {active ? 'Работает' : 'Не настроено'}</div></div><span>⋮</span></div>)}</div></section><section className={cn(card, 'p-4')}><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Очередь обмена</h2><span className="text-xs text-muted-foreground">Обработано сегодня: —</span></div><div className="mt-4 h-28 border-b border-l border-border"><div className="mt-12 h-px bg-border" /></div></section></div>
-        <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">{devices[0]?.label || 'Телематика'}</h2><div className="mt-4 space-y-3 text-xs"><InfoRow label="Статус" value={devices[0]?.status || 'Не подключена'} /><InfoRow label="Подключено устройств" value={String(devices.length)} /><InfoRow label="Интервал обмена" value="По настройке устройства" /></div><div className="mt-4 flex flex-wrap gap-2">{['Моточасы', 'Зажигание', 'GPS', 'CAN'].map((parameter) => <span key={parameter} className="rounded border border-border px-2 py-1 text-3xs">{parameter}</span>)}</div><Button variant="outline" className="mt-4 w-full">⚙ Настроить</Button></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Ошибки обмена</h2><div className="mt-4 text-xs text-success-strong">Ошибок не обнаружено</div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">API и безопасность</h2><p className="mt-2 text-xs text-muted-foreground">Ключи и доступ по IP управляются в системных настройках.</p><Button variant="outline" className="mt-3 w-full">Документация API</Button></section></aside>
-      </div>
-    </>
-  );
-}
-
-function AuditSettings(props: ReferenceUiProps) {
-  const events = props.audit?.data ?? [];
-  const verification = props.audit?.verification;
-  return (
-    <>
-      <ScreenTitle heading="Аудит" subtitle="Неизменяемая история действий, решений и изменений данных" actions={<Button asChild variant="outline"><Link href="/admin/settings">Политика хранения</Link></Button>} />
-      <ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode="audit" />
-      <SettingsKpis items={[{ icon: 'history', label: 'Событий за 24 ч', value: events.filter((event) => Date.now() - new Date(event.occurredAt).getTime() < 86_400_000).length }, { icon: 'reports', label: 'Изменений данных', value: events.length }, { icon: 'risk', label: 'Целостность', value: verification?.valid ? 'Подтверждена' : 'Нарушена' }, { icon: 'documents', label: 'Последовательность', value: verification?.lastSequence ?? '0' }]} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className={cn(card, 'overflow-x-auto')}>
-          <div className="p-4"><div className="flex items-center gap-3"><h2 className="text-lg font-bold">Доказательный журнал</h2><span className={cn('rounded border px-2 py-1 text-xs', verification?.valid ? 'border-success/25 bg-success/10 text-success-strong' : 'border-destructive/25 bg-destructive/10 text-destructive-strong')}>{verification?.valid ? 'Hash-chain подтверждена' : 'Требуется проверка цепочки'}</span></div><div className="mt-4 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск по журналу аудита" placeholder="Поиск по действию, объекту, пользователю…" className="min-h-11 pl-9 text-xs" /></div><button className="min-h-11 rounded-lg border border-border px-3 text-xs">Диапазон дат</button><button className="min-h-11 rounded-lg border border-border px-3 text-xs">Все типы действий</button><button className="min-h-11 rounded-lg border border-border px-3 text-xs">Все объекты</button></div></div>
-          <div className="hidden min-w-[820px] grid-cols-[150px_150px_1fr_160px_110px_20px] border-y border-border px-4 py-2 text-3xs uppercase text-muted-foreground md:grid"><span>Время</span><span>Пользователь</span><span>Действие</span><span>Объект</span><span>Результат</span><span /></div>
-          <div className="hidden max-h-[500px] min-w-[820px] divide-y divide-border overflow-y-auto md:block">{events.slice(0, 20).map((event) => <div key={event.id} className="grid grid-cols-[150px_150px_1fr_160px_110px_20px] items-center px-4 py-2 text-xs hover:bg-signal/5"><span>{formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}</span><span><b>{event.actor.name || 'Система'}</b><br /><small className="text-muted-foreground">{event.actor.actingAs || event.actor.role || 'PilingTrack'}</small></span><span>{event.action}</span><span>{event.entity.type}<br /><small className="text-muted-foreground">{event.entity.id.slice(0, 12)}</small></span><span className="font-semibold text-success-strong">Зафиксировано</span><ChevronRight className="h-4 w-4 text-muted-foreground" /></div>)}</div>
-          <div className="space-y-2 p-3 md:hidden">{events.slice(0, 20).map((event) => <article key={event.id} className="rounded-lg border border-border p-3 text-xs"><div className="flex items-start justify-between gap-2"><b className="min-w-0 truncate">{event.action}</b><span className="shrink-0 rounded bg-success/10 px-2 py-1 text-3xs font-semibold text-success-strong">Зафиксировано</span></div><div className="mt-2 text-muted-foreground">{event.actor.name || 'Система'} · {event.actor.actingAs || event.actor.role || 'PilingTrack'}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground"><span>{formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}</span><span>{event.entity.type}:{event.entity.id.slice(0, 12)}</span></div></article>)}</div>
-          {events.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground">События аудита недоступны в текущем источнике.</div>}
-          <div className="flex items-center justify-between border-t border-border p-3 text-xs text-muted-foreground"><span>Показано 1–{Math.min(12, events.length)} из {events.length} событий</span><span>20 на странице · 1 2 3</span></div>
-        </section>
-        <aside className="space-y-3"><section className={cn(card, 'p-4')}><h2 className="font-bold">Событие {events[0] ? `#${events[0].sequence}` : '—'}</h2><div className="mt-4 space-y-3 text-xs"><InfoRow label="Автор" value={events[0]?.actor.name || 'Система'} /><InfoRow label="Дата и время" value={events[0] ? formatDateTimeInTimezone(events[0].occurredAt, props.bootstrap?.tenant.timezone) : '—'} /><InfoRow label="Действие" value={events[0]?.action || '—'} /></div><div className="mt-4 overflow-x-auto rounded-lg bg-primary p-3 font-mono text-3xs leading-relaxed text-border"><div className="text-muted-foreground">SHA-256</div><div className="mt-2 break-all text-success-foreground">{events[0]?.hash || '—'}</div></div></section><section className={cn(card, 'p-4')}><h2 className="font-bold">Целостность журнала</h2><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{verification?.valid ? `Цепочка проверена: ${verification.eventCount} событий, разрывов не обнаружено.` : `Проверка не пройдена${verification?.reason ? `: ${verification.reason}` : '.'}`}</p></section><Button disabled={!props.bootstrap?.capabilities.entities.audit.export} className="min-h-11 w-full bg-signal-strong hover:bg-signal-strong" onClick={() => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, event.action, `${event.entity.type}:${event.entity.id}`, event.hash])])}>Экспорт журнала</Button></aside>
-      </div>
-    </>
-  );
-}
-
-interface ChecklistTemplateSummary {
-  id: string;
-  name: string;
-  level: string;
-  blockType?: string | null;
-  isActive?: boolean;
-  sections?: Array<{items?: unknown[]}>;
-  updatedAt?: string;
-}
-
-function LiveChecklistsSettings(_props: ReferenceUiProps) {
-  const [templates, setTemplates] = useState<ChecklistTemplateSummary[]>([]);
-  const [query, setQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let active = true;
-    void authFetch('/api/checklist-templates').then(async (response) => {
-      if (!response.ok) throw new Error(await commandFailure(response));
-      const body = await response.json() as {templates?: ChecklistTemplateSummary[]};
-      if (active) setTemplates(Array.isArray(body.templates) ? body.templates : []);
-    }).catch((reason) => active && setError(reason instanceof Error ? reason.message : 'Не удалось загрузить чек-листы'));
-    return () => { active = false; };
-  }, []);
-  const filtered = templates.filter((template) => !query.trim() || `${template.name} ${template.level} ${template.blockType ?? ''}`.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
-  return <>
-    <ScreenTitle heading="Чек-листы" subtitle="Опубликованные серверные шаблоны осмотров и обслуживания" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/checklists">Управление шаблонами</Link></Button>} />
-    <SettingsKpis items={[{icon: 'inspection', label: 'Шаблонов', value: templates.length}, {icon: 'accepted', label: 'Активных', value: templates.filter((item) => item.isActive !== false).length}, {icon: 'documents', label: 'Пунктов', value: templates.reduce((sum, item) => sum + (item.sections ?? []).reduce((sectionSum, section) => sectionSum + (section.items?.length ?? 0), 0), 0)}, {icon: 'history', label: 'Источник', value: 'Сервер'}]} />
-    <section className={cn(card, 'mt-3 overflow-hidden')}><div className="flex flex-wrap items-center gap-2 border-b border-border p-4"><div className="relative min-w-[240px] flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск шаблонов" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Название, уровень или блок" className="min-h-11 pl-9" /></div><span className="text-xs text-muted-foreground">Найдено: {filtered.length}</span></div>{error ? <div role="alert" className="p-6 text-sm text-destructive-strong">{error}</div> : <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map((template) => <Link key={template.id} href={`/admin/checklists/${template.id}`} className="rounded-xl border border-border p-4 transition hover:border-signal hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"><div className="font-bold">{template.name}</div><div className="mt-2 text-xs text-muted-foreground">{template.level} · {template.blockType ?? 'BASE'} · {(template.sections ?? []).reduce((sum, section) => sum + (section.items?.length ?? 0), 0)} пунктов</div><span className={cn('mt-3 inline-flex rounded px-2 py-1 text-2xs font-semibold', template.isActive === false ? 'bg-muted text-muted-foreground' : 'bg-success/10 text-success-strong')}>{template.isActive === false ? 'Архивный' : 'Активный'}</span></Link>)}</div>}</section>
-  </>;
-}
-
-function LiveRolesSettings(props: ReferenceUiProps) {
-  const actors = props.bootstrap?.selectors.actors ?? [];
-  const roleCounts = actors.reduce<Record<string, number>>((result, actor) => ({...result, [actor.role]: (result[actor.role] ?? 0) + 1}), {});
-  const abilities = props.bootstrap?.capabilities.abilities ?? [];
-  return <>
-    <ScreenTitle heading="Роли и доступы" subtitle="Фактические пользователи и полномочия текущего контура" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/users">Управление пользователями</Link></Button>} />
-    <SettingsKpis items={[{icon: 'crew', label: 'Пользователей', value: actors.length}, {icon: 'accepted', label: 'Ролей', value: Object.keys(roleCounts).length}, {icon: 'operator', label: 'Текущая роль', value: handoverRoleLabel(props.bootstrap?.actor.actingAs ?? props.bootstrap?.actor.role ?? null) ?? '—'}, {icon: 'risk', label: 'Полномочий', value: abilities.length}]} />
-    <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]"><section className={cn(card, 'overflow-hidden')}><div className="border-b border-border p-4"><h2 className="font-bold">Разрешения текущей роли</h2><p className="mt-1 text-xs text-muted-foreground">Данные получены из readiness bootstrap, а не из локального макета.</p></div><div className="grid grid-cols-1 gap-2 p-4 md:grid-cols-2">{abilities.map((ability) => <div key={ability} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 text-xs"><CheckCircle2 className="h-4 w-4 text-success-strong" /><span>{ability}</span></div>)}</div></section><aside className={cn(card, 'p-4')}><h2 className="font-bold">Пользователи по ролям</h2><div className="mt-3 divide-y divide-border">{Object.entries(roleCounts).map(([role, count]) => <div key={role} className="flex min-h-11 items-center justify-between text-xs"><span>{handoverRoleLabel(role)}</span><b>{count}</b></div>)}</div></aside></div>
-  </>;
-}
-
-function LiveDictionariesSettings(props: ReferenceUiProps) {
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
-  const rows = props.equipment.filter((item) => (status === 'ALL' || (status === 'ACTIVE' ? item.isActive : !item.isActive)) && (!query.trim() || `${item.name} ${item.model ?? ''}`.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU'))));
-  return <>
-    <ScreenTitle heading="Справочники" subtitle="Фактический справочник техники; остальные типы открываются в административном модуле" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/dictionaries">Открыть все справочники</Link></Button>} />
-    <SettingsKpis items={[{icon: 'equipment-rig', label: 'Техника', value: props.equipment.length}, {icon: 'accepted', label: 'Активных', value: props.equipment.filter((item) => item.isActive).length}, {icon: 'history', label: 'Архивных', value: props.equipment.filter((item) => !item.isActive).length}, {icon: 'site', label: 'Объектов', value: props.bootstrap?.counts.sites ?? 0}]} />
-    <section className={cn(card, 'mt-3 overflow-hidden')}><div className="flex flex-wrap gap-2 border-b border-border p-4"><div className="relative min-w-[230px] flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск в справочнике техники" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Наименование или модель" className="min-h-11 pl-9" /></div><select aria-label="Статус техники" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="min-h-11 rounded-md border border-input bg-background px-3 text-xs"><option value="ALL">Все статусы</option><option value="ACTIVE">Активные</option><option value="ARCHIVED">Архив</option></select><Button variant="outline" onClick={() => void downloadReadinessExport('dictionary', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div><div className="divide-y divide-border">{rows.map((item) => <Link key={item.id} href={`/admin/equipment/${item.id}`} className="grid min-h-14 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_90px] items-center gap-3 px-4 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal"><b className="truncate">{item.name}</b><span className="truncate text-muted-foreground">{item.model || 'Модель не указана'}</span><span className={item.isActive ? 'text-success-strong' : 'text-muted-foreground'}>{item.isActive ? 'Активна' : 'Архив'}</span></Link>)}</div>{rows.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">Записи не найдены.</div>}</section>
-  </>;
-}
-
-function LiveIntegrationsSettings(props: ReferenceUiProps) {
-  const devices = Object.values(props.details).flatMap((detail) => detail.telematicsDevices ?? []);
-  const [telegramCount, setTelegramCount] = useState<number | null>(null);
-  useEffect(() => {
-    let active = true;
-    void authFetch('/api/telegram/configs').then(async (response) => {
-      if (!response.ok) return;
-      const body = await response.json() as {configs?: unknown[]};
-      if (active) setTelegramCount(Array.isArray(body.configs) ? body.configs.length : 0);
-    }).catch(() => undefined);
-    return () => { active = false; };
-  }, []);
-  const liveDevices = devices.filter((device) => device.status === 'ONLINE' || device.status === 'ACTIVE');
-  return <>
-    <ScreenTitle heading="Интеграции" subtitle="Фактические подключения телематики и каналов уведомлений" actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/settings">Системные настройки</Link></Button>} />
-    <SettingsKpis items={[{icon: 'settings', label: 'Устройств', value: devices.length}, {icon: 'accepted', label: 'В сети', value: liveDevices.length}, {icon: 'notifications', label: 'Telegram-конфигураций', value: telegramCount ?? '—'}, {icon: 'history', label: 'Часовой пояс', value: props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}]} />
-    <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2"><section className={cn(card, 'p-4')}><div className="flex items-center justify-between"><h2 className="font-bold">Телематика</h2><Button asChild variant="outline"><Link href="/admin/equipment">Оборудование</Link></Button></div><div className="mt-3 divide-y divide-border">{devices.map((device) => <div key={device.id} className="grid min-h-14 grid-cols-[minmax(0,1fr)_100px] items-center gap-3 text-xs"><div><b>{device.label}</b><div className="mt-1 text-muted-foreground">{device.provider} · {device.lastSeenAt ? formatDateTimeInTimezone(device.lastSeenAt, props.bootstrap?.tenant.timezone) : 'нет сеансов'}</div></div><span className={liveDevices.includes(device) ? 'text-success-strong' : 'text-muted-foreground'}>{device.status}</span></div>)}{devices.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">Устройства телематики не зарегистрированы.</div>}</div></section><section className={cn(card, 'p-4')}><div className="flex items-center justify-between"><h2 className="font-bold">Telegram</h2><Button asChild variant="outline"><Link href="/admin/telegram">Настроить</Link></Button></div><p className="mt-4 text-sm text-muted-foreground">{telegramCount == null ? 'Проверяем доступный канал…' : telegramCount > 0 ? `Настроено конфигураций: ${telegramCount}.` : 'Telegram-конфигурации не созданы.'}</p></section></div>
-  </>;
 }

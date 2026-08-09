@@ -90,7 +90,7 @@ export async function queryReadinessBootstrap(
   ] = await Promise.all([
     tx.tenantSettings.findUnique({
       where: { tenantId: actor.tenantId },
-      select: { timezone: true },
+      select: { timezone: true, companyName: true },
     }),
     tx.equipment.findMany({
       where: { tenantId: actor.tenantId, isActive: true },
@@ -133,6 +133,7 @@ export async function queryReadinessBootstrap(
   return {
     tenant: {
       timezone: assertIanaTimezone(settings.timezone),
+      name: settings.companyName,
     },
     actor: {
       id: actor.id,

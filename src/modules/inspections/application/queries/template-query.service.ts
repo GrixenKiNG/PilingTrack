@@ -7,10 +7,18 @@ export async function listTemplates(
   filter: { level?: ChecklistLevel } = {},
 ) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
-  return db.checklistTemplate.findMany({
+  const templates = await db.checklistTemplate.findMany({
     where: { tenantId, isActive: true, ...(filter.level ? { level: filter.level } : {}) },
     orderBy: [{ level: 'asc' }, { name: 'asc' }],
+    // Счётчики нужны спискам шаблонов: без них экран показывал «0 пунктов»
+    // у каждого шаблона, хотя пункты есть.
+    include: { sections: { select: { _count: { select: { items: true } } } } },
   });
+  return templates.map(({ sections, ...template }) => ({
+    ...template,
+    sectionCount: sections.length,
+    itemCount: sections.reduce((sum, section) => sum + section._count.items, 0),
+  }));
 }
 
 export async function getTemplate(id: string, tenantId: string) {

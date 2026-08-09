@@ -22,7 +22,7 @@ export const READINESS_ABILITIES = [
 export type ReadinessAbility = (typeof READINESS_ABILITIES)[number];
 
 export interface ReadinessBootstrap {
-  tenant: { timezone: string };
+  tenant: { timezone: string; name: string };
   actor: {
     id: string;
     role: string;
@@ -248,7 +248,8 @@ export function isReadinessBootstrapEnvelope(
   if (!record(value) || !record(value.meta) || !stringValue(value.meta.requestId)) return false;
   const data = value.data;
   if (!record(data)) return false;
-  if (!record(data.tenant) || !stringValue(data.tenant.timezone)) return false;
+  // Название контура может быть пустым — организация его не обязана заполнять.
+  if (!record(data.tenant) || !stringValue(data.tenant.timezone) || typeof data.tenant.name !== 'string') return false;
   if (
     !record(data.actor)
     || !stringValue(data.actor.id)

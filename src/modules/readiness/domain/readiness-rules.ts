@@ -8,12 +8,13 @@ export const READINESS_CRITERION_KEYS = [
 
 export type ReadinessCriterionKey = (typeof READINESS_CRITERION_KEYS)[number];
 
-export const CRITERION_LABELS: Record<ReadinessCriterionKey, { title: string; hint: string }> = {
-  INSPECTION: { title: 'Осмотр', hint: 'Проверка узлов и систем' },
-  ENGINE_HOURS: { title: 'Моточасы', hint: 'Фиксация показаний' },
-  PERMIT: { title: 'Наряд-допуск', hint: 'Допуск и условия' },
-  MAINTENANCE: { title: 'Обслуживание', hint: 'Плановое ТО и ремонты' },
-  ACCEPTANCE: { title: 'Приёмка диспетчером', hint: 'Подтверждение готовности' },
+/** `short` — для узких колонок (предпросмотр расчёта), где полное имя не влезает. */
+export const CRITERION_LABELS: Record<ReadinessCriterionKey, { title: string; short: string; hint: string }> = {
+  INSPECTION: { title: 'Осмотр', short: 'Осмотр', hint: 'Проверка узлов и систем' },
+  ENGINE_HOURS: { title: 'Моточасы', short: 'Моточасы', hint: 'Фиксация показаний' },
+  PERMIT: { title: 'Наряд-допуск', short: 'Наряд', hint: 'Допуск и условия' },
+  MAINTENANCE: { title: 'Обслуживание', short: 'ТО', hint: 'Плановое ТО и ремонты' },
+  ACCEPTANCE: { title: 'Приёмка диспетчером', short: 'Приёмка', hint: 'Подтверждение готовности' },
 };
 
 export interface ReadinessCriterion {

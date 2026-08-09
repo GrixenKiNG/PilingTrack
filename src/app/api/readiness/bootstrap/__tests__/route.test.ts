@@ -28,7 +28,7 @@ describe('GET /api/readiness/bootstrap', () => {
       user: { id: 'mechanic-1', name: 'Mechanic', role: 'MECHANIC', tenantId: 'tenant-a' },
       error: null,
     });
-    mocks.queryBootstrap.mockResolvedValue({ tenant: { timezone: 'Europe/Moscow' } });
+    mocks.queryBootstrap.mockResolvedValue({ tenant: { timezone: 'Europe/Moscow', name: 'ОРИОН' } });
     mocks.withTransaction.mockImplementation(
       async (_tenantId: string, work: (tx: object) => Promise<unknown>) => work({})
     );

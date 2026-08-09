@@ -5,7 +5,7 @@ export function bootstrapEnvelope(
 ): ReadinessBootstrapEnvelope {
   return {
     data: {
-      tenant: { timezone: 'Europe/Moscow' },
+      tenant: { timezone: 'Europe/Moscow', name: 'ОРИОН' },
       actor: { id: 'actor-1', role: 'DISPATCHER', actingAs: null },
       featureFlags: {
         readiness_shifts_v1: true,

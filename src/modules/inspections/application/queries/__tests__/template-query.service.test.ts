@@ -17,6 +17,14 @@ describe('listTemplates', () => {
   it('throws when tenantId empty (fail-closed)', async () => {
     await expect(listTemplates('', {})).rejects.toThrow();
   });
+  it('counts sections and items so lists do not report zero', async () => {
+    findManyMock.mockResolvedValue([
+      { id: 't1', sections: [{ _count: { items: 4 } }, { _count: { items: 2 } }] },
+    ]);
+    const [template] = await listTemplates('orion', {});
+    expect(template).toMatchObject({ id: 't1', sectionCount: 2, itemCount: 6 });
+    expect('sections' in template).toBe(false);
+  });
 });
 
 describe('getTemplate', () => {
