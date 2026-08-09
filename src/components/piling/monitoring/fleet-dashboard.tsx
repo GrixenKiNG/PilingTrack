@@ -288,12 +288,12 @@ const selectCls =
 
 function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
   return (
-    <div className="kpi-animated rounded-xl border p-4 sm:p-5 shadow-sm">
+    <div className="kpi-accent rounded-xl border p-4 sm:p-5 shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-white/80">Сегодня · {formatRuDate(snap.today)}</div>
+          <div className="text-xs uppercase tracking-wide text-white">Сегодня · {formatRuDate(snap.today)}</div>
           <div className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-            {snap.totals.activeToday} <span className="text-white/80">из {snap.totals.totalEquipment} в работе</span>
+            {snap.totals.activeToday} <span className="text-white">из {snap.totals.totalEquipment} в работе</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -325,7 +325,9 @@ function Metric({ label, value, muted = false }: { label: string; value: string 
   return (
     <div>
       <dt className="text-2xs uppercase tracking-wide text-white">{label}</dt>
-      <dd className={cn('mt-0.5 font-mono text-lg tabular-nums text-white', muted && 'text-white/80')}>{value}</dd>
+      {/* Второстепенность показываем весом, а не прозрачностью: text-white/80
+          на бренд-оранжевом давало 3.86 при 18px — ниже нормы. */}
+      <dd className={cn('mt-0.5 font-mono text-lg tabular-nums text-white', muted ? 'font-normal' : 'font-semibold')}>{value}</dd>
     </div>
   );
 }
