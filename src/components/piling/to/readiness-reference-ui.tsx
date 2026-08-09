@@ -752,11 +752,15 @@ function ReadinessCentre(props: ReferenceUiProps) {
           <div className="mt-3 flex gap-3">
             <EquipmentPhoto cardData={fleetCard} name={selected.name} className="h-24 w-24 shrink-0" priority />
             <div className="min-w-0">
-              <h2 className="break-words text-xl font-extrabold">{selected.name}</h2>
+              <h2 className="break-words text-xl font-extrabold">
+                <Link href={`/admin/equipment/${selected.id}`} className="hover:text-signal-strong hover:underline">{selected.name}</Link>
+              </h2>
               <div className="mt-2 text-2xs text-muted-foreground">Заводской №</div>
               <div className="text-xs font-semibold">{detail?.equipment?.serialNumber || '—'}</div>
               <div className="mt-1 text-2xs text-muted-foreground">Место базирования</div>
-              <div className="text-xs font-semibold">{detail?.crew?.site?.name || 'Не назначено'}</div>
+              <div className="text-xs font-semibold">{detail?.crew?.site?.name
+                ? <Link href="/admin/sites" className="hover:text-signal-strong hover:underline">{detail.crew.site.name}</Link>
+                : 'Не назначено'}</div>
               <div className="mt-1 text-2xs text-muted-foreground">Наработка</div>
               <div className="text-xs font-semibold">{selected.engineHoursTotal != null ? `${selected.engineHoursTotal.toLocaleString('ru-RU')} м/ч` : '—'}</div>
             </div>
@@ -874,6 +878,15 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 <div key={evidence.key} className="rounded-lg border border-border p-3">
                   <div className="text-xs font-semibold">{evidence.label}</div>
                   <div className="mt-2 break-all text-2xs text-muted-foreground">{evidence.reference}</div>
+                  {evidence.links && evidence.links.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                      {evidence.links.map((link) => (
+                        <Link key={link.href} href={link.href} className="inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
+                          {link.text}<ArrowRight className="h-3 w-3" />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {presentation.evidence.length === 0 && <div className="rounded-lg border border-signal/30 bg-signal/10 p-3 text-xs text-signal-strong">{presentation.title}</div>}
@@ -1031,7 +1044,7 @@ function FleetScreen(props: ReferenceUiProps) {
                     { }
                     <img src="/icons/pilingtrack/defect.png" alt="" className="h-6 w-6 shrink-0 object-contain" />
                     <div className="min-w-0">
-                      <div className="text-xs font-bold">{selectedReadiness.activeRecord.title}</div>
+                      <div className="text-xs font-bold"><Link href={`/admin/maintenance/${selectedReadiness.activeRecord.id}`} className="hover:underline">{selectedReadiness.activeRecord.title}</Link></div>
                       <span className="mt-1 inline-flex rounded border border-destructive px-1.5 py-0.5 text-3xs font-semibold text-destructive-strong">Критическое</span>
                       <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">{selectedReadiness.reason}</p>
                     </div>

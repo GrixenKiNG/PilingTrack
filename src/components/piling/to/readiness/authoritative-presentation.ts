@@ -20,6 +20,12 @@ export interface PresentationEvidence {
   key: 'equipment' | 'inspection' | 'permit' | 'maintenance' | 'evaluation';
   label: string;
   reference: string;
+  /**
+   * Ссылки на исходные записи. Без них доказательство оставалось голым
+   * идентификатором: проверить, на чём основано решение, было не по чему.
+   * Пусто там, где отдельной страницы у сущности нет.
+   */
+  links?: readonly { text: string; href: string }[];
 }
 
 export interface AuthoritativeReadinessPresentation {
@@ -175,13 +181,25 @@ export function buildAuthoritativeReadinessPresentation(
   ];
 
   const evidenceCards: PresentationEvidence[] = [
-    {key: 'equipment', label: 'Установка', reference: evidence.equipmentId},
+    {key: 'equipment', label: 'Установка', reference: evidence.equipmentId,
+      links: [{text: 'Открыть карточку установки', href: `/admin/equipment/${evidence.equipmentId}`}]},
     {key: 'evaluation', label: 'Расчёт выполнен', reference: evidence.evaluatedAt},
   ];
-  if (evidence.inspectionId) evidenceCards.push({key: 'inspection', label: 'Осмотр', reference: evidence.inspectionId});
-  if (evidence.permitId) evidenceCards.push({key: 'permit', label: 'Допуск', reference: evidence.permitId});
+  if (evidence.inspectionId) {
+    evidenceCards.push({key: 'inspection', label: 'Осмотр', reference: evidence.inspectionId,
+      links: [{text: 'Открыть осмотр', href: `/inspections/${evidence.inspectionId}`}]});
+  }
+  if (evidence.permitId) {
+    // Отдельной страницы у наряда нет — ведём на реестр внутри контура.
+    evidenceCards.push({key: 'permit', label: 'Допуск', reference: evidence.permitId,
+      links: [{text: 'Открыть реестр нарядов', href: '/admin/to?view=permits'}]});
+  }
   if (evidence.maintenanceRecordIds.length > 0) {
-    evidenceCards.push({key: 'maintenance', label: 'Записи ТО', reference: evidence.maintenanceRecordIds.join(', ')});
+    evidenceCards.push({key: 'maintenance', label: 'Записи ТО',
+      reference: evidence.maintenanceRecordIds.join(', '),
+      links: evidence.maintenanceRecordIds.map((id, index) => ({
+        text: `Заявка ${index + 1}`, href: `/admin/maintenance/${id}`,
+      }))});
   }
 
   return {

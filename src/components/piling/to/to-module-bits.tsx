@@ -122,7 +122,11 @@ export function TabButton({ active, onClick, children }: { active: boolean; onCl
 
 export function JournalRow({ record }: { record: JournalRecord }) {
   const isInspection = isInspectionRecord(record);
-  const href = isInspection && record.inspection ? `/inspections/${record.inspection.id}` : '/admin/maintenance';
+  // Ремонтная запись ведёт на свою заявку, а не в общий список: страница
+  // /admin/maintenance/[id] существует, но ссылка на неё не строилась.
+  const href = isInspection && record.inspection
+    ? `/inspections/${record.inspection.id}`
+    : `/admin/maintenance/${record.id}`;
   const score = record.inspection?.healthScore;
   const staleDays = staleOpenOrderDays(record);
 
