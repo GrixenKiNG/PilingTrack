@@ -1100,6 +1100,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ShiftsScreen(props: ReferenceUiProps) {
   const [period, setPeriod] = useState<'day' | 'week'>('day');
   const [command, setCommand] = useState<{shift: ReadinessShiftDto; action: 'start' | 'handover'} | null>(null);
+  const [reworkTarget, setReworkTarget] = useState<ReadinessShiftDto['handovers'][number] | null>(null);
+  const [reworkReason, setReworkReason] = useState('');
   const [commandSummary, setCommandSummary] = useState('');
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
@@ -1142,6 +1144,32 @@ function ShiftsScreen(props: ReferenceUiProps) {
     });
     if (!response.ok) return toast.error((await response.json().catch(() => null))?.error?.message ?? 'Не удалось принять смену');
     toast.success('Передача смены принята');
+    props.onRetry();
+  };
+  /**
+   * Возврат пакета оператору. Раньше интерфейс умел только принимать: endpoint
+   * существовал, но не вызывался, и диспетчер не мог отказать в приёмке.
+   */
+  const reworkHandover = async (handover: ReadinessShiftDto['handovers'][number], reason: string) => {
+    setCommandPending(true);
+    setCommandError(null);
+    const response = await authFetch(`/api/readiness/handovers/${handover.id}/rework`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        'if-match': `"handover-${handover.id}-v${handover.version}"`,
+      },
+      body: JSON.stringify({ expectedVersion: handover.version, reason: reason.trim() }),
+    });
+    setCommandPending(false);
+    if (!response.ok) {
+      setCommandError((await response.json().catch(() => null))?.error?.message ?? 'Не удалось вернуть передачу.');
+      return;
+    }
+    setReworkTarget(null);
+    setReworkReason('');
+    toast.success('Передача возвращена оператору');
     props.onRetry();
   };
   const runShiftAction = async (shift: ReadinessShiftDto, action: 'start' | 'handover') => {
@@ -1238,7 +1266,7 @@ function ShiftsScreen(props: ReferenceUiProps) {
                 <div key={shift.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal' : 'border-border')}>
                   <div className="flex gap-2"><EquipmentPhoto cardData={fleet} name={equipment?.name || 'Установка'} className="h-11 w-11 shrink-0" /><div className="min-w-0"><div className="truncate text-xs font-bold">{equipment?.name || 'Установка'}</div><div className="mt-1 truncate text-3xs text-muted-foreground">{crew?.site?.name || 'Объект не назначен'} · {crew?.name || 'Экипаж не назначен'}</div></div></div>
                   <div className="mt-2 line-clamp-2 text-3xs leading-relaxed text-muted-foreground">{handover?.summary || 'Передача ожидает решения диспетчера'}</div>
-                  <Button type="button" disabled={!handover || !props.bootstrap?.capabilities.entities.shift.decideHandover} onClick={() => handover && void acceptHandover(handover)} className="mt-2 min-h-11 w-full bg-signal-strong text-2xs hover:bg-signal-strong">Принять смену</Button>
+                  <div className="mt-2 grid grid-cols-2 gap-2"><Button type="button" disabled={!handover || !props.bootstrap?.capabilities.entities.shift.decideHandover} onClick={() => handover && void acceptHandover(handover)} className="min-h-11 w-full bg-signal-strong text-2xs hover:bg-signal-strong">Принять</Button><Button type="button" variant="outline" disabled={!handover || !props.bootstrap?.capabilities.entities.shift.decideHandover} onClick={() => { if (!handover) return; setReworkTarget(handover); setReworkReason(''); setCommandError(null); }} className="min-h-11 w-full text-2xs">На доработку</Button></div>
                 </div>
               );
             })}
@@ -1277,6 +1305,30 @@ function ShiftsScreen(props: ReferenceUiProps) {
           { label: 'Механик', icon: 'repair', tasks: ['Устранить дефект', 'Подтвердить выполнение', 'Вернуть технику'], tone: 'orange' },
         ]}
       />
+      <CommandDialog
+        open={reworkTarget !== null}
+        pending={commandPending}
+        title="Вернуть передачу на доработку"
+        description={reworkTarget ? `Пакет v${reworkTarget.version} · ${timezone}` : undefined}
+        onClose={() => { setReworkTarget(null); setReworkReason(''); setCommandError(null); }}
+        footer={<Button type="button" disabled={commandPending || reworkReason.trim().length < 3} onClick={() => reworkTarget && void reworkHandover(reworkTarget, reworkReason)} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Вернуть оператору'}</Button>}
+      >
+        <div className="space-y-3 text-sm">
+          <p>Оператор получит пакет обратно и сможет передать его заново. Прежняя передача останется в журнале без изменений.</p>
+          <label className="grid gap-1 font-medium" htmlFor="handover-rework-reason">
+            Что нужно исправить
+            <textarea
+              id="handover-rework-reason"
+              value={reworkReason}
+              onChange={(event) => setReworkReason(event.target.value)}
+              maxLength={1000}
+              className="min-h-24 rounded-md border border-input bg-background p-3 font-normal"
+            />
+            <span className="text-2xs font-normal text-muted-foreground">Причина попадёт в журнал передач и будет видна оператору. От 3 до 1000 символов.</span>
+          </label>
+          {commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}
+        </div>
+      </CommandDialog>
       <CommandDialog
         open={command !== null}
         pending={commandPending}
