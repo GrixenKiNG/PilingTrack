@@ -6,10 +6,13 @@ import {transitionHandover, transitionShift} from '../transitions';
 
 describe('shift and handover domain', () => {
   it.each([
-    ['PLANNED', 'start', 'STARTED'],
+    ['PLANNED', 'request', 'PENDING_ACCEPTANCE'],
+    ['PENDING_ACCEPTANCE', 'start', 'STARTED'],
+    ['PENDING_ACCEPTANCE', 'decline', 'PLANNED'],
     ['STARTED', 'handover', 'HANDOVER_PENDING'],
     ['HANDOVER_PENDING', 'accept', 'CLOSED'],
     ['PLANNED', 'cancel', 'CANCELLED'],
+    ['PENDING_ACCEPTANCE', 'cancel', 'CANCELLED'],
     ['STARTED', 'cancel', 'CANCELLED'],
     ['HANDOVER_PENDING', 'rework', 'STARTED'],
   ] as const)('moves shift %s --%s--> %s', (state, command, expected) => {
@@ -28,6 +31,8 @@ describe('shift and handover domain', () => {
   it('keeps terminal states and forbidden cancellation closed', () => {
     expect(() => transitionHandover('ACCEPTED', 'rework')).toThrow(/cannot execute/i);
     expect(() => transitionShift('HANDOVER_PENDING', 'cancel')).toThrow(/cannot execute/i);
+    // Допуск нельзя обойти: прямой запуск из PLANNED должен оставаться закрытым.
+    expect(() => transitionShift('PLANNED', 'start')).toThrow(/cannot execute/i);
     expect(() => transitionShift('CLOSED', 'start')).toThrow(/cannot execute/i);
   });
 

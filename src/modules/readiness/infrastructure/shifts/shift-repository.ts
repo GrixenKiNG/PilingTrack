@@ -66,9 +66,19 @@ export class ShiftRepository {
     return this.get(input.tenantId, input.id);
   }
 
+  /** Оператор заявляет установку готовой и передаёт решение диспетчеру. */
+  async requestAcceptance(tenantId: string, id: string, version: number, actorId: string, now: Date): Promise<ShiftRow> {
+    const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'PLANNED'},
+      data: {state: 'PENDING_ACCEPTANCE', requestedAt: now, requestedById: actorId,
+        declinedAt: null, declinedById: null, declineReason: null, version: {increment: 1}}});
+    if (changed.count !== 1) throw conflict('Shift acceptance request conflict', await this.safeCurrent(tenantId, id));
+    return this.get(tenantId, id);
+  }
+
+  /** Запуск возможен только из PENDING_ACCEPTANCE: допуск нельзя обойти. */
   async start(tenantId: string, id: string, version: number, actorId: string, now: Date): Promise<ShiftRow> {
     try {
-      const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'PLANNED'},
+      const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'PENDING_ACCEPTANCE'},
         data: {state: 'STARTED', startedAt: now, startedById: actorId, version: {increment: 1}}});
       if (changed.count !== 1) throw conflict('Shift start conflict', await this.safeCurrent(tenantId, id));
       return this.get(tenantId, id);
@@ -78,9 +88,18 @@ export class ShiftRepository {
     }
   }
 
+  /** Диспетчер отказывает в допуске: смена возвращается оператору с причиной. */
+  async decline(input: {tenantId: string; id: string; version: number; actorId: string; reason: string; now: Date}) {
+    const changed = await this.tx.shift.updateMany({where: {tenantId: input.tenantId, id: input.id,
+      version: input.version, state: 'PENDING_ACCEPTANCE'}, data: {state: 'PLANNED',
+      declinedAt: input.now, declinedById: input.actorId, declineReason: input.reason, version: {increment: 1}}});
+    if (changed.count !== 1) throw conflict('Shift decline conflict', await this.safeCurrent(input.tenantId, input.id));
+    return this.get(input.tenantId, input.id);
+  }
+
   async cancel(input: {tenantId: string; id: string; version: number; actorId: string; reason: string; now: Date}) {
     const changed = await this.tx.shift.updateMany({where: {tenantId: input.tenantId, id: input.id,
-      version: input.version, state: {in: ['PLANNED', 'STARTED']}}, data: {state: 'CANCELLED',
+      version: input.version, state: {in: ['PLANNED', 'PENDING_ACCEPTANCE', 'STARTED']}}, data: {state: 'CANCELLED',
       cancelledAt: input.now, cancelledById: input.actorId, cancelReason: input.reason, version: {increment: 1}}});
     if (changed.count !== 1) throw conflict('Shift cancel conflict', await this.safeCurrent(input.tenantId, input.id));
     return this.get(input.tenantId, input.id);

@@ -1099,7 +1099,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function ShiftsScreen(props: ReferenceUiProps) {
   const [period, setPeriod] = useState<'day' | 'week'>('day');
-  const [command, setCommand] = useState<{shift: ReadinessShiftDto; action: 'start' | 'handover'} | null>(null);
+  const [command, setCommand] = useState<{shift: ReadinessShiftDto; action: 'request-acceptance' | 'start' | 'handover' | 'decline'} | null>(null);
   const [reworkTarget, setReworkTarget] = useState<ReadinessShiftDto['handovers'][number] | null>(null);
   const [reworkReason, setReworkReason] = useState('');
   const [commandSummary, setCommandSummary] = useState('');
@@ -1172,9 +1172,13 @@ function ShiftsScreen(props: ReferenceUiProps) {
     toast.success('Передача возвращена оператору');
     props.onRetry();
   };
-  const runShiftAction = async (shift: ReadinessShiftDto, action: 'start' | 'handover') => {
+  const runShiftAction = async (shift: ReadinessShiftDto, action: 'request-acceptance' | 'start' | 'handover' | 'decline') => {
     if (action === 'handover' && !commandSummary.trim()) {
       setCommandError('Укажите состояние техники и незавершённые работы.');
+      return;
+    }
+    if (action === 'decline' && commandSummary.trim().length < 3) {
+      setCommandError('Укажите, что мешает допустить установку к работе.');
       return;
     }
     setCommandPending(true);
@@ -1188,7 +1192,9 @@ function ShiftsScreen(props: ReferenceUiProps) {
       },
       body: JSON.stringify(action === 'handover'
         ? { expectedVersion: shift.version, summary: commandSummary.trim() }
-        : { expectedVersion: shift.version }),
+        : action === 'decline'
+          ? { expectedVersion: shift.version, reason: commandSummary.trim() }
+          : { expectedVersion: shift.version }),
     });
     setCommandPending(false);
     if (!response.ok) {
@@ -1197,7 +1203,10 @@ function ShiftsScreen(props: ReferenceUiProps) {
       if (response.status === 409) props.onRetry();
       return;
     }
-    toast.success(action === 'start' ? 'Смена запущена' : 'Смена передана диспетчеру');
+    toast.success(action === 'start' ? 'Смена запущена'
+      : action === 'request-acceptance' ? 'Запрос допуска отправлен диспетчеру'
+        : action === 'decline' ? 'В допуске отказано, смена возвращена оператору'
+          : 'Смена передана диспетчеру');
     setCommand(null);
     setCommandSummary('');
     props.onRetry();
@@ -1239,7 +1248,7 @@ function ShiftsScreen(props: ReferenceUiProps) {
                 <div key={shift.id} className="grid grid-cols-[220px_minmax(0,1fr)] items-center py-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <EquipmentPhoto cardData={equipmentCard} name={equipment?.name || 'Установка'} className="h-9 w-9 shrink-0" />
-                    <div className="min-w-0 flex-1"><div className="truncate text-2xs font-semibold">{equipment?.name || 'Установка'}</div><div className="mt-0.5 truncate text-3xs text-muted-foreground">{crew?.site?.name || 'Объект не назначен'}</div><div className="truncate text-3xs text-muted-foreground">{shift.type === 'DAY' ? 'Дневная' : 'Ночная'} смена</div>{shift.state === 'PLANNED' && props.bootstrap?.capabilities.entities.shift.manage && <button type="button" onClick={() => { setCommand({shift, action: 'start'}); setCommandError(null); }} className="mt-1 min-h-11 rounded border border-success/30 px-2 text-3xs font-semibold text-success-strong">Запустить</button>}{shift.state === 'STARTED' && props.bootstrap?.capabilities.entities.shift.prepareHandover && <button type="button" onClick={() => { setCommand({shift, action: 'handover'}); setCommandError(null); }} className="mt-1 min-h-11 rounded border border-signal/30 px-2 text-3xs font-semibold text-signal-strong">Передать</button>}</div>
+                    <div className="min-w-0 flex-1"><div className="truncate text-2xs font-semibold">{equipment?.name || 'Установка'}</div><div className="mt-0.5 truncate text-3xs text-muted-foreground">{crew?.site?.name || 'Объект не назначен'}</div><div className="truncate text-3xs text-muted-foreground">{shift.type === 'DAY' ? 'Дневная' : 'Ночная'} смена</div>{shift.state === 'PLANNED' && props.bootstrap?.capabilities.entities.shift.manage && <button type="button" onClick={() => { setCommand({shift, action: 'request-acceptance'}); setCommandError(null); }} className="mt-1 min-h-11 rounded border border-signal/30 px-2 text-3xs font-semibold text-signal-strong">Запросить допуск</button>}{shift.state === 'PENDING_ACCEPTANCE' && props.bootstrap?.capabilities.entities.shift.decideHandover && <span className="mt-1 flex gap-1"><button type="button" onClick={() => { setCommand({shift, action: 'start'}); setCommandError(null); }} className="min-h-11 rounded border border-success/30 px-2 text-3xs font-semibold text-success-strong">Допустить</button><button type="button" onClick={() => { setCommand({shift, action: 'decline'}); setCommandSummary(''); setCommandError(null); }} className="min-h-11 rounded border border-destructive/30 px-2 text-3xs font-semibold text-destructive-strong">Отказать</button></span>}{shift.state === 'STARTED' && props.bootstrap?.capabilities.entities.shift.prepareHandover && <button type="button" onClick={() => { setCommand({shift, action: 'handover'}); setCommandError(null); }} className="mt-1 min-h-11 rounded border border-signal/30 px-2 text-3xs font-semibold text-signal-strong">Передать</button>}</div>
                     <span className="mr-2 shrink-0 rounded bg-muted px-1.5 py-1 text-3xs font-semibold">{shift.state}</span>
                   </div>
                   <div className="relative h-7 rounded bg-muted">
@@ -1332,12 +1341,15 @@ function ShiftsScreen(props: ReferenceUiProps) {
       <CommandDialog
         open={command !== null}
         pending={commandPending}
-        title={command?.action === 'start' ? 'Запустить смену' : 'Передать смену диспетчеру'}
+        title={command?.action === 'start' ? 'Допустить смену к работе'
+          : command?.action === 'request-acceptance' ? 'Запросить допуск у диспетчера'
+            : command?.action === 'decline' ? 'Отказать в допуске'
+              : 'Передать смену диспетчеру'}
         description={command ? `Версия ${command.shift.version} · ${command.shift.type === 'DAY' ? 'дневная' : 'ночная'} смена · ${timezone}` : undefined}
         onClose={() => { setCommand(null); setCommandSummary(''); setCommandError(null); }}
-        footer={<Button type="button" disabled={commandPending || (command?.action === 'handover' && !commandSummary.trim())} onClick={() => command && void runShiftAction(command.shift, command.action)} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
+        footer={<Button type="button" disabled={commandPending || ((command?.action === 'handover' || command?.action === 'decline') && commandSummary.trim().length < 3)} onClick={() => command && void runShiftAction(command.shift, command.action)} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
       >
-        <div className="space-y-3 text-sm"><p>{command?.action === 'start' ? 'Будет создан новый снимок готовности. Запуск заблокируется, если опубликованные правила требуют действующий наряд.' : 'После передачи диспетчер получит неизменяемую запись и сможет принять смену либо вернуть её на доработку.'}</p>{command?.action === 'handover' && <label className="grid gap-1 font-medium">Состояние техники и незавершённые работы<textarea value={commandSummary} onChange={(event) => setCommandSummary(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" /></label>}{commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}</div>
+        <div className="space-y-3 text-sm"><p>{command?.action === 'start' ? 'Будет создан новый снимок готовности. Допуск заблокируется, если опубликованные правила требуют действующий наряд.' : command?.action === 'request-acceptance' ? 'Установка заявляется готовой. Смену откроет диспетчер после проверки доказательств — до его решения работать нельзя.' : command?.action === 'decline' ? 'Смена вернётся оператору в статус «Запланирована». Причина попадёт в журнал и будет видна оператору.' : 'После передачи диспетчер получит неизменяемую запись и сможет принять смену либо вернуть её на доработку.'}</p>{(command?.action === 'handover' || command?.action === 'decline') && <label className="grid gap-1 font-medium">{command.action === 'decline' ? 'Что мешает допустить установку' : 'Состояние техники и незавершённые работы'}<textarea value={commandSummary} onChange={(event) => setCommandSummary(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" /></label>}{commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}</div>
       </CommandDialog>
     </>
   );

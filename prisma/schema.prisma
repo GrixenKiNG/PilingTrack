@@ -649,6 +649,7 @@ enum ShiftType {
 
 enum ShiftState {
   PLANNED
+  PENDING_ACCEPTANCE
   STARTED
   HANDOVER_PENDING
   CLOSED
@@ -674,8 +675,13 @@ model Shift {
   plannedEndAt    DateTime?       @db.Timestamptz(3)
   createdById     String
   lastEditedById  String
+  requestedAt     DateTime?       @db.Timestamptz(3)
+  requestedById   String?
   startedAt       DateTime?       @db.Timestamptz(3)
   startedById     String?
+  declinedAt      DateTime?       @db.Timestamptz(3)
+  declinedById    String?
+  declineReason   String?
   closedAt        DateTime?       @db.Timestamptz(3)
   closedById      String?
   cancelledAt     DateTime?       @db.Timestamptz(3)

@@ -105,11 +105,14 @@ export interface ReadinessShiftDto {
   id: string;
   equipmentId: string;
   type: 'DAY' | 'NIGHT';
-  state: 'PLANNED' | 'STARTED' | 'HANDOVER_PENDING' | 'CLOSED' | 'CANCELLED';
+  state: 'PLANNED' | 'PENDING_ACCEPTANCE' | 'STARTED' | 'HANDOVER_PENDING' | 'CLOSED' | 'CANCELLED';
   productionDate: string;
   timezone: string;
   plannedStartAt: string | null;
   plannedEndAt: string | null;
+  requestedAt: string | null;
+  declinedAt: string | null;
+  declineReason: string | null;
   startedAt: string | null;
   closedAt: string | null;
   version: number;

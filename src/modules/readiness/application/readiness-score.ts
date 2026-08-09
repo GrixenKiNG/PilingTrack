@@ -17,7 +17,7 @@ export async function evaluateAuthoritativeReadiness(input: {
 }) {
   const now = input.clock.now();
   const [
-    equipment, inspection, openRecords, permit, publishedRow, acceptedHandover, blockingDefect,
+    equipment, inspection, openRecords, permit, publishedRow, startApproval, blockingDefect,
   ] = await Promise.all([
     input.tx.equipment.findFirst({
       where: {tenantId: input.tenantId, id: input.equipmentId, isActive: true},
@@ -43,8 +43,12 @@ export async function evaluateAuthoritativeReadiness(input: {
     input.tx.readinessRuleSet.findFirst({
       where: {tenantId: input.tenantId, status: 'PUBLISHED'}, orderBy: {updatedAt: 'desc'},
     }),
-    input.shiftId ? input.tx.shiftHandover.findFirst({
-      where: {tenantId: input.tenantId, shiftId: input.shiftId, state: 'ACCEPTED'}, select: {id: true},
+    // «Приёмка» — это предсменный допуск диспетчера, а не сдача смены в конце.
+    // Раньше признак брался из принятой передачи, но приёмка передачи закрывает
+    // смену: десять баллов начислялись уже после того, как работа окончена.
+    input.shiftId ? input.tx.shift.findFirst({
+      where: {tenantId: input.tenantId, id: input.shiftId, startedById: {not: null}},
+      select: {id: true},
     }) : Promise.resolve(null),
     // Незакрытый критичный дефект из журнала. Без него запись в журнале
     // ничего не меняла бы в оценке: блокировка держалась только на нарядах
@@ -78,7 +82,7 @@ export async function evaluateAuthoritativeReadiness(input: {
     maintenanceConfigured: equipment.nextMaintenanceAtHours != null || equipment.nextMaintenanceDate != null,
     maintenanceOverdueHours: overdueHours,
     maintenanceOverdueDays: overdueDays,
-    accepted: Boolean(acceptedHandover),
+    accepted: Boolean(startApproval),
     criticalDefect: blockingDefect != null || openRecords.some((row) =>
       (row.type === 'FAULT' || row.type === 'REPAIR') && row.priority === 'CRITICAL'),
     findings: healthScore == null ? 0 : Math.max(0, Math.ceil((100 - healthScore) / 10)),

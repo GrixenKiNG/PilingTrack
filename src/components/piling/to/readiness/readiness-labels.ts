@@ -9,6 +9,7 @@ import type {ReadinessHandoverDto, ReadinessShiftDto, WorkPermitDto} from './api
  */
 export const SHIFT_STATE_LABEL: Record<ReadinessShiftDto['state'], string> = {
   PLANNED: 'Запланирована',
+  PENDING_ACCEPTANCE: 'Ждёт допуска',
   STARTED: 'В работе',
   HANDOVER_PENDING: 'Ждёт приёмки',
   CLOSED: 'Закрыта',

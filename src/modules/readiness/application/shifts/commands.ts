@@ -32,6 +32,7 @@ export const serializeHandover = (row: HandoverRow) => ({...row,
 export const serializeShift = (row: ShiftRow) => ({...row,
   productionDate: row.productionDate.toISOString().slice(0, 10),
   plannedStartAt: row.plannedStartAt?.toISOString() ?? null, plannedEndAt: row.plannedEndAt?.toISOString() ?? null,
+  requestedAt: row.requestedAt?.toISOString() ?? null, declinedAt: row.declinedAt?.toISOString() ?? null,
   startedAt: row.startedAt?.toISOString() ?? null, closedAt: row.closedAt?.toISOString() ?? null,
   cancelledAt: row.cancelledAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(), handovers: row.handovers.map(serializeHandover)});
@@ -126,7 +127,8 @@ export function updateShiftCommand(input: {tx: ReadinessTransaction; context: Sh
 
 export function startShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
   key: string | null; ifMatch: string | null; expectedVersion?: number; now?: Date}) {
-  requireAbility(input.context, 'readiness.shift.manage');
+  // Запуск — решение принимающей стороны, а не того, кто готовил установку.
+  requireAbility(input.context, 'readiness.handover.decide');
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch, expectedVersion: input.expectedVersion,
     kind: 'shift', id: input.id});
   return runCommand({tx: input.tx, context: input.context, method: 'POST', routeTemplate: '/api/readiness/shifts/:id/start',
@@ -150,6 +152,46 @@ export function startShiftCommand(input: {tx: ReadinessTransaction; context: Shi
         entityType: 'Shift', entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
         triggerOccurredAt: row.startedAt ?? now, before: serializeShift(beforeRow), after: {shift: after, decision}});
       return {status: 200, body: asAuditJson({data: after, decision}), headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};
+    }});
+}
+
+export function requestShiftAcceptanceCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext;
+  id: string; key: string | null; ifMatch: string | null; expectedVersion?: number; now?: Date}) {
+  requireAbility(input.context, 'readiness.shift.manage');
+  const expected = resolveExpectedVersion({ifMatch: input.ifMatch, expectedVersion: input.expectedVersion,
+    kind: 'shift', id: input.id});
+  return runCommand({tx: input.tx, context: input.context, method: 'POST',
+    routeTemplate: '/api/readiness/shifts/:id/request-acceptance', aggregateId: input.id, key: input.key,
+    body: {expectedVersion: input.expectedVersion ?? null}, expectedVersion: expected, execute: async (key) => {
+      const repo = new ShiftRepository(input.tx); const before = await repo.get(input.context.tenantId, input.id);
+      assertShiftTransition(before.state, 'request'); const now = input.now ?? new Date();
+      const row = await repo.requestAcceptance(input.context.tenantId, input.id, expected, input.context.actorId, now);
+      const after = serializeShift(row);
+      await effects({tx: input.tx, context: input.context, key, action: 'acceptance-requested', entityType: 'Shift',
+        entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
+        triggerOccurredAt: row.requestedAt ?? now, before: serializeShift(before), after});
+      return {status: 200, body: {data: after}, headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};
+    }});
+}
+
+export function declineShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
+  key: string | null; ifMatch: string | null; expectedVersion?: number; reason: string; now?: Date}) {
+  requireAbility(input.context, 'readiness.handover.decide');
+  const expected = resolveExpectedVersion({ifMatch: input.ifMatch, expectedVersion: input.expectedVersion,
+    kind: 'shift', id: input.id});
+  const reason = requireCancellationReason(input.reason);
+  return runCommand({tx: input.tx, context: input.context, method: 'POST',
+    routeTemplate: '/api/readiness/shifts/:id/decline', aggregateId: input.id, key: input.key,
+    body: {expectedVersion: input.expectedVersion, reason}, expectedVersion: expected, execute: async (key) => {
+      const repo = new ShiftRepository(input.tx); const before = await repo.get(input.context.tenantId, input.id);
+      assertShiftTransition(before.state, 'decline'); const now = input.now ?? new Date();
+      const row = await repo.decline({tenantId: input.context.tenantId, id: input.id, version: expected,
+        actorId: input.context.actorId, reason, now});
+      const after = serializeShift(row);
+      await effects({tx: input.tx, context: input.context, key, action: 'acceptance-declined', entityType: 'Shift',
+        entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
+        triggerOccurredAt: row.declinedAt ?? now, before: serializeShift(before), after});
+      return {status: 200, body: {data: after}, headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};
     }});
 }
 

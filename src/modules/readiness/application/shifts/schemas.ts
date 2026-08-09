@@ -25,6 +25,7 @@ export const submitHandoverSchema = strictObject({
 });
 export const acceptHandoverSchema = strictObject({expectedVersion});
 export const reworkHandoverSchema = strictObject({expectedVersion, reason: z.string().min(3).max(1000)});
+export const declineShiftSchema = strictObject({expectedVersion, reason: z.string().min(3).max(1000)});
 
 export type CreateShiftPayload = z.infer<typeof createShiftSchema>;
 export type UpdateShiftPayload = z.infer<typeof updateShiftSchema>;

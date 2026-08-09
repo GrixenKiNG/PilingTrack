@@ -3,8 +3,12 @@ import type {ShiftHandoverState, ShiftState} from './types';
 
 const SHIFT_ALLOWED = {
   edit: ['PLANNED'],
-  start: ['PLANNED'],
-  cancel: ['PLANNED', 'STARTED'],
+  // Оператор просит допуск, запускает смену диспетчер. Прямой запуск из
+  // PLANNED убран намеренно: иначе допуск можно обойти.
+  request: ['PLANNED'],
+  start: ['PENDING_ACCEPTANCE'],
+  decline: ['PENDING_ACCEPTANCE'],
+  cancel: ['PLANNED', 'PENDING_ACCEPTANCE', 'STARTED'],
   handover: ['STARTED'],
   accept: ['HANDOVER_PENDING'],
   rework: ['HANDOVER_PENDING'],
@@ -24,10 +28,12 @@ export function assertShiftTransition(state: ShiftState, command: keyof typeof S
 
 export function transitionShift(state: ShiftState, command: keyof typeof SHIFT_ALLOWED): ShiftState {
   assertShiftTransition(state, command);
+  if (command === 'request') return 'PENDING_ACCEPTANCE';
   if (command === 'start' || command === 'rework') return 'STARTED';
   if (command === 'cancel') return 'CANCELLED';
   if (command === 'handover') return 'HANDOVER_PENDING';
   if (command === 'accept') return 'CLOSED';
+  // decline возвращает смену оператору на доработку до запуска
   return 'PLANNED';
 }
 
