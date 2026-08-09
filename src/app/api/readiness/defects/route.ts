@@ -22,19 +22,19 @@ export async function GET(request: NextRequest) {
   // контекст, чтобы не утверждать его наличие восклицательным знаком.
   if (!context) {
     return response ?? readinessErrorResponse(
-      new ReadinessCommandError('VALIDATION_ERROR', 403, 'Readiness access denied'),
+      new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности'),
       'unknown', 'unknown',
     );
   }
   try {
     if (!resolveReadinessCapabilities(context.actorRole).has('readiness.read')) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Readiness access denied');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
     }
     const parsed = listDefectsQuerySchema.safeParse(
       Object.fromEntries(request.nextUrl.searchParams.entries()),
     );
     if (!parsed.success) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid defect filters',
+      throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные фильтры дефектов',
         {fieldErrors: parsed.error.flatten().fieldErrors});
     }
     const result = await withReadinessRequestTransaction(context.tenantId, (tx) => queryDefects({
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     return readinessErrorResponse(
       error instanceof ReadinessCommandError
         ? error
-        : new ReadinessCommandError('RETRYABLE_TRANSACTION_FAILURE', 503, 'Defect list is unavailable'),
+        : new ReadinessCommandError('RETRYABLE_TRANSACTION_FAILURE', 503, 'Список дефектов недоступен'),
       context.correlationId,
       context.requestId,
     );
@@ -67,10 +67,10 @@ export async function GET(request: NextRequest) {
 export const POST = withReadinessCommand(async (request: NextRequest, context) => {
   let body: unknown;
   try { body = await request.json(); }
-  catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Request body must be JSON'); }
+  catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Тело запроса должно быть в формате JSON'); }
   const parsed = createDefectSchema.safeParse(body);
   if (!parsed.success) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid defect payload',
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные дефекта',
       {fieldErrors: parsed.error.flatten().fieldErrors});
   }
   const result = await withReadinessSerializableTransaction(context.tenantId,

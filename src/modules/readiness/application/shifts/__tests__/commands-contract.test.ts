@@ -11,7 +11,7 @@ describe('shift command contract', () => {
   it.each(['MECHANIC', 'OPERATOR'] as const)('denies shift start to %s without handover.decide', (role) => {
     expect(() => startShiftCommand({tx: null as never, context: context(role), id: 'shift-a',
       key: `task04-${role.toLowerCase()}-denied`, ifMatch: '"shift-shift-a-v1"', expectedVersion: 1}))
-      .toThrow(/handover\.decide capability/i);
+      .toThrow(/Недостаточно прав: readiness\.handover\.decide/i);
   });
 
   it('requires a strong matching aggregate ETag', () => {

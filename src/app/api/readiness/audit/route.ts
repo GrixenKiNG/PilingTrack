@@ -16,15 +16,15 @@ export async function GET(request: NextRequest) {
   const context = resolved.context!;
   try {
     if (!resolveReadinessCapabilities(context.actorRole).has('readiness.audit.read')) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Audit access denied');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к журналу аудита');
     }
     const params = request.nextUrl.searchParams;
     const allowed = new Set(['eventType', 'actor', 'from', 'to', 'limit']);
     if ([...params.keys()].some((key) => !allowed.has(key))) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Unknown audit filter');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный фильтр аудита');
     }
     const limit = Math.min(500, Math.max(1, Number(params.get('limit') ?? 200)));
-    if (!Number.isInteger(limit)) throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid limit');
+    if (!Number.isInteger(limit)) throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Некорректный размер страницы');
     const result = await withReadinessRequestTransaction(context.tenantId, async (tx) => {
       const repository = new PrismaAuditRepository(tx);
       const timezone = (await tx.tenantSettings.findUnique({where: {tenantId: context.tenantId}, select: {timezone: true}}))?.timezone;

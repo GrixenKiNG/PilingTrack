@@ -34,7 +34,7 @@ function parseInstant(value: string | null, edge: 'from' | 'to', timezone: strin
   if (!value) return undefined;
   const date = ISO_DATE.test(value) ? localBoundaryToUtc(value, edge, timezone) : new Date(value);
   if (Number.isNaN(date.getTime())) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid ' + edge + ' date');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Некорректная дата: ' + edge);
   }
   return date;
 }
@@ -43,10 +43,10 @@ export function parseReadinessReadFilters(params: URLSearchParams, timezone = 'E
   const shiftType = params.get('shiftType');
   const risk = params.get('risk');
   if (shiftType && shiftType !== 'DAY' && shiftType !== 'NIGHT') {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid shift type');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный тип смены');
   }
   if (risk && risk !== 'NORMAL' && risk !== 'ELEVATED') {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit risk');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный уровень риска наряда');
   }
   let normalizedTimezone = timezone;
   try { new Intl.DateTimeFormat('en-CA', {timeZone: timezone}).format(new Date()); }
@@ -54,7 +54,7 @@ export function parseReadinessReadFilters(params: URLSearchParams, timezone = 'E
   const from = parseInstant(params.get('from'), 'from', normalizedTimezone);
   const to = parseInstant(params.get('to'), 'to', normalizedTimezone);
   if (from && to && from > to) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'The from date must not be after to');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Дата начала не может быть позже даты окончания');
   }
   return {
     status: params.get('status') || undefined,

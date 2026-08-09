@@ -14,13 +14,13 @@ export class ShiftRepository {
 
   async requireActor(tenantId: string, actorId: string): Promise<void> {
     if (!await this.tx.user.findFirst({where: {tenantId, id: actorId, isActive: true}, select: {id: true}})) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Active actor not found');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Учётная запись неактивна или не найдена');
     }
   }
 
   async requireEquipment(tenantId: string, equipmentId: string): Promise<void> {
     if (!await this.tx.equipment.findFirst({where: {tenantId, id: equipmentId, isActive: true}, select: {id: true}})) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
     }
   }
 
@@ -37,7 +37,7 @@ export class ShiftRepository {
 
   async get(tenantId: string, id: string): Promise<ShiftRow> {
     const row = await this.tx.shift.findFirst({where: {tenantId, id}, include: includeHandovers});
-    if (!row) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!row) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
     return row;
   }
 
@@ -71,7 +71,7 @@ export class ShiftRepository {
     const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'PLANNED'},
       data: {state: 'PENDING_ACCEPTANCE', requestedAt: now, requestedById: actorId,
         declinedAt: null, declinedById: null, declineReason: null, version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift acceptance request conflict', await this.safeCurrent(tenantId, id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(tenantId, id));
     return this.get(tenantId, id);
   }
 
@@ -80,7 +80,7 @@ export class ShiftRepository {
     try {
       const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'PENDING_ACCEPTANCE'},
         data: {state: 'STARTED', startedAt: now, startedById: actorId, version: {increment: 1}}});
-      if (changed.count !== 1) throw conflict('Shift start conflict', await this.safeCurrent(tenantId, id));
+      if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(tenantId, id));
       return this.get(tenantId, id);
     } catch (error) {
       if ((error as {code?: string}).code === 'P2002') throw conflict('Equipment already has an active shift');
@@ -93,7 +93,7 @@ export class ShiftRepository {
     const changed = await this.tx.shift.updateMany({where: {tenantId: input.tenantId, id: input.id,
       version: input.version, state: 'PENDING_ACCEPTANCE'}, data: {state: 'PLANNED',
       declinedAt: input.now, declinedById: input.actorId, declineReason: input.reason, version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift decline conflict', await this.safeCurrent(input.tenantId, input.id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(input.tenantId, input.id));
     return this.get(input.tenantId, input.id);
   }
 
@@ -101,7 +101,7 @@ export class ShiftRepository {
     const changed = await this.tx.shift.updateMany({where: {tenantId: input.tenantId, id: input.id,
       version: input.version, state: {in: ['PLANNED', 'PENDING_ACCEPTANCE', 'STARTED']}}, data: {state: 'CANCELLED',
       cancelledAt: input.now, cancelledById: input.actorId, cancelReason: input.reason, version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift cancel conflict', await this.safeCurrent(input.tenantId, input.id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(input.tenantId, input.id));
     return this.get(input.tenantId, input.id);
   }
 

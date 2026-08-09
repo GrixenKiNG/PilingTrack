@@ -84,7 +84,7 @@ export async function executeIdempotentCommand(input: {
     if (!existing) throw commandInProgress();
     if (!hashesEqual(existing.requestHash, input.requestHash)) {
       throw new ReadinessCommandError(
-        'IDEMPOTENCY_KEY_REUSED', 409, 'Idempotency-Key was used for another request',
+        'IDEMPOTENCY_KEY_REUSED', 409, 'Ключ повторной отправки уже использован для другого запроса',
       );
     }
     if (existing.status !== 'completed' || existing.statusCode === null || existing.result === null) {

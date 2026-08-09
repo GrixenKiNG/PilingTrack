@@ -9,11 +9,27 @@ const ALLOWED: Record<string, readonly WorkPermitState[]> = {
   expire: ['APPROVED'],
 };
 
+const PERMIT_STATE_TEXT: Record<WorkPermitState, string> = {
+  DRAFT: 'черновик',
+  PENDING_APPROVAL: 'на согласовании',
+  APPROVED: 'согласован',
+  EXPIRED: 'истёк',
+  REVOKED: 'отозван',
+};
+
+const PERMIT_COMMAND_TEXT: Record<string, string> = {
+  submit: 'отправить на согласование',
+  approve: 'согласовать',
+  edit: 'изменить',
+  revoke: 'отозвать',
+  expire: 'пометить истёкшим',
+};
+
 export function assertPermitTransition(state: WorkPermitState, command: keyof typeof ALLOWED): void {
   if (!ALLOWED[command].includes(state)) {
     throw new ReadinessCommandError(
       'VALIDATION_ERROR', 422,
-      `Work permit in state ${state} cannot execute ${command}`,
+      `Наряд ${PERMIT_STATE_TEXT[state]} — действие «${PERMIT_COMMAND_TEXT[command] ?? command}» сейчас недоступно`,
       {state, command},
     );
   }
@@ -25,5 +41,5 @@ export function transitionPermit(state: WorkPermitState, command: string): WorkP
   if (command === 'edit') { assertPermitTransition(state, 'edit'); return 'DRAFT'; }
   if (command === 'revoke') { assertPermitTransition(state, 'revoke'); return 'REVOKED'; }
   if (command === 'expire') { assertPermitTransition(state, 'expire'); return 'EXPIRED'; }
-  throw new ReadinessCommandError('VALIDATION_ERROR', 422, `Unknown permit command ${command}`);
+  throw new ReadinessCommandError('VALIDATION_ERROR', 422, `Неизвестная команда наряда: ${command}`);
 }

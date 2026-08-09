@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, route: {params: Promise<{id: str
 }
 export const PATCH = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => { const {id} = await params;
   const parsed = updateShiftSchema.safeParse(await request.json());
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid shift update', {fieldErrors: parsed.error.flatten().fieldErrors});
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные изменения смены', {fieldErrors: parsed.error.flatten().fieldErrors});
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => updateShiftCommand({tx, context, id,
     key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), payload: parsed.data}));
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,

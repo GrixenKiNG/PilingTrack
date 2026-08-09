@@ -12,7 +12,7 @@ export class HandoverRepository {
 
   async get(tenantId: string, id: string): Promise<HandoverRow> {
     const row = await this.tx.shiftHandover.findFirst({where: {tenantId, id}});
-    if (!row) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!row) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
     return row;
   }
 

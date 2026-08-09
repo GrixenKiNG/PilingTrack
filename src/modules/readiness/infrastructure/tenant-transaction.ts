@@ -89,7 +89,7 @@ export async function runReadinessSerializableTransaction<T>(
         throw new ReadinessCommandError(
           'VERSION_CONFLICT',
           409,
-          'Concurrent readiness command conflict',
+          'Одновременное изменение. Повторите действие',
           details,
           {'Retry-After': '1'},
         );

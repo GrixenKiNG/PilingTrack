@@ -48,7 +48,7 @@ export const serializeDefect = (row: DefectRow) => ({
  */
 function assertCanReport(context: DefectCommandContext): void {
   if (!resolveReadinessCapabilities(context.actorRole).has('readiness.defect.report')) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Defect report capability is required');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права фиксировать дефекты');
   }
 }
 
@@ -57,7 +57,7 @@ function assertCanManage(context: DefectCommandContext): void {
   const direct = resolveReadinessCapabilities(context.actorRole).has('readiness.defect.manage');
   const adminAsMechanic = context.actorRole === 'ADMIN' && context.actingAs === 'MECHANIC';
   if (!direct && !adminAsMechanic) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Defect manage capability is required');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права разбирать дефекты');
   }
 }
 
@@ -154,7 +154,7 @@ async function versionedAction(input: {
       const before = await repository.get(input.context.tenantId, input.id);
       const record = toDefectRecord(before);
       if (record.version !== expected) {
-        throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Defect version conflict');
+        throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Дефект изменился. Обновите страницу и повторите действие');
       }
       const row = await input.apply({repository, expected, before});
       await emitEffects({tx: input.tx, context: input.context, action: input.action,
@@ -173,7 +173,7 @@ export async function triageDefectCommand(input: {
     apply: async ({repository, expected, before}) => {
       const status = transitionDefect(before.status, 'TRIAGE');
       if (!status) {
-        throw new ReadinessCommandError('VALIDATION_ERROR', 409, 'Defect is already closed');
+        throw new ReadinessCommandError('VALIDATION_ERROR', 409, 'Дефект уже закрыт');
       }
       if (input.payload.maintenanceRecordId) {
         await repository.requireMaintenanceRecord({tenantId: input.context.tenantId,
@@ -196,7 +196,7 @@ export async function resolveDefectCommand(input: {
       const status = transitionDefect(before.status, 'RESOLVE');
       if (!status) {
         throw new ReadinessCommandError('VALIDATION_ERROR', 409,
-          'Defect must be taken into work before it can be closed');
+          'Сначала возьмите дефект в работу, потом закрывайте');
       }
       return repository.close({tenantId: input.context.tenantId, id: input.id,
         expectedVersion: expected, actorId: input.context.actorId,
@@ -214,7 +214,7 @@ export async function rejectDefectCommand(input: {
       const status = transitionDefect(before.status, 'REJECT');
       if (!status) {
         throw new ReadinessCommandError('VALIDATION_ERROR', 409,
-          'Only an untriaged defect can be rejected');
+          'Отклонить можно только неразобранный дефект');
       }
       return repository.close({tenantId: input.context.tenantId, id: input.id,
         expectedVersion: expected, actorId: input.context.actorId,

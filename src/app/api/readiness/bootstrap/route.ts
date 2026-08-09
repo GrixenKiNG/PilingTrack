@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     return response({ error: 'Client-controlled readiness context is not accepted' }, 400, requestId);
   }
   if (actingAs === 'MECHANIC' && user.role !== 'ADMIN') {
-    return response({ error: 'Readiness access denied' }, 403, requestId);
+    return response({ error: 'Нет доступа к контуру технической готовности' }, 403, requestId);
   }
 
   try {

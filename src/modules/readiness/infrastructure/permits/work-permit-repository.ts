@@ -42,21 +42,21 @@ export class WorkPermitRepository {
     const equipment = await this.tx.equipment.findFirst({
       where: {tenantId, id: equipmentId, isActive: true}, select: {id: true},
     });
-    if (!equipment) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!equipment) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
   }
 
   async requireActor(tenantId: string, actorId: string): Promise<void> {
     const actor = await this.tx.user.findFirst({
       where: {tenantId, id: actorId, isActive: true}, select: {id: true},
     });
-    if (!actor) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Active actor not found');
+    if (!actor) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Учётная запись неактивна или не найдена');
   }
 
   async tenantTimezone(tenantId: string): Promise<string> {
     const settings = await this.tx.tenantSettings.findUnique({
       where: {tenantId}, select: {timezone: true},
     });
-    if (!settings?.timezone) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Tenant timezone is unavailable');
+    if (!settings?.timezone) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Не задан часовой пояс организации');
     return normalizeTenantTimezone(settings.timezone);
   }
 
@@ -74,7 +74,7 @@ export class WorkPermitRepository {
 
   async get(tenantId: string, id: string): Promise<PermitRow> {
     const permit = await this.tx.workPermit.findFirst({where: {tenantId, id}, include: includeApprovals});
-    if (!permit) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!permit) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
     return permit;
   }
 
@@ -118,7 +118,7 @@ export class WorkPermitRepository {
         submittedAt: null, approvedAt: null, revokedAt: null, revokedById: null, revokeReason: null,
       },
     });
-    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Permit version conflict');
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
     if (input.invalidateApprovals) {
       await this.tx.workPermitApproval.updateMany({
         where: {tenantId: input.tenantId, permitId: input.id, valid: true},
@@ -133,7 +133,7 @@ export class WorkPermitRepository {
       where: {tenantId, id, version, state: 'DRAFT'},
       data: {state: 'PENDING_APPROVAL', submittedAt: new Date()},
     });
-    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Permit submit conflict');
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
     return this.get(tenantId, id);
   }
 
@@ -148,7 +148,7 @@ export class WorkPermitRepository {
       }});
     } catch (error) {
       if ((error as {code?: string}).code === 'P2002') {
-        throw new ReadinessCommandError('VERSION_CONFLICT', 409, `${input.role} approval already exists`);
+        throw new ReadinessCommandError('VERSION_CONFLICT', 409, `Решение по этой роли уже принято: ${input.role}`);
       }
       throw error;
     }
@@ -159,7 +159,7 @@ export class WorkPermitRepository {
       where: {tenantId, id, version, state: 'PENDING_APPROVAL'},
       data: {state: 'APPROVED', approvedAt: new Date()},
     });
-    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Permit approval conflict');
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
     return this.get(tenantId, id);
   }
 
@@ -168,7 +168,7 @@ export class WorkPermitRepository {
       where: {tenantId: input.tenantId, id: input.id, version: input.version, state: 'APPROVED'},
       data: {state: 'REVOKED', revokedAt: new Date(), revokedById: input.actorId, revokeReason: input.reason},
     });
-    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Permit revoke conflict');
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
     return this.get(input.tenantId, input.id);
   }
 }

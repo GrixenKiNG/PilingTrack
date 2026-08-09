@@ -18,19 +18,19 @@ export function assertCanApprovePermit(input: {
 }): WorkPermitApprovalRole {
   const role = input.role === 'DISPATCHER' || input.role === 'ADMIN' ? input.role : null;
   if (!role || !requiredApprovalRoles(input.permit.risk).includes(role)) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Actor cannot approve this permit');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'У вас нет полномочий согласовать этот наряд');
   }
   if (input.actorId === input.permit.authorId || input.actorId === input.permit.lastEditedById) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Permit author or last editor cannot self-approve');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Автор наряда не может согласовать его сам');
   }
   const current = input.approvals.filter((item) =>
     item.valid && item.permitVersion === input.permit.version);
   if (current.some((item) => item.role === role)) {
-    throw new ReadinessCommandError('VERSION_CONFLICT', 409, `${role} approval already exists`);
+    throw new ReadinessCommandError('VERSION_CONFLICT', 409, `Решение по этой роли уже принято: ${role}`);
   }
   if (current.some((item) => item.approvedById === input.actorId)) {
     throw new ReadinessCommandError(
-      'VALIDATION_ERROR', 422, 'Elevated approvals require distinct users',
+      'VALIDATION_ERROR', 422, 'Повышенный риск требует согласования двумя разными людьми',
     );
   }
   return role;

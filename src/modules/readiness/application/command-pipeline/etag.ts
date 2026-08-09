@@ -49,7 +49,7 @@ export function resolveExpectedVersion(input: {
 
 export function assertCurrentVersion(expected: number, current: number): void {
   if (expected !== current) {
-    throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'The resource has changed', {
+    throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Запись изменилась. Обновите страницу и повторите действие', {
       submittedVersion: expected,
       currentVersion: current,
     });

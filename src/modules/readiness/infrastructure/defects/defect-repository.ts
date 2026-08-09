@@ -28,14 +28,14 @@ export class DefectRepository {
     const equipment = await this.tx.equipment.findFirst({
       where: {tenantId, id: equipmentId, isActive: true}, select: {id: true},
     });
-    if (!equipment) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!equipment) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
   }
 
   async requireActor(tenantId: string, actorId: string): Promise<void> {
     const actor = await this.tx.user.findFirst({
       where: {tenantId, id: actorId, isActive: true}, select: {id: true},
     });
-    if (!actor) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Active actor not found');
+    if (!actor) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Учётная запись неактивна или не найдена');
   }
 
   /** Наряд должен принадлежать тому же тенанту и той же установке. */
@@ -46,7 +46,7 @@ export class DefectRepository {
       where: {tenantId: input.tenantId, id: input.id, equipmentId: input.equipmentId},
       select: {id: true},
     });
-    if (!record) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!record) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
   }
 
   async create(input: {
@@ -72,7 +72,7 @@ export class DefectRepository {
 
   async get(tenantId: string, id: string) {
     const defect = await this.tx.equipmentDefect.findFirst({where: {tenantId, id}});
-    if (!defect) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Resource not found');
+    if (!defect) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
     return defect;
   }
 
@@ -115,7 +115,7 @@ export class DefectRepository {
       data: {...input.data, version: {increment: 1}},
     });
     if (updated.count !== 1) {
-      throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Defect version conflict');
+      throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Дефект изменился. Обновите страницу и повторите действие');
     }
     return this.get(input.tenantId, input.id);
   }

@@ -41,7 +41,7 @@ function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.
   const direct = resolveReadinessCapabilities(context.actorRole).has(ability);
   const adminAsMechanic = ability === 'readiness.handover.prepare'
     && context.actorRole === 'ADMIN' && context.actingAs === 'MECHANIC';
-  if (!direct && !adminAsMechanic) throw new ReadinessCommandError('VALIDATION_ERROR', 403, `${ability} capability is required`);
+  if (!direct && !adminAsMechanic) throw new ReadinessCommandError('VALIDATION_ERROR', 403, `Недостаточно прав: ${ability}`);
 }
 
 async function runCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; method: 'POST' | 'PATCH';
@@ -135,7 +135,7 @@ export function startShiftCommand(input: {tx: ReadinessTransaction; context: Shi
     aggregateId: input.id, key: input.key, body: {expectedVersion: input.expectedVersion ?? null}, expectedVersion: expected,
     execute: async (key) => {
       const repo = new ShiftRepository(input.tx); const beforeRow = await repo.get(input.context.tenantId, input.id);
-      if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Shift start conflict',
+      if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Смена изменилась. Обновите страницу и повторите действие',
         {current: serializeShift(beforeRow)});
       assertShiftTransition(beforeRow.state, 'start'); const now = input.now ?? new Date();
       const decision = await evaluateAuthoritativeShiftStart({tx: input.tx, tenantId: input.context.tenantId,
@@ -243,7 +243,7 @@ async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCo
     execute: async (key) => { const handovers = new HandoverRepository(input.tx); const shifts = new ShiftRepository(input.tx);
       const before = await handovers.get(input.context.tenantId, input.id);
       if (before.version !== expected || before.state !== 'SUBMITTED') {
-        throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Handover decision conflict',
+        throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Передача изменилась. Обновите страницу и повторите действие',
           {current: serializeHandover(before)});
       }
       assertHandoverTransition(before.state, input.action);

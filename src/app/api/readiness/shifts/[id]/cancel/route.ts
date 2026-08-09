@@ -7,7 +7,7 @@ import {readinessResponse} from '../../../_shared/response'; import {withReadine
 export const runtime = 'nodejs';
 type Params = {params: Promise<{id: string}>};
 export const POST = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => { const {id} = await params;
-  const parsed = cancelShiftSchema.safeParse(await request.json()); if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid cancel command');
+  const parsed = cancelShiftSchema.safeParse(await request.json()); if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные отмены');
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => cancelShiftCommand({tx, context, id,
     key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), ...parsed.data}));
   return readinessResponse({body: result.body, status: result.status, headers: result.headers, correlationId: context.correlationId, requestId: context.requestId});

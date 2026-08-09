@@ -40,7 +40,7 @@ function assertPermitEditor(context: PermitCommandContext): void {
   const direct = resolveReadinessCapabilities(context.actorRole).has('readiness.permit.edit');
   const adminAsMechanic = context.actorRole === 'ADMIN' && context.actingAs === 'MECHANIC';
   if (!direct && !adminAsMechanic) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Permit edit capability is required');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права редактировать наряд-допуск');
   }
 }
 
@@ -124,7 +124,7 @@ export async function updateWorkPermitCommand(input: {
       const repository = new WorkPermitRepository(input.tx);
       const beforeRow = await repository.get(input.context.tenantId, input.id);
       const permit = toWorkPermitRecord(beforeRow);
-      if (permit.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Permit version conflict');
+      if (permit.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
       if (input.payload.equipmentId) await repository.requireEquipment(input.context.tenantId, input.payload.equipmentId);
       const edit = editPermit(permit, {...input.payload,
         validFrom: input.payload.validFrom ? new Date(input.payload.validFrom) : undefined,
@@ -147,7 +147,7 @@ async function versionedAction(input: {
 }): Promise<CommandHttpResult> {
   if (input.action !== 'approve') assertPermitEditor(input.context);
   if (input.action === 'approve' && input.context.actingAs) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Acting role cannot approve permits');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'В режиме замещения согласовывать наряды нельзя');
   }
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch,
     expectedVersion: input.expectedVersion, kind: 'work-permit', id: input.id});
@@ -162,7 +162,7 @@ async function versionedAction(input: {
       await repository.requireActor(input.context.tenantId, input.context.actorId);
       const beforeRow = await repository.get(input.context.tenantId, input.id);
       const before = serializePermit(beforeRow);
-      if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Permit version conflict');
+      if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
       let row: PermitRow;
       let eventAction: string = input.action;
       if (input.action === 'submit') {
@@ -176,7 +176,7 @@ async function versionedAction(input: {
       } else {
         const permit = toWorkPermitRecord(beforeRow);
         assertPermitTransition(permit.state, 'approve');
-        if (beforeRow.validTo <= new Date()) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Expired permit cannot be approved');
+        if (beforeRow.validTo <= new Date()) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Просроченный наряд согласовать нельзя');
         const role = assertCanApprovePermit({permit, actorId: input.context.actorId,
           role: input.context.actorRole, approvals: permit.approvals});
         await repository.addApproval({tenantId: input.context.tenantId,

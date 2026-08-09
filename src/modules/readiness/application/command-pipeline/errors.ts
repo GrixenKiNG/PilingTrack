@@ -23,7 +23,7 @@ export class ReadinessCommandError extends Error {
 }
 
 export const preconditionRequired = () => new ReadinessCommandError(
-  'PRECONDITION_REQUIRED', 428, 'A strong If-Match or expected version is required',
+  'PRECONDITION_REQUIRED', 428, 'Не указана версия записи. Обновите страницу и повторите действие',
 );
 
 export const invalidPrecondition = (message: string) => new ReadinessCommandError(
@@ -31,6 +31,6 @@ export const invalidPrecondition = (message: string) => new ReadinessCommandErro
 );
 
 export const commandInProgress = () => new ReadinessCommandError(
-  'COMMAND_IN_PROGRESS', 409, 'An identical command is still in progress', undefined,
+  'COMMAND_IN_PROGRESS', 409, 'Такая же команда ещё выполняется', undefined,
   {'Retry-After': '1'},
 );

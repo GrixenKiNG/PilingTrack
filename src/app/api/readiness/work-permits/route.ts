@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 const readJson = async (request: NextRequest) => {
   try { return await request.json(); }
-  catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Request body must be JSON'); }
+  catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Тело запроса должно быть в формате JSON'); }
 };
 
 export async function GET(request: NextRequest) {
@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
   const context = resolved.context!;
   try {
     if (!resolveReadinessCapabilities(context.actorRole).has('readiness.read')) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Readiness access denied');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
     }
     const params = request.nextUrl.searchParams;
     const allowed = new Set(['equipmentId', 'state', 'risk', 'limit', 'cursor', 'status', 'from', 'to']);
     if ([...params.keys()].some((key) => !allowed.has(key))) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Unknown permit filter');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный фильтр нарядов');
     }
     const limit = params.has('limit') ? Number(params.get('limit')) : 50;
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
@@ -40,10 +40,10 @@ export async function GET(request: NextRequest) {
       const state = params.get('state') ?? common.status;
       const risk = params.get('risk') ?? common.risk;
       if (state && !['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED', 'REVOKED'].includes(state)) {
-        throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit state');
+        throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестное состояние наряда');
       }
       if (risk && !['NORMAL', 'ELEVATED'].includes(risk)) {
-        throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit risk');
+        throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный уровень риска наряда');
       }
       const filters: PermitListFilters = {
         equipmentId: params.get('equipmentId') ?? undefined,
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 
 export const POST = withReadinessCommand(async (request, context) => {
   const parsed = createWorkPermitSchema.safeParse(await readJson(request));
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid work permit', {fieldErrors: parsed.error.flatten().fieldErrors});
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные наряда', {fieldErrors: parsed.error.flatten().fieldErrors});
   const result = await withReadinessSerializableTransaction(context.tenantId,
     (tx) => createWorkPermitCommand({tx, context, key: request.headers.get('idempotency-key'), payload: parsed.data}));
   return readinessResponse({body: result.body, status: result.status,

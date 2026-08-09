@@ -7,7 +7,7 @@ import {readinessResponse} from '../../../_shared/response'; import {withReadine
 export const runtime = 'nodejs';
 type Params = {params: Promise<{id: string}>};
 export const POST = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => { const {id} = await params;
-  const parsed = submitHandoverSchema.safeParse(await request.json()); if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid handover');
+  const parsed = submitHandoverSchema.safeParse(await request.json()); if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные передачи');
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => submitHandoverCommand({tx, context,
     shiftId: id, key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), payload: parsed.data}));
   return readinessResponse({body: result.body, status: result.status, headers: result.headers, correlationId: context.correlationId, requestId: context.requestId});

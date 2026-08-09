@@ -6,7 +6,7 @@ import {withReadinessSerializableTransaction, withReadinessTenantTransaction} fr
 export const runtime = 'nodejs';
 type Params = {params: Promise<{id: string}>};
 export const POST = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => { const {id} = await params; const parsed = acceptHandoverSchema.safeParse(await request.json());
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid accept command');
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные приёмки');
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => acceptHandoverCommand({tx, context, id,
     key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), expectedVersion: parsed.data.expectedVersion}), {
     resolveConflictDetails: async () => {

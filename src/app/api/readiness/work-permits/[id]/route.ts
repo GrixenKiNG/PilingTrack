@@ -30,9 +30,9 @@ export async function GET(request: NextRequest, {params}: Params) {
 export const PATCH = withReadinessCommand(async (request, context, {params}: Params) => {
   const {id} = await params;
   let body: unknown;
-  try { body = await request.json(); } catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Request body must be JSON'); }
+  try { body = await request.json(); } catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Тело запроса должно быть в формате JSON'); }
   const parsed = updateWorkPermitSchema.safeParse(body);
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid work permit edit', {fieldErrors: parsed.error.flatten().fieldErrors});
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные изменения наряда', {fieldErrors: parsed.error.flatten().fieldErrors});
   const result = await withReadinessSerializableTransaction(context.tenantId,
     (tx) => updateWorkPermitCommand({tx, context, id,
       key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), payload: parsed.data}));

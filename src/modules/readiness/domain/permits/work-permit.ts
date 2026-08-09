@@ -5,19 +5,19 @@ import type {WorkPermitContent, WorkPermitRecord} from './types';
 export function validatePermitContent(content: WorkPermitContent): WorkPermitContent {
   const scope = content.scope.trim();
   if (scope.length < 3 || scope.length > 4000) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Permit scope must be 3 to 4000 characters');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Описание работ: от 3 до 4000 символов');
   }
   if (content.shiftId) {
     throw new ReadinessCommandError(
       'VALIDATION_ERROR', 422,
-      'Shift linkage is unavailable until the Shift aggregate migration is active',
+      'Привязка наряда к смене пока недоступна',
     );
   }
   if (!Number.isFinite(content.validFrom.getTime()) || !Number.isFinite(content.validTo.getTime())) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Permit timestamps are invalid');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные даты действия наряда');
   }
   if (content.validTo <= content.validFrom) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'validTo must be later than validFrom');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Дата окончания должна быть позже даты начала');
   }
   return {...content, scope, shiftId: null};
 }
@@ -43,7 +43,7 @@ export function editPermit(
     || content.validFrom.getTime() !== permit.validFrom.getTime()
     || content.validTo.getTime() !== permit.validTo.getTime();
   if (!changed) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Permit edit contains no substantive change');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'В наряде нечего сохранять — изменений нет');
   }
   return {
     content,

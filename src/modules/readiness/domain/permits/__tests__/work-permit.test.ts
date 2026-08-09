@@ -58,7 +58,7 @@ describe('work permit state machine', () => {
       actorId: 'reviewer-1',
       role: 'ADMIN',
       approvals: [first],
-    })).toThrow(/distinct users/i);
+    })).toThrow(/двумя разными людьми/i);
     expect(assertCanApprovePermit({
       permit: record,
       actorId: 'admin-1',
@@ -78,7 +78,7 @@ describe('work permit state machine', () => {
         actorId,
         role: 'DISPATCHER',
         approvals: [],
-      })).toThrow(/self-approve/i);
+      })).toThrow(/не может согласовать его сам/i);
     }
   });
 
@@ -98,7 +98,7 @@ describe('work permit state machine', () => {
   });
 
   it('rejects no-op edits and terminal-state transitions', () => {
-    expect(() => editPermit(permit({state: 'DRAFT'}), {}, 'mechanic-2')).toThrow(/no substantive change/i);
-    expect(() => transitionPermit('REVOKED', 'submit')).toThrow(/cannot execute/i);
+    expect(() => editPermit(permit({state: 'DRAFT'}), {}, 'mechanic-2')).toThrow(/нечего сохранять/i);
+    expect(() => transitionPermit('REVOKED', 'submit')).toThrow(/сейчас недоступно/i);
   });
 });

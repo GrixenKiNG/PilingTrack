@@ -8,13 +8,13 @@ const VALID_KEY = /^[\x21-\x7E]{16,128}$/;
 export function requireIdempotencyKey(value?: string | null): string {
   if (!value) {
     throw new ReadinessCommandError(
-      'IDEMPOTENCY_KEY_REQUIRED', 400, 'Idempotency-Key is required',
+      'IDEMPOTENCY_KEY_REQUIRED', 400, 'Не передан ключ повторной отправки',
     );
   }
   if (!VALID_KEY.test(value)) {
     throw new ReadinessCommandError(
       'INVALID_IDEMPOTENCY_KEY', 400,
-      'Idempotency-Key must contain 16 to 128 visible ASCII characters',
+      'Ключ повторной отправки должен содержать от 16 до 128 печатных символов ASCII',
     );
   }
   return value;

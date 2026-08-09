@@ -22,12 +22,12 @@ export async function GET(request: NextRequest) {
   try {
     const dataset = request.nextUrl.searchParams.get('dataset') ?? '';
     if (!DATASETS.has(dataset)) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid export dataset');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный набор данных для выгрузки');
     }
     const capabilities = resolveReadinessCapabilities(context.actorRole);
     const requiredAbility = dataset === 'audit' ? 'readiness.audit.export' : 'readiness.read';
     if (!capabilities.has(requiredAbility)) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Export access denied');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет прав на выгрузку');
     }
     const generatedAt = new Date();
     const result = await withReadinessSerializableTransaction(context.tenantId, async (tx) => {

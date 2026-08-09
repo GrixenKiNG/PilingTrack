@@ -10,7 +10,7 @@ type Params = {params: Promise<{id: string}>};
 export const POST = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => {
   const {id} = await params;
   const parsed = declineShiftSchema.safeParse(await request.json());
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid decline command');
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные отказа');
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) =>
     declineShiftCommand({tx, context, id, key: request.headers.get('idempotency-key'),
       ifMatch: request.headers.get('if-match'), expectedVersion: parsed.data.expectedVersion,

@@ -24,7 +24,7 @@ const decodeCursor = (value: string): {updatedAt: Date; id: string} => {
     if (!parsed.id || Number.isNaN(updatedAt.getTime())) throw new Error('bad cursor');
     return {updatedAt, id: parsed.id};
   } catch {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Invalid permit cursor');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Некорректная страница списка нарядов');
   }
 };
 

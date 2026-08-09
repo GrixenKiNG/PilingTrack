@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 type Params = {params: Promise<{id: string}>};
 export const POST = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => { const {id} = await params;
   const parsed = versionedShiftSchema.safeParse(await request.json());
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Invalid start command');
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные допуска');
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => startShiftCommand({tx, context, id,
     key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), expectedVersion: parsed.data.expectedVersion}));
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,

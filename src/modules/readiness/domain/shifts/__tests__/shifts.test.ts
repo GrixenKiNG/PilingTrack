@@ -29,11 +29,11 @@ describe('shift and handover domain', () => {
   });
 
   it('keeps terminal states and forbidden cancellation closed', () => {
-    expect(() => transitionHandover('ACCEPTED', 'rework')).toThrow(/cannot execute/i);
-    expect(() => transitionShift('HANDOVER_PENDING', 'cancel')).toThrow(/cannot execute/i);
+    expect(() => transitionHandover('ACCEPTED', 'rework')).toThrow(/сейчас недоступно/i);
+    expect(() => transitionShift('HANDOVER_PENDING', 'cancel')).toThrow(/сейчас недоступно/i);
     // Допуск нельзя обойти: прямой запуск из PLANNED должен оставаться закрытым.
-    expect(() => transitionShift('PLANNED', 'start')).toThrow(/cannot execute/i);
-    expect(() => transitionShift('CLOSED', 'start')).toThrow(/cannot execute/i);
+    expect(() => transitionShift('PLANNED', 'start')).toThrow(/сейчас недоступно/i);
+    expect(() => transitionShift('CLOSED', 'start')).toThrow(/сейчас недоступно/i);
   });
 
   it('derives production date only from server instant and tenant timezone', () => {
@@ -44,7 +44,7 @@ describe('shift and handover domain', () => {
   });
 
   it('validates windows, summaries and required reasons', () => {
-    expect(() => validateShiftWindow(new Date('2026-08-02'), new Date('2026-08-01'))).toThrow(/later/i);
+    expect(() => validateShiftWindow(new Date('2026-08-02'), new Date('2026-08-01'))).toThrow(/должно быть позже|должна быть позже/i);
     expect(validateHandoverSummary('  Смена передана  ')).toBe('Смена передана');
     expect(requireCancellationReason('  Поломка  ')).toBe('Поломка');
     expect(requireReworkReason('  Уточнить дефект  ')).toBe('Уточнить дефект');

@@ -136,7 +136,7 @@ describe.skip('Tech Readiness production state machines [PRD §6, ADR-0041]', ()
       risk: 'NORMAL',
       authorId: 'test-user-dispatcher',
       approvals: [{role: 'DISPATCHER', userId: 'test-user-dispatcher'}],
-    })).toThrow(/self.?approval/i);
+    })).toThrow(/не может согласовать его сам/i);
   });
 });
 

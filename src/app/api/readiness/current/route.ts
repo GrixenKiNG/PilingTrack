@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   try {
     if (!resolveReadinessCapabilities(context.actorRole).has('readiness.read')) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Readiness access denied');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
     }
     const equipmentId = request.nextUrl.searchParams.get('equipmentId');
     const rows = await withReadinessRequestTransaction(context.tenantId, async (tx) => {

@@ -16,6 +16,6 @@ describe('readiness read filters', () => {
   });
 
   it('rejects an inverted interval', () => {
-    expect(() => parseReadinessReadFilters(new URLSearchParams('from=2026-08-03&to=2026-08-02'))).toThrow(/from date/i);
+    expect(() => parseReadinessReadFilters(new URLSearchParams('from=2026-08-03&to=2026-08-02'))).toThrow(/не может быть позже/i);
   });
 });
