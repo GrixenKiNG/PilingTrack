@@ -12,10 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
 
+/**
+ * Быстрые переходы по разделам сменного отчёта.
+ *
+ * Подписи обязаны совпадать с тем, куда ведут. Прежние «Осмотр» и «Дефект»
+ * открывали шапку отчёта и блок простоев: осмотр оператору вообще недоступен
+ * (право maintenance.manage есть только у диспетчера и администратора), а
+ * дефект — это не простой. Пока для оператора нет своих экранов осмотра и
+ * дефекта, кнопки называются по факту.
+ */
 const OPERATOR_ACTIONS: { label: string; icon: PilingIconName; target: string }[] = [
-  { label: 'Осмотр', icon: 'inspection', target: 'inspection' },
+  { label: 'Смена', icon: 'shift-start', target: 'inspection' },
   { label: 'Моточасы', icon: 'engine-hours', target: 'engine-hours' },
-  { label: 'Дефект', icon: 'defect', target: 'defect' },
+  { label: 'Простой', icon: 'downtime', target: 'defect' },
   { label: 'Фото', icon: 'camera', target: 'photo' },
   { label: 'Отправить', icon: 'send', target: 'submit' },
 ];

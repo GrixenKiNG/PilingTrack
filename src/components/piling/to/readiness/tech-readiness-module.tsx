@@ -60,6 +60,7 @@ export function TechReadinessModule({
         activeView={activeView}
         onViewChange={onViewChange}
         activeTabRef={activeTabRef}
+        screens={bootstrap?.capabilities.screens ?? null}
       />
       {MODULE_TABS.map((tab) => {
         const active = tab.id === activeView;

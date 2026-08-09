@@ -22,19 +22,27 @@ interface ModuleTabListProps {
   activeView: ReferenceView;
   onViewChange: (view: ReferenceView) => void;
   activeTabRef?: RefObject<HTMLButtonElement | null>;
+  /**
+   * Экраны, разрешённые ролью. Недоступные вкладки не показываем: раньше
+   * оператор видел все семь, а «Отчёты» и «Настройки» отвечали ему
+   * «Недостаточно прав». Пока прав нет, показываем весь список.
+   */
+  screens?: Record<ReferenceView, boolean> | null;
 }
 
 export function ModuleTabList({
   activeView,
   onViewChange,
   activeTabRef,
+  screens,
 }: ModuleTabListProps) {
   const localRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabs = screens ? MODULE_TABS.filter((tab) => screens[tab.id] !== false) : MODULE_TABS;
 
   useEffect(() => {
-    const activeTab = localRefs.current[MODULE_TABS.findIndex((tab) => tab.id === activeView)];
+    const activeTab = localRefs.current[tabs.findIndex((tab) => tab.id === activeView)];
     activeTab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [activeView]);
+  }, [activeView, tabs]);
 
   const focusTab = (index: number) => {
     localRefs.current[index]?.focus();
@@ -42,10 +50,10 @@ export function ModuleTabList({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % MODULE_TABS.length;
-    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + MODULE_TABS.length) % MODULE_TABS.length;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = MODULE_TABS.length - 1;
+    if (event.key === 'End') nextIndex = tabs.length - 1;
 
     if (nextIndex !== null) {
       event.preventDefault();
@@ -55,7 +63,7 @@ export function ModuleTabList({
 
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onViewChange(MODULE_TABS[index].id);
+      onViewChange(tabs[index].id);
     }
   };
 
@@ -71,7 +79,7 @@ export function ModuleTabList({
         data-scroll-region="module-tabs"
         className="flex h-12 w-full min-w-0 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
       >
-        {MODULE_TABS.map((tab, index) => {
+        {tabs.map((tab, index) => {
           const selected = tab.id === activeView;
           return (
             <button

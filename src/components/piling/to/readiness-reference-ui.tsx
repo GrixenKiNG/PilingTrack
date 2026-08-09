@@ -618,7 +618,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
           aria-label="Разделы модуля технической готовности"
           className="sticky top-0 z-20 flex h-12 w-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden bg-primary px-2 text-white sm:px-4"
         >
-          {VIEW_ITEMS.map((item) => {
+          {VIEW_ITEMS.filter((item) => props.bootstrap?.capabilities.screens[item.id] !== false).map((item) => {
             const Icon = item.icon;
             return (
               <button
