@@ -1,6 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Тёмной темы у продукта нет: сцена — улица, солнце, перчатки, и переключателя
+   в интерфейсе не было ни одного дня. Токены `.dark` и ThemeProvider удалены
+   2026-08-09 (аудит: 93 из 132 подписей на экране правил были нечитаемы,
+   контраст 1.04 — белым по белому).
+
+   Эта строка НЕ мёртвая, не удаляйте её. В Tailwind v4 встроенный `dark:`
+   работает через @media (prefers-color-scheme: dark). Привязка к классу
+   держит его выключенным: класс `.dark` теперь не выставляет никто. Уберёте
+   строку — `dark:`-классы в базовых компонентах shadcn (button, input, select,
+   tabs, badge, checkbox, textarea) включатся у всех, у кого тёмная ОС, и вы
+   получите ту самую полусломанную тему, ради удаления которой всё это было. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -124,59 +135,6 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-strong: oklch(0.78 0.14 22.216);
-  --success: oklch(0.696 0.17 162);
-  --success-foreground: oklch(0.145 0 0);
-  --success-strong: oklch(0.78 0.13 162);
-  --warning: oklch(0.769 0.188 70);
-  --warning-foreground: oklch(0.145 0 0);
-  --warning-strong: oklch(0.82 0.12 70);
-  --info: oklch(0.62 0.19 256);
-  --info-foreground: oklch(0.985 0 0);
-  --info-strong: oklch(0.78 0.12 256);
-  --signal: oklch(0.73 0.19 48);
-  --signal-foreground: oklch(0.145 0 0);
-  --signal-strong: oklch(0.8 0.13 48);
-  --icon-neutral: oklch(0.78 0.02 240);
-  --icon-primary: oklch(0.73 0.19 48);
-  --icon-info: oklch(0.7 0.16 256);
-  --icon-success: oklch(0.72 0.15 149);
-  --icon-warning: oklch(0.78 0.16 70);
-  --icon-danger: oklch(0.72 0.19 27);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.185 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -234,7 +192,6 @@
   .piling-icon-tile[data-tone='success'] { background: color-mix(in oklch, var(--icon-success) 12%, white); }
   .piling-icon-tile[data-tone='warning'] { background: color-mix(in oklch, var(--icon-warning) 14%, white); }
   .piling-icon-tile[data-tone='danger'] { background: color-mix(in oklch, var(--icon-danger) 11%, white); }
-  .dark .piling-icon-tile { background: color-mix(in oklch, var(--icon-primary) 18%, var(--card)); }
   .piling-icon-tile:has(.piling-icon--approved) { background: transparent; }
 }
 
@@ -257,13 +214,6 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: oklch(0.65 0 0);
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: oklch(0.35 0 0);
-}
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: oklch(0.45 0 0);
 }
 
 /* Notion-like checkbox */
@@ -290,9 +240,6 @@
 .card-hover:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
-}
-.dark .card-hover:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Drag and drop */

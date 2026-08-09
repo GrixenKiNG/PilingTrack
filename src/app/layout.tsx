@@ -1,6 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { headers } from 'next/headers';
-import { ThemeProvider } from 'next-themes';
 // Sonner, not the Radix toaster: every toast.* call in the app goes through
 // sonner, and without its <Toaster/> mounted they all silently no-op (login
 // errors and report-submit errors were invisible to users).
@@ -77,13 +75,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Pull the per-request CSP nonce the proxy minted so next-themes'
-  // anti-flash inline script can carry it. Without an explicit `nonce`
-  // prop, ThemeProvider injects a <script> without the attribute and
-  // strict-dynamic CSP blocks it — the visible symptom is one
-  // "Executing inline script violates" error per page load on iOS.
-  const nonce = (await headers()).get('x-nonce') || undefined;
-
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
@@ -94,16 +85,8 @@ export default async function RootLayout({
         )}
       </head>
       <body className="font-sans antialiased bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-          nonce={nonce}
-        >
-          {children}
-          <Toaster richColors position="top-center" closeButton />
-        </ThemeProvider>
+        {children}
+        <Toaster richColors position="top-center" closeButton />
       </body>
     </html>
   );
