@@ -172,7 +172,7 @@ export function CrewFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {mode === 'edit'
@@ -365,7 +365,7 @@ function AssistantSelectorModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
-      <DialogContent className="max-h-[80vh] overflow-y-auto">
+      <DialogContent aria-describedby={undefined} className="max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />

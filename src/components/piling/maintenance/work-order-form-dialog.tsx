@@ -209,7 +209,7 @@ export function WorkOrderFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingId ? 'Редактировать наряд' : 'Новый наряд ТО'}</DialogTitle>
         </DialogHeader>

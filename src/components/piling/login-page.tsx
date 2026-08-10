@@ -56,6 +56,11 @@ export function LoginPage() {
     }
   };
 
+  // Экран входа — единственная тёмная сцена продукта: фотография объекта на
+  // весь экран и стеклянная карточка поверх. Светлые семантические токены
+  // (--muted-foreground и т.п.) здесь неприменимы, они рассчитаны на белый фон,
+  // поэтому в этом файле сохранены прямые тёмные значения и белый текст.
+  // Это осознанное исключение, а не дрейф палитры.
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-slate-900">
       <AnimatePresence>
@@ -128,7 +133,7 @@ export function LoginPage() {
                   type="button"
                   aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 rounded-md"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-info rounded-md"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -137,7 +142,7 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-12 md:h-13 bg-info-strong hover:bg-info-strong text-white font-medium text-base shadow-lg shadow-blue-600/30"
+              className="w-full h-12 md:h-13 bg-info-strong hover:bg-info-strong text-white font-medium text-base shadow-lg shadow-info/30"
               disabled={loading}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Войти'}
@@ -145,7 +150,9 @@ export function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-white/70 mt-6 drop-shadow">
+        {/* Без text-white/70: прозрачность белого запрещена системой — она
+            снижает контраст непредсказуемо. Второстепенность даём размером. */}
+        <p className="text-center text-xs text-white mt-6 drop-shadow">
           © 2026 PilingTrack — Система управления свайными работами
         </p>
       </motion.div>

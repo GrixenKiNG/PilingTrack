@@ -327,7 +327,7 @@ export function AdminTelegram() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-4 h-4" />

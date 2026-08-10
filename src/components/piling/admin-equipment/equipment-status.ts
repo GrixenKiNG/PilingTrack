@@ -33,11 +33,11 @@ export const STATUS_META: Record<
 export const REPORT_STATUS_META: Record<ReportStatus, { label: string; badge: string }> = {
   has_report: {
     label: 'Есть отчёт',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badge: 'bg-success/10 text-success-strong border-success/30',
   },
   expected: {
     label: 'Ждём отчёт',
-    badge: 'bg-orange-50 text-orange-700 border-orange-200',
+    badge: 'bg-warning/10 text-warning-strong border-warning/30',
   },
   missing: {
     label: 'Нет отчёта',
@@ -51,18 +51,18 @@ export const EQUIPMENT_STATUS_META: Record<
 > = {
   working: {
     label: 'В работе',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    bar: 'bg-emerald-500',
+    badge: 'bg-success/10 text-success-strong border-success/30',
+    bar: 'bg-success-strong',
   },
   repair: {
     label: 'Ремонт',
-    badge: 'bg-blue-50 text-blue-700 border-blue-200',
-    bar: 'bg-blue-500',
+    badge: 'bg-info/10 text-info-strong border-info/30',
+    bar: 'bg-info-strong',
   },
   idle: {
     label: 'Простой',
-    badge: 'bg-amber-50 text-amber-700 border-amber-200',
-    bar: 'bg-amber-500',
+    badge: 'bg-warning/10 text-warning-strong border-warning/30',
+    bar: 'bg-warning-strong',
   },
 };
 

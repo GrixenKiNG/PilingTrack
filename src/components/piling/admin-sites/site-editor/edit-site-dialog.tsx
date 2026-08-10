@@ -128,7 +128,7 @@ export function EditSiteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent aria-describedby={undefined} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Редактировать объект</DialogTitle>
         </DialogHeader>

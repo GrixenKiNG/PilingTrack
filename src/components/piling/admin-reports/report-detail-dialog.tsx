@@ -33,7 +33,7 @@ export function ReportDetailDialog({
   return (
     <>
       <Dialog open={!!report} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto custom-scrollbar">
+        <DialogContent aria-describedby={undefined} className="max-w-lg max-h-[85vh] overflow-y-auto custom-scrollbar">
           <div className="flex items-center justify-between">
             <DialogHeader>
               <DialogTitle className="text-base">Отчёт от {formatDate(report.date)}</DialogTitle>

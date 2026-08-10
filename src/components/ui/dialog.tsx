@@ -57,9 +57,19 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
+      {/*
+        aria-describedby здесь НЕ переопределяем. Раньше стояло
+        `aria-describedby={undefined}` — так глушат предупреждение Radix у
+        диалогов без описания, но заодно это рвало связь и там, где описание
+        есть: скринридер читал только заголовок, а поясняющий текст
+        («Снимите показание счётчика установки…», «Укажите причину отзыва
+        наряда») пропадал во всех диалогах приложения.
+
+        Диалогу без пояснения достаточно заголовка; такой передаёт
+        `aria-describedby={undefined}` сам, через props ниже.
+      */}
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        aria-describedby={undefined}
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
           showCloseButton && "[&_[data-slot=dialog-header]]:pr-10",

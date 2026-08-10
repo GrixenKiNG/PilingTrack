@@ -40,10 +40,20 @@ export interface EquipmentCardTemplate extends LayoutTemplate {
   blocks: EquipmentCardBlock[];
 }
 
+/**
+ * Значения по умолчанию задаются шестнадцатеричными кодами, а не токенами
+ * `var(--…)`, намеренно: шаблон редактируется в конструкторе через
+ * `<input type="color">` (layout-inspector.tsx), а он принимает только hex —
+ * с CSS-переменной пикер сбрасывается в чёрный. Поэтому здесь стоят точные
+ * hex-эквиваленты токенов палитры, снятые с живого CSS 2026-08-10:
+ *   --card #ffffff · --foreground #101010 · --border #e2e2e2
+ *   предупреждение: фон #fdf4ea, текст #7e4600, рамка #f7ddc0
+ * Меняются они вместе с палитрой в globals.css.
+ */
 const BASE_STYLE: LayoutBlockStyle = {
   background: '#ffffff',
-  color: '#0f172a',
-  borderColor: '#e2e8f0',
+  color: '#101010',
+  borderColor: '#e2e2e2',
   borderWidth: 1,
   borderRadius: 12,
   padding: 8,
@@ -83,7 +93,7 @@ export const DEFAULT_EQUIPMENT_CARD_TEMPLATE: EquipmentCardTemplate = {
     rowHeight: 24,
     gap: 8,
     background: '#ffffff',
-    borderColor: '#e2e8f0',
+    borderColor: '#e2e2e2',
     borderWidth: 1,
     borderRadius: 16,
     padding: 12,
@@ -103,9 +113,9 @@ export const DEFAULT_EQUIPMENT_CARD_TEMPLATE: EquipmentCardTemplate = {
     dataBlock('today-drilling', 'todayDrilling', 4, 12, 4, 2),
     dataBlock('today-downtime', 'todayDowntime', 8, 12, 4, 2),
     dataBlock('maintenance-alert', 'maintenanceAlert', 0, 14, 12, 2, {
-      background: '#fffbeb',
-      color: '#92400e',
-      borderColor: '#fde68a',
+      background: '#fdf4ea',
+      color: '#7e4600',
+      borderColor: '#f7ddc0',
     }),
     dataBlock('quick-links', 'quickLinks', 0, 16, 12, 2, { borderWidth: 0, background: 'transparent' }),
   ],

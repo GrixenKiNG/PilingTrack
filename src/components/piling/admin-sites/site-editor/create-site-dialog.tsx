@@ -64,7 +64,7 @@ export function CreateSiteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent aria-describedby={undefined} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Новый объект</DialogTitle>
         </DialogHeader>

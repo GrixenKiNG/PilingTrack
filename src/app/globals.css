@@ -69,6 +69,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* «Таблетка»: бейджи, пилюли статусов, ползунок прокрутки. Была разбросана
+     как 9999px и случайные 3px. */
+  --radius-full: 9999px;
   /* Audit L-2: design-system tokens for sub-xs sizes.
      Convention follows Tailwind's "higher N = smaller" pattern:
      text-xs = 12px > text-2xs = 11px > text-3xs = 10px.
@@ -258,11 +261,14 @@
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: oklch(0.8 0 0);
-  border-radius: 3px;
+  /* Токены вместо самодельных серых: ползунок — та же граница, что у карточек,
+     на наведении — цвет второстепенного текста. Радиус полный: 6px-полоска
+     скруглением в 3px и так становится «таблеткой», а 3px не было в шкале. */
+  background-color: var(--border);
+  border-radius: var(--radius-full);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: oklch(0.65 0 0);
+  background-color: var(--muted-foreground);
 }
 
 /* Notion-like checkbox */
@@ -287,7 +293,9 @@
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .card-hover:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  /* Тень строится от --foreground, а не от произвольного чёрного: цвет тени
+     должен ехать вместе с палитрой. */
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--foreground) 8%, transparent);
   transform: translateY(-1px);
 }
 

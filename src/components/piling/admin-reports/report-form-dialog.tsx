@@ -192,7 +192,7 @@ export function ReportFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <DialogContent aria-describedby={undefined} className="max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
         <DialogHeader>
           <DialogTitle className="text-base">{editReport ? 'Редактировать отчёт' : 'Сформировать отчёт'}</DialogTitle>
         </DialogHeader>

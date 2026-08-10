@@ -783,7 +783,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               <div className="text-xs font-semibold">{detail?.equipment?.serialNumber || '—'}</div>
               <div className="mt-1 text-2xs text-muted-foreground">Место базирования</div>
               <div className="text-xs font-semibold">{detail?.crew?.site?.name
-                ? <Link href="/admin/sites" className="hover:text-signal-strong hover:underline">{detail.crew.site.name}</Link>
+                ? <Link href="/admin/sites" className="hit-target hover:text-signal-strong hover:underline">{detail.crew.site.name}</Link>
                 : 'Не назначено'}</div>
               <div className="mt-1 text-2xs text-muted-foreground">Наработка</div>
               <div className="text-xs font-semibold">{selected.engineHoursTotal != null ? `${selected.engineHoursTotal.toLocaleString('ru-RU')} м/ч` : '—'}</div>
@@ -909,10 +909,16 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 <div key={evidence.key} className="rounded-lg border border-border p-3">
                   <div className="text-xs font-semibold">{evidence.label}</div>
                   <div className="mt-2 text-2xs">{evidenceMetric(evidence, presentation.stages, props.bootstrap?.tenant.timezone)}</div>
+                  {/*
+                    gap-y-2, а не gap-y-1: строка ссылки 16px, а `hit-target`
+                    растит зону нажатия до 24px (44px на сенсоре). При зазоре
+                    4px зоны соседних строк накладывались бы, и палец попадал
+                    бы в чужую ссылку.
+                  */}
                   {evidence.links && evidence.links.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-2">
                       {evidence.links.map((link) => (
-                        <Link key={link.href} href={link.href} className="inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
+                        <Link key={link.href} href={link.href} className="hit-target inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
                           {link.text}<ArrowRight className="h-3 w-3" />
                         </Link>
                       ))}
@@ -1036,7 +1042,7 @@ function FleetScreen(props: ReferenceUiProps) {
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
         <aside className={cn(card, 'p-3')}>
           <h2 className="font-bold">Парк техники</h2>
-          <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск установки" className="h-9 bg-muted pl-9" /></div>
+          <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск установки" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск установки" className="h-9 bg-muted pl-9" /></div>
           <FilterGroup
             title="Статус готовности"
             active={statusFilter}
@@ -1097,7 +1103,7 @@ function FleetScreen(props: ReferenceUiProps) {
                     { }
                     <img src="/icons/pilingtrack/defect.png" alt="" className="h-6 w-6 shrink-0 object-contain" />
                     <div className="min-w-0">
-                      <div className="text-xs font-bold"><Link href={`/admin/maintenance/${selectedReadiness.activeRecord.id}`} className="hover:underline">{selectedReadiness.activeRecord.title}</Link></div>
+                      <div className="text-xs font-bold"><Link href={`/admin/maintenance/${selectedReadiness.activeRecord.id}`} className="hit-target hover:underline">{selectedReadiness.activeRecord.title}</Link></div>
                       <span className="mt-1 inline-flex rounded border border-destructive px-1.5 py-0.5 text-3xs font-semibold text-destructive-strong">Критическое</span>
                       <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">{selectedReadiness.reason}</p>
                     </div>
@@ -1780,7 +1786,7 @@ function ReportsScreen(props: ReferenceUiProps) {
       <section className={cn(card, 'mt-2 overflow-x-auto')}>
         <div className="flex flex-wrap items-center justify-between gap-2 p-3">
           <div><h2 className="font-bold">Доказательный журнал</h2><p className="mt-1 text-xs text-muted-foreground">Неизменяемая история решений и подтверждений</p></div>
-          <div className="flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1 sm:w-64"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input className="h-8 bg-muted pl-9 text-xs" placeholder="Поиск по установке или событию" /></div><Button variant="outline" className="h-8 text-xs">Фильтры</Button><Button variant="outline" className="h-8 text-xs" onClick={() => props.onViewChange('maintenance')}>Открыть полный журнал</Button></div>
+          <div className="flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1 sm:w-64"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск по доказательному журналу" className="h-8 bg-muted pl-9 text-xs" placeholder="Поиск по установке или событию" /></div><Button variant="outline" className="h-8 text-xs">Фильтры</Button><Button variant="outline" className="h-8 text-xs" onClick={() => props.onViewChange('maintenance')}>Открыть полный журнал</Button></div>
         </div>
         <div className="hidden min-w-[760px] grid-cols-[160px_190px_minmax(0,1fr)_150px_120px] border-y border-border bg-muted px-4 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>Дата и время</span><span>Установка</span><span>Событие</span><span>Тип</span><span>Статус</span></div>
         <div className="hidden min-w-[760px] divide-y divide-border md:block">
@@ -1929,7 +1935,11 @@ function evidenceMetric(
 /** Ползунок веса: 60% — практический потолок одного критерия. */
 const WEIGHT_SLIDER_MAX = 60;
 
-const WEIGHT_SLIDER_CLASS = 'h-1.5 min-w-0 cursor-pointer appearance-none rounded-full disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+// Высота элемента 24px (44px на сенсоре), а трек рисуется полосой 6px по
+// центру через background-size — вид прежний, но цель нажатия перестала быть
+// шестипиксельной ниткой. Растягивать сам трек нельзя: градиент заливки
+// задан inline на элементе, до ::-webkit-slider-runnable-track он не достаёт.
+const WEIGHT_SLIDER_CLASS = 'h-6 [@media(pointer:coarse)]:h-11 bg-no-repeat bg-center [background-size:100%_6px] min-w-0 cursor-pointer appearance-none rounded-full disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
   + ' [&::-webkit-slider-thumb]:h-[13px] [&::-webkit-slider-thumb]:w-[13px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-signal-strong [&::-webkit-slider-thumb]:bg-background'
   + ' [&::-moz-range-thumb]:h-[13px] [&::-moz-range-thumb]:w-[13px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-signal-strong [&::-moz-range-thumb]:bg-background';
 
@@ -2108,7 +2118,9 @@ function RulesSettings(props: ReferenceUiProps) {
                           disabled={saving || rulesUnavailable || criterion.locked}
                           onChange={(event) => patchCriterion(criterion.key, { weight: Number(event.target.value) })}
                           aria-label={`Вес критерия ${meta.title}`}
-                          className="w-full min-w-0 border-none bg-transparent text-right font-mono text-xs font-bold outline-none disabled:text-muted-foreground"
+                          // h-full: поле тянется на всю высоту рамки (32px).
+                          // Само по себе оно было 16px — ниже минимальной цели.
+                          className="h-full w-full min-w-0 border-none bg-transparent text-right font-mono text-xs font-bold outline-none disabled:text-muted-foreground"
                         />
                         <span className="text-3xs text-muted-foreground">%</span>
                       </label>

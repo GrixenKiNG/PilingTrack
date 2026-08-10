@@ -11,10 +11,10 @@ export const LEVEL_LABEL: Record<InspectionLevel, string> = {
 
 export const LEVEL_STYLE: Record<InspectionLevel, string> = {
   EO: 'bg-muted text-muted-foreground',
-  TO1: 'bg-sky-100 text-sky-700',
-  TO2: 'bg-blue-100 text-blue-700',
+  TO1: 'bg-info/10 text-info-strong',
+  TO2: 'bg-info/10 text-info-strong',
   TO3: 'bg-violet-100 text-violet-700',
-  SEASONAL: 'bg-emerald-100 text-emerald-700',
+  SEASONAL: 'bg-success/10 text-success-strong',
 };
 
 export const STATUS_LABEL: Record<InspectionStatus, string> = {
@@ -23,14 +23,14 @@ export const STATUS_LABEL: Record<InspectionStatus, string> = {
 };
 
 export const STATUS_STYLE: Record<InspectionStatus, string> = {
-  DRAFT: 'bg-amber-100 text-amber-700',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
+  DRAFT: 'bg-warning/10 text-warning-strong',
+  COMPLETED: 'bg-success/10 text-success-strong',
 };
 
 export function healthScoreColor(score: number | null): string {
   if (score === null) return 'text-muted-foreground';
-  if (score >= 90) return 'text-emerald-600';
-  if (score >= 75) return 'text-amber-600';
-  if (score >= 50) return 'text-orange-600';
-  return 'text-rose-600';
+  if (score >= 90) return 'text-success-strong';
+  if (score >= 75) return 'text-warning-strong';
+  if (score >= 50) return 'text-warning-strong';
+  return 'text-destructive-strong';
 }

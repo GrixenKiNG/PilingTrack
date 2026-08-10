@@ -70,14 +70,14 @@ export interface CrewAssignment {
 export type MaintenanceCrewView = EquipmentCrewSummary | CrewAssignment;
 
 export const statusView = (record: WorkOrderRow) => {
-  if (isOverdue(record)) return { label: 'Просрочено', className: 'bg-red-50 text-red-700 border-red-200' };
-  if (record.status === 'DONE') return { label: 'Готова', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+  if (isOverdue(record)) return { label: 'Просрочено', className: 'bg-destructive/10 text-destructive-strong border-destructive/30' };
+  if (record.status === 'DONE') return { label: 'Готова', className: 'bg-success/10 text-success-strong border-success/30' };
   if (record.status === 'ON_HOLD' || REPAIR_TYPES.has(record.type)) {
-    return { label: 'В ремонте', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+    return { label: 'В ремонте', className: 'bg-info/10 text-info-strong border-info/30' };
   }
-  if (record.status === 'IN_PROGRESS') return { label: 'В работе', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+  if (record.status === 'IN_PROGRESS') return { label: 'В работе', className: 'bg-info/10 text-info-strong border-info/30' };
   if (record.status === 'CANCELLED') return { label: STATUS_LABEL[record.status], className: STATUS_STYLE[record.status] };
-  return { label: 'Требует ТО', className: 'bg-orange-50 text-orange-700 border-orange-200' };
+  return { label: 'Требует ТО', className: 'bg-warning/10 text-warning-strong border-warning/30' };
 };
 
 export const crewForRecord = (

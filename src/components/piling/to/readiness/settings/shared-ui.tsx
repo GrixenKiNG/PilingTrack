@@ -25,7 +25,13 @@ export function ScreenTitle({
   return (
     <div className="flex min-h-[58px] flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between sm:py-0">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">{heading}</h1>
+        {/*
+          h2, а не h1: единственный h1 страницы ставит сам модуль — скрытый
+          заголовок «Техническая готовность — <раздел>» в readiness-reference-ui.
+          Пока здесь стоял h1, на шести вкладках из семи было по два h1, и
+          страница объявляла скринридеру два разных названия.
+        */}
+        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">{heading}</h2>
         {subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}
       </div>
       {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}

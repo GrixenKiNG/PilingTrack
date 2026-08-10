@@ -83,8 +83,12 @@ export function OverviewHero({
   const kind = ((eq.kind as EquipmentKindDTO) || 'OTHER');
   return (
     <div
-      className="relative min-h-44 overflow-hidden rounded-lg border border-border bg-slate-900 bg-cover bg-center p-4 text-white"
-      style={{ backgroundImage: "linear-gradient(90deg, rgba(15,23,42,.92), rgba(15,23,42,.48), rgba(15,23,42,.14)), url('/login-bg/bg-3.png')" }}
+      className="relative min-h-44 overflow-hidden rounded-lg border border-border bg-foreground bg-cover bg-center p-4 text-white"
+      // Затемнение задано rgba, а не токеном: это градиент поверх фонового
+      // снимка, и цвет нужен с альфой. Значения — тот же --foreground (#101010),
+      // а не сырой slate-900. Хвост уплотнён с .14 до .45: справа в шапке тоже
+      // стоит белый текст, и на светлом участке снимка он проваливался.
+      style={{ backgroundImage: "linear-gradient(90deg, rgba(16,16,16,.92), rgba(16,16,16,.70), rgba(16,16,16,.45)), url('/login-bg/bg-3.png')" }}
     >
       <div className="relative z-10 flex h-full min-h-36 flex-col justify-between">
         <div>

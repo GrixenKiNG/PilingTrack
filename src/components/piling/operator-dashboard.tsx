@@ -200,7 +200,7 @@ export function OperatorDashboard() {
         <section className="rounded-xl border border-border bg-card p-3">
           <div className="mb-1 flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Последние отчёты</h2>
-            <button type="button" onClick={() => router.push('/history')} className="text-xs font-medium text-info-strong">История</button>
+            <button type="button" onClick={() => router.push('/history')} className="hit-target text-xs font-medium text-info-strong">История</button>
           </div>
           <ul className="divide-y divide-border">
             {reports.slice(0, 3).map((report) => (

@@ -86,7 +86,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
   const assignedIds = new Set(assignedUsers.map((a) => a.userId));
 
   return (
-    <DialogContent>
+    <DialogContent aria-describedby={undefined}>
       <DialogHeader>
         <DialogTitle>Операторы на объекте</DialogTitle>
       </DialogHeader>

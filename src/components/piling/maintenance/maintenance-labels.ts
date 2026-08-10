@@ -19,10 +19,10 @@ export const STATUS_LABEL: Record<MaintenanceStatus, string> = {
 };
 export const STATUS_STYLE: Record<MaintenanceStatus, string> = {
   PLANNED: 'bg-muted text-muted-foreground',
-  ASSIGNED: 'bg-sky-100 text-sky-700',
-  IN_PROGRESS: 'bg-amber-100 text-amber-700',
-  ON_HOLD: 'bg-orange-100 text-orange-700',
-  DONE: 'bg-emerald-100 text-emerald-700',
+  ASSIGNED: 'bg-info/10 text-info-strong',
+  IN_PROGRESS: 'bg-warning/10 text-warning-strong',
+  ON_HOLD: 'bg-warning/10 text-warning-strong',
+  DONE: 'bg-success/10 text-success-strong',
   CANCELLED: 'bg-muted text-muted-foreground line-through',
 };
 export const PRIORITY_LABEL: Record<MaintenancePriority, string> = {
@@ -31,19 +31,19 @@ export const PRIORITY_LABEL: Record<MaintenancePriority, string> = {
 export const PRIORITY_STYLE: Record<MaintenancePriority, string> = {
   LOW: 'bg-muted text-muted-foreground',
   NORMAL: 'bg-muted text-muted-foreground',
-  HIGH: 'bg-amber-100 text-amber-700',
-  CRITICAL: 'bg-rose-100 text-rose-700',
+  HIGH: 'bg-warning/10 text-warning-strong',
+  CRITICAL: 'bg-destructive/10 text-destructive-strong',
 };
 
 export const TYPE_STYLE: Record<MaintenanceType, string> = {
   EO: 'bg-muted text-muted-foreground',
-  TO1: 'bg-blue-100 text-blue-700',
-  TO2: 'bg-blue-100 text-blue-700',
-  TO3: 'bg-indigo-100 text-indigo-700',
-  SEASONAL: 'bg-cyan-100 text-cyan-700',
-  REPAIR: 'bg-rose-100 text-rose-700',
-  FAULT: 'bg-amber-100 text-amber-700',
-  SCHEDULED: 'bg-blue-100 text-blue-700',
+  TO1: 'bg-info/10 text-info-strong',
+  TO2: 'bg-info/10 text-info-strong',
+  TO3: 'bg-info/10 text-info-strong',
+  SEASONAL: 'bg-info/10 text-info-strong',
+  REPAIR: 'bg-destructive/10 text-destructive-strong',
+  FAULT: 'bg-warning/10 text-warning-strong',
+  SCHEDULED: 'bg-info/10 text-info-strong',
   INSPECTION: 'bg-muted text-muted-foreground',
 };
 

@@ -211,7 +211,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? 'Редактировать документ' : 'Новый документ'}</DialogTitle>
           </DialogHeader>

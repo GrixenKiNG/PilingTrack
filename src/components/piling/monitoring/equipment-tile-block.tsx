@@ -82,10 +82,10 @@ function PhotoBlock({ card }: { card: FleetCard }) {
         ? { label: 'В работе', classes: 'bg-success/10 text-success-strong' }
         : card.status === 'expected'
           ? { label: 'Ждём отчёт', classes: 'bg-warning/10 text-warning-strong' }
-          : { label: 'Нет отчёта', classes: 'bg-slate-200 text-foreground' };
+          : { label: 'Нет отчёта', classes: 'bg-muted text-foreground' };
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: brand?.tint ?? '#cbd5e1' }}>
+    <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: brand?.tint ?? 'var(--foreground)' }}>
       {photo && (
         <>
           {/* Обычный img, а не next/image: фото из Media приходит presigned-ссылкой
@@ -101,7 +101,9 @@ function PhotoBlock({ card }: { card: FleetCard }) {
           {status.label}
         </span>
         <h3 className="mt-1 line-clamp-1 text-base font-bold leading-tight drop-shadow">{card.name}</h3>
-        <p className="line-clamp-1 text-2xs font-medium text-white/85">
+        {/* Без прозрачности: второстепенность даём весом, иначе белый на светлом
+            участке градиента уходит ниже нормы (правило системы). */}
+        <p className="line-clamp-1 text-2xs font-normal text-white">
           {card.model}{card.model && KIND_LABEL[card.kind] !== '—' ? ` · ${KIND_LABEL[card.kind]}` : ''}
         </p>
       </div>

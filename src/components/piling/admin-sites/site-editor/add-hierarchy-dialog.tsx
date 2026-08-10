@@ -49,7 +49,7 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Добавить {TYPE_LABELS[type]}</DialogTitle>
         </DialogHeader>

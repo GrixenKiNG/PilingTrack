@@ -67,10 +67,11 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#3b82f6' },
-    { media: '(prefers-color-scheme: dark)', color: '#1e293b' },
-  ],
+  // Бренд-оранжевый `--signal` (oklch(0.55 0.18 48)) в hex — им красится строка
+  // браузера и системная обвязка PWA на телефоне оператора. Раньше стоял синий
+  // #3b82f6, не принадлежащий палитре продукта, плюс отдельный цвет для тёмной
+  // схемы, которой у продукта нет с 2026-08-09. Один цвет на все схемы.
+  themeColor: '#c04300',
   // Cover the iPhone notch / Dynamic Island when installed as a PWA.
   viewportFit: 'cover',
 };

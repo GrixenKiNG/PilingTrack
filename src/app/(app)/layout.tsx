@@ -99,17 +99,24 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={user?.id}
-          initial={pageVariants.initial}
-          animate={pageVariants.animate}
-          exit={pageVariants.exit}
-          transition={{ duration: 0.2 }}
-        >
-          {children}
-        </motion.div>
-      </AnimatePresence>
+      {/*
+        main — как в админской оболочке. У операторской его не было вовсе:
+        на главном экране основного пользователя продукта скринридеру не за что
+        было зацепиться, чтобы перескочить шапку и нижнюю навигацию.
+      */}
+      <main>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={user?.id}
+            initial={pageVariants.initial}
+            animate={pageVariants.animate}
+            exit={pageVariants.exit}
+            transition={{ duration: 0.2 }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </main>
 
       {nav}
     </div>
