@@ -66,6 +66,18 @@ function normalizeProjectionEvent(event: unknown): ReportDomainEvent | null {
 }
 
 export function getProjectionDate(event: ReportDomainEvent, fallbackDate?: string | null): string | null {
+  // Рабочая дата смены важнее момента отправки. occurredAt — это когда отчёт
+  // сохранили; операторы сплошь и рядом сдают смену задним числом (а админ
+  // заводит неделю разом), и при прежнем порядке вся статистика уезжала в
+  // день отправки: 49 отчётов за 03–10.08 легли бы одним днём. Тот же разбор
+  // уже сделан для projectOperatorPerformance — там дату тоже берут из отчёта.
+  const eventDate = typeof event.data?.date === 'string' ? event.data.date : null;
+  if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    return eventDate;
+  }
+
+  if (fallbackDate) return fallbackDate;
+
   if (event.occurredAt) {
     const occurredAt = new Date(event.occurredAt);
     if (!Number.isNaN(occurredAt.getTime())) {
@@ -73,12 +85,51 @@ export function getProjectionDate(event: ReportDomainEvent, fallbackDate?: strin
     }
   }
 
+  return null;
+}
+
+/**
+ * Достроить конверт события маршрутными полями из самой записи отчёта.
+ *
+ * Транзакционный outbox кладёт в payload только `event.data`, а siteId/userId/
+ * tenantId живут в колонках и при восстановлении события теряются. Все
+ * проекции ниже начинаются с `if (!siteId || !userId) return`, поэтому молча
+ * не писали ничего — а событие всё равно помечалось projected=true, так что и
+ * ретрая не было: ReportStats, OperatorPerformance, DowntimeSummary и
+ * SiteWeeklyTrend наполнялись только ручным rebuild'ом. Тот же дефект уже
+ * чинили в handleReportForDailySummary (services/reports/event-handlers.ts) —
+ * здесь его пропустили.
+ *
+ * `aggregateId` — это Report.reportId (бизнес-ключ), а не первичный `id`.
+ * Для REPORT_DELETED строки уже нет: возвращаем событие как есть, и проекции
+ * отрабатывают прежний ранний выход.
+ */
+async function enrichReportEvent(
+  event: ReportDomainEvent
+): Promise<{ event: ReportDomainEvent; reportDate: string | null }> {
   const eventDate = typeof event.data?.date === 'string' ? event.data.date : null;
-  if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-    return eventDate;
+  if (event.siteId && event.userId && eventDate) {
+    return { event, reportDate: eventDate };
   }
 
-  return fallbackDate || null;
+  const report = await db.report.findUnique({
+    where: { reportId: event.aggregateId },
+    select: { siteId: true, userId: true, tenantId: true, date: true },
+  });
+  if (!report) return { event, reportDate: eventDate };
+
+  return {
+    event: {
+      ...event,
+      siteId: event.siteId ?? report.siteId,
+      userId: event.userId ?? report.userId,
+      tenantId: event.tenantId ?? report.tenantId ?? undefined,
+      // Дата смены кладётся в data, чтобы getProjectionDate нашла её сама и
+      // сигнатуры обработчиков не менялись.
+      data: eventDate ? event.data : { ...event.data, date: report.date },
+    },
+    reportDate: eventDate ?? report.date,
+  };
 }
 
 async function projectEvent(event: ReportDomainEvent) {
@@ -93,20 +144,22 @@ async function projectEvent(event: ReportDomainEvent) {
     return;
   }
 
+  const { event: enrichedEvent, reportDate } = await enrichReportEvent(normalizedEvent);
+
   try {
     await Promise.all([
-      projectReportStats(normalizedEvent),
-      projectOperatorPerformance(normalizedEvent),
-      projectDowntimeSummary(normalizedEvent),
+      projectReportStats(enrichedEvent),
+      projectOperatorPerformance(enrichedEvent),
+      projectDowntimeSummary(enrichedEvent),
     ]);
 
     if (
-      normalizedEvent.type.startsWith('Report') ||
-      normalizedEvent.type.startsWith('Pile') ||
-      normalizedEvent.type.startsWith('Drilling')
+      enrichedEvent.type.startsWith('Report') ||
+      enrichedEvent.type.startsWith('Pile') ||
+      enrichedEvent.type.startsWith('Drilling')
     ) {
-      if (normalizedEvent.siteId) {
-        await projectWeeklyTrend(normalizedEvent.siteId);
+      if (enrichedEvent.siteId) {
+        await projectWeeklyTrend(enrichedEvent.siteId, reportDate);
       }
     }
   } catch (error) {

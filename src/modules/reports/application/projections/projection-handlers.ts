@@ -266,13 +266,23 @@ export async function projectDowntimeSummary(event: ReportDomainEvent) {
   });
 }
 
-export async function projectWeeklyTrend(siteId: string) {
-  const now = new Date();
-  const dayOfWeek = now.getDay() || 7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - dayOfWeek + 1);
+/**
+ * @param refDate дата смены (YYYY-MM-DD), неделя которой пересчитывается.
+ *   Без неё берётся текущая неделя — так ходит только часовой пересчёт по
+ *   всем объектам. Событийный путь обязан передавать дату отчёта: раньше
+ *   неделя всегда считалась от `new Date()`, поэтому отчёт за прошлую неделю
+ *   обновлял тренд текущей, а своя неделя так и оставалась без строки.
+ */
+export async function projectWeeklyTrend(siteId: string, refDate?: string | null) {
+  const reference = refDate && /^\d{4}-\d{2}-\d{2}$/.test(refDate)
+    ? new Date(`${refDate}T00:00:00Z`)
+    : new Date();
+  // UTC-арифметика: у локальной дата смены на границе суток съезжает на день.
+  const dayOfWeek = reference.getUTCDay() || 7;
+  const monday = new Date(reference);
+  monday.setUTCDate(reference.getUTCDate() - dayOfWeek + 1);
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
 
   const weekStart = monday.toISOString().split('T')[0];
   const weekEnd = sunday.toISOString().split('T')[0];
