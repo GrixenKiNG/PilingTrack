@@ -1,6 +1,6 @@
 import type {Prisma} from '@/generated/postgres-client/client';
 import {recordChainedReadinessAudit} from '@/core/infrastructure/audit-log-service';
-import {resolveReadinessCapabilities} from '../capabilities';
+import {effectiveReadinessCapabilities} from '../capabilities';
 import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from '../command-pipeline/idempotency';
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
 import {resolveExpectedVersion, formatStrongEtag} from '../command-pipeline/etag';
@@ -37,9 +37,7 @@ export const serializePermit = (row: PermitRow) => ({
 });
 
 function assertPermitEditor(context: PermitCommandContext): void {
-  const direct = resolveReadinessCapabilities(context.actorRole).has('readiness.permit.edit');
-  const adminAsMechanic = context.actorRole === 'ADMIN' && context.actingAs === 'MECHANIC';
-  if (!direct && !adminAsMechanic) {
+  if (!effectiveReadinessCapabilities(context.actorRole, context.actingAs).has('readiness.permit.edit')) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права редактировать наряд-допуск');
   }
 }

@@ -1,6 +1,6 @@
 import type {Prisma} from '@/generated/postgres-client/client';
 import {recordChainedReadinessAudit} from '@/core/infrastructure/audit-log-service';
-import {resolveReadinessCapabilities} from '../capabilities';
+import {effectiveReadinessCapabilities} from '../capabilities';
 import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from '../command-pipeline/idempotency';
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
 import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag';
@@ -38,10 +38,9 @@ export const serializeShift = (row: ShiftRow) => ({...row,
   updatedAt: row.updatedAt.toISOString(), handovers: row.handovers.map(serializeHandover)});
 
 function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.manage' | 'readiness.handover.prepare' | 'readiness.handover.decide') {
-  const direct = resolveReadinessCapabilities(context.actorRole).has(ability);
-  const adminAsMechanic = ability === 'readiness.handover.prepare'
-    && context.actorRole === 'ADMIN' && context.actingAs === 'MECHANIC';
-  if (!direct && !adminAsMechanic) throw new ReadinessCommandError('VALIDATION_ERROR', 403, `Недостаточно прав: ${ability}`);
+  if (!effectiveReadinessCapabilities(context.actorRole, context.actingAs).has(ability)) {
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, `Недостаточно прав: ${ability}`);
+  }
 }
 
 async function runCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; method: 'POST' | 'PATCH';
@@ -68,13 +67,24 @@ async function effects(input: {tx: ReadinessTransaction; context: ShiftCommandCo
       actingAs: input.context.actingAs}, requestId: input.context.requestId,
     correlationId: input.context.correlationId, idempotencyKey: input.key,
     before: input.before, after: input.after});
-  await input.tx.outboxEvent.create({data: {type: 'ReadinessSnapshotRequested', tenantId: input.context.tenantId,
-    aggregateId: input.entityId, aggregateType: input.entityType,
-    dedupeKey: `readiness.snapshot:${input.context.tenantId}:${input.equipmentId}:${input.entityType.toUpperCase()}_${input.action.toUpperCase()}:${input.entityId}:v${input.entityVersion}`,
-    payload: {triggerType: `${input.entityType.toUpperCase()}_${input.action.toUpperCase()}`,
-      triggerId: `${input.entityId}:v${input.entityVersion}:${input.action}`, equipmentId: input.equipmentId,
-      shiftId: input.shiftId ?? (input.entityType === 'Shift' ? input.entityId : undefined),
-      triggerOccurredAt: input.triggerOccurredAt.toISOString()} as Prisma.InputJsonValue}});
+  // createMany со skipDuplicates, а не create: дубль dedupeKey означает
+  // «снимок по этому же триггеру уже заказан» — ровно то, ради чего ключ и
+  // заведён, и это не ошибка. Перехватить P2002 в try/catch нельзя: в
+  // Postgres упавший запрос отменяет всю транзакцию, и следующая команда
+  // всё равно упала бы. ON CONFLICT DO NOTHING оставляет транзакцию живой.
+  //
+  // Заблокированный запуск — единственное действие, которое не меняет версию
+  // смены, поэтому повторная попытка запустить ту же заблокированную смену
+  // давала тот же ключ. Раньше это всплывало наружу сырой ошибкой Prisma с
+  // путём к файлу сервера вместо «запуск запрещён правилами готовности».
+  await input.tx.outboxEvent.createMany({skipDuplicates: true,
+    data: [{type: 'ReadinessSnapshotRequested', tenantId: input.context.tenantId,
+      aggregateId: input.entityId, aggregateType: input.entityType,
+      dedupeKey: `readiness.snapshot:${input.context.tenantId}:${input.equipmentId}:${input.entityType.toUpperCase()}_${input.action.toUpperCase()}:${input.entityId}:v${input.entityVersion}`,
+      payload: {triggerType: `${input.entityType.toUpperCase()}_${input.action.toUpperCase()}`,
+        triggerId: `${input.entityId}:v${input.entityVersion}:${input.action}`, equipmentId: input.equipmentId,
+        shiftId: input.shiftId ?? (input.entityType === 'Shift' ? input.entityId : undefined),
+        triggerOccurredAt: input.triggerOccurredAt.toISOString()} as Prisma.InputJsonValue}]});
 }
 
 export function createShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; key: string | null;
@@ -144,7 +154,7 @@ export function startShiftCommand(input: {tx: ReadinessTransaction; context: Shi
         await effects({tx: input.tx, context: input.context, key, action: 'start-blocked', entityType: 'Shift',
           entityId: beforeRow.id, entityVersion: beforeRow.version, equipmentId: beforeRow.equipmentId,
           triggerOccurredAt: now, before: serializeShift(beforeRow), after: {shift: serializeShift(beforeRow), decision}});
-        return {status: 422, body: asAuditJson({error: {code: 'SHIFT_START_BLOCKED', message: 'Shift start is blocked by published readiness rules',
+        return {status: 422, body: asAuditJson({error: {code: 'SHIFT_START_BLOCKED', message: 'Запуск смены запрещён действующими правилами готовности',
           details: {blockers: decision.blockers, warnings: decision.warnings, snapshotId: decision.snapshotId}}})};
       }
       const row = await repo.start(input.context.tenantId, input.id, expected, input.context.actorId, now);
@@ -218,14 +228,26 @@ export function submitHandoverCommand(input: {tx: ReadinessTransaction; context:
     aggregateId: input.shiftId, key: input.key, body: input.payload, expectedVersion: expected, execute: async (key) => {
       const shifts = new ShiftRepository(input.tx); const handovers = new HandoverRepository(input.tx);
       const before = await shifts.get(input.context.tenantId, input.shiftId); assertShiftTransition(before.state, 'handover');
-      const now = input.now ?? new Date(); const handover = await handovers.createSubmitted({tenantId: input.context.tenantId,
-        shiftId: input.shiftId, summary: validateHandoverSummary(input.payload.summary),
-        evidence: (input.payload.evidence ?? {}) as Prisma.InputJsonValue, actorId: input.context.actorId, now});
+      const now = input.now ?? new Date();
+      const summary = validateHandoverSummary(input.payload.summary);
+      const evidence = (input.payload.evidence ?? {}) as Prisma.InputJsonValue;
+      // Возвращённую на доработку передачу переоформляем той же записью:
+      // состояние REWORK_REQUIRED домен считает пригодным для повторной
+      // передачи, а второй живой строки по смене индекс не разрешает.
+      const live = await handovers.findLive(input.context.tenantId, input.shiftId);
+      const reworked = live?.state === 'REWORK_REQUIRED' ? live : null;
+      if (reworked) assertHandoverTransition(reworked.state, 'submit');
+      const handover = reworked
+        ? await handovers.resubmit({tenantId: input.context.tenantId, id: reworked.id,
+          version: reworked.version, summary, evidence, actorId: input.context.actorId, now})
+        : await handovers.createSubmitted({tenantId: input.context.tenantId,
+          shiftId: input.shiftId, summary, evidence, actorId: input.context.actorId, now});
       const shift = await shifts.markHandoverPending(input.context.tenantId, input.shiftId, expected);
       const after = serializeHandover(handover); await effects({tx: input.tx, context: input.context, key,
-        action: 'submitted', entityType: 'ShiftHandover', entityId: handover.id, entityVersion: handover.version,
+        action: reworked ? 'resubmitted' : 'submitted', entityType: 'ShiftHandover', entityId: handover.id,
+        entityVersion: handover.version,
         equipmentId: shift.equipmentId, shiftId: shift.id, triggerOccurredAt: handover.submittedAt ?? now,
-        before: null, after});
+        before: reworked ? serializeHandover(reworked) : null, after});
       return {status: 201, body: {data: after, shift: serializeShift(shift)},
         headers: {ETag: formatStrongEtag('handover', handover.id, handover.version), Location: `/api/readiness/handovers/${handover.id}`}};
     }});

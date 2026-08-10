@@ -401,16 +401,34 @@ export function ToModule() {
   }, [bootstrap?.actor.role, details, equipmentId, journalLoaded]);
 
   const readinessByEquipment = useMemo(() => {
-    const entries = equipment.map((item) => [
-      item.id,
-      deriveEquipmentReadiness(
+    // Балл и вердикт берём из авторитетного снимка, а не из производной оценки
+    // по журналу. Журнал грузится только для выбранной установки, поэтому
+    // остальные показывались как «Нет данных · —/100», хотя снимок по ним есть,
+    // и парк выглядел неготовым при готовом парке. Подсказки, доказательства и
+    // следующее действие остаются от производной модели: их снимок не хранит.
+    const authoritative = new Map(currentReadiness.map((item) => [item.equipmentId, item]));
+    const entries = equipment.map((item) => {
+      const derived = deriveEquipmentReadiness(
         item,
         journals[item.id] ?? [],
         journalLoaded[item.id] === true,
-      ),
-    ] as const);
+      );
+      const snapshot = authoritative.get(item.id);
+      if (!snapshot) return [item.id, derived] as const;
+      // Подсказку «следующее действие» без загруженного журнала не показываем:
+      // она вывелась бы из пустого списка и предлагала бы начать осмотр там,
+      // где осмотр уже сделан. Карточка подставит нейтральное «Проверить данные».
+      const loaded = journalLoaded[item.id] === true;
+      return [item.id, {
+        ...derived,
+        score: snapshot.score,
+        status: snapshot.status === 'BLOCKED' ? 'BLOCKED' : 'READY',
+        canOperate: snapshot.status === 'READY',
+        ...(loaded ? {} : {reason: '', nextAction: '', nextActionHref: '', evidence: []}),
+      } satisfies EquipmentReadiness] as const;
+    });
     return Object.fromEntries(entries) as Record<string, EquipmentReadiness>;
-  }, [equipment, journalLoaded, journals]);
+  }, [currentReadiness, equipment, journalLoaded, journals]);
 
   const factsByEquipment = useMemo(() => Object.fromEntries(
     equipment.map((item) => [

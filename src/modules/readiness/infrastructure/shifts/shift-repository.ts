@@ -62,7 +62,7 @@ export class ShiftRepository {
       version: input.expectedVersion, state: 'PLANNED'}, data: {type: input.type,
       plannedStartAt: input.plannedStartAt, plannedEndAt: input.plannedEndAt,
       lastEditedById: input.actorId, version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift update conflict', await this.safeCurrent(input.tenantId, input.id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(input.tenantId, input.id));
     return this.get(input.tenantId, input.id);
   }
 
@@ -83,7 +83,7 @@ export class ShiftRepository {
       if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(tenantId, id));
       return this.get(tenantId, id);
     } catch (error) {
-      if ((error as {code?: string}).code === 'P2002') throw conflict('Equipment already has an active shift');
+      if ((error as {code?: string}).code === 'P2002') throw conflict('По этой установке уже открыта смена');
       throw error;
     }
   }
@@ -108,21 +108,21 @@ export class ShiftRepository {
   async markHandoverPending(tenantId: string, id: string, version: number): Promise<ShiftRow> {
     const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'STARTED'},
       data: {state: 'HANDOVER_PENDING', version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift handover conflict', await this.safeCurrent(tenantId, id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(tenantId, id));
     return this.get(tenantId, id);
   }
 
   async close(tenantId: string, id: string, version: number, actorId: string, now: Date): Promise<ShiftRow> {
     const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'HANDOVER_PENDING'},
       data: {state: 'CLOSED', closedAt: now, closedById: actorId, version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift close conflict', await this.safeCurrent(tenantId, id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(tenantId, id));
     return this.get(tenantId, id);
   }
 
   async reopen(tenantId: string, id: string, version: number): Promise<ShiftRow> {
     const changed = await this.tx.shift.updateMany({where: {tenantId, id, version, state: 'HANDOVER_PENDING'},
       data: {state: 'STARTED', version: {increment: 1}}});
-    if (changed.count !== 1) throw conflict('Shift rework conflict', await this.safeCurrent(tenantId, id));
+    if (changed.count !== 1) throw conflict('Смена изменилась. Обновите страницу и повторите действие', await this.safeCurrent(tenantId, id));
     return this.get(tenantId, id);
   }
 

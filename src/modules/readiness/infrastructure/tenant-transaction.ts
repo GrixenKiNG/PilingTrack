@@ -49,13 +49,34 @@ export const withReadinessWorkerTransaction = withReadinessTenantTransaction;
 
 const SERIALIZABLE_ATTEMPTS = 3;
 
+/** 40001 — сериализационный конфликт, 40P01 — взаимная блокировка. */
+const RETRYABLE_PG_CODES = new Set(['40001', '40P01']);
+
+/**
+ * Код Postgres из ошибки Prisma, где бы он ни лежал.
+ *
+ * Драйверный адаптер (PrismaPg) не поднимает код наверх: сериализационный сбой
+ * приходит как P2010 «Raw query failed», а настоящий 40001 спрятан в
+ * meta.driverAdapterError.cause.originalCode. Пока разбирали только code и
+ * meta.code, такая ошибка не считалась конфликтом: транзакция не повторялась,
+ * а наружу вместо 409 «Одновременное изменение» уходил сырой P2010. Ловилось
+ * это как «плавающее» падение теста на 20 параллельных запусках.
+ */
+function postgresErrorCode(error: unknown): string | null {
+  const candidate = error as {
+    code?: string;
+    meta?: {code?: string; driverAdapterError?: {cause?: {originalCode?: string}}};
+  };
+  return candidate.meta?.driverAdapterError?.cause?.originalCode
+    ?? candidate.meta?.code
+    ?? candidate.code
+    ?? null;
+}
+
 function isSerializableConflict(error: unknown): boolean {
-  const candidate = error as {code?: string; meta?: {code?: string}};
-  return candidate.code === 'P2034'
-    || candidate.code === '40001'
-    || candidate.code === '40P01'
-    || candidate.meta?.code === '40001'
-    || candidate.meta?.code === '40P01';
+  if ((error as {code?: string}).code === 'P2034') return true;
+  const code = postgresErrorCode(error);
+  return code !== null && RETRYABLE_PG_CODES.has(code);
 }
 
 export async function runReadinessSerializableTransaction<T>(

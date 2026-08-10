@@ -154,8 +154,40 @@ export async function completeInspection(id: string, ctx: { tenantId: string; si
     );
   }
   const healthScore = computeHealthScore(items, answers);
-  return db.inspection.update({
-    where: { id },
-    data: { status: 'COMPLETED', healthScore, signedByName: ctx.signedByName, signedAt: new Date() },
+  const now = new Date();
+  return db.$transaction(async (tx) => {
+    const inspection = await tx.inspection.update({
+      where: { id },
+      data: { status: 'COMPLETED', healthScore, signedByName: ctx.signedByName, signedAt: now },
+    });
+    // Запись ТО заводится вместе с осмотром и закрывается вместе с ним. Без
+    // этого каждый сменный осмотр навсегда оставался «в работе»: журнал
+    // обслуживания копил мнимые незакрытые работы, а производная готовность
+    // считала машину требующей внимания сразу после успешного осмотра.
+    if (ins.maintenanceRecordId) {
+      await tx.maintenanceRecord.updateMany({
+        where: { id: ins.maintenanceRecordId, tenantId: ctx.tenantId, status: { not: 'DONE' } },
+        data: { status: 'DONE', completedAt: now, engineHoursAtService: ins.engineHours ?? undefined },
+      });
+    }
+    // Осмотр — четверть балла готовности и условие запуска смены, поэтому его
+    // завершение обязано пересчитать снимок. Раньше снимок заказывали только
+    // наряды, дефекты и смены, и центр готовности показывал вчерашнюю оценку
+    // до тех пор, пока не случится что-то ещё.
+    // skipDuplicates: повторное завершение того же осмотра не должно ронять
+    // транзакцию на уникальном dedupeKey — снимок по нему уже заказан.
+    await tx.outboxEvent.createMany({
+      skipDuplicates: true,
+      data: [{
+        type: 'ReadinessSnapshotRequested', aggregateId: id, aggregateType: 'Inspection',
+        tenantId: ctx.tenantId,
+        dedupeKey: `readiness.snapshot:${ctx.tenantId}:${ins.equipmentId}:INSPECTION_COMPLETED:${id}`,
+        payload: {
+          triggerType: 'INSPECTION_COMPLETED', triggerId: `${id}:completed`,
+          equipmentId: ins.equipmentId, inspectionId: id, triggerOccurredAt: now.toISOString(),
+        } as Prisma.InputJsonValue,
+      }],
+    });
+    return inspection;
   });
 }

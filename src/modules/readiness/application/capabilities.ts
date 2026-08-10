@@ -54,6 +54,10 @@ const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
   ASSISTANT: ['readiness.defect.report'],
   MECHANIC: [
     'readiness.read',
+    // Механик возвращает технику после ремонта — это та же передача смены,
+    // что готовит оператор. Раньше право было зашито в команду отдельной
+    // проверкой «администратор за механика» и в матрице не значилось.
+    'readiness.handover.prepare',
     'readiness.permit.edit',
     'readiness.inspection.manage',
     'readiness.defect.report',
@@ -111,6 +115,26 @@ export function resolveReadinessCapabilities(role: string): ReadonlySet<Readines
     return new Set();
   }
   return new Set(ROLE_ABILITIES[role]);
+}
+
+/**
+ * Права, которыми команда реально располагает: свои плюс права исполняемой роли.
+ *
+ * Тот же расчёт, что отдаётся экрану в bootstrap, только без записи в журнал —
+ * замещение уже подписано при входе в раздел. Раньше команды сверялись лишь с
+ * собственной ролью и отдельно допускали зашитый случай «администратор за
+ * механика»: экран показывал инженеру ОТ доступное действие, а сервер отвечал
+ * отказом. Одна функция на оба конца убирает расхождение.
+ */
+export function effectiveReadinessCapabilities(
+  actorRole: string,
+  actingAs: string | null | undefined
+): ReadonlySet<ReadinessAbility> {
+  const own = resolveReadinessCapabilities(actorRole);
+  if (!actingAs) return own;
+  // Замещать роль может только администратор — то же правило, что в canActAs.
+  if (actorRole !== 'ADMIN' || !isReadinessRole(actingAs)) return own;
+  return new Set([...own, ...ROLE_ABILITIES[actingAs]]);
 }
 
 export async function resolveAuditedReadinessCapabilities(

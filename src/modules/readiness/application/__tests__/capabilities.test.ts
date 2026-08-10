@@ -5,14 +5,18 @@ import {
 } from '../capabilities';
 
 describe('readiness capabilities', () => {
-  it('grants mechanics only inspection, defect, meter and maintenance execution', () => {
+  // Механик выполняет работы и возвращает технику, но смену не планирует и
+  // решение по передаче не принимает. Право на подготовку передачи раньше было
+  // зашито прямо в команду проверкой «администратор за механика» — в матрице
+  // его не было, и экран о нём не знал.
+  it('grants mechanics execution plus handover preparation, but no shift planning', () => {
     const abilities = resolveReadinessCapabilities('MECHANIC');
     expect(abilities).toContain('readiness.inspection.manage');
     expect(abilities).toContain('readiness.defect.manage');
     expect(abilities).toContain('readiness.meter.manage');
     expect(abilities).toContain('readiness.maintenance.manage');
+    expect(abilities).toContain('readiness.handover.prepare');
     expect(abilities).not.toContain('readiness.shift.manage');
-    expect(abilities).not.toContain('readiness.handover.prepare');
     expect(abilities).not.toContain('readiness.handover.decide');
     expect(abilities).toContain('readiness.permit.edit');
     expect(abilities).not.toContain('readiness.permit.approve_admin');

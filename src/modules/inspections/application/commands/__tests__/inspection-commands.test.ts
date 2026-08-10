@@ -3,17 +3,20 @@ const m = vi.hoisted(() => ({
   tplFindUnique: vi.fn(), tplFindMany: vi.fn(), eqFindUnique: vi.fn(),
   insCreate: vi.fn(), insFindUnique: vi.fn(), insUpdate: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
-  recCreate: vi.fn(),
+  recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const client = {
     checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },
     equipment: { findUnique: m.eqFindUnique },
     inspection: { create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
-    maintenanceRecord: { create: m.recCreate },
-  },
-}));
+    maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
+    outboxEvent: { createMany: m.outboxCreate },
+    $transaction: (run: (tx: unknown) => unknown) => run(client),
+  };
+  return { db: client };
+});
 import { startInspection, startToInspection, saveAnswers, completeInspection } from '../inspection-commands';
 
 beforeEach(() => Object.values(m).forEach((fn) => fn.mockReset()));
