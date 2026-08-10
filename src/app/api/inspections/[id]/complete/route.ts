@@ -15,14 +15,15 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'maintenance.manage');
+    assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const { id } = await params;
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
     try {
-      const inspection = await completeInspection(id, { tenantId, signedByName: parsed.data.signedByName });
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      const inspection = await completeInspection(id, { tenantId, signedByName: parsed.data.signedByName, performerId: user!.role === 'OPERATOR' ? user!.id : null });
       return NextResponse.json({ inspection });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

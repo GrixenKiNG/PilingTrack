@@ -30,14 +30,16 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'maintenance.manage');
+    assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const equipmentId = request.nextUrl.searchParams.get('equipmentId') ?? undefined;
     const level = request.nextUrl.searchParams.get('level') ?? undefined;
-    // maintenance.manage (ADMIN/DISPATCHER only, see authorization-service.ts)
-    // already excludes OPERATOR above, so there's no operator to self-scope by.
-    const inspections = await listInspections(tenantId, { equipmentId, level }, null);
+    // Оператор видит только свои осмотры: право проводить осмотр не даёт
+    // права смотреть чужие. Офис (админ, диспетчер, инженер ОТ) видит все.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const selfScopeId = user!.role === 'OPERATOR' ? user!.id : null;
+    const inspections = await listInspections(tenantId, { equipmentId, level }, selfScopeId);
     return NextResponse.json({ inspections });
   },
   { domain: 'inspections' }
@@ -48,7 +50,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'maintenance.manage');
+    assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });

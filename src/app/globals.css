@@ -307,22 +307,13 @@
   z-index: 10;
 }
 
-/* KPI tiles: a calm solid colour that occasionally cross-fades to the next
-   brand colour. Each colour is held for most of its slot, then transitions
-   smoothly — no constant gradient shimmer. */
-/* Акцентная плитка сводки парка.
-   Была `kpi-animated`: фон гонялся по кругу через #f97316 → #6366f1 →
-   #0ea5e9 → #10b981 за 48 секунд. Белый текст поверх давал контраст от
-   2.10 до 3.46 в зависимости от фазы — подпись то читалась, то нет, и
-   заметить это на скриншоте было невозможно. Ни один из четырёх цветов не
-   был токеном, а DESIGN.md прямо называл цветовую анимацию KPI
-   несистемным паттерном. Убрано 2026-08-09 по решению владельца:
-   один бренд-цвет из палитры, белый на нём держит 5.15 постоянно. */
-.kpi-accent {
-  background-color: var(--signal);
-  color: #fff;
-  border-color: transparent;
-}
+/* Класс `.kpi-accent` (сплошная заливка бренд-оранжевым под белый текст) удалён
+   2026-08-10. История: сначала это была `kpi-animated` — фон гонялся по кругу
+   через четыре цвета за 48 секунд, и белый текст поверх давал контраст от 2.10
+   до 3.46 в зависимости от фазы. Анимацию убрали, осталась ровная оранжевая
+   плашка. Она проходила по контрасту, но оставалась единственным тёмным блоком
+   в приложении, где все KPI — светлые плитки. Сводка парка переведена на общий
+   `KpiTile`; оранжевый остался акцентом на цифре, а не фоном. */
 
 /* Technical-readiness adaptation: the desktop information architecture stays
    intact, while field tablets and phones receive reliable touch targets and a

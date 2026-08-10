@@ -144,9 +144,6 @@ async function versionedAction(input: {
   reason?: string;
 }): Promise<CommandHttpResult> {
   if (input.action !== 'approve') assertPermitEditor(input.context);
-  if (input.action === 'approve' && input.context.actingAs) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'В режиме замещения согласовывать наряды нельзя');
-  }
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch,
     expectedVersion: input.expectedVersion, kind: 'work-permit', id: input.id});
   const body = input.action === 'revoke'
@@ -175,8 +172,14 @@ async function versionedAction(input: {
         const permit = toWorkPermitRecord(beforeRow);
         assertPermitTransition(permit.state, 'approve');
         if (beforeRow.validTo <= new Date()) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Просроченный наряд согласовать нельзя');
+        // Согласуем от имени исполняемой роли. Замещение при согласовании
+        // раньше запрещалось целиком, и администратор не мог подписать наряд
+        // обычного риска вовсе: для него требуется диспетчер. Разделение
+        // обязанностей держится не на запрете замещения, а на правиле
+        // «автор наряда не согласует его сам» внутри assertCanApprovePermit —
+        // оно остаётся, и подпись уходит в журнал вместе с actingAs.
         const role = assertCanApprovePermit({permit, actorId: input.context.actorId,
-          role: input.context.actorRole, approvals: permit.approvals});
+          role: input.context.actingAs ?? input.context.actorRole, approvals: permit.approvals});
         await repository.addApproval({tenantId: input.context.tenantId,
           permitId: input.id, permitVersion: expected, role,
           actorId: input.context.actorId});

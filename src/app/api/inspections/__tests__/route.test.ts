@@ -45,8 +45,18 @@ describe('GET /api/inspections', () => {
     listMock.mockReset();
   });
 
-  it('returns 403 for an OPERATOR', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'op', role: 'OPERATOR' }, error: null });
+  // Сменный осмотр — работа оператора, поэтому доступ у него есть. Но список
+  // сужен до его собственных записей: право проводить осмотр не даёт права
+  // читать чужие.
+  it('scopes the list to the operator who performed the inspections', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'op', role: 'OPERATOR', tenantId: 'orion' }, error: null });
+    listMock.mockResolvedValue([{ id: 'i1' }]);
+    expect((await GET(get())).status).toBe(200);
+    expect(listMock).toHaveBeenCalledWith('orion', { equipmentId: undefined, level: undefined }, 'op');
+  });
+
+  it('returns 403 for an ASSISTANT', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'as', role: 'ASSISTANT' }, error: null });
     expect((await GET(get())).status).toBe(403);
     expect(listMock).not.toHaveBeenCalled();
   });
@@ -69,8 +79,14 @@ describe('POST /api/inspections', () => {
     startToMock.mockReset();
   });
 
-  it('returns 403 for an OPERATOR', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'op', role: 'OPERATOR' }, error: null });
+  it('lets an OPERATOR start their shift inspection', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'op', role: 'OPERATOR', tenantId: 'orion' }, error: null });
+    startMock.mockResolvedValue({ id: 'insp-op' });
+    expect((await POST(post({ equipmentId: 'e1', templateId: 't1', inspectionDate: '2026-04-05' }))).status).toBe(201);
+  });
+
+  it('returns 403 for an ASSISTANT', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'as', role: 'ASSISTANT' }, error: null });
     expect((await POST(post({ equipmentId: 'e1', templateId: 't1', inspectionDate: '2026-04-05' }))).status).toBe(403);
   });
 

@@ -9,7 +9,7 @@ export { createEquipmentDocument, updateEquipmentDocument, deleteEquipmentDocume
 export type { EquipmentDocumentInput, EquipmentDocumentType } from './application/commands/equipment-document';
 export { createMaintenance, updateMaintenance, deleteMaintenance, acceptMaintenance } from './application/commands/equipment-maintenance';
 export type { MaintenanceInput, MaintenanceType, MaintenanceStatus, MaintenancePriority } from './application/commands/equipment-maintenance';
-export { addMeterReading, deleteMeterReading } from './application/commands/meter-reading';
+export { addMeterReading, deleteMeterReading, recordMeterReadingInTx } from './application/commands/meter-reading';
 export type { MeterReadingInput, MeterSource, AddMeterReadingResult } from './application/commands/meter-reading';
 export { createMaintenancePlan, updateMaintenancePlan, deleteMaintenancePlan } from './application/commands/maintenance-plan';
 export type { MaintenancePlanInput } from './application/commands/maintenance-plan';

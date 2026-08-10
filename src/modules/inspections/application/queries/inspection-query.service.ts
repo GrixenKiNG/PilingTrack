@@ -36,12 +36,20 @@ export async function listToJournal(tenantId: string, equipmentId: string) {
   });
 }
 
-export async function getInspection(id: string, tenantId: string) {
+/**
+ * @param performerId если задан — осмотр обязан принадлежать этому человеку.
+ * Так сужается доступ оператора: право проводить осмотр не даёт права читать
+ * и править чужие. Офис передаёт null и видит все.
+ */
+export async function getInspection(id: string, tenantId: string, performerId: string | null = null) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({
     where: { id },
     include: { answers: true, equipment: { select: { id: true, name: true, model: true } } },
   });
   if (!ins || ins.tenantId !== tenantId) throw new ServiceError('Inspection not found', 404);
+  // 404, а не 403: чужой осмотр для оператора не существует, и по коду ответа
+  // нельзя перебором узнать, какие идентификаторы заняты.
+  if (performerId && ins.performedById !== performerId) throw new ServiceError('Inspection not found', 404);
   return ins;
 }

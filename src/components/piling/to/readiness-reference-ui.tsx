@@ -45,7 +45,7 @@ import { IntegrationsSettings } from './readiness/settings/integrations-section'
 import { AuditSettings } from './readiness/settings/audit-section';
 import { auditActionLabel, auditEntityLabel } from './readiness/settings/audit-labels';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
-import { KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
+import { KpiTile, kpiGridStyle, type KpiTone } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
@@ -578,6 +578,7 @@ function RefKpi({
   value,
   detail,
   alert,
+  tone,
   onClick,
 }: {
   icon: PilingIconName;
@@ -585,9 +586,10 @@ function RefKpi({
   value: React.ReactNode;
   detail?: string;
   alert?: boolean;
+  tone?: KpiTone;
   onClick?: () => void;
 }) {
-  return <KpiTile icon={icon} label={label} value={value} detail={detail} alert={alert} onClick={onClick} />;
+  return <KpiTile icon={icon} label={label} value={value} detail={detail} alert={alert} tone={tone} onClick={onClick} />;
 }
 
 export function ReadinessReferenceUi(props: ReferenceUiProps) {
@@ -1026,10 +1028,10 @@ function FleetScreen(props: ReferenceUiProps) {
         )}
       />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="equipment-rig" label="Всего" value={props.equipment.length} onClick={() => setStatusFilter('all')} />
-        <RefKpi icon="accepted" label="Готово" value={ready} onClick={() => setStatusFilter('ready')} />
-        <RefKpi icon="risk" label="Требует внимания" value={attention} alert={attention > 0} onClick={() => setStatusFilter('attention')} />
-        <RefKpi icon="defect" label="Недоступно" value={blocked} alert={blocked > 0} onClick={() => setStatusFilter('blocked')} />
+        <RefKpi icon="equipment-rig" label="Всего" tone="neutral" value={props.equipment.length} onClick={() => setStatusFilter('all')} />
+        <RefKpi icon="accepted" label="Готово" tone="success" value={ready} onClick={() => setStatusFilter('ready')} />
+        <RefKpi icon="risk" label="Требует внимания" tone="warning" value={attention} alert={attention > 0} onClick={() => setStatusFilter('attention')} />
+        <RefKpi icon="defect" label="Недоступно" tone="danger" value={blocked} alert={blocked > 0} onClick={() => setStatusFilter('blocked')} />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
         <aside className={cn(card, 'p-3')}>
@@ -1302,10 +1304,10 @@ function ShiftsScreen(props: ReferenceUiProps) {
       />
       <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-card px-2 py-1">Дневная 08:00–20:00</span><span className="rounded border border-border bg-card px-2 py-1">Ночная 20:00–08:00</span><span className="rounded border border-border bg-card px-2 py-1">Часовой пояс: {timezone}</span></div>
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="shift-start" label="Смен сегодня" value={todayShifts.length} />
-        <RefKpi icon="technical-readiness" label="Готовы к запуску" value={ready.length} />
-        <RefKpi icon="operator" label="Ждут приёмки" value={waiting.length} alert={waiting.length > 0} />
-        <RefKpi icon="defect" label="Заблокированы" value={blocked.length} alert={blocked.length > 0} />
+        <RefKpi icon="shift-start" label="Смен сегодня" tone="info" value={todayShifts.length} />
+        <RefKpi icon="technical-readiness" label="В работе" tone="success" value={ready.length} />
+        <RefKpi icon="operator" label="Ждут приёмки" tone="warning" value={waiting.length} alert={waiting.length > 0} />
+        <RefKpi icon="defect" label="Отменены" tone="danger" value={blocked.length} alert={blocked.length > 0} />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-x-auto p-3')}>
@@ -1486,7 +1488,10 @@ function PermitsScreen(props: ReferenceUiProps) {
         'content-type': 'application/json',
         'idempotency-key': crypto.randomUUID(),
         'if-match': `"work-permit-${permit.id}-v${permit.version}"`,
-        ...(action !== 'approve' && props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
+        // Замещение передаём и при согласовании: администратор подписывает
+        // наряд обычного риска именно как диспетчер. Правило «автор не
+        // согласует свой наряд» остаётся на сервере.
+        ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
       },
       body: JSON.stringify(action === 'revoke'
         ? { expectedVersion: permit.version, reason: commandText.trim() }
@@ -1503,10 +1508,10 @@ function PermitsScreen(props: ReferenceUiProps) {
     <>
       <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => void downloadReadinessExport('permits', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button><Button type="button" disabled={!props.selectedId || !props.bootstrap?.capabilities.entities.permit.edit} onClick={() => void createPermit()} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="documents" label="Всего нарядов" value={props.permits.length} />
-        <RefKpi icon="accepted" label="Действуют" value={active} />
-        <RefKpi icon="history" label="На согласовании" value={pending} alert={pending > 0} />
-        <RefKpi icon="defect" label="Заблокированы" value={blocked} alert={blocked > 0} />
+        <RefKpi icon="documents" label="Всего нарядов" tone="info" value={props.permits.length} />
+        <RefKpi icon="accepted" label="Действуют" tone="success" value={active} />
+        <RefKpi icon="history" label="На согласовании" tone="warning" value={pending} alert={pending > 0} />
+        <RefKpi icon="defect" label="Заблокированы" tone="danger" value={blocked} alert={blocked > 0} />
       </section>
       <section className={cn(card, 'mt-2 p-3')}>
         <div className="flex items-center gap-2"><CheckCircle2 className="h-6 w-6 text-success-strong" /><h2 className="font-bold">Условия допуска подтверждены для {active} из {props.permits.length} нарядов</h2></div>
@@ -1611,10 +1616,10 @@ function MaintenanceScreen(props: ReferenceUiProps) {
     <>
       <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance">+ Создать заявку</Link></Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="defect" label="Критические дефекты" value={critical.length} alert={critical.length > 0} />
-        <RefKpi icon="work-order" label="Работы сегодня" value={open.length} />
-        <RefKpi icon="maintenance-due" label="Ближайшие ТО" value={planned.length} />
-        <RefKpi icon="technical-readiness" label="Готовность сервиса" value={`${Math.max(0, servicePercent)}%`} />
+        <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={critical.length} alert={critical.length > 0} />
+        <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={open.length} />
+        <RefKpi icon="maintenance-due" label="Ближайшие ТО" tone="info" value={planned.length} />
+        <RefKpi icon="technical-readiness" label="Готовность сервиса" tone="success" value={`${Math.max(0, servicePercent)}%`} />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'p-3')}>
@@ -1741,11 +1746,11 @@ function ReportsScreen(props: ReferenceUiProps) {
     <>
       <ScreenTitle heading="Отчёты" subtitle="Аналитика доказательной готовности" actions={<div className="flex flex-wrap gap-2"><span className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs">▣ Текущий срез · {formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone)}</span><Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
-        <RefKpi icon="technical-readiness" label="Готовность парка" value={`${readinessPercent}%`} detail="текущий срез" />
-        <RefKpi icon="shift-start" label="Смен допущено" value={ready} detail="по текущим доказательствам" />
-        <RefKpi icon="defect" label="Заблокировано" value={blocked} alert={blocked > 0} />
+        <RefKpi icon="technical-readiness" label="Готовность парка" tone="success" value={`${readinessPercent}%`} detail="текущий срез" />
+        <RefKpi icon="shift-start" label="Смен допущено" tone="info" value={ready} detail="по текущим доказательствам" />
+        <RefKpi icon="defect" label="Заблокировано" tone="danger" value={blocked} alert={blocked > 0} />
         <RefKpi icon="history" label="Среднее решение" value="—" detail="нет истории решений" />
-        <RefKpi icon="documents" label="Доказательств" value={completed} detail="снимки и решения audit-chain" />
+        <RefKpi icon="documents" label="Доказательств" tone="info" value={completed} detail="снимки и решения audit-chain" />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
         <section className={cn(card, 'p-3')}>

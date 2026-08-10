@@ -24,6 +24,8 @@ export type Ability =
   | 'users.manage'
   | 'equipment.manage'
   | 'maintenance.manage'
+  | 'inspection.perform'
+  | 'meter.record'
   | 'crews.read'
   | 'crews.manage'
   | 'crews.legacy_manage'
@@ -53,7 +55,18 @@ const abilityRoles: Record<Ability, Role[]> = {
   'equipment.manage': ['ADMIN'],
   // Инженер ОТ ведёт осмотры и наряды-допуски — они живут в контуре
   // обслуживания. Мастеру запись сюда не нужна: он смотрит и распределяет.
+  // Право охватывает заявки, ремонты и планы ТО — то, что решает офис.
   'maintenance.manage': ['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER'],
+  // Сменный осмотр — работа оператора, а не офиса: именно он обходит машину
+  // перед сменой, и именно его сегодняшний осмотр открывает смену. Раньше
+  // осмотры сидели под maintenance.manage, и оператор получал 403 на дело,
+  // которое модуль сам ему предписывает. Отдельное право не даёт ему при
+  // этом закрывать ремонтные заявки. Свои осмотры оператор видит только свои —
+  // сужение в маршрутах, см. api/inspections.
+  'inspection.perform': ['ADMIN', 'DISPATCHER', 'OPERATOR', 'SAFETY_ENGINEER'],
+  // Снятие моточасов — тоже работа сменщика. Отдельно от maintenance.manage
+  // по той же причине: показания фиксирует тот, кто стоит у машины.
+  'meter.record': ['ADMIN', 'DISPATCHER', 'OPERATOR', 'SAFETY_ENGINEER'],
   'crews.read': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'crews.manage': ['ADMIN', 'DISPATCHER'],
   'crews.legacy_manage': ['ADMIN'],

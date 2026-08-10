@@ -52,7 +52,27 @@ export async function assertCanAccessMediaEntity(
     return;
   }
 
-  throw new ServiceError(`Operators cannot manage media for entity type ${entityType}`, 403);
+  // Фото к пункту осмотра. entityId — составной `${inspectionId}__${itemId}`.
+  //
+  // Оператор проводит сменный осмотр (право `inspection.perform`), а часть
+  // пунктов чек-листа не завершить без снимка. Без этой ветки осмотр для него
+  // упирался в тупик: ответы сохранялись, а завершение отвечало «без
+  // обязательного фото». Доступ сужен до своего осмотра — тем же правилом,
+  // что и сам осмотр.
+  if (entityType === 'inspection') {
+    const inspectionId = entityId.split('__')[0];
+    if (!inspectionId) throw new ServiceError('Forbidden', 403);
+    const { db } = await import('@/lib/db');
+    const inspection = await db.inspection.findUnique({
+      where: { id: inspectionId },
+      select: { performedById: true },
+    });
+    if (!inspection) throw new ServiceError('Forbidden', 403);
+    if (inspection.performedById !== actor.id) throw new ServiceError('Forbidden', 403);
+    return;
+  }
+
+  throw new ServiceError(`Загрузка файлов к «${entityType}» для вашей роли недоступна`, 403);
 }
 
 /**

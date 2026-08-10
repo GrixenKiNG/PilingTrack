@@ -67,9 +67,11 @@ describe('GET /api/readiness/bootstrap', () => {
     }, undefined, 'MECHANIC', expect.any(String));
   });
 
+  // DISPATCHER и OPERATOR стали исполняемыми ролями 2026-08-10, поэтому
+  // «неизвестной» ролью для этой проверки взят несуществующий код.
   it('rejects actingAs for non-admin and rejects unknown acting roles', async () => {
     expect((await GET(request('?actingAs=MECHANIC'))).status).toBe(403);
-    expect((await GET(request('?actingAs=DISPATCHER'))).status).toBe(400);
+    expect((await GET(request('?actingAs=WELDER'))).status).toBe(400);
     expect(mocks.withTransaction).not.toHaveBeenCalled();
   });
 

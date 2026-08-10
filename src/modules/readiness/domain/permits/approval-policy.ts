@@ -20,8 +20,19 @@ export function assertCanApprovePermit(input: {
   if (!role || !requiredApprovalRoles(input.permit.risk).includes(role)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'У вас нет полномочий согласовать этот наряд');
   }
-  if (input.actorId === input.permit.authorId || input.actorId === input.permit.lastEditedById) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Автор наряда не может согласовать его сам');
+  // «Второй глаз» требуется на работах повышенного риска — там наряд обязаны
+  // подписать двое разных людей (см. isApprovalComplete).
+  //
+  // На обычных работах запрет снят намеренно. В ОРИОНе наряды заводит
+  // администратор, замещая механика или инженера ОТ, и согласовать их, кроме
+  // него, было некому: у диспетчера нет права редактировать наряд, а у автора
+  // не было права подписать. Контур вставал целиком. Кто подписал и от чьего
+  // имени — видно в цепочке аудита, поэтому след не теряется.
+  if (
+    input.permit.risk !== 'NORMAL'
+    && (input.actorId === input.permit.authorId || input.actorId === input.permit.lastEditedById)
+  ) {
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Наряд повышенного риска согласует не его автор');
   }
   const current = input.approvals.filter((item) =>
     item.valid && item.permitVersion === input.permit.version);

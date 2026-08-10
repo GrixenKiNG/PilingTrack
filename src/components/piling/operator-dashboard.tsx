@@ -10,20 +10,22 @@ import { getTodayInTimezone } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
+import { MeterReadingDialog } from '@/components/piling/operator/meter-reading-dialog';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
 
 /**
- * Быстрые переходы по разделам сменного отчёта.
+ * Быстрые переходы смены.
  *
- * Подписи обязаны совпадать с тем, куда ведут. Прежние «Осмотр» и «Дефект»
- * открывали шапку отчёта и блок простоев: осмотр оператору вообще недоступен
- * (право maintenance.manage есть только у диспетчера и администратора), а
- * дефект — это не простой. Пока для оператора нет своих экранов осмотра и
- * дефекта, кнопки называются по факту.
+ * Подписи обязаны совпадать с тем, куда ведут. «Моточасы» с 2026-08-10 больше
+ * не прыгают в середину сменного отчёта: показание счётчика нужно контуру
+ * готовности до начала работ, поэтому у него своё окно (`action: 'meter'`).
+ * Остальные кнопки по-прежнему открывают нужный раздел отчёта.
  */
-const OPERATOR_ACTIONS: { label: string; icon: PilingIconName; target: string }[] = [
+const OPERATOR_ACTIONS: {
+  label: string; icon: PilingIconName; target: string; action?: 'meter';
+}[] = [
   { label: 'Смена', icon: 'shift-start', target: 'inspection' },
-  { label: 'Моточасы', icon: 'engine-hours', target: 'engine-hours' },
+  { label: 'Моточасы', icon: 'engine-hours', target: 'engine-hours', action: 'meter' },
   { label: 'Простой', icon: 'downtime', target: 'defect' },
   { label: 'Фото', icon: 'camera', target: 'photo' },
   { label: 'Отправить', icon: 'send', target: 'submit' },
@@ -39,6 +41,9 @@ export function OperatorDashboard() {
   const [todayReport, setTodayReport] = useState<ReportListItemDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState('');
+  const [meterOpen, setMeterOpen] = useState(false);
+  // Установка берётся из экипажа: оператор не выбирает машину, он на ней стоит.
+  const [crew, setCrew] = useState<{ equipmentId: string; equipmentName: string } | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sync local date after hydration
@@ -49,10 +54,15 @@ export function OperatorDashboard() {
     if (!user) return;
     setLoading(true);
     try {
-      const [sitesRes, reportsRes] = await Promise.all([
+      const [sitesRes, reportsRes, crewRes] = await Promise.all([
         authFetch(`/api/sites?userId=${user.id}`),
         authFetch(`/api/reports/my?userId=${user.id}`),
+        authFetch('/api/crews/my'),
       ]);
+      if (crewRes.ok) {
+        const { crew: myCrew } = await crewRes.json();
+        setCrew(myCrew ? { equipmentId: myCrew.equipmentId, equipmentName: myCrew.equipmentName } : null);
+      }
       if (sitesRes.ok) {
         const sitesData = await sitesRes.json();
         const accessibleSites = sitesData.data || sitesData.sites || [];
@@ -142,8 +152,8 @@ export function OperatorDashboard() {
           <button
             key={action.label}
             type="button"
-            onClick={() => openReport(action.target)}
-            disabled={ctaDisabled}
+            onClick={() => (action.action === 'meter' ? setMeterOpen(true) : openReport(action.target))}
+            disabled={action.action === 'meter' ? false : ctaDisabled}
             className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-border bg-card p-3 shadow-sm transition hover:border-signal/30 hover:bg-signal/10/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
           >
             <PilingIcon name={action.icon} size={82} decorative />
@@ -210,6 +220,13 @@ export function OperatorDashboard() {
           </ul>
         </section>
       )}
+
+      <MeterReadingDialog
+        open={meterOpen}
+        onOpenChange={setMeterOpen}
+        equipmentId={crew?.equipmentId ?? null}
+        equipmentName={crew?.equipmentName ?? null}
+      />
     </div>
   );
 }

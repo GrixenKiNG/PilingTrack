@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
 import { formatHours, formatFixed, formatRelative, formatRuDate } from '@/lib/format';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
+import { KpiTile, KPI_GRID, kpiGridStyle } from '@/components/piling/kpi-tile';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentCard } from './equipment-card';
 import { EquipmentTileEditor } from './equipment-tile-editor';
@@ -286,48 +287,52 @@ const selectCls =
 
 // ----------------------------------------------------------------------------
 
+/**
+ * Сводка смены.
+ *
+ * Панель была сплошной заливкой бренд-оранжевым с белым текстом. На таком
+ * фоне цифры читались хуже, чем на белом, а главное — она выбивалась из
+ * приложения: везде KPI это светлые плитки `KpiTile`, и только здесь был
+ * тёмный блок. Теперь тот же светлый вид, а оранжевый остался акцентом —
+ * на главной цифре смены и на точке «требует внимания».
+ */
 function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
   return (
-    <div className="kpi-accent rounded-xl border p-4 sm:p-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-white">Сегодня · {formatRuDate(snap.today)}</div>
-          <div className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-            {snap.totals.activeToday} <span className="text-white">из {snap.totals.totalEquipment} в работе</span>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            Сегодня · {formatRuDate(snap.today)}
+          </div>
+          <div className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <span className="text-signal-strong">{snap.totals.activeToday}</span>
+            {' '}
+            <span className="text-muted-foreground">из {snap.totals.totalEquipment} в работе</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div aria-live="polite" className={cn(
-            'rounded-full bg-card/90 px-2.5 py-1 text-3xs uppercase tracking-wide',
-            conn === 'live' && 'text-success-strong',
-            conn === 'connecting' && 'text-warning-strong',
-            conn === 'offline' && 'text-destructive-strong',
+            'rounded-full border px-2.5 py-1 text-3xs uppercase tracking-wide',
+            conn === 'live' && 'border-success/30 bg-success/10 text-success-strong',
+            conn === 'connecting' && 'border-warning/30 bg-warning/10 text-warning-strong',
+            conn === 'offline' && 'border-destructive/30 bg-destructive/10 text-destructive-strong',
           )}>
             {conn === 'live' ? 'Данные онлайн' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
           </div>
-          <div className="text-3xs text-white">Данные обновлены {formatRelative(snap.asOf)}</div>
+          <div className="text-3xs text-muted-foreground">Данные обновлены {formatRelative(snap.asOf)}</div>
         </div>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-        <Metric label="Свай" value={snap.totals.pilesToday} />
-        <Metric label="Бурения, м" value={formatFixed(snap.totals.drillingToday, 1)} />
-        <Metric label="Простой" value={formatHours(snap.totals.downtimeHoursToday)} />
-        <Metric label="Ожидаются отчёты" value={snap.totals.expected} muted />
-        <Metric label="Бригад на смене" value={snap.totals.crewsOnShiftToday} muted />
-        <Metric label="Операторов на смене" value={snap.totals.operatorsOnShiftToday} muted />
-      </dl>
-    </div>
-  );
-}
-
-function Metric({ label, value, muted = false }: { label: string; value: string | number; muted?: boolean }) {
-  return (
-    <div>
-      <dt className="text-2xs uppercase tracking-wide text-white">{label}</dt>
-      {/* Второстепенность показываем весом, а не прозрачностью: text-white/80
-          на бренд-оранжевом давало 3.86 при 18px — ниже нормы. */}
-      <dd className={cn('mt-0.5 font-mono text-lg tabular-nums text-white', muted ? 'font-normal' : 'font-semibold')}>{value}</dd>
-    </div>
+      <div className={cn(KPI_GRID, 'mt-4')} style={kpiGridStyle(6)}>
+        <KpiTile icon="pile-driving" label="Свай" tone="info" value={snap.totals.pilesToday} />
+        <KpiTile icon="drilling-auger" label="Бурения, м" tone="info" value={formatFixed(snap.totals.drillingToday, 1)} />
+        <KpiTile icon="downtime" label="Простой" tone={snap.totals.downtimeHoursToday > 0 ? 'danger' : 'neutral'}
+          value={formatHours(snap.totals.downtimeHoursToday)} />
+        <KpiTile icon="reports" label="Ожидаются отчёты" tone={snap.totals.expected > 0 ? 'warning' : 'success'}
+          value={snap.totals.expected} alert={snap.totals.expected > 0} />
+        <KpiTile icon="crew" label="Бригад на смене" tone="neutral" value={snap.totals.crewsOnShiftToday} />
+        <KpiTile icon="operator" label="Операторов на смене" tone="neutral" value={snap.totals.operatorsOnShiftToday} />
+      </div>
+    </section>
   );
 }

@@ -70,16 +70,28 @@ describe('work permit state machine', () => {
     }], 1)).toBe(true);
   });
 
-  it('forbids author and last editor self-approval', () => {
-    const record = permit({authorId: 'author-1', lastEditedById: 'editor-1'});
+  // «Второй глаз» держится там, где он стоит своей цены — на повышенном риске.
+  // На обычных работах наряды заводит администратор, замещая механика или
+  // инженера ОТ, и подписать их было больше некому: у диспетчера нет права
+  // редактировать наряд. Контур вставал целиком, поэтому запрет сужен.
+  it('forbids author and last editor self-approval on elevated risk only', () => {
+    const elevated = permit({authorId: 'author-1', lastEditedById: 'editor-1', risk: 'ELEVATED'});
     for (const actorId of ['author-1', 'editor-1']) {
       expect(() => assertCanApprovePermit({
-        permit: record,
+        permit: elevated,
         actorId,
-        role: 'DISPATCHER',
+        role: 'ADMIN',
         approvals: [],
-      })).toThrow(/не может согласовать его сам/i);
+      })).toThrow(/согласует не его автор/i);
     }
+
+    const normal = permit({authorId: 'author-1', lastEditedById: 'author-1', risk: 'NORMAL'});
+    expect(assertCanApprovePermit({
+      permit: normal,
+      actorId: 'author-1',
+      role: 'DISPATCHER',
+      approvals: [],
+    })).toBe('DISPATCHER');
   });
 
   it('invalidates current approvals, resets state and increments version after substantive edit', () => {

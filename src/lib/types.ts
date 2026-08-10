@@ -37,7 +37,16 @@ export const ROLE_LABELS: Record<UserRole, string> = {
  * (`api/readiness/bootstrap`) сверяются с ним. Строковых сравнений
  * с 'MECHANIC' в коде быть не должно — так режим и разъезжался.
  */
-export const ACTING_ROLES = ['MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER'] as const;
+export const ACTING_ROLES = [
+  'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER',
+  // Диспетчер и оператор — живые роли, и обычно администратору замещать их не
+  // нужно. Но владелец должен уметь провести смену целиком в одиночку: ночью,
+  // в выходной, при болезни диспетчера. Без этих двух пунктов администратор не
+  // мог ни открыть смену, ни принять передачу — эти права есть только у них.
+  // Замещение подписывается в журнале, поэтому «кто на самом деле нажал»
+  // остаётся видно.
+  'DISPATCHER', 'OPERATOR',
+] as const;
 export type ActingRole = (typeof ACTING_ROLES)[number];
 
 /** Принимает `unknown`: используется и как валидатор ответа сервера. */

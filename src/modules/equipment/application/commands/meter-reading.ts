@@ -46,6 +46,52 @@ export interface AddMeterReadingResult {
   warning: string | null;
 }
 
+/**
+ * Ядро добавления показания: работает внутри уже открытой транзакции.
+ *
+ * Выделено, чтобы осмотр мог записать снятые моточасы той же механикой, что и
+ * ручной ввод, — с историей и синхронизацией кэша. Вкладывать `addMeterReading`
+ * в чужую транзакцию нельзя: Prisma не поддерживает вложенный `$transaction`.
+ */
+export async function recordMeterReadingInTx(
+  tx: typeof db,
+  equipmentId: string,
+  input: MeterReadingInput,
+  ctx: { tenantId: string; recordedById?: string | null },
+): Promise<AddMeterReadingResult> {
+  const recordedAt = toDate(input.recordedAt) ?? new Date();
+  const prev = await latestReading(tx, equipmentId);
+  const warning =
+    prev && input.engineHours < prev.engineHours
+      ? `Новое показание (${input.engineHours} м.ч.) меньше предыдущего (${prev.engineHours} м.ч.)`
+      : null;
+
+  const reading = await tx.meterReading.create({
+    data: {
+      tenantId: ctx.tenantId,
+      equipmentId,
+      engineHours: input.engineHours,
+      recordedAt,
+      source: input.source ?? 'MANUAL',
+      recordedById: ctx.recordedById ?? null,
+      note: input.note?.trim() ?? '',
+    },
+    select: { id: true, engineHours: true, recordedAt: true },
+  });
+
+  // Sync the engineHoursTotal cache to the latest reading (which may be this
+  // one, or an earlier one if this reading was backdated).
+  const latest = await latestReading(tx, equipmentId);
+  if (latest) {
+    await tx.equipment.update({
+      where: { id: equipmentId },
+      data: { engineHoursTotal: latest.engineHours },
+    });
+  }
+
+  return { reading, warning };
+}
+
 export async function addMeterReading(
   equipmentId: string,
   input: MeterReadingInput,
@@ -62,40 +108,7 @@ export async function addMeterReading(
   });
   if (!equipment) throw new ServiceError('Equipment not found', 404);
 
-  const recordedAt = toDate(input.recordedAt) ?? new Date();
-
-  return db.$transaction(async (tx) => {
-    const prev = await latestReading(tx as typeof db, equipmentId);
-    const warning =
-      prev && input.engineHours < prev.engineHours
-        ? `Новое показание (${input.engineHours} м.ч.) меньше предыдущего (${prev.engineHours} м.ч.)`
-        : null;
-
-    const reading = await tx.meterReading.create({
-      data: {
-        tenantId: ctx.tenantId,
-        equipmentId,
-        engineHours: input.engineHours,
-        recordedAt,
-        source: input.source ?? 'MANUAL',
-        recordedById: ctx.recordedById ?? null,
-        note: input.note?.trim() ?? '',
-      },
-      select: { id: true, engineHours: true, recordedAt: true },
-    });
-
-    // Sync the engineHoursTotal cache to the latest reading (which may be this
-    // one, or an earlier one if this reading was backdated).
-    const latest = await latestReading(tx as typeof db, equipmentId);
-    if (latest) {
-      await tx.equipment.update({
-        where: { id: equipmentId },
-        data: { engineHoursTotal: latest.engineHours },
-      });
-    }
-
-    return { reading, warning };
-  });
+  return db.$transaction((tx) => recordMeterReadingInTx(tx as typeof db, equipmentId, input, ctx));
 }
 
 export async function deleteMeterReading(

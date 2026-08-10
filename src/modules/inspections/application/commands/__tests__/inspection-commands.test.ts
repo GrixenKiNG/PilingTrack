@@ -98,7 +98,7 @@ describe('saveAnswers', () => {
   it('throws 409 when inspection already completed; does not write', async () => {
     m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'COMPLETED' });
     await expect(saveAnswers('ins1', [{ itemId: 'i1', result: 'YES' }], { tenantId: 'orion' }))
-      .rejects.toThrow(/already completed/i);
+      .rejects.toThrow(/уже завершён/i);
     expect(m.ansCreateMany).not.toHaveBeenCalled();
   });
   it('replaces answers and stamps tenantId + inspectionId on each', async () => {

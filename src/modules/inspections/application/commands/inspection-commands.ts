@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
+import { recordMeterReadingInTx } from '@/modules/equipment';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import {
   composeChecklist, selectBlocks, requiredBlockTypes, type CandidateBlock,
@@ -122,11 +123,20 @@ export async function startInspection(
 
 export interface AnswerInput { itemId: string; result: string; value?: string | null; note?: string | null; photoCount?: number }
 
-export async function saveAnswers(id: string, answers: AnswerInput[], ctx: { tenantId: string }) {
+export async function saveAnswers(
+  id: string,
+  answers: AnswerInput[],
+  ctx: { tenantId: string; performerId?: string | null },
+) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
-  const ins = await db.inspection.findUnique({ where: { id }, select: { id: true, tenantId: true, status: true } });
+  const ins = await db.inspection.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true, status: true, performedById: true },
+  });
   if (!ins || ins.tenantId !== ctx.tenantId) throw new ServiceError('Inspection not found', 404);
-  if (ins.status === 'COMPLETED') throw new ServiceError('Inspection already completed', 409);
+  // Оператор правит только свой осмотр (см. getInspection про 404).
+  if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Inspection not found', 404);
+  if (ins.status === 'COMPLETED') throw new ServiceError('Осмотр уже завершён', 409);
   await db.inspectionAnswer.deleteMany({ where: { inspectionId: id } });
   if (answers.length) {
     await db.inspectionAnswer.createMany({
@@ -139,10 +149,15 @@ export async function saveAnswers(id: string, answers: AnswerInput[], ctx: { ten
   return db.inspection.findUnique({ where: { id }, include: { answers: true } });
 }
 
-export async function completeInspection(id: string, ctx: { tenantId: string; signedByName: string }) {
+export async function completeInspection(
+  id: string,
+  ctx: { tenantId: string; signedByName: string; performerId?: string | null },
+) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({ where: { id }, include: { answers: true } });
   if (!ins || ins.tenantId !== ctx.tenantId) throw new ServiceError('Inspection not found', 404);
+  // Оператор завершает только свой осмотр (см. getInspection про 404).
+  if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Inspection not found', 404);
 
   const items = (ins.templateSnapshot as unknown as SnapItem[]) ?? [];
   const answers: AnswerLike[] = ins.answers.map((a) => ({ itemId: a.itemId, result: a.result, photoCount: a.photoCount }));
@@ -169,6 +184,20 @@ export async function completeInspection(id: string, ctx: { tenantId: string; si
         where: { id: ins.maintenanceRecordId, tenantId: ctx.tenantId, status: { not: 'DONE' } },
         data: { status: 'DONE', completedAt: now, engineHoursAtService: ins.engineHours ?? undefined },
       });
+    }
+    // Моточасы, снятые при осмотре, — это настоящее показание счётчика, и оно
+    // обязано попасть в журнал наработки. Раньше число оставалось внутри
+    // осмотра: в карточке установки и в критерии готовности «Моточасы»
+    // продолжала висеть прежняя цифра, хотя оператор только что снял новую.
+    // Пишем той же командой, что и ручной ввод, — с историей и синхронизацией
+    // Equipment.engineHoursTotal.
+    if (typeof ins.engineHours === 'number' && ins.engineHours >= 0) {
+      await recordMeterReadingInTx(tx as typeof db, ins.equipmentId, {
+        engineHours: ins.engineHours,
+        recordedAt: now,
+        source: 'MANUAL',
+        note: `Снято при осмотре ${ins.level}`,
+      }, { tenantId: ctx.tenantId, recordedById: ins.performedById });
     }
     // Осмотр — четверть балла готовности и условие запуска смены, поэтому его
     // завершение обязано пересчитать снимок. Раньше снимок заказывали только

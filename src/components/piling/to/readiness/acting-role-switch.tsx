@@ -1,7 +1,7 @@
 'use client';
 
 import { ForemanIcon, SafetyEngineerIcon } from '@/components/piling/icons';
-import { Wrench } from '@/components/piling/icons/unified-icons';
+import { Headset, Joystick, Wrench } from '@/components/piling/icons/unified-icons';
 import { ACTING_ROLES, ROLE_LABELS, type ActingRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -24,11 +24,13 @@ interface ActingRoleSwitchProps {
   disabled?: boolean;
 }
 
-/** Все три — контурные иконки одной грамматики, чтобы ряд читался как ряд. */
+/** Контурные иконки одной грамматики, чтобы ряд читался как ряд. */
 const ROLE_ICON: Record<ActingRole, (props: { className?: string }) => React.ReactElement> = {
   MECHANIC: (props) => <Wrench {...props} />,
   FOREMAN: (props) => <ForemanIcon {...props} />,
   SAFETY_ENGINEER: (props) => <SafetyEngineerIcon {...props} />,
+  DISPATCHER: (props) => <Headset {...props} />,
+  OPERATOR: (props) => <Joystick {...props} />,
 };
 
 export function ActingRoleSwitch({ actorRole, value, onChange, disabled = false }: ActingRoleSwitchProps) {

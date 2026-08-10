@@ -10,7 +10,7 @@ export const card = 'rounded-[14px] border border-border bg-card shadow-sm';
 
 export const COMPACT_KPI_GRID = cn(
   KPI_GRID,
-  '[&>*]:!min-h-[84px] [&>*]:!rounded-[10px] [&>*]:!p-3 max-sm:!grid-cols-1',
+  '[&>*]:!min-h-[76px] [&>*]:!rounded-[10px] [&>*]:!p-3 max-sm:!grid-cols-1',
 );
 
 export function ScreenTitle({
