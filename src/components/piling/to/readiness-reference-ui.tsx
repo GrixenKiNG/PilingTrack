@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
   BarChart3,
@@ -22,6 +23,7 @@ import {
   Link2,
   Lock,
   Search,
+  Send,
   Settings2,
   ShieldCheck,
   User,
@@ -56,7 +58,7 @@ import {
   type MaintenancePriority, type MaintenanceStatus, type MaintenanceType,
 } from '@/components/piling/maintenance/maintenance-labels';
 import { PERMIT_STATE_LABEL, SHIFT_STATE_LABEL } from './readiness/readiness-labels';
-import { buildHandoverJournal, handoverRoleLabel } from './readiness/handover-journal';
+import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind } from './readiness/handover-journal';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import {
   BLOCKER_ACTIONS,
@@ -78,6 +80,7 @@ import type { JournalRecord } from './to-stats';
 import type { EquipmentReadiness, ReadinessStatus } from './readiness-model';
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import type {
+  AuthoritativeReadinessFactsDto,
   CurrentReadinessDto,
   ReadinessAuditEnvelope,
   ReadinessBootstrap,
@@ -89,6 +92,7 @@ import { readinessFilterQuery, type ReadinessUrlFilters } from './readiness/api/
 import {
   buildAuthoritativeReadinessPresentation,
   buildUnavailableReadinessPresentation,
+  type AuthoritativeReadinessPresentation,
   type PresentationEvidence,
   type PresentationStage,
 } from './readiness/authoritative-presentation';
@@ -725,6 +729,142 @@ function StageLink({target, label, onViewChange, children}: {
     : <button type="button" onClick={() => target.view && onViewChange(target.view)} className={shared} aria-label={`${label}: открыть`}>{children}</button>;
 }
 
+/**
+ * Состояние шага читается пилюлей справа, а не из текста значения — так строка
+ * чек-листа сканируется одним взглядом, как в утверждённом макете.
+ */
+const STAGE_PILL: Record<PresentationStage['state'], { label: string; cls: string }> = {
+  pass: { label: 'Выполнено', cls: 'bg-success/10 text-success-strong' },
+  warning: { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' },
+  fail: { label: 'Не выполнено', cls: 'bg-destructive/10 text-destructive-strong' },
+  unknown: { label: 'Ожидает', cls: 'bg-muted text-muted-foreground' },
+};
+
+/** Подпись кнопки «следующее действие» — по конкретному незакрытому шагу. */
+const STAGE_CTA: Record<PresentationStage['key'], string> = {
+  INSPECTION: 'Перейти к осмотру',
+  ENGINE_HOURS: 'Внести моточасы',
+  PERMIT: 'Открыть наряд-допуск',
+  MAINTENANCE: 'Открыть обслуживание',
+  ACCEPTANCE: 'Открыть приёмку',
+};
+
+/** Иконка события журнала передачи. Кружок в ленте вместо безымянной точки. */
+const HANDOVER_ICON: Record<HandoverEventKind, typeof Send> = {
+  SUBMITTED: Send,
+  REWORKED: AlertCircle,
+  ACCEPTED: CheckCircle2,
+};
+
+const HANDOVER_PILL: Record<HandoverEventKind, { label: string; cls: string }> = {
+  SUBMITTED: { label: 'Передано', cls: 'border-signal/40 text-signal-strong' },
+  REWORKED: { label: 'На доработке', cls: 'border-warning/40 text-warning-strong' },
+  ACCEPTED: { label: 'Принято', cls: 'border-border text-muted-foreground' },
+};
+
+interface ReadinessMetricTile {
+  key: string;
+  label: string;
+  icon: typeof FileText;
+  pill: { label: string; cls: string };
+  rows: Array<{ caption: string; value: string }>;
+  href?: string;
+  view?: ReferenceView;
+}
+
+/**
+ * Плитки доказательств: показатель, а не идентификатор.
+ *
+ * Раньше здесь печатались ссылки на сущности («Установка», «Расчёт выполнен»)
+ * и до семи строк «Заявка N» подряд — по ним нельзя было понять состояние, не
+ * открыв каждую. Метрики берутся из фактов авторитетного снимка; сами
+ * идентификаторы никуда не делись — они под «Смотреть всё».
+ */
+function buildReadinessMetricTiles(
+  facts: AuthoritativeReadinessFactsDto | null,
+  presentation: AuthoritativeReadinessPresentation,
+  equipmentId: string,
+  engineHoursTotal: number | null | undefined,
+  detail: EquipmentDetailSnapshot | undefined,
+  inspectionId: string | null,
+): ReadinessMetricTile[] {
+  const inspectionStage = presentation.stages.find((stage) => stage.key === 'INSPECTION');
+  const maintenanceStage = presentation.stages.find((stage) => stage.key === 'MAINTENANCE');
+  const nextAtHours = detail?.equipment?.nextMaintenanceAtHours;
+  const hoursLeft = nextAtHours != null && engineHoursTotal != null
+    ? Math.round(nextAtHours - engineHoursTotal)
+    : null;
+  const nextDate = detail?.equipment?.nextMaintenanceDate;
+  const daysLeft = nextDate
+    ? Math.ceil((new Date(nextDate).getTime() - Date.now()) / 86_400_000)
+    : null;
+
+  return [
+    {
+      key: 'inspection',
+      label: 'Чек-лист осмотра',
+      icon: FileText,
+      pill: STAGE_PILL[inspectionStage?.state ?? 'unknown'],
+      rows: [{
+        caption: 'Выполнено пунктов',
+        value: facts ? `${Math.round(facts.inspectionProgress * 100)}%` : '—',
+      }],
+      href: inspectionId ? `/inspections/${inspectionId}` : '/inspections',
+    },
+    {
+      key: 'meter',
+      label: 'Моточасы',
+      icon: Gauge,
+      pill: facts?.meterKnown
+        ? { label: 'Выполнено', cls: 'bg-success/10 text-success-strong' }
+        : { label: 'Нет показаний', cls: 'bg-muted text-muted-foreground' },
+      rows: [{
+        caption: 'Текущие моточасы',
+        value: engineHoursTotal != null ? `${engineHoursTotal.toLocaleString('ru-RU')} м/ч` : '—',
+      }],
+      href: `/admin/equipment/${equipmentId}`,
+    },
+    {
+      key: 'findings',
+      label: 'Замечания и дефекты',
+      icon: AlertTriangle,
+      pill: presentation.blockers.length > 0
+        ? { label: 'Есть', cls: 'bg-destructive/10 text-destructive-strong' }
+        : presentation.warnings.length > 0
+          ? { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' }
+          : { label: 'Нет', cls: 'bg-success/10 text-success-strong' },
+      rows: [
+        { caption: 'Критические', value: String(presentation.blockers.length) },
+        { caption: 'Обычные', value: String(facts?.findings ?? presentation.warnings.length) },
+      ],
+      view: 'maintenance',
+    },
+    {
+      key: 'maintenance',
+      label: 'Обслуживание',
+      icon: Wrench,
+      pill: maintenanceStage?.state === 'pass'
+        ? { label: 'Актуально', cls: 'bg-success/10 text-success-strong' }
+        : { label: 'Требует внимания', cls: 'bg-warning/10 text-warning-strong' },
+      rows: [
+        {
+          caption: 'Ближайшее ТО',
+          value: hoursLeft != null
+            ? hoursLeft > 0 ? `через ${hoursLeft.toLocaleString('ru-RU')} м/ч` : `перепробег ${Math.abs(hoursLeft).toLocaleString('ru-RU')} м/ч`
+            : 'регламент не задан',
+        },
+        {
+          caption: 'Плановое ТО',
+          value: daysLeft != null
+            ? daysLeft > 0 ? `через ${daysLeft} дн.` : `просрочено на ${Math.abs(daysLeft)} дн.`
+            : 'дата не задана',
+        },
+      ],
+      view: 'maintenance',
+    },
+  ];
+}
+
 function ReadinessCentre(props: ReferenceUiProps) {
   const selected = props.equipment.find((item) => item.id === props.selectedId) ?? props.equipment[0];
   if (!selected) {
@@ -766,6 +906,26 @@ function ReadinessCentre(props: ReferenceUiProps) {
   };
   const blockers = presentation.blockers.length;
   const warnings = presentation.warnings.length;
+  const facts = authoritativeCurrent?.facts ?? null;
+  const doneStages = presentation.stages.filter((stage) => stage.state === 'pass').length;
+  const stageProgress = Math.round((doneStages / presentation.stages.length) * 100);
+  /**
+   * Первый незакрытый шаг задаёт и подпись, и адрес кнопки «следующее
+   * действие». Раньше кнопка при любом состоянии вела на /admin/to — то есть
+   * на страницу, где пользователь уже стоит.
+   */
+  const nextStage = presentation.stages.find((stage) => stage.state !== 'pass') ?? null;
+  const nextTarget = nextStage ? stageTargets[nextStage.key] : null;
+  const metricTiles = buildReadinessMetricTiles(
+    facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionEvidenceId,
+  );
+  const recommendation = blockers > 0
+    ? 'Рекомендация: устранить критические замечания для допуска к работе.'
+    : warnings > 0
+      ? 'Рекомендация: закрыть замечания до начала смены.'
+      : presentation.status === 'READY'
+        ? 'Рекомендация: установка допущена к работе.'
+        : 'Рекомендация: выполнить авторитетную оценку готовности.';
 
   return (
     <div>
@@ -792,26 +952,63 @@ function ReadinessCentre(props: ReferenceUiProps) {
         </div>
         <div className="border-b border-border p-4">
           <div className="text-2xs text-muted-foreground">Статус готовности</div>
-          <div className="mt-2">
-            <span className={cn(
-              'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold',
-              presentation.status === 'READY' && 'bg-success/10 text-success-strong',
-              presentation.status === 'BLOCKED' && 'bg-destructive/10 text-destructive-strong',
-              presentation.status === 'UNCONFIRMED' && 'bg-signal/10 text-signal-strong',
-            )}>
-              {presentation.status === 'READY' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-              {presentation.status === 'READY' ? 'Готово' : presentation.status === 'BLOCKED' ? 'Заблокировано' : 'Не подтверждено'}
-            </span>
+          {/*
+            Статус — плашка, а не мелкий чип: это первое, что должен увидеть
+            диспетчер, и рядом обязан стоять балл, иначе «Требует внимания»
+            ничем не отличается от «Заблокировано».
+          */}
+          <div className={cn(
+            'mt-2 flex items-start gap-2.5 rounded-lg border p-3',
+            presentation.status === 'READY' && 'border-success/30 bg-success/10',
+            presentation.status === 'BLOCKED' && 'border-destructive/30 bg-destructive/10',
+            presentation.status === 'UNCONFIRMED' && 'border-warning/30 bg-warning/10',
+          )}>
+            {presentation.status === 'READY'
+              ? <CheckCircle2 className="h-5 w-5 shrink-0 text-success-strong" />
+              : <AlertTriangle className={cn('h-5 w-5 shrink-0', presentation.status === 'BLOCKED' ? 'text-destructive-strong' : 'text-warning-strong')} />}
+            <div className="min-w-0">
+              <div className="text-sm font-bold">
+                {presentation.status === 'READY' ? 'Готово' : presentation.status === 'BLOCKED' ? 'Заблокировано' : 'Требует внимания'}
+              </div>
+              <div className="mt-0.5 text-2xs text-muted-foreground">
+                {presentation.score != null
+                  ? `Готовность подтверждена на ${presentation.score}%`
+                  : 'Авторитетной оценки ещё нет'}
+              </div>
+            </div>
           </div>
           <div className="mt-3 rounded-lg border border-signal bg-signal/10 p-3">
-            <div className="text-2xs text-muted-foreground">Следующее действие</div>
-            <div className="mt-2 font-bold">{presentation.nextAction}</div>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{props.authoritativeReadinessError ?? presentation.description}</p>
-            <Button asChild className="mt-3 h-10 w-full bg-signal-strong hover:bg-signal-strong">
-              <Link href="/admin/to">
-                Перейти к действию <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-2xs text-muted-foreground">Следующее действие</div>
+                <div className="mt-2 font-bold">{presentation.nextAction}</div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{props.authoritativeReadinessError ?? presentation.description}</p>
+              </div>
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-signal-strong text-white">
+                <ClipboardCheck className="h-7 w-7" />
+              </span>
+            </div>
+            {nextStage && nextTarget ? (
+              nextTarget.href ? (
+                <Button asChild className="mt-3 h-10 w-full bg-signal-strong hover:bg-signal-strong">
+                  <Link href={nextTarget.href}>
+                    {STAGE_CTA[nextStage.key]} <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="mt-3 h-10 w-full bg-signal-strong hover:bg-signal-strong"
+                  onClick={() => nextTarget.view && props.onViewChange(nextTarget.view)}
+                >
+                  {STAGE_CTA[nextStage.key]} <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )
+            ) : (
+              <p className="mt-3 rounded-md bg-success/10 px-3 py-2 text-xs font-semibold text-success-strong">
+                Все шаги контура закрыты
+              </p>
+            )}
           </div>
         </div>
         <div className="p-4">
@@ -831,6 +1028,9 @@ function ReadinessCentre(props: ReferenceUiProps) {
                       {stage.value}
                     </div>
                   </div>
+                  <span className={cn('shrink-0 rounded px-2 py-1 text-2xs font-semibold', STAGE_PILL[stage.state].cls)}>
+                    {STAGE_PILL[stage.state].label}
+                  </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </>
               );
@@ -839,6 +1039,29 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 ? <Link key={stage.key} href={target.href} className={shared} aria-label={`${stage.label}: открыть`}>{body}</Link>
                 : <button key={stage.key} type="button" onClick={() => target.view && props.onViewChange(target.view)} className={shared} aria-label={`${stage.label}: открыть`}>{body}</button>;
             })}
+          </div>
+          {/*
+            Сколько контура пройдено — одной полосой. До этого пять пилюль
+            приходилось пересчитывать глазами, чтобы понять, далеко ли до смены.
+          */}
+          <div className="mt-4">
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuenow={stageProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Готовность чек-листа смены"
+            >
+              <div
+                className={cn('h-full rounded-full', stageProgress === 100 ? 'bg-success-strong' : 'bg-signal-strong')}
+                style={{ width: `${stageProgress}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-2xs text-muted-foreground">
+              <span>Выполнено {doneStages} из {presentation.stages.length} шагов</span>
+              <span className="font-semibold tabular-nums">{stageProgress}%</span>
+            </div>
           </div>
         </div>
       </section>
@@ -866,10 +1089,18 @@ function ReadinessCentre(props: ReferenceUiProps) {
               <Button variant="outline" className="mt-3 h-9" onClick={() => props.onViewChange('reports')}><History className="mr-2 h-4 w-4" />История оценок</Button>
             </div>
           </div>
-          <div className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-            {presentation.ruleSetVersion === 'unpublished'
-              ? 'Правила готовности ещё не опубликованы. '
-              : presentation.ruleSetVersion ? `Правила ${presentation.ruleSetVersion}. ` : ''}{presentation.title}. {presentation.calculatedAt ? `Авторитетный снимок от ${formatDateTimeInTimezone(presentation.calculatedAt, props.bootstrap?.tenant.timezone)}.` : presentation.description}
+          {/*
+            Первой строкой — что делать, второй мелким — на чём основано.
+            Раньше здесь стояла только техническая справка о версии правил:
+            вердикт есть, а указания к действию нет.
+          */}
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="text-xs font-semibold text-foreground">{recommendation}</p>
+            <p className="mt-1 text-2xs text-muted-foreground">
+              {presentation.ruleSetVersion === 'unpublished'
+                ? 'Правила готовности ещё не опубликованы. '
+                : presentation.ruleSetVersion ? `Правила ${presentation.ruleSetVersion}. ` : ''}{presentation.title}. {presentation.calculatedAt ? `Авторитетный снимок от ${formatDateTimeInTimezone(presentation.calculatedAt, props.bootstrap?.tenant.timezone)}.` : presentation.description}
+            </p>
           </div>
         </section>
         <section className={cn(card, 'overflow-hidden')}>
@@ -886,7 +1117,8 @@ function ReadinessCentre(props: ReferenceUiProps) {
                     </span>
                     <div className={cn('mt-2 text-2xs', stage.state === 'fail' ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{stage.label}</div>
                   </StageLink>
-                  {index < 4 && <div className="mx-3 h-px flex-1 bg-border" />}
+                  {/* Пунктир, а не сплошная: связь между шагами — маршрут, а не заполненная шкала. */}
+                  {index < 4 && <div className="mx-3 flex-1 border-t border-dashed border-border" />}
                 </div>
               );})}
             </div>
@@ -904,30 +1136,73 @@ function ReadinessCentre(props: ReferenceUiProps) {
           </div>
           <div className="border-t border-border p-4">
             <h3 className="font-bold">Доказательства готовности</h3>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-5">
-              {presentation.evidence.map((evidence) => (
-                <div key={evidence.key} className="rounded-lg border border-border p-3">
-                  <div className="text-xs font-semibold">{evidence.label}</div>
-                  <div className="mt-2 text-2xs">{evidenceMetric(evidence, presentation.stages, props.bootstrap?.tenant.timezone)}</div>
-                  {/*
-                    gap-y-2, а не gap-y-1: строка ссылки 16px, а `hit-target`
-                    растит зону нажатия до 24px (44px на сенсоре). При зазоре
-                    4px зоны соседних строк накладывались бы, и палец попадал
-                    бы в чужую ссылку.
-                  */}
-                  {evidence.links && evidence.links.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-2">
-                      {evidence.links.map((link) => (
-                        <Link key={link.href} href={link.href} className="hit-target inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
-                          {link.text}<ArrowRight className="h-3 w-3" />
-                        </Link>
-                      ))}
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-4">
+              {metricTiles.map((tile) => {
+                const TileIcon = tile.icon;
+                return (
+                  <div key={tile.key} className="flex flex-col rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-2">
+                      <TileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate text-xs font-semibold">{tile.label}</span>
                     </div>
-                  )}
-                </div>
-              ))}
-              {presentation.evidence.length === 0 && <div className="rounded-lg border border-signal/30 bg-signal/10 p-3 text-xs text-signal-strong">{presentation.title}</div>}
+                    <span className={cn('mt-2 self-start rounded px-2 py-1 text-2xs font-semibold', tile.pill.cls)}>
+                      {tile.pill.label}
+                    </span>
+                    <dl className="mt-3 flex-1 space-y-1.5">
+                      {tile.rows.map((row) => (
+                        <div key={row.caption}>
+                          <dt className="text-2xs text-muted-foreground">{row.caption}</dt>
+                          <dd className="text-xs font-semibold">{row.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {tile.href ? (
+                      <Button asChild variant="outline" className="mt-3 h-9 w-full">
+                        <Link href={tile.href}>Открыть</Link>
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-3 h-9 w-full"
+                        onClick={() => tile.view && props.onViewChange(tile.view)}
+                      >
+                        Открыть
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+            {/*
+              Сами идентификаторы решения остаются доступны, но убраны под
+              раскрытие: в развёрнутом виде это была стена из «Заявка 1…7»,
+              которая перебивала показатели. Аудитору они по-прежнему нужны —
+              это единственный способ проверить, на чём построен вердикт.
+            */}
+            <details className="mt-3 rounded-lg border border-border">
+              <summary className="hit-target cursor-pointer px-3 py-2 text-xs font-semibold text-signal-strong">
+                Смотреть всё — первоисточники решения
+              </summary>
+              <div className="space-y-2 border-t border-border p-3">
+                {presentation.evidence.map((evidence) => (
+                  <div key={evidence.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+                    <span className="text-2xs font-semibold">{evidence.label}:</span>
+                    <span className="text-2xs text-muted-foreground">
+                      {evidenceMetric(evidence, presentation.stages, props.bootstrap?.tenant.timezone)}
+                    </span>
+                    {evidence.links?.map((link) => (
+                      <Link key={link.href} href={link.href} className="hit-target inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
+                        {link.text}<ArrowRight className="h-3 w-3" />
+                      </Link>
+                    ))}
+                  </div>
+                ))}
+                {presentation.evidence.length === 0 && (
+                  <p className="text-2xs text-signal-strong">{presentation.title}</p>
+                )}
+              </div>
+            </details>
           </div>
         </section>
       </div>
@@ -940,12 +1215,26 @@ function ReadinessCentre(props: ReferenceUiProps) {
               По этой установке ещё не было передач смены. Записи появятся, когда оператор передаст смену диспетчеру.
             </p>
           ) : (
-            <ol className="mt-4 space-y-5 border-l border-border pl-5">
-              {handoverJournal.map((event, index) => (
+            <ol className="mt-4 space-y-5 border-l border-border pl-6">
+              {handoverJournal.map((event, index) => {
+                const EventIcon = HANDOVER_ICON[event.kind];
+                const pill = HANDOVER_PILL[event.kind];
+                return (
                 <li key={event.id} className="relative">
-                  <span className={cn('absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full',
-                    index === 0 ? 'bg-signal-strong' : event.kind === 'REWORKED' ? 'bg-warning-strong' : 'bg-muted-foreground')} />
-                  <div className="text-xs font-semibold">{event.label}</div>
+                  {/*
+                    Кружок с иконкой вместо безымянной точки: тип события
+                    читается, не доходя до подписи.
+                  */}
+                  <span className={cn('absolute -left-[35px] top-0 grid h-[18px] w-[18px] place-items-center rounded-full border bg-card',
+                    index === 0 ? 'border-signal text-signal-strong' : event.kind === 'REWORKED' ? 'border-warning text-warning-strong' : 'border-border text-muted-foreground')}>
+                    <EventIcon className="h-2.5 w-2.5" />
+                  </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 text-xs font-semibold">{event.label}</div>
+                    <span className={cn('shrink-0 rounded border px-1.5 py-0.5 text-3xs font-semibold', pill.cls)}>
+                      {pill.label}
+                    </span>
+                  </div>
                   <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">
                     {formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}
                     {event.actorName ? ` · ${event.actorName}` : ''}
@@ -956,7 +1245,8 @@ function ReadinessCentre(props: ReferenceUiProps) {
                     <p className="mt-1 rounded border border-border bg-muted/40 p-2 text-2xs leading-relaxed">{event.comment}</p>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ol>
           )}
           <button type="button" onClick={() => props.onViewChange('reports')} className="mt-4 text-xs font-semibold text-signal-strong">Открыть полный журнал →</button>
@@ -970,14 +1260,70 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 ? buildUnavailableReadinessPresentation(itemSnapshot)
                 : buildAuthoritativeReadinessPresentation(itemSnapshot);
               const itemFleet = props.fleetCards.find((cardItem) => cardItem.id === item.id);
+              const active = item.id === selected.id;
+              // Время последней передачи по этой установке — «когда упало во входящие».
+              const lastSubmitted = buildHandoverJournal(props.shifts, item.id, props.bootstrap?.selectors.actors)
+                .find((event) => event.kind === 'SUBMITTED');
+              const statusPill = itemPresentation.status === 'READY'
+                ? { label: 'Готова к приёмке', cls: 'border-success/30 bg-success/10 text-success-strong' }
+                : itemPresentation.status === 'BLOCKED'
+                  ? { label: 'Заблокирована', cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong' }
+                  : { label: 'Требует внимания', cls: 'border-warning/30 bg-warning/10 text-warning-strong' };
               return (
-                <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className="flex w-full gap-3 rounded-lg border border-border p-3 text-left hover:border-signal/30">
-                  <EquipmentPhoto cardData={itemFleet} name={item.name} className="h-12 w-12 shrink-0" />
-                  <div className="min-w-0"><div className="truncate text-xs font-bold">{item.name}</div><div className="mt-1 text-2xs text-muted-foreground">{props.details[item.id]?.crew?.site?.name || 'Объект не назначен'}</div><div className="mt-2 text-2xs font-semibold">{itemPresentation.status === 'READY' ? 'Готово' : itemPresentation.status === 'BLOCKED' ? 'Заблокировано' : 'Не подтверждено'}</div></div>
-                </button>
+                <div key={item.id} className={cn('rounded-lg border p-3', active ? 'border-signal bg-signal/5' : 'border-border')}>
+                  <button
+                    type="button"
+                    onClick={() => props.onSelect(item.id)}
+                    className="flex w-full gap-3 text-left"
+                    aria-label={`${item.name}: открыть карточку готовности`}
+                  >
+                    <EquipmentPhoto cardData={itemFleet} name={item.name} className="h-12 w-12 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="truncate text-xs font-bold">{item.name}</div>
+                        {lastSubmitted && (
+                          <span className="shrink-0 text-3xs text-muted-foreground">
+                            {formatDateTimeInTimezone(lastSubmitted.occurredAt, props.bootstrap?.tenant.timezone)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-2xs text-muted-foreground">{props.details[item.id]?.crew?.site?.name || 'Объект не назначен'}</div>
+                      <span className={cn('mt-2 inline-block rounded border px-2 py-0.5 text-2xs font-semibold', statusPill.cls)}>
+                        {statusPill.label}
+                      </span>
+                    </div>
+                  </button>
+                  {/*
+                    Приёмка и возврат на доработку живут на вкладке «Смены» —
+                    здесь кнопки ведут туда с уже выбранной установкой, а не
+                    имитируют действие на месте.
+                  */}
+                  {active && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="h-9 flex-1 bg-signal-strong hover:bg-signal-strong"
+                        onClick={() => props.onViewChange('shifts')}
+                      >
+                        Принять и назначить
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 flex-1"
+                        onClick={() => props.onViewChange('shifts')}
+                      >
+                        Запросить доработки
+                      </Button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
+          <button type="button" onClick={() => props.onViewChange('shifts')} className="mt-3 text-xs font-semibold text-signal-strong">
+            Открыть все входящие →
+          </button>
         </section>
         </aside>
       </div>
