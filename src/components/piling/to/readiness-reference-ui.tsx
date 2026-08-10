@@ -76,7 +76,7 @@ import {
   type ReadinessScoreResult,
 } from '@/modules/readiness';
 import type { EquipmentOption } from './to-module-bits';
-import type { JournalRecord } from './to-stats';
+import { isOpenRecord, type JournalRecord } from './to-stats';
 import type { EquipmentReadiness, ReadinessStatus } from './readiness-model';
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import type {
@@ -131,6 +131,14 @@ export interface EquipmentDetailSnapshot {
     name: string;
     operator?: { id: string; name: string } | null;
     site?: { id: string; name: string } | null;
+  } | null;
+  /** Последний осмотр установки: пункты шаблона и сколько из них заполнено. */
+  latestInspection?: {
+    id: string;
+    status: string;
+    inspectionDate: string;
+    itemsTotal: number;
+    itemsAnswered: number;
   } | null;
   telematicsDevices?: Array<{
     id: string;
@@ -420,8 +428,6 @@ const ROLE_FLOW = [
     icon: 'inspection' as const,
     lucide: User,
     tasks: ['Провести осмотр', 'Зафиксировать моточасы', 'Передать диспетчеру'],
-    state: 'В работе',
-    progress: '1/5 шагов',
     border: 'border-success/25',
     header: 'border-success/25 bg-success/10 text-success-strong',
   },
@@ -430,8 +436,6 @@ const ROLE_FLOW = [
     icon: 'dispatcher' as const,
     lucide: User,
     tasks: ['Проверить готовность', 'Принять и назначить технику', 'Открыть смену'],
-    state: 'Ожидает',
-    progress: '0/3 шагов',
     border: 'border-info/25',
     header: 'border-info/25 bg-info/10 text-info-strong',
   },
@@ -440,8 +444,6 @@ const ROLE_FLOW = [
     icon: 'repair' as const,
     lucide: Wrench,
     tasks: ['Устранить дефекты', 'Провести обслуживание', 'Подтвердить работы'],
-    state: 'Ожидает',
-    progress: '0/3 шагов',
     border: 'border-signal/25',
     header: 'border-signal/25 bg-signal/10 text-signal-strong',
   },
@@ -455,11 +457,70 @@ const ROLE_FLOW = [
   },
 ];
 
-function RoleFlowFooter() {
+export interface RoleFlowProgress {
+  done: number;
+  total: number;
+  state: string;
+}
+
+/**
+ * Кто на каком шаге прямо сейчас.
+ *
+ * Раньше эти счётчики были константами в ROLE_FLOW: у оператора вечно
+ * «1/5 шагов», у остальных «0/3», независимо от того, что происходит с
+ * установкой. Теперь каждый шаг — проверяемый факт из авторитетного снимка,
+ * смены и журнала обслуживания; галочка ставится только по факту.
+ *
+ * У оператора шкала намеренно пятишаговая: это тот же чек-лист смены, что и в
+ * левой колонке, — два счётчика на одном экране обязаны совпадать.
+ */
+function buildRoleFlowProgress(
+  presentation: AuthoritativeReadinessPresentation,
+  facts: AuthoritativeReadinessFactsDto | null,
+  shift: ReadinessShiftDto | null,
+  openMaintenanceCount: number,
+  rulesPublished: boolean,
+): RoleFlowProgress[] {
+  const stageDone = (key: PresentationStage['key']) =>
+    presentation.stages.find((stage) => stage.key === key)?.state === 'pass';
+
+  const label = (done: number, total: number) =>
+    done === 0 ? 'Ожидает' : done === total ? 'Готово' : 'В работе';
+
+  const operatorDone = presentation.stages.filter((stage) => stage.state === 'pass').length;
+
+  const dispatcher = [
+    presentation.mode === 'authoritative',
+    Boolean(facts?.accepted),
+    shift?.state === 'STARTED' || shift?.state === 'HANDOVER_PENDING' || shift?.state === 'CLOSED',
+  ].filter(Boolean).length;
+
+  const mechanic = [
+    facts ? !facts.criticalDefect : false,
+    stageDone('MAINTENANCE'),
+    openMaintenanceCount === 0,
+  ].filter(Boolean).length;
+
+  const admin = [
+    stageDone('PERMIT'),
+    rulesPublished,
+    presentation.calculatedAt !== null,
+  ].filter(Boolean).length;
+
+  return [
+    { done: operatorDone, total: presentation.stages.length, state: label(operatorDone, presentation.stages.length) },
+    { done: dispatcher, total: 3, state: label(dispatcher, 3) },
+    { done: mechanic, total: 3, state: label(mechanic, 3) },
+    { done: admin, total: 3, state: admin === 3 ? 'В мониторинге' : label(admin, 3) },
+  ];
+}
+
+function RoleFlowFooter({ progress }: { progress: RoleFlowProgress[] }) {
   return (
     <section aria-label="Роли процесса технической готовности" className="mt-2 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2 2xl:grid-cols-[1fr_24px_1fr_24px_1fr_24px_1fr] 2xl:gap-0">
       {ROLE_FLOW.map((role, index) => {
         const RoleIcon = role.lucide;
+        const roleProgress = progress[index];
         return (
           <div key={role.label} className="contents">
             <article className={cn('flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm', role.border)}>
@@ -471,10 +532,10 @@ function RoleFlowFooter() {
                 <div className="min-w-0 flex-1 space-y-1 text-2xs leading-[1.35] text-muted-foreground">
                   {role.tasks.map((task) => <div key={task} className="flex gap-1.5"><span className="text-muted-foreground">•</span><span>{task}</span></div>)}
                 </div>
-                {role.state && (
+                {roleProgress && (
                   <div className="shrink-0 rounded-[10px] border border-border px-2.5 py-1.5 text-center text-2xs">
-                    <div className="text-muted-foreground">{role.state}</div>
-                    <div className="font-bold">{role.progress}</div>
+                    <div className="text-muted-foreground">{roleProgress.state}</div>
+                    <div className="font-bold tabular-nums">{roleProgress.done}/{roleProgress.total} шагов</div>
                   </div>
                 )}
                 {/* The handoff uses the approved PNG directly in this footer. */}
@@ -790,6 +851,14 @@ function buildReadinessMetricTiles(
 ): ReadinessMetricTile[] {
   const inspectionStage = presentation.stages.find((stage) => stage.key === 'INSPECTION');
   const maintenanceStage = presentation.stages.find((stage) => stage.key === 'MAINTENANCE');
+  const lastInspection = detail?.latestInspection ?? null;
+  // Пункты, а не процент: доля из facts — это флаг «завершён / начат / нет»,
+  // по ней нельзя сказать, сколько строк чек-листа реально заполнено.
+  const inspectionItems = !lastInspection
+    ? 'осмотра ещё не было'
+    : lastInspection.itemsTotal === 0
+      ? 'пункты не заданы'
+      : `${lastInspection.itemsAnswered} из ${lastInspection.itemsTotal}`;
   const nextAtHours = detail?.equipment?.nextMaintenanceAtHours;
   const hoursLeft = nextAtHours != null && engineHoursTotal != null
     ? Math.round(nextAtHours - engineHoursTotal)
@@ -805,11 +874,10 @@ function buildReadinessMetricTiles(
       label: 'Чек-лист осмотра',
       icon: FileText,
       pill: STAGE_PILL[inspectionStage?.state ?? 'unknown'],
-      rows: [{
-        caption: 'Выполнено пунктов',
-        value: facts ? `${Math.round(facts.inspectionProgress * 100)}%` : '—',
-      }],
-      href: inspectionId ? `/inspections/${inspectionId}` : '/inspections',
+      rows: [{ caption: 'Выполнено пунктов', value: inspectionItems }],
+      href: inspectionId
+        ? `/inspections/${inspectionId}`
+        : lastInspection ? `/inspections/${lastInspection.id}` : '/inspections',
     },
     {
       key: 'meter',
@@ -919,6 +987,16 @@ function ReadinessCentre(props: ReferenceUiProps) {
   const metricTiles = buildReadinessMetricTiles(
     facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionEvidenceId,
   );
+  // Смена и открытые заявки по выбранной установке — вход для счётчиков ролей.
+  const currentShift = props.shifts.find((item) => item.equipmentId === selected.id) ?? null;
+  const openMaintenanceCount = (props.journals[selected.id] ?? []).filter(isOpenRecord).length;
+  const roleProgress = buildRoleFlowProgress(
+    presentation,
+    facts,
+    currentShift,
+    openMaintenanceCount,
+    props.rulesState.publishedInDb,
+  );
   const recommendation = blockers > 0
     ? 'Рекомендация: устранить критические замечания для допуска к работе.'
     : warnings > 0
@@ -929,8 +1007,22 @@ function ReadinessCentre(props: ReferenceUiProps) {
 
   return (
     <div>
-      <div className="grid min-h-0 grid-cols-1 gap-3 py-3 md:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
-        <section className={cn(card, 'overflow-hidden')}>
+      {/*
+        Пропорции взяты с утверждённой визуализации: 0.9 / 1.45 / 1, то есть
+        27% / 43% / 30%. Было 300px / 1fr / 320px — фиксированные бока отдавали
+        центру весь избыток ширины, и на большом мониторе он раздувался, а
+        карточка установки и журнал передач оставались зажатыми.
+
+        Именно доли, а не фиксированные ширины: под сетку идёт не вся страница,
+        слева рельс навигации (на 1280px остаётся 977px). При жёстких 360+400
+        центр схлопывался до 193px. Доли держат соотношение макета на любой
+        ширине и нигде не давят середину.
+
+        Колонки — flex-контейнеры, последняя карточка в каждой тянется, поэтому
+        все три заканчиваются на одной линии.
+      */}
+      <div className="grid min-h-0 grid-cols-1 items-stretch gap-3 py-3 md:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.45fr)_minmax(0,1fr)]">
+        <section className={cn(card, 'flex flex-col overflow-hidden')}>
         <div className="border-b border-border p-4">
           <div className={cn(muted, 'text-2xs')}>Выбранная установка</div>
           <div className="mt-3 flex gap-3">
@@ -984,13 +1076,13 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 <div className="mt-2 font-bold">{presentation.nextAction}</div>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{props.authoritativeReadinessError ?? presentation.description}</p>
               </div>
-              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-signal-strong text-white">
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-signal text-white">
                 <ClipboardCheck className="h-7 w-7" />
               </span>
             </div>
             {nextStage && nextTarget ? (
               nextTarget.href ? (
-                <Button asChild className="mt-3 h-10 w-full bg-signal-strong hover:bg-signal-strong">
+                <Button asChild className="mt-3 h-10 w-full bg-signal text-white hover:bg-signal-strong">
                   <Link href={nextTarget.href}>
                     {STAGE_CTA[nextStage.key]} <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -998,7 +1090,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               ) : (
                 <Button
                   type="button"
-                  className="mt-3 h-10 w-full bg-signal-strong hover:bg-signal-strong"
+                  className="mt-3 h-10 w-full bg-signal text-white hover:bg-signal-strong"
                   onClick={() => nextTarget.view && props.onViewChange(nextTarget.view)}
                 >
                   {STAGE_CTA[nextStage.key]} <ArrowRight className="ml-2 h-4 w-4" />
@@ -1011,14 +1103,14 @@ function ReadinessCentre(props: ReferenceUiProps) {
             )}
           </div>
         </div>
-        <div className="p-4">
+        <div className="flex flex-1 flex-col p-4">
           <h3 className="font-bold">Чек-лист смены (5 шагов)</h3>
           <div className="mt-3 divide-y divide-border">
             {presentation.stages.map((stage, index) => {
               const target = stageTargets[stage.key];
               const body = (
                 <>
-                  <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', stage.state === 'pass' ? 'bg-success-strong text-white' : stage.state === 'unknown' ? 'bg-muted text-muted-foreground' : 'bg-signal-strong text-white')}>{index + 1}</span>
+                  <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', stage.state === 'pass' ? 'bg-success-strong text-white' : stage.state === 'unknown' ? 'bg-muted text-muted-foreground' : 'bg-signal text-white')}>{index + 1}</span>
                   <div className="min-w-0 flex-1 text-left">
                     <div className="text-xs font-semibold">{stage.label}</div>
                     <div
@@ -1044,7 +1136,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
             Сколько контура пройдено — одной полосой. До этого пять пилюль
             приходилось пересчитывать глазами, чтобы понять, далеко ли до смены.
           */}
-          <div className="mt-4">
+          <div className="mt-auto pt-4">
             <div
               className="h-1.5 overflow-hidden rounded-full bg-muted"
               role="progressbar"
@@ -1054,7 +1146,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               aria-label="Готовность чек-листа смены"
             >
               <div
-                className={cn('h-full rounded-full', stageProgress === 100 ? 'bg-success-strong' : 'bg-signal-strong')}
+                className={cn('h-full rounded-full', stageProgress === 100 ? 'bg-success-strong' : 'bg-signal')}
                 style={{ width: `${stageProgress}%` }}
               />
             </div>
@@ -1066,7 +1158,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
         </div>
       </section>
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         <section className={cn(card, 'p-5')}>
           <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
             <div>
@@ -1103,7 +1195,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
             </p>
           </div>
         </section>
-        <section className={cn(card, 'overflow-hidden')}>
+        <section className={cn(card, 'flex flex-1 flex-col overflow-hidden')}>
           <div className="p-4">
             <h2 className="font-bold">Цепочка состояния</h2>
             <div className="mt-4 flex items-center justify-between overflow-x-auto pb-2">
@@ -1112,7 +1204,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
                 return (
                 <div key={stage.key} className="flex min-w-[118px] flex-1 items-center">
                   <StageLink target={stageTargets[stage.key]} label={stage.label} onViewChange={props.onViewChange}>
-                    <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-full border', stage.state === 'pass' ? 'border-success bg-success-strong text-white' : stage.state === 'unknown' ? 'border-border bg-muted text-muted-foreground' : 'border-signal bg-signal-strong text-white')}>
+                    <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-full border', stage.state === 'pass' ? 'border-success bg-success-strong text-white' : stage.state === 'unknown' ? 'border-border bg-muted text-muted-foreground' : 'border-signal bg-signal text-white')}>
                       <Icon className="h-5 w-5" />
                     </span>
                     <div className={cn('mt-2 text-2xs', stage.state === 'fail' ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{stage.label}</div>
@@ -1134,7 +1226,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               <span className="rounded border border-destructive px-2 py-1 text-xs text-destructive-strong">{blockers ? 'Критическое' : 'Нет блокеров'}</span>
             </div>
           </div>
-          <div className="border-t border-border p-4">
+          <div className="flex flex-1 flex-col border-t border-border p-4">
             <h3 className="font-bold">Доказательства готовности</h3>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-4">
               {metricTiles.map((tile) => {
@@ -1180,7 +1272,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
               которая перебивала показатели. Аудитору они по-прежнему нужны —
               это единственный способ проверить, на чём построен вердикт.
             */}
-            <details className="mt-3 rounded-lg border border-border">
+            <details className="mt-auto rounded-lg border border-border">
               <summary className="hit-target cursor-pointer px-3 py-2 text-xs font-semibold text-signal-strong">
                 Смотреть всё — первоисточники решения
               </summary>
@@ -1207,7 +1299,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
         </section>
       </div>
 
-      <aside className="space-y-3 md:col-span-2 xl:col-span-1">
+      <aside className="flex flex-col gap-3 md:col-span-2 xl:col-span-1">
         <section className={cn(card, 'p-4')}>
           <div className="flex items-center justify-between"><h2 className="font-bold">Передача и приёмка</h2><span className="text-2xs text-muted-foreground">неизменяемый журнал</span></div>
           {handoverJournal.length === 0 ? (
@@ -1251,7 +1343,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
           )}
           <button type="button" onClick={() => props.onViewChange('reports')} className="mt-4 text-xs font-semibold text-signal-strong">Открыть полный журнал →</button>
         </section>
-        <section className={cn(card, 'p-4')}>
+        <section className={cn(card, 'flex flex-1 flex-col p-4')}>
           <div className="flex items-center justify-between"><h2 className="font-bold">Входящие (диспетчер)</h2><span className="text-xs text-muted-foreground">{props.equipment.length}</span></div>
           <div className="mt-3 space-y-3">
             {props.equipment.slice(0, 3).map((item) => {
@@ -1302,7 +1394,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        className="h-9 flex-1 bg-signal-strong hover:bg-signal-strong"
+                        className="h-9 flex-1 bg-signal text-white hover:bg-signal-strong"
                         onClick={() => props.onViewChange('shifts')}
                       >
                         Принять и назначить
@@ -1321,13 +1413,13 @@ function ReadinessCentre(props: ReferenceUiProps) {
               );
             })}
           </div>
-          <button type="button" onClick={() => props.onViewChange('shifts')} className="mt-3 text-xs font-semibold text-signal-strong">
+          <button type="button" onClick={() => props.onViewChange('shifts')} className="hit-target mt-auto pt-3 text-left text-xs font-semibold text-signal-strong">
             Открыть все входящие →
           </button>
         </section>
         </aside>
       </div>
-      <RoleFlowFooter />
+      <RoleFlowFooter progress={roleProgress} />
     </div>
   );
 }

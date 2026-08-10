@@ -137,11 +137,43 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
     };
   });
 
+  // Последний осмотр с числом пунктов. Контур готовности показывает «N из M»
+  // выполненных пунктов; до этого он мог опираться только на facts
+  // .inspectionProgress, а это не доля пунктов, а флаг 1 / 0.5 / 0 («завершён
+  // сегодня» / «есть черновик» / «нет»), и подпись «выполнено пунктов %»
+  // вводила в заблуждение. Пункты считаем по снимку шаблона, ответы — по
+  // непустому результату: пустая строка сохраняется и для нетронутого пункта.
+  const latestInspectionRow = await db.inspection.findFirst({
+    where: { equipmentId, tenantId },
+    orderBy: [{ inspectionDate: 'desc' }, { createdAt: 'desc' }],
+    select: {
+      id: true,
+      status: true,
+      inspectionDate: true,
+      templateSnapshot: true,
+      answers: { select: { result: true } },
+    },
+  });
+  const latestInspection = latestInspectionRow
+    ? {
+        id: latestInspectionRow.id,
+        status: latestInspectionRow.status,
+        inspectionDate: latestInspectionRow.inspectionDate.toISOString(),
+        itemsTotal: Array.isArray(latestInspectionRow.templateSnapshot)
+          ? latestInspectionRow.templateSnapshot.length
+          : 0,
+        itemsAnswered: latestInspectionRow.answers.filter(
+          (answer) => typeof answer.result === 'string' && answer.result.trim() !== '',
+        ).length,
+      }
+    : null;
+
   return {
     equipment,
     crew: equipment.crews[0] ?? null,
     telematicsDevices: equipment.telematicsDevices,
     documents: equipment.documents,
+    latestInspection,
     stats30d: { reportCount: reports30d.length, ...stats30d },
     timeline,
   };
