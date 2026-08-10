@@ -95,7 +95,7 @@ export function ReportDetailDialog({
                 <Separator />
                 <div>
                   <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Drill className="w-4 h-4 text-blue-500" />
+                    <Drill className="w-4 h-4 text-info-strong" />
                     Лидерное бурение ({formatRecordCount(report.drillings.length)})
                   </h4>
                   <div className="space-y-1">
@@ -118,7 +118,7 @@ export function ReportDetailDialog({
                 <Separator />
                 <div>
                   <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-500" />Простой техники
+                    <Clock className="w-4 h-4 text-warning-strong" />Простой техники
                   </h4>
                   <div className="space-y-1">
                     {report.downtimes.map((dt) => (
@@ -127,7 +127,7 @@ export function ReportDetailDialog({
                           <span>{dt.reason?.name || '—'}</span>
                           {dt.comment && <p className="text-3xs text-muted-foreground">{dt.comment}</p>}
                         </div>
-                        <span className="font-mono font-semibold text-amber-600">{dt.duration} ч</span>
+                        <span className="font-mono font-semibold text-warning-strong">{dt.duration} ч</span>
                       </div>
                     ))}
                   </div>

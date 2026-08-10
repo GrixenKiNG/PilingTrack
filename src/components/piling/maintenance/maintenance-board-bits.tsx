@@ -18,7 +18,7 @@ export function QuickChip({ active, onClick, children }: { active: boolean; onCl
       className={cn(
         'h-8 rounded-md border px-3 text-xs font-medium transition-colors',
         active
-          ? 'border-blue-200 bg-blue-50 text-blue-700'
+          ? 'border-info/30 bg-info/10 text-info-strong'
           : 'border-border bg-card text-foreground hover:bg-muted',
       )}
     >

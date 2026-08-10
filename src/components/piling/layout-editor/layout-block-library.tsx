@@ -23,7 +23,7 @@ export function LayoutBlockLibrary({
   onUploadImage?: (file: File) => Promise<void>;
   uploadError?: string | null;
 }) {
-  const buttonClass = 'min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+  const buttonClass = 'min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground hover:border-info/30 hover:bg-info/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30';
   return (
     <section aria-label="Библиотека блоков" className="space-y-2">
       <h3 className="text-sm font-semibold text-foreground">Добавить блок</h3>
@@ -45,7 +45,7 @@ export function LayoutBlockLibrary({
           />
         </label>
       )}
-      {uploadError && <p role="alert" className="text-xs font-medium text-red-700">{uploadError}</p>}
+      {uploadError && <p role="alert" className="text-xs font-medium text-destructive-strong">{uploadError}</p>}
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
         {dataBlocks.map((item) => (
           <button key={item.key} type="button" className={buttonClass} onClick={() => onAdd('data', item.key)}>

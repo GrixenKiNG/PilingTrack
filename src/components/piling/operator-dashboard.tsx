@@ -157,8 +157,8 @@ export function OperatorDashboard() {
           {shiftSteps.map((step, index) => {
             return (
               <div key={step.label} className="relative flex flex-col items-center text-center">
-                {index > 0 && <span className={`absolute right-1/2 top-2 h-px w-full ${step.complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />}
-                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${step.complete ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-card'}`} />
+                {index > 0 && <span className={`absolute right-1/2 top-2 h-px w-full ${step.complete ? 'bg-success-strong' : 'bg-slate-300'}`} />}
+                <span className={`relative z-10 h-4 w-4 rounded-full border-2 ${step.complete ? 'border-success bg-success-strong' : 'border-slate-400 bg-card'}`} />
                 <span className="mt-2 text-xs leading-tight text-muted-foreground">{step.label}</span>
                 <span className="sr-only">{step.complete ? 'выполнено' : 'ожидается'}</span>
               </div>
@@ -190,7 +190,7 @@ export function OperatorDashboard() {
         <section className="rounded-xl border border-border bg-card p-3">
           <div className="mb-1 flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Последние отчёты</h2>
-            <button type="button" onClick={() => router.push('/history')} className="text-xs font-medium text-blue-700">История</button>
+            <button type="button" onClick={() => router.push('/history')} className="text-xs font-medium text-info-strong">История</button>
           </div>
           <ul className="divide-y divide-border">
             {reports.slice(0, 3).map((report) => (

@@ -58,7 +58,7 @@ export function OpsPage({
               title="Потяните, чтобы изменить ширину"
               className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize xl:block"
             >
-              <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+              <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-info" />
             </div>
             {aside}
           </div>

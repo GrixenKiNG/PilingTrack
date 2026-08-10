@@ -168,14 +168,14 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                   {st === 'PLANNED' && (
                     <button onClick={() => patchStatus(r, 'IN_PROGRESS')} disabled={pendingId === r.id}
                     aria-label={`Перевести «${r.title}» в работу`}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50" title="В работу">
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong disabled:opacity-50" title="В работу">
                       <PlayCircle className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {st !== 'DONE' && st !== 'CANCELLED' && (
                     <button onClick={() => patchStatus(r, 'DONE')} disabled={pendingId === r.id}
                     aria-label={`Отметить «${r.title}» выполненным`}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50" title="Выполнено">
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-success-strong transition-colors hover:bg-success/10 hover:text-success-strong disabled:opacity-50" title="Выполнено">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -186,7 +186,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                   </button>
                   <button onClick={() => setPendingDelete(r)} disabled={pendingId === r.id}
                     aria-label={`Удалить запись «${r.title}»`}
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50" title="Удалить">
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong disabled:opacity-50" title="Удалить">
                     {pendingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   </button>
                 </div>

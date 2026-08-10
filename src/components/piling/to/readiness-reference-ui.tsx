@@ -600,6 +600,13 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
       className="tech-readiness-module min-h-screen w-full min-w-0 overflow-x-hidden overflow-y-auto bg-background font-sans text-foreground"
     >
       <div className="min-h-screen w-full min-w-0">
+        {/* У модуля не было заголовка первого уровня: разметка начиналась с h2
+            «Banut 655», и для скринридера страница оставалась без названия.
+            Скрыт визуально — на экране роль заголовка играет полоса вкладок,
+            дублировать её текстом незачем. */}
+        <h1 className="sr-only">
+          Техническая готовность — {VIEW_ITEMS.find((item) => item.id === props.view)?.label ?? 'Центр готовности'}
+        </h1>
         {props.showInternalNavigation && <header
           aria-label="Разделы модуля технической готовности"
           className="sticky top-0 z-20 flex h-12 w-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden border-b border-border bg-card px-2 sm:px-4"
@@ -686,7 +693,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
         ) : props.view === 'settings' ? (
           <SettingsWorkspace {...props} />
         ) : (
-          <main className="min-w-0 px-2 sm:px-4">
+          <div className="min-w-0 px-2 sm:px-4">
             {(props.view === 'shifts' || props.view === 'permits' || props.view === 'reports') && (
               <ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode={props.view} />
             )}
@@ -696,7 +703,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
             {props.view === 'permits' && <PermitsScreen {...props} />}
             {props.view === 'maintenance' && <MaintenanceScreen {...props} />}
             {props.view === 'reports' && <ReportsScreen {...props} />}
-          </main>
+          </div>
         )}
       </div>
     </div>
@@ -1826,7 +1833,7 @@ function SettingsWorkspace(props: ReferenceUiProps) {
           <span className="truncate">{props.bootstrap?.tenant.name?.trim() || 'Организация'} · Основной контур</span>
         </div>
       </aside>
-      <main className="min-w-0 px-2 sm:px-4">
+      <div className="min-w-0 px-2 sm:px-4">
         {props.settingsSection === 'rules' && (
           <RulesSettings
             key={`${props.rulesState.published.version}:${props.rulesState.draft?.updatedAt ?? 'published'}`}
@@ -1858,7 +1865,7 @@ function SettingsWorkspace(props: ReferenceUiProps) {
             onExport={(events) => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, auditActionLabel(event.action), `${auditEntityLabel(event.entity.type)}:${event.entity.id}`, event.hash])])}
           />
         )}
-      </main>
+      </div>
     </div>
   );
 }

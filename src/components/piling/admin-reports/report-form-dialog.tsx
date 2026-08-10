@@ -288,7 +288,7 @@ export function ReportFormDialog({
                         <span className="block text-xs text-muted-foreground">{getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.</span>
                       </span>
                       <button onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -301,8 +301,8 @@ export function ReportFormDialog({
           {/* Drillings */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2"><Drill className="w-4 h-4 text-blue-500" />Лидерное бурение</h4>
-              {formTotalMeters > 0 && <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м</span>}
+              <h4 className="text-sm font-semibold flex items-center gap-2"><Drill className="w-4 h-4 text-info-strong" />Лидерное бурение</h4>
+              {formTotalMeters > 0 && <span className="text-xs font-mono font-bold text-info-strong bg-info/10 px-2 py-0.5 rounded-full">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м</span>}
             </div>
             <div className="flex gap-2 mb-2">
               <Select value={tempDrillType} onValueChange={setTempDrillType}>
@@ -313,7 +313,7 @@ export function ReportFormDialog({
                 min="1" className="w-20 h-9 font-mono text-sm" />
               <Input type="number" step="0.1" placeholder="м/шт" value={tempDrillMetersPerUnit} onChange={(e) => setTempDrillMetersPerUnit(e.target.value)}
                 min="0.1" className="w-20 h-9 font-mono text-sm" />
-              <Button onClick={addDrilling} size="sm" className="h-9 bg-blue-500 hover:bg-blue-600 text-white px-3"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={addDrilling} size="sm" className="h-9 bg-info-strong hover:bg-info-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
             </div>
             {formDrillings.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
@@ -326,7 +326,7 @@ export function ReportFormDialog({
                         <span className="block text-xs text-muted-foreground">{d.meters} м</span>
                       </span>
                       <button onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -339,7 +339,7 @@ export function ReportFormDialog({
           {/* Downtime */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2"><Clock className="w-4 h-4 text-amber-500" />Простой техники</h4>
+              <h4 className="text-sm font-semibold flex items-center gap-2"><Clock className="w-4 h-4 text-warning-strong" />Простой техники</h4>
               <button onClick={() => setShowFormDowntime(!showFormDowntime)} className="text-xs text-signal-strong font-medium">
                 {showFormDowntime ? 'Скрыть' : '+ Добавить'}
               </button>
@@ -353,7 +353,7 @@ export function ReportFormDialog({
                   </Select>
                   <Input type="number" step="0.5" placeholder="Часы" value={tempDtDuration} onChange={(e) => setTempDtDuration(e.target.value)}
                     min="0.5" className="w-20 h-9 font-mono text-sm" />
-                  <Button onClick={addDowntime} size="sm" className="h-9 bg-amber-500 hover:bg-amber-600 text-white px-3"><Plus className="w-4 h-4" /></Button>
+                  <Button onClick={addDowntime} size="sm" className="h-9 bg-warning-strong hover:bg-warning-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
                 </div>
                 <Input placeholder="Комментарий (необязательно)" value={tempDtComment} onChange={(e) => setTempDtComment(e.target.value)} className="h-9 text-sm" />
                 {formDowntimes.length > 0 && (
@@ -365,9 +365,9 @@ export function ReportFormDialog({
                           {dt.comment && <p className="text-3xs text-muted-foreground truncate">{dt.comment}</p>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-amber-600">{dt.duration} ч</span>
+                          <span className="font-mono font-semibold text-warning-strong">{dt.duration} ч</span>
                           <button onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
-                            className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                            className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       </div>
                     ))}
@@ -386,7 +386,7 @@ export function ReportFormDialog({
               <div className="flex items-center gap-4 text-sm">
                 <span className="font-mono font-bold">{formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п. сваи</span>
                 <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м.п. бурение</span>
-                {formDowntimes.length > 0 && <span className="font-mono font-bold text-amber-400">{formTotalDowntime} ч</span>}
+                {formDowntimes.length > 0 && <span className="font-mono font-bold text-warning-strong">{formTotalDowntime} ч</span>}
               </div>
             </div>
           )}

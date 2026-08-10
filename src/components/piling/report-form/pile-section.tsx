@@ -53,7 +53,7 @@ export function PileSection({
                 </span>
               )}
               <button onClick={onToggleMode}
-                className="text-sm text-blue-600 hover:text-blue-700 font-semibold min-w-[44px] min-h-[44px] flex items-center justify-center">
+                className="text-sm text-info-strong hover:text-info-strong font-semibold min-w-[44px] min-h-[44px] flex items-center justify-center">
                 {quickMode ? 'Включить расширенный' : 'Включить простой'}
               </button>
             </div>
@@ -72,7 +72,7 @@ export function PileSection({
                   <PilingIcon name="add" size={20} decorative className="!text-white" />
                 </Button>
               </div>
-              {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
+              {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-destructive-strong text-xs" role="alert">Количество должно быть больше 0</p>}
               {!tempGrade && <p className="text-muted-foreground text-sm font-medium">Выберите марку сваи</p>}
               {(tempGrade || tempCount) && Number(tempCount) > 0 && (
                 <div className="rounded-lg bg-signal/10 px-3 py-2 text-sm font-medium text-signal-strong">
@@ -91,7 +91,7 @@ export function PileSection({
                   min="1" className="h-11 font-mono" />
                 <Button onClick={onAdd} aria-label="Добавить сваи в отчёт" className="h-11 min-h-[44px] bg-signal hover:bg-signal-strong text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
-              {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-red-500 text-xs" role="alert">Количество должно быть больше 0</p>}
+              {tempGrade && tempCount && Number(tempCount) <= 0 && <p className="text-destructive-strong text-xs" role="alert">Количество должно быть больше 0</p>}
               {(tempGrade || tempCount) && (
                 <div className="rounded-lg bg-signal/10 px-3 py-2 text-sm font-medium text-signal-strong">
                   Автоподсчёт: {tempCount || 0} шт. × {formatNumber(getPileMetersPerUnit(tempGrade))} м.п. = {formatNumber(tempMeters)} м.п.
@@ -115,7 +115,7 @@ export function PileSection({
                     </span>
                     <button onClick={() => onRemove(pile.id)}
                       aria-label={`Удалить сваи ${getPileGradeName(pile.pileGradeId)} из отчёта`}
-                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700">
+                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong">
                       <PilingIcon name="delete" size={16} tone="danger" decorative />
                     </button>
                   </div>

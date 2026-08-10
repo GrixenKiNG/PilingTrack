@@ -326,9 +326,9 @@ export function AdminReports() {
               aria-valuemax={720}
               aria-valuenow={panelWidth}
               title="Потяните, чтобы изменить ширину"
-              className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize outline-none focus-visible:ring-2 focus-visible:ring-blue-500 xl:block"
+              className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize outline-none focus-visible:ring-2 focus-visible:ring-info/30 xl:block"
             >
-              <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+              <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-info" />
             </div>
             <ReportEvidencePreview
               report={effectivePreview}

@@ -105,7 +105,7 @@ export function TemplateList() {
                   aria-label="Деактивировать"
                   disabled={deletingId === t.id}
                   onClick={(e) => void handleDelete(e, t.id)}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:text-red-500 disabled:opacity-40"
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive-strong disabled:opacity-40"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

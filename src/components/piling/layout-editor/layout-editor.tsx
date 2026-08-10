@@ -16,7 +16,7 @@ import type { RenderBlockContent } from './layout-renderer';
 import type { LayoutBlock, LayoutBlockKind } from './layout-template';
 import type { LayoutController } from './use-layout-template';
 
-const toolbarButton = 'min-h-11 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const toolbarButton = 'min-h-11 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30';
 
 export interface LayoutEditorImageSupport {
   /** Shown in the inspector next to the photo tools. */
@@ -83,7 +83,7 @@ export function LayoutEditor({
     // In modal mode the parent controls mounting; don't show the floating entry.
     if (autoOpen) return null;
     return (
-      <button type="button" className="fixed bottom-4 right-4 z-40 min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={controller.startEditing}>
+      <button type="button" className="fixed bottom-4 right-4 z-40 min-h-11 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" onClick={controller.startEditing}>
         Редактировать шаблон
       </button>
     );
@@ -154,7 +154,7 @@ export function LayoutEditor({
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>
         <button type="button" className={toolbarButton} aria-pressed={preview} onClick={() => setPreview((value) => !value)}>Предпросмотр</button>
         <button type="button" className={toolbarButton} onClick={() => { void controller.reset(); setSelectedBlockId(null); }}>Сбросить</button>
-        <button type="button" className="min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" onClick={() => void controller.saveDraft()}>Сохранить</button>
+        <button type="button" className="min-h-11 rounded-lg bg-info-strong px-4 text-sm font-semibold text-white hover:bg-info-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" onClick={() => void controller.saveDraft()}>Сохранить</button>
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('library')}>Блоки</button>}
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('inspector')}>Свойства</button>}
         <button type="button" className={toolbarButton} onClick={closeEditor}>Закрыть</button>

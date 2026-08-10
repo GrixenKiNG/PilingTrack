@@ -25,17 +25,17 @@ export function YesNoControl({ value, onChange, disabled }: { value: string; onC
   );
   return (
     <div className="flex gap-2">
-      {btn('YES', 'Да', 'border-emerald-500 bg-emerald-50 text-emerald-700')}
-      {btn('NO', 'Нет', 'border-rose-500 bg-rose-50 text-rose-700')}
+      {btn('YES', 'Да', 'border-success bg-success/10 text-success-strong')}
+      {btn('NO', 'Нет', 'border-destructive bg-destructive/10 text-destructive-strong')}
     </div>
   );
 }
 
 export function Status4Control({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
   const options = [
-    { v: 'OK', label: 'Исправно', cls: 'border-emerald-500 bg-emerald-50 text-emerald-700' },
-    { v: 'REMARK', label: 'Замечание', cls: 'border-amber-500 bg-amber-50 text-amber-700' },
-    { v: 'FAULT', label: 'Неисправно', cls: 'border-rose-500 bg-rose-50 text-rose-700' },
+    { v: 'OK', label: 'Исправно', cls: 'border-success bg-success/10 text-success-strong' },
+    { v: 'REMARK', label: 'Замечание', cls: 'border-warning bg-warning/10 text-warning-strong' },
+    { v: 'FAULT', label: 'Неисправно', cls: 'border-destructive bg-destructive/10 text-destructive-strong' },
     { v: 'NA', label: 'Не проверено', cls: 'border-slate-400 bg-muted text-muted-foreground' },
   ];
   return (

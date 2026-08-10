@@ -82,7 +82,7 @@ export function AdminEquipment() {
   if (error || !snapshot) {
     return (
       <div className="p-4 lg:p-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive-strong">
           Не удалось загрузить парк техники{error ? `: ${error}` : ''}.
           <button onClick={refetch} className="ml-2 underline">
             Повторить
@@ -137,7 +137,7 @@ export function AdminEquipment() {
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
               {cards.length > 0 && (
-                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 text-xs text-blue-600 underline">
+                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 text-xs text-info-strong underline">
                   Сбросить фильтры
                 </button>
               )}
@@ -184,9 +184,9 @@ export function AdminEquipment() {
             aria-valuemax={900}
             aria-valuenow={panelWidth}
             title="Потяните, чтобы изменить ширину"
-            className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:block"
+            className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize outline-none focus-visible:ring-2 focus-visible:ring-info/30 lg:block"
           >
-            <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-blue-400" />
+            <div className="mx-auto h-full w-px bg-slate-200 transition-colors hover:bg-info" />
           </div>
 
           <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">

@@ -199,7 +199,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
                   onClick={() => setPendingDelete(d)}
                   disabled={deletingId === d.id}
                   aria-label={`Удалить документ «${d.title}»`}
-                  className="flex h-11 w-11 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                  className="flex h-11 w-11 items-center justify-center rounded-md text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong disabled:opacity-50"
                   title="Удалить"
                 >
                   {deletingId === d.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -304,7 +304,7 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
 function ExpiresIndicator({ iso }: { iso: string }) {
   const d = new Date(iso);
   const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return <span className={cn('rounded px-1.5 py-0.5 text-rose-700 bg-rose-100')}>Истёк {Math.abs(days)} дн. назад</span>;
-  if (days <= 30) return <span className={cn('rounded px-1.5 py-0.5 text-amber-700 bg-amber-100')}>истекает через {days} дн.</span>;
+  if (days < 0) return <span className={cn('rounded px-1.5 py-0.5 text-destructive-strong bg-destructive/10')}>Истёк {Math.abs(days)} дн. назад</span>;
+  if (days <= 30) return <span className={cn('rounded px-1.5 py-0.5 text-warning-strong bg-warning/10')}>истекает через {days} дн.</span>;
   return <span>до {formatRuDate(iso.slice(0, 10))}</span>;
 }

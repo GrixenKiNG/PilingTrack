@@ -145,7 +145,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
             type="button"
             onClick={() => setDeleteOpen(true)}
             disabled={busy}
-            className="flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+            className="flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-medium text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong"
           >
             <Trash2 className="h-4 w-4" /> Удалить
           </button>

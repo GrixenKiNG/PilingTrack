@@ -45,7 +45,7 @@ export function DrillingSection({
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2"><PilingIcon name="drilling-auger" size={18} tone="info" decorative />Лидерное бурение</CardTitle>
             {totalMeters > 0 && (
-              <span className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{formatNumber(totalMeters)} м</span>
+              <span className="text-sm font-mono font-bold text-info-strong bg-info/10 px-2 py-0.5 rounded-full">{formatNumber(totalMeters)} м</span>
             )}
           </div>
         </CardHeader>
@@ -60,10 +60,10 @@ export function DrillingSection({
                 min="1" className="h-11 font-mono" />
               <Input type="number" aria-label="Глубина одной скважины, м" step="0.1" placeholder="Метры на 1 шт." value={tempMetersPerUnit} onChange={(e) => onTempMetersPerUnitChange(e.target.value)}
                 min="0.1" className="h-11 font-mono" />
-              <Button onClick={onAdd} aria-label="Добавить бурение в отчёт" className="h-11 min-h-[44px] bg-blue-500 hover:bg-blue-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
+              <Button onClick={onAdd} aria-label="Добавить бурение в отчёт" className="h-11 min-h-[44px] bg-info-strong hover:bg-info-strong text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
             </div>
             {(tempCount || tempMetersPerUnit) && (
-              <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+              <div className="rounded-lg bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
                 Автоподсчёт: {tempCount || 0} шт. × {tempMetersPerUnit || 0} м = {formatNumber(tempVolume)} м
               </div>
             )}
@@ -84,7 +84,7 @@ export function DrillingSection({
                     </span>
                     <button onClick={() => onRemove(drill.id)}
                       aria-label={`Удалить бурение ${getDrillTypeName(drill.typeId)} из отчёта`}
-                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700">
+                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong">
                       <PilingIcon name="delete" size={16} tone="danger" decorative />
                     </button>
                   </div>

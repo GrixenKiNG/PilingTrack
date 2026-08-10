@@ -75,7 +75,7 @@ export function WorkOrderTable({
                 onClick={() => onSelect(record.id)}
                 className={cn(
                   'cursor-pointer align-top transition-colors hover:bg-signal/10/30',
-                  selectedRow && 'bg-sky-50/80 outline outline-1 -outline-offset-1 outline-sky-200',
+                  selectedRow && 'bg-info/10/80 outline outline-1 -outline-offset-1 outline-sky-200',
                 )}
               >
                 <td className="px-2.5 py-2.5">
@@ -94,10 +94,10 @@ export function WorkOrderTable({
                   <div className="mt-1 text-2xs text-muted-foreground">{REGULAR_TYPES.has(record.type) ? 'регламентное' : 'ремонт'}</div>
                 </td>
                 <td className="px-2.5 py-2.5">
-                  <div className={cn('font-mono font-semibold text-foreground', isOverdue(record) && 'text-red-600')}>
+                  <div className={cn('font-mono font-semibold text-foreground', isOverdue(record) && 'text-destructive-strong')}>
                     {formatRuDate(record.scheduledAt)}
                   </div>
-                  <div className={cn('mt-1 text-2xs', isOverdue(record) ? 'font-semibold text-red-600' : 'text-muted-foreground')}>
+                  <div className={cn('mt-1 text-2xs', isOverdue(record) ? 'font-semibold text-destructive-strong' : 'text-muted-foreground')}>
                     {deadlineText(record)}
                   </div>
                 </td>
@@ -133,7 +133,7 @@ export function WorkOrderTable({
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onDone(record); }}
                       disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE'}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-success-strong hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
                       title="Закрыть ТО"
                     >
                       {busyAction === `${record.id}:DONE` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -142,7 +142,7 @@ export function WorkOrderTable({
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onDelete(record); }}
                       disabled={busyAction === `${record.id}:delete`}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-destructive-strong hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
                       title="Удалить ТО"
                     >
                       {busyAction === `${record.id}:delete` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}

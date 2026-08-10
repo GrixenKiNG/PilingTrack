@@ -95,7 +95,7 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
         </Button>
       </div>
 
-      <p className={cn('text-xs', invalid ? 'text-rose-500' : 'text-muted-foreground')}>
+      <p className={cn('text-xs', invalid ? 'text-destructive-strong' : 'text-muted-foreground')}>
         {invalid
           ? 'Дата «С» позже даты «По».'
           : 'Отчёт по этой установке за период: смены, сваи, бурение, простои. «Открыть» — печать или сохранение из просмотрщика браузера.'}

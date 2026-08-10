@@ -303,8 +303,8 @@ export function ReportHistory() {
                         variant="secondary"
                         className={
                           report.status === 'submitted'
-                            ? 'bg-green-100 text-green-700 border-green-200'
-                            : 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                            ? 'bg-success/10 text-success-strong border-success/30'
+                            : 'bg-warning/10 text-warning-strong border-warning/30'
                         }
                       >
                         {report.status === 'submitted' ? 'Отправлен' : 'Черновик'}
@@ -321,7 +321,7 @@ export function ReportHistory() {
                       <span className="text-xs text-muted-foreground">шт/м.п.</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Drill className="w-3.5 h-3.5 text-blue-500" />
+                      <Drill className="w-3.5 h-3.5 text-info-strong" />
                       <span className="text-sm font-mono font-semibold text-foreground">
                         {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
                       </span>
@@ -329,8 +329,8 @@ export function ReportHistory() {
                     </div>
                     {report.totalDowntime > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-amber-500" />
-                        <span className="text-sm font-mono font-semibold text-amber-600">
+                        <Clock className="w-3.5 h-3.5 text-warning-strong" />
+                        <span className="text-sm font-mono font-semibold text-warning-strong">
                           {report.totalDowntime}
                         </span>
                         <span className="text-xs text-muted-foreground">ч</span>

@@ -212,7 +212,7 @@ export function AdminAnalytics() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
+            <BarChart3 className="w-5 h-5 text-info-strong" />
             Аналитика
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -222,7 +222,7 @@ export function AdminAnalytics() {
       </div>
 
       {(sitesError || fleetError) && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+        <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-strong" role="status">
           Часть источников недоступна: {[sitesError, fleetError].filter(Boolean).join(' ')}
         </div>
       )}
@@ -263,7 +263,7 @@ export function AdminAnalytics() {
           {sectionVisible('chart-dynamics') && (
             <Card className={cn('gap-2 py-3', sectionVisible('usage-equipment') ? '' : 'lg:col-span-2')}>
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Динамика погонных метров</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-info-strong" /> Динамика погонных метров</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={155}>
@@ -282,7 +282,7 @@ export function AdminAnalytics() {
           {sectionVisible('usage-equipment') && (
             <Card className="gap-2 py-3">
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Использование установок</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-info-strong" /> Использование установок</CardTitle>
               </CardHeader>
               <CardContent className="max-h-[195px] space-y-2.5 overflow-y-auto">
                 {overview.equipmentUsage.length === 0 ? (
@@ -291,7 +291,7 @@ export function AdminAnalytics() {
                   <div key={e.id} className="flex items-center gap-2 text-xs" title={`Дней с отчётом: ${e.activeDays} из ${overview.period.days}`}>
                     <span className="w-36 truncate text-foreground">{e.name}</span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-sky-500" style={{ width: `${e.usagePct}%` }} />
+                      <div className="h-full rounded-full bg-info-strong" style={{ width: `${e.usagePct}%` }} />
                     </div>
                     <span className="w-9 text-right font-medium tabular-nums text-foreground">{e.usagePct}%</span>
                   </div>
@@ -313,7 +313,7 @@ export function AdminAnalytics() {
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors flex items-center gap-1.5',
               tab === t.key
-                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                ? 'bg-info/10 text-info-strong border-info/30'
                 : 'bg-card text-muted-foreground border-border hover:bg-muted'
             )}
           >
@@ -371,7 +371,7 @@ export function AdminAnalytics() {
                   {operators.length > 5 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Показано {showAllOperators ? operators.length : 5} из {operators.length} операторов</span>
-                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="font-medium text-blue-600 hover:underline">
+                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="font-medium text-info-strong hover:underline">
                         {showAllOperators ? 'Свернуть' : 'Смотреть всех'}
                       </button>
                     </div>
@@ -396,7 +396,7 @@ export function AdminAnalytics() {
           ) : sectionVisible('chart-trends') ? (
             <Card className="gap-2 py-3">
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-600" /> Тренд за месяц</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="w-4 h-4 text-info-strong" /> Тренд за месяц</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -409,7 +409,7 @@ export function AdminAnalytics() {
                       className={cn(
                         'rounded-md border px-2 py-0.5 text-2xs transition-colors',
                         trendSiteId === site.id
-                          ? 'border-blue-200 bg-blue-50 font-semibold text-blue-700'
+                          ? 'border-info/30 bg-info/10 font-semibold text-info-strong'
                           : 'border-border bg-card text-muted-foreground hover:bg-muted',
                       )}
                     >
@@ -452,7 +452,7 @@ export function AdminAnalytics() {
                 { id: 'table-problem-rigs', node: (
               <Card className="gap-1 py-2">
                 <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-600" /> Топ проблемных установок</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Wrench className="w-4 h-4 text-info-strong" /> Топ проблемных установок</CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-[92px] overflow-y-auto">
                   {kpi.topProblemRigs.length === 0 ? (
@@ -511,12 +511,12 @@ export function AdminAnalytics() {
                         <span className="shrink-0 font-mono text-foreground">{Math.round(s.meters).toLocaleString('ru-RU')} <span className="text-xs text-muted-foreground">· {s.piles}</span></span>
                       </div>
                       <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(4, Math.round((s.meters / max) * 100))}%` }} />
+                        <div className="h-full rounded-full bg-info-strong" style={{ width: `${Math.max(4, Math.round((s.meters / max) * 100))}%` }} />
                       </div>
                     </div>
                   );
                 })}
-                <Link href="/admin/reports" className="inline-block text-xs font-medium text-blue-600 hover:underline">Смотреть отчёт по объектам →</Link>
+                <Link href="/admin/reports" className="inline-block text-xs font-medium text-info-strong hover:underline">Смотреть отчёт по объектам →</Link>
               </div>
             )}
           </CardContent>

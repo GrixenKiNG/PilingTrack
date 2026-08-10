@@ -74,7 +74,7 @@ export function ReportEvidencePreview({
             <p className="mt-0.5 text-2xs text-muted-foreground">Доказательства смены · {formatDate(report.date)}</p>
             <span className={cn(
               'mt-1 inline-block rounded px-2 py-0.5 text-3xs font-medium',
-              report.status === 'submitted' ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground',
+              report.status === 'submitted' ? 'bg-success/10 text-success-strong' : 'bg-muted text-muted-foreground',
             )}>{statusLabel(report.status)}</span>
           </div>
           <button
@@ -110,7 +110,7 @@ export function ReportEvidencePreview({
             {history.loading ? (
               <div className="px-2.5 py-3 text-2xs text-muted-foreground">Загрузка истории…</div>
             ) : history.error ? (
-              <div className="px-2.5 py-3 text-2xs text-red-500">Не удалось загрузить историю изменений</div>
+              <div className="px-2.5 py-3 text-2xs text-destructive-strong">Не удалось загрузить историю изменений</div>
             ) : !history.data || history.data.events.length === 0 ? (
               <div className="px-2.5 py-3 text-2xs text-muted-foreground">Событий пока нет</div>
             ) : (
@@ -239,8 +239,8 @@ function ProgressLine({ label, value, pct, tone }: { label: string; value: strin
         <div
           className={cn(
             'h-full rounded-full',
-            tone === 'amber' && 'bg-amber-500',
-            tone === 'blue' && 'bg-blue-500',
+            tone === 'amber' && 'bg-warning-strong',
+            tone === 'blue' && 'bg-info-strong',
             tone === 'orange' && 'bg-signal',
           )}
           style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}

@@ -44,14 +44,14 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
   const active: LubePoint | undefined = map.points.find((p) => p.n === sel);
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-800">
+    <div className="rounded-lg border border-warning/30 bg-warning/10/60 p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-warning-strong">
         <PilingIcon name="maintenance-due" size={18} tone="warning" decorative /> Карта смазки
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
         {/* Схема */}
-        <div className="rounded-md border border-amber-100 bg-card p-2">
+        <div className="rounded-md border border-warning/30 bg-card p-2">
           <svg viewBox="0 0 200 240" className="h-56 w-full select-none">
             <CrawlerRig />
             {map.points.map((p) => {
@@ -85,13 +85,13 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
         {/* Список + деталь активной точки */}
         <div className="min-w-0">
           {active && (
-            <div className="mb-2 rounded-md border border-amber-200 bg-card p-2.5">
+            <div className="mb-2 rounded-md border border-warning/30 bg-card p-2.5">
               <div className="flex items-center gap-2">
                 <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-signal text-2xs font-bold text-white">{active.n}</span>
                 <span className="text-sm font-semibold text-foreground">{active.label}</span>
               </div>
               <dl className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-                <div><dt className="inline text-muted-foreground">Чем: </dt><dd className="inline font-medium text-teal-700">{active.lubricant}</dd></div>
+                <div><dt className="inline text-muted-foreground">Чем: </dt><dd className="inline font-medium text-success-strong">{active.lubricant}</dd></div>
                 <div><dt className="inline text-muted-foreground">Как: </dt><dd className="inline">{active.method}</dd></div>
                 <div><dt className="inline text-muted-foreground">Когда: </dt><dd className="inline font-medium text-foreground">{active.interval}</dd></div>
               </dl>
@@ -105,11 +105,11 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
                 onClick={() => setSel(p.n)}
                 className={cn(
                   'flex w-full items-center gap-2 border-b border-slate-50 px-2 py-1.5 text-left text-xs last:border-0',
-                  p.n === sel ? 'bg-amber-50' : 'hover:bg-muted',
+                  p.n === sel ? 'bg-warning/10' : 'hover:bg-muted',
                 )}
               >
                 <span className={cn('grid h-4 w-4 shrink-0 place-items-center rounded-full text-2xs leading-none font-bold text-white',
-                  p.n === sel ? 'bg-signal' : 'bg-amber-400')}>{p.n}</span>
+                  p.n === sel ? 'bg-signal' : 'bg-warning')}>{p.n}</span>
                 <span className="flex-1 truncate text-foreground">{p.label}</span>
                 <span className="shrink-0 text-2xs text-muted-foreground">{p.interval}</span>
               </button>

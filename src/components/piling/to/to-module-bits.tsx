@@ -61,13 +61,13 @@ export const TYPE_LABEL: Record<string, string> = {
 
 export const TYPE_STYLE: Record<string, string> = {
   EO: 'border-border bg-muted text-foreground',
-  TO1: 'border-blue-200 bg-blue-50 text-blue-700',
-  TO2: 'border-blue-200 bg-blue-50 text-blue-700',
-  TO3: 'border-indigo-200 bg-indigo-50 text-indigo-700',
-  SEASONAL: 'border-cyan-200 bg-cyan-50 text-cyan-700',
-  REPAIR: 'border-rose-200 bg-rose-50 text-rose-700',
-  FAULT: 'border-amber-200 bg-amber-50 text-amber-700',
-  SCHEDULED: 'border-blue-200 bg-blue-50 text-blue-700',
+  TO1: 'border-info/30 bg-info/10 text-info-strong',
+  TO2: 'border-info/30 bg-info/10 text-info-strong',
+  TO3: 'border-info/30 bg-info/10 text-info-strong',
+  SEASONAL: 'border-info/30 bg-info/10 text-info-strong',
+  REPAIR: 'border-destructive/30 bg-destructive/10 text-destructive-strong',
+  FAULT: 'border-warning/30 bg-warning/10 text-warning-strong',
+  SCHEDULED: 'border-info/30 bg-info/10 text-info-strong',
   INSPECTION: 'border-border bg-muted text-foreground',
 };
 
@@ -82,10 +82,10 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export const STATUS_STYLE: Record<string, string> = {
   PLANNED: 'border-border bg-muted text-foreground',
-  ASSIGNED: 'border-sky-200 bg-sky-50 text-sky-700',
+  ASSIGNED: 'border-info/30 bg-info/10 text-info-strong',
   IN_PROGRESS: 'border-signal/30 bg-signal/10 text-signal-strong',
-  ON_HOLD: 'border-amber-200 bg-amber-50 text-amber-700',
-  DONE: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  ON_HOLD: 'border-warning/30 bg-warning/10 text-warning-strong',
+  DONE: 'border-success/30 bg-success/10 text-success-strong',
   CANCELLED: 'border-border bg-muted text-muted-foreground',
 };
 
@@ -163,7 +163,7 @@ export function JournalRow({ record }: { record: JournalRecord }) {
         </span>
         {staleDays != null && (
           <div className="mt-1">
-            <span className="inline-flex rounded border border-rose-200 bg-rose-50 px-2 py-0.5 text-2xs font-semibold text-rose-700">
+            <span className="inline-flex rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-2xs font-semibold text-destructive-strong">
               просрочен · {staleDays} дн.
             </span>
           </div>
@@ -178,7 +178,7 @@ export function ChecklistBlock({ icon: Icon, label }: { icon: LucideIcon; label:
     <div className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
       <Icon className="h-4 w-4 shrink-0 text-signal-strong" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+      <CheckCircle2 className="h-4 w-4 shrink-0 text-success-strong" />
     </div>
   );
 }

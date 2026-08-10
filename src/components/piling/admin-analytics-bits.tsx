@@ -75,11 +75,11 @@ function fmtHours(h: number | null): string {
  */
 export function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
   const metrics: { label: string; value: string; tone?: string }[] = [
-    { label: 'Готовность парка', value: kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—', tone: 'text-emerald-600' },
+    { label: 'Готовность парка', value: kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—', tone: 'text-success-strong' },
     { label: 'MTBF', value: fmtHours(kpi.mtbfHours) },
     { label: 'MTTR', value: fmtHours(kpi.mttrHours) },
     { label: 'Выполнение ППР', value: kpi.pmCompliance != null ? `${(kpi.pmCompliance * 100).toFixed(0)}%` : '—' },
-    { label: 'Отказы за период', value: String(kpi.failureCount), tone: kpi.failureCount > 0 ? 'text-red-600' : undefined },
+    { label: 'Отказы за период', value: String(kpi.failureCount), tone: kpi.failureCount > 0 ? 'text-destructive-strong' : undefined },
     { label: 'Простой по ремонтам', value: fmtHours(kpi.downtimeHours) },
     { label: 'Затраты на ТО', value: `${kpi.totalCost.toLocaleString('ru')} ₽` },
     { label: 'ППР закрыто', value: `${kpi.pmClosed} / ${kpi.pmPlanned}` },

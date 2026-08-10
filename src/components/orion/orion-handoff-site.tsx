@@ -217,7 +217,10 @@ export function OrionHandoffSite() {
         </section>
 
         <section className={styles.statement}>
-          <p className={styles.sectionLabel}>// ПОЗИЦИОНИРОВАНИЕ</p>
+          {/* Слэши — часть оформления подписи, а не комментарий: в фигурных
+              скобках, иначе JSX читает их как начало комментария (линт-ошибка
+              react/jsx-no-comment-textnodes роняла npm run verify). */}
+          <p className={styles.sectionLabel}>{'// ПОЗИЦИОНИРОВАНИЕ'}</p>
           <h2>Мы не подрядчик на подхвате. <em>Собственный парк, инженерная дисциплина и ответственность за производственный контур.</em></h2>
         </section>
 

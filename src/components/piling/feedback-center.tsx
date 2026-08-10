@@ -48,28 +48,28 @@ const HEALTH_REFRESH_INTERVAL_MS = 300_000;
 function getLevelIcon(level: FeedbackEventDTO['level']) {
   switch (level) {
     case 'success':
-      return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+      return <CheckCircle2 className="h-4 w-4 text-success-strong" />;
     case 'warn':
-      return <AlertTriangle className="h-4 w-4 text-amber-600" />;
+      return <AlertTriangle className="h-4 w-4 text-warning-strong" />;
     case 'error':
-      return <XCircle className="h-4 w-4 text-red-600" />;
+      return <XCircle className="h-4 w-4 text-destructive-strong" />;
     case 'audit':
       return <ShieldCheck className="h-4 w-4 text-muted-foreground" />;
     default:
-      return <Info className="h-4 w-4 text-blue-600" />;
+      return <Info className="h-4 w-4 text-info-strong" />;
   }
 }
 
 function getPriorityBadge(priority: FeedbackEventPriority) {
   switch (priority) {
     case 'CRITICAL':
-      return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Критично</Badge>;
+      return <Badge className="bg-destructive/10 text-destructive-strong hover:bg-destructive/10">Критично</Badge>;
     case 'HIGH':
-      return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Высокий</Badge>;
+      return <Badge className="bg-warning/10 text-warning-strong hover:bg-warning/10">Высокий</Badge>;
     case 'LOW':
       return <Badge className="bg-muted text-foreground hover:bg-muted">Низкий</Badge>;
     default:
-      return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Средний</Badge>;
+      return <Badge className="bg-info/10 text-info-strong hover:bg-info/10">Средний</Badge>;
   }
 }
 
@@ -284,7 +284,7 @@ export function FeedbackCenter() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-muted">
+        <button className="hit-target relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-muted">
           <Bell className="h-4.5 w-4.5 text-muted-foreground" />
           {/* destructive-strong, а не red-500: белым по red-500 на 10px
               контраст 3.81 — ниже нормы для мелкого текста. */}
@@ -392,7 +392,7 @@ export function FeedbackCenter() {
                               <Badge className="bg-signal/10 text-signal-strong hover:bg-signal/10">Новое</Badge>
                             )}
                             {event.acknowledgedAt && (
-                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                              <Badge className="bg-success/10 text-success-strong hover:bg-success/10">
                                 Подтверждено
                               </Badge>
                             )}

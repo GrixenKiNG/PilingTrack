@@ -13,7 +13,7 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-red-50 to-red-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-500 text-white mb-4 shadow-lg shadow-red-500/25">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive-strong text-white mb-4 shadow-lg shadow-red-500/25">
           <HardHat className="w-8 h-8" />
         </div>
         <h1 className="text-2xl font-bold text-foreground tracking-tight mb-2">

@@ -105,7 +105,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           <button
             type="button"
             onClick={onRemove}
-            className="shrink-0 self-start mt-5 rounded p-1 text-muted-foreground hover:text-red-500"
+            className="shrink-0 self-start mt-5 rounded p-1 text-muted-foreground hover:text-destructive-strong"
             aria-label="Удалить пункт"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -238,7 +238,7 @@ export function SectionEditor({
             type="button"
             onClick={onRemove}
             disabled={total === 1}
-            className="rounded p-1 text-muted-foreground hover:text-red-500 disabled:opacity-30"
+            className="rounded p-1 text-muted-foreground hover:text-destructive-strong disabled:opacity-30"
             aria-label="Удалить раздел"
           >
             <Trash2 className="w-3.5 h-3.5" />

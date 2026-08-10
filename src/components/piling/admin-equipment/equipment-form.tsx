@@ -302,7 +302,7 @@ function ActiveToggle({ value, onChange }: { value: boolean; onChange: (v: boole
         onClick={() => onChange(!value)}
         className={cn(
           'relative w-10 h-6 rounded-full transition-colors',
-          value ? 'bg-green-500' : 'bg-slate-300',
+          value ? 'bg-success-strong' : 'bg-slate-300',
         )}
       >
         <span className={cn(

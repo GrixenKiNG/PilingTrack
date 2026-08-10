@@ -104,7 +104,7 @@ export function OpsHistoryList({
         {loading ? (
           <div className="px-2.5 py-3 text-2xs text-muted-foreground">Загрузка истории…</div>
         ) : error ? (
-          <div className="px-2.5 py-3 text-2xs text-red-500">Не удалось загрузить историю</div>
+          <div className="px-2.5 py-3 text-2xs text-destructive-strong">Не удалось загрузить историю</div>
         ) : !entries || entries.length === 0 ? (
           <div className="px-2.5 py-3 text-2xs text-muted-foreground">Событий пока нет</div>
         ) : (

@@ -32,7 +32,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const INSPECTION_TYPES = new Set(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'INSPECTION']);
 const fmt = (s: string | null) => (s ? new Date(s).toLocaleDateString('ru-RU') : '—');
-const scoreColor = (n: number) => (n >= 90 ? 'text-emerald-600' : n >= 75 ? 'text-amber-600' : n >= 50 ? 'text-signal-strong' : 'text-rose-600');
+const scoreColor = (n: number) => (n >= 90 ? 'text-success-strong' : n >= 75 ? 'text-warning-strong' : n >= 50 ? 'text-signal-strong' : 'text-destructive-strong');
 
 export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
   const [records, setRecords] = useState<JournalRecord[]>([]);

@@ -85,7 +85,7 @@ export function LoginPage() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight leading-tight">
                 <span className="text-white">Piling</span>
-                <span className="text-sky-400">Track</span>
+                <span className="text-info-strong">Track</span>
               </h1>
               <p className="text-xs md:text-sm text-muted-foreground mt-0.5">Управление свайными работами</p>
             </div>
@@ -102,7 +102,7 @@ export function LoginPage() {
                   placeholder="operator@piling.ru"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 md:h-13 bg-card/10 border-white/20 text-white placeholder:text-muted-foreground focus-visible:border-sky-400 focus-visible:ring-sky-400/30"
+                  className="pl-10 h-12 md:h-13 bg-card/10 border-white/20 text-white placeholder:text-muted-foreground focus-visible:border-info/30 focus-visible:ring-info/30/30"
                   autoComplete="email"
                   autoFocus
                 />
@@ -119,7 +119,7 @@ export function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 md:h-13 bg-card/10 border-white/20 text-white placeholder:text-muted-foreground focus-visible:border-sky-400 focus-visible:ring-sky-400/30"
+                  className="pl-10 pr-10 h-12 md:h-13 bg-card/10 border-white/20 text-white placeholder:text-muted-foreground focus-visible:border-info/30 focus-visible:ring-info/30/30"
                   autoComplete="current-password"
                 />
                 {/* 44×44 hit-target + accessible name (audit A-5): полевые
@@ -137,7 +137,7 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-12 md:h-13 bg-blue-600 hover:bg-blue-700 text-white font-medium text-base shadow-lg shadow-blue-600/30"
+              className="w-full h-12 md:h-13 bg-info-strong hover:bg-info-strong text-white font-medium text-base shadow-lg shadow-blue-600/30"
               disabled={loading}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Войти'}

@@ -72,14 +72,14 @@ export function LayoutCanvas({
           style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridAutoRows: template.card.rowHeight, gap: template.card.gap, padding: template.card.padding }}
         >
           <div
-            className="pointer-events-auto relative cursor-move border-2 border-blue-600"
+            className="pointer-events-auto relative cursor-move border-2 border-info"
             style={{ gridColumn: `${selected.x + 1} / span ${selected.width}`, gridRow: `${selected.y + 1} / span ${selected.height}` }}
             onPointerDown={(event) => beginPointer(event, false)}
           >
             <button
               type="button"
               aria-label="Изменить размер блока"
-              className="absolute -bottom-2 -right-2 h-6 w-6 cursor-se-resize rounded-full border-2 border-white bg-blue-600 shadow"
+              className="absolute -bottom-2 -right-2 h-6 w-6 cursor-se-resize rounded-full border-2 border-white bg-info-strong shadow"
               onPointerDown={(event) => { event.stopPropagation(); beginPointer(event, true); }}
             />
           </div>

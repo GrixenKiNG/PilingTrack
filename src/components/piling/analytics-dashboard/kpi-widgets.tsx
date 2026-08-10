@@ -59,7 +59,7 @@ function KpiTile({ id, label, value, hint, delta }: { id: string; label: string;
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
         {delta
-          ? <p className={`mt-1 text-xs font-medium ${delta.good ? 'text-emerald-600' : 'text-red-500'}`}>{delta.text}</p>
+          ? <p className={`mt-1 text-xs font-medium ${delta.good ? 'text-success-strong' : 'text-destructive-strong'}`}>{delta.text}</p>
           : <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
         </div>
       </CardContent>

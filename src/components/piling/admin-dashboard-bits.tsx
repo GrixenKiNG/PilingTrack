@@ -40,12 +40,12 @@ export interface SiteOption { id: string; name: string }
 
 export type Tone = 'danger' | 'warning' | 'info' | 'success' | 'muted';
 export const TONE_TEXT: Record<Tone, string> = {
-  danger: 'text-red-600', warning: 'text-amber-600', info: 'text-blue-600',
-  success: 'text-emerald-600', muted: 'text-muted-foreground',
+  danger: 'text-destructive-strong', warning: 'text-warning-strong', info: 'text-info-strong',
+  success: 'text-success-strong', muted: 'text-muted-foreground',
 };
 export const TONE_TAG: Record<Tone, string> = {
-  danger: 'bg-red-50 text-red-700', warning: 'bg-amber-50 text-amber-700',
-  info: 'bg-blue-50 text-blue-700', success: 'bg-emerald-50 text-emerald-700',
+  danger: 'bg-destructive/10 text-destructive-strong', warning: 'bg-warning/10 text-warning-strong',
+  info: 'bg-info/10 text-info-strong', success: 'bg-success/10 text-success-strong',
   muted: 'bg-muted text-muted-foreground',
 };
 
@@ -81,7 +81,7 @@ export function KpiTile({ icon, label, value, sub, progress }: {
           {progress != null && (
             <div className="mt-3 flex items-center gap-2">
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-emerald-600" style={{ width: `${clampPct(progress)}%` }} />
+                <div className="h-full rounded-full bg-success-strong" style={{ width: `${clampPct(progress)}%` }} />
               </div>
               <span className="font-mono text-xs text-muted-foreground">{Math.round(clampPct(progress))}%</span>
             </div>
@@ -94,10 +94,10 @@ export function KpiTile({ icon, label, value, sub, progress }: {
 
 type MiniTone = 'emerald' | 'blue' | 'amber' | 'red';
 const MINI_BAR: Record<MiniTone, string> = {
-  emerald: 'bg-emerald-600',
-  blue: 'bg-blue-600',
-  amber: 'bg-amber-500',
-  red: 'bg-red-500',
+  emerald: 'bg-success-strong',
+  blue: 'bg-info-strong',
+  amber: 'bg-warning-strong',
+  red: 'bg-destructive-strong',
 };
 
 export function PlanTile({ a }: { a: SiteAnalyticsDTO }) {
@@ -124,7 +124,7 @@ export function RigTile({ r, status, onOpen }: { r: FleetCard; status: { tone: T
     <button
       type="button"
       onClick={onOpen}
-      className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+      className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -173,7 +173,7 @@ export function RiskGroup({ title, risks, onOpen }: { title: string; risks: Risk
             key={r.id}
             type="button"
             onClick={() => onOpen(r.href)}
-            className="flex w-full items-start gap-2.5 px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+            className="flex w-full items-start gap-2.5 px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
           >
             <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', TONE_TEXT[r.tone])} />
             <span className="min-w-0 flex-1">
@@ -191,15 +191,15 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
   icon: LucideIcon; title: string; count?: number; dominant?: boolean; footerLabel?: string; onFooter?: () => void; children: ReactNode;
 }) {
   return (
-    <section className={cn('overflow-hidden rounded-lg border bg-card', dominant ? 'border-red-200' : 'border-border')}>
+    <section className={cn('overflow-hidden rounded-lg border bg-card', dominant ? 'border-destructive/30' : 'border-border')}>
       <div className={cn('flex items-center gap-2 border-b px-3 py-2',
-        dominant ? 'border-red-100 bg-red-50 text-red-700' : 'border-border text-foreground')}>
+        dominant ? 'border-destructive/30 bg-destructive/10 text-destructive-strong' : 'border-border text-foreground')}>
         <Icon className="h-4 w-4" />
         <span className="text-sm font-semibold">{title}</span>
         {count != null && (
           <span className={cn(
             'ml-auto rounded-full px-2 py-0.5 text-xs',
-            dominant ? 'bg-red-100 text-red-700' : 'bg-muted text-muted-foreground',
+            dominant ? 'bg-destructive/10 text-destructive-strong' : 'bg-muted text-muted-foreground',
           )}>
             {count}
           </span>
@@ -210,7 +210,7 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
         <button
           type="button"
           onClick={onFooter}
-          className="flex w-full items-center justify-between border-t border-border px-3 py-2 text-left text-xs font-medium text-blue-700 hover:bg-blue-50"
+          className="flex w-full items-center justify-between border-t border-border px-3 py-2 text-left text-xs font-medium text-info-strong hover:bg-info/10"
         >
           {footerLabel}
           <span aria-hidden="true">›</span>

@@ -131,7 +131,7 @@ export function MeterReadingsPanel({
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-bold text-foreground">Журнал наработки</h3>
-        <Gauge className="h-5 w-5 text-blue-600" />
+        <Gauge className="h-5 w-5 text-info-strong" />
       </div>
 
       {!formOpen && (
@@ -206,7 +206,7 @@ export function MeterReadingsPanel({
                   type="button"
                   onClick={() => remove(r.id)}
                   aria-label="Удалить показание"
-                  className="shrink-0 text-muted-foreground transition-colors hover:text-rose-600"
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-destructive-strong"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

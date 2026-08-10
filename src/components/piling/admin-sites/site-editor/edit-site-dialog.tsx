@@ -141,7 +141,7 @@ export function EditSiteDialog({
               <Skeleton className="h-24 w-full" />
             </div>
           ) : detailState === 'error' ? (
-            <div className="space-y-3 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-strong">
               <p>Не удалось загрузить планы объекта</p>
               <Button type="button" variant="outline" onClick={() => setRetryKey((value) => value + 1)}>Повторить</Button>
             </div>
@@ -163,7 +163,7 @@ export function EditSiteDialog({
                   onClick={() => setActive(!active)}
                   className={cn(
                     'w-10 h-6 rounded-full transition-colors relative',
-                    active ? 'bg-green-500' : 'bg-slate-300'
+                    active ? 'bg-success-strong' : 'bg-slate-300'
                   )}
                 >
                   <div

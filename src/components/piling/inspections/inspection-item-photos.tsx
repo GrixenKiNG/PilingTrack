@@ -193,7 +193,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
                 type="button"
                 onClick={() => handleDelete(p.id)}
                 disabled={busy}
-                className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded bg-card/90 text-rose-600 opacity-0 group-hover:opacity-100 shadow-sm disabled:opacity-50"
+                className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded bg-card/90 text-destructive-strong opacity-0 group-hover:opacity-100 shadow-sm disabled:opacity-50"
                 title="Удалить"
               >
                 <Trash2 className="w-3 h-3" />

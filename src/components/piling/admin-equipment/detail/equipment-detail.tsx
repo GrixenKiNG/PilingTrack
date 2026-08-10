@@ -108,7 +108,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
     return (
       <div className="p-6">
         {!embedded && <BackLink />}
-        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-strong">
           Не удалось загрузить установку: {error || 'нет данных'}
         </div>
       </div>
@@ -167,7 +167,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
               className={cn(
                 '-mb-px min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors',
                 tab === t.key
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-info text-info-strong'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >

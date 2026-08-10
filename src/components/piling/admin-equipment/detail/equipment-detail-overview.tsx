@@ -50,10 +50,10 @@ export interface DetailsResponse {
 }
 
 export const KIND_BADGE_STYLE: Record<EquipmentKindDTO, string> = {
-  PILE_DRIVER: 'bg-amber-100 text-amber-700 border-amber-200',
-  DRILLING_RIG: 'bg-blue-100 text-blue-700 border-blue-200',
+  PILE_DRIVER: 'bg-warning/10 text-warning-strong border-warning/30',
+  DRILLING_RIG: 'bg-info/10 text-info-strong border-info/30',
   VIBRO_HAMMER: 'bg-violet-100 text-violet-700 border-violet-200',
-  HYBRID: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  HYBRID: 'bg-success/10 text-success-strong border-success/30',
   OTHER: 'bg-muted text-muted-foreground border-border',
 };
 

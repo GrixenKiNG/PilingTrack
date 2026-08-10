@@ -204,7 +204,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
                 type="button"
                 onClick={() => handleDelete(p.id)}
                 disabled={busy}
-                className="absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-card/90 text-rose-600 opacity-0 group-hover:opacity-100 hover:bg-card shadow-sm disabled:opacity-50"
+                className="absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-card/90 text-destructive-strong opacity-0 group-hover:opacity-100 hover:bg-card shadow-sm disabled:opacity-50"
                 title="Удалить"
               >
                 <Trash2 className="w-3.5 h-3.5" />

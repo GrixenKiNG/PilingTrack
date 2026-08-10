@@ -197,13 +197,13 @@ export function FleetDashboard() {
   if (error && !snap) {
     return (
       <div className="p-6">
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-destructive-strong">
           <p className="text-sm font-semibold">Мониторинг не загрузился</p>
           <p className="mt-1 text-sm">{error} Проверьте подключение и повторите попытку.</p>
           <button
             type="button"
             onClick={() => void fetchSnapshot({ bust: true })}
-            className="mt-3 text-sm font-semibold text-rose-800 underline underline-offset-2"
+            className="mt-3 text-sm font-semibold text-destructive-strong underline underline-offset-2"
           >
             Повторить загрузку
           </button>
@@ -282,7 +282,7 @@ export function FleetDashboard() {
 }
 
 const selectCls =
-  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15';
+  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15';
 
 // ----------------------------------------------------------------------------
 
@@ -299,9 +299,9 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
         <div className="flex flex-col items-end gap-1">
           <div aria-live="polite" className={cn(
             'rounded-full bg-card/90 px-2.5 py-1 text-3xs uppercase tracking-wide',
-            conn === 'live' && 'text-emerald-700',
-            conn === 'connecting' && 'text-amber-700',
-            conn === 'offline' && 'text-rose-700',
+            conn === 'live' && 'text-success-strong',
+            conn === 'connecting' && 'text-warning-strong',
+            conn === 'offline' && 'text-destructive-strong',
           )}>
             {conn === 'live' ? 'Данные онлайн' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
           </div>

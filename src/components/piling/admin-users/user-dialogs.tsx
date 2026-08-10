@@ -393,7 +393,7 @@ export function DeleteUserDialog({ open, user, onOpenChange, onConfirm }: Delete
           <AlertDialogAction
             onClick={submit}
             disabled={submitting}
-            className="bg-red-500 text-white hover:bg-red-600"
+            className="bg-destructive-strong text-white hover:bg-destructive-strong"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Удалить'}
           </AlertDialogAction>
@@ -423,10 +423,10 @@ function FormField({ label, value, type = 'text', inputMode, error, placeholder,
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={cn('h-11', error && 'border-red-500')}
+        className={cn('h-11', error && 'border-destructive')}
       />
       {error && (
-        <p className="mt-1 text-xs text-red-500" role="alert">
+        <p className="mt-1 text-xs text-destructive-strong" role="alert">
           {error}
         </p>
       )}

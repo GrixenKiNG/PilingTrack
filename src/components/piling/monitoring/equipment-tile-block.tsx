@@ -77,11 +77,11 @@ function PhotoBlock({ card }: { card: FleetCard }) {
   const brand = getEquipmentBrand(card.model);
   const status =
     card.equipmentStatus === 'repair'
-      ? { label: 'В ремонте', classes: 'bg-red-100 text-red-700' }
+      ? { label: 'В ремонте', classes: 'bg-destructive/10 text-destructive-strong' }
       : card.status === 'active'
-        ? { label: 'В работе', classes: 'bg-emerald-100 text-emerald-700' }
+        ? { label: 'В работе', classes: 'bg-success/10 text-success-strong' }
         : card.status === 'expected'
-          ? { label: 'Ждём отчёт', classes: 'bg-amber-100 text-amber-700' }
+          ? { label: 'Ждём отчёт', classes: 'bg-warning/10 text-warning-strong' }
           : { label: 'Нет отчёта', classes: 'bg-slate-200 text-foreground' };
 
   return (

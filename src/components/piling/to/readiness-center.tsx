@@ -43,18 +43,18 @@ interface ReadinessCenterProps {
 const STATUS_META: Record<ReadinessStatus, { label: string; cls: string; dot: string }> = {
   IN_REPAIR: {
     label: 'В ремонте',
-    cls: 'border-rose-200 bg-rose-50 text-rose-700',
-    dot: 'bg-rose-500',
+    cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong',
+    dot: 'bg-destructive-strong',
   },
   BLOCKED: {
     label: 'Заблокировано',
-    cls: 'border-rose-200 bg-rose-50 text-rose-700',
-    dot: 'bg-rose-500',
+    cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong',
+    dot: 'bg-destructive-strong',
   },
   OVERDUE: {
     label: 'ТО просрочено',
-    cls: 'border-red-200 bg-red-50 text-red-700',
-    dot: 'bg-red-500',
+    cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong',
+    dot: 'bg-destructive-strong',
   },
   NO_DATA: {
     label: 'Нет данных',
@@ -63,21 +63,21 @@ const STATUS_META: Record<ReadinessStatus, { label: string; cls: string; dot: st
   },
   ATTENTION: {
     label: 'Требует внимания',
-    cls: 'border-amber-200 bg-amber-50 text-amber-700',
-    dot: 'bg-amber-500',
+    cls: 'border-warning/30 bg-warning/10 text-warning-strong',
+    dot: 'bg-warning-strong',
   },
   READY: {
     label: 'Готово',
-    cls: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    dot: 'bg-emerald-500',
+    cls: 'border-success/30 bg-success/10 text-success-strong',
+    dot: 'bg-success-strong',
   },
 };
 
 const EVIDENCE_META: Record<EvidenceState, { icon: typeof CheckCircle2; cls: string }> = {
-  pass: { icon: CheckCircle2, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  warning: { icon: AlertTriangle, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
+  pass: { icon: CheckCircle2, cls: 'border-success/30 bg-success/10 text-success-strong' },
+  warning: { icon: AlertTriangle, cls: 'border-warning/30 bg-warning/10 text-warning-strong' },
   missing: { icon: Clock, cls: 'border-border bg-muted text-muted-foreground' },
-  block: { icon: ShieldAlert, cls: 'border-rose-200 bg-rose-50 text-rose-700' },
+  block: { icon: ShieldAlert, cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong' },
 };
 
 const DECISION_CHAIN: ReadinessStatus[] = [
@@ -210,7 +210,7 @@ export function ReadinessCenter({
           </div>
         </section>
 
-        <main className="min-w-0 space-y-3">
+        <div className="min-w-0 space-y-3">
           <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -240,17 +240,17 @@ export function ReadinessCenter({
                 className={cn(
                   'mt-4 rounded-xl border p-4',
                   readiness.canOperate
-                    ? 'border-emerald-200 bg-emerald-50'
+                    ? 'border-success/30 bg-success/10'
                     : readiness.status === 'ATTENTION'
-                      ? 'border-amber-200 bg-amber-50'
-                      : 'border-rose-200 bg-rose-50',
+                      ? 'border-warning/30 bg-warning/10'
+                      : 'border-destructive/30 bg-destructive/10',
                 )}
               >
                 <div className="flex items-start gap-3">
                   {readiness.canOperate ? (
-                    <ShieldCheck className="h-10 w-10 shrink-0 text-emerald-600" />
+                    <ShieldCheck className="h-10 w-10 shrink-0 text-success-strong" />
                   ) : (
-                    <ShieldAlert className="h-10 w-10 shrink-0 text-rose-600" />
+                    <ShieldAlert className="h-10 w-10 shrink-0 text-destructive-strong" />
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -279,7 +279,7 @@ export function ReadinessCenter({
                 <h3 className="text-sm font-bold text-foreground">Доказательства решения</h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">Факт, состояние и переход к источнику</p>
               </div>
-              <FileText className="h-5 w-5 text-blue-600" />
+              <FileText className="h-5 w-5 text-info-strong" />
             </div>
             <div className="divide-y divide-border">
               {readiness?.evidence.map((item) => {
@@ -354,7 +354,7 @@ export function ReadinessCenter({
               </div>
             )}
           </section>
-        </main>
+        </div>
 
         <aside className="min-w-0 space-y-3">
           <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -363,7 +363,7 @@ export function ReadinessCenter({
                 <h3 className="text-sm font-bold text-foreground">Цепочка статуса</h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">Приоритет правил сверху вниз</p>
               </div>
-              <Gauge className="h-5 w-5 text-blue-600" />
+              <Gauge className="h-5 w-5 text-info-strong" />
             </div>
             <div className="mt-4 space-y-1.5">
               {DECISION_CHAIN.map((status, index) => {
@@ -391,10 +391,10 @@ export function ReadinessCenter({
           <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <h3 className="text-sm font-bold text-foreground">Границы решения</h3>
             <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="rounded-lg border border-info/30 bg-info/10 p-3">
                 «Готово» означает, что обязательные данные на текущую смену собраны и явных блокеров нет.
               </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
                 Наряд-допуск и подтверждённая передача смены пока не представлены отдельными сущностями — они не учитываются как выполненные.
               </div>
             </div>

@@ -106,10 +106,10 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                 {assignedUsers.map((a) => (
                   <div
                     key={a.id}
-                    className="flex items-center justify-between p-2.5 rounded-lg bg-green-50 border border-green-200"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-success/10 border border-success/30"
                   >
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <CheckCircle2 className="w-4 h-4 text-success-strong" />
                       <div>
                         <p className="text-sm font-medium text-foreground">{a.user.name}</p>
                         <p className="text-3xs text-muted-foreground">{a.user.email}</p>
@@ -117,7 +117,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                     </div>
                     <button
                       onClick={() => handleUnassignUser(a.userId)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"
                       title="Снять назначение"
                     >
                       <X className="w-3.5 h-3.5" />

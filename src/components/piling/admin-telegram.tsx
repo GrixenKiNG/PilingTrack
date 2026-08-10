@@ -245,7 +245,7 @@ export function AdminTelegram() {
                         className={cn(
                           'w-10 h-10 rounded-xl flex items-center justify-center',
                           config.enabled
-                            ? 'bg-sky-100 text-sky-600'
+                            ? 'bg-info/10 text-info-strong'
                             : 'bg-muted text-muted-foreground'
                         )}
                       >
@@ -268,7 +268,7 @@ export function AdminTelegram() {
                         variant="secondary"
                         className={
                           config.enabled
-                            ? 'bg-green-100 text-green-700 border-green-200'
+                            ? 'bg-success/10 text-success-strong border-success/30'
                             : 'bg-muted text-muted-foreground border-border'
                         }
                       >
@@ -280,7 +280,7 @@ export function AdminTelegram() {
                     <button
                       onClick={handleTest}
                       disabled={testing || !config.enabled}
-                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-sky-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-sky-50 disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-info-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-info/10 disabled:opacity-50"
                     >
                       {testing ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -291,7 +291,7 @@ export function AdminTelegram() {
                     </button>
                     <button
                       onClick={() => openEdit(config)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-info-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-info/10"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       Редактировать
@@ -312,7 +312,7 @@ export function AdminTelegram() {
                     </button>
                     <button
                       onClick={() => handleDelete(config.id)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-destructive-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-destructive/10"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Удалить

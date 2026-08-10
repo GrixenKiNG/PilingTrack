@@ -67,7 +67,7 @@ export function EquipmentTable({
                 onClick={() => onSelect(c.id)}
                 className={cn(
                   'cursor-pointer transition-colors hover:bg-muted',
-                  selectedId === c.id && 'bg-blue-50/60',
+                  selectedId === c.id && 'bg-info/10/60',
                 )}
               >
                 <td>

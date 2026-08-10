@@ -59,13 +59,13 @@ const PARAM_SPECS: Record<string, ParamSpec> = {
 
 const MACHINE_STATES: Record<number, { label: string; cls: string }> = {
   0: { label: 'Выключена', cls: 'bg-slate-200 text-foreground' },
-  1: { label: 'Простой', cls: 'bg-amber-100 text-amber-700' },
-  2: { label: 'Движение', cls: 'bg-sky-100 text-sky-700' },
-  3: { label: 'Работа', cls: 'bg-emerald-100 text-emerald-700' },
-  4: { label: 'Бурение', cls: 'bg-teal-100 text-teal-700' },
-  5: { label: 'Забивка свай', cls: 'bg-indigo-100 text-indigo-700' },
+  1: { label: 'Простой', cls: 'bg-warning/10 text-warning-strong' },
+  2: { label: 'Движение', cls: 'bg-info/10 text-info-strong' },
+  3: { label: 'Работа', cls: 'bg-success/10 text-success-strong' },
+  4: { label: 'Бурение', cls: 'bg-success/10 text-success-strong' },
+  5: { label: 'Забивка свай', cls: 'bg-info/10 text-info-strong' },
   6: { label: 'Извлечение', cls: 'bg-violet-100 text-violet-700' },
-  7: { label: 'Ошибка', cls: 'bg-rose-100 text-rose-700' },
+  7: { label: 'Ошибка', cls: 'bg-destructive/10 text-destructive-strong' },
   8: { label: 'Обслуживание', cls: 'bg-signal/10 text-signal-strong' },
 };
 
@@ -98,13 +98,13 @@ function worst(...s: Status[]): Status {
 
 const STATUS_CARD: Record<Status, string> = {
   ok: '',
-  warn: 'border-amber-300 bg-amber-50/40',
-  alarm: 'border-rose-300 bg-rose-50',
+  warn: 'border-warning/30 bg-warning/10/40',
+  alarm: 'border-destructive/30 bg-destructive/10',
 };
 const STATUS_VALUE: Record<Status, string> = {
   ok: 'text-foreground',
-  warn: 'text-amber-600',
-  alarm: 'text-rose-600',
+  warn: 'text-warning-strong',
+  alarm: 'text-destructive-strong',
 };
 const SPARK_STROKE: Record<Status, string> = {
   ok: '#0d9488',
@@ -228,9 +228,9 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
       </div>
 
       {invalid ? (
-        <p className="text-xs text-rose-500">Дата «С» позже даты «По».</p>
+        <p className="text-xs text-destructive-strong">Дата «С» позже даты «По».</p>
       ) : error ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Не удалось загрузить телеметрию: {error}</p>
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">Не удалось загрузить телеметрию: {error}</p>
       ) : records === null ? (
         <p className="text-sm text-muted-foreground">Загрузка…</p>
       ) : seriesByType.size === 0 ? (

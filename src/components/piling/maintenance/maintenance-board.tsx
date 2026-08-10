@@ -382,7 +382,7 @@ export function MaintenanceBoard() {
                 className={cn(
                   'h-8 w-8 rounded-md border font-mono',
                   pageNumber === safePage
-                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    ? 'border-info/30 bg-info/10 text-info-strong'
                     : 'border-border bg-card text-foreground',
                 )}
               >

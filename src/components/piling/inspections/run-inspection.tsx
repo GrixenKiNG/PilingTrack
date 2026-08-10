@@ -303,7 +303,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <p className="text-sm font-medium text-foreground leading-snug">
                         {item.text}
-                        {item.required && <span className="ml-1 text-rose-500">*</span>}
+                        {item.required && <span className="ml-1 text-destructive-strong">*</span>}
                       </p>
                       {item.provenance && (
                         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">
@@ -373,7 +373,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
                             className="mt-2 text-xs resize-none"
                           />
                           {item.photoRequired && (
-                            <p className="mt-2 text-2xs text-amber-600 font-medium">Требуется фото</p>
+                            <p className="mt-2 text-2xs text-warning-strong font-medium">Требуется фото</p>
                           )}
                           <InspectionItemPhotos
                             inspectionId={inspectionId}

@@ -90,7 +90,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="sm"
               onClick={() => void logoutClient()}
-              className="h-11 w-11 text-muted-foreground hover:text-red-500"
+              className="h-11 w-11 text-muted-foreground hover:text-destructive-strong"
               aria-label="Выйти"
             >
               <PilingIcon name="logout" size={16} tone="danger" decorative />
@@ -185,7 +185,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           variant="outline"
           size="sm"
           onClick={() => void logoutClient()}
-          className="w-full justify-start text-muted-foreground hover:text-red-600 hover:border-red-200"
+          className="hit-target w-full justify-start text-muted-foreground hover:text-destructive-strong hover:border-destructive/30"
         >
           <PilingIcon name="logout" size={16} tone="danger" decorative className="mr-2" />
           Выйти

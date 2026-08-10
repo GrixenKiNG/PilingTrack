@@ -17,14 +17,14 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-sm font-semibold flex items-center gap-1.5">
-          <Drill className="w-4 h-4 text-blue-500" />
+          <Drill className="w-4 h-4 text-info-strong" />
           План бурения
         </Label>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          className="h-7 text-xs text-info-strong hover:text-info-strong hover:bg-info/10"
           onClick={() => setPlans([...plans, emptyDrillingPlanRow()])}
         >
           <Plus className="w-3 h-3 mr-1" />
@@ -78,7 +78,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
               <button
                 type="button"
                 onClick={() => setPlans(plans.filter((p) => p.tempId !== row.tempId))}
-                className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-500 flex-shrink-0"
+                className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong flex-shrink-0"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -88,7 +88,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
       )}
 
       {plans.length > 0 && (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-blue-50 rounded-lg text-xs">
+        <div className="flex items-center justify-between px-2 py-1.5 bg-info/10 rounded-lg text-xs">
           <span className="font-medium text-muted-foreground">Итого бурение</span>
           <span className="text-foreground">
             <span className="font-mono font-semibold">{totalDrillingMeters(plans).toFixed(1)}</span> м

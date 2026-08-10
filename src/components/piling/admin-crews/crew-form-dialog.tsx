@@ -83,7 +83,7 @@ function AssistantSelector({
           {names.map(name => (
             <span
               key={name}
-              className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+              className="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning-strong"
             >
               {name}
             </span>
@@ -209,7 +209,7 @@ export function CrewFormDialog({
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>
-                  Оператор <span className="text-red-500">*</span>
+                  Оператор <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={operatorId} onValueChange={setOperatorId}>
                   <SelectTrigger className="h-11 w-full">
@@ -227,7 +227,7 @@ export function CrewFormDialog({
 
               <div className="space-y-1.5">
                 <Label>
-                  Установка <span className="text-red-500">*</span>
+                  Установка <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={equipmentId} onValueChange={setEquipmentId}>
                   <SelectTrigger className="h-11 w-full">
@@ -245,7 +245,7 @@ export function CrewFormDialog({
 
               <div className="space-y-1.5">
                 <Label>
-                  Объект <span className="text-red-500">*</span>
+                  Объект <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={siteId} onValueChange={setSiteId}>
                   <SelectTrigger className="h-11 w-full">
@@ -410,13 +410,13 @@ function AssistantSelectorModal({
               {selectedIds.map(id => (
                 <span
                   key={id}
-                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+                  className="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning-strong"
                 >
                   {assistantUsers.find(user => user.id === id)?.name ?? id}
                   <button
                     type="button"
                     onClick={() => onRemoveId(id)}
-                    className="rounded p-0.5 text-amber-500 transition-colors hover:bg-amber-100 hover:text-amber-700"
+                    className="rounded p-0.5 text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

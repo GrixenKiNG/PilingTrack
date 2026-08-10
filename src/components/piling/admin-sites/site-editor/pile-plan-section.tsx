@@ -96,7 +96,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
               <button
                 type="button"
                 onClick={() => setPlans(plans.filter((p) => p.tempId !== row.tempId))}
-                className="w-6 h-6 rounded flex items-center justify-center hover:bg-red-50 text-muted-foreground hover:text-red-500 flex-shrink-0"
+                className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong flex-shrink-0"
               >
                 <X className="w-3 h-3" />
               </button>

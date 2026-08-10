@@ -315,7 +315,7 @@ export function AdminDashboard() {
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
                 className={cn(
                   'min-h-11 border-border px-3 text-sm font-medium first:border-0 max-sm:border-t max-sm:odd:border-r sm:border-l',
-                  periodMode === m ? 'bg-blue-50 text-blue-700' : 'bg-card text-muted-foreground hover:bg-muted',
+                  periodMode === m ? 'bg-info/10 text-info-strong' : 'bg-card text-muted-foreground hover:bg-muted',
                 )}>
                 {label}
               </button>
@@ -346,7 +346,7 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={refreshAll}
-            className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+            className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
             aria-label="Обновить дашборд"
           >
             <RefreshCw className="h-4 w-4" />
@@ -357,7 +357,7 @@ export function AdminDashboard() {
       </div>
 
       {(stale.fleet || stale.maint || stale.recent || stale.sites) && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800" role="status">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning-strong" role="status">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           Сводка неполная: не удалось обновить данные по разделам — {staleSourceNames}. Нажмите «Обновить дашборд».
         </div>

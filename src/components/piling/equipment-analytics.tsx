@@ -135,7 +135,7 @@ export function EquipmentAnalytics() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
-            <Gauge className="h-5 w-5 text-teal-600" /> Аналитика по установкам
+            <Gauge className="h-5 w-5 text-success-strong" /> Аналитика по установкам
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Выработка, утилизация, простои и обслуживание парка за период</p>
         </div>
@@ -161,7 +161,7 @@ export function EquipmentAnalytics() {
         </div>
       </div>
 
-      {invalid && <p className="text-xs text-rose-500">Дата «С» позже даты «По».</p>}
+      {invalid && <p className="text-xs text-destructive-strong">Дата «С» позже даты «По».</p>}
 
       {error && !data ? (
         <QueryErrorBanner message={error} onRetry={() => void load()} retrying={loading} />
@@ -273,7 +273,7 @@ function FleetTable({
                   <div className="text-2xs text-muted-foreground">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
                 </div>
                 {r.maintenanceDue && (
-                  <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">ТО скоро</span>
+                  <span className="shrink-0 rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">ТО скоро</span>
                 )}
               </div>
               <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
@@ -330,7 +330,7 @@ function FleetTable({
               <td className="px-3 py-2 text-right font-mono">{r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'}</td>
               <td className="px-3 py-2 text-right">
                 {r.maintenanceDue
-                  ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-2xs font-medium text-amber-700">скоро</span>
+                  ? <span className="rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">скоро</span>
                   : <span className="text-2xs text-muted-foreground">—</span>}
               </td>
             </tr>
@@ -375,7 +375,7 @@ function DowntimePareto({ rows }: { rows: AnalyticsResult['downtimePareto'] }) {
               <span className="font-mono text-xs text-muted-foreground">{fmtHours(r.hours)} · {r.pct}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded bg-muted">
-              <div className="h-full rounded bg-amber-400" style={{ width: `${(r.hours / max) * 100}%` }} />
+              <div className="h-full rounded bg-warning" style={{ width: `${(r.hours / max) * 100}%` }} />
             </div>
           </div>
         ))}

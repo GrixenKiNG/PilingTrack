@@ -155,7 +155,7 @@ export function EquipmentCardGrid({
                 }}
                 className={cn(
                   'cursor-pointer rounded-2xl transition-shadow hover:shadow-md',
-                  selectedId === card.id && 'ring-2 ring-blue-500/40',
+                  selectedId === card.id && 'ring-2 ring-info/30/40',
                 )}
               >
                 <LayoutRenderer
@@ -171,7 +171,7 @@ export function EquipmentCardGrid({
                   className={cn(
                     'absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border px-2 py-1 text-2xs font-semibold shadow-sm backdrop-blur transition-colors',
                     customized
-                      ? 'border-blue-200 bg-blue-50/90 text-blue-700 hover:bg-blue-100'
+                      ? 'border-info/30 bg-info/10/90 text-info-strong hover:bg-info/10'
                       : 'border-border bg-card/90 text-muted-foreground opacity-0 hover:bg-muted group-hover:opacity-100',
                   )}
                 >

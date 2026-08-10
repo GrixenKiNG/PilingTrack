@@ -56,7 +56,7 @@ export function DowntimeSection({
               <div className="flex gap-2">
                 <Input type="number" aria-label="Продолжительность простоя, ч" step="0.5" placeholder="Часы" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
                   min="0.5" className="h-11 font-mono flex-1" />
-                <Button onClick={onAdd} aria-label="Добавить простой в отчёт" className="h-11 min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
+                <Button onClick={onAdd} aria-label="Добавить простой в отчёт" className="h-11 min-h-[44px] bg-warning-strong hover:bg-warning-strong text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
               <Input aria-label="Комментарий к простою" placeholder="Комментарий (необязательно)" value={tempComment} onChange={(e) => onTempCommentChange(e.target.value)} className="h-11" />
             </div>
@@ -70,10 +70,10 @@ export function DowntimeSection({
                       {dt.comment && <p className="text-xs font-medium text-muted-foreground truncate">{dt.comment}</p>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-mono font-bold text-amber-600">{dt.duration} ч</span>
+                      <span className="text-base font-mono font-bold text-warning-strong">{dt.duration} ч</span>
                       <button onClick={() => onRemove(dt.id)}
                         aria-label={`Удалить простой «${getDowntimeReasonName(dt.reasonId)}» из отчёта`}
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700">
+                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong">
                         <PilingIcon name="delete" size={16} tone="danger" decorative />
                       </button>
                     </div>

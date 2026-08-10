@@ -326,13 +326,13 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       <div className="mt-4 rounded-xl border bg-card p-4">
         <h2 className="mb-2 text-sm font-semibold text-foreground">Приёмка</h2>
         {record.acceptedAt ? (
-          <p className="text-sm text-emerald-700">
+          <p className="text-sm text-success-strong">
             ✓ Принято {formatRuDate(record.acceptedAt)}
           </p>
         ) : isAdmin ? (
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-muted-foreground">Работа ещё не принята.</span>
-            <Button size="sm" disabled={accepting} className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={accept}>
+            <Button size="sm" disabled={accepting} className="bg-success-strong hover:bg-success-strong text-white" onClick={accept}>
               {accepting && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
               Принять
             </Button>

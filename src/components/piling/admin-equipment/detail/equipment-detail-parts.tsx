@@ -88,17 +88,17 @@ export function BackLink() {
 
 function ShiftBadge({ type }: { type: string }) {
   if (type === 'NIGHT') {
-    return <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700">Ночь</span>;
+    return <span className="rounded bg-info/10 px-1.5 py-0.5 text-info-strong">Ночь</span>;
   }
-  return <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">День</span>;
+  return <span className="rounded bg-warning/10 px-1.5 py-0.5 text-warning-strong">День</span>;
 }
 
 export function TelematicsStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    ACTIVE:     'bg-emerald-100 text-emerald-700',
+    ACTIVE:     'bg-success/10 text-success-strong',
     PROVISIONED: 'bg-muted text-muted-foreground',
-    DEGRADED:   'bg-amber-100 text-amber-700',
-    OFFLINE:    'bg-rose-100 text-rose-700',
+    DEGRADED:   'bg-warning/10 text-warning-strong',
+    OFFLINE:    'bg-destructive/10 text-destructive-strong',
     ARCHIVED:   'bg-muted text-muted-foreground',
   };
   return <span className={cn('rounded px-1.5 py-0.5', map[status] || 'bg-muted text-muted-foreground')}>{status}</span>;
@@ -217,7 +217,7 @@ export function OperatorRotationCard({ rows }: { rows: TimelineRow[] }) {
               <td className="px-3 py-2">
                 <span className="inline-flex items-center gap-1.5">
                   {s.isSubstitution && (
-                    <span title="подмена" className="text-amber-600">⇄</span>
+                    <span title="подмена" className="text-warning-strong">⇄</span>
                   )}
                   {s.operatorName ?? '—'}
                 </span>
@@ -268,8 +268,8 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
   const hoursStatus = remainingHours == null ? 'ok' : remainingHours <= 0 ? 'alarm' : remainingHours <= 50 ? 'warn' : 'ok';
   const dateStatus = daysLeft == null ? 'ok' : daysLeft < 0 ? 'alarm' : daysLeft <= 14 ? 'warn' : 'ok';
 
-  const barColor = (st: string) => (st === 'alarm' ? 'bg-rose-500' : st === 'warn' ? 'bg-amber-500' : 'bg-emerald-500');
-  const txtColor = (st: string) => (st === 'alarm' ? 'text-rose-600' : st === 'warn' ? 'text-amber-600' : 'text-foreground');
+  const barColor = (st: string) => (st === 'alarm' ? 'bg-destructive-strong' : st === 'warn' ? 'bg-warning-strong' : 'bg-success-strong');
+  const txtColor = (st: string) => (st === 'alarm' ? 'text-destructive-strong' : st === 'warn' ? 'text-warning-strong' : 'text-foreground');
 
   return (
     <div className="space-y-4">

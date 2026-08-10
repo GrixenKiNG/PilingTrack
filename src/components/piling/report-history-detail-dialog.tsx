@@ -73,8 +73,8 @@ export function ReportHistoryDetailDialog({
                     variant="secondary"
                     className={
                       report.status === 'submitted'
-                        ? 'bg-green-100 text-green-700 border-green-200'
-                        : 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                        ? 'bg-success/10 text-success-strong border-success/30'
+                        : 'bg-warning/10 text-warning-strong border-warning/30'
                     }
                   >
                     {report.status === 'submitted' ? 'Отправлен' : 'Черновик'}
@@ -122,7 +122,7 @@ export function ReportHistoryDetailDialog({
                   <Separator />
                   <div>
                     <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <Drill className="w-4 h-4 text-blue-500" />
+                      <Drill className="w-4 h-4 text-info-strong" />
                       Лидерное бурение ({report.drillings.length})
                     </h4>
                     <div className="space-y-1">
@@ -148,7 +148,7 @@ export function ReportHistoryDetailDialog({
                   <Separator />
                   <div>
                     <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-amber-500" />
+                      <Clock className="w-4 h-4 text-warning-strong" />
                       Простой техники
                     </h4>
                     <div className="space-y-1">
@@ -163,7 +163,7 @@ export function ReportHistoryDetailDialog({
                               <p className="text-3xs text-muted-foreground">{downtime.comment}</p>
                             )}
                           </div>
-                          <span className="font-mono font-semibold text-amber-600">
+                          <span className="font-mono font-semibold text-warning-strong">
                             {downtime.duration} ч
                           </span>
                         </div>

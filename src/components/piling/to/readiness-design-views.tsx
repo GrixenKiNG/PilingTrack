@@ -82,12 +82,12 @@ const STATUS_META: Record<
   ReadinessStatus,
   { label: string; className: string }
 > = {
-  READY: { label: 'Готово', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  ATTENTION: { label: 'Требует решения', className: 'border-amber-200 bg-amber-50 text-amber-800' },
+  READY: { label: 'Готово', className: 'border-success/30 bg-success/10 text-success-strong' },
+  ATTENTION: { label: 'Требует решения', className: 'border-warning/30 bg-warning/10 text-warning-strong' },
   NO_DATA: { label: 'Нет данных', className: 'border-border bg-muted text-muted-foreground' },
-  IN_REPAIR: { label: 'В ремонте', className: 'border-rose-200 bg-rose-50 text-rose-700' },
-  BLOCKED: { label: 'Недоступно', className: 'border-rose-200 bg-rose-50 text-rose-700' },
-  OVERDUE: { label: 'ТО просрочено', className: 'border-rose-200 bg-rose-50 text-rose-700' },
+  IN_REPAIR: { label: 'В ремонте', className: 'border-destructive/30 bg-destructive/10 text-destructive-strong' },
+  BLOCKED: { label: 'Недоступно', className: 'border-destructive/30 bg-destructive/10 text-destructive-strong' },
+  OVERDUE: { label: 'ТО просрочено', className: 'border-destructive/30 bg-destructive/10 text-destructive-strong' },
 };
 
 function ViewHeading({
@@ -231,7 +231,7 @@ export function ReadinessFleetView({
                     {item.crewCount > 0 ? `Бригад: ${item.crewCount}` : 'Бригада не назначена'}
                   </div>
                 </div>
-                <div className="mt-3"><ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-signal'} /></div>
+                <div className="mt-3"><ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-success-strong' : 'bg-signal'} /></div>
                 <p className="mt-3 min-h-10 text-xs leading-relaxed text-muted-foreground">{state?.reason}</p>
               </button>
             );
@@ -295,7 +295,7 @@ export function ReadinessShiftsView({
         {activeCrews.length === 0 && <EmptyBlock label="Активных назначений бригад нет" tall />}
       </section>
       {equipment.some((item) => !assignedIds.has(item.id)) && (
-        <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-strong">
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <div><strong>Есть техника без назначения:</strong> {equipment.filter((item) => !assignedIds.has(item.id)).map((item) => item.name).join(', ')}.</div>
         </div>
@@ -324,7 +324,7 @@ export function ReadinessPermitsView({
         <KpiTile icon="risk" label="Ожидают данных" value={summary.attention + summary.noData} detail="требуется подтверждение" alert={summary.attention + summary.noData > 0} />
         <KpiTile icon="defect" label="Запуск запрещён" value={summary.blocked} detail="есть блокирующее условие" alert={summary.blocked > 0} />
       </section>
-      <div className="flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-950">
+      <div className="flex gap-3 rounded-xl border border-info/30 bg-info/10 p-4 text-sm leading-relaxed text-info-strong">
         <ShieldAlert className="h-5 w-5 shrink-0" />
         <div><strong>Контур предварительный.</strong> В текущей базе нет отдельной сущности наряд-допуска, его номера, срока действия и маршрута согласования. Экран не подменяет документ и не выдаёт допуск автоматически.</div>
       </div>
@@ -420,7 +420,7 @@ export function ReadinessMaintenanceView({
                   <article key={record.id} className="rounded-lg border border-border p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div><h3 className="font-semibold text-foreground">{record.title}</h3><p className="mt-1 text-xs text-muted-foreground">{record.equipment?.name}</p></div>
-                      <span className={cn('rounded-full px-2 py-1 text-xs font-bold', ['CRITICAL', 'HIGH'].includes(record.priority) ? 'bg-rose-50 text-rose-700' : 'bg-muted text-muted-foreground')}>{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</span>
+                      <span className={cn('rounded-full px-2 py-1 text-xs font-bold', ['CRITICAL', 'HIGH'].includes(record.priority) ? 'bg-destructive/10 text-destructive-strong' : 'bg-muted text-muted-foreground')}>{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</span>
                     </div>
                     <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{record.description || 'Описание не заполнено'}</p>
                     <div className="mt-4 flex justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>{TYPE_LABEL[record.type] ?? record.type}</span><span>{STATUS_LABEL[record.status] ?? record.status}</span></div>
@@ -483,7 +483,7 @@ export function ReadinessReportsView({
               return (
                 <div key={item.id} className="grid items-center gap-3 sm:grid-cols-[180px_minmax(0,1fr)_110px]">
                   <div className="truncate text-sm font-semibold text-foreground">{item.name}</div>
-                  <ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-emerald-500' : 'bg-signal'} />
+                  <ProgressBar value={state?.score ?? 0} tone={state?.canOperate ? 'bg-success-strong' : 'bg-signal'} />
                   <div className="text-right">{state && <StatusBadge status={state.status} />}</div>
                 </div>
               );
@@ -497,7 +497,7 @@ export function ReadinessReportsView({
             {blockerRows.map(([label, count]) => (
               <div key={label}>
                 <div className="mb-2 flex items-center justify-between text-sm"><span className="text-muted-foreground">{label}</span><strong className="font-mono text-foreground">{count}</strong></div>
-                <ProgressBar value={(count / maxBlockers) * 100} tone={count > 0 ? 'bg-signal' : 'bg-emerald-500'} />
+                <ProgressBar value={(count / maxBlockers) * 100} tone={count > 0 ? 'bg-signal' : 'bg-success-strong'} />
               </div>
             ))}
           </div>
@@ -548,12 +548,12 @@ export function ReadinessSettingsView() {
                 <div key={name} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] sm:items-center">
                   <div className="font-semibold text-foreground">{name}</div>
                   <div className="text-sm text-muted-foreground">{condition}</div>
-                  <div className="text-right"><span className="rounded-full bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700">{effect}</span></div>
+                  <div className="text-right"><span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive-strong">{effect}</span></div>
                 </div>
               ))}
             </div>
           </section>
-          <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
+          <div className="flex gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm leading-relaxed text-warning-strong">
             <ShieldAlert className="h-5 w-5 shrink-0" />
             <div><strong>Правила доступны только для просмотра.</strong> Для редактирования весов, маршрутов согласования и электронных допусков нужна отдельная серверная модель с аудитом изменений.</div>
           </div>

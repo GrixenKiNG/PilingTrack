@@ -6,7 +6,7 @@
 
 import type { LayoutBlock, LayoutTemplate } from './layout-template';
 
-const inputClass = 'min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
+const inputClass = 'min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/20';
 
 function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
   return (
@@ -54,7 +54,7 @@ export function LayoutInspector({
     <section aria-label="Свойства блока" className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="truncate text-sm font-semibold text-foreground">Блок: {block.id}</h3>
-        <button type="button" className="min-h-11 rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-700 hover:bg-red-50" onClick={onDelete}>Удалить</button>
+        <button type="button" className="min-h-11 rounded-lg border border-destructive/30 px-3 text-xs font-semibold text-destructive-strong hover:bg-destructive/10" onClick={onDelete}>Удалить</button>
       </div>
       {block.kind === 'text' && (
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
@@ -91,7 +91,7 @@ export function LayoutInspector({
               />
             </label>
           )}
-          {imageTools?.error && <p role="alert" className="text-xs font-medium text-red-700">{imageTools.error}</p>}
+          {imageTools?.error && <p role="alert" className="text-xs font-medium text-destructive-strong">{imageTools.error}</p>}
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">

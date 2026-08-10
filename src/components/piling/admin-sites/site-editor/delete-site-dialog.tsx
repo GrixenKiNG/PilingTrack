@@ -31,15 +31,15 @@ export function DeleteSiteDialog({ site, open, onOpenChange, onConfirm, onDeacti
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-red-700">Удалить объект навсегда?</DialogTitle>
+          <DialogTitle className="text-destructive-strong">Удалить объект навсегда?</DialogTitle>
           <DialogDescription>
             Объект «{site?.name}» и его настройки (планы, иерархия, назначения) будут удалены безвозвратно.
             Удаление возможно только для ошибочно заведённых объектов — без бригад и без отчётов.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-          <p className="text-xs text-red-800">
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive-strong" />
+          <p className="text-xs text-destructive-strong">
             Это действие необратимо. Если объект уже в работе (есть бригады или отчёты), удаление будет отклонено —
             деактивируйте его вместо удаления.
           </p>

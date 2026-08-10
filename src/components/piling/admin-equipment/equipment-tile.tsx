@@ -42,22 +42,22 @@ export function EquipmentTile({
           ? 'Ожидается'
           : 'Нет отчёта сегодня';
   const stateClass = inRepair
-    ? 'border-blue-200 bg-blue-50 text-blue-700'
+    ? 'border-info/30 bg-info/10 text-info-strong'
     : flag
-      ? 'border-amber-200 bg-amber-50 text-amber-700'
+      ? 'border-warning/30 bg-warning/10 text-warning-strong'
       : card.status === 'active'
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        ? 'border-success/30 bg-success/10 text-success-strong'
         : card.status === 'expected'
-          ? 'border-sky-200 bg-sky-50 text-sky-700'
+          ? 'border-info/30 bg-info/10 text-info-strong'
           : 'border-border bg-muted text-muted-foreground';
-  const barClass = flag === 'overdue' ? 'bg-rose-500' : flag === 'soon' ? 'bg-amber-500' : st.bar;
+  const barClass = flag === 'overdue' ? 'bg-destructive-strong' : flag === 'soon' ? 'bg-warning-strong' : st.bar;
 
   return (
     <Card
       onClick={() => onSelect(card.id)}
       className={cn(
         'cursor-pointer gap-0 overflow-hidden p-0 transition-all hover:shadow-md',
-        selected && 'ring-2 ring-blue-500/40',
+        selected && 'ring-2 ring-info/30/40',
       )}
     >
       <div className={cn('h-1 w-full', barClass)} />

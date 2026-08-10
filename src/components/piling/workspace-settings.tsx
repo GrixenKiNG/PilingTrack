@@ -50,7 +50,7 @@ function Field({ label, value, onChange, disabled, placeholder }: { label: strin
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:text-muted-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:text-muted-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/20"
       />
     </label>
   );
@@ -208,7 +208,7 @@ export function WorkspaceSettings() {
                   <span className="font-medium text-foreground">{roleCounts[role] ?? 0}</span>
                 </div>
               ))}
-              <a href="/admin/users" className="mt-3 inline-block text-sm font-medium text-blue-600 hover:underline">Все роли и права доступа →</a>
+              <a href="/admin/users" className="mt-3 inline-block text-sm font-medium text-info-strong hover:underline">Все роли и права доступа →</a>
             </CardContent>
           </Card>
 
@@ -229,8 +229,8 @@ export function WorkspaceSettings() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-signal-strong" />Интеграции и резервное копирование</CardTitle><CardDescription>Подключения и защита данных.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Telegram-бот</span>{isAdmin ? <button type="button" onClick={() => setActiveTab('telegram')} className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Send className="h-3.5 w-3.5" />Настроить</button> : <span className="text-muted-foreground">только администратор</span>}</div>
-              {isAdmin && <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Очередь сообщений (DLQ)</span><button type="button" onClick={() => setActiveTab('dlq')} className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:underline"><Database className="h-3.5 w-3.5" />Открыть</button></div>}
+              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Telegram-бот</span>{isAdmin ? <button type="button" onClick={() => setActiveTab('telegram')} className="inline-flex items-center gap-1.5 font-medium text-info-strong hover:underline"><Send className="h-3.5 w-3.5" />Настроить</button> : <span className="text-muted-foreground">только администратор</span>}</div>
+              {isAdmin && <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Очередь сообщений (DLQ)</span><button type="button" onClick={() => setActiveTab('dlq')} className="inline-flex items-center gap-1.5 font-medium text-info-strong hover:underline"><Database className="h-3.5 w-3.5" />Открыть</button></div>}
               <p className="text-xs leading-5 text-muted-foreground">Резервное копирование выполняется на сервере по расписанию (off-site). Управление — на стороне инфраструктуры.</p>
             </CardContent>
           </Card>

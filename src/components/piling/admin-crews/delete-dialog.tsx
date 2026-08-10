@@ -24,7 +24,7 @@ export function DeleteDialog({ open, onClose, crewName, deleting, onConfirm }: D
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
+          <DialogTitle className="flex items-center gap-2 text-destructive-strong">
             <AlertTriangle className="h-4 w-4" />Деактивировать бригаду?
           </DialogTitle>
           <DialogDescription>
@@ -34,7 +34,7 @@ export function DeleteDialog({ open, onClose, crewName, deleting, onConfirm }: D
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={deleting}>Отмена</Button>
-          <Button onClick={onConfirm} disabled={deleting} className="bg-red-600 text-white hover:bg-red-700">
+          <Button onClick={onConfirm} disabled={deleting} className="bg-destructive-strong text-white hover:bg-destructive-strong">
             {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Деактивировать'}
           </Button>
         </DialogFooter>

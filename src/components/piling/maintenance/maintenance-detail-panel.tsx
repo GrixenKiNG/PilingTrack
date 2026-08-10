@@ -129,7 +129,7 @@ export function MaintenanceDetailPanel({
               <TimelineLine tone="green" date={formatRuDate(record.startedAt)} text={record.startedAt ? 'Работы начаты' : 'Работы не начаты'} actor={assigneeName} />
               <TimelineLine tone={record.completedAt ? 'green' : 'orange'} date={formatRuDate(record.completedAt)} text={record.completedAt ? 'ТО закрыто' : 'Закрытие ожидается'} actor={assigneeName} />
             </div>
-            <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex text-xs font-medium text-blue-600 hover:text-blue-700">
+            <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex text-xs font-medium text-info-strong hover:text-info-strong">
               Показать все события
             </Link>
           </PanelSection>
@@ -198,7 +198,7 @@ function FactRow({ label, value }: { label: string; value: string | null | undef
 function RemarkLine({ tone, text }: { tone: 'orange' | 'red'; text: string }) {
   return (
     <div className="flex items-center gap-2 text-xs text-foreground">
-      <span className={cn('h-2 w-2 rounded-full', tone === 'orange' ? 'bg-signal' : 'bg-red-500')} />
+      <span className={cn('h-2 w-2 rounded-full', tone === 'orange' ? 'bg-signal' : 'bg-destructive-strong')} />
       <span className="min-w-0 flex-1 truncate">{text}</span>
     </div>
   );
@@ -207,7 +207,7 @@ function RemarkLine({ tone, text }: { tone: 'orange' | 'red'; text: string }) {
 function TimelineLine({ tone, date, text, actor }: { tone: 'green' | 'orange'; date: string; text: string; actor: string }) {
   return (
     <div className="grid grid-cols-[12px_112px_1fr_88px] items-start gap-2">
-      <span className={cn('mt-1.5 h-2 w-2 rounded-full', tone === 'green' ? 'bg-emerald-500' : 'bg-signal')} />
+      <span className={cn('mt-1.5 h-2 w-2 rounded-full', tone === 'green' ? 'bg-success-strong' : 'bg-signal')} />
       <span className="font-mono text-2xs text-muted-foreground">{date}</span>
       <span className="text-foreground">{text}</span>
       <span className="truncate text-right text-2xs text-muted-foreground">{actor}</span>

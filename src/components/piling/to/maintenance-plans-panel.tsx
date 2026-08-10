@@ -37,8 +37,8 @@ interface Plan {
 
 const DUE_META: Record<PmDueStatus, { label: string; cls: string }> = {
   ok: { label: 'норма', cls: 'border-border bg-muted text-muted-foreground' },
-  due_soon: { label: 'скоро ТО', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-  overdue: { label: 'просрочено', cls: 'border-rose-200 bg-rose-50 text-rose-700' },
+  due_soon: { label: 'скоро ТО', cls: 'border-warning/30 bg-warning/10 text-warning-strong' },
+  overdue: { label: 'просрочено', cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong' },
 };
 
 function dueDetail(p: Plan): string {
@@ -147,7 +147,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-bold text-foreground">Регламенты ТО</h3>
-        <CalendarClock className="h-5 w-5 text-blue-600" />
+        <CalendarClock className="h-5 w-5 text-info-strong" />
       </div>
 
       {!formOpen && (
@@ -171,14 +171,14 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             <button
               type="button"
               onClick={() => setTrigger('HOURS')}
-              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'HOURS' ? 'bg-blue-100 text-blue-700' : 'text-muted-foreground')}
+              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'HOURS' ? 'bg-info/10 text-info-strong' : 'text-muted-foreground')}
             >
               По моточасам
             </button>
             <button
               type="button"
               onClick={() => setTrigger('CALENDAR')}
-              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'CALENDAR' ? 'bg-blue-100 text-blue-700' : 'text-muted-foreground')}
+              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'CALENDAR' ? 'bg-info/10 text-info-strong' : 'text-muted-foreground')}
             >
               По календарю
             </button>
@@ -234,7 +234,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
                     type="button"
                     onClick={() => remove(p.id)}
                     aria-label="Удалить регламент"
-                    className="text-muted-foreground transition-colors hover:text-rose-600"
+                    className="text-muted-foreground transition-colors hover:text-destructive-strong"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

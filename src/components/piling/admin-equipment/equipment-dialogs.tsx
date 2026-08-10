@@ -182,15 +182,15 @@ export function DeleteEquipmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-red-600">Удалить установку?</DialogTitle>
+          <DialogTitle className="text-destructive-strong">Удалить установку?</DialogTitle>
           <DialogDescription>
             Установка «{item?.name}» будет удалена. Это действие нельзя отменить.
           </DialogDescription>
         </DialogHeader>
         {crewCount > 0 && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-red-700">
+          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-destructive-strong mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-destructive-strong">
               Эта установка используется в <strong>{crewCount}</strong>{' '}
               {pluralizeRu(crewCount, ['бригаде', 'бригадах', 'бригадах'])}.
               Удаление может повлиять на связанные записи.
@@ -203,7 +203,7 @@ export function DeleteEquipmentDialog({
             onClick={submit}
             disabled={submitting}
             variant="destructive"
-            className="bg-red-500 hover:bg-red-600 text-white"
+            className="bg-destructive-strong hover:bg-destructive-strong text-white"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Удалить навсегда'}
           </Button>

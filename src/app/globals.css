@@ -163,6 +163,45 @@
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
   .pl-safe { padding-left: env(safe-area-inset-left); }
   .pr-safe { padding-right: env(safe-area-inset-right); }
+
+  /* Расширение области попадания без изменения внешнего вида.
+     Нужно для плотных операционных таблиц: сам значок или квадратик
+     остаётся мелким (диспетчер за монитором ценит плотность строки —
+     см. Operational Table в DESIGN.md), но нажимать можно по большему
+     невидимому прямоугольнику.
+
+     24px — минимум WCAG 2.2 AA «Target Size (Minimum)», действует при
+     любом вводе. 44px включается только там, где пальцем: грубый
+     указатель или узкий экран. Размер элемента при этом не меняется,
+     поэтому строка таблицы не разъезжается. */
+  .hit-target { position: relative; }
+  .hit-target::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
+  }
+  @media (pointer: coarse), (max-width: 767px) {
+    .hit-target::after {
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+    }
+  }
+
+  /* Группа значков-действий в конце строки таблицы.
+     Здесь накладка `hit-target` не годится: кнопки стоят через 4px, и
+     невидимые области в 44px наложились бы друг на друга — палец попадал
+     бы в соседнее действие, а «Удалить» стоит рядом с «Архивировать».
+     Поэтому на сенсорном вводе цели растут по-настоящему и разъезжаются
+     зазором. Строка при этом становится выше — для пальца это правильно. */
+  .row-actions { display: flex; justify-content: flex-end; gap: 0.25rem; }
+  @media (pointer: coarse), (max-width: 767px) {
+    .row-actions { gap: 0.5rem; }
+    .row-actions > button { min-width: 44px; min-height: 44px; }
+  }
 }
 
 @layer components {

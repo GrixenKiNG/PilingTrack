@@ -211,13 +211,13 @@ export function StartInspectionForm() {
                     <b.icon className="w-3.5 h-3.5 text-signal-strong" />
                     <span className="flex-1">{b.label}</span>
                     {b.ok
-                      ? <span className="text-2xs text-emerald-600">✓ шаблон есть</span>
-                      : <span className="text-2xs text-rose-600">нет шаблона</span>}
+                      ? <span className="text-2xs text-success-strong">✓ шаблон есть</span>
+                      : <span className="text-2xs text-destructive-strong">нет шаблона</span>}
                   </div>
                 ))}
               </div>
               {!hasBase && (
-                <p className="mt-2 rounded bg-rose-50 px-2 py-1.5 text-2xs text-rose-700">
+                <p className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-2xs text-destructive-strong">
                   Нет блока «База» для модели «{selected.model || '—'}». Создайте его в разделе{' '}
                   <Link href="/admin/checklists" className="underline">Чек-листы</Link>{' '}
                   (тип «База», применимость «{selected.model || '—'}» или без модели — общий для всех).
@@ -232,16 +232,16 @@ export function StartInspectionForm() {
 
           {/* Расходники к заказу (для уровней ТО) */}
           {selected && consumables.length > 0 && (
-            <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-3">
+            <div className="rounded-lg border border-success/30 bg-success/10/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-teal-800">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-success-strong">
                   <ShoppingCart className="h-4 w-4" /> Заказать перед ТО
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={copyConsumables} className="h-7 gap-1 px-2 text-xs">
                   <Copy className="h-3 w-3" /> Скопировать
                 </Button>
               </div>
-              <div className="overflow-hidden rounded-md border border-teal-100 bg-card">
+              <div className="overflow-hidden rounded-md border border-success/30 bg-card">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left text-2xs uppercase tracking-wide text-muted-foreground">
@@ -257,7 +257,7 @@ export function StartInspectionForm() {
                           {c.name}
                           {c.note && <span className="block text-2xs text-muted-foreground">{c.note}</span>}
                         </td>
-                        <td className="px-2 py-1.5 font-medium text-teal-700">{c.marking}</td>
+                        <td className="px-2 py-1.5 font-medium text-success-strong">{c.marking}</td>
                         <td className="whitespace-nowrap px-2 py-1.5 font-semibold text-foreground">{c.qty}</td>
                       </tr>
                     ))}

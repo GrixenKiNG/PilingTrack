@@ -41,7 +41,7 @@ export function SubmitBar({
               </div>
               {hasDowntime && (
                 <div>
-                  <p className="text-lg font-bold font-mono tabular-nums text-amber-400">{formatNumber(totalDowntime)} ч</p>
+                  <p className="text-lg font-bold font-mono tabular-nums text-warning-strong">{formatNumber(totalDowntime)} ч</p>
                   <p className="text-xs font-medium text-muted-foreground">Простой</p>
                 </div>
               )}
@@ -53,8 +53,8 @@ export function SubmitBar({
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-sm border-t px-4 py-3 pb-safe">
         {showHint && (
           <div className="flex items-center gap-1.5 mb-2 justify-center">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-            <p className="text-sm text-amber-600 font-semibold">
+            <AlertTriangle className="w-3.5 h-3.5 text-warning-strong" />
+            <p className="text-sm text-warning-strong font-semibold">
               {!selectedSiteId ? 'Сначала выберите объект выше' : 'Добавьте хотя бы одну сваю, бурение или простой'}
             </p>
           </div>

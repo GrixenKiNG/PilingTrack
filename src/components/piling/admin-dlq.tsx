@@ -43,10 +43,10 @@ interface DlqStats {
 }
 
 const STATUS_FILTERS: Array<{ key: DlqStatus; label: string; color: string }> = [
-  { key: 'pending', label: 'В очереди', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { key: 'resolved', label: 'Решено', color: 'bg-green-100 text-green-700 border-green-200' },
+  { key: 'pending', label: 'В очереди', color: 'bg-warning/10 text-warning-strong border-warning/30' },
+  { key: 'resolved', label: 'Решено', color: 'bg-success/10 text-success-strong border-success/30' },
   { key: 'discarded', label: 'Отброшено', color: 'bg-muted text-muted-foreground border-border' },
-  { key: 'all', label: 'Все', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { key: 'all', label: 'Все', color: 'bg-info/10 text-info-strong border-info/30' },
 ];
 
 export function AdminDlq() {
@@ -118,7 +118,7 @@ export function AdminDlq() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <AlertTriangle className="w-5 h-5 text-warning-strong" />
             Dead Letter Queue
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -133,10 +133,10 @@ export function AdminDlq() {
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard icon={Clock} label="В очереди" value={stats.pending} color="text-amber-600" bg="bg-amber-50" />
-          <StatCard icon={CheckCircle2} label="Решено" value={stats.resolved} color="text-green-600" bg="bg-green-50" />
+          <StatCard icon={Clock} label="В очереди" value={stats.pending} color="text-warning-strong" bg="bg-warning/10" />
+          <StatCard icon={CheckCircle2} label="Решено" value={stats.resolved} color="text-success-strong" bg="bg-success/10" />
           <StatCard icon={XCircle} label="Отброшено" value={stats.discarded} color="text-muted-foreground" bg="bg-muted" />
-          <StatCard icon={AlertTriangle} label="Всего" value={stats.total} color="text-blue-600" bg="bg-blue-50" />
+          <StatCard icon={AlertTriangle} label="Всего" value={stats.total} color="text-info-strong" bg="bg-info/10" />
         </div>
       )}
 
@@ -171,7 +171,7 @@ export function AdminDlq() {
         </div>
       ) : entries.length === 0 ? (
         <div className="text-center py-16">
-          <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
+          <CheckCircle2 className="w-12 h-12 text-success/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">DLQ пуст</p>
           <p className="text-xs text-muted-foreground mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
         </div>
@@ -211,10 +211,10 @@ export function AdminDlq() {
                           <span className="ml-2">· Обновлено: {formatDate(entry.updatedAt)}</span>
                         )}
                       </p>
-                      <p className="text-sm text-red-600 mt-2 line-clamp-2">{entry.errorMessage}</p>
+                      <p className="text-sm text-destructive-strong mt-2 line-clamp-2">{entry.errorMessage}</p>
                       <button
                         onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                        className="text-xs text-blue-600 hover:underline mt-1"
+                        className="text-xs text-info-strong hover:underline mt-1"
                       >
                         {expandedId === entry.id ? 'Скрыть payload' : 'Показать payload'}
                       </button>
@@ -241,7 +241,7 @@ export function AdminDlq() {
                           variant="outline"
                           onClick={() => handleAction(entry.id, 'discard')}
                           disabled={actingId === entry.id}
-                          className="h-8 text-xs text-red-600 hover:text-red-700"
+                          className="h-8 text-xs text-destructive-strong hover:text-destructive-strong"
                         >
                           <Trash2 className="w-3 h-3" />
                           Отбросить

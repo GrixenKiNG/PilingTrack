@@ -138,7 +138,7 @@ export function AdminUsers() {
             <div className="text-3xs text-muted-foreground">+ ещё {user.assignedSites.length - 1}</div>
           )}
         </div>
-      ) : <span className="text-2xs text-amber-600">Не назначен</span>,
+      ) : <span className="text-2xs text-warning-strong">Не назначен</span>,
     },
     {
       key: 'crew',
@@ -149,7 +149,7 @@ export function AdminUsers() {
           <div className="truncate text-xs font-medium text-foreground">{user.activeCrew.name || 'Экипаж'}</div>
           <div className="truncate text-3xs text-muted-foreground">{user.activeCrew.equipmentName || 'Без установки'}</div>
         </div>
-      ) : <span className="text-2xs text-amber-600">Не назначена</span>,
+      ) : <span className="text-2xs text-warning-strong">Не назначена</span>,
     },
     {
       key: 'activity',
@@ -190,7 +190,7 @@ export function AdminUsers() {
     return (
       <div className="grid min-h-72 place-items-center p-6 text-center">
         <div>
-          <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500" />
+          <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive-strong" />
           <p className="text-sm font-semibold text-foreground">Не удалось загрузить пользователей</p>
           <p className="mt-1 text-xs text-muted-foreground">{error}</p>
           <Button variant="outline" onClick={retry} className="mt-4">

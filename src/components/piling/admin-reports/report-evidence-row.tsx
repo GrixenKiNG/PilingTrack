@@ -146,7 +146,7 @@ export function EvidenceReportRow({
         <span className={cn(
           'mt-0.5 inline-block rounded px-1.5 py-0.5 text-xs font-medium',
           report.status === 'submitted'
-            ? 'bg-emerald-50 text-emerald-700'
+            ? 'bg-success/10 text-success-strong'
             : 'bg-muted text-foreground',
         )}>{statusLabel(report.status)}</span>
       </div>
@@ -173,8 +173,8 @@ function MetricCell({ value, sub, tone }: { value: string; sub: string; tone: 'o
       <span className={cn(
         'font-mono font-semibold tabular-nums',
         tone === 'orange' && 'text-signal-strong',
-        tone === 'blue' && 'text-blue-700',
-        tone === 'amber' && 'text-amber-700',
+        tone === 'blue' && 'text-info-strong',
+        tone === 'amber' && 'text-warning-strong',
         tone === 'slate' && 'text-foreground',
       )}>{value}</span>
       <span className="text-2xs text-muted-foreground lg:mt-0.5 lg:block">{sub}</span>
@@ -207,7 +207,7 @@ function IconButton({
       aria-label={label}
       className={cn(
         'grid h-11 w-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50',
-        danger && 'hover:bg-red-50 hover:text-red-500',
+        danger && 'hover:bg-destructive/10 hover:text-destructive-strong',
       )}
     >
       <Icon className="h-3.5 w-3.5" />
