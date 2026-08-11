@@ -132,7 +132,26 @@ export interface WorkPermitDto {
   validTo: string;
   timezone: string;
   version: number;
-  approvals: Array<{ id: string; role: 'DISPATCHER' | 'ADMIN'; decision: string; decidedAt: string }>;
+  /**
+   * Подписи под нарядом (WorkPermitApproval).
+   *
+   * Тип был объявлен как {id, role, decision, decidedAt} — три поля из четырёх
+   * не существуют в ответе. У этого DTO нет zod-схемы, поэтому расхождение
+   * ничем не ловилось: UI читал approval.decidedAt, получал undefined, а
+   * форматтер даты подставлял текущий момент — журнал согласования показывал
+   * выдуманное время вместо настоящего.
+   *
+   * Действующей считается подпись с valid=true и permitVersion равной текущей
+   * версии наряда: при правке наряда прежние решения аннулируются
+   * (см. modules/readiness/domain/permits/approval-policy.ts).
+   */
+  approvals: Array<{
+    role: 'DISPATCHER' | 'ADMIN';
+    approvedById: string;
+    approvedAt: string;
+    valid: boolean;
+    permitVersion: number;
+  }>;
 }
 
 export const authoritativeReadinessFactsSchema = z.object({

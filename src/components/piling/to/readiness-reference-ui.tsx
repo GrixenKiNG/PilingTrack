@@ -2205,6 +2205,32 @@ function PermitsScreen(props: ReferenceUiProps) {
   const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
   const pending = props.permits.filter((item) => item.state === 'PENDING_APPROVAL').length;
   const crewByEquipment = new Map(props.crews.flatMap((crew) => crew.isActive && crew.equipment ? [[crew.equipment.id, crew] as const] : []));
+  const awaitingApproval = props.permits.filter((item) => item.state === 'PENDING_APPROVAL');
+  const equipmentWithApprovedPermit = new Set(
+    props.permits.flatMap((item) => item.state === 'APPROVED' ? [item.equipmentId] : []),
+  ).size;
+  /*
+    Счётчики плиток — по авторитетным снимкам, а не по производной модели.
+    У производной доказательства заполнены только для выбранной установки
+    (журнал ТО грузится по одной), поэтому плитка «Техника» показывала
+    «Осмотрено: 0 из 9» при девяти выполненных осмотрах.
+  */
+  const inspectedCount = props.currentReadiness.filter((item) => item.facts?.inspectionCompleted).length;
+  const maintenanceOkCount = props.currentReadiness.filter((item) => item.facts
+    && item.facts.maintenanceConfigured
+    && item.facts.maintenanceOverdueHours === 0
+    && item.facts.maintenanceOverdueDays === 0).length;
+  /**
+   * Чей журнал согласования показываем: наряд выбранной установки, иначе
+   * первый ожидающий решения. Журнал строится из его approvals[].
+   */
+  const journalPermit = props.permits.find((item) => item.equipmentId === props.selectedId)
+    ?? awaitingApproval[0]
+    ?? props.permits[0]
+    ?? null;
+  const validApprovals = journalPermit
+    ? journalPermit.approvals.filter((item) => item.valid && item.permitVersion === journalPermit.version).length
+    : 0;
   const filteredPermits = props.permits.filter((permit) => {
     if (permitFilter !== 'ALL' && permit.state !== permitFilter) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
@@ -2270,17 +2296,39 @@ function PermitsScreen(props: ReferenceUiProps) {
       </section>
       <section className={cn(card, 'mt-2 p-3')}>
         <div className="flex items-center gap-2"><CheckCircle2 className="h-6 w-6 text-success-strong" /><h2 className="font-bold">Условия допуска подтверждены для {active} из {props.permits.length} нарядов</h2></div>
-        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-border"><div className="bg-success-strong" style={{ width: `${props.permits.length ? active / props.permits.length * 100 : 0}%` }} /><div className="bg-signal-strong" style={{ width: `${props.permits.length ? pending / props.permits.length * 100 : 0}%` }} /><div className="flex-1 bg-destructive-strong" /></div>
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted-foreground"><span>● <b>{active}</b> допущено</span><span className="text-signal-strong">● <b>{pending}</b> ожидают подтверждения</span><span className="text-destructive-strong">● <b>{blocked}</b> заблокировано</span><span className="xl:ml-auto text-muted-foreground">Фактическая проверка условий готовности</span></div>
+        {/*
+          Красный сегмент был `flex-1` — он забирал ВСЮ оставшуюся ширину, а не
+          долю заблокированных. Черновики (ни одна из трёх категорий) красились
+          красным как «заблокировано», хотя легенда рядом честно писала 0.
+          Полоса противоречила собственной подписи. Теперь каждый сегмент имеет
+          свою ширину, а остаток отдан черновикам нейтральным цветом.
+        */}
+        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-border">
+          {([
+            [active, 'bg-success-strong'],
+            [pending, 'bg-signal'],
+            [blocked, 'bg-destructive-strong'],
+            [Math.max(0, props.permits.length - active - pending - blocked), 'bg-muted-foreground/40'],
+          ] as const).map(([count, cls], index) => (
+            <div key={index} className={cls} style={{ width: `${props.permits.length ? count / props.permits.length * 100 : 0}%` }} />
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted-foreground"><span>● <b>{active}</b> допущено</span><span className="text-signal-strong">● <b>{pending}</b> ожидают подтверждения</span><span className="text-destructive-strong">● <b>{blocked}</b> заблокировано</span>{props.permits.length - active - pending - blocked > 0 && <span>● <b>{props.permits.length - active - pending - blocked}</b> черновиков</span>}<span className="xl:ml-auto text-muted-foreground">Фактическая проверка условий готовности</span></div>
       </section>
       <section className={cn(card, 'mt-2 p-3')}>
-        <div className="flex items-center justify-between"><div><h2 className="font-bold">Доказательства допуска</h2><p className="mt-0.5 text-2xs text-muted-foreground">Полный комплект подтверждений перед началом работ</p></div><span className="text-xs text-muted-foreground">{active} из {props.equipment.length} комплектов подтверждено</span></div>
+        <div className="flex items-center justify-between"><div><h2 className="font-bold">Доказательства допуска</h2><p className="mt-0.5 text-2xs text-muted-foreground">Полный комплект подтверждений перед началом работ</p></div>{/*
+            Было «{active} из {equipment.length}» — согласованные НАРЯДЫ против
+            числа УСТАНОВОК. Величины несопоставимы, и на живых данных выходило
+            «10 из 9 комплектов подтверждено». Считаем установки, у которых есть
+            действующий наряд, из общего числа установок.
+          */}
+          <span className="text-xs text-muted-foreground">{equipmentWithApprovedPermit} из {props.equipment.length} установок с действующим нарядом</span></div>
         <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
           {[
             { title: 'Люди', icon: 'operator' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.operator) ? 'pass' : 'missing', lines: [`Экипажей: ${props.crews.filter((crew) => crew.isActive).length}`, 'Удостоверения проверяются'] },
-            { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : 'pass', lines: [`Ограничений: ${blocked}`, `Осмотрено: ${states.filter((item) => item.evidence.some((entry) => entry.key === 'inspection' && entry.state === 'pass')).length} из ${states.length}`] },
+            { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : 'pass', lines: [`Ограничений: ${blocked}`, `Осмотрено: ${inspectedCount} из ${props.equipment.length}`] },
             { title: 'Место работ', icon: 'site' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.site) ? 'pass' : 'missing', lines: [`Объектов: ${new Set(props.crews.flatMap((crew) => crew.site?.id ? [crew.site.id] : [])).size}`, 'Схема требует подтверждения'] },
-            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : 'pass', lines: [`Подтверждено: ${states.filter((item) => item.evidence.some((entry) => entry.key === 'maintenance' && entry.state === 'pass')).length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
+            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : 'pass', lines: [`Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
           ].map((item) => (
             <article key={item.title} className="rounded-lg border border-border p-2">
               <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-info/10 text-info-strong"><PilingIcon name={item.icon} size={12} decorative /></span><div className="min-w-0 flex-1"><h3 className="text-xs font-bold">{item.title}</h3><EvidenceState state={item.state} /></div></div>
@@ -2300,7 +2348,7 @@ function PermitsScreen(props: ReferenceUiProps) {
               const current = props.currentReadiness.find((entry) => entry.equipmentId === permit.equipmentId);
               return (
                 <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', index === 0 && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
-                  <span className="font-bold">НД-{permit.id.slice(-8).toUpperCase()}</span><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span><b className="text-signal-strong">{current?.score ?? '—'}%</b></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
+                  <span className="font-bold">НД-{permit.id.slice(-8).toUpperCase()}</span><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= 85 ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= 85 ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
                 </div>
               );
             })}
@@ -2326,8 +2374,83 @@ function PermitsScreen(props: ReferenceUiProps) {
         </section>
         <aside className={cn(card, 'p-3')}>
           <div className="flex items-center justify-between"><h2 className="font-bold">Ожидают согласования</h2><span className="text-xs text-muted-foreground">{pending}</span></div>
-          <div className="mt-2 space-y-2">{props.permits.filter((item) => item.state === 'PENDING_APPROVAL').slice(0, 2).map((permit, index) => <div key={permit.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal' : 'border-border')}><div className="text-xs font-bold">НД-{permit.id.slice(-8).toUpperCase()}</div><div className="mt-1 text-3xs text-muted-foreground">{props.equipment.find((item) => item.id === permit.equipmentId)?.name || 'Установка'}</div><div className="mt-1 line-clamp-2 text-3xs text-signal-strong">{permit.risk === 'ELEVATED' ? 'Повышенный риск · требуется два согласования' : 'Ожидает решения диспетчера'}</div></div>)}</div>
-          <div className="mt-3 border-t border-border pt-3"><h3 className="text-xs font-bold">Журнал согласования</h3><div className="mt-2 space-y-1.5 text-3xs"><div className="text-success-strong">● Создан мастером</div><div className="text-info-strong">● Проверен инженером ОТ</div><div className="text-signal-strong">● Ожидает диспетчера · {pending}</div></div></div>
+          <div className="mt-2 space-y-2">
+            {awaitingApproval.slice(0, 3).map((permit, index) => {
+              const canApprove = props.bootstrap?.capabilities.entities.permit.approveDispatcher
+                || props.bootstrap?.capabilities.entities.permit.approveAdmin;
+              return (
+                <div key={permit.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal bg-signal/5' : 'border-border')}>
+                  <div className="text-xs font-bold">НД-{permit.id.slice(-8).toUpperCase()}</div>
+                  <div className="mt-1 text-3xs text-muted-foreground">{props.equipment.find((item) => item.id === permit.equipmentId)?.name || 'Установка'} · {crewByEquipment.get(permit.equipmentId)?.site?.name || 'Объект не назначен'}</div>
+                  <div className="mt-1 line-clamp-2 text-3xs text-signal-strong">{permit.risk === 'ELEVATED' ? 'Повышенный риск · требуется два согласования' : 'Ожидает решения диспетчера'}</div>
+                  {/* Действие прямо в панели: раньше карточка только называла
+                      наряд, а согласовывать приходилось идти в таблицу. */}
+                  {canApprove && (
+                    <Button
+                      type="button"
+                      className="mt-2 h-9 w-full bg-signal text-2xs text-white hover:bg-signal-strong"
+                      onClick={() => void runPermitAction(permit, 'approve')}
+                    >
+                      Проверить и согласовать
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+            {awaitingApproval.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">Нарядов на согласовании нет.</p>}
+          </div>
+          {/*
+            Журнал строится из реальных решений (WorkPermitApproval: роль,
+            решение, время). Раньше здесь стояли три постоянные строки —
+            «Создан мастером», «Проверен инженером ОТ», «Ожидает диспетчера»,
+            — но таких этапов в модели наряда нет вовсе: жизненный цикл это
+            DRAFT → PENDING_APPROVAL → APPROVED, а подписи хранятся в
+            approvals[]. Даты не показывались, потому что их неоткуда было
+            взять: этапы были выдуманы.
+          */}
+          <div className="mt-3 border-t border-border pt-3">
+            <h3 className="text-xs font-bold">Журнал согласования</h3>
+            {journalPermit ? (
+              <>
+                <div className="mt-1 text-3xs text-muted-foreground">НД-{journalPermit.id.slice(-8).toUpperCase()}</div>
+                <ol className="mt-2 space-y-2">
+                  {journalPermit.approvals.length === 0 && (
+                    <li className="text-3xs text-muted-foreground">Решений пока нет.</li>
+                  )}
+                  {journalPermit.approvals.map((approval) => {
+                    // Аннулированное решение и решение по прежней версии наряда
+                    // не подтверждают ничего — показываем это, а не галочку.
+                    const current = approval.valid && approval.permitVersion === journalPermit.version;
+                    return (
+                      <li key={`${approval.role}-${approval.approvedAt}`} className="flex items-start gap-2">
+                        {current
+                          ? <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-success-strong" />
+                          : <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />}
+                        <div className="min-w-0">
+                          <div className={cn('text-3xs font-semibold', !current && 'text-muted-foreground')}>
+                            {current ? 'Согласовано' : `Аннулировано (версия ${approval.permitVersion})`} · {handoverRoleLabel(approval.role)}
+                          </div>
+                          <div className="text-3xs text-muted-foreground">{formatDateTimeInTimezone(approval.approvedAt, props.bootstrap?.tenant.timezone)}</div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                  {journalPermit.state === 'PENDING_APPROVAL' && (
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full border-2 border-signal" />
+                      <div className="text-3xs font-semibold text-signal-strong">
+                        {journalPermit.risk === 'ELEVATED' && validApprovals < 2
+                          ? `Ожидает ещё ${2 - validApprovals} решения (повышенный риск)`
+                          : 'Ожидает решения диспетчера'}
+                      </div>
+                    </li>
+                  )}
+                </ol>
+              </>
+            ) : (
+              <p className="mt-2 text-3xs text-muted-foreground">Выберите наряд, чтобы увидеть его решения.</p>
+            )}
+          </div>
         </aside>
       </div>
       <ProcessRoleStrip
