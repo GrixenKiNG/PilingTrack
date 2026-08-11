@@ -7,18 +7,24 @@
  */
 const ACTION_LABEL: Record<string, string> = {
   'shift.created': 'Смена запланирована',
+  'shift.updated': 'Смена изменена',
   'shift.acceptance-requested': 'Запрошен допуск к работе',
   'shift.acceptance-declined': 'В допуске отказано',
   'shift.started': 'Смена допущена к работе',
   'shift.start-blocked': 'Запуск смены заблокирован',
   'shift.cancelled': 'Смена отменена',
   'handover.submitted': 'Смена передана диспетчеру',
+  'handover.resubmitted': 'Передача сдана повторно',
   'handover.accepted': 'Передача принята',
   'handover.rework-requested': 'Передача возвращена на доработку',
   'work-permit.created': 'Наряд-допуск создан',
   'work-permit.updated': 'Наряд-допуск изменён',
   'work-permit.submit': 'Наряд отправлен на согласование',
-  'work-permit.approve': 'Наряд согласован',
+  // Согласование пишется с ролью подписавшего: `approved-dispatcher` и
+  // `approved-admin`. Кода `work-permit.approve` контур не выдаёт вовсе —
+  // из-за него две подписи показывались в журнале сырыми кодами.
+  'work-permit.approved-dispatcher': 'Наряд согласован диспетчером',
+  'work-permit.approved-admin': 'Наряд согласован администратором',
   'work-permit.revoke': 'Наряд отозван',
   'defect.reported': 'Зафиксировано замечание',
   'defect.triage': 'Замечание разобрано',
@@ -26,7 +32,10 @@ const ACTION_LABEL: Record<string, string> = {
   'defect.reject': 'Замечание отклонено',
   'readiness.exported': 'Выгрузка данных готовности',
   published: 'Опубликованы правила готовности',
-  acting_as_mechanic: 'Включён режим «действую за механика»',
+  // Код действия исторический: замещать можно любую из пяти ролей, и какую
+  // именно — записано в самом событии. Подпись «за механика» врала бы на
+  // мастере и инженере ОТ.
+  acting_as_mechanic: 'Включён режим замещения роли',
 };
 
 const ENTITY_LABEL: Record<string, string> = {

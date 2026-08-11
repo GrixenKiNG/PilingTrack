@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronRight, Search } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
@@ -19,9 +18,6 @@ interface AuditSettingsProps {
   onExport: (events: ReadinessAuditEventDto[]) => void;
   filtersBar: React.ReactNode;
 }
-
-/** Срок хранения журнала — политика контура, а не настройка модуля. */
-const RETENTION_YEARS = 5;
 
 export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBar }: AuditSettingsProps) {
   const events = audit?.data ?? [];
@@ -46,13 +42,15 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
       <ScreenTitle
         heading="Аудит"
         subtitle="Неизменяемая история действий, решений и изменений данных"
-        actions={<Button asChild variant="outline"><Link href="/admin/settings">Политика хранения</Link></Button>}
       />
       <SettingsKpis items={[
         { icon: 'history', label: 'Событий за 24 ч', value: lastDay.length },
         { icon: 'reports', label: 'Всего в журнале', value: verification?.eventCount ?? events.length },
         { icon: 'risk', label: 'Критических действий', value: criticalCount, alert: criticalCount > 0 },
-        { icon: 'documents', label: 'Срок хранения', value: `${RETENTION_YEARS} лет` },
+        // Раньше плитка обещала «Срок хранения 5 лет». Ни очистки журнала, ни
+        // политики хранения в контуре нет — записи не удаляются вовсе, и в
+        // доказательном журнале выдуманный срок опаснее всего.
+        { icon: 'documents', label: 'Хранение', value: 'Без очистки', detail: 'записи не удаляются' },
       ]} />
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-hidden')}>

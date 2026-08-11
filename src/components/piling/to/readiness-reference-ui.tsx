@@ -80,6 +80,11 @@ import {
   type ReadinessRulesState,
   type ReadinessScoreResult,
 } from '@/modules/readiness';
+import {
+  resolveReadinessCapabilities,
+  type ReadinessAbility,
+  type ReadinessRole,
+} from '@/modules/readiness/application/capabilities';
 import type { EquipmentOption } from './to-module-bits';
 import { isOpenRecord, type JournalRecord } from './to-stats';
 import type { EquipmentReadiness, ReadinessStatus } from './readiness-model';
@@ -2200,7 +2205,6 @@ function PermitsScreen(props: ReferenceUiProps) {
   const [commandText, setCommandText] = useState('');
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
-  const states = Object.values(props.readinessByEquipment);
   const active = props.permits.filter((item) => item.state === 'APPROVED').length;
   const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
   const pending = props.permits.filter((item) => item.state === 'PENDING_APPROVAL').length;
@@ -2905,18 +2909,34 @@ const CRITERION_ICONS: Record<ReadinessCriterionKey, typeof ClipboardCheck> = {
   ACCEPTANCE: CheckCircle2,
 };
 
-const ROLE_COLUMNS = ['Оператор', 'Диспетчер', 'Механик', 'Админ'] as const;
+const ROLE_COLUMNS: ReadonlyArray<{ role: ReadinessRole; label: string }> = [
+  { role: 'OPERATOR', label: 'Оператор' },
+  { role: 'DISPATCHER', label: 'Диспетчер' },
+  { role: 'MECHANIC', label: 'Механик' },
+  { role: 'ADMIN', label: 'Админ' },
+];
 
 /**
- * Сводка матрицы доступов. Полная и авторитетная живёт в разделе «Роли и
- * доступы»; здесь — витрина на четыре строки, как в макете.
+ * Сводка матрицы доступов: четыре строки, как в макете. Полная живёт в разделе
+ * «Роли и доступы».
+ *
+ * Значения считаются из `resolveReadinessCapabilities` — того же источника, по которому
+ * сервер пропускает команду. Раньше здесь стояли зашитые галочки, и три строки
+ * из четырёх врали: администратору приписывались «открывать смену» и
+ * «принимать технику», которых у него нет, а у диспетчера отнималось
+ * «закрывать дефекты», которое есть. Две вкладки одного раздела показывали
+ * разные права на одни и те же роли.
  */
-const ROLE_MATRIX: Array<{ permission: string; allowed: [boolean, boolean, boolean, boolean] }> = [
-  { permission: 'Открывать смену', allowed: [true, true, false, true] },
-  { permission: 'Принимать технику', allowed: [false, true, false, true] },
-  { permission: 'Закрывать дефекты', allowed: [false, false, true, true] },
-  { permission: 'Изменять правила', allowed: [false, false, false, true] },
+const ROLE_MATRIX: ReadonlyArray<{ permission: string; ability: ReadinessAbility }> = [
+  { permission: 'Открывать смену', ability: 'readiness.shift.manage' },
+  { permission: 'Принимать технику', ability: 'readiness.handover.decide' },
+  { permission: 'Закрывать дефекты', ability: 'readiness.defect.manage' },
+  { permission: 'Изменять правила', ability: 'readiness.rules.manage' },
 ];
+
+const ROLE_MATRIX_ABILITIES = new Map(
+  ROLE_COLUMNS.map(({ role }) => [role, resolveReadinessCapabilities(role)]),
+);
 
 /**
  * Что показать в карточке доказательства. `reference` — это внутренний
@@ -3207,20 +3227,24 @@ function RulesSettings(props: ReferenceUiProps) {
               <div className="overflow-x-auto rounded-xl border border-border p-3">
                 <h3 className="font-bold">Роли и доступы</h3>
                 <div className="mt-2 grid min-w-[286px] grid-cols-[104px_repeat(4,minmax(0,1fr))] text-3xs font-semibold text-muted-foreground">
-                  <span />{ROLE_COLUMNS.map((role) => <span key={role} className="truncate text-center">{role}</span>)}
+                  <span />{ROLE_COLUMNS.map(({ role, label }) => <span key={role} className="truncate text-center">{label}</span>)}
                 </div>
                 {ROLE_MATRIX.map((row) => (
-                  <div key={row.permission} className="grid min-w-[286px] grid-cols-[104px_repeat(4,minmax(0,1fr))] items-center border-t border-border py-1.5 text-2xs">
+                  <div key={row.ability} className="grid min-w-[286px] grid-cols-[104px_repeat(4,minmax(0,1fr))] items-center border-t border-border py-1.5 text-2xs">
                     <span>{row.permission}</span>
-                    {row.allowed.map((allowed, column) => (
-                      <span key={ROLE_COLUMNS[column]} className="flex justify-center">
-                        {allowed
-                          ? <CheckCircle2 className="h-4 w-4 text-success-strong" aria-label="Разрешено" />
-                          : <span className="text-muted-foreground" aria-label="Недоступно">—</span>}
+                    {ROLE_COLUMNS.map(({ role, label }) => (
+                      <span key={role} className="flex justify-center">
+                        {ROLE_MATRIX_ABILITIES.get(role)?.has(row.ability)
+                          ? <CheckCircle2 className="h-4 w-4 text-success-strong" aria-label={`${label}: разрешено`} />
+                          : <span className="text-muted-foreground" aria-label={`${label}: недоступно`}>—</span>}
                       </span>
                     ))}
                   </div>
                 ))}
+                <p className="mt-2 text-3xs leading-relaxed text-muted-foreground">
+                  Администратор ведёт смену и принимает технику через режим «Действую как» —
+                  собственных прав на эти действия у него нет.
+                </p>
                 <button type="button" onClick={() => props.onSettingsSectionChange('roles')} className="mt-2 flex items-center gap-1 text-2xs font-semibold text-signal-strong hover:underline">
                   Открыть полную матрицу <ArrowRight className="h-3 w-3" />
                 </button>
