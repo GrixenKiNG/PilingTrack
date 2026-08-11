@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { CheckCircle2, ChevronRight } from '@/components/piling/icons/unified-icons';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronRight } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
+import { authFetch } from '@/lib/api';
+import { pluralizeRu } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
   READINESS_ABILITIES,
@@ -41,6 +43,28 @@ const ABILITY_LABEL: Record<ReadinessAbility, string> = {
   'readiness.audit.export': 'Выгружать журнал аудита',
 };
 
+/**
+ * Роли, которым объекты не назначают: у них есть `sites.read_all`, и проверка
+ * `assertCanAccessSite` пропускает их до обращения к назначениям
+ * (`resource-access-service.ts`). Для остальных пустой список назначений — это
+ * не «все объекты», а ни одного: пользователь не откроет ни одну площадку.
+ */
+const UNSCOPED_ROLES = new Set(['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER']);
+
+/**
+ * Форма из `listUsers` (`services/users/user-service.ts`): назначенные объекты
+ * приходят полем `assignedSites`, уже развёрнутым в площадки. Связь в базе
+ * называется `sites` и хранит промежуточные записи — на неё легко ошибиться,
+ * и тогда объекты не найдутся ни у кого.
+ */
+interface DirectoryUser {
+  id: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+  assignedSites?: Array<{ id: string; name: string }>;
+}
+
 interface RolesSettingsProps {
   bootstrap: ReadinessBootstrap | null;
 }
@@ -48,6 +72,37 @@ interface RolesSettingsProps {
 export function RolesSettings({ bootstrap }: RolesSettingsProps) {
   const actors = bootstrap?.selectors.actors ?? [];
   const [selectedRole, setSelectedRole] = useState<string>(bootstrap?.actor.role ?? 'DISPATCHER');
+  // Контур доступа приходит только из справочника пользователей: в bootstrap
+  // лежат id, имя и роль. Право `users.manage` есть не у всех, кому открыт
+  // раздел, — на отказ просто не показываем колонку.
+  const [directory, setDirectory] = useState<DirectoryUser[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void authFetch('/api/users?limit=100')
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = await response.json() as { users?: DirectoryUser[] };
+        if (active && Array.isArray(body.users)) setDirectory(body.users);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  const scopeById = new Map((directory ?? []).map((user) => [user.id, user]));
+  const scopeOf = (userId: string, role: string) => {
+    if (UNSCOPED_ROLES.has(role)) return { label: 'Все объекты', tone: 'neutral' as const };
+    if (!directory) return { label: '—', tone: 'neutral' as const };
+    const sites = scopeById.get(userId)?.assignedSites ?? [];
+    if (sites.length === 0) return { label: 'Объекты не назначены', tone: 'warning' as const };
+    if (sites.length <= 2) return { label: sites.map((item) => item.name).join(', '), tone: 'info' as const };
+    return { label: `${sites.length} ${pluralizeRu(sites.length, ['объект', 'объекта', 'объектов'])}`, tone: 'info' as const };
+  };
+
+  // Пользователь без назначений и без права видеть все объекты не откроет ни
+  // одной площадки — это настоящая дыра в настройке, а не косметика.
+  const lockedOut = (directory ?? []).filter((user) =>
+    user.isActive && !UNSCOPED_ROLES.has(user.role) && (user.assignedSites?.length ?? 0) === 0);
 
   const byRole = new Map<string, typeof actors>();
   for (const actor of actors) {
@@ -75,7 +130,13 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
         { icon: 'crew', label: 'Пользователей', value: actors.length },
         { icon: 'operator', label: 'Ролей в контуре', value: byRole.size },
         { icon: 'settings', label: 'Полномочий модуля', value: READINESS_ABILITIES.length },
-        { icon: 'users', label: 'Ваша роль', value: handoverRoleLabel(bootstrap?.actor.actingAs ?? bootstrap?.actor.role ?? null) ?? '—' },
+        {
+          icon: 'risk',
+          label: 'Без доступа к объектам',
+          value: directory ? lockedOut.length : '…',
+          detail: directory && lockedOut.length > 0 ? 'не откроют ни одной площадки' : undefined,
+          alert: lockedOut.length > 0,
+        },
       ]} />
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-hidden')}>
@@ -143,15 +204,30 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
               <StatusPill tone="neutral">{handoverRoleLabel(selectedRole)}</StatusPill>
             </div>
             <div className="divide-y divide-border">
-              {selectedUsers.map((user) => (
-                <Link key={user.id} href="/admin/users" className="flex min-h-11 items-center gap-3 px-4 py-2 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal">
-                  <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-3xs font-bold text-muted-foreground">{(user.name || '?').slice(0, 1).toLocaleUpperCase('ru-RU')}</span>
-                  <span className="min-w-0 flex-1 truncate">{user.name || 'Без имени'}</span>
-                  <StatusPill tone="success">Активен</StatusPill>
-                </Link>
-              ))}
+              {selectedUsers.map((user) => {
+                const scope = scopeOf(user.id, user.role);
+                return (
+                  <Link key={user.id} href="/admin/users" className="flex min-h-11 items-center gap-3 px-4 py-2 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal">
+                    <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-3xs font-bold text-muted-foreground">{(user.name || '?').slice(0, 1).toLocaleUpperCase('ru-RU')}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{user.name || 'Без имени'}</span>
+                      <span className="mt-0.5 block truncate text-3xs text-muted-foreground">Контур: {scope.label}</span>
+                    </span>
+                    {scope.tone === 'warning'
+                      ? <StatusPill tone="warning">Нет объектов</StatusPill>
+                      : <StatusPill tone="success">Активен</StatusPill>}
+                  </Link>
+                );
+              })}
               {selectedUsers.length === 0 && <div className="p-6 text-center text-xs text-muted-foreground">В этой роли нет действующих пользователей.</div>}
             </div>
+            {lockedOut.length > 0 && (
+              <p className="flex items-start gap-2 border-t border-border bg-warning/10 p-3 text-2xs font-semibold leading-relaxed text-warning-strong">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                {lockedOut.length} {pluralizeRu(lockedOut.length, ['пользователь', 'пользователя', 'пользователей'])} без назначенных объектов.
+                Роль без права «видеть все объекты» без назначения не откроет ни одной площадки.
+              </p>
+            )}
             <div className="border-t border-border p-3">
               <Button asChild variant="outline" className="w-full"><Link href="/admin/users">Добавить пользователя</Link></Button>
             </div>
