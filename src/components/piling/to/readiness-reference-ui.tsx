@@ -1314,10 +1314,11 @@ function ReadinessCentre(props: ReferenceUiProps) {
               ))}
               {presentation.stages.map((stage, index) => {
                 const Icon = [Search, Gauge, ShieldCheck, Wrench, User][index] ?? Search;
-                // Залит только пройденный шаг (зелёный) и тот, на котором стоит
-                // процесс (оранжевый). Остальные — контур: раньше заливку
-                // получали и «не выполнено», и «нет данных», и по цвету нельзя
-                // было отличить сделанное от предстоящего.
+                // Заливка означает ровно одно — шаг выполнен. Текущий шаг
+                // выделен толстой оранжевой обводкой, но НЕ залит: при четырёх
+                // закрытых шагах залитая «Приёмка» делала линию сплошь цветной,
+                // и невыполненное читалось как сделанное. Правило то же, что в
+                // чек-листе смены слева.
                 const current = nextStage?.key === stage.key;
                 return (
                   <StageLink key={stage.key} target={stageTargets[stage.key]} label={stage.label} onViewChange={props.onViewChange}>
@@ -1326,7 +1327,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
                       stage.state === 'pass'
                         ? 'border-success bg-success-strong text-white'
                         : current
-                          ? 'border-signal bg-signal text-white'
+                          ? 'border-signal text-signal-strong'
                           : 'border-border text-muted-foreground',
                     )}>
                       <Icon className="h-5 w-5" />
