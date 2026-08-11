@@ -58,7 +58,12 @@ import {
   type MaintenancePriority, type MaintenanceStatus, type MaintenanceType,
 } from '@/components/piling/maintenance/maintenance-labels';
 import { PERMIT_STATE_LABEL, SHIFT_STATE_LABEL } from './readiness/readiness-labels';
-import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind } from './readiness/handover-journal';
+import {
+  buildHandoverJournal,
+  handoverRoleLabel,
+  type HandoverEventKind,
+  type HandoverJournalEvent,
+} from './readiness/handover-journal';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import {
   BLOCKER_ACTIONS,
@@ -515,18 +520,29 @@ function buildRoleFlowProgress(
   ];
 }
 
-function RoleFlowFooter({ progress }: { progress: RoleFlowProgress[] }) {
+function RoleFlowFooter({ progress, owner }: { progress: RoleFlowProgress[]; owner: string | null }) {
   return (
     <section aria-label="Роли процесса технической готовности" className="mt-2 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2 2xl:grid-cols-[1fr_24px_1fr_24px_1fr_24px_1fr] 2xl:gap-0">
       {ROLE_FLOW.map((role, index) => {
         const RoleIcon = role.lucide;
         const roleProgress = progress[index];
+        // Роль, на которой стоит процесс: без этой отметки лента показывала
+        // четыре равнозначные карточки, и кто именно держит ход — не читалось.
+        const holding = owner === role.label;
         return (
           <div key={role.label} className="contents">
-            <article className={cn('flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm', role.border)}>
+            <article className={cn(
+              'flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm',
+              holding ? 'border-signal ring-2 ring-signal/30' : role.border,
+            )}>
               <header className={cn('flex items-center gap-2 border-b px-3 py-1.5', role.header)}>
                 <RoleIcon className="h-4 w-4" />
                 <h2 className="text-sm font-extrabold">{role.label}</h2>
+                {holding && (
+                  <span className="ml-auto rounded bg-signal px-2 py-0.5 text-3xs font-bold text-white">
+                    Сейчас ход
+                  </span>
+                )}
               </header>
               <div className="flex flex-1 items-center gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1 space-y-1 text-2xs leading-[1.35] text-muted-foreground">
@@ -784,7 +800,10 @@ function StageLink({target, label, onViewChange, children}: {
   onViewChange: (view: ReferenceView) => void;
   children: React.ReactNode;
 }) {
-  const shared = 'block min-h-11 rounded-lg px-2 py-1 text-center transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  // flex, а не block: у <button> браузер центрирует содержимое по вертикали,
+  // и в сетке цепочки кружки шагов с однострочной подписью съезжали на 8px
+  // ниже кружков со «Техническое обслуживание» — ряд переставал быть линией.
+  const shared = 'flex min-h-11 flex-col items-center justify-start rounded-lg px-2 py-1 text-center transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
   return target.href
     ? <Link href={target.href} className={shared} aria-label={`${label}: открыть`}>{children}</Link>
     : <button type="button" onClick={() => target.view && onViewChange(target.view)} className={shared} aria-label={`${label}: открыть`}>{children}</button>;
@@ -799,6 +818,19 @@ const STAGE_PILL: Record<PresentationStage['state'], { label: string; cls: strin
   warning: { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' },
   fail: { label: 'Не выполнено', cls: 'bg-destructive/10 text-destructive-strong' },
   unknown: { label: 'Ожидает', cls: 'bg-muted text-muted-foreground' },
+};
+
+/**
+ * Кто отвечает за шаг. По незакрытому шагу видно, на ком стоит процесс:
+ * подпись под цепочкой и подсветка карточки в нижней ленте ролей берутся
+ * отсюда. Названия обязаны совпадать с ROLE_FLOW — по ним идёт сопоставление.
+ */
+const STAGE_OWNER: Record<PresentationStage['key'], string> = {
+  INSPECTION: 'Оператор',
+  ENGINE_HOURS: 'Оператор',
+  PERMIT: 'Администратор',
+  MAINTENANCE: 'Механик',
+  ACCEPTANCE: 'Диспетчер',
 };
 
 /** Подпись кнопки «следующее действие» — по конкретному незакрытому шагу. */
@@ -816,6 +848,9 @@ const HANDOVER_ICON: Record<HandoverEventKind, typeof Send> = {
   REWORKED: AlertCircle,
   ACCEPTED: CheckCircle2,
 };
+
+/** Сколько событий передачи видно сразу; остальное — под «полным журналом». */
+const HANDOVER_PREVIEW = 4;
 
 const HANDOVER_PILL: Record<HandoverEventKind, { label: string; cls: string }> = {
   SUBMITTED: { label: 'Передано', cls: 'border-signal/40 text-signal-strong' },
@@ -933,6 +968,42 @@ function buildReadinessMetricTiles(
   ];
 }
 
+/** Одно событие ленты передачи. Вынесено, чтобы список и раскрытие «полного
+ *  журнала» рисовали строку одинаково, а не двумя копиями разметки. */
+function HandoverEvent({ event, latest, timezone }: {
+  event: HandoverJournalEvent;
+  latest: boolean;
+  timezone: string | undefined;
+}) {
+  const EventIcon = HANDOVER_ICON[event.kind];
+  const pill = HANDOVER_PILL[event.kind];
+  return (
+    <li className="relative">
+      {/* Кружок с иконкой вместо безымянной точки: тип события читается,
+          не доходя до подписи. */}
+      <span className={cn('absolute -left-[35px] top-0 grid h-[18px] w-[18px] place-items-center rounded-full border bg-card',
+        latest ? 'border-signal text-signal-strong' : event.kind === 'REWORKED' ? 'border-warning text-warning-strong' : 'border-border text-muted-foreground')}>
+        <EventIcon className="h-2.5 w-2.5" />
+      </span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 text-xs font-semibold">{event.label}</div>
+        <span className={cn('shrink-0 rounded border px-1.5 py-0.5 text-3xs font-semibold', pill.cls)}>
+          {pill.label}
+        </span>
+      </div>
+      <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+        {formatDateTimeInTimezone(event.occurredAt, timezone)}
+        {event.actorName ? ` · ${event.actorName}` : ''}
+        {handoverRoleLabel(event.actorRole) ? ` (${handoverRoleLabel(event.actorRole)})` : ''}
+        {` · пакет v${event.packageVersion}`}
+      </div>
+      {event.comment && (
+        <p className="mt-1 rounded border border-border bg-muted/40 p-2 text-2xs leading-relaxed">{event.comment}</p>
+      )}
+    </li>
+  );
+}
+
 function ReadinessCentre(props: ReferenceUiProps) {
   const selected = props.equipment.find((item) => item.id === props.selectedId) ?? props.equipment[0];
   if (!selected) {
@@ -984,6 +1055,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
    */
   const nextStage = presentation.stages.find((stage) => stage.state !== 'pass') ?? null;
   const nextTarget = nextStage ? stageTargets[nextStage.key] : null;
+  const stageOwner = nextStage ? STAGE_OWNER[nextStage.key] : null;
   const metricTiles = buildReadinessMetricTiles(
     facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionEvidenceId,
   );
@@ -1108,9 +1180,23 @@ function ReadinessCentre(props: ReferenceUiProps) {
           <div className="mt-3 divide-y divide-border">
             {presentation.stages.map((stage, index) => {
               const target = stageTargets[stage.key];
+              const current = nextStage?.key === stage.key;
               const body = (
                 <>
-                  <span className={cn('grid h-6 w-6 place-items-center rounded-full text-xs font-bold', stage.state === 'pass' ? 'bg-success-strong text-white' : stage.state === 'unknown' ? 'bg-muted text-muted-foreground' : 'bg-signal text-white')}>{index + 1}</span>
+                  {/*
+                    Цветом залито только выполненное. Текущий шаг обведён
+                    оранжевым, но не залит, остальные — серый контур. Раньше
+                    заливку получали все состояния кроме «нет данных», и пять
+                    цветных кружков подряд читались как пять сделанных шагов.
+                  */}
+                  <span className={cn(
+                    'grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 text-xs font-bold',
+                    stage.state === 'pass'
+                      ? 'border-success bg-success-strong text-white'
+                      : current
+                        ? 'border-signal bg-card text-signal-strong'
+                        : 'border-border bg-card text-muted-foreground',
+                  )}>{index + 1}</span>
                   <div className="min-w-0 flex-1 text-left">
                     <div className="text-xs font-semibold">{stage.label}</div>
                     <div
@@ -1198,22 +1284,75 @@ function ReadinessCentre(props: ReferenceUiProps) {
         <section className={cn(card, 'flex flex-1 flex-col overflow-hidden')}>
           <div className="p-4">
             <h2 className="font-bold">Цепочка состояния</h2>
-            <div className="mt-4 flex items-center justify-between overflow-x-auto pb-2">
+            {/*
+              Пять равных колонок: центры кружков стоят на 10 / 30 / 50 / 70 /
+              90 % ширины, поэтому шаги распределены строго равномерно, а линия
+              и стрелки ложатся ровно между ними. Раньше соединитель лежал
+              ВНУТРИ ячейки шага и растягивался своим flex-1: ширины выходили
+              разными, а вертикальный центр считался по всей ячейке вместе с
+              двухстрочной подписью — линия уезжала и вниз, и вбок.
+
+              Кружок centre-y = padding StageLink (4px) + половина кружка
+              (20px) = 24px; на этой отметке и линия, и стрелки.
+            */}
+            {/* gap-0: с зазором центры ячеек смещаются, и стрелки перестают
+                попадать точно в середину между кружками. Подписи не слипаются
+                за счёт собственных px-2 внутри StageLink. */}
+            <div className="relative mt-4 grid grid-cols-5">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute left-[10%] right-[10%] -translate-y-1/2 border-t-2 border-dashed border-border"
+                style={{ top: 24 }}
+              />
+              {[20, 40, 60, 80].map((left) => (
+                <ChevronRight
+                  key={left}
+                  aria-hidden
+                  className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 bg-card text-muted-foreground"
+                  style={{ top: 24, left: `${left}%` }}
+                />
+              ))}
               {presentation.stages.map((stage, index) => {
                 const Icon = [Search, Gauge, ShieldCheck, Wrench, User][index] ?? Search;
+                // Залит только пройденный шаг (зелёный) и тот, на котором стоит
+                // процесс (оранжевый). Остальные — контур: раньше заливку
+                // получали и «не выполнено», и «нет данных», и по цвету нельзя
+                // было отличить сделанное от предстоящего.
+                const current = nextStage?.key === stage.key;
                 return (
-                <div key={stage.key} className="flex min-w-[118px] flex-1 items-center">
-                  <StageLink target={stageTargets[stage.key]} label={stage.label} onViewChange={props.onViewChange}>
-                    <span className={cn('mx-auto grid h-10 w-10 place-items-center rounded-full border', stage.state === 'pass' ? 'border-success bg-success-strong text-white' : stage.state === 'unknown' ? 'border-border bg-muted text-muted-foreground' : 'border-signal bg-signal text-white')}>
+                  <StageLink key={stage.key} target={stageTargets[stage.key]} label={stage.label} onViewChange={props.onViewChange}>
+                    <span className={cn(
+                      'relative z-10 mx-auto grid h-10 w-10 place-items-center rounded-full border-2 bg-card',
+                      stage.state === 'pass'
+                        ? 'border-success bg-success-strong text-white'
+                        : current
+                          ? 'border-signal bg-signal text-white'
+                          : 'border-border text-muted-foreground',
+                    )}>
                       <Icon className="h-5 w-5" />
                     </span>
-                    <div className={cn('mt-2 text-2xs', stage.state === 'fail' ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{stage.label}</div>
+                    <div className={cn('mt-2 text-2xs', current ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>{stage.label}</div>
                   </StageLink>
-                  {/* Пунктир, а не сплошная: связь между шагами — маршрут, а не заполненная шкала. */}
-                  {index < 4 && <div className="mx-3 flex-1 border-t border-dashed border-border" />}
-                </div>
-              );})}
+                );
+              })}
             </div>
+            {/*
+              Явная строка «где встал процесс и кто его держит»: по цепочке это
+              приходилось вычислять глазами, сопоставляя цвет кружков с ролями
+              в нижней ленте.
+            */}
+            {nextStage ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-signal/30 bg-signal/10 px-3 py-2">
+                <span className="text-2xs text-muted-foreground">Процесс остановился на шаге</span>
+                <span className="text-xs font-bold">{nextStage.label}</span>
+                <span className="text-2xs text-muted-foreground">· ход за</span>
+                <span className="rounded bg-signal px-2 py-0.5 text-2xs font-semibold text-white">{stageOwner}</span>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-2xs font-semibold text-success-strong">
+                Все шаги контура закрыты — установка готова к работе
+              </div>
+            )}
           </div>
           <div className="border-t border-border p-4">
             <h3 className="font-bold">Критическое замечание</h3>
@@ -1308,40 +1447,38 @@ function ReadinessCentre(props: ReferenceUiProps) {
             </p>
           ) : (
             <ol className="mt-4 space-y-5 border-l border-border pl-6">
-              {handoverJournal.map((event, index) => {
-                const EventIcon = HANDOVER_ICON[event.kind];
-                const pill = HANDOVER_PILL[event.kind];
-                return (
-                <li key={event.id} className="relative">
-                  {/*
-                    Кружок с иконкой вместо безымянной точки: тип события
-                    читается, не доходя до подписи.
-                  */}
-                  <span className={cn('absolute -left-[35px] top-0 grid h-[18px] w-[18px] place-items-center rounded-full border bg-card',
-                    index === 0 ? 'border-signal text-signal-strong' : event.kind === 'REWORKED' ? 'border-warning text-warning-strong' : 'border-border text-muted-foreground')}>
-                    <EventIcon className="h-2.5 w-2.5" />
-                  </span>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 text-xs font-semibold">{event.label}</div>
-                    <span className={cn('shrink-0 rounded border px-1.5 py-0.5 text-3xs font-semibold', pill.cls)}>
-                      {pill.label}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">
-                    {formatDateTimeInTimezone(event.occurredAt, props.bootstrap?.tenant.timezone)}
-                    {event.actorName ? ` · ${event.actorName}` : ''}
-                    {handoverRoleLabel(event.actorRole) ? ` (${handoverRoleLabel(event.actorRole)})` : ''}
-                    {` · пакет v${event.packageVersion}`}
-                  </div>
-                  {event.comment && (
-                    <p className="mt-1 rounded border border-border bg-muted/40 p-2 text-2xs leading-relaxed">{event.comment}</p>
-                  )}
-                </li>
-                );
-              })}
+              {handoverJournal.slice(0, HANDOVER_PREVIEW).map((event, index) => (
+                <HandoverEvent
+                  key={event.id}
+                  event={event}
+                  latest={index === 0}
+                  timezone={props.bootstrap?.tenant.timezone}
+                />
+              ))}
             </ol>
           )}
-          <button type="button" onClick={() => props.onViewChange('reports')} className="mt-4 text-xs font-semibold text-signal-strong">Открыть полный журнал →</button>
+          {/*
+            Полный журнал раскрывается на месте — так же, как первоисточники
+            решения в «Доказательствах». Раньше кнопка уводила на вкладку
+            «Отчёты», где журнала передач по этой установке нет вовсе.
+          */}
+          {handoverJournal.length > HANDOVER_PREVIEW && (
+            <details className="mt-4 rounded-lg border border-border">
+              <summary className="hit-target cursor-pointer px-3 py-2 text-xs font-semibold text-signal-strong">
+                Открыть полный журнал — ещё {handoverJournal.length - HANDOVER_PREVIEW}
+              </summary>
+              <ol className="ml-6 space-y-5 border-l border-border py-3 pl-6 pr-3">
+                {handoverJournal.slice(HANDOVER_PREVIEW).map((event) => (
+                  <HandoverEvent
+                    key={event.id}
+                    event={event}
+                    latest={false}
+                    timezone={props.bootstrap?.tenant.timezone}
+                  />
+                ))}
+              </ol>
+            </details>
+          )}
         </section>
         <section className={cn(card, 'flex flex-1 flex-col p-4')}>
           <div className="flex items-center justify-between"><h2 className="font-bold">Входящие (диспетчер)</h2><span className="text-xs text-muted-foreground">{props.equipment.length}</span></div>
@@ -1419,7 +1556,7 @@ function ReadinessCentre(props: ReferenceUiProps) {
         </section>
         </aside>
       </div>
-      <RoleFlowFooter progress={roleProgress} />
+      <RoleFlowFooter progress={roleProgress} owner={stageOwner} />
     </div>
   );
 }
