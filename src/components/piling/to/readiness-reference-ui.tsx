@@ -1573,6 +1573,65 @@ function matchesFleetStatus(status: ReadinessStatus | undefined, filter: FleetSt
   return status === 'IN_REPAIR' || status === 'BLOCKED' || status === 'OVERDUE';
 }
 
+/**
+ * Строки показателей в правой панели «Техники»: осмотр, моточасы, дефекты, ТО.
+ *
+ * По макету это конкретные числа с переходом к источнику. До этого здесь
+ * печатались пары «подпись доказательства + значок состояния» — ни одной
+ * цифры, поэтому решить что-либо по панели было нельзя, только открыть
+ * установку и посмотреть.
+ */
+function buildFleetMetricRows(
+  presentation: AuthoritativeReadinessPresentation,
+  equipment: EquipmentOption,
+  detail: EquipmentDetailSnapshot | undefined,
+): Array<{ key: string; icon: typeof FileText; label: string; value: string; tone?: 'danger'; href: string }> {
+  const inspection = detail?.latestInspection ?? null;
+  const nextAtHours = detail?.equipment?.nextMaintenanceAtHours;
+  const hoursLeft = nextAtHours != null && equipment.engineHoursTotal != null
+    ? Math.round(nextAtHours - equipment.engineHoursTotal)
+    : null;
+  const blockers = presentation.blockers.length;
+
+  return [
+    {
+      key: 'inspection',
+      icon: FileText,
+      label: 'Осмотр',
+      value: !inspection
+        ? 'не проводился'
+        : inspection.itemsTotal === 0 ? 'пункты не заданы' : `${inspection.itemsAnswered} из ${inspection.itemsTotal}`,
+      href: inspection ? `/inspections/${inspection.id}` : '/inspections',
+    },
+    {
+      key: 'meter',
+      icon: Gauge,
+      label: 'Моточасы',
+      value: equipment.engineHoursTotal != null
+        ? `${equipment.engineHoursTotal.toLocaleString('ru-RU')} м/ч`
+        : '—',
+      href: `/admin/equipment/${equipment.id}`,
+    },
+    {
+      key: 'defects',
+      icon: AlertTriangle,
+      label: 'Дефекты',
+      value: blockers > 0 ? `${blockers} критический` : 'нет критических',
+      ...(blockers > 0 ? { tone: 'danger' as const } : {}),
+      href: '/admin/maintenance',
+    },
+    {
+      key: 'maintenance',
+      icon: Wrench,
+      label: 'ТО через',
+      value: hoursLeft != null
+        ? hoursLeft > 0 ? `${hoursLeft.toLocaleString('ru-RU')} м/ч` : `перепробег ${Math.abs(hoursLeft).toLocaleString('ru-RU')} м/ч`
+        : 'регламент не задан',
+      href: `/admin/equipment/${equipment.id}`,
+    },
+  ];
+}
+
 function FleetScreen(props: ReferenceUiProps) {
   const readinessItems = Object.values(props.readinessByEquipment);
   const ready = readinessItems.filter((item) => item.status === 'READY').length;
@@ -1595,6 +1654,21 @@ function FleetScreen(props: ReferenceUiProps) {
   const selected = props.equipment.find((item) => item.id === props.selectedId) ?? props.equipment[0];
   const selectedReadiness = selected ? props.readinessByEquipment[selected.id] : null;
   const selectedFleet = selected ? props.fleetCards.find((item) => item.id === selected.id) : undefined;
+  // Тот же авторитетный снимок, что и в центре готовности: иначе балл и
+  // следующее действие на двух вкладках расходятся по одной установке.
+  const selectedSnapshot = selected
+    ? props.currentReadiness.find((item) => item.equipmentId === selected.id) ?? null
+    : null;
+  const selectedPresentation = selected
+    ? (props.authoritativeReadinessError
+        ? buildUnavailableReadinessPresentation(selectedSnapshot)
+        : buildAuthoritativeReadinessPresentation(selectedSnapshot))
+    : null;
+  const selectedNextStage = selectedPresentation?.stages.find((stage) => stage.state !== 'pass') ?? null;
+  const selectedDetail = selected ? props.details[selected.id] : undefined;
+  const fleetMetrics = selected && selectedPresentation
+    ? buildFleetMetricRows(selectedPresentation, selected, selectedDetail)
+    : [];
 
   return (
     <>
@@ -1615,7 +1689,10 @@ function FleetScreen(props: ReferenceUiProps) {
         <RefKpi icon="risk" label="Требует внимания" tone="warning" value={attention} alert={attention > 0} onClick={() => setStatusFilter('attention')} />
         <RefKpi icon="defect" label="Недоступно" tone="danger" value={blocked} alert={blocked > 0} onClick={() => setStatusFilter('blocked')} />
       </section>
-      <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[180px_minmax(0,1fr)_290px]">
+      {/* Доли по макету: 0.46 / 2.42 / 1 ≈ 12 % / 63 % / 26 %. Правая панель
+          была 290px и на широком мониторе оставалась зажатой, пока центру
+          доставался весь избыток. Левому фильтру задан минимум 170px. */}
+      <div className="mt-2 grid grid-cols-1 items-start gap-2 xl:grid-cols-[minmax(170px,0.46fr)_minmax(0,2.42fr)_minmax(0,1fr)]">
         <aside className={cn(card, 'p-3')}>
           <h2 className="font-bold">Парк техники</h2>
           <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск установки" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск установки" className="h-9 bg-muted pl-9" /></div>
@@ -1634,25 +1711,42 @@ function FleetScreen(props: ReferenceUiProps) {
             {filtered.map((item) => {
               const state = props.readinessByEquipment[item.id];
               const fleet = props.fleetCards.find((entry) => entry.id === item.id);
+              // Следующее действие — из авторитетного снимка, он есть по каждой
+              // установке. Производная модель считает его по журналу, а журнал
+              // грузится только для выбранной, поэтому на остальных карточках
+              // стояла заглушка «Проверить данные».
+              const itemSnapshot = props.currentReadiness.find((entry) => entry.equipmentId === item.id) ?? null;
+              const itemStage = itemSnapshot?.facts
+                ? buildAuthoritativeReadinessPresentation(itemSnapshot).stages.find((stage) => stage.state !== 'pass')
+                : null;
+              const itemAction = itemStage
+                ? STAGE_CTA[itemStage.key]
+                : itemSnapshot?.facts ? 'Контур закрыт' : state?.nextAction || 'Выполнить оценку готовности';
               return (
                 <button key={item.id} type="button" onClick={() => props.onSelect(item.id)} className={cn(card, 'flex min-h-[140px] gap-2 p-2 text-left transition hover:border-signal/30', item.id === props.selectedId && 'border-signal')}>
                   <EquipmentPhoto cardData={fleet} name={item.name} className="h-[72px] w-[72px] shrink-0 self-center" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between"><div><h3 className="font-bold">{item.name}</h3><div className="mt-1 text-xs text-muted-foreground">{fleet?.assignedSiteName || 'Объект не назначен'}</div></div><ChevronRight className="h-4 w-4 text-muted-foreground" /></div>
-                    <div className="mt-1 flex items-center gap-2"><ReadinessRing value={state?.score ?? null} size={40} />{state && <StatusPill status={state.status} />}</div>
+                    <div className="mt-1 flex items-center gap-2"><ReadinessRing value={state?.score ?? null} size={52} />{state && <StatusPill status={state.status} />}</div>
                     <div className="mt-1 flex items-center gap-2 text-3xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         { }
                         <img src="/icons/pilingtrack/engine-hours.png" alt="" className="h-3.5 w-3.5 object-contain" />
                         {item.engineHoursTotal != null ? `${item.engineHoursTotal.toLocaleString('ru-RU')} м/ч` : '—'}
                       </span>
+                      {/* Экипаж и оператор: по макету видно, КТО стоит на
+                          установке, а не только номер бригады. */}
                       <span className="inline-flex min-w-0 items-center gap-1">
                         { }
                         <img src="/icons/pilingtrack/crew.png" alt="" className="h-3.5 w-3.5 object-contain" />
-                        <span className="truncate">{fleet?.assignedCrewName || 'Бригада не назначена'}</span>
+                        <span className="truncate">
+                          {fleet?.assignedCrewName
+                            ? [fleet.assignedCrewName, props.details[item.id]?.crew?.operator?.name].filter(Boolean).join(' · ')
+                            : 'Бригада не назначена'}
+                        </span>
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-1 text-3xs"><span className="shrink-0 text-muted-foreground">Следующее действие</span><span className="truncate font-semibold text-signal-strong">{state?.nextAction || 'Проверить данные'} ›</span></div>
+                    <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-1 text-3xs"><span className="shrink-0 text-muted-foreground">Следующее действие</span><span className="truncate font-semibold text-signal-strong">{itemAction} ›</span></div>
                   </div>
                 </button>
               );
@@ -1672,7 +1766,28 @@ function FleetScreen(props: ReferenceUiProps) {
                 <ReadinessRing value={selectedReadiness?.score ?? null} size={56} />
               </div>
               <div className="mt-3">{selectedReadiness && <StatusPill status={selectedReadiness.status} />}</div>
-              <div className="mt-2 divide-y divide-border">{selectedReadiness?.evidence.map((evidence) => <div key={evidence.key} className="flex items-center justify-between py-2 text-2xs"><span className="font-semibold">{evidence.label}</span><EvidenceState state={evidence.state} /></div>)}</div>
+              {/* Показатели строками с переходом к источнику — вместо пар
+                  «подпись + значок», по которым нельзя было назвать ни одного
+                  числа. */}
+              <div className="mt-3 divide-y divide-border rounded-lg border border-border">
+                {fleetMetrics.map((row) => {
+                  const RowIcon = row.icon;
+                  return (
+                    <Link
+                      key={row.key}
+                      href={row.href}
+                      className="flex min-h-11 items-center gap-2 px-2.5 py-2 transition hover:bg-muted/60"
+                    >
+                      <RowIcon className={cn('h-4 w-4 shrink-0', row.tone === 'danger' ? 'text-destructive-strong' : 'text-muted-foreground')} />
+                      <span className="min-w-0 flex-1 truncate text-xs font-semibold">{row.label}</span>
+                      <span className={cn('shrink-0 text-xs font-semibold', row.tone === 'danger' ? 'text-destructive-strong' : 'text-foreground')}>
+                        {row.value}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  );
+                })}
+              </div>
               {selectedReadiness?.activeRecord && (
                 <div className="mt-2 rounded-lg border border-destructive bg-destructive/10 p-2.5">
                   <div className="flex items-start gap-2">
@@ -1688,16 +1803,33 @@ function FleetScreen(props: ReferenceUiProps) {
               )}
               <div className="mt-2">
                 <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Следующее действие</div>
-                <div className="flex items-center gap-2.5 rounded-[10px] border border-border p-2.5">
+                <div className="flex items-center gap-2.5 rounded-[10px] border border-signal bg-signal/10 p-2.5">
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold">{selectedReadiness?.nextAction || 'Проверить данные готовности'}</div>
-                    <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">{selectedReadiness?.reason || 'Откройте центр готовности для продолжения процесса.'}</p>
+                    <div className="text-xs font-bold">
+                      {selectedNextStage ? STAGE_CTA[selectedNextStage.key] : 'Все шаги контура закрыты'}
+                    </div>
+                    <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">{selectedReadiness?.reason || selectedPresentation?.description || 'Откройте центр готовности для продолжения процесса.'}</p>
                   </div>
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-signal/10 text-signal-strong"><ClipboardCheck className="h-5 w-5" /></span>
+                  {/* Плитка залита фирменным, а не бледной подложкой: в макете
+                      это самый яркий элемент правой панели. */}
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-signal text-white"><ClipboardCheck className="h-5 w-5" /></span>
                 </div>
-                <Button className="mt-2 h-9 w-full bg-signal-strong hover:bg-signal-strong" onClick={() => props.onViewChange('readiness')}>
-                  Перейти к действию <ArrowRight className="ml-2 h-4 w-4" />
+                <Button className="mt-2 h-9 w-full bg-signal text-white hover:bg-signal-strong" onClick={() => props.onViewChange('readiness')}>
+                  {selectedNextStage ? STAGE_CTA[selectedNextStage.key] : 'Открыть центр готовности'} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
+                {/* Карточка, история и документы установки живут на её странице —
+                    даём прямые переходы вместо декоративных вкладок. */}
+                <div className="mt-2 grid grid-cols-3 gap-1">
+                  {([
+                    ['Карточка', `/admin/equipment/${selected.id}`],
+                    ['История', `/admin/equipment/${selected.id}#history`],
+                    ['Документы', `/admin/equipment/${selected.id}#documents`],
+                  ] as const).map(([label, href]) => (
+                    <Button key={label} asChild variant="outline" className="h-9 px-1 text-2xs">
+                      <Link href={href}>{label}</Link>
+                    </Button>
+                  ))}
+                </div>
               </div>
             </>
           ) : <div className="text-sm text-muted-foreground">Выберите установку</div>}
@@ -1708,7 +1840,18 @@ function FleetScreen(props: ReferenceUiProps) {
           <div className="text-xs text-muted-foreground">Готовность парка</div>
           <div className="mt-1 flex items-center gap-3">
             <ReadinessRing value={averageReadiness} size={48} />
-            <div className="text-xs leading-relaxed text-muted-foreground">Средняя готовность<br /><b className="text-muted-foreground">{ready} из {props.equipment.length} установок</b></div>
+            {/*
+              Раньше под подписью «Средняя готовность» стояло «{ready} из N» —
+              количество ГОТОВЫХ установок, а кольцо рядом показывало средний
+              балл. Две разные метрики под одной подписью. Теперь текст
+              выражает тот же средний балл в установках: 76 % от 6 = 4,6.
+            */}
+            <div className="text-xs leading-relaxed text-muted-foreground">
+              Средняя готовность<br />
+              <b className="text-muted-foreground tabular-nums">
+                {(averageReadiness / 100 * props.equipment.length).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} из {props.equipment.length} установок
+              </b>
+            </div>
           </div>
         </div>
         {[
