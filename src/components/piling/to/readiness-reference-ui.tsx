@@ -2482,6 +2482,45 @@ function MaintenanceScreen(props: ReferenceUiProps) {
   const critical = open.filter((record) => ['CRITICAL', 'HIGH'].includes(record.priority));
   const planned = open.filter((record) => ['PLANNED', 'ASSIGNED'].includes(record.status));
   const servicePercent = props.equipment.length ? Math.round(((props.equipment.length - critical.length) / props.equipment.length) * 100) : 0;
+  const timezone = props.bootstrap?.tenant.timezone;
+  const todayIso = getTodayInTimezone(timezone);
+  // «Работы сегодня» считали ВСЕ открытые заявки — счётчик не имел отношения к
+  // сегодняшнему дню. Берём назначенные или начатые на сегодня.
+  const todayWork = open.filter((record) =>
+    (record.scheduledAt ?? record.startedAt ?? '').slice(0, 10) === todayIso);
+  /**
+   * Загрузка механиков по фактическому исполнителю.
+   *
+   * Было: Array.from({length: 1..3}) и раздача заявок по остатку индекса от
+   * трёх — то есть выдуманные механики с выдуманной загрузкой, все под
+   * подписью «Исполнитель не назначен». Настоящий assigneeId в записи есть и
+   * приходит с сервера; имена берём из справочника участников.
+   */
+  const actorById = new Map((props.bootstrap?.selectors.actors ?? []).map((actor) => [actor.id, actor]));
+  const workloadByMechanic = (() => {
+    const groups = new Map<string, { name: string; records: MaintenanceSummary[] }>();
+    for (const record of open) {
+      const key = record.assigneeId ?? '__unassigned';
+      const name = record.assigneeId
+        ? actorById.get(record.assigneeId)?.name ?? record.performedBy ?? 'Исполнитель вне справочника'
+        : 'Не назначен';
+      const bucket = groups.get(key) ?? { name, records: [] };
+      bucket.records.push(record);
+      groups.set(key, bucket);
+    }
+    return [...groups.entries()]
+      .map(([id, group]) => ({ id, ...group }))
+      .sort((left, right) => right.records.length - left.records.length);
+  })();
+  const busiest = Math.max(1, ...workloadByMechanic.map((group) => group.records.length));
+  const closedRecords = props.maintenance.filter((record) => record.status === 'DONE');
+  /** Запчасти — из реально израсходованного (partsUsedText), а не из списка в коде. */
+  const partsUsed = props.maintenance
+    .flatMap((record) => (record.partsUsedText ?? '')
+      .split(/[,;\n]/)
+      .map((part) => part.trim())
+      .filter(Boolean))
+    .reduce((acc, part) => acc.set(part, (acc.get(part) ?? 0) + 1), new Map<string, number>());
   const displayedMaintenance = props.maintenance.filter((record) => {
     if (maintenanceFilter === 'CRITICAL' && !['CRITICAL', 'HIGH'].includes(record.priority)) return false;
     if (maintenanceFilter === 'ACTIVE' && !['IN_PROGRESS', 'ASSIGNED'].includes(record.status)) return false;
@@ -2495,7 +2534,7 @@ function MaintenanceScreen(props: ReferenceUiProps) {
       <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance">+ Создать заявку</Link></Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={critical.length} alert={critical.length > 0} />
-        <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={open.length} />
+        <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={todayWork.length} />
         <RefKpi icon="maintenance-due" label="Ближайшие ТО" tone="info" value={planned.length} />
         <RefKpi icon="technical-readiness" label="Готовность сервиса" tone="success" value={`${Math.max(0, servicePercent)}%`} />
       </section>
@@ -2521,43 +2560,127 @@ function MaintenanceScreen(props: ReferenceUiProps) {
         <aside className="space-y-3">
           <section className={cn(card, 'p-3')}>
             <h2 className="font-bold">Сервисный план по моточасам</h2>
-            <div className="mt-2 divide-y divide-border">{props.equipment.slice(0, 5).map((item) => <div key={item.id} className="flex items-center gap-2 py-2"><span className="text-signal-strong">⚠</span><EquipmentPhoto cardData={props.fleetCards.find((entry) => entry.id === item.id)} name={item.name} className="h-8 w-8 shrink-0" /><div className="min-w-0"><div className="truncate text-2xs font-semibold">{item.name}</div><div className="text-3xs text-muted-foreground">{item.nextMaintenanceAtHours != null ? `ТО через ${Math.max(0, item.nextMaintenanceAtHours - (item.engineHoursTotal ?? 0)).toLocaleString('ru-RU')} м/ч` : 'Регламент не задан'}</div></div></div>)}</div>
+            {/*
+              Раньше строки шли в произвольном порядке и у каждой стоял один и
+              тот же значок «⚠» — срочность не читалась. Сортируем по остатку до
+              ТО и показываем полосу пробега: красная у перепробега, оранжевая
+              на подходе, зелёная в норме.
+            */}
+            <div className="mt-2 divide-y divide-border">
+              {props.equipment
+                .map((item) => ({
+                  item,
+                  left: item.nextMaintenanceAtHours != null
+                    ? item.nextMaintenanceAtHours - (item.engineHoursTotal ?? 0)
+                    : null,
+                }))
+                .sort((left, right) => (left.left ?? Number.POSITIVE_INFINITY) - (right.left ?? Number.POSITIVE_INFINITY))
+                .slice(0, 5)
+                .map(({ item, left }) => {
+                  const overdue = left != null && left <= 0;
+                  const soon = left != null && left > 0 && left <= 250;
+                  const progress = left != null && item.nextMaintenanceAtHours
+                    ? Math.min(100, Math.max(0, (item.engineHoursTotal ?? 0) / item.nextMaintenanceAtHours * 100))
+                    : 0;
+                  return (
+                    <div key={item.id} className="flex items-center gap-2 py-2">
+                      <EquipmentPhoto cardData={props.fleetCards.find((entry) => entry.id === item.id)} name={item.name} className="h-8 w-8 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-2xs font-semibold">{item.name}</div>
+                        <div className={cn('text-3xs', overdue ? 'font-semibold text-destructive-strong' : soon ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>
+                          {left == null
+                            ? 'Регламент не задан'
+                            : overdue ? `Перепробег ${Math.abs(left).toLocaleString('ru-RU')} м/ч` : `ТО через ${left.toLocaleString('ru-RU')} м/ч`}
+                        </div>
+                        <div className="mt-1 h-1 overflow-hidden rounded-full bg-border">
+                          <div className={cn('h-full rounded-full', overdue ? 'bg-destructive-strong' : soon ? 'bg-signal' : 'bg-success-strong')} style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
             <Button asChild variant="outline" className="mt-2 h-8 w-full text-2xs"><Link href="/admin/maintenance"><CalendarClock className="mr-2 h-4 w-4" />Открыть календарь</Link></Button>
           </section>
-          <section className={cn(card, 'p-3')}><h2 className="font-bold">Запчасти и материалы</h2><div className="mt-2 grid grid-cols-2 gap-2">{['Фильтр топливный', 'Рукав РВД', 'Масло гидравлическое', 'Комплект уплотнений'].map((item) => <div key={item} className="rounded-lg border border-border p-2 text-center"><div className="text-3xs font-semibold">{item}</div><div className="mt-1 text-3xs text-muted-foreground">Наличие не учтено</div></div>)}</div></section>
+          {/*
+            Список запчастей был захардкожен четырьмя названиями с подписью
+            «Наличие не учтено» — то есть выдуман целиком. Склада в системе нет,
+            но в заявке есть partsUsedText: показываем то, что реально
+            расходовали, с числом упоминаний. Пусто — так и пишем.
+          */}
+          <section className={cn(card, 'p-3')}>
+            <div className="flex items-center justify-between"><h2 className="font-bold">Израсходованные запчасти</h2><span className="text-3xs text-muted-foreground">по заявкам</span></div>
+            {partsUsed.size > 0 ? (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {[...partsUsed.entries()].sort((left, right) => right[1] - left[1]).slice(0, 6).map(([part, count]) => (
+                  <div key={part} className="rounded-lg border border-border p-2">
+                    <div className="line-clamp-2 text-3xs font-semibold">{part}</div>
+                    <div className="mt-1 text-3xs text-muted-foreground">упоминаний: {count}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 rounded-lg border border-border p-3 text-3xs leading-relaxed text-muted-foreground">
+                В закрытых заявках расход запчастей не заполнен. Складского учёта в системе нет — список появится, когда механики начнут указывать израсходованное в заявке.
+              </p>
+            )}
+          </section>
         </aside>
       </div>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'p-3')}>
           <div className="flex items-center justify-between"><div><h2 className="font-bold">Загрузка механиков</h2><p className="mt-1 text-xs text-muted-foreground">Распределение открытых заявок между исполнителями</p></div><span className="text-xs text-muted-foreground">{open.length} работ в очереди</span></div>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
-            {Array.from({ length: Math.min(3, Math.max(1, open.length)) }, (_, index) => {
-              const assigned = open.filter((_, recordIndex) => recordIndex % 3 === index);
-              const workload = open.length ? Math.round(assigned.length / Math.max(1, Math.ceil(open.length / 3)) * 100) : 0;
+            {workloadByMechanic.slice(0, 3).map((group) => {
+              // Доля относительно самого загруженного исполнителя — это
+              // сравнение между людьми, а не выдуманный процент от нормы.
+              const share = Math.round(group.records.length / busiest * 100);
+              const unassigned = group.id === '__unassigned';
               return (
-                <article key={index} className="rounded-lg border border-border p-2">
-                  <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-signal/10 text-signal-strong"><Wrench className="h-5 w-5" /></span><div><h3 className="text-xs font-bold">Исполнитель не назначен</h3><p className="text-3xs text-muted-foreground">{assigned.length} заявок</p></div></div>
-                  <div className="mt-3 flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-signal-strong" style={{ width: `${Math.min(100, workload)}%` }} /></div><b className="text-3xs">{Math.min(100, workload)}%</b></div>
-                  <div className="mt-3 space-y-1 text-3xs text-muted-foreground">{assigned.slice(0, 2).map((record) => <div key={record.id} className="truncate">• {record.title}</div>)}{assigned.length === 0 && <div>Свободен для назначения</div>}</div>
+                <article key={group.id} className={cn('rounded-lg border p-2', unassigned ? 'border-warning/40 bg-warning/5' : 'border-border')}>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('grid h-9 w-9 place-items-center rounded-full', unassigned ? 'bg-warning/10 text-warning-strong' : 'bg-signal/10 text-signal-strong')}>
+                      {unassigned ? <AlertTriangle className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-xs font-bold">{group.name}</h3>
+                      <p className="text-3xs text-muted-foreground">{group.records.length} заявок</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-border"><div className={cn('h-full rounded-full', unassigned ? 'bg-warning-strong' : 'bg-signal')} style={{ width: `${share}%` }} /></div><b className="text-3xs tabular-nums">{share}%</b></div>
+                  <div className="mt-3 space-y-1 text-3xs text-muted-foreground">{group.records.slice(0, 2).map((record) => <div key={record.id} className="truncate">• {record.title}</div>)}</div>
                 </article>
               );
             })}
+            {workloadByMechanic.length === 0 && (
+              <p className="py-6 text-center text-xs text-muted-foreground md:col-span-3">Открытых заявок нет.</p>
+            )}
           </div>
         </section>
         <section className={cn(card, 'p-3')}>
-          <div className="flex items-center justify-between"><h2 className="font-bold">Доказательства выполнения</h2><span className="text-xs text-muted-foreground">{props.maintenance.filter((record) => record.status === 'DONE').length} подтверждено</span></div>
+          {/*
+            Четыре плитки показывали «Нет подтверждения» всегда, а счётчик рядом
+            считал закрытые заявки — величины между собой не связаны. Считаем по
+            фактическим полям записи: описание работ, приёмка, дата закрытия.
+          */}
+          <div className="flex items-center justify-between"><h2 className="font-bold">Доказательства выполнения</h2><span className="text-xs text-muted-foreground">{closedRecords.length} закрытых заявок</span></div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {[
-              ['Фото до ремонта', 'camera' as PilingIconName],
-              ['Фото после ремонта', 'camera' as PilingIconName],
-              ['PDF / Акт выполненных работ', 'documents' as PilingIconName],
-              ['Подтверждение механика', 'accepted' as PilingIconName],
-            ].map(([label, icon]) => (
-              <div key={label} className="rounded-lg border border-border p-2">
-                <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded bg-info/10 text-info-strong"><PilingIcon name={icon as PilingIconName} size={11} decorative /></span><span className="min-w-0 flex-1 text-3xs font-semibold">{label}</span></div>
-                <span className="mt-1 block text-3xs text-muted-foreground">Нет подтверждения</span>
-              </div>
-            ))}
+            {([
+              ['Работы описаны', 'documents' as PilingIconName, closedRecords.filter((record) => (record.workDone ?? '').trim() !== '').length],
+              ['Расход запчастей', 'work-order' as PilingIconName, closedRecords.filter((record) => (record.partsUsedText ?? '').trim() !== '').length],
+              ['Дата закрытия', 'history' as PilingIconName, closedRecords.filter((record) => record.completedAt).length],
+              ['Работа принята', 'accepted' as PilingIconName, closedRecords.filter((record) => record.acceptedAt).length],
+            ] as const).map(([label, icon, count]) => {
+              const complete = closedRecords.length > 0 && count === closedRecords.length;
+              return (
+                <div key={label} className="rounded-lg border border-border p-2">
+                  <div className="flex items-center gap-2"><span className={cn('grid h-7 w-7 place-items-center rounded', complete ? 'bg-success/10 text-success-strong' : 'bg-info/10 text-info-strong')}><PilingIcon name={icon} size={11} decorative /></span><span className="min-w-0 flex-1 text-3xs font-semibold">{label}</span></div>
+                  <span className={cn('mt-1 block text-3xs font-semibold', complete ? 'text-success-strong' : 'text-muted-foreground')}>
+                    {closedRecords.length === 0 ? 'закрытых заявок нет' : `${count} из ${closedRecords.length}`}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </section>
       </div>

@@ -66,6 +66,18 @@ export interface MaintenanceSummary {
   scheduledAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /**
+   * Поля исполнения. listAllMaintenance отдаёт запись целиком (include, не
+   * select), так что они всегда приходили — просто не были объявлены здесь, и
+   * экраны рисовали вместо них выдуманные данные: загрузка механиков делилась
+   * по остатку индекса от трёх, а список запчастей был захардкожен.
+   */
+  assigneeId?: string | null;
+  performedBy?: string | null;
+  partsUsedText?: string | null;
+  workDone?: string | null;
+  startedAt?: string | null;
+  acceptedAt?: string | null;
   equipment: {
     id: string;
     name: string;
