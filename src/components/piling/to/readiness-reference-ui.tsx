@@ -2722,13 +2722,28 @@ function ReportsScreen(props: ReferenceUiProps) {
   const journalRows = [...snapshotRows, ...decisionRows]
     .sort((left, right) => new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime());
   const completed = journalRows.length;
-  const blockerRows = [
-    ['Ремонт и дефекты', blocked],
-    ['Осмотр', states.filter((item) => item.evidence.find((e) => e.key === 'inspection')?.state !== 'pass').length],
-    ['Экипаж', states.filter((item) => item.evidence.find((e) => e.key === 'crew')?.state !== 'pass').length],
-    ['Документы', states.filter((item) => item.evidence.find((e) => e.key === 'maintenance')?.state !== 'pass').length],
-  ] as const;
+  /**
+   * Причины блокировки — по фактам авторитетных снимков.
+   *
+   * Считались по производной модели: item.evidence.find(...)?.state !== 'pass'.
+   * Доказательства в ней заполнены только для выбранной установки (журнал ТО
+   * грузится по одной), поэтому у остальных find возвращал undefined и условие
+   * «!== pass» срабатывало всегда — Парето показывал почти весь парк в каждой
+   * причине. Ключа 'crew' среди доказательств вообще нет, эта строка была
+   * равна общему числу установок при любых данных.
+   */
+  const facts = props.currentReadiness.flatMap((item) => item.facts ? [item.facts] : []);
+  const blockerRows: Array<readonly [string, number]> = [
+    ['Критический дефект', facts.filter((item) => item.criticalDefect).length],
+    ['Осмотр не завершён', facts.filter((item) => !item.inspectionCompleted).length],
+    ['Наряд-допуск', facts.filter((item) => item.permitValid === false || item.permitExpired).length],
+    ['Просрочено ТО', facts.filter((item) => item.maintenanceOverdueHours > 0 || item.maintenanceOverdueDays > 0).length],
+    ['Приёмка не подтверждена', facts.filter((item) => !item.accepted).length],
+  ];
+  blockerRows.sort((left, right) => right[1] - left[1]);
   const maxBlocker = Math.max(1, ...blockerRows.map(([, value]) => value));
+  const startedShifts = props.shifts.filter((shift) =>
+    ['STARTED', 'HANDOVER_PENDING', 'CLOSED'].includes(shift.state)).length;
   const dailyTrend = Object.entries(props.readinessHistory.reduce<Record<string, number[]>>((result, snapshot) => {
     const date = new Date(snapshot.calculatedAt);
     if (reportPeriod === 'week') date.setDate(date.getDate() - date.getDay());
@@ -2748,9 +2763,14 @@ function ReportsScreen(props: ReferenceUiProps) {
       <ScreenTitle heading="Отчёты" subtitle="Аналитика доказательной готовности" actions={<div className="flex flex-wrap gap-2"><span className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-3 text-xs">▣ Текущий срез · {formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone)}</span><Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
         <RefKpi icon="technical-readiness" label="Готовность парка" tone="success" value={`${readinessPercent}%`} detail="текущий срез" />
-        <RefKpi icon="shift-start" label="Смен допущено" tone="info" value={ready} detail="по текущим доказательствам" />
+        {/*
+          Было «Смен допущено» со значением ready — это количество ГОТОВЫХ
+          УСТАНОВОК, а не допущенных смен. Считаем смены, реально дошедшие до
+          запуска, а установки называем установками.
+        */}
+        <RefKpi icon="shift-start" label="Смен запущено" tone="info" value={startedShifts} detail="дошли до работы" />
+        <RefKpi icon="accepted" label="Установок готово" tone="success" value={ready} detail={`из ${props.equipment.length}`} />
         <RefKpi icon="defect" label="Заблокировано" tone="danger" value={blocked} alert={blocked > 0} />
-        <RefKpi icon="history" label="Среднее решение" value="—" detail="нет истории решений" />
         <RefKpi icon="documents" label="Доказательств" tone="info" value={completed} detail="снимки и решения audit-chain" />
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
