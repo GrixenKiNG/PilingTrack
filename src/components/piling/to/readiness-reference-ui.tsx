@@ -1924,6 +1924,28 @@ function ShiftsScreen(props: ReferenceUiProps) {
   const waiting = todayShifts.filter((shift) => shift.state === 'HANDOVER_PENDING');
   const blocked = todayShifts.filter((shift) => shift.state === 'CANCELLED');
   const hours = ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+  /**
+   * Отметка «сейчас» на графике. Была прибита к left-[23%] — не двигалась со
+   * временем и в любой час показывала одно и то же место, то есть врала о
+   * текущем моменте. Считается от фактического времени в поясе тенанта; ось
+   * графика 06:00–22:00, отсюда шкала в 16 часов. Вне этого окна метки нет.
+   *
+   * Значение ставится в эффекте, а не при рендере: время на сервере и на
+   * клиенте разное, и прямой расчёт ломал бы гидратацию.
+   */
+  const [now, setNow] = useState<{ left: number; label: string } | null>(null);
+  useEffect(() => {
+    const update = () => {
+      const current = new Date();
+      const decimal = decimalHourInTimezone(current, timezone);
+      setNow(decimal >= 6 && decimal <= 22
+        ? { left: (decimal - 6) / 16 * 100, label: formatTimeInTimezone(current, timezone) }
+        : null);
+    };
+    update();
+    const timer = setInterval(update, 60_000);
+    return () => clearInterval(timer);
+  }, [timezone]);
   const createShift = async () => {
     if (!props.selectedId || !props.bootstrap?.capabilities.entities.shift.manage) return;
     const hour = new Date().getHours();
@@ -2042,7 +2064,7 @@ function ShiftsScreen(props: ReferenceUiProps) {
             <div className="grid grid-cols-9 px-2 text-3xs text-muted-foreground">{hours.map((hour) => <span key={hour}>{hour}</span>)}</div>
           </div>
           <div className="mt-2 hidden min-w-[760px] divide-y divide-border md:block">
-            {todayShifts.length > 0 ? todayShifts.slice(0, 8).map((shift) => {
+            {todayShifts.length > 0 ? todayShifts.slice(0, 8).map((shift, shiftIndex) => {
               const equipment = props.equipment.find((item) => item.id === shift.equipmentId);
               const crew = activeCrews.find((item) => item.equipment?.id === shift.equipmentId);
               const equipmentCard = props.fleetCards.find((item) => item.id === shift.equipmentId);
@@ -2063,7 +2085,15 @@ function ShiftsScreen(props: ReferenceUiProps) {
                     <div className={cn('absolute top-0.5 h-6 overflow-hidden rounded px-3 py-1 text-3xs font-semibold text-white', shift.state === 'STARTED' ? 'bg-success-strong' : shift.state === 'CANCELLED' ? 'bg-destructive-strong' : 'bg-signal-strong')} style={{ left: `${left}%`, width: `${width}%` }}>
                       {start ? formatTimeInTimezone(start, timezone) : '—'} – {end ? formatTimeInTimezone(end, timezone) : '—'}
                     </div>
-                    <div className="absolute bottom-[-8px] top-[-8px] left-[23%] w-px bg-signal-strong"><span className="absolute -top-5 -translate-x-1/2 rounded bg-signal-strong px-1.5 py-0.5 text-3xs text-white">сейчас</span></div>
+                    {/* Подпись времени только у первой строки: линия проходит
+                        через все ряды, повторять ярлык на каждом незачем. */}
+                    {now && (
+                      <div className="absolute bottom-[-8px] top-[-8px] w-px bg-signal" style={{ left: `${now.left}%` }}>
+                        {shiftIndex === 0 && (
+                          <span className="absolute -top-5 -translate-x-1/2 rounded bg-signal px-1.5 py-0.5 text-3xs text-white">{now.label}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
