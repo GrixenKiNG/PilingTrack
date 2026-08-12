@@ -3,14 +3,20 @@ import {resolve} from 'node:path';
 import {describe, expect, it} from 'vitest';
 
 describe('readiness center authority boundary', () => {
-  const source = readFileSync(
-    resolve(process.cwd(), 'src/components/piling/to/readiness-reference-ui.tsx'),
+  // Экран центра готовности живёт в своём файле; раньше проверка вырезала его
+  // из общего readiness-reference-ui.tsx между двумя именами функций. После
+  // разбора файла срез стал пустым, и запреты ниже начали проходить впустую —
+  // пустая строка не совпадает ни с одним шаблоном. Отсюда явная проверка,
+  // что источник вообще прочитан.
+  const center = readFileSync(
+    resolve(process.cwd(), 'src/components/piling/to/readiness/screens/readiness-centre.tsx'),
     'utf8',
   );
-  const center = source.slice(
-    source.indexOf('function ReadinessCentre'),
-    source.indexOf('function FleetScreen'),
-  );
+
+  it('reads the centre source', () => {
+    expect(center.length).toBeGreaterThan(1000);
+    expect(center).toContain('function ReadinessCentre');
+  });
 
   it('renders decision-bearing center fields from the authoritative presentation', () => {
     expect(center).toContain('buildAuthoritativeReadinessPresentation');
