@@ -2700,17 +2700,46 @@ const REPORT_DEFAULT_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 /**
+ * Календарный день тенанта для момента времени, «ГГГГ-ММ-ДД».
+ *
+ * Границы периода считаем днями тенанта, а не мгновениями по часам браузера.
+ * Раньше здесь стоял `new Date('2026-07-13T00:00:00')` — это полночь у того,
+ * кто смотрит. Сервер при этом разбирает те же даты в поясе тенанта
+ * (`parseReadinessReadFilters`), и у пользователя не в Москве серверная
+ * выборка и клиентский отбор разъезжались на сутки по краям окна.
+ */
+const tenantDay = (value: Date | string, timezone: string): string =>
+  new Date(value).toLocaleDateString('en-CA', { timeZone: timezone });
+
+/** День как UTC-полночь: арифметика по календарю, без перевода часов. */
+const dayToUtc = (day: string): Date => new Date(`${day}T00:00:00.000Z`);
+
+const shiftDay = (day: string, delta: number): string =>
+  new Date(dayToUtc(day).getTime() + delta * DAY_MS).toISOString().slice(0, 10);
+
+/** Дата тенанта человеку. Формат в UTC — день уже календарный, сдвигать нечего. */
+const formatTenantDay = (day: string): string =>
+  new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeZone: 'UTC' }).format(dayToUtc(day));
+
+/**
  * Окно отчёта и равное ему предыдущее окно — для сравнений «к предыдущему
  * периоду». Сравнивать не с чем, если в прошлом окне данных нет: тогда дельту
  * не показываем вовсе, а не рисуем ноль или прочерк со стрелкой.
  */
-function resolveReportPeriod(filters: ReadinessUrlFilters) {
-  const to = filters.to ? new Date(`${filters.to}T23:59:59.999`) : new Date();
-  const from = filters.from
-    ? new Date(`${filters.from}T00:00:00`)
-    : new Date(to.getTime() - (REPORT_DEFAULT_DAYS - 1) * DAY_MS);
-  const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / DAY_MS) + 1);
-  return { from, to, days, previousFrom: new Date(from.getTime() - days * DAY_MS) };
+function resolveReportPeriod(filters: ReadinessUrlFilters, timezone: string) {
+  const toDay = filters.to || tenantDay(new Date(), timezone);
+  const fromDay = filters.from || shiftDay(toDay, -(REPORT_DEFAULT_DAYS - 1));
+  const days = Math.max(
+    1,
+    Math.round((dayToUtc(toDay).getTime() - dayToUtc(fromDay).getTime()) / DAY_MS) + 1,
+  );
+  return {
+    fromDay,
+    toDay,
+    days,
+    previousFromDay: shiftDay(fromDay, -days),
+    previousToDay: shiftDay(fromDay, -1),
+  };
 }
 
 const average = (values: readonly number[]) =>
@@ -2738,15 +2767,19 @@ function ReportsScreen(props: ReferenceUiProps) {
   const readinessPercent = authoritative?.length
     ? Math.round(authoritative.reduce((sum, item) => sum + item.score, 0) / authoritative.length * 10) / 10
     : states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
-  const period = resolveReportPeriod(props.filters);
-  const within = (value: string | null | undefined, start: Date, end: Date) => {
+  const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+  const period = resolveReportPeriod(props.filters, timezone);
+  // Сравнение строк «ГГГГ-ММ-ДД» — то же, что сравнение календарных дней.
+  const within = (value: string | null | undefined, first: string, last: string) => {
     if (!value) return false;
     const time = new Date(value).getTime();
-    return Number.isFinite(time) && time >= start.getTime() && time <= end.getTime();
+    if (!Number.isFinite(time)) return false;
+    const day = tenantDay(value, timezone);
+    return day >= first && day <= last;
   };
-  const inPeriod = (value: string | null | undefined) => within(value, period.from, period.to);
+  const inPeriod = (value: string | null | undefined) => within(value, period.fromDay, period.toDay);
   const inPrevious = (value: string | null | undefined) =>
-    within(value, period.previousFrom, new Date(period.from.getTime() - 1));
+    within(value, period.previousFromDay, period.previousToDay);
 
   /**
    * Итог допуска считаем по самим сменам, а не по установкам: у смены есть
@@ -2870,10 +2903,11 @@ function ReportsScreen(props: ReferenceUiProps) {
   blockerRows.sort((left, right) => right[1] - left[1]);
   const maxBlocker = Math.max(1, ...blockerRows.map(([, value]) => value));
   const dailyTrend = Object.entries(periodSnapshots.reduce<Record<string, number[]>>((result, snapshot) => {
-    const date = new Date(snapshot.calculatedAt);
-    if (reportPeriod === 'week') date.setDate(date.getDate() - date.getDay());
-    const day = date.toISOString().slice(0, 10);
-    (result[day] ??= []).push(snapshot.score);
+    const day = tenantDay(snapshot.calculatedAt, timezone);
+    // Неделя начинается с понедельника: getUTCDay() отдаёт 0 для воскресенья.
+    const weekday = (dayToUtc(day).getUTCDay() + 6) % 7;
+    const bucket = reportPeriod === 'week' ? shiftDay(day, -weekday) : day;
+    (result[bucket] ??= []).push(snapshot.score);
     return result;
   }, {})).sort(([left], [right]) => left.localeCompare(right)).map(([day, scores]) => ({
     day,
@@ -2909,7 +2943,7 @@ function ReportsScreen(props: ReferenceUiProps) {
         срез», и заголовок «за 30 дней» ничем не подкреплялся.
       */}
       <p className="mb-2 text-2xs text-muted-foreground">
-        Период: {formatDateInTimezone(period.from, props.bootstrap?.tenant.timezone)} — {formatDateInTimezone(period.to, props.bootstrap?.tenant.timezone)}
+        Период: {formatTenantDay(period.fromDay)} — {formatTenantDay(period.toDay)}
         {' · '}{period.days} {pluralizeRu(period.days, ['сутки', 'суток', 'суток'])}
       </p>
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
@@ -2994,8 +3028,8 @@ function ReportsScreen(props: ReferenceUiProps) {
           </div>
           {dailyTrend.length > 0 && (
             <div className="mt-1 flex justify-between pl-10 text-3xs text-muted-foreground">
-              <span>{formatDateInTimezone(dailyTrend[0].day, props.bootstrap?.tenant.timezone)}</span>
-              <span>{formatDateInTimezone(dailyTrend[dailyTrend.length - 1].day, props.bootstrap?.tenant.timezone)}</span>
+              <span>{formatTenantDay(dailyTrend[0].day)}</span>
+              <span>{formatTenantDay(dailyTrend[dailyTrend.length - 1].day)}</span>
             </div>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-4 border-t border-border pt-2 text-3xs text-muted-foreground">
