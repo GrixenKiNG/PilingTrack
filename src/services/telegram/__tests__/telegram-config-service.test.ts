@@ -88,7 +88,11 @@ describe('listTelegramConfigs', () => {
     expect(mocks.findMany).toHaveBeenCalledWith({ where: { tenantId: TENANT_A }, orderBy: { createdAt: 'desc' } });
   });
 
-  it('decrypts botToken on encrypted rows', async () => {
+  // Раньше эти два теста закрепляли, что токен расшифровывается и уходит
+  // наружу целиком. Это и была утечка: токен бота даёт полный контроль над
+  // ботом, а интерфейсу от него нужны только последние символы для опознания
+  // записи. Теперь тесты закрепляют обратное — секрет не покидает сервер.
+  it('не отдаёт расшифрованный токен наружу — только хвост', async () => {
     const enc = `enc:v1:${Buffer.from('123:secret').toString('base64')}`;
     mocks.findMany.mockResolvedValue([
       { id: '1', label: 'Main', botToken: enc, chatId: '-100' },
@@ -96,20 +100,40 @@ describe('listTelegramConfigs', () => {
 
     const result = await listTelegramConfigs(TENANT_A);
 
-    expect(result[0].botToken).toBe('123:secret');
+    expect(result[0]).not.toHaveProperty('botToken');
+    expect(result[0].botTokenHint).toBe('cret');
+    expect(result[0].hasBotToken).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('123:secret');
     expect(mocks.decrypt).toHaveBeenCalledWith(enc);
   });
 
-  it('passes through plain (legacy unencrypted) tokens unchanged', async () => {
-    // Pre-encryption rows survive a migration; we don't mangle them.
+  it('старые незашифрованные записи тоже не утекают', async () => {
+    // Строки, пережившие миграцию шифрования, читаются как есть — но наружу
+    // от них уходит ровно столько же, сколько от зашифрованных.
     mocks.findMany.mockResolvedValue([
       { id: '1', label: 'Legacy', botToken: 'plain-token-456', chatId: '-100' },
     ]);
 
     const result = await listTelegramConfigs(TENANT_A);
 
-    expect(result[0].botToken).toBe('plain-token-456');
+    expect(result[0]).not.toHaveProperty('botToken');
+    expect(result[0].botTokenHint).toBe('-456');
+    expect(result[0].hasBotToken).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('plain-token-456');
     expect(mocks.decrypt).not.toHaveBeenCalled();
+  });
+
+  it('нечитаемый токен (чужой ключ шифрования) не ломает список', async () => {
+    const enc = `enc:v1:${Buffer.from('whatever').toString('base64')}`;
+    mocks.findMany.mockResolvedValue([
+      { id: '1', label: 'Foreign', botToken: enc, chatId: '-100' },
+    ]);
+    mocks.decrypt.mockImplementationOnce(() => { throw new Error('bad key'); });
+
+    const result = await listTelegramConfigs(TENANT_A);
+
+    expect(result[0].hasBotToken).toBe(false);
+    expect(result[0].botTokenHint).toBe('');
   });
 });
 

@@ -259,7 +259,9 @@ export function AdminTelegram() {
                           Chat ID: {config.chatId}
                         </p>
                         <p className="text-3xs text-muted-foreground font-mono">
-                          Token: ••••{config.botToken.slice(-6)}
+                          {config.hasBotToken
+                            ? `Token: ••••${config.botTokenHint}`
+                            : 'Токен не задан — введите заново'}
                         </p>
                       </div>
                     </div>

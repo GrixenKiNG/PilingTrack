@@ -373,7 +373,14 @@ export interface SiteAnalyticsDTO {
 export interface TelegramConfigDTO {
   id: string;
   label: string;
-  botToken: string;
+  /**
+   * Последние символы токена — только чтобы опознать запись в списке.
+   * Сам токен наружу не отдаётся: он даёт полный контроль над ботом.
+   * Пустая строка означает, что токен не читается (запись зашифрована другим
+   * ключом) — тогда `hasBotToken` тоже false и токен нужно ввести заново.
+   */
+  botTokenHint: string;
+  hasBotToken: boolean;
   chatId: string;
   enabled: boolean;
 }

@@ -17,28 +17,62 @@ function requireTenantId(tenantId: string) {
   return tenantId;
 }
 
-export async function listTelegramConfigs(tenantId: string) {
+/**
+ * Хвост токена для опознания записи — и ничего больше.
+ *
+ * Токен бота даёт полный контроль над ботом: рассылку от его имени, чтение
+ * истории, смену вебхука. Наружу он не выходит НИКОГДА. Интерфейс и так
+ * показывал только последние символы (`••••1234`) — полный токен ехал в
+ * браузер лишь затем, чтобы там же быть обрезанным, попутно оседая в памяти
+ * вкладки, в devtools и в любом XSS.
+ *
+ * Отправитель уведомлений читает базу напрямую и расшифровывает сам
+ * (core/notifications/telegram.ts), поэтому маскировка его не затрагивает.
+ */
+function tokenHint(plainToken: string): string {
+  return plainToken.length > 4 ? plainToken.slice(-4) : '';
+}
+
+export type TelegramConfigView = Omit<
+  Awaited<ReturnType<typeof db.telegramConfig.findMany>>[number],
+  'botToken'
+> & { botTokenHint: string; hasBotToken: boolean };
+
+export async function listTelegramConfigs(tenantId: string): Promise<TelegramConfigView[]> {
   requireTenantId(tenantId);
   const configs = await db.telegramConfig.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },
   });
 
-  // Decrypt botToken for each config. A token encrypted under a different
-  // ENCRYPTION_KEY (e.g. prod data loaded into a local DB) can't be decrypted
-  // here — degrade to an empty token instead of failing the whole list, so the
-  // settings page still loads and the token can be re-entered.
+  // Расшифровка нужна только чтобы взять хвост. Токен, зашифрованный другим
+  // ENCRYPTION_KEY (прод-данные в локальной базе), не читается — тогда запись
+  // считается «без токена», и страница настроек всё равно открывается, а
+  // токен можно ввести заново.
   return configs.map((config) => {
-    let botToken = config.botToken;
-    if (botToken && isEncrypted(botToken)) {
+    const { botToken: stored, ...rest } = config;
+    let plain = stored;
+    if (plain && isEncrypted(plain)) {
       try {
-        botToken = decrypt(botToken);
+        plain = decrypt(plain);
       } catch {
-        botToken = '';
+        plain = '';
       }
     }
-    return { ...config, botToken };
+    return { ...rest, botTokenHint: tokenHint(plain), hasBotToken: Boolean(plain) };
   });
+}
+
+/** Запись без секрета — для ответов на создание и правку. */
+function toView(config: { botToken: string } & Record<string, unknown>): TelegramConfigView {
+  const { botToken, ...rest } = config;
+  // Здесь в botToken лежит шифротекст: расшифровывать ради хвоста не нужно,
+  // вызывающий только что сам прислал токен и знает его.
+  return {
+    ...(rest as Omit<TelegramConfigView, 'botTokenHint' | 'hasBotToken'>),
+    botTokenHint: '',
+    hasBotToken: Boolean(botToken),
+  };
 }
 
 export async function createTelegramConfig(
@@ -54,7 +88,7 @@ export async function createTelegramConfig(
   const rawBotToken = normalizeText(input.botToken, 'botToken');
   const encryptedBotToken = encrypt(rawBotToken);
 
-  return db.telegramConfig.create({
+  const created = await db.telegramConfig.create({
     data: {
       tenantId,
       label: normalizeText(input.label, 'label'),
@@ -63,6 +97,7 @@ export async function createTelegramConfig(
       enabled: input.enabled === undefined ? true : Boolean(input.enabled),
     },
   });
+  return toView(created);
 }
 
 export async function updateTelegramConfig(
@@ -96,10 +131,10 @@ export async function updateTelegramConfig(
   if (input.enabled !== undefined) data.enabled = Boolean(input.enabled);
 
   try {
-    return await db.telegramConfig.update({
+    return toView(await db.telegramConfig.update({
       where: { id },
       data,
-    });
+    }));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to update not found')) {
