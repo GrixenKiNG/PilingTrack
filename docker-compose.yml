@@ -40,6 +40,10 @@ services:
         echo '✓ Migration complete.'
       "
     environment:
+      # Единственный сервис, который ходит в базу РОЛЬЮ-ВЛАДЕЛЬЦЕМ
+      # (POSTGRES_USER). Ему нужен DDL: он накатывает миграции и владеет
+      # таблицами. Рантайм (app/workers/ws) ходит ролью APP_DB_USER без
+      # BYPASSRLS — см. docs/runbooks/011-app-db-role.md.
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
@@ -72,8 +76,8 @@ services:
       # which is required in transaction pool mode.
       # DIRECT_DATABASE_URL keeps a session-mode path open for the rare Prisma
       # internals that need it (migrations are run by the migrate service).
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
+      - DATABASE_URL_POSTGRES=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
@@ -144,8 +148,8 @@ services:
       - NODE_ENV=production
       # Workers also go through PgBouncer (transaction pooling) — see app
       # service for full rationale.
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
+      - DATABASE_URL_POSTGRES=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
@@ -211,8 +215,8 @@ services:
     environment:
       - NODE_ENV=production
       # WS server uses PgBouncer for runtime queries too.
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
+      - DATABASE_URL=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
+      - DATABASE_URL_POSTGRES=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - WS_PORT=3001
@@ -248,7 +252,17 @@ services:
     ports:
       - "6432:6432"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}
+      # Из этого URL образ собирает userlist.txt и auth_user. Строка
+      # [databases] генерируется БЕЗ `user=`, поэтому серверное соединение
+      # открывается ролью клиента — то есть RLS действует и через пул
+      # (проверено 13.08.2026: Shift=0 без GUC, 14 с GUC, current_user =
+      # pilingtrack_app).
+      # Держим здесь ту же роль, что у app/workers/ws, по одной причине: иначе
+      # в контейнере пула лежит пароль суперпользователя, а неизвестные роли
+      # аутентифицируются через auth_query к pg_shadow от его имени.
+      # Побочный эффект (проверен): владелец через пул больше не подключится —
+      # так и задумано, миграции ходят напрямую в postgres:5432.
+      - DATABASE_URL=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=1000
       # 3 services × Prisma max=20 = 60 potential client connections.
