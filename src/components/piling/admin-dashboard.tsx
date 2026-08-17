@@ -307,52 +307,53 @@ export function AdminDashboard() {
           <p className="mt-0.5 text-sm text-muted-foreground">Оперативная сводка производства</p>
         </div>
 
-        {/* Фильтры: период + Объект + Установка */}
-        <div className="w-full space-y-2 lg:w-auto">
-          <span className="block text-xs font-medium text-muted-foreground">Период производственных показателей</span>
-          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border sm:grid-cols-4">
-            {([['all', 'Всё время'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Выбрать даты']] as const).map(([m, label]) => (
+        {/* Фильтры: период + Объект + Установка.
+            Компактный ряд, как на проде: это админский экран за столом, а не
+            полевой. Крупные цели нажатия в 44px разнесли панель на три ряда и
+            съедали высоту до первых цифр — владелец сравнил с продом и выбрал
+            продовый вид (18.08.2026). Полевые экраны оператора это не
+            затрагивает, там 44px остаются. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded-md border border-border">
+            {([['all', 'Весь период'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Период']] as const).map(([m, label]) => (
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
                 className={cn(
-                  'min-h-11 border-border px-3 text-sm font-medium first:border-0 max-sm:border-t max-sm:odd:border-r sm:border-l',
+                  'px-2.5 py-1 text-xs font-medium',
                   periodMode === m ? 'bg-info/10 text-info-strong' : 'bg-card text-muted-foreground hover:bg-muted',
                 )}>
                 {label}
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[auto_minmax(10rem,1fr)_minmax(10rem,1fr)_auto]">
           {periodMode === 'custom' && (
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:col-span-2 xl:col-span-1">
+            <div className="flex items-center gap-1">
               <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
                 aria-label="Начало периода"
-                className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground" />
-              <span className="text-sm text-muted-foreground">—</span>
+                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
+              <span className="text-xs text-muted-foreground">—</span>
               <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                 aria-label="Конец периода"
-                className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground" />
+                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
             </div>
           )}
           <select value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)} aria-label="Фильтр по объекту"
-            className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground">
+            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground">
             <option value="all">Все объекты</option>
             {siteOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <select value={rigFilter} onChange={(e) => setRigFilter(e.target.value)} aria-label="Фильтр по установке"
-            className="h-11 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground">
+            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground">
             <option value="all">Все установки</option>
             {(fleet?.equipment ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button
             type="button"
             onClick={refreshAll}
-            className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
             aria-label="Обновить дашборд"
           >
             <RefreshCw className="h-4 w-4" />
-            <span>Обновить</span>
           </button>
-          </div>
         </div>
       </div>
 
