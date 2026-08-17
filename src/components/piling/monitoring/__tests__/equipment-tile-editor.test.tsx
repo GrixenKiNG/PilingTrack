@@ -11,8 +11,18 @@ vi.mock('next/image', () => ({
 
 const storeState = vi.hoisted(() => ({ role: 'ADMIN' as string | null }));
 vi.mock('@/lib/store', () => ({
-  usePilingStore: (selector: (state: { currentUser: { role: string } | null }) => unknown) =>
-    selector({ currentUser: storeState.role ? { role: storeState.role } : null }),
+  /*
+    Заглушка отдаёт и селектор, и статический getState.
+    `authFetch` (src/lib/api.ts) читает исполняемую роль именно статически —
+    `usePilingStore.getState().actingAs`, — а не через селектор. Пока getState
+    здесь не было, каждый запрос теста падал с «usePilingStore.getState is not
+    a function», и все пять проверок редактора плитки валились разом.
+  */
+  usePilingStore: Object.assign(
+    (selector: (state: { currentUser: { role: string } | null }) => unknown) =>
+      selector({ currentUser: storeState.role ? { role: storeState.role } : null }),
+    { getState: () => ({ actingAs: null as string | null }) },
+  ),
 }));
 
 type FetchCall = { url: string; method: string; body?: unknown };

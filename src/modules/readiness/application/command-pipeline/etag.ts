@@ -44,7 +44,17 @@ export function resolveExpectedVersion(input: {
   if (headerVersion !== undefined && bodyVersion !== undefined && headerVersion !== bodyVersion) {
     throw invalidPrecondition('If-Match and expected version disagree');
   }
-  return headerVersion ?? bodyVersion!;
+  /*
+    Было `headerVersion ?? bodyVersion!`. Утверждение опиралось на верный, но
+    двухшаговый вывод: раз выше не бросили, значит есть либо заголовок, либо
+    тело; раз заголовка нет — есть тело. Компилятор такую цепочку не видит, и
+    `!` просто затыкал ему рот. Развёрнутый возврат делает тот же вывод явным,
+    а последняя строка честно отказывает вместо того, чтобы вернуть undefined
+    под видом числа, если условия выше однажды разойдутся.
+  */
+  if (headerVersion !== undefined) return headerVersion;
+  if (bodyVersion !== undefined) return bodyVersion;
+  throw preconditionRequired();
 }
 
 export function assertCurrentVersion(expected: number, current: number): void {

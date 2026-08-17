@@ -4,6 +4,7 @@ import {
   DOWNTIME_REASON_TEMPLATES,
   DRILLING_TYPE_TEMPLATES,
   PILE_GRADE_TEMPLATES,
+  USER_DOCUMENT_TYPE_TEMPLATES,
 } from '../system-templates';
 
 describe('initializeTenantDictionaries', () => {
@@ -12,6 +13,7 @@ describe('initializeTenantDictionaries', () => {
       pileGrade: { createMany: vi.fn().mockResolvedValue({ count: PILE_GRADE_TEMPLATES.length }) },
       drillingType: { createMany: vi.fn().mockResolvedValue({ count: DRILLING_TYPE_TEMPLATES.length }) },
       downtimeReason: { createMany: vi.fn().mockResolvedValue({ count: DOWNTIME_REASON_TEMPLATES.length }) },
+      userDocumentType: { createMany: vi.fn().mockResolvedValue({ count: USER_DOCUMENT_TYPE_TEMPLATES.length }) },
     };
 
     await initializeTenantDictionaries(tx as never, 'tenant-a');
@@ -20,6 +22,7 @@ describe('initializeTenantDictionaries', () => {
       tx.pileGrade.createMany,
       tx.drillingType.createMany,
       tx.downtimeReason.createMany,
+      tx.userDocumentType.createMany,
     ]) {
       expect(createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }));
       expect(createMany.mock.calls[0]?.[0].data.every(

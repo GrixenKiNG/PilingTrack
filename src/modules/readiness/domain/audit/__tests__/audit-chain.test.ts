@@ -27,7 +27,7 @@ describe('audit canonicalization and masking', () => {
   });
 
   it('enforces depth and masked byte limits', () => {
-    let deep: Record<string, unknown> = {};
+    const deep: Record<string, unknown> = {};
     let cursor = deep;
     for (let index = 0; index < 34; index += 1) {
       cursor.child = {};

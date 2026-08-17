@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { TechReadinessModule } from './tech-readiness-module';
+import { MODULE_TABS } from './module-tab-list';
 import { bootstrapEnvelope } from './api/__tests__/fixtures';
 
 beforeAll(() => {
@@ -19,7 +20,7 @@ describe('TechReadinessModule', () => {
       </TechReadinessModule>,
     );
 
-    expect(screen.getAllByRole('tab')).toHaveLength(7);
+    expect(screen.getAllByRole('tab')).toHaveLength(MODULE_TABS.length);
     expect(screen.getByRole('tabpanel', { name: 'Центр готовности' })).toContainElement(
       screen.getByText('Рабочая область'),
     );
@@ -35,7 +36,7 @@ describe('TechReadinessModule', () => {
     expect(root.innerHTML).not.toMatch(/100vh-|min-w-\[(?:1280|1440)px\]/);
   });
 
-  it('keeps all seven tabs visible when the active feature is scoped off', () => {
+  it('keeps every tab visible when the active feature is scoped off', () => {
     render(
       <TechReadinessModule
         activeView="shifts"
@@ -45,7 +46,7 @@ describe('TechReadinessModule', () => {
         <div>Смены</div>
       </TechReadinessModule>,
     );
-    expect(screen.getAllByRole('tab')).toHaveLength(7);
+    expect(screen.getAllByRole('tab')).toHaveLength(MODULE_TABS.length);
     expect(screen.getByText('Смены включаются поэтапно.')).toBeInTheDocument();
   });
 

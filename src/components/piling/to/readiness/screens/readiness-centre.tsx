@@ -472,19 +472,27 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             диспетчер, и рядом обязан стоять балл, иначе «Требует внимания»
             ничем не отличается от «Заблокировано».
           */}
+          {/*
+            Четыре исхода вместо двух. Раньше «готова с замечанием» красилась
+            зелёным наравне с чистой готовностью — замечание было некому
+            заметить, — а «требуется подтверждение диспетчера» показывалось
+            тем же красным, что и «эксплуатация запрещена».
+          */}
           <div className={cn(
             'mt-2 flex items-start gap-2.5 rounded-lg border p-3',
-            presentation.status === 'READY' && 'border-success/30 bg-success/10',
-            presentation.status === 'BLOCKED' && 'border-destructive/30 bg-destructive/10',
-            presentation.status === 'UNCONFIRMED' && 'border-warning/30 bg-warning/10',
+            presentation.outcome === 'READY' && 'border-success/30 bg-success/10',
+            presentation.outcome === 'READY_WITH_WARNING' && 'border-warning/30 bg-warning/10',
+            presentation.outcome === 'ATTENTION' && 'border-info/30 bg-info/10',
+            presentation.outcome === 'BLOCKED' && 'border-destructive/30 bg-destructive/10',
+            presentation.outcome === 'UNCONFIRMED' && 'border-warning/30 bg-warning/10',
           )}>
-            {presentation.status === 'READY'
+            {presentation.outcome === 'READY'
               ? <CheckCircle2 className="h-5 w-5 shrink-0 text-success-strong" />
-              : <AlertTriangle className={cn('h-5 w-5 shrink-0', presentation.status === 'BLOCKED' ? 'text-destructive-strong' : 'text-warning-strong')} />}
+              : <AlertTriangle className={cn('h-5 w-5 shrink-0',
+                  presentation.outcome === 'BLOCKED' ? 'text-destructive-strong'
+                    : presentation.outcome === 'ATTENTION' ? 'text-info-strong' : 'text-warning-strong')} />}
             <div className="min-w-0">
-              <div className="text-sm font-bold">
-                {presentation.status === 'READY' ? 'Готово' : presentation.status === 'BLOCKED' ? 'Заблокировано' : 'Требует внимания'}
-              </div>
+              <div className="text-sm font-bold">{presentation.title}</div>
               <div className="mt-0.5 text-2xs text-muted-foreground">
                 {presentation.score != null
                   ? `Готовность подтверждена на ${presentation.score}%`
@@ -845,11 +853,15 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               // Время последней передачи по этой установке — «когда упало во входящие».
               const lastSubmitted = buildHandoverJournal(props.shifts, item.id, props.bootstrap?.selectors.actors)
                 .find((event) => event.kind === 'SUBMITTED');
-              const statusPill = itemPresentation.status === 'READY'
+              const statusPill = itemPresentation.outcome === 'READY'
                 ? { label: 'Готова к приёмке', cls: 'border-success/30 bg-success/10 text-success-strong' }
-                : itemPresentation.status === 'BLOCKED'
-                  ? { label: 'Заблокирована', cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong' }
-                  : { label: 'Требует внимания', cls: 'border-warning/30 bg-warning/10 text-warning-strong' };
+                : itemPresentation.outcome === 'READY_WITH_WARNING'
+                  ? { label: 'Готова с замечанием', cls: 'border-warning/30 bg-warning/10 text-warning-strong' }
+                  : itemPresentation.outcome === 'BLOCKED'
+                    ? { label: 'Заблокирована', cls: 'border-destructive/30 bg-destructive/10 text-destructive-strong' }
+                    : itemPresentation.outcome === 'ATTENTION'
+                      ? { label: 'Требует решения', cls: 'border-info/30 bg-info/10 text-info-strong' }
+                      : { label: 'Требует внимания', cls: 'border-warning/30 bg-warning/10 text-warning-strong' };
               return (
                 <div key={item.id} className={cn('rounded-lg border p-3', active ? 'border-signal bg-signal/5' : 'border-border')}>
                   <button

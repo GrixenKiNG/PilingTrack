@@ -15,6 +15,7 @@ export const MODULE_TABS = [
   { id: 'shifts', label: 'Смены' },
   { id: 'permits', label: 'Наряд-допуски' },
   { id: 'maintenance', label: 'Обслуживание' },
+  { id: 'documents', label: 'Документы' },
   { id: 'reports', label: 'Отчёты' },
   { id: 'settings', label: 'Настройки' },
 ] as const satisfies ReadonlyArray<{ id: ReferenceView; label: string }>;

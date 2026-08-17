@@ -4,6 +4,12 @@ import {NextRequest} from 'next/server';
 const mocks = vi.hoisted(() => ({requireAuth: vi.fn()}));
 
 vi.mock('@/lib/auth', () => ({requireAuth: mocks.requireAuth}));
+// Матрица доступов читается из базы на каждом запросе. Здесь проверяется
+// граница доверия — тенант, актор и роль берутся только из сессии, — поэтому
+// загрузка матрицы подменяется, а не поднимается база.
+vi.mock('@/modules/readiness/application/access-matrix-service', () => ({
+  getPublishedAccessMatrix: vi.fn().mockResolvedValue({version: 'v1.0', status: 'PUBLISHED', grants: {}}),
+}));
 
 import {resolveReadinessRequestContext} from '../request-context';
 

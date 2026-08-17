@@ -90,12 +90,31 @@ export class PrismaAuditRepository implements AuditRepository {
       }),
       this.tx.tenantAuditChain.findUnique({where: {tenantId}}),
     ]);
-    const events = rows.map((row): StoredAuditEvent => ({
+    const events = rows.map((row): StoredAuditEvent => {
+      /*
+        Запрос отбирает строки по `hash: {not: null}` — значит непустым
+        гарантирован ТОЛЬКО хэш. Остальные поля цепочки (tenantId, sequence,
+        occurredAt, recordedAt, entityType) по схеме допускают пустоту и ничем
+        здесь не отфильтрованы, а стояло на них шесть утверждений «точно не
+        пусто». Строка с хэшем и без порядкового номера роняла бы чтение
+        цепочки как `Cannot read properties of null`.
+
+        Такая строка означает повреждённую цепочку аудита. Собрать из неё
+        событие молча нельзя: это выдало бы испорченный аудит за целый — ровно
+        то, ради чего цепочка и заводилась. Отказываем с указанием строки.
+      */
+      if (
+        row.tenantId === null || row.sequence === null || row.occurredAt === null
+        || row.recordedAt === null || row.entityType === null || row.hash === null
+      ) {
+        throw new Error(`Audit chain row ${row.id} is incomplete: chained fields are missing`);
+      }
+      return {
       id: row.id,
-      tenantId: row.tenantId!,
-      sequence: row.sequence!.toString(),
-      occurredAt: row.occurredAt!.toISOString(),
-      recordedAt: row.recordedAt!.toISOString(),
+      tenantId: row.tenantId,
+      sequence: row.sequence.toString(),
+      occurredAt: row.occurredAt.toISOString(),
+      recordedAt: row.recordedAt.toISOString(),
       actor: {
         id: row.actorId,
         name: row.userName,
@@ -103,7 +122,7 @@ export class PrismaAuditRepository implements AuditRepository {
         actingAs: row.actingAs,
       },
       action: row.action,
-      entity: {type: row.entityType!, id: row.entityId, version: row.entityVersion},
+      entity: {type: row.entityType, id: row.entityId, version: row.entityVersion},
       requestId: row.requestId,
       correlationId: row.correlationId,
       idempotencyKeyHash: row.idempotencyKeyHash
@@ -113,8 +132,9 @@ export class PrismaAuditRepository implements AuditRepository {
       after: row.after as CanonicalAuditEvent['after'],
       metadata: row.metadata as CanonicalAuditEvent['metadata'],
       prevHash: row.prevHash ? Buffer.from(row.prevHash).toString('hex') : null,
-      hash: Buffer.from(row.hash!).toString('hex'),
-    }));
+      hash: Buffer.from(row.hash).toString('hex'),
+      };
+    });
     return {
       events,
       head: head ? {lastSequence: head.lastSequence, headHash: head.headHash} : null,

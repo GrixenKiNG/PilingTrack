@@ -163,10 +163,16 @@ describe('Unified Worker Service', () => {
       // Import to trigger server creation
       await import('@/workers/unified-worker');
 
-      // Wait for initialization
+      // Wait for initialization.
+      //
+      // Таймаут задан явно: это первый тест в файле, и именно он оплачивает
+      // холодный импорт всего графа модулей воркера. Остальные waitFor ниже
+      // работают с уже загруженным модулем и укладываются в стандартную
+      // секунду, а этот на загруженной машине в неё иногда не попадал — один
+      // плавающий провал на пять полных прогонов.
       await vi.waitFor(() => {
         expect(mocks.mockHttpListen).toHaveBeenCalled();
-      });
+      }, { timeout: 10_000 });
 
       // Health server should be created with correct port
       expect(mocks.mockHttpListen).toHaveBeenCalledWith(

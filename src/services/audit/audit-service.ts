@@ -62,6 +62,35 @@ function describeAuditEvent(event: AuditEvent) {
         title: 'Отчёт обновлён',
         message: 'Отчёт был изменён и повторно сохранён.',
       };
+    // Документы работника: права на управление установкой, медосмотр,
+    // удостоверения. Работник ведёт их сам, поэтому запись в журнале —
+    // единственное, что показывает диспетчеру, кто и когда трогал срок
+    // действия. Отдельный текст, а не общий «событие аудита»: журнал, который
+    // невозможно прочитать, контролем не является.
+    case 'user.document.created':
+      return {
+        level: 'info' as const,
+        title: 'Документ работника добавлен',
+        message: event.metadata?.selfService
+          ? 'Работник приложил свой документ.'
+          : 'Документ работника заведён администратором.',
+      };
+    case 'user.document.updated':
+      return {
+        level: event.metadata?.selfService ? ('warn' as const) : ('info' as const),
+        title: 'Документ работника изменён',
+        message: event.metadata?.selfService
+          ? 'Работник изменил собственный документ — проверьте срок действия.'
+          : 'Документ работника изменён администратором.',
+      };
+    case 'user.document.deleted':
+      return {
+        level: 'warn' as const,
+        title: 'Документ работника удалён',
+        message: event.metadata?.selfService
+          ? 'Работник удалил собственный документ.'
+          : 'Документ работника удалён администратором.',
+      };
     default:
       return {
         level: 'audit' as const,

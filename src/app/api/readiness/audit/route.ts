@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { ReadinessCommandError } from '@/modules/readiness/application/command-pipeline/errors';
-import { resolveReadinessCapabilities } from '@/modules/readiness/application/capabilities';
 import { parseReadinessReadFilters, serializeReadinessFilters } from '@/modules/readiness/application/read-filters';
 import { PrismaAuditRepository } from '@/modules/readiness/infrastructure/audit/audit-repository';
 import { verifyTenantAuditChain } from '@/modules/readiness/infrastructure/audit/verify-chain';
@@ -13,9 +12,9 @@ export const runtime = 'nodejs';
 export async function GET(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
-  const context = resolved.context!;
+  const context = resolved.context;
   try {
-    if (!resolveReadinessCapabilities(context.actorRole).has('readiness.audit.read')) {
+    if (!context.capabilities.has('readiness.audit.read')) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к журналу аудита');
     }
     const params = request.nextUrl.searchParams;

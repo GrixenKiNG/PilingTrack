@@ -18,6 +18,14 @@ interface CurrentUser {
 interface PilingStore {
   // Auth state
   currentUser: CurrentUser | null;
+  /**
+   * Роль, которую администратор исполняет прямо сейчас («Действую как»).
+   *
+   * Живёт здесь, а не внутри модуля техготовности: режим меняет и навигацию, и
+   * права во всём приложении, поэтому значение нужно и оболочке, и `authFetch`,
+   * который подставляет заголовок на каждом запросе.
+   */
+  actingAs: string | null;
   currentPage: AppPage;
   selectedSiteId: string | null;
   localFeedbackEvents: FeedbackEventDTO[];
@@ -25,6 +33,7 @@ interface PilingStore {
   // Auth actions
   login: (user: CurrentUser) => void;
   setCurrentUser: (user: CurrentUser) => void;
+  setActingAs: (role: string | null) => void;
   logout: () => void;
 
   // Navigation
@@ -65,6 +74,7 @@ export const usePilingStore = create<PilingStore>()(
   persist(
     (set) => ({
       currentUser: null,
+      actingAs: null,
       currentPage: 'login',
       selectedSiteId: null,
       localFeedbackEvents: [],
@@ -72,6 +82,7 @@ export const usePilingStore = create<PilingStore>()(
       login: (user: CurrentUser) => {
         set({
           currentUser: user,
+          actingAs: null,
           currentPage: getDefaultPage(user.role),
         });
       },
@@ -84,9 +95,17 @@ export const usePilingStore = create<PilingStore>()(
         }));
       },
 
+      // Режим замещения сбрасывается и при входе, и при выходе: иначе он
+      // пережил бы смену пользователя и следующий вошедший начал бы работу
+      // «за механика», сам того не зная.
+      setActingAs: (role: string | null) => {
+        set({ actingAs: role });
+      },
+
       logout: () => {
         set({
           currentUser: null,
+          actingAs: null,
           currentPage: 'login',
           selectedSiteId: null,
           localFeedbackEvents: [],
@@ -154,6 +173,12 @@ export const usePilingStore = create<PilingStore>()(
       name: 'piling-track-storage',
       partialize: (state) => ({
         currentUser: state.currentUser,
+        // Без сохранения режим замещения не переживал перезагрузку: роль
+        // выставлялась, страница перезагружалась (права меняются на сервере), и
+        // состояние поднималось пустым — роль «на мгновение менялась и
+        // возвращалась к администратору». Сбрасывают её вход и выход, а не
+        // перезагрузка.
+        actingAs: state.actingAs,
         selectedSiteId: state.selectedSiteId,
       }),
     }

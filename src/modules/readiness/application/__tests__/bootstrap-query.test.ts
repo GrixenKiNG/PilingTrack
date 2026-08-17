@@ -22,6 +22,9 @@ function transaction() {
     },
     crew: { count: vi.fn().mockResolvedValue(1) },
     readinessRuleSet: { count: vi.fn().mockResolvedValue(1) },
+    // Матрица доступов читается той же транзакцией. Пусто — действуют значения
+    // по умолчанию из кода, то есть проверки ниже описывают прежнее поведение.
+    readinessAccessMatrix: { findFirst: vi.fn().mockResolvedValue(null) },
     auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit-1' }) },
   };
 }
@@ -80,7 +83,11 @@ describe('readiness bootstrap query', () => {
     });
     expect(result.actor.actingAs).toBe('MECHANIC');
     expect(result.capabilities.entities.maintenance.manage).toBe(true);
-    expect(result.capabilities.entities.rules.manage).toBe(true);
+    // Права администратора в режиме механика НЕ сохраняются: «Действую как
+    // механик» — это исполнение роли, а не добавка к своей. Раньше здесь стояло
+    // `true`, и проверка закрепляла ошибку: из режима механика оставался доступ
+    // к настройке правил и матрицы доступов.
+    expect(result.capabilities.entities.rules.manage).toBe(false);
   });
 
   it('rejects non-admin actingAs without writing an audit', async () => {

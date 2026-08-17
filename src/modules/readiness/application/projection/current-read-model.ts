@@ -6,18 +6,20 @@ export async function advanceCurrentReadiness(input: {
   equipmentId: string;
   snapshotId: string;
   status: string;
+  verdict: string | null;
   score: number;
   calculatedAt: Date;
 }) {
   await input.tx.$executeRaw`
     INSERT INTO "CurrentReadiness"
-      ("tenantId", "equipmentId", "snapshotId", "status", "score", "calculatedAt", "updatedAt")
+      ("tenantId", "equipmentId", "snapshotId", "status", "verdict", "score", "calculatedAt", "updatedAt")
     VALUES
-      (${input.tenantId}, ${input.equipmentId}, ${input.snapshotId}, ${input.status},
+      (${input.tenantId}, ${input.equipmentId}, ${input.snapshotId}, ${input.status}, ${input.verdict},
        ${input.score}, ${input.calculatedAt}, CURRENT_TIMESTAMP)
     ON CONFLICT ("tenantId", "equipmentId") DO UPDATE SET
       "snapshotId" = EXCLUDED."snapshotId",
       "status" = EXCLUDED."status",
+      "verdict" = EXCLUDED."verdict",
       "score" = EXCLUDED."score",
       "calculatedAt" = EXCLUDED."calculatedAt",
       "updatedAt" = CURRENT_TIMESTAMP

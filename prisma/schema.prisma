@@ -45,6 +45,8 @@ model Tenant {
   pileGrades        PileGrade[]
   drillingTypes     DrillingType[]
   downtimeReasons   DowntimeReason[]
+  userDocumentTypes UserDocumentType[]
+  permitWorkTypes   PermitWorkType[]
   auditChain        TenantAuditChain?
 
   @@index([slug])
@@ -106,11 +108,75 @@ model User {
   crew            Crew?                @relation("CrewOperator")
   crewAssistantOf CrewAssistant[]      @relation("CrewAssistantUser")
   feedbackReads   FeedbackEventRead[]
+  documents       UserDocument[]
+  placePresets    UserPlacePreset[]
 
   @@unique([tenantId, id])
   @@index([email])
   @@index([tenantId])
   @@index([tenantId, role, isActive])
+}
+
+// ============================================================
+// ДОКУМЕНТЫ РАБОТНИКА — допуск людей к работе
+// ------------------------------------------------------------
+// Документы техники (EquipmentDocument) в системе были с самого начала,
+// документов людей не было вовсе: права на управление установкой, медосмотр,
+// удостоверение по охране труда нигде не хранились и по срокам не
+// контролировались. Диспетчеру нечего было проверять.
+//
+// Вид документа — справочник, а не enum в коде: список задаётся
+// законодательством и заказчиком, он будет пополняться. Enum потребовал бы
+// релиза на каждый новый вид (см. навык module-vs-dictionary).
+// ============================================================
+
+model UserDocumentType {
+  id                 String  @id @default(cuid())
+  tenantId           String
+  tenant             Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String // «Удостоверение машиниста копровой установки»
+  normalizedName     String
+  /// Бессрочные документы существуют — для них срок не спрашиваем.
+  requiresExpiry     Boolean @default(true)
+  /// Подсказка при заведении: на сколько месяцев обычно выдаётся.
+  defaultValidMonths Int?
+  /// За сколько дней предупреждать об окончании срока. 30 — решение владельца
+  /// от 15.08.2026: у документов, в отличие от ТО, продление занимает недели.
+  leadTimeDays       Int     @default(30)
+  isActive           Boolean @default(true)
+  notes              String  @default("")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  documents UserDocument[]
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive])
+}
+
+model UserDocument {
+  id        String    @id @default(cuid())
+  tenantId  String
+  userId    String
+  typeId    String
+  number    String    @default("")
+  issuedAt  DateTime? @db.Timestamptz(3)
+  /// null — документ бессрочный. Контроль просрочки такие пропускает.
+  expiresAt DateTime? @db.Timestamptz(3)
+  /// Скан документа в Media. Связь мягкая (без FK), как у остальных вложений.
+  mediaId   String?
+  notes     String    @default("")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type UserDocumentType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, userId])
+  @@index([tenantId, expiresAt])
+  @@index([tenantId, typeId])
 }
 
 // ============================================================
@@ -270,6 +336,7 @@ model MaintenanceRecord {
   faultCause           String? // стадия 1: диагностика / причина отказа
   workDone             String              @default("") // стадия 2: выполненные работы
   partsUsedText        String              @default("") // израсходованные запчасти текстом ("крючок" под склад)
+  cancelReason         String? // почему наряд отменён (обязательна при переводе в CANCELLED)
   closedById           String? // кто проверил/закрыл (User.id)
   acceptedById         String? // кто принял работу (админ, User.id)
   acceptedAt           DateTime?           @db.Timestamptz(3) // когда принято
@@ -342,6 +409,10 @@ model EquipmentDefect {
   reportedAt   DateTime @default(now()) @db.Timestamptz(3)
   inspectionId String? // если замечание найдено на предсменном осмотре
   shiftId      String? // смена, в которую обнаружен
+  // Устойчивый ключ источника: «этот пункт чек-листа на этой установке».
+  // По нему повторный осмотр узнаёт уже заведённый дефект и не плодит копии —
+  // иначе одна незакрытая течь давала бы новую запись каждую смену.
+  sourceKey    String?
 
   // разбор диспетчером
   triagedById         String?
@@ -365,6 +436,7 @@ model EquipmentDefect {
   @@index([tenantId, reportedAt])
   @@index([tenantId, maintenanceRecordId])
   @@index([equipmentId])
+  @@index([tenantId, sourceKey, status])
 }
 
 enum DefectSeverity {
@@ -511,18 +583,27 @@ model ChecklistSection {
 }
 
 model ChecklistItem {
-  id            String           @id @default(cuid())
-  tenantId      String
-  sectionId     String
-  text          String
-  answerType    AnswerType       @default(YES_NO)
-  unit          String?
-  norm          String?
-  provenance    String?
-  photoRequired Boolean          @default(false)
-  required      Boolean          @default(true)
-  order         Int
-  section       ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  id             String           @id @default(cuid())
+  tenantId       String
+  sectionId      String
+  text           String
+  answerType     AnswerType       @default(YES_NO)
+  unit           String?
+  norm           String?
+  provenance     String?
+  photoRequired  Boolean          @default(false)
+  required       Boolean          @default(true)
+  // Замыкание контура «осмотр → дефект». Пункт чек-листа умеет сказать, что
+  // отрицательный ответ на него — это не просто минус к баллу, а
+  // зафиксированная неисправность. Раньше механик отвечал «нет» на «есть ли
+  // течь гидравлики», и не происходило ничего: часть логики допуска жила вне
+  // системы, в голове осматривающего.
+  createsDefect  Boolean          @default(false)
+  // Серьёзность заводимого дефекта. CRITICAL останавливает эксплуатацию
+  // системным правилом безопасности (SYSTEM_SAFETY_BLOCKERS).
+  defectSeverity String?
+  order          Int
+  section        ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([sectionId])
@@ -563,6 +644,27 @@ model ReadinessRuleSet {
   @@index([tenantId, status])
 }
 
+/// Матрица доступов контура готовности: роль → полномочия.
+/// Тот же жизненный цикл, что у ReadinessRuleSet (черновик → публикация →
+/// архив), потому что это такая же политика организации, а не код.
+/// Отсутствие опубликованной строки означает «действуют значения из кода».
+model ReadinessAccessMatrix {
+  id          String    @id @default(cuid())
+  tenantId    String
+  status      String
+  version     String
+  /// { "OPERATOR": ["readiness.read", ...], ... } — только известные роли и
+  /// полномочия, лишнее отбрасывается при сохранении.
+  grants      Json
+  updatedBy   String?
+  publishedAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
 // Immutable readiness evidence projection. Workflow relations are added in
 // their owning migrations; this additive slice intentionally keeps shiftId
 // nullable so it can ship before Shift exists.
@@ -576,6 +678,10 @@ model ReadinessScoreSnapshot {
   triggerType    String
   triggerId      String
   status         String
+  // Полный вердикт домена. `status` — его двоичная проекция (READY/BLOCKED),
+  // из-за которой «требуется подтверждение» и «запрещено» приходили на экран
+  // одинаковыми. Nullable: снимки, записанные до 2026-08-13, вердикта не знают.
+  verdict        String?
   score          Int
   blockers       Json
   warnings       Json
@@ -598,6 +704,7 @@ model CurrentReadiness {
   equipmentId  String
   snapshotId   String
   status       String
+  verdict      String?
   score        Int
   calculatedAt DateTime @db.Timestamptz(3)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
@@ -687,6 +794,10 @@ model Shift {
   cancelledAt     DateTime?       @db.Timestamptz(3)
   cancelledById   String?
   cancelReason    String?
+  /// Смена закрыта планировщиком по окончании производственных суток, потому
+  /// что её не сдали. Отличает «закрыто по факту сдачи» от «закрыто временем»:
+  /// первое — работа принята, второе — повод спросить, почему не сдали.
+  autoClosedAt    DateTime?       @db.Timestamptz(3)
   version         Int             @default(1)
   startSnapshotId String?
   createdAt       DateTime        @default(now()) @db.Timestamptz(3)
@@ -723,6 +834,80 @@ model ShiftHandover {
   @@index([tenantId, state, updatedAt])
 }
 
+/// Личный шаблон места работ: пара «место работы + объект», сохранённая
+/// пользователем, чтобы не вписывать одно и то же заново.
+///
+/// Почему это НЕ справочник организации. Владелец сформулировал так: место и
+/// объект вписывает тот, кто оформляет наряд, они меняются, и у одного человека
+/// таких мест может быть много. Общий справочник заставил бы админа заранее
+/// перечислить все площадки — а их никто не знает наперёд. Здесь список растёт
+/// сам, по мере работы, и он личный: чужие площадки в подсказках не мешают.
+///
+/// В сам наряд попадает ТЕКСТ, а не ссылка на эту строку: наряд — документ, и
+/// удаление шаблона не должно менять то, что было подписано.
+model UserPlacePreset {
+  id            String   @id @default(cuid())
+  tenantId      String
+  userId        String
+  user          User     @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Cascade)
+  location      String
+  objectName    String
+  /// Защита от дублей: обе строки, свёрнутые к нижнему регистру. Без неё
+  /// «Площадка 3» и «площадка 3» осели бы в подсказках двумя строками.
+  normalizedKey String
+  /// Когда шаблоном пользовались последний раз — недавние показываем первыми.
+  usedAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([tenantId, userId, normalizedKey])
+  @@index([tenantId, userId, usedAt])
+}
+
+/// Вид работ наряда-допуска. Справочник, а не enum: набор задаётся правилами
+/// охраны труда заказчика и пополняется админом (решение владельца 16.08.2026).
+/// Именно поэтому риск здесь — свойство СТРОКИ справочника: зашей правило
+/// «огневые = повышенный» в код, и заведённый админом новый вид работ молча
+/// считался бы обычным.
+model PermitWorkType {
+  id             String         @id @default(cuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String // «Огневые работы»
+  normalizedName String
+  /// Пояснение под названием на плитке выбора: «Сварка, резка, пайка».
+  hint           String         @default("")
+  /// Значок плитки. Слаг, а не имя компонента: интерфейс сам решает, чем его
+  /// рисовать, и переживает неизвестное значение запасным значком.
+  icon           String         @default("")
+  /// Категория риска, подставляемая в новый наряд. Теперь это ЯРЛЫК: сколько
+  /// подписей нужно, решает requiredApprovals ниже, а не риск.
+  defaultRisk    WorkPermitRisk @default(NORMAL)
+  /// Какие подписи требует этот вид работ. Задаёт админ: нормативы у каждой
+  /// организации свои, и решать за него разработчик не вправе. Пусто — наряд
+  /// согласовывать некому, поэтому пустой список считается ошибкой настройки
+  /// (см. effectiveApprovalRule).
+  requiredApprovals   WorkPermitApprovalRole[]
+  /// Может ли автор подписать собственный наряд. Тоже решение заказчика:
+  /// «второй глаз» стоит денег и времени, и где он обязателен — знает он.
+  allowAuthorApproval Boolean        @default(true)
+  /// Типовые опасные факторы этого вида работ: подсказки в форме наряда.
+  /// Админ пополняет их прямо из наряда кнопкой «сохранить в шаблон».
+  hazardPresets  String[]
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  permits WorkPermit[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive, sortOrder])
+}
+
 model WorkPermit {
   id             String               @id @default(cuid())
   tenantId       String
@@ -730,6 +915,41 @@ model WorkPermit {
   shiftId        String?
   risk           WorkPermitRisk
   state          WorkPermitState      @default(DRAFT)
+  /// Вид работ. Необязателен: наряды, выписанные до появления справочника
+  /// (16.08.2026), его не имеют, и переписывать боевые данные ради колонки
+  /// незачем. Обязательность включена в валидации для НОВЫХ нарядов.
+  workTypeId     String?
+  workType       PermitWorkType?      @relation(fields: [tenantId, workTypeId], references: [tenantId, id], onDelete: Restrict)
+  /// Снимок требования к подписям на момент оформления. Живьём из справочника
+  /// читать нельзя: правка вида работ переписала бы прошлое — вчера подписанные
+  /// наряды разом стали бы недоподписанными или, наоборот, «согласованными» без
+  /// нужной подписи. Снимок обновляется при правке наряда, а она и так
+  /// аннулирует подписи.
+  requiredApprovals   WorkPermitApprovalRole[]
+  allowAuthorApproval Boolean              @default(true)
+  /// Наименование работ — короткая строка в реестре: «Сварочные работы по
+  /// ремонту гидравлики». До этого в реестре показывали начало `scope`.
+  title          String               @default("")
+  /// Место работы и объект — свободный текст, а не ссылки. Наряд это документ:
+  /// переименование или архивация объекта не должны задним числом менять то,
+  /// что было подписано. Подсказки при вводе берутся из объектов системы и
+  /// личных шаблонов пользователя, но в наряд попадает именно текст.
+  location       String               @default("")
+  objectName     String               @default("")
+  /// Опасные факторы этого наряда. Заполняются из типовых факторов вида работ
+  /// либо вписываются руками.
+  hazards        String[]
+  /// Три ответственных лица. Гибрид по решению владельца: либо учётная запись,
+  /// либо просто ФИО — у наблюдающего учётки может не быть вовсе.
+  /// ФИО хранится ВСЕГДА, даже когда выбран пользователь: это снимок на момент
+  /// подписания, и он переживёт переименование или удаление учётки. Внешнего
+  /// ключа намеренно нет — как у authorId и revokedById рядом.
+  producerUserId String?
+  producerName   String               @default("")
+  observerUserId String?
+  observerName   String               @default("")
+  safetyUserId   String?
+  safetyName     String               @default("")
   scope          String               @db.Text
   validFrom      DateTime             @db.Timestamptz(3)
   validTo        DateTime             @db.Timestamptz(3)
@@ -753,6 +973,8 @@ model WorkPermit {
   @@index([tenantId, state, updatedAt])
   @@index([tenantId, risk, updatedAt])
   @@index([tenantId, shiftId])
+  // Под защиту справочника: «вид работ используется, удаление недоступно».
+  @@index([tenantId, workTypeId])
 }
 
 model WorkPermitApproval {

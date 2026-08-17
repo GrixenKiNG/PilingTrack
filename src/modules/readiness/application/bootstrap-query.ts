@@ -1,10 +1,12 @@
 import { ServiceError } from '@/lib/service-error';
-import type { ActingRole } from '@/lib/types';
+import { getPublishedAccessMatrix } from './access-matrix-service';
+import { canActAs, type ActingRole } from '@/lib/types';
 import type { ReadinessTransaction } from '../infrastructure/tenant-transaction';
 import { normalizeTenantTimezone } from '../domain/shifts/tenant-production-date';
 import {
   hasReadinessCapability,
   resolveAuditedReadinessCapabilities,
+  resolveReadinessCapabilities,
   serializeReadinessCapabilities,
 } from './capabilities';
 
@@ -45,13 +47,38 @@ function assertIanaTimezone(timezone: string): string {
   return normalizeTenantTimezone(timezone);
 }
 
+/**
+ * Права, которые контур готовности не может вычислить сам.
+ *
+ * Документы работников живут в другом домене (`users`), и правило доступа к
+ * ним — `users.documents.read_all` — принадлежит прикладной матрице прав, а не
+ * матрице ролей готовности. Модулю нельзя импортировать services/auth, поэтому
+ * значение приходит снаружи, из маршрута: там композиция и знание обеих
+ * матриц. Иначе вкладка показывалась бы одному набору ролей, а сервер отдавал
+ * данные другому — экран предлагал бы то, в чём откажут.
+ */
+export interface ReadinessExternalGrants {
+  /** `users.documents.read_all`: админ, диспетчер, инженер ОТ. */
+  documentsControl: boolean;
+}
+
 export async function queryReadinessBootstrap(
   tx: ReadinessTransaction,
   actor: ReadinessBootstrapActor,
   flags = readReadinessFeatureFlags(),
   actingAs: ActingRole | null = null,
   requestId: string | null = null,
+  grants: ReadinessExternalGrants = { documentsControl: false },
 ) {
+  // Замещать роль может только администратор. Правило одно на всё приложение,
+  // поэтому вызываем `canActAs`, а не повторяем условие здесь. Маршрут его уже
+  // проверил — эта проверка держит границу и для прямых вызовов запроса.
+  if (!canActAs(actor.role, actingAs)) {
+    throw new ServiceError('Readiness access denied', 403);
+  }
+  // Та же матрица, по которой сервер потом откажет или пропустит команду:
+  // иначе экран показывал бы права из кода, а проверка шла по опубликованным.
+  const accessMatrix = await getPublishedAccessMatrix(actor.tenantId, tx);
   const capabilities = await resolveAuditedReadinessCapabilities(
     actor,
     actingAs,
@@ -72,9 +99,16 @@ export async function queryReadinessBootstrap(
           requestId,
         },
       });
-    }
+    },
+    accessMatrix,
   );
-  if (!capabilities.has('readiness.read')) {
+  // Вход в раздел решает СОБСТВЕННАЯ роль, а полномочия внутри — исполняемая.
+  //
+  // Замещение теперь ограничивает: администратор в роли помощника получает
+  // только права помощника, а у того нет `readiness.read`. Если бы вход
+  // проверялся по исполняемой роли, модуль ответил бы 403 и переключиться
+  // обратно стало бы нечем — человек запирал бы себя одним щелчком.
+  if (!resolveReadinessCapabilities(actor.role, accessMatrix).has('readiness.read')) {
     throw new ServiceError('Readiness access denied', 403);
   }
 
@@ -162,6 +196,7 @@ export async function queryReadinessBootstrap(
         shifts: flags.readiness_shifts_v1 && can('readiness.read'),
         permits: flags.readiness_permits_v1 && can('readiness.read'),
         maintenance: can('readiness.read'),
+        documents: grants.documentsControl && can('readiness.read'),
         reports: can('readiness.audit.read'),
         settings: can('readiness.rules.manage') || can('readiness.audit.read'),
       },
@@ -173,6 +208,10 @@ export async function queryReadinessBootstrap(
           manage: can('readiness.inspection.manage'),
         },
         defect: {
+          // Фиксировать замечание может и оператор, разбирать — только
+          // диспетчер, механик, администратор. Право report раньше в контракт
+          // не отдавалось, и экран не мог показать кнопку тому, кто её имеет.
+          report: can('readiness.defect.report'),
           manage: can('readiness.defect.manage'),
         },
         meter: {

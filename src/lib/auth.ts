@@ -2,12 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { readSessionToken, verifySessionToken } from '@/services/auth/session-service';
+import { canActAs } from '@/lib/types';
 
 interface AuthenticatedUser {
   id: string;
   email: string;
   name: string;
+  /** Собственная роль. В журнал пишется именно она. */
   role: string;
+  /**
+   * Исполняемая роль из заголовка `x-acting-as`, если замещение разрешено.
+   *
+   * Права по ней считает `can()` — одна точка на всё приложение. Заголовок
+   * проверяется здесь через `canActAs`, поэтому подставить чужую роль нельзя:
+   * не администратор получит null и останется при своих правах.
+   */
+  actingAs: string | null;
   phone: string;
   tenantId: string | null;
 }
@@ -91,6 +101,10 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
       email: user.email,
       name: user.name,
       role: user.role,
+      // Кэш сессии не зависит от заголовка: замещение проставляется в
+      // requireAuth отдельно для каждого запроса. Иначе роль из одного запроса
+      // протекла бы в остальные через общий кэш.
+      actingAs: null,
       phone: user.phone,
       tenantId: user.tenantId,
     };
@@ -151,7 +165,12 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
       };
     }
 
-    return { user, error: null };
+    // Замещение роли: администратор смотрит приложение глазами другой роли.
+    // Значение не доверяем клиенту слепо — `canActAs` пропускает только
+    // администратора и только известную роль.
+    const requestedActingAs = request.headers.get('x-acting-as');
+    const actingAs = canActAs(user.role, requestedActingAs) ? requestedActingAs : null;
+    return { user: { ...user, actingAs }, error: null };
   } catch {
     return {
       user: null,

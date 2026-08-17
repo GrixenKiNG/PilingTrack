@@ -8,6 +8,7 @@
 
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { registerAllEventHandlers } from '@/services/reports/event-handlers';
+import { registerReadinessProjectionHandler } from '@/workers/register-readiness-projection';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';
 import {
   getOutboxLeaderElection,
@@ -120,6 +121,7 @@ async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
 
   try {
     registerAllEventHandlers();
+    registerReadinessProjectionHandler();
   } catch (error) {
     logger.warn('Embedded outbox: failed to register handlers', {
       error: error instanceof Error ? error.message : String(error),

@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { MeterReadingDialog } from '@/components/piling/operator/meter-reading-dialog';
+import { OperatorDocumentReminder } from '@/components/piling/operator-document-reminder';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
 
 /**
@@ -146,6 +147,8 @@ export function OperatorDashboard() {
           {currentSite?.name || 'Нет назначенного объекта'}
         </span>
       </motion.button>
+
+      <OperatorDocumentReminder />
 
       <section aria-label="Действия смены" className="grid grid-cols-6 gap-3">
         {OPERATOR_ACTIONS.map((action, index) => (

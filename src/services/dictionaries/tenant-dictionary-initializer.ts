@@ -4,11 +4,12 @@ import {
   DRILLING_TYPE_TEMPLATES,
   normalizeDictionaryName,
   PILE_GRADE_TEMPLATES,
+  USER_DOCUMENT_TYPE_TEMPLATES,
 } from './system-templates';
 
 type TenantDictionaryClient = Pick<
   Prisma.TransactionClient,
-  'pileGrade' | 'drillingType' | 'downtimeReason'
+  'pileGrade' | 'drillingType' | 'downtimeReason' | 'userDocumentType'
 >;
 
 export async function initializeTenantDictionaries(
@@ -41,6 +42,16 @@ export async function initializeTenantDictionaries(
         tenantId,
         name: template.name,
         normalizedName: normalizeDictionaryName(template.name),
+      })),
+      skipDuplicates: true,
+    }),
+    client.userDocumentType.createMany({
+      data: USER_DOCUMENT_TYPE_TEMPLATES.map((template) => ({
+        tenantId,
+        name: template.name,
+        normalizedName: normalizeDictionaryName(template.name),
+        defaultValidMonths: template.defaultValidMonths,
+        leadTimeDays: template.leadTimeDays,
       })),
       skipDuplicates: true,
     }),

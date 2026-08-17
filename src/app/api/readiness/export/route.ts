@@ -1,7 +1,6 @@
 import type {NextRequest} from 'next/server';
 import {NextResponse} from 'next/server';
-import {recordChainedReadinessAudit} from '@/core/infrastructure/audit-log-service';
-import {resolveReadinessCapabilities} from '@/modules/readiness/application/capabilities';
+import {recordChainedReadinessAudit} from '@/modules/readiness/infrastructure/audit/record-audit';
 import {buildReadinessCsv} from '@/modules/readiness/application/csv-export';
 import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
 import {parseReadinessReadFilters, serializeReadinessFilters} from '@/modules/readiness/application/read-filters';
@@ -18,13 +17,13 @@ const DATASETS = new Set(['fleet', 'permits', 'reports', 'dictionary', 'audit'])
 export async function GET(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
-  const context = resolved.context!;
+  const context = resolved.context;
   try {
     const dataset = request.nextUrl.searchParams.get('dataset') ?? '';
     if (!DATASETS.has(dataset)) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный набор данных для выгрузки');
     }
-    const capabilities = resolveReadinessCapabilities(context.actorRole);
+    const capabilities = context.capabilities;
     const requiredAbility = dataset === 'audit' ? 'readiness.audit.export' : 'readiness.read';
     if (!capabilities.has(requiredAbility)) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет прав на выгрузку');

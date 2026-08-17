@@ -29,36 +29,45 @@ export async function projectReadinessEvent(eventId: string) {
   });
   if (!envelope) throw new Error('Readiness outbox event was not found');
   if (envelope.type !== 'ReadinessSnapshotRequested') throw new Error('Unsupported readiness event type');
-  if (!envelope.tenantId) throw new Error('Readiness outbox event has no tenant');
+  /*
+    Тенант вынесен в переменную, а не читается как `envelope.tenantId` внутри
+    транзакции. Проверка ниже сужает тип, но сужение СВОЙСТВА не переживает
+    переход в замыкание — компилятор допускает, что объект успел измениться, и
+    внутри требует `!`. Шесть таких утверждений здесь и стояли: не обман, а
+    обход слепоты компилятора, но по виду неотличимый от настоящего «доверься
+    мне». Локальная константа сужается честно и один раз.
+  */
+  const tenantId = envelope.tenantId;
+  if (!tenantId) throw new Error('Readiness outbox event has no tenant');
   if (envelope.projected) return {projected: false, duplicate: true};
 
-  return withReadinessWorkerTransaction(envelope.tenantId, async (tx) => {
+  return withReadinessWorkerTransaction(tenantId, async (tx) => {
     const outbox = new ReadinessOutboxRepository(tx);
-    const event = await outbox.find(envelope.tenantId!, eventId);
+    const event = await outbox.find(tenantId, eventId);
     if (!event) throw new Error('Tenant-scoped readiness outbox event was not found');
     if (event.projected) return {projected: false, duplicate: true};
     const payload = parsePayload(event.payload);
     const capturedAt = payload.triggerOccurredAt ? new Date(payload.triggerOccurredAt) : event.occurredAt;
     if (Number.isNaN(capturedAt.getTime())) throw new Error('Readiness event clock is invalid');
     const settings = await tx.tenantSettings.findUnique({
-      where: {tenantId: envelope.tenantId!}, select: {timezone: true},
+      where: {tenantId}, select: {timezone: true},
     });
     const evaluation = await evaluateAuthoritativeReadiness({
-      tx, tenantId: envelope.tenantId!, equipmentId: payload.equipmentId,
+      tx, tenantId, equipmentId: payload.equipmentId,
       shiftId: payload.shiftId ?? null, timezone: settings?.timezone ?? 'Europe/Moscow',
       clock: capturedClock(capturedAt),
     });
     const snapshot = await createDeduplicatedSnapshot(tx, {
-      tenantId: envelope.tenantId!, equipmentId: payload.equipmentId,
+      tenantId, equipmentId: payload.equipmentId,
       shiftId: payload.shiftId ?? null, ruleSetId: evaluation.ruleSetId,
       triggerType: payload.triggerType, triggerId: payload.triggerId,
     }, evaluation);
     await advanceCurrentReadiness({
-      tx, tenantId: envelope.tenantId!, equipmentId: payload.equipmentId,
-      snapshotId: snapshot.id, status: snapshot.status, score: snapshot.score,
-      calculatedAt: snapshot.calculatedAt,
+      tx, tenantId, equipmentId: payload.equipmentId,
+      snapshotId: snapshot.id, status: snapshot.status, verdict: snapshot.verdict,
+      score: snapshot.score, calculatedAt: snapshot.calculatedAt,
     });
-    await outbox.markProjected(envelope.tenantId!, eventId);
+    await outbox.markProjected(tenantId, eventId);
     return {projected: true, duplicate: false, snapshotId: snapshot.id};
   });
 }

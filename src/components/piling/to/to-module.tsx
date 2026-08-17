@@ -1,5 +1,6 @@
 'use client';
 
+import { usePilingStore } from '@/lib/store';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
@@ -14,7 +15,6 @@ import {
 } from '@/modules/readiness';
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import type { ActingRole } from '@/lib/types';
-import { ActingRoleSwitch } from './readiness/acting-role-switch';
 import { TechReadinessModule } from './readiness/tech-readiness-module';
 import type { QueryState } from './readiness/boundaries/query-state';
 import {
@@ -24,6 +24,7 @@ import {
   fetchReadinessHistory,
   fetchReadinessShifts,
   fetchWorkPermits,
+  fetchReadinessDefects,
   type ReadinessUrlFilters,
 } from './readiness/api/client';
 import type {
@@ -33,6 +34,7 @@ import type {
   ReadinessShiftDto,
   ReadinessSnapshotDto,
   WorkPermitDto,
+  DefectDto,
 } from './readiness/api/contracts';
 import {
   ReadinessApiError,
@@ -169,7 +171,11 @@ export function ToModule() {
   // Роль, которую администратор исполняет. null — работает как администратор.
   // MECHANIC по умолчанию сохраняет прежнее поведение: раньше модуль включал
   // этот режим сам, без ведома пользователя.
-  const [actingAs, setActingAs] = useState<ActingRole | null>('MECHANIC');
+  // Исполняемая роль живёт в общем store, а не в состоянии этого экрана:
+  // режим меняет навигацию и права во всём приложении, и `authFetch` берёт
+  // значение оттуда же, чтобы подставить заголовок на каждом запросе. Пока
+  // значение было локальным, «Действую как» действовало только здесь.
+  const actingAs = usePilingStore((state) => state.actingAs) as ActingRole | null;
   const [bootstrapError, setBootstrapError] = useState<ReadinessApiError | null>(null);
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [equipmentId, setEquipmentId] = useState('');
@@ -193,6 +199,7 @@ export function ToModule() {
   const [rulesAvailable, setRulesAvailable] = useState(false);
   const [shifts, setShifts] = useState<ReadinessShiftDto[]>([]);
   const [permits, setPermits] = useState<WorkPermitDto[]>([]);
+  const [defects, setDefects] = useState<DefectDto[]>([]);
   const [currentReadiness, setCurrentReadiness] = useState<CurrentReadinessDto[]>([]);
   const [readinessHistory, setReadinessHistory] = useState<ReadinessSnapshotDto[]>([]);
   const [authoritativeReadinessError, setAuthoritativeReadinessError] = useState<string | null>(null);
@@ -240,6 +247,7 @@ export function ToModule() {
         readinessRulesResult,
         shiftsResult,
         permitsResult,
+        defectsResult,
         currentResult,
         historyResult,
         auditResult,
@@ -265,6 +273,7 @@ export function ToModule() {
         ),
         fetchReadinessShifts(controller.signal, readinessFilters).catch(() => []),
         fetchWorkPermits(controller.signal, readinessFilters).catch(() => []),
+        fetchReadinessDefects(controller.signal, readinessFilters).catch(() => []),
         readAuthoritativeCollection(fetchCurrentReadiness(controller.signal, readinessFilters)),
         readAuthoritativeCollection(fetchReadinessHistory(controller.signal, readinessFilters)),
         readinessBootstrap.capabilities.entities.audit.read
@@ -308,6 +317,7 @@ export function ToModule() {
       setRulesAvailable(readinessRules !== null);
       setShifts(shiftsResult);
       setPermits(permitsResult);
+      setDefects(defectsResult);
       setCurrentReadiness(currentResult.data);
       setReadinessHistory(historyResult.data);
       setAuthoritativeReadinessError(currentResult.error ?? historyResult.error);
@@ -381,6 +391,16 @@ export function ToModule() {
   }, [readinessFilters, actingAs]);
 
   useEffect(() => {
+    /*
+      Правило справедливо в общем случае, но здесь срабатывает вхолостую.
+      loadWorkspace начинается с setLoading(true) / сброса двух ошибок — и на
+      монтировании все три уже в этих значениях (loading объявлен как
+      useState(true), ошибки — null), поэтому React выходит из обновления без
+      перерисовки. Каскада, ради которого правило заведено, не возникает.
+      Сами вызовы нужны для ПОВТОРНОЙ загрузки, где состояние уже другое.
+      Убрать их значило бы сломать повтор ради тишины линтера.
+    */
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- на монтировании сеттеры попадают в те же значения и перерисовки не вызывают; нужны для повторной загрузки
     void loadWorkspace();
     return () => workspaceRequest.current?.abort();
   }, [loadWorkspace]);
@@ -520,6 +540,7 @@ export function ToModule() {
       bootstrap={bootstrap}
       shifts={shifts}
       permits={permits}
+      defects={defects}
       currentReadiness={currentReadiness}
       authoritativeReadinessError={authoritativeReadinessError}
       readinessHistory={readinessHistory}
@@ -557,14 +578,6 @@ export function ToModule() {
             : `Открыт раздел ${view}`
       }
       onRetry={bootstrapError?.retryable === false ? undefined : loadWorkspace}
-      tabStripTrailing={
-        <ActingRoleSwitch
-          actorRole={bootstrap?.actor.role ?? ''}
-          value={actingAs}
-          onChange={setActingAs}
-          disabled={loading}
-        />
-      }
     >
       {referenceUi}
     </TechReadinessModule>

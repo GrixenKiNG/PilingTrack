@@ -17,7 +17,7 @@ export function withReadinessCommand<T extends unknown[]>(
   return withMutation(async (request: NextRequest, ...args: T) => {
     const resolved = await resolveReadinessRequestContext(request);
     if (resolved.response) return resolved.response;
-    const context = resolved.context!;
+    const context = resolved.context;
     try {
       return await handler(request, context, ...args);
     } catch (error) {

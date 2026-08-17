@@ -60,6 +60,21 @@ export function canActAs(role: string, actingAs: string | null | undefined): boo
   return role === 'ADMIN' && isActingRole(actingAs);
 }
 
+/**
+ * Роль, по которой считаются права и рисуется интерфейс.
+ *
+ * Замещение ЗАМЕНЯЕТ роль, а не дополняет: администратор в режиме механика
+ * видит и может ровно то, что механик. Повысить доступ так нельзя — права
+ * каждой роли являются подмножеством прав администратора (проверено по
+ * `abilityRoles` в services/auth/authorization-service.ts).
+ *
+ * Настоящая роль при этом никуда не девается: в журнал пишутся оба значения,
+ * поэтому «смену открыл администратор, исполняя роль оператора» остаётся видно.
+ */
+export function resolveEffectiveRole(role: string, actingAs: string | null | undefined): string {
+  return canActAs(role, actingAs) && actingAs ? actingAs : role;
+}
+
 // ============================================================
 // AUTH
 // ============================================================

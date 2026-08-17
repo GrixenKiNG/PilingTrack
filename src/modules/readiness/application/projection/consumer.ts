@@ -10,3 +10,4 @@ export async function consumeReadinessProjectionEvent(event: {id?: string; type?
   await projectReadinessEvent(event.id);
   return true;
 }
+

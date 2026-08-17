@@ -18,6 +18,7 @@ const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730105500_readiness_snapshot_immutability/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730106000_readiness_backfill_progress/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260808130000_readiness_snapshot_facts/migration.sql'),
+  resolve(process.cwd(), 'prisma/migrations/20260813000000_readiness_verdict/migration.sql'),
 ];
 
 describe.runIf(Boolean(connectionString))('readiness snapshot projection on disposable PostgreSQL', () => {
@@ -37,7 +38,7 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     await sql.query(`CREATE TABLE "ReadinessScoreSnapshot" (
       "id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "equipmentId" TEXT NOT NULL, "shiftId" TEXT,
       "ruleSetId" TEXT NOT NULL, "ruleSetVersion" TEXT NOT NULL, "triggerType" TEXT NOT NULL,
-      "triggerId" TEXT NOT NULL, "status" TEXT NOT NULL, "score" INTEGER NOT NULL,
+      "triggerId" TEXT NOT NULL, "status" TEXT NOT NULL, "verdict" TEXT, "score" INTEGER NOT NULL,
       "blockers" JSONB NOT NULL, "warnings" JSONB NOT NULL, "evidence" JSONB NOT NULL,
       "factsHash" BYTEA NOT NULL, "calculatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW(),
       UNIQUE ("tenantId", "equipmentId", "triggerType", "triggerId"), UNIQUE ("tenantId", "id"));`);
@@ -94,12 +95,12 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
         {tenantId, equipmentId: 'eq-2', ruleSetId: 'rules-1', triggerType: 'METER_READING', triggerId: 'new'},
         evaluation('2026-07-01T10:00:00Z'));
       await advanceCurrentReadiness({tx, tenantId, equipmentId: 'eq-2', snapshotId: newer.id,
-        status: newer.status, score: newer.score, calculatedAt: newer.calculatedAt});
+        status: newer.status, verdict: newer.verdict, score: newer.score, calculatedAt: newer.calculatedAt});
       const older = await createDeduplicatedSnapshot(tx,
         {tenantId, equipmentId: 'eq-2', ruleSetId: 'rules-1', triggerType: 'METER_READING', triggerId: 'old'},
         evaluation('2026-07-01T09:00:00Z'));
       await advanceCurrentReadiness({tx, tenantId, equipmentId: 'eq-2', snapshotId: older.id,
-        status: older.status, score: older.score, calculatedAt: older.calculatedAt});
+        status: older.status, verdict: older.verdict, score: older.score, calculatedAt: older.calculatedAt});
     });
     const current = await prisma.currentReadiness.findUniqueOrThrow({where: {tenantId_equipmentId: {tenantId, equipmentId: 'eq-2'}}});
     const pointed = await prisma.readinessScoreSnapshot.findUniqueOrThrow({where: {id: current.snapshotId}});

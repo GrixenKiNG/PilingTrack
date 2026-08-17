@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
-import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
+import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, SYSTEM_SAFETY_BLOCKERS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
 import { resolveReadinessCapabilities, type ReadinessAbility, type ReadinessRole } from '@/modules/readiness/application/capabilities';
 import { type ReadinessUrlFilters } from '../api/client';
 import { EquipmentPhoto, ReadinessFiltersBar, ReadinessRing, downloadReadinessExport } from './shared';
@@ -390,25 +390,42 @@ function RulesSettings(props: ReferenceUiProps) {
                 {draft.blockers.map((blocker) => {
                   // Предупреждение не останавливает работу — не красим его как критическое.
                   const advisory = blocker.action === 'WARN_ONLY';
+                  // Системное правило безопасности показываем замком, а не
+                  // переключателем: сервер всё равно вернёт его включённым, и
+                  // выключатель, который ничего не выключает, — обман.
+                  const system = SYSTEM_SAFETY_BLOCKERS[blocker.condition];
                   return (
                     <div key={blocker.condition} className="grid grid-cols-[minmax(0,1fr)_128px_44px] items-center gap-2 border-b border-border py-2 text-2xs last:border-b-0">
                       <span className="flex min-w-0 items-center gap-2">
                         <AlertTriangle className={cn('h-3.5 w-3.5 shrink-0', blocker.isActive ? (advisory ? 'text-warning-strong' : 'text-destructive-strong') : 'text-muted-foreground')} />
-                        <span className="leading-tight">{BLOCKER_LABELS[blocker.condition]}</span>
+                        <span className="min-w-0 leading-tight">
+                          {BLOCKER_LABELS[blocker.condition]}
+                          {system ? <span className="mt-0.5 block text-3xs font-normal text-muted-foreground">{system.reason}</span> : null}
+                        </span>
                       </span>
-                      <select
-                        value={blocker.action}
-                        disabled={saving || rulesUnavailable}
-                        onChange={(event) => patchBlocker(blocker.condition, { action: event.target.value as BlockerAction })}
-                        aria-label={`Действие правила ${BLOCKER_LABELS[blocker.condition]}`}
-                        className={cn('w-full min-w-0 rounded px-1 py-1 text-3xs', advisory
-                          ? 'border border-warning/25 bg-warning/10 text-warning-strong'
-                          : 'border border-destructive/25 bg-destructive/10 text-destructive-strong')}
-                      >
-                        {BLOCKER_ACTIONS.map((action) => <option key={action} value={action}>{BLOCKER_ACTION_LABELS[action]}</option>)}
-                      </select>
+                      {system ? (
+                        <span className="rounded border border-destructive/25 bg-destructive/10 px-1 py-1 text-3xs font-semibold text-destructive-strong">
+                          {BLOCKER_ACTION_LABELS[blocker.action]}
+                        </span>
+                      ) : (
+                        <select
+                          value={blocker.action}
+                          disabled={saving || rulesUnavailable}
+                          onChange={(event) => patchBlocker(blocker.condition, { action: event.target.value as BlockerAction })}
+                          aria-label={`Действие правила ${BLOCKER_LABELS[blocker.condition]}`}
+                          className={cn('w-full min-w-0 rounded px-1 py-1 text-3xs', advisory
+                            ? 'border border-warning/25 bg-warning/10 text-warning-strong'
+                            : 'border border-destructive/25 bg-destructive/10 text-destructive-strong')}
+                        >
+                          {BLOCKER_ACTIONS.map((action) => <option key={action} value={action}>{BLOCKER_ACTION_LABELS[action]}</option>)}
+                        </select>
+                      )}
                       <span className="flex justify-end">
-                        <Toggle checked={blocker.isActive} onChange={saving || rulesUnavailable ? undefined : (isActive) => patchBlocker(blocker.condition, { isActive })} label={`Включить правило ${BLOCKER_LABELS[blocker.condition]}`} />
+                        {system ? (
+                          <Lock className="h-4 w-4 text-muted-foreground" aria-label="Системное правило, отключить нельзя" />
+                        ) : (
+                          <Toggle checked={blocker.isActive} onChange={saving || rulesUnavailable ? undefined : (isActive) => patchBlocker(blocker.condition, { isActive })} label={`Включить правило ${BLOCKER_LABELS[blocker.condition]}`} />
+                        )}
                       </span>
                     </div>
                   );

@@ -14,11 +14,15 @@ function ControlledTabs() {
 }
 
 describe('ModuleTabList', () => {
-  it('renders the immutable seven-tab contract in the approved order', () => {
+  // Восьмая вкладка — «Документы» (контроль сроков документов работников,
+  // роль диспетчера в утверждённом порядке). Длина сверяется с MODULE_TABS, а
+  // не с числом в тесте: смысл проверки — порядок и полнота списка, а не то,
+  // что вкладок ровно семь навсегда.
+  it('renders the module tab contract in the approved order', () => {
     render(<ControlledTabs />);
 
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(7);
+    expect(tabs).toHaveLength(MODULE_TABS.length);
     expect(tabs.map((tab) => tab.textContent)).toEqual(MODULE_TABS.map((tab) => tab.label));
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(tabs[0]).toHaveAttribute('aria-controls', 'view-panel-readiness');
@@ -37,13 +41,14 @@ describe('ModuleTabList', () => {
     expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
     expect(tabs[1]).toHaveFocus();
 
+    const last = tabs.length - 1;
     fireEvent.keyDown(tabs[1], { key: 'End' });
-    expect(tabs[6]).toHaveFocus();
-    fireEvent.keyDown(tabs[6], { key: ' ' });
-    expect(tabs[6]).toHaveAttribute('aria-selected', 'true');
-    expect(tabs[6]).toHaveFocus();
+    expect(tabs[last]).toHaveFocus();
+    fireEvent.keyDown(tabs[last], { key: ' ' });
+    expect(tabs[last]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[last]).toHaveFocus();
 
-    fireEvent.keyDown(tabs[6], { key: 'Home' });
+    fireEvent.keyDown(tabs[last], { key: 'Home' });
     expect(tabs[0]).toHaveFocus();
   });
 });

@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/lib/service-error';
 import { attachRequestIdHeader, getRequestId } from '@/lib/request-context';
 import { canActAs, isActingRole } from '@/lib/types';
+import { can } from '@/services/auth/authorization-service';
 import { queryReadinessBootstrap } from '@/modules/readiness/application/bootstrap-query';
 import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
 
@@ -21,6 +22,9 @@ export async function GET(request: NextRequest) {
   if (!user?.tenantId) {
     return response({ error: 'Tenant context is required' }, 403, requestId);
   }
+  // Проверка выше сужает тип, но сужение свойства не переживает вход в
+  // замыкание ниже — там стояло `user.tenantId!`. Константа сужается честно.
+  const tenantId = user.tenantId;
   const searchParams = new URL(request.url).searchParams;
   const actingAs = searchParams.get('actingAs');
   if (
@@ -34,13 +38,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await withReadinessRequestTransaction(user.tenantId, (tx) =>
+    const data = await withReadinessRequestTransaction(tenantId, (tx) =>
       queryReadinessBootstrap(tx, {
         id: user.id,
         name: user.name,
         role: user.role,
-        tenantId: user.tenantId!,
-      }, undefined, actingAs, requestId)
+        tenantId,
+      }, undefined, actingAs, requestId, {
+        // Право из прикладной матрицы: контур готовности его не знает, см.
+        // ReadinessExternalGrants.
+        documentsControl: can(user, 'users.documents.read_all'),
+      })
     );
     return response({ data, meta: { requestId } }, 200, requestId);
   } catch (caught) {

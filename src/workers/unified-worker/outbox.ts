@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';
 import { registerAllEventHandlers } from '@/services/reports/event-handlers';
+import { registerReadinessProjectionHandler } from '@/workers/register-readiness-projection';
 import { getOutboxStats, startOutboxWorker } from '@/services/reports/outbox-publisher';
 import { OUTBOX_INTERVAL } from './config';
 import { recordLeaderHeartbeat, setRunning, workerStates } from './state';
@@ -31,6 +32,7 @@ export async function startOutbox(): Promise<void> {
   // is idempotent (registerAllEventHandlers internally guards re-entry).
   try {
     registerAllEventHandlers();
+    registerReadinessProjectionHandler();
   } catch (error) {
     logger.warn('Failed to register event handlers in outbox loop', {
       error: error instanceof Error ? error.message : String(error),

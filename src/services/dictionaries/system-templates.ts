@@ -24,3 +24,18 @@ export const DOWNTIME_REASON_TEMPLATES = [
   { name: 'Ожидание техники' },
   { name: 'Прочее' },
 ] as const;
+
+/**
+ * Виды документов работника. Список утверждён владельцем 15.08.2026 и
+ * задуман пополняемым: заказчик добавляет свои виды в справочнике, релиз для
+ * этого не нужен.
+ *
+ * leadTimeDays — за сколько дней предупреждать об окончании срока. 30 против
+ * семи у ТО: продление удостоверения занимает недели, а не день.
+ */
+export const USER_DOCUMENT_TYPE_TEMPLATES = [
+  { name: 'Удостоверение машиниста копровой установки', defaultValidMonths: 60, leadTimeDays: 30 },
+  { name: 'Медицинский осмотр', defaultValidMonths: 12, leadTimeDays: 30 },
+  { name: 'Удостоверение по охране труда', defaultValidMonths: 36, leadTimeDays: 30 },
+  { name: 'Аттестация по промышленной безопасности', defaultValidMonths: 60, leadTimeDays: 30 },
+] as const;

@@ -24,12 +24,12 @@ export async function createDeduplicatedSnapshot(
   const inserted = await tx.$queryRaw<Array<{id: string}>>`
     INSERT INTO "ReadinessScoreSnapshot"
       ("id", "tenantId", "equipmentId", "shiftId", "ruleSetId", "ruleSetVersion",
-       "triggerType", "triggerId", "status", "score", "blockers", "warnings",
+       "triggerType", "triggerId", "status", "verdict", "score", "blockers", "warnings",
        "evidence", "facts", "factsHash", "calculatedAt")
     VALUES
       (${id}, ${identity.tenantId}, ${identity.equipmentId}, ${identity.shiftId ?? null},
        ${identity.ruleSetId}, ${evaluation.ruleSetVersion}, ${identity.triggerType}, ${identity.triggerId},
-       ${evaluation.status}, ${evaluation.score}, ${JSON.stringify(evaluation.blockers)}::jsonb,
+       ${evaluation.status}, ${evaluation.verdict}, ${evaluation.score}, ${JSON.stringify(evaluation.blockers)}::jsonb,
        ${JSON.stringify(evaluation.warnings)}::jsonb, ${JSON.stringify(evaluation.evidence)}::jsonb,
        ${JSON.stringify(evaluation.facts)}::jsonb, ${factsHash}, ${evaluation.calculatedAt})
     ON CONFLICT ("tenantId", "equipmentId", "triggerType", "triggerId") DO NOTHING

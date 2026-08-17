@@ -4,7 +4,7 @@ import type { EquipmentOption } from '../../to-module-bits';
 import { type JournalRecord } from '../../to-stats';
 import type { EquipmentReadiness } from '../../readiness-model';
 import type { CrewSummary, MaintenanceSummary } from '../../readiness-design-views';
-import type { CurrentReadinessDto, ReadinessAuditEnvelope, ReadinessBootstrap, ReadinessShiftDto, ReadinessSnapshotDto, WorkPermitDto } from '../api/contracts';
+import type { CurrentReadinessDto, DefectDto, ReadinessAuditEnvelope, ReadinessBootstrap, ReadinessShiftDto, ReadinessSnapshotDto, WorkPermitDto } from '../api/contracts';
 import { type ReadinessUrlFilters } from '../api/client';
 
 export type ReferenceView =
@@ -13,6 +13,7 @@ export type ReferenceView =
   | 'shifts'
   | 'permits'
   | 'maintenance'
+  | 'documents'
   | 'reports'
   | 'settings';
 
@@ -84,6 +85,7 @@ export interface ReferenceUiProps {
   bootstrap: ReadinessBootstrap | null;
   shifts: ReadinessShiftDto[];
   permits: WorkPermitDto[];
+  defects: DefectDto[];
   currentReadiness: CurrentReadinessDto[];
   authoritativeReadinessError: string | null;
   readinessHistory: ReadinessSnapshotDto[];

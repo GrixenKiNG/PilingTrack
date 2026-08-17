@@ -101,26 +101,39 @@ export function ReportForm() {
     temp.tempDowntimeComment,
   ]);
 
+  /*
+    Сеттеры вынуты из `temp` до эффекта. Правило exhaustive-deps требовало
+    добавить в зависимости сам `temp` — но это объект, собираемый заново на
+    каждый рендер, и эффект перезапускался бы бесконечно. Буквальное следование
+    совету здесь сломало бы форму, поэтому берём отдельные ссылки: они
+    стабильны, и правило удовлетворяется по существу, а не подавлением.
+  */
+  const {
+    setTempPileGrade, setTempPileCount, setTempDrillType, setTempDrillCount,
+    setTempDrillMetersPerUnit, setTempDowntimeReason, setTempDowntimeDuration,
+    setTempDowntimeComment,
+  } = temp;
+
   useEffect(() => {
     if (!restoredDraftTemp) return;
-    temp.setTempPileGrade(restoredDraftTemp.pileGrade || '');
-    temp.setTempPileCount(restoredDraftTemp.pileCount || '');
-    temp.setTempDrillType(restoredDraftTemp.drillingType || '');
-    temp.setTempDrillCount(restoredDraftTemp.drillingCount || '');
-    temp.setTempDrillMetersPerUnit(restoredDraftTemp.drillingMetersPerUnit || '');
-    temp.setTempDowntimeReason(restoredDraftTemp.downtimeReason || '');
-    temp.setTempDowntimeDuration(restoredDraftTemp.downtimeDuration || '');
-    temp.setTempDowntimeComment(restoredDraftTemp.downtimeComment || '');
+    setTempPileGrade(restoredDraftTemp.pileGrade || '');
+    setTempPileCount(restoredDraftTemp.pileCount || '');
+    setTempDrillType(restoredDraftTemp.drillingType || '');
+    setTempDrillCount(restoredDraftTemp.drillingCount || '');
+    setTempDrillMetersPerUnit(restoredDraftTemp.drillingMetersPerUnit || '');
+    setTempDowntimeReason(restoredDraftTemp.downtimeReason || '');
+    setTempDowntimeDuration(restoredDraftTemp.downtimeDuration || '');
+    setTempDowntimeComment(restoredDraftTemp.downtimeComment || '');
   }, [
     restoredDraftTemp,
-    temp.setTempPileGrade,
-    temp.setTempPileCount,
-    temp.setTempDrillType,
-    temp.setTempDrillCount,
-    temp.setTempDrillMetersPerUnit,
-    temp.setTempDowntimeReason,
-    temp.setTempDowntimeDuration,
-    temp.setTempDowntimeComment,
+    setTempPileGrade,
+    setTempPileCount,
+    setTempDrillType,
+    setTempDrillCount,
+    setTempDrillMetersPerUnit,
+    setTempDowntimeReason,
+    setTempDowntimeDuration,
+    setTempDowntimeComment,
   ]);
 
   useEffect(() => {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { readinessFilterQuery, type ReadinessUrlFilters } from '../api/client';
 import { type PresentationStage } from '../authoritative-presentation';
@@ -206,7 +207,7 @@ export function ReadinessRing({ value, size = 116 }: { value: number | null; siz
           cy="56"
           r={radius}
           fill="none"
-          stroke={numeric >= 85 ? 'var(--success)' : 'var(--signal)'}
+          stroke={numeric >= READINESS_READY_THRESHOLD ? 'var(--success)' : 'var(--signal)'}
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -256,7 +257,13 @@ export const STAGE_CTA: Record<PresentationStage['key'], string> = {
 export async function commandFailure(response: Response): Promise<string> {
   const body = await response.json().catch(() => null) as {error?: {message?: string} | string} | null;
   const serverMessage = typeof body?.error === 'string' ? body.error : body?.error?.message;
-  if (response.status === 409) return 'Кто-то уже изменил эту запись. Данные обновлены — повторите действие с актуальной версией.';
+  // 409 приходит и на состязание версий, и на запрещённый переход состояния
+  // («Сначала возьмите дефект в работу, потом закрывайте»). Общий текст про
+  // «кто-то уже изменил запись» стирал вторую причину, и пользователь видел
+  // ложное объяснение вместо настоящего правила.
+  if (response.status === 409) {
+    return serverMessage || 'Кто-то уже изменил эту запись. Данные обновлены — повторите действие с актуальной версией.';
+  }
   if (response.status === 422) return serverMessage || 'Условие операции не выполнено. Проверьте готовность, наряд и обязательные поля.';
   return serverMessage || 'Операция не выполнена. Повторите попытку.';
 }

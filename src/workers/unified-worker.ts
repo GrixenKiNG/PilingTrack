@@ -24,12 +24,14 @@ import { startPdf } from './unified-worker/pdf';
 import { startProjection } from './unified-worker/projection';
 import { startPmScheduler } from './unified-worker/pm-scheduler';
 import { startProjectionRebuildScheduler } from './unified-worker/projection-rebuild-scheduler';
+import { startReadinessScheduler } from './unified-worker/readiness-scheduler';
 import { workerStates } from './unified-worker/state';
 
 let isShuttingDown = false;
 let healthServer: http.Server | null = null;
 let stopPmScheduler: (() => void) | null = null;
 let stopProjectionRebuild: (() => void) | null = null;
+let stopReadinessScheduler: (() => void) | null = null;
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
@@ -64,6 +66,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
   if (stopProjectionRebuild) {
     stopProjectionRebuild();
     stopProjectionRebuild = null;
+  }
+
+  if (stopReadinessScheduler) {
+    stopReadinessScheduler();
+    stopReadinessScheduler = null;
   }
 
   if (healthServer) {
@@ -115,6 +122,13 @@ async function main(): Promise<void> {
   // dump restore / worker lag. Idempotent full recompute, no leader election.
   if (process.env.PROJECTION_REBUILD_ENABLED !== 'false') {
     stopProjectionRebuild = startProjectionRebuildScheduler();
+  }
+
+  // Суточный сброс техготовности: истечение нарядов и закрытие несданных
+  // смен. Без него вчерашняя смена висит «в работе», а истёкший наряд
+  // числится согласованным. Идемпотентен, выбора лидера не требует.
+  if (process.env.READINESS_SCHEDULER_ENABLED !== 'false') {
+    stopReadinessScheduler = startReadinessScheduler();
   }
 
   logger.info('Unified Worker Service ready');

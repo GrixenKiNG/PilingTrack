@@ -46,7 +46,8 @@ export async function backfillTenantReadiness(input: {
           }, evaluation);
           await advanceCurrentReadiness({
             tx, tenantId: input.tenantId, equipmentId: row.id, snapshotId: snapshot.id,
-            status: snapshot.status, score: snapshot.score, calculatedAt: snapshot.calculatedAt,
+            status: snapshot.status, verdict: snapshot.verdict, score: snapshot.score,
+            calculatedAt: snapshot.calculatedAt,
           });
         }
         await progressRepo.checkpoint({

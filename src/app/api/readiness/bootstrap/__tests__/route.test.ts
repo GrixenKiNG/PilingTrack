@@ -43,7 +43,7 @@ describe('GET /api/readiness/bootstrap', () => {
       name: 'Mechanic',
       role: 'MECHANIC',
       tenantId: 'tenant-a',
-    }, undefined, null, expect.any(String));
+    }, undefined, null, expect.any(String), { documentsControl: expect.any(Boolean) });
   });
 
   it('rejects spoofed tenant/timezone context', async () => {
@@ -64,7 +64,7 @@ describe('GET /api/readiness/bootstrap', () => {
       name: 'Admin',
       role: 'ADMIN',
       tenantId: 'tenant-a',
-    }, undefined, 'MECHANIC', expect.any(String));
+    }, undefined, 'MECHANIC', expect.any(String), { documentsControl: expect.any(Boolean) });
   });
 
   // DISPATCHER и OPERATOR стали исполняемыми ролями 2026-08-10, поэтому

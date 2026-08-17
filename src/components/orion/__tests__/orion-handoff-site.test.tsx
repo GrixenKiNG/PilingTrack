@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { OrionHandoffSite } from '../orion-handoff-site';
 
 vi.mock('next/image', () => ({
-  default: ({ fill: _fill, priority: _priority, fetchPriority: _fetchPriority, ...props }: Record<string, unknown>) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img {...props} />
+  // `alt` вынут из props явно: при простом расплющивании линтер не видит его в
+  // разметке и требует alt-текст. Заглушка next/image обязана донести alt до
+  // <img>, иначе тесты доступности проверяли бы картинку без подписи.
+  default: ({ fill: _fill, priority: _priority, fetchPriority: _fetchPriority, alt, ...props }: Record<string, unknown>) => (
+    <img alt={typeof alt === 'string' ? alt : ''} {...props} />
   ),
 }));
 

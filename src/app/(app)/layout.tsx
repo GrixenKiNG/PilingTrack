@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { usePilingStore } from '@/lib/store';
+import { resolveEffectiveRole, type UserRole } from '@/lib/types';
 import { AppErrorBoundary } from '@/components/piling/app-error-boundary';
 import { FeedbackCenter } from '@/components/piling/feedback-center';
+import { ActingAsBanner } from '@/components/piling/acting-as-banner';
 import { PilingIcon, ROLE_NAVIGATION } from '@/components/piling/icons';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -32,8 +34,12 @@ function isActivePath(currentPath: string, href: string): boolean {
 
 function OperatorLayout({ children }: { children: React.ReactNode }) {
   const user = usePilingStore((s) => s.currentUser);
+  const actingAs = usePilingStore((s) => s.actingAs);
   const pathname = usePathname();
-  const navItems = ROLE_NAVIGATION[user?.role || 'OPERATOR'];
+  // Навигация — по исполняемой роли: смысл режима «Действую как» в том, чтобы
+  // видеть приложение её глазами, а не своими.
+  const navItems = ROLE_NAVIGATION[
+    resolveEffectiveRole(user?.role || 'OPERATOR', actingAs) as UserRole];
 
   const nav = (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t safe-area-bottom">
@@ -105,6 +111,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
         было зацепиться, чтобы перескочить шапку и нижнюю навигацию.
       */}
       <main>
+        <ActingAsBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={user?.id}
@@ -125,8 +132,10 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = usePilingStore((s) => s.currentUser);
+  const actingAs = usePilingStore((s) => s.actingAs);
   const pathname = usePathname();
-  const navItems = ROLE_NAVIGATION[user?.role || 'ADMIN'];
+  const navItems = ROLE_NAVIGATION[
+    resolveEffectiveRole(user?.role || 'ADMIN', actingAs) as UserRole];
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isDispatcher = user?.role === 'DISPATCHER';
@@ -229,6 +238,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <main className="min-h-screen bg-background lg:ml-64">
+        <ActingAsBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={user?.id}

@@ -14,11 +14,15 @@ import { cn } from '@/lib/utils';
 import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
 import type { ReadinessShiftDto } from '../api/contracts';
 import { type ReadinessUrlFilters } from '../api/client';
+import { describeBlockers } from './blocker-guidance';
 import { RefKpi, downloadReadinessExport } from './shared';
 import type { ReferenceUiProps } from './types';
 
 /** Период отчёта по умолчанию, если фильтр дат не задан. */
 const REPORT_DEFAULT_DAYS = 30;
+
+/** Сколько строк журнала показывать на экране отчётов; остальное — в полном журнале. */
+const JOURNAL_PREVIEW_ROWS = 8;
 
 const DAY_MS = 86_400_000;
 
@@ -82,6 +86,7 @@ function deltaDetail(current: number | null, previous: number | null, unit?: str
 export function ReportsScreen(props: ReferenceUiProps) {
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week'>('day');
   const [fleetMetric, setFleetMetric] = useState<'readiness' | 'usage'>('readiness');
+  const [journalSearch, setJournalSearch] = useState('');
   const states = Object.values(props.readinessByEquipment);
   const authoritative = props.currentReadiness.length > 0 ? props.currentReadiness : null;
   const ready = authoritative
@@ -185,8 +190,11 @@ export function ReportsScreen(props: ReferenceUiProps) {
     id: snapshot.id,
     at: snapshot.calculatedAt,
     event: 'Снимок готовности',
+    // Что именно держит установку и кто это снимает. Без этой строки журнал
+    // сообщал «Заблокировано» и молчал о причине и адресате.
+    reason: snapshot.status === 'READY' ? null : describeBlockers(snapshot.blockers),
     equipmentId: snapshot.equipmentId,
-    actor: 'Система',
+    actor: 'Система (расчёт по правилам)',
     outcome: snapshot.status === 'READY'
       ? { label: 'Готово', tone: 'success' as const }
       : { label: 'Заблокировано', tone: 'danger' as const },
@@ -197,14 +205,25 @@ export function ReportsScreen(props: ReferenceUiProps) {
       id: event.id,
       at: event.occurredAt,
       event: auditActionLabel(event.action),
+      reason: null,
       equipmentId: equipmentByEntity.get(event.entity.id) ?? null,
       actor: event.actor.name || 'Система',
       outcome: isCriticalAuditAction(event.action)
         ? { label: 'Критично', tone: 'danger' as const }
         : { label: 'Зафиксировано', tone: 'info' as const },
     }));
-  const journalRows = [...snapshotRows, ...decisionRows]
+  const allJournalRows = [...snapshotRows, ...decisionRows]
     .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
+  // Поле поиска над журналом было мёртвым: ни значения, ни обработчика — текст
+  // вводился и ничего не менял. Ищем по всему, что в строке видно.
+  const journalQuery = journalSearch.trim().toLocaleLowerCase('ru-RU');
+  const journalRows = journalQuery === '' ? allJournalRows : allJournalRows.filter((record) => [
+    record.event,
+    record.reason,
+    record.actor,
+    record.equipmentId ? nameByEquipment.get(record.equipmentId) : null,
+    record.equipmentId ? siteByEquipment.get(record.equipmentId) : null,
+  ].some((value) => value?.toLocaleLowerCase('ru-RU').includes(journalQuery)));
   /**
    * Причины блокировки — по фактам авторитетных снимков.
    *
@@ -472,15 +491,32 @@ export function ReportsScreen(props: ReferenceUiProps) {
       </div>
       <section className={cn(card, 'mt-2 overflow-x-auto')}>
         <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-          <div><h2 className="font-bold">Доказательный журнал</h2><p className="mt-1 text-xs text-muted-foreground">Неизменяемая история решений и подтверждений</p></div>
-          <div className="flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1 sm:w-64"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск по доказательному журналу" className="h-8 bg-muted pl-9 text-xs" placeholder="Поиск по установке или событию" /></div><Button variant="outline" className="h-8 text-xs">Фильтры</Button><Button variant="outline" className="h-8 text-xs" onClick={() => { props.onViewChange('settings'); props.onSettingsSectionChange('audit'); }}>Открыть полный журнал</Button></div>
+          <div>
+            <h2 className="font-bold">Доказательный журнал</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Неизменяемая история решений и подтверждений
+              {journalRows.length > JOURNAL_PREVIEW_ROWS && (
+                <> · показаны последние {JOURNAL_PREVIEW_ROWS} из {journalRows.length}</>
+              )}
+            </p>
+          </div>
+          {/*
+            Кнопка «Фильтры» убрана: она ничего не открывала. Период задаёт
+            полоса фильтров над экраном, а разбор по типам — полный журнал.
+          */}
+          <div className="flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1 sm:w-64"><Search className="absolute left-3 top-2 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск по доказательному журналу" className="h-8 bg-muted pl-9 text-xs" placeholder="Поиск по установке, событию или причине" value={journalSearch} onChange={(event) => setJournalSearch(event.target.value)} /></div><Button variant="outline" className="h-8 text-xs" onClick={() => { props.onViewChange('settings'); props.onSettingsSectionChange('audit'); }}>Открыть полный журнал</Button></div>
         </div>
         <div className="hidden min-w-[860px] grid-cols-[140px_minmax(0,1.3fr)_170px_150px_150px_110px] border-y border-border bg-muted px-4 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>Время</span><span>Событие</span><span>Установка</span><span>Объект</span><span>Исполнитель</span><span>Результат</span></div>
         <div className="hidden min-w-[860px] divide-y divide-border md:block">
-          {journalRows.length > 0 ? journalRows.slice(0, 8).map((record) => (
-            <div key={record.id} className="grid grid-cols-[140px_minmax(0,1.3fr)_170px_150px_150px_110px] items-center px-4 py-2 text-2xs">
+          {journalRows.length > 0 ? journalRows.slice(0, JOURNAL_PREVIEW_ROWS).map((record) => (
+            <div key={record.id} className="grid grid-cols-[140px_minmax(0,1.3fr)_170px_150px_150px_110px] items-start px-4 py-2 text-2xs">
               <span className="text-muted-foreground">{formatDateTimeInTimezone(record.at, props.bootstrap?.tenant.timezone)}</span>
-              <span className="truncate" title={record.event}>{record.event}</span>
+              <span className="min-w-0">
+                <span className="block truncate" title={record.event}>{record.event}</span>
+                {record.reason && (
+                  <span className="mt-0.5 block text-3xs text-destructive-strong" title={record.reason}>{record.reason}</span>
+                )}
+              </span>
               <span className="truncate font-semibold">{record.equipmentId ? nameByEquipment.get(record.equipmentId) ?? '—' : '—'}</span>
               <span className="truncate text-muted-foreground">{record.equipmentId ? siteByEquipment.get(record.equipmentId) || 'не назначен' : '—'}</span>
               <span className="truncate text-muted-foreground">{record.actor}</span>
@@ -508,6 +544,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
                 </span>
               </div>
               <div className="mt-2 font-medium">{record.equipmentId ? nameByEquipment.get(record.equipmentId) ?? '—' : '—'}</div>
+              {record.reason && <div className="mt-1 text-2xs text-destructive-strong">{record.reason}</div>}
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground">
                 <span>{formatDateTimeInTimezone(record.at, props.bootstrap?.tenant.timezone)}</span>
                 <span>{record.actor}</span>

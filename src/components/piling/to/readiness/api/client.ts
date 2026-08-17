@@ -6,6 +6,7 @@ import {
   parseReadinessHistoryResponse,
   type ReadinessBootstrap,
   type CurrentReadinessDto,
+  type DefectDto,
   type ReadinessAuditEnvelope,
   type ReadinessShiftDto,
   type ReadinessSnapshotDto,
@@ -152,6 +153,21 @@ export async function fetchReadinessShifts(signal?: AbortSignal, filters: Readin
 export async function fetchWorkPermits(signal?: AbortSignal, filters: ReadinessUrlFilters = {}): Promise<WorkPermitDto[]> {
   const query = readinessFilterQuery(filters);
   const body = await fetchReadinessJson<{ data?: WorkPermitDto[] }>(`/api/readiness/work-permits?limit=200${query ? `&${query}` : ''}`, signal);
+  return Array.isArray(body.data) ? body.data : [];
+}
+
+/**
+ * Дефекты установок.
+ *
+ * Маршрут существовал с самого начала, но его не звал ни один экран: журнал
+ * замечаний нельзя было ни завести, ни разобрать, а критерий блокировки в
+ * авторитетном расчёте («незакрытый CRITICAL») не мог сработать в принципе.
+ */
+export async function fetchReadinessDefects(signal?: AbortSignal, filters: ReadinessUrlFilters = {}): Promise<DefectDto[]> {
+  const params = new URLSearchParams();
+  if (filters.equipmentId) params.set('equipmentId', filters.equipmentId);
+  params.set('limit', '200');
+  const body = await fetchReadinessJson<{ data?: DefectDto[] }>(`/api/readiness/defects?${params}`, signal);
   return Array.isArray(body.data) ? body.data : [];
 }
 

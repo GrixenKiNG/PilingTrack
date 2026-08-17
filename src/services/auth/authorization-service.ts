@@ -1,3 +1,4 @@
+import { resolveEffectiveRole } from '@/lib/types';
 import { ServiceError } from '@/services/service-error';
 
 /**
@@ -22,6 +23,7 @@ export type Ability =
   | 'sites.assign_users'
   | 'sites.manage_hierarchy'
   | 'users.manage'
+  | 'users.documents.read_all'
   | 'equipment.manage'
   | 'maintenance.manage'
   | 'inspection.perform'
@@ -38,7 +40,10 @@ export type Ability =
 
 export interface SessionActor {
   id: string;
+  /** Собственная роль — она же попадает в журнал как «кто на самом деле». */
   role: string;
+  /** Исполняемая роль: права считаются по ней, а не по собственной. */
+  actingAs?: string | null;
 }
 
 const abilityRoles: Record<Ability, Role[]> = {
@@ -52,6 +57,13 @@ const abilityRoles: Record<Ability, Role[]> = {
   'sites.assign_users': ['ADMIN', 'DISPATCHER'],
   'sites.manage_hierarchy': ['ADMIN', 'DISPATCHER'],
   'users.manage': ['ADMIN'],
+  // Документы работника (права на управление установкой, медосмотр, охрана
+  // труда) видит не только кадровик: диспетчер обязан контролировать просрочку
+  // перед сменой, инженер ОТ — перед допуском. Свои документы работник видит и
+  // ведёт всегда, без этого права — проверка «свой ли это работник» живёт в
+  // services/users/user-documents.ts. Заводить и удалять чужие документы
+  // по-прежнему может только админ (users.manage).
+  'users.documents.read_all': ['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER'],
   'equipment.manage': ['ADMIN'],
   // Инженер ОТ ведёт осмотры и наряды-допуски — они живут в контуре
   // обслуживания. Мастеру запись сюда не нужна: он смотрит и распределяет.
@@ -82,24 +94,42 @@ export function isPrivilegedRole(role: string) {
   return role === 'ADMIN' || role === 'DISPATCHER';
 }
 
-export function can(user: { role: string }, ability: Ability) {
-  return abilityRoles[ability].includes(user.role as Role);
+/**
+ * Права считаются по ИСПОЛНЯЕМОЙ роли.
+ *
+ * `actingAs` кладёт в сессию `requireAuth`, проверив заголовок через
+ * `canActAs`. Достаточно одной этой функции: все `can`/`assertCan` приложения
+ * ходят через неё, и забыть учесть замещение негде. Раньше режим «Действую
+ * как» жил только внутри техготовности — администратор в роли механика
+ * оставался в остальном приложении администратором: видел Бригады, Аналитику и
+ * Справочники, которых механику не видно, и любое действие выполнялось его
+ * правами.
+ *
+ * Роль, неизвестная матрице (MECHANIC, ASSISTANT), даёт false — отказ по
+ * умолчанию. Так и нужно: у них своя матрица в контуре готовности, а разделы
+ * админки им не положены.
+ */
+export function can(user: { role: string; actingAs?: string | null }, ability: Ability) {
+  return abilityRoles[ability].includes(resolveEffectiveRole(user.role, user.actingAs) as Role);
 }
 
-export function assertCan(user: { role: string }, ability: Ability) {
+export function assertCan(user: { role: string; actingAs?: string | null }, ability: Ability) {
   if (!can(user, ability)) {
     throw new ServiceError('Доступ запрещён', 403);
   }
 }
 
-export function assertRole(user: { role: string }, role: Role) {
-  if (user.role !== role) {
+// Проверки по роли тоже смотрят на исполняемую: иначе администратор в режиме
+// механика проходил бы туда, куда механику нельзя, — а именно это и есть смысл
+// режима «Действую как».
+export function assertRole(user: { role: string; actingAs?: string | null }, role: Role) {
+  if (resolveEffectiveRole(user.role, user.actingAs) !== role) {
     throw new ServiceError('Доступ запрещён', 403);
   }
 }
 
-export function assertAnyRole(user: { role: string }, roles: Role[]) {
-  if (!roles.includes(user.role as Role)) {
+export function assertAnyRole(user: { role: string; actingAs?: string | null }, roles: Role[]) {
+  if (!roles.includes(resolveEffectiveRole(user.role, user.actingAs) as Role)) {
     throw new ServiceError('Доступ запрещён', 403);
   }
 }

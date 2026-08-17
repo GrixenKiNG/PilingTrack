@@ -5,7 +5,12 @@ import {capturedClock, type EvaluationClock} from '../domain/evaluation/clock';
 import {evaluateReadiness} from '../domain/evaluation/evaluator';
 import {immutablePublishedRules} from '../domain/evaluation/rules';
 
-const OPEN_MAINTENANCE = ['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'] as const;
+/**
+ * Статусы наряда ТО, которые авторитетный расчёт считает «работа не закрыта».
+ * Экспортируется, чтобы модуль ТО заказывал пересчёт по тому же списку, а не
+ * по своей копии: разъехавшись, они дали бы наряды, меняющие балл молча.
+ */
+export const OPEN_MAINTENANCE = ['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'] as const;
 
 export async function evaluateAuthoritativeReadiness(input: {
   tx: ReadinessTransaction;

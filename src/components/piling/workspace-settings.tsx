@@ -161,20 +161,13 @@ export function WorkspaceSettings() {
             <CardContent>
               {editing ? (
                 <div className="space-y-4">
+                  {/* Только то, что приложение действительно читает. ИНН,
+                      формат даты, единицы и валюта сохранялись и не влияли ни
+                      на что: даты всегда ru-RU, единицы метрические, валюта
+                      подписана «₽» в разметке. */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Название компании" value={settings.companyName} disabled={!isAdmin} placeholder="ООО «Орион»" onChange={(v) => setField({ companyName: v })} />
-                    <Field label="ИНН" value={settings.inn} disabled={!isAdmin} placeholder="7802XXXXXX" onChange={(v) => setField({ inn: v })} />
-                    <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} onChange={(v) => setField({ timezone: v })} />
-                    <Field label="Формат даты" value={settings.dateFormat} disabled={!isAdmin} onChange={(v) => setField({ dateFormat: v })} />
-                    <label className="block">
-                      <span className="text-xs text-muted-foreground">Единицы измерения</span>
-                      <select value={settings.units} disabled={!isAdmin} onChange={(e) => setField({ units: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm disabled:bg-muted">
-                        <option value="metric">Метрическая (м, ч)</option>
-                        <option value="imperial">Имперская (ft)</option>
-                      </select>
-                    </label>
-                    <Field label="Валюта" value={settings.currency} disabled={!isAdmin} onChange={(v) => setField({ currency: v })} />
+                    <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} placeholder="Europe/Moscow" onChange={(v) => setField({ timezone: v })} />
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={async () => { await save(settings); setEditing(false); }} disabled={saving}><Save className="mr-2 h-4 w-4" />Сохранить</Button>
@@ -184,11 +177,7 @@ export function WorkspaceSettings() {
               ) : (
                 <dl className="divide-y divide-border text-sm">
                   <Row label="Название компании" value={settings.companyName || '—'} />
-                  <Row label="ИНН" value={settings.inn || '—'} />
                   <Row label="Часовой пояс" value={settings.timezone || '—'} />
-                  <Row label="Формат даты" value={settings.dateFormat || '—'} />
-                  <Row label="Единицы измерения" value={settings.units === 'imperial' ? 'Имперская (ft)' : 'Метрическая система'} />
-                  <Row label="Валюта" value={settings.currency || '—'} />
                 </dl>
               )}
             </CardContent>
@@ -216,9 +205,14 @@ export function WorkspaceSettings() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-signal-strong" />Уведомления</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {NOTIFICATION_KEYS.map(({ key, label }) => (
+              {NOTIFICATION_KEYS.map(({ key, label, implemented }) => (
                 <div key={key} className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{label}</p>
+                    {/* Правило без отправителя: признак сохранится, но слать
+                        его некому. Молчать об этом — обманывать администратора. */}
+                    {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
+                  </div>
                   <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
                 </div>
               ))}

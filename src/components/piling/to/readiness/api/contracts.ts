@@ -55,13 +55,14 @@ export interface ReadinessBootstrap {
       shifts: boolean;
       permits: boolean;
       maintenance: boolean;
+      documents: boolean;
       reports: boolean;
       settings: boolean;
     };
     entities: {
       equipment: { read: boolean };
       inspection: { manage: boolean };
-      defect: { manage: boolean };
+      defect: { report: boolean; manage: boolean };
       meter: { manage: boolean };
       maintenance: { manage: boolean };
       shift: {
@@ -127,7 +128,27 @@ export interface WorkPermitDto {
   shiftId: string | null;
   risk: 'NORMAL' | 'ELEVATED';
   state: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED';
+  /** Вид работ из справочника. null — у нарядов, выписанных до 16.08.2026. */
+  workTypeId: string | null;
+  /** Наименование работ — короткая строка для реестра. */
+  title: string;
+  /** Описание работ. Историческое имя поля: раньше это был единственный текст. */
   scope: string;
+  location: string;
+  objectName: string;
+  hazards: string[];
+  /**
+   * Ответственные лица. `...UserId` — учётная запись, если человек есть в
+   * системе; `...Name` — ФИО, заполнено всегда, когда роль назначена.
+   * Показывать нужно именно ФИО: оно снято на момент оформления и не изменится
+   * задним числом, если учётку переименуют или удалят.
+   */
+  producerUserId: string | null;
+  producerName: string;
+  observerUserId: string | null;
+  observerName: string;
+  safetyUserId: string | null;
+  safetyName: string;
   validFrom: string;
   validTo: string;
   timezone: string;
@@ -154,6 +175,37 @@ export interface WorkPermitDto {
   }>;
 }
 
+/**
+ * Дефект (EquipmentDefect) в том виде, в каком его отдаёт serializeDefect.
+ *
+ * Поля перечислены по фактическому сериализатору
+ * (modules/readiness/application/defects/commands.ts), а не по представлению
+ * о нём: прошлый раз расхождение с WorkPermitApproval стоило выдуманных дат
+ * в журнале согласования.
+ */
+export interface DefectDto {
+  id: string;
+  equipmentId: string;
+  severity: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  status: 'OPEN' | 'IN_WORK' | 'CLOSED' | 'REJECTED';
+  title: string;
+  description: string;
+  node: string | null;
+  reportedById: string;
+  reportedAt: string;
+  inspectionId: string | null;
+  shiftId: string | null;
+  triagedById: string | null;
+  triagedAt: string | null;
+  maintenanceRecordId: string | null;
+  resolvedById: string | null;
+  resolvedAt: string | null;
+  resolution: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const authoritativeReadinessFactsSchema = z.object({
   inspectionCompleted: z.boolean(),
   inspectionProgress: z.number().min(0).max(1),
@@ -169,12 +221,41 @@ export const authoritativeReadinessFactsSchema = z.object({
   findings: z.number().int().min(0),
 }).strict();
 
+/**
+ * Сработавшая блокировка внутри снимка.
+ *
+ * Читаем авторитетный вердикт, а не пересчитываем причины на клиенте из
+ * `facts`: правила публикуются тенантом и меняются, и вывод «почему
+ * заблокировано», собранный экраном заново, начал бы расходиться с тем, что
+ * решил сервер. Ровно этот разрыв («данные говорят одно, экран другое») уже
+ * ловили в модуле.
+ *
+ * Схема нестрогая и с запасом: у части записей ключ называется `code` (ветка
+ * «правила не опубликованы»), а состав полей со временем расширяется —
+ * незнакомый ключ не должен ронять разбор всего ответа.
+ */
+export const readinessBlockerSchema = z.looseObject({
+  condition: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+  label: z.string().min(1),
+  action: z.string().min(1),
+  actionLabel: z.string().optional(),
+});
+
+export type ReadinessBlockerDto = z.infer<typeof readinessBlockerSchema>;
+
 const authoritativeSnapshotBaseSchema = z.object({
   equipmentId: z.string().min(1),
   status: z.enum(['READY', 'BLOCKED']),
+  // Полный вердикт. null у снимков, записанных до введения колонки, — тогда
+  // экран показывает состояние по двоичному status, как и раньше.
+  verdict: z.enum(['ALLOWED', 'CONFIRMATION_REQUIRED', 'RETURN_TO_OPERATOR', 'DENIED']).nullable().optional(),
   score: z.number().int().min(0).max(100),
   calculatedAt: z.iso.datetime(),
-  blockers: z.unknown(),
+  // `.catch([])`: снимки, записанные до появления структуры, могли сохранить
+  // другой формат — тогда экран покажет «причина не записана», но не потеряет
+  // весь ответ истории из-за одной старой строки.
+  blockers: z.array(readinessBlockerSchema).catch([]),
   warnings: z.unknown(),
   evidence: z.unknown(),
   facts: authoritativeReadinessFactsSchema.nullable(),
@@ -307,7 +388,7 @@ export function isReadinessBootstrapEnvelope(
     return false;
   }
   if (!booleanRecord(capabilities.screens, [
-    'readiness', 'fleet', 'shifts', 'permits', 'maintenance', 'reports', 'settings',
+    'readiness', 'fleet', 'shifts', 'permits', 'maintenance', 'documents', 'reports', 'settings',
   ])) return false;
   if (typeof capabilities.canActAsMechanic !== 'boolean' || !record(capabilities.entities)) {
     return false;
@@ -316,7 +397,7 @@ export function isReadinessBootstrapEnvelope(
   const entities = capabilities.entities;
   return booleanRecord(entities.equipment, ['read'])
     && booleanRecord(entities.inspection, ['manage'])
-    && booleanRecord(entities.defect, ['manage'])
+    && booleanRecord(entities.defect, ['report', 'manage'])
     && booleanRecord(entities.meter, ['manage'])
     && booleanRecord(entities.maintenance, ['manage'])
     && booleanRecord(entities.shift, ['manage', 'prepareHandover', 'decideHandover'])

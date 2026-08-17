@@ -11,6 +11,17 @@ function buildHeaders(options: RequestInit) {
     headers.set('Content-Type', 'application/json');
   }
 
+  // Режим «Действую как» — на каждом запросе, из одного места.
+  //
+  // Иначе про заголовок пришлось бы помнить в каждом вызове, а забытый вызов
+  // тихо ушёл бы с правами администратора: экран показывал бы чужую роль, а
+  // сервер выполнял бы от админа. Значению сервер не доверяет — `requireAuth`
+  // пропускает замещение только администратору и только известной роли.
+  const actingAs = usePilingStore.getState().actingAs;
+  if (actingAs && !headers.has('x-acting-as')) {
+    headers.set('x-acting-as', actingAs);
+  }
+
   return headers;
 }
 
