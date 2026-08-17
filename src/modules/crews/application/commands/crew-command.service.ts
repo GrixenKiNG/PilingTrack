@@ -10,6 +10,11 @@ import { CrewAggregate } from '../../domain';
 import { getCrewRepository } from '../../infrastructure';
 import { CreateCrewCommand, UpdateCrewCommand, DeleteCrewCommand } from './crew.command';
 import { logger } from '@/lib/logger';
+// Кэш 'crews:all' живёт 5 минут и до сих пор никем не сбрасывался: функция
+// invalidateCrews была написана и не вызвана ни разу. Правка бригады не
+// появлялась в /api/crews/all до истечения TTL — диспетчер видел прежний
+// состав экипажа и не понимал, сохранилось ли изменение.
+import { invalidateCrews } from '@/lib/cached-queries';
 
 // Fields tracked in the crew assignment history (scope 'crews').
 function crewAuditSnapshot(
@@ -182,6 +187,7 @@ export async function createCrew(command: CreateCrewCommand) {
     metadata: crewAuditSnapshot(aggregate.getState(), assistantRows.map((r) => r.name)),
   });
 
+  await invalidateCrews();
   return created;
 }
 
@@ -320,6 +326,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
     },
   });
 
+  await invalidateCrews();
   return updated;
 }
 
@@ -354,5 +361,6 @@ export async function deleteCrew(command: DeleteCrewCommand) {
     metadata: { ...snapshot, deactivated: true },
   });
 
+  await invalidateCrews();
   return { success: true, deactivated: true };
 }

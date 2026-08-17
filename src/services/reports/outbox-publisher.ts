@@ -39,6 +39,11 @@ function getBackoffDelay(attempts: number): number {
 /**
  * Save events to outbox WITHIN the same transaction as business data.
  * Call this inside db.$transaction().
+ *
+ * ВНИМАНИЕ: в проде эту функцию сейчас никто не зовёт — отчёты пишут outbox
+ * сами (report.repository.ts, mapEventsToOutboxData). Оставлена как публичный
+ * помощник, поэтому tenantId проставляется здесь так же, как там: строка без
+ * тенанта выпадает из-под RLS-политики outbox.
  */
 export async function saveToOutbox(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
@@ -54,6 +59,7 @@ export async function saveToOutbox(
           type: event.type,
           aggregateId: event.aggregateId,
           aggregateType: event.aggregateType,
+          tenantId: event.tenantId ?? null,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
           payload: event as any, // JSON
         },
@@ -119,6 +125,10 @@ async function consumeOutboxEvents(
         aggregateId: outboxEvent.aggregateId,
         aggregateType: outboxEvent.aggregateType,
         occurredAt: outboxEvent.occurredAt.toISOString(),
+        // Тенант — такая же каноническая колонка, как type и aggregateId.
+        // Без него обработчики, которым нужны настройки организации (признаки
+        // уведомлений), не знали бы, чьи настройки читать.
+        tenantId: outboxEvent.tenantId ?? (looksLikeFullEvent ? payloadObj.tenantId : undefined),
         data: looksLikeFullEvent ? (payloadObj.data ?? {}) : payloadObj,
       } as unknown as ReportDomainEvent;
 

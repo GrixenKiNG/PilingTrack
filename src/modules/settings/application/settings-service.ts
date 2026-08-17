@@ -5,8 +5,10 @@
 
 import { db } from '@/lib/db';
 import {
+  DEFAULT_NOTIFICATIONS,
   DEFAULT_WORKSPACE_SETTINGS,
   sanitizeSettings,
+  type NotificationKey,
   type WorkspaceSettings,
 } from '../domain/settings';
 
@@ -23,6 +25,30 @@ export async function getSettings(tenantId: string): Promise<WorkspaceSettings> 
     currency: row.currency,
     notifications: row.notifications,
   });
+}
+
+/**
+ * Проверка признака уведомления перед отправкой.
+ *
+ * Вызывается из обработчиков доменных событий, где tenantId приходит из
+ * конверта события и может отсутствовать (в outbox он писался не всегда) —
+ * тогда берём тенант по умолчанию, как и остальной код.
+ *
+ * При ошибке чтения настроек отправляем: молчащее оповещение о простое хуже
+ * лишнего. Явное `false` в настройках при этом соблюдается строго.
+ */
+export async function isNotificationEnabled(
+  tenantId: string | null | undefined,
+  key: NotificationKey,
+): Promise<boolean> {
+  const resolved = tenantId || process.env.DEFAULT_TENANT_ID;
+  if (!resolved) return true;
+  try {
+    const settings = await getSettings(resolved);
+    return settings.notifications[key] ?? DEFAULT_NOTIFICATIONS[key] ?? false;
+  } catch {
+    return true;
+  }
 }
 
 export async function saveSettings(

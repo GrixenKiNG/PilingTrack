@@ -8,7 +8,7 @@
 
 import { db } from '@/lib/db';
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
-import { getProjectionDate } from './projection-worker';
+import { getProjectionDate } from './projection-date';
 
 export async function projectReportStats(event: ReportDomainEvent) {
   const { siteId, userId, tenantId } = event;

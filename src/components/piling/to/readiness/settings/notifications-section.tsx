@@ -26,36 +26,29 @@ import { ScreenTitle, SettingsKpis, StatusPill, Toggle, card } from './shared-ui
  * «Получатели» перечисляла роли — доставка идёт в настроенные Telegram-чаты и
  * ролей не знает вовсе.
  */
-const RULES = [
-  {
-    key: 'downtime30',
-    event: 'Простой в сменном отчёте',
-    threshold: 'дольше 2 ч · от 4 ч важность выше',
-    implemented: true,
-    icon: Clock,
-  },
-  {
-    key: 'newReports',
-    event: 'Сменный отчёт отправлен',
-    threshold: 'PDF отчёта в чат',
-    implemented: true,
-    icon: Bell,
-  },
-  {
-    key: 'planDeviation',
-    event: 'Отклонение от производственного плана',
-    threshold: 'порог не задан',
-    implemented: false,
-    icon: AlertTriangle,
-  },
-  {
-    key: 'maintenanceOverdue',
-    event: 'Просроченное техническое обслуживание',
-    threshold: 'порог не задан',
-    implemented: false,
-    icon: Wrench,
-  },
-] as const;
+const RULE_ICONS: Record<string, typeof Clock> = {
+  downtime30: Clock,
+  newReports: Bell,
+  planDeviation: AlertTriangle,
+  maintenanceOverdue: Wrench,
+};
+
+const RULE_THRESHOLDS: Record<string, string> = {
+  downtime30: 'дольше 2 ч · от 4 ч важность выше',
+  newReports: 'PDF отчёта в чат',
+  planDeviation: 'порог не задан',
+  maintenanceOverdue: 'порог не задан',
+};
+
+// Порядок и признак «есть отправитель» берём из доменного каталога, а не из
+// местной копии: разъехавшись, экран снова начал бы обещать то, чего нет.
+const RULES = NOTIFICATION_KEYS.map((rule) => ({
+  key: rule.key,
+  event: rule.label,
+  implemented: rule.implemented,
+  threshold: RULE_THRESHOLDS[rule.key] ?? '',
+  icon: RULE_ICONS[rule.key] ?? Bell,
+}));
 
 interface NotificationsSettingsProps {
   isAdmin: boolean;
@@ -187,11 +180,11 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
                 );
               })}
             </div>
-            <p className="flex items-start gap-2 border-t border-border bg-warning/10 p-3 text-2xs font-semibold leading-relaxed text-warning-strong">
+            <p className="flex items-start gap-2 border-t border-border bg-muted p-3 text-2xs leading-relaxed text-muted-foreground">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              Признак сохраняется в настройках организации, но отправка его пока не проверяет:
-              включённое и выключенное правило ведут себя одинаково.
-              {!telegramReady && telegramCount != null && ' Канал доставки при этом не настроен — не уходит ничего.'}
+              Признак читается отправителем: выключенное правило со «Работает» отправку не делает.
+              У правил без отправителя признак сохраняется, но отправлять нечему.
+              {!telegramReady && telegramCount != null && ' Канал доставки не настроен — не уходит ничего.'}
             </p>
           </section>
 

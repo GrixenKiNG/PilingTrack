@@ -35,7 +35,8 @@ export interface SaveHooks {
  */
 function mapEventsToOutboxData(
   events: ReadonlyArray<{ type: string; aggregateId: string; aggregateType: string; data?: unknown }>,
-  reportId: string
+  reportId: string,
+  tenantId: string | null
 ): Array<{
   type: string;
   aggregateId: string;
@@ -43,6 +44,7 @@ function mapEventsToOutboxData(
   payload: unknown;
   published: boolean;
   attempts: number;
+  tenantId: string | null;
 }> {
   return events.map((event) => ({
     type: event.type,
@@ -51,6 +53,11 @@ function mapEventsToOutboxData(
     payload: event.data || {},
     published: false,
     attempts: 0,
+    // Тенант писался только readiness-издателями, а события отчётов ложились
+    // с пустым tenantId: строка outbox переставала принадлежать тенанту и
+    // выпадала из-под RLS-политики. Берём его из состояния отчёта — там он
+    // уже проверен на входе команды.
+    tenantId,
   }));
 }
 
@@ -227,7 +234,7 @@ export class PrismaReportRepository implements ReportRepository {
       // or neither is — preventing data/event inconsistency.
       const pendingEvents = aggregate.getPendingEvents();
       if (pendingEvents.length > 0) {
-        const outboxRecords = mapEventsToOutboxData(pendingEvents, state.reportId);
+        const outboxRecords = mapEventsToOutboxData(pendingEvents, state.reportId, state.tenantId ?? null);
         await tx.outboxEvent.createMany({ data: outboxRecords });
       }
 

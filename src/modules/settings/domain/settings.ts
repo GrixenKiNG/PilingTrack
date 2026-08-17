@@ -3,6 +3,19 @@
  * catalog. Pure module (no React / no db): safe on client and server.
  */
 
+/**
+ * Настройки организации.
+ *
+ * Приложение считается только с `companyName` (шапка контура техготовности) и
+ * `timezone` (производственные сутки, периоды отчётов, форматирование дат).
+ *
+ * `inn`, `dateFormat`, `units`, `currency` хранятся исторически и не влияют ни
+ * на что: даты форматируются жёстко по ru-RU, единицы всегда метрические,
+ * денег в приложении одна колонка (стоимость наряда ТО) и та подписана «₽» в
+ * разметке. Поля убраны с экрана настроек — администратор менял их и думал,
+ * что что-то произошло. Колонки оставлены: значения не теряются, если поля
+ * когда-нибудь свяжут с выводом документов.
+ */
 export interface WorkspaceSettings {
   companyName: string;
   inn: string;
@@ -13,12 +26,22 @@ export interface WorkspaceSettings {
   notifications: Record<string, boolean>;
 }
 
-/** The notification preferences a tenant can toggle. */
+/**
+ * Правила уведомлений, которые тенант может включать и выключать.
+ *
+ * `implemented` — есть ли у правила настоящий отправитель. Отправителей ровно
+ * два (`services/reports/event-handlers.ts`): предупреждение о простое и PDF
+ * сменного отчёта. Оба теперь проверяют признак; раньше признак сохранялся, но
+ * никем не читался, и включённое правило вело себя ровно как выключенное.
+ *
+ * Подпись первого правила обещала простой «более 30 минут», хотя отправитель
+ * молчит до 2 часов, — приведена к фактическому порогу.
+ */
 export const NOTIFICATION_KEYS = [
-  { key: 'downtime30', label: 'Простой установки более 30 минут' },
-  { key: 'planDeviation', label: 'Отклонения по плану (±10%)' },
-  { key: 'maintenanceOverdue', label: 'Просроченные ТО' },
-  { key: 'newReports', label: 'Новые отчёты и сводки' },
+  { key: 'downtime30', label: 'Простой в сменном отчёте дольше 2 часов', implemented: true },
+  { key: 'planDeviation', label: 'Отклонения по плану (±10%)', implemented: false },
+  { key: 'maintenanceOverdue', label: 'Просроченные ТО', implemented: false },
+  { key: 'newReports', label: 'Новые отчёты и сводки', implemented: true },
 ] as const;
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]['key'];
@@ -33,7 +56,9 @@ export const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   companyName: '',
   inn: '',
-  timezone: 'UTC+3',
+  // Именно IANA-зона, а не 'UTC+3': такую строку Intl.DateTimeFormat не знает
+  // и бросает RangeError. Совпадает с умолчанием колонки в схеме.
+  timezone: 'Europe/Moscow',
   dateFormat: 'DD.MM.YYYY',
   units: 'metric',
   currency: 'RUB',

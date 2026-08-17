@@ -2,8 +2,9 @@
  * Settings module facade — per-tenant workspace settings + notification prefs.
  */
 
-export { getSettings, saveSettings } from './application/settings-service';
+export { getSettings, saveSettings, isNotificationEnabled } from './application/settings-service';
 export {
+  DEFAULT_NOTIFICATIONS,
   DEFAULT_WORKSPACE_SETTINGS,
   NOTIFICATION_KEYS,
   sanitizeSettings,

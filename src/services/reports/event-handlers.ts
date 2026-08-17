@@ -193,6 +193,17 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
 
   if (duration <= 2) return;
 
+  // Признак из настроек организации. До этого переключатель «Простой…» на
+  // экране настроек сохранялся, но отправку не спрашивали, и выключенное
+  // правило всё равно слало алерт.
+  const { isNotificationEnabled } = await import('@/modules/settings');
+  if (!await isNotificationEnabled(event.tenantId, 'downtime30')) {
+    logger.info('Downtime alert suppressed by tenant settings', {
+      reportId: event.aggregateId, duration,
+    });
+    return;
+  }
+
   logger.warn('High downtime detected', {
     duration,
     siteId: event.siteId,
@@ -275,6 +286,16 @@ function fmtNum(n: number): string {
 async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
   try {
     const { db } = await import('@/lib/db');
+
+    // Признак «Новые отчёты и сводки» из настроек организации. Раньше PDF
+    // уходил независимо от переключателя.
+    const { isNotificationEnabled } = await import('@/modules/settings');
+    if (!await isNotificationEnabled(event.tenantId, 'newReports')) {
+      logger.info('Telegram report PDF suppressed by tenant settings', {
+        reportId: event.aggregateId,
+      });
+      return;
+    }
 
     // If there are newer unprocessed ReportSubmitted events for the same report,
     // skip this one — only the last event in the batch should send the PDF.
