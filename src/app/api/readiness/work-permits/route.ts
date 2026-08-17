@@ -1,5 +1,4 @@
 import type {NextRequest} from 'next/server';
-import {resolveReadinessCapabilities} from '@/modules/readiness/application/capabilities';
 import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
 import {createWorkPermitCommand} from '@/modules/readiness/application/permits/commands';
 import {queryWorkPermits, type PermitListFilters} from '@/modules/readiness/application/permits/queries';
@@ -20,9 +19,9 @@ const readJson = async (request: NextRequest) => {
 export async function GET(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
-  const context = resolved.context!;
+  const context = resolved.context;
   try {
-    if (!resolveReadinessCapabilities(context.actorRole).has('readiness.read')) {
+    if (!context.capabilities.has('readiness.read')) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
     }
     const params = request.nextUrl.searchParams;

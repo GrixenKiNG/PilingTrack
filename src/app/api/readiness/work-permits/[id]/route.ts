@@ -13,7 +13,7 @@ type Params = {params: Promise<{id: string}>};
 export async function GET(request: NextRequest, {params}: Params) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
-  const context = resolved.context!;
+  const context = resolved.context;
   try {
     const {id} = await params;
     const data = await withReadinessRequestTransaction(context.tenantId,

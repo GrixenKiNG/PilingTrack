@@ -9,9 +9,24 @@ const permit = (overrides: Partial<WorkPermitRecord> = {}): WorkPermitRecord => 
   tenantId: 'tenant-1',
   equipmentId: 'equipment-1',
   shiftId: null,
+  workTypeId: 'work-type-1',
   risk: 'NORMAL',
   state: 'PENDING_APPROVAL',
+  // Правило согласования теперь снимок настройки вида работ, а не следствие
+  // риска. По умолчанию здесь — то же, что было зашито для обычных работ.
+  requiredApprovals: ['DISPATCHER'],
+  allowAuthorApproval: true,
+  title: 'Замена шлангов',
   scope: 'Работы на площадке 7А',
+  location: 'Площадка 7А',
+  objectName: '',
+  hazards: [],
+  producerUserId: null,
+  producerName: 'Смирнов А.В.',
+  observerUserId: null,
+  observerName: '',
+  safetyUserId: null,
+  safetyName: '',
   validFrom: new Date('2026-08-01T06:00:00.000Z'),
   validTo: new Date('2026-08-01T18:00:00.000Z'),
   timezone: 'Europe/Moscow',
@@ -31,7 +46,7 @@ describe('work permit state machine', () => {
     expect(transitionPermit(from, command)).toBe(expected);
   });
 
-  it('approves NORMAL with one non-author dispatcher', () => {
+  it('approves with the single configured dispatcher signature', () => {
     const record = permit();
     expect(assertCanApprovePermit({
       permit: record,
@@ -39,55 +54,87 @@ describe('work permit state machine', () => {
       role: 'DISPATCHER',
       approvals: [],
     })).toBe('DISPATCHER');
-    expect(isApprovalComplete('NORMAL', [{
+    expect(isApprovalComplete(record, [{
       role: 'DISPATCHER', approvedById: 'dispatcher-1', permitVersion: 1, valid: true,
     }], 1)).toBe(true);
   });
 
-  it('requires distinct dispatcher and admin users for ELEVATED', () => {
-    const record = permit({risk: 'ELEVATED'});
+  it('requires distinct people when two signatures are configured', () => {
+    const record = permit({requiredApprovals: ['DISPATCHER', 'ADMIN'], allowAuthorApproval: false});
     const first = {
       role: 'DISPATCHER' as const,
       approvedById: 'reviewer-1',
       permitVersion: 1,
       valid: true,
     };
-    expect(isApprovalComplete('ELEVATED', [first], 1)).toBe(false);
+    expect(isApprovalComplete(record, [first], 1)).toBe(false);
     expect(() => assertCanApprovePermit({
       permit: record,
       actorId: 'reviewer-1',
       role: 'ADMIN',
       approvals: [first],
-    })).toThrow(/двумя разными людьми/i);
+    })).toThrow(/разными людьми/i);
     expect(assertCanApprovePermit({
       permit: record,
       actorId: 'admin-1',
       role: 'ADMIN',
       approvals: [first],
     })).toBe('ADMIN');
-    expect(isApprovalComplete('ELEVATED', [first, {
+    expect(isApprovalComplete(record, [first, {
       role: 'ADMIN', approvedById: 'admin-1', permitVersion: 1, valid: true,
     }], 1)).toBe(true);
   });
 
-  // «Второй глаз» держится там, где он стоит своей цены — на повышенном риске.
-  // На обычных работах наряды заводит администратор, замещая механика или
-  // инженера ОТ, и подписать их было больше некому: у диспетчера нет права
-  // редактировать наряд. Контур вставал целиком, поэтому запрет сужен.
-  it('forbids author and last editor self-approval on elevated risk only', () => {
-    const elevated = permit({authorId: 'author-1', lastEditedById: 'editor-1', risk: 'ELEVATED'});
+  /*
+    Ради чего правило вообще переехало в справочник (решение владельца
+    16.08.2026): админ вправе назначить на опасные работы одну подпись
+    администратора вместо пары «диспетчер + админ». Раньше такой набор был
+    невыразим — состав подписей выводился из риска в коде.
+  */
+  it('honours an admin-only single-signature rule configured by the owner', () => {
+    const record = permit({risk: 'ELEVATED', requiredApprovals: ['ADMIN']});
+    expect(() => assertCanApprovePermit({
+      permit: record, actorId: 'dispatcher-1', role: 'DISPATCHER', approvals: [],
+    })).toThrow(/нет полномочий/i);
+    expect(assertCanApprovePermit({
+      permit: record, actorId: 'admin-1', role: 'ADMIN', approvals: [],
+    })).toBe('ADMIN');
+    expect(isApprovalComplete(record, [{
+      role: 'ADMIN', approvedById: 'admin-1', permitVersion: 1, valid: true,
+    }], 1)).toBe(true);
+  });
+
+  /*
+    Недонастроенный вид работ (согласующие не заданы) не должен означать
+    «подписи не нужны» — иначе наряд согласуется сам собой. Отказ безопаснее.
+  */
+  it('refuses to approve when no signatures are configured', () => {
+    const record = permit({requiredApprovals: []});
+    expect(isApprovalComplete(record, [], 1)).toBe(false);
+    expect(() => assertCanApprovePermit({
+      permit: record, actorId: 'admin-1', role: 'ADMIN', approvals: [],
+    })).toThrow(/не заданы согласующие/i);
+  });
+
+  // Может ли автор подписать свой наряд — теперь настройка вида работ, а не
+  // следствие риска. Обе половины прежнего поведения остались значениями по
+  // умолчанию, но их стало видно и можно изменить.
+  it('forbids author self-approval only when the work type disallows it', () => {
+    const strict = permit({
+      authorId: 'author-1', lastEditedById: 'editor-1', allowAuthorApproval: false,
+    });
     for (const actorId of ['author-1', 'editor-1']) {
       expect(() => assertCanApprovePermit({
-        permit: elevated,
+        permit: strict,
         actorId,
-        role: 'ADMIN',
+        role: 'DISPATCHER',
         approvals: [],
       })).toThrow(/согласует не его автор/i);
     }
 
-    const normal = permit({authorId: 'author-1', lastEditedById: 'author-1', risk: 'NORMAL'});
+    const relaxed = permit({authorId: 'author-1', lastEditedById: 'author-1'});
     expect(assertCanApprovePermit({
-      permit: normal,
+      permit: relaxed,
       actorId: 'author-1',
       role: 'DISPATCHER',
       approvals: [],
@@ -101,7 +148,7 @@ describe('work permit state machine', () => {
         role: 'DISPATCHER', approvedById: 'dispatcher-1', permitVersion: 1, valid: true,
       }],
     });
-    expect(editPermit(record, {scope: 'Работы на площадке 7Б'}, 'mechanic-2')).toMatchObject({
+    expect(editPermit(record, {scope: 'Работы на площадке 7Б'})).toMatchObject({
       state: 'DRAFT',
       version: 2,
       invalidatesApprovals: true,
@@ -109,8 +156,28 @@ describe('work permit state machine', () => {
     });
   });
 
+  /*
+    Сторож для полей, добавленных 16.08.2026. Раньше «изменилось ли что-нибудь»
+    считалось перечислением полей через ||; забыть там новое поле означало, что
+    правка этого поля молча отвечает «нечего сохранять» И оставляет наряд
+    согласованным с изменённым содержанием. Смена ответственного и опасных
+    факторов — как раз то, ради чего подписи обязаны слетать.
+  */
+  it('treats responsible-person and hazard edits as substantive', () => {
+    const approved = () => permit({
+      state: 'APPROVED',
+      approvals: [{role: 'DISPATCHER', approvedById: 'dispatcher-1', permitVersion: 1, valid: true}],
+    });
+    expect(editPermit(approved(), {producerName: 'Кузнецов И.В.'}))
+      .toMatchObject({state: 'DRAFT', invalidatesApprovals: true});
+    expect(editPermit(approved(), {hazards: ['Открытый огонь']}))
+      .toMatchObject({state: 'DRAFT', invalidatesApprovals: true});
+    expect(editPermit(approved(), {workTypeId: 'work-type-2'}))
+      .toMatchObject({state: 'DRAFT', invalidatesApprovals: true});
+  });
+
   it('rejects no-op edits and terminal-state transitions', () => {
-    expect(() => editPermit(permit({state: 'DRAFT'}), {}, 'mechanic-2')).toThrow(/нечего сохранять/i);
+    expect(() => editPermit(permit({state: 'DRAFT'}), {})).toThrow(/нечего сохранять/i);
     expect(() => transitionPermit('REVOKED', 'submit')).toThrow(/сейчас недоступно/i);
   });
 });

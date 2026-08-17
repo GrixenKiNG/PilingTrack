@@ -13,10 +13,22 @@ import {
 import {runReadinessSerializableTransaction} from '../../src/modules/readiness/infrastructure/tenant-transaction';
 
 const connectionString = process.env.DATABASE_URL_POSTGRES;
-const migrationPath = resolve(
-  process.cwd(),
+/*
+  Одноразовая база собирается не всей цепочкой миграций, а точечно: минимальный
+  набор таблиц выше плюс перечисленные здесь файлы, по порядку.
+
+  Список пришлось расширить 16.08.2026: наряд получил вид работ, наименование,
+  место, опасные факторы, ответственных и снимок правила согласования. Пока
+  здесь стояла одна миграция, тесты падали на `column WorkPermit.workTypeId does
+  not exist` — схема кода ушла вперёд фикстуры. Добавляя миграцию, меняющую
+  наряд, дописывайте её сюда, иначе набор снова разойдётся с реальностью.
+*/
+const migrationPaths = [
   'prisma/migrations/20260730104000_readiness_workflows/migration.sql',
-);
+  'prisma/migrations/20260816120000_permit_work_types/migration.sql',
+  'prisma/migrations/20260816130000_permit_form_fields/migration.sql',
+  'prisma/migrations/20260816150000_permit_approval_rules/migration.sql',
+].map((path) => resolve(process.cwd(), path));
 
 type DbError = {code?: string; meta?: {code?: string}};
 
@@ -59,11 +71,26 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
     risk?: 'NORMAL' | 'ELEVATED';
     version?: number;
   }) => {
+    /*
+      Наряд заводится полным: наименование, место и производитель работ теперь
+      обязательны по валидации содержания. Без них правка наряда (даже правка
+      одного описания) отвергалась бы на «Наименование работ: от 3 до 200
+      символов» — тест ловил бы не гонку, ради которой написан, а незаполненную
+      фикстуру.
+
+      requiredApprovals задаётся явно: у колонки пустое значение по умолчанию, а
+      пустой список означает «согласующие не настроены» и делает наряд
+      несогласуемым. Здесь нужно прежнее поведение обычных работ.
+    */
     await testDb.query(`
       INSERT INTO "WorkPermit"
-        ("id", "tenantId", "equipmentId", "risk", "state", "scope", "validFrom", "validTo",
-         "timezone", "authorId", "lastEditedById", "version", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, 'Работы на площадке 7А', NOW(), NOW() + INTERVAL '1 day',
+        ("id", "tenantId", "equipmentId", "workTypeId", "risk", "state", "title", "scope",
+         "location", "producerName", "requiredApprovals", "allowAuthorApproval",
+         "validFrom", "validTo", "timezone", "authorId", "lastEditedById", "version", "updatedAt")
+      VALUES ($1, $2, $3, 'work-type-a', $4, $5, 'Осмотр и мелкий ремонт',
+              'Работы на площадке 7А', 'Площадка 7А', 'Смирнов А.В.',
+              ARRAY['DISPATCHER']::"WorkPermitApprovalRole"[], TRUE,
+              NOW(), NOW() + INTERVAL '1 day',
               'Europe/Moscow', $6, $6, $7, NOW())
     `, [input.id, tenantA, equipmentA, input.risk ?? 'NORMAL', input.state ?? 'PENDING_APPROVAL', mechanicA,
       input.version ?? 1]);
@@ -179,7 +206,24 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
         ('equipment-a', 'tenant-a'), ('equipment-b', 'tenant-b');
       INSERT INTO "TenantSettings" ("id", "tenantId") VALUES ('settings-a', 'tenant-a'), ('settings-b', 'tenant-b');
     `);
-    await testDb.query(await readFile(migrationPath, 'utf8'));
+    for (const path of migrationPaths) {
+      await testDb.query(await readFile(path, 'utf8'));
+    }
+    /*
+      Эталонный вид работ с известным идентификатором. Миграция справочника
+      засевает шесть штук со случайными идентификаторами — по ним нельзя
+      сослаться из фикстуры. Правило согласования здесь повторяет прежнее
+      поведение обычных работ: одна подпись диспетчера, автору можно.
+    */
+    await testDb.query(`
+      INSERT INTO "PermitWorkType"
+        ("id", "tenantId", "name", "normalizedName", "requiredApprovals", "allowAuthorApproval", "updatedAt")
+      VALUES
+        ('work-type-a', 'tenant-a', 'Тестовые работы', 'тестовые работы',
+         ARRAY['DISPATCHER']::"WorkPermitApprovalRole"[], TRUE, NOW()),
+        ('work-type-b', 'tenant-b', 'Тестовые работы', 'тестовые работы',
+         ARRAY['DISPATCHER']::"WorkPermitApprovalRole"[], TRUE, NOW())
+    `);
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: testConnectionString, max: 30})});
     await prisma.$connect();
   }, 30_000);

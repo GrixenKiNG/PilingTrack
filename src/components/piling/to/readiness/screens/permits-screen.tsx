@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertCircle, CheckCircle2, Search } from '@/components/piling/icons/unified-icons';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
@@ -11,10 +11,12 @@ import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
 import { formatDateInTimezone, formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
 import { PERMIT_STATE_LABEL } from '../readiness-labels';
 import { handoverRoleLabel } from '../handover-journal';
 import type { WorkPermitDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
+import { PermitForm } from '../forms/permit-form';
 import { ProcessRoleStrip, RefKpi, commandFailure, downloadReadinessExport } from './shared';
 import type { ReferenceUiProps } from './types';
 
@@ -35,12 +37,41 @@ function EvidenceState({ state }: { state: string }) {
 }
 
 export function PermitsScreen(props: ReferenceUiProps) {
+  /*
+    Оформление наряда — полноэкранная форма, а не диалог (макет владельца от
+    16.08.2026). Режим живёт состоянием этого экрана, а не отдельным маршрутом:
+    модуль готовности — вкладочная оболочка, и новый адрес пришлось бы
+    протаскивать через всю навигацию ради одной формы.
+  */
+  const [composing, setComposing] = useState(false);
   const [permitQuery, setPermitQuery] = useState('');
   const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL'>('ALL');
-  const [command, setCommand] = useState<{kind: 'create'} | {kind: 'action'; permit: WorkPermitDto; action: 'submit' | 'approve' | 'revoke'} | null>(null);
+  /*
+    Диалог остался только для решений по существующему наряду: отправить,
+    согласовать, отозвать. Создание переехало в полноэкранную форму — прежнее
+    окошко умещало весь наряд в одно поле «состав и границы работ», риск и срок
+    жизни, чего для наряда-допуска мало.
+  */
+  const [command, setCommand] = useState<{permit: WorkPermitDto; action: 'submit' | 'approve' | 'revoke'} | null>(null);
   const [commandText, setCommandText] = useState('');
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
+  // Сроки документов экипажей: те же данные, что во вкладке «Документы».
+  const [documents, setDocuments] = useState<{expired: number; expiring: number} | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void authFetch('/api/user-documents/control')
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = await response.json() as {expired?: number; expiring?: number};
+        // Право на этот список есть не у всех, кому открыт экран нарядов —
+        // отказ оставляет плитку в состоянии «не загружено», а не врёт «в порядке».
+        if (!cancelled) setDocuments({expired: body.expired ?? 0, expiring: body.expiring ?? 0});
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
+
   const active = props.permits.filter((item) => item.state === 'APPROVED').length;
   const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
   const pending = props.permits.filter((item) => item.state === 'PENDING_APPROVAL').length;
@@ -77,30 +108,8 @@ export function PermitsScreen(props: ReferenceUiProps) {
     const query = permitQuery.trim().toLocaleLowerCase('ru-RU');
     return !query || permit.id.toLocaleLowerCase('ru-RU').includes(query) || equipmentName.toLocaleLowerCase('ru-RU').includes(query) || permit.scope.toLocaleLowerCase('ru-RU').includes(query);
   });
-  const createPermit = async (confirmed = false) => {
-    if (!props.selectedId || !props.bootstrap?.capabilities.entities.permit.edit) return;
-    if (!confirmed) { setCommand({kind: 'create'}); setCommandText(''); setCommandError(null); return; }
-    if (!commandText.trim()) { setCommandError('Укажите состав и границы работ.'); return; }
-    setCommandPending(true);
-    const validFrom = new Date();
-    const validTo = new Date(validFrom.getTime() + 12 * 3_600_000);
-    const response = await authFetch('/api/readiness/work-permits', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'idempotency-key': crypto.randomUUID(),
-        ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
-      },
-      body: JSON.stringify({ equipmentId: props.selectedId, shiftId: null, risk: props.filters.risk ?? 'NORMAL', scope: commandText.trim(), validFrom: validFrom.toISOString(), validTo: validTo.toISOString() }),
-    });
-    setCommandPending(false);
-    if (!response.ok) { setCommandError(await commandFailure(response)); if (response.status === 409) props.onRetry(); return; }
-    toast.success('Наряд создан');
-    setCommand(null);
-    props.onRetry();
-  };
   const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
-    if (!confirmed) { setCommand({kind: 'action', permit, action}); setCommandText(''); setCommandError(null); return; }
+    if (!confirmed) { setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }
     if (action === 'revoke' && !commandText.trim()) { setCommandError('Укажите причину отзыва наряда.'); return; }
     setCommandPending(true);
     const response = await authFetch(`/api/readiness/work-permits/${permit.id}/${action}`, {
@@ -125,9 +134,25 @@ export function PermitsScreen(props: ReferenceUiProps) {
     props.onRetry();
   };
 
+  if (composing) {
+    return (
+      <PermitForm
+        equipment={props.equipment}
+        fleetCards={props.fleetCards}
+        selectedEquipmentId={props.selectedId}
+        bootstrap={props.bootstrap}
+        onCancel={() => setComposing(false)}
+        onCreated={() => { setComposing(false); props.onRetry(); }}
+      />
+    );
+  }
+
   return (
     <>
-      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => void downloadReadinessExport('permits', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button><Button type="button" disabled={!props.selectedId || !props.bootstrap?.capabilities.entities.permit.edit} onClick={() => void createPermit()} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
+      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => void downloadReadinessExport('permits', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button>{/* Установку выбирают в самой форме, поэтому кнопка больше не ждёт
+                выделенной строки в списке — раньше она была недоступна, пока
+                пользователь не догадается кликнуть установку. */}
+            <Button type="button" disabled={!props.bootstrap?.capabilities.entities.permit.edit} onClick={() => setComposing(true)} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="documents" label="Всего нарядов" tone="info" value={props.permits.length} />
         <RefKpi icon="accepted" label="Действуют" tone="success" value={active} />
@@ -165,9 +190,27 @@ export function PermitsScreen(props: ReferenceUiProps) {
           <span className="text-xs text-muted-foreground">{equipmentWithApprovedPermit} из {props.equipment.length} установок с действующим нарядом</span></div>
         <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
           {[
-            { title: 'Люди', icon: 'operator' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.operator) ? 'pass' : 'missing', lines: [`Экипажей: ${props.crews.filter((crew) => crew.isActive).length}`, 'Удостоверения проверяются'] },
+            // Плитка обещала «Удостоверения проверяются» и ничего не проверяла.
+            // Контроль сроков уже есть (`/api/user-documents/control`) — берём
+            // его, а не подпись о намерении.
+            {
+              title: 'Люди',
+              icon: 'operator' as PilingIconName,
+              state: documents === null ? 'missing'
+                : documents.expired > 0 ? 'block'
+                  : documents.expiring > 0 ? 'warning' : 'pass',
+              lines: [
+                `Экипажей: ${props.crews.filter((crew) => crew.isActive).length}`,
+                documents === null ? 'Сроки документов не загружены'
+                  : documents.expired > 0 ? `Просрочены документы: ${documents.expired}`
+                    : documents.expiring > 0 ? `Истекают: ${documents.expiring}`
+                      : 'Документы действуют',
+              ],
+            },
             { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : 'pass', lines: [`Ограничений: ${blocked}`, `Осмотрено: ${inspectedCount} из ${props.equipment.length}`] },
-            { title: 'Место работ', icon: 'site' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.site) ? 'pass' : 'missing', lines: [`Объектов: ${new Set(props.crews.flatMap((crew) => crew.site?.id ? [crew.site.id] : [])).size}`, 'Схема требует подтверждения'] },
+            { title: 'Место работ', icon: 'site' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.site) ? 'pass' : 'missing', lines: [`Объектов: ${new Set(props.crews.flatMap((crew) => crew.site?.id ? [crew.site.id] : [])).size}`,
+              // Подтверждения схемы площадки в системе нет — не делаем вид, что есть.
+              `Экипажей без объекта: ${props.crews.filter((crew) => crew.isActive && !crew.site).length}`] },
             { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : 'pass', lines: [`Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
           ].map((item) => (
             <article key={item.title} className="rounded-lg border border-border p-2">
@@ -188,7 +231,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
               const current = props.currentReadiness.find((entry) => entry.equipmentId === permit.equipmentId);
               return (
                 <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', index === 0 && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
-                  <span className="font-bold">НД-{permit.id.slice(-8).toUpperCase()}</span><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= 85 ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= 85 ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
+                  <span className="font-bold">НД-{permit.id.slice(-8).toUpperCase()}</span><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
                 </div>
               );
             })}
@@ -293,23 +336,39 @@ export function PermitsScreen(props: ReferenceUiProps) {
           </div>
         </aside>
       </div>
+      {/*
+        Полоса ролей описывает то, что действительно умеет код. Раньше первым
+        стоял «Мастер: формирует условия, проверяет экипаж, прикладывает
+        документы» — а у роли FOREMAN нет права `readiness.permit.edit` вовсе,
+        и этапа «проверка мастером» в жизненном цикле наряда не существует.
+        Реальный цикл: черновик → на согласовании → согласован, и подписи
+        лежат в approvals[].
+      */}
       <ProcessRoleStrip
-        ariaLabel="Роли согласования наряда-допуска"
+        ariaLabel="Кто что делает с нарядом-допуском"
         roles={[
-          { label: 'Мастер', icon: 'operator', tasks: ['Формирует условия', 'Проверяет экипаж и технику', 'Прикладывает документы'], tone: 'green' },
-          { label: 'Инженер ОТ', icon: 'inspection', tasks: ['Проверяет безопасность', 'Оценивает риски', 'Фиксирует замечания'], tone: 'blue' },
-          { label: 'Диспетчер', icon: 'crew', tasks: ['Проверяет условия', 'Подтверждает допуск', 'Разрешает начало работ'], tone: 'orange' },
+          { label: 'Инженер ОТ или механик', icon: 'inspection', tasks: ['Создаёт наряд-допуск', 'Описывает состав и границы работ', 'Отправляет на согласование'], tone: 'green' },
+          { label: 'Диспетчер', icon: 'crew', tasks: ['Проверяет условия', 'Согласовывает наряд', 'Отказ фиксируется в журнале'], tone: 'blue' },
+          { label: 'Администратор', icon: 'accepted', tasks: ['Второе решение при повышенном риске', 'Свой наряд согласовать нельзя', 'Отзыв прекращает действие'], tone: 'orange' },
         ]}
       />
       <CommandDialog
         open={command !== null}
         pending={commandPending}
-        title={command?.kind === 'create' ? 'Создать наряд-допуск' : command?.action === 'submit' ? 'Отправить на согласование' : command?.action === 'approve' ? 'Согласовать наряд' : 'Отозвать наряд'}
-        description={command?.kind === 'action' ? `Версия ${command.permit.version} · риск ${command.permit.risk === 'ELEVATED' ? 'повышенный' : 'обычный'} · ${props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}` : `Срок действия: 12 часов · ${props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}`}
+        title={command?.action === 'submit' ? 'Отправить на согласование' : command?.action === 'approve' ? 'Согласовать наряд' : 'Отозвать наряд'}
+        description={command ? `Версия ${command.permit.version} · риск ${command.permit.risk === 'ELEVATED' ? 'повышенный' : 'обычный'} · ${props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}` : ''}
         onClose={() => { setCommand(null); setCommandText(''); setCommandError(null); }}
-        footer={<Button type="button" disabled={commandPending || ((command?.kind === 'create' || (command?.kind === 'action' && command.action === 'revoke')) && !commandText.trim())} onClick={() => command?.kind === 'create' ? void createPermit(true) : command?.kind === 'action' ? void runPermitAction(command.permit, command.action, true) : undefined} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
+        footer={<Button type="button" disabled={commandPending || (command?.action === 'revoke' && !commandText.trim())} onClick={() => command ? void runPermitAction(command.permit, command.action, true) : undefined} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
       >
-        <div className="space-y-3 text-sm"><p>{command?.kind === 'create' ? 'Наряд будет создан как черновик. Для повышенного риска потребуются решения диспетчера и администратора.' : command?.action === 'approve' ? 'Решение попадёт в доказательный журнал и вызовет новый снимок готовности.' : command?.action === 'submit' ? 'После отправки содержание нельзя менять без сброса согласований.' : 'Отзыв немедленно прекращает действие наряда и может заблокировать запуск смены.'}</p>{(command?.kind === 'create' || (command?.kind === 'action' && command.action === 'revoke')) && <label className="grid gap-1 font-medium">{command.kind === 'create' ? 'Состав и границы работ' : 'Причина отзыва'}<textarea value={commandText} onChange={(event) => setCommandText(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" /></label>}{commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}</div>
+        <div className="space-y-3 text-sm">
+          <p>{command?.action === 'approve' ? 'Решение попадёт в доказательный журнал и вызовет новый снимок готовности.' : command?.action === 'submit' ? 'После отправки содержание нельзя менять без сброса согласований.' : 'Отзыв немедленно прекращает действие наряда и может заблокировать запуск смены.'}</p>
+          {command?.action === 'revoke' && (
+            <label className="grid gap-1 font-medium">Причина отзыва
+              <textarea value={commandText} onChange={(event) => setCommandText(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" />
+            </label>
+          )}
+          {commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}
+        </div>
       </CommandDialog>
     </>
   );

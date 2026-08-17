@@ -3,11 +3,29 @@ import type {
   WorkPermitApprovalRecord,
   WorkPermitApprovalRole,
   WorkPermitRecord,
-  WorkPermitRisk,
 } from './types';
 
-export function requiredApprovalRoles(risk: WorkPermitRisk): readonly WorkPermitApprovalRole[] {
-  return risk === 'NORMAL' ? ['DISPATCHER'] : ['DISPATCHER', 'ADMIN'];
+/**
+ * Действующее правило согласования наряда.
+ *
+ * Раньше оно выводилось из риска прямо здесь: обычный — диспетчер, повышенный —
+ * диспетчер и админ. Владелец 16.08.2026 указал, что это не решение
+ * разработчика: нормативы у каждой организации свои, и сколько подписей требуют
+ * такие-то работы, знает админ, а не код. Требование переехало в справочник
+ * видов работ, а наряд хранит его СНИМОК на момент оформления.
+ *
+ * Пустой список — не «подписи не нужны», а недонастроенный вид работ. Считаем
+ * такой наряд несогласуемым: отказ безопаснее, чем наряд, который согласуется
+ * сам собой, не собрав ни одной подписи.
+ */
+function effectiveApprovalRule(permit: WorkPermitRecord): {
+  roles: readonly WorkPermitApprovalRole[]; allowAuthorApproval: boolean;
+} {
+  return {roles: permit.requiredApprovals, allowAuthorApproval: permit.allowAuthorApproval};
+}
+
+export function requiredApprovalRoles(permit: WorkPermitRecord): readonly WorkPermitApprovalRole[] {
+  return effectiveApprovalRule(permit).roles;
 }
 
 export function assertCanApprovePermit(input: {
@@ -16,46 +34,55 @@ export function assertCanApprovePermit(input: {
   role: string;
   approvals: WorkPermitApprovalRecord[];
 }): WorkPermitApprovalRole {
+  const {roles, allowAuthorApproval} = effectiveApprovalRule(input.permit);
+  if (roles.length === 0) {
+    throw new ReadinessCommandError(
+      'VALIDATION_ERROR', 422,
+      'Для этого вида работ не заданы согласующие. Настройте их в справочнике видов работ',
+    );
+  }
   const role = input.role === 'DISPATCHER' || input.role === 'ADMIN' ? input.role : null;
-  if (!role || !requiredApprovalRoles(input.permit.risk).includes(role)) {
+  if (!role || !roles.includes(role)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'У вас нет полномочий согласовать этот наряд');
   }
-  // «Второй глаз» требуется на работах повышенного риска — там наряд обязаны
-  // подписать двое разных людей (см. isApprovalComplete).
-  //
-  // На обычных работах запрет снят намеренно. В ОРИОНе наряды заводит
-  // администратор, замещая механика или инженера ОТ, и согласовать их, кроме
-  // него, было некому: у диспетчера нет права редактировать наряд, а у автора
-  // не было права подписать. Контур вставал целиком. Кто подписал и от чьего
-  // имени — видно в цепочке аудита, поэтому след не теряется.
+  // Может ли автор подписать собственный наряд — решает админ на виде работ.
+  // Раньше это было зашито: на повышенном риске нельзя, на обычном можно.
+  // Обе половины этого правила остались значениями по умолчанию, но теперь их
+  // видно и можно изменить, а не вычитывать из исходников.
   if (
-    input.permit.risk !== 'NORMAL'
+    !allowAuthorApproval
     && (input.actorId === input.permit.authorId || input.actorId === input.permit.lastEditedById)
   ) {
-    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Наряд повышенного риска согласует не его автор');
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Этот наряд согласует не его автор');
   }
   const current = input.approvals.filter((item) =>
     item.valid && item.permitVersion === input.permit.version);
   if (current.some((item) => item.role === role)) {
     throw new ReadinessCommandError('VERSION_CONFLICT', 409, `Решение по этой роли уже принято: ${role}`);
   }
-  if (current.some((item) => item.approvedById === input.actorId)) {
+  // Несколько требуемых подписей — значит несколько РАЗНЫХ людей: иначе «два
+  // согласования» вырождаются в одного человека, дважды нажавшего кнопку.
+  // При одной требуемой подписи ограничение бессмысленно и не применяется.
+  if (roles.length > 1 && current.some((item) => item.approvedById === input.actorId)) {
     throw new ReadinessCommandError(
-      'VALIDATION_ERROR', 422, 'Повышенный риск требует согласования двумя разными людьми',
+      'VALIDATION_ERROR', 422, 'Этот наряд требует согласования разными людьми',
     );
   }
   return role;
 }
 
 export function isApprovalComplete(
-  risk: WorkPermitRisk,
+  permit: WorkPermitRecord,
   approvals: WorkPermitApprovalRecord[],
   version: number,
 ): boolean {
+  const {roles} = effectiveApprovalRule(permit);
+  // Ни одной требуемой роли — наряд не считается согласованным. Пустое
+  // требование это ошибка настройки, а не разрешение.
+  if (roles.length === 0) return false;
   const current = approvals.filter((item) => item.valid && item.permitVersion === version);
-  const roles = new Set(current.map((item) => item.role));
+  const signed = new Set(current.map((item) => item.role));
   const users = new Set(current.map((item) => item.approvedById));
-  const required = requiredApprovalRoles(risk);
-  return required.every((role) => roles.has(role))
-    && (risk === 'NORMAL' || users.size === required.length);
+  return roles.every((role) => signed.has(role))
+    && (roles.length === 1 || users.size >= roles.length);
 }
