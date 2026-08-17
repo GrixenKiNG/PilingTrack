@@ -1555,99 +1555,12 @@ model SiteDailySummary {
 // ============================================================
 // CQRS READ PROJECTIONS — Advanced Read Models
 // ============================================================
-
-// Report-level aggregated stats for fast dashboard queries
-model ReportStats {
-  id        String  @id @default(cuid())
-  reportId  String  @unique
-  siteId    String
-  userId    String
-  tenantId  String?
-  date      String // YYYY-MM-DD
-  shiftType String // DAY | NIGHT
-
-  // Aggregated metrics
-  totalPiles     Int   @default(0)
-  totalDrilling  Float @default(0)
-  totalDowntime  Float @default(0)
-  downtimeCount  Int   @default(0)
-  pileGradeCount Int   @default(0)
-  drillingCount  Int   @default(0)
-
-  // Performance metrics
-  pilesPerHour    Float? // Computed from shift duration
-  drillingPerHour Float?
-
-  // Downtime breakdown (top reason)
-  topDowntimeReasonId String?
-  topDowntimeDuration Float?
-
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  @@index([siteId, date])
-  @@index([userId, date])
-  @@index([tenantId])
-  @@index([date])
-}
-
-// Operator performance — daily aggregation per user
-model OperatorPerformance {
-  id       String  @id @default(cuid())
-  userId   String
-  userName String // Denormalized
-  siteId   String
-  siteName String // Denormalized
-  tenantId String?
-  date     String // YYYY-MM-DD
-
-  // Production metrics
-  totalPiles    Int   @default(0)
-  totalDrilling Float @default(0)
-  totalDowntime Float @default(0)
-  reportCount   Int   @default(0)
-
-  // Efficiency
-  avgPilesPerReport    Float?
-  avgDrillingPerReport Float?
-  avgDowntimePerReport Float?
-
-  // Downtime ratio
-  downtimeRatio Float @default(0) // downtime / shift duration
-
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  @@unique([userId, siteId, date])
-  @@index([userId, date])
-  @@index([siteId, date])
-  @@index([tenantId])
-}
-
-// Downtime summary — aggregated by reason, site, date
-model DowntimeSummary {
-  id         String  @id @default(cuid())
-  siteId     String
-  date       String // YYYY-MM-DD
-  reasonId   String
-  reasonName String // Denormalized
-  tenantId   String?
-
-  totalDuration   Float @default(0)
-  occurrenceCount Int   @default(0)
-  affectedReports Int   @default(0)
-
-  // Percentage of total site downtime for that day
-  percentageOfTotal Float @default(0)
-
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  @@unique([siteId, date, reasonId])
-  @@index([siteId, date])
-  @@index([reasonId])
-  @@index([tenantId])
-}
+//
+// Здесь до 17.08.2026 жили ReportStats, OperatorPerformance и
+// DowntimeSummary. Их обработчики удалены 17.08 как непрочитанные — ни одна
+// витрина к ним не обращалась, а каждое сохранение отчёта делало три upsert-а
+// впустую. Таблицы снесены миграцией 20260817220000_drop_unread_projections.
+// Данные не потеряны: все три выводятся из Report, расчёт лежит в истории git.
 
 // Site weekly summary — for trend charts
 model SiteWeeklyTrend {
