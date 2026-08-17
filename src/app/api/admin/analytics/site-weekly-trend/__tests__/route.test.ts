@@ -47,7 +47,7 @@ describe('GET /api/admin/analytics/site-weekly-trend', () => {
   });
 
   it('clamps weeks to [1, 52]', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN' }, error: null });
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'orion' }, error: null });
 
     await GET(req('weeks=999'));
     // No siteId → take = weeks * 10 (cross-site rows). Clamped weeks = 52.
@@ -64,19 +64,31 @@ describe('GET /api/admin/analytics/site-weekly-trend', () => {
   });
 
   it('orders rows by weekStart desc and applies siteId filter only when concrete', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN' }, error: null });
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'orion' }, error: null });
 
     await GET(req('weeks=4&siteId=all'));
     expect(findManyMock.mock.calls[0][0]).toMatchObject({
-      where: {},
+      where: { tenantId: 'orion' },
       orderBy: { weekStart: 'desc' },
     });
 
     findManyMock.mockClear();
     await GET(req('weeks=4&siteId=site_X'));
     expect(findManyMock.mock.calls[0][0]).toMatchObject({
-      where: { siteId: 'site_X' },
+      where: { tenantId: 'orion', siteId: 'site_X' },
       orderBy: { weekStart: 'desc' },
     });
+  });
+
+  // Раньше маршрут читал SiteWeeklyTrend вообще без tenantId: тренды всех
+  // организаций складывались в один график. Тест закрепляет отказ, а не
+  // выборку по всем — «нет организации» не должно означать «показать всё».
+  it('отказывает, если организация не определена, и в базу не ходит', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: null }, error: null });
+
+    const res = await GET(req('weeks=4'));
+
+    expect(res.status).toBe(400);
+    expect(findManyMock).not.toHaveBeenCalled();
   });
 });
