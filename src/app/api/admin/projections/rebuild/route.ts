@@ -8,7 +8,10 @@
  *   - Suspect projection drift after a manual DB edit.
  *   - First-time bring-up after restoring from a dump.
  *
- * Query: ?name=operator-performance | site-daily | site-weekly | all (default)
+ * Query: ?name=site-daily | site-weekly | report-analytics | all (default)
+ *
+ * `operator-performance` и `report-stats` убраны 17.08.2026 вместе с самими
+ * проекциями — их не читала ни одна витрина.
  *
  * Response: { results: [{ name, rowsWritten, durationMs }, ...] }
  */
@@ -17,7 +20,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
 import {
-  rebuildOperatorPerformance,
+  rebuildReportAnalytics,
   rebuildSiteDailySummary,
   rebuildSiteWeeklyTrend,
   rebuildAll,
@@ -27,7 +30,7 @@ import {
 
 export const runtime = 'nodejs';
 
-const VALID: ProjectionName[] = ['operator-performance', 'site-daily', 'site-weekly', 'all'];
+const VALID: ProjectionName[] = ['site-daily', 'site-weekly', 'report-analytics', 'all'];
 
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -47,8 +50,8 @@ export const POST = withMutation(
     let results: RebuildResult[];
     if (nameParam === 'all') {
       results = await rebuildAll();
-    } else if (nameParam === 'operator-performance') {
-      results = [await rebuildOperatorPerformance()];
+    } else if (nameParam === 'report-analytics') {
+      results = [await rebuildReportAnalytics()];
     } else if (nameParam === 'site-daily') {
       results = [await rebuildSiteDailySummary()];
     } else {

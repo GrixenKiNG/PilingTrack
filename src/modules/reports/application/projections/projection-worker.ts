@@ -15,16 +15,8 @@ import {
 } from '@/modules/reports/domain';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { projectOutboxEvents } from '@/services/reports/outbox-publisher';
-import {
-  projectDowntimeSummary,
-  projectOperatorPerformance,
-  projectReportStats,
-  projectWeeklyTrend,
-} from './projection-handlers';
+import { projectWeeklyTrend } from './projection-handlers';
 import {consumeReadinessProjectionEvent} from '@/modules/readiness/application/projection/consumer';
-
-// Re-export: callers (rebuild.ts, reports/delete route) import it from here.
-export { projectOperatorPerformanceFull } from './projection-handlers';
 
 function shouldLogProjectionLifecycle(): boolean {
   return process.env.LOG_WORKER_LIFECYCLE === 'true';
@@ -101,8 +93,8 @@ async function enrichReportEvent(
       siteId: event.siteId ?? report.siteId,
       userId: event.userId ?? report.userId,
       tenantId: event.tenantId ?? report.tenantId ?? undefined,
-      // Дата смены кладётся в data, чтобы getProjectionDate нашла её сама и
-      // сигнатуры обработчиков не менялись.
+      // Дата смены докладывается в data, если её там не было: обработчики
+      // обязаны считать по рабочей дате отчёта, а не по дню отправки события.
       data: eventDate ? event.data : { ...event.data, date: report.date },
     },
     reportDate: eventDate ?? report.date,
@@ -124,12 +116,11 @@ async function projectEvent(event: ReportDomainEvent) {
   const { event: enrichedEvent, reportDate } = await enrichReportEvent(normalizedEvent);
 
   try {
-    await Promise.all([
-      projectReportStats(enrichedEvent),
-      projectOperatorPerformance(enrichedEvent),
-      projectDowntimeSummary(enrichedEvent),
-    ]);
-
+    // Раньше здесь тремя параллельными upsert-ами обновлялись ReportStats,
+    // OperatorPerformance и DowntimeSummary — каждый со своим запросом отчёта
+    // со всеми дочерними строками. Ни одну из трёх проекций не читала ни одна
+    // витрина, так что работа на каждом событии делалась впустую. Удалено
+    // 17.08.2026 вместе с обработчиками.
     if (
       enrichedEvent.type.startsWith('Report') ||
       enrichedEvent.type.startsWith('Pile') ||
@@ -142,8 +133,7 @@ async function projectEvent(event: ReportDomainEvent) {
   } catch (error) {
     // Re-throw so consumeOutboxEvents can drive retry / DLQ. Swallowing
     // here used to mark every event as `projected=true` even when the
-    // upsert failed, hiding silent data loss in ReportStats /
-    // OperatorPerformance / DowntimeSummary / SiteWeeklyTrend the same
+    // upsert failed, hiding silent data loss in SiteWeeklyTrend the same
     // way ReportAnalytics was hidden until the 2026-05-20 incident.
     logger.error('Projection failed', error, {
       eventType: normalizedEvent.type,

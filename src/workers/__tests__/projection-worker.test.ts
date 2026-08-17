@@ -3,9 +3,7 @@
  *
  * Tests CQRS read model projections:
  * - Event routing to handlers
- * - ReportStats projection
- * - OperatorPerformance projection
- * - DowntimeSummary projection
+ * - SiteWeeklyTrend projection (единственная, что живёт на событийном пути)
  * - Staleness detection
  */
 
@@ -30,9 +28,6 @@ vi.mock('@/lib/db', () => ({
       findUnique: mocks.mockReportFindUnique,
       findMany: mocks.mockReportFindMany,
     },
-    reportStats: { upsert: mocks.mockUpsert },
-    operatorPerformance: { upsert: mocks.mockUpsert },
-    downtimeSummary: { upsert: mocks.mockUpsert },
     site: { findUnique: mocks.mockSiteFindUnique },
     siteDailySummary: { upsert: mocks.mockUpsert, findMany: mocks.mockDailyFindMany },
     siteWeeklyTrend: { upsert: mocks.mockWeeklyUpsert },
@@ -146,8 +141,11 @@ describe('Projection Worker', () => {
       const worker = startProjectionWorker(1000);
       await vi.advanceTimersByTimeAsync(1000);
 
-      // Projections should be upserted
-      expect(mocks.mockUpsert).toHaveBeenCalled();
+      // После 17.08.2026 живая проекция на этом пути одна — недельный тренд.
+      // Раньше здесь проверялся общий mockUpsert, за которым стояли ещё
+      // ReportStats, OperatorPerformance и DowntimeSummary; их удалили вместе
+      // с обработчиками, потому что читателей у них не было.
+      expect(mocks.mockWeeklyUpsert).toHaveBeenCalled();
 
       worker.stop();
     });
@@ -293,108 +291,9 @@ describe('Projection Worker', () => {
     });
   });
 
-  describe('OperatorPerformance projection', () => {
-    it('aggregates by the report work date, not the event submission day', async () => {
-      const { startProjectionWorker } = await import(
-        '@/modules/reports/application/projections/projection-worker'
-      );
-
-      // Operator submits today a report for an earlier shift.
-      const workDate = '2026-05-06';
-      const submittedAt = '2026-05-25T08:00:00.000Z';
-
-      const event = {
-        id: 'outbox-1',
-        type: 'ReportSubmitted',
-        aggregateId: 'report-1',
-        aggregateType: 'Report',
-        payload: createEvent({ type: 'ReportSubmitted', occurredAt: submittedAt }),
-        published: false,
-        attempts: 0,
-        occurredAt: new Date(submittedAt),
-        createdAt: new Date(submittedAt),
-      };
-
-      mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
-      mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
-      mocks.mockOutboxUpdate.mockResolvedValue({});
-      mocks.mockReportFindUnique.mockResolvedValue({
-        id: 'report-1',
-        reportId: 'report-1',
-        siteId: 'site-1',
-        userId: 'user-1',
-        status: 'submitted',
-        date: workDate,
-        piles: [],
-        drillings: [],
-        downtimes: [],
-      });
-      mocks.mockReportFindMany.mockResolvedValue([]);
-
-      const worker = startProjectionWorker(500);
-      await vi.advanceTimersByTimeAsync(500);
-
-      // projectOperatorPerformanceFull must query reports for the WORK date.
-      // Before the fix it used occurredAt's date (2026-05-25) and found nothing.
-      expect(mocks.mockReportFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ date: workDate }),
-        })
-      );
-      expect(mocks.mockReportFindMany).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ date: '2026-05-25' }),
-        })
-      );
-
-      worker.stop();
-    });
-  });
-
-  describe('Downtime projection', () => {
-    it('computes top downtime reason from report downtimes', async () => {
-      const { startProjectionWorker } = await import(
-        '@/modules/reports/application/projections/projection-worker'
-      );
-
-      const event = {
-        id: 'outbox-1',
-        type: 'ReportUpdated',
-        aggregateId: 'report-1',
-        aggregateType: 'Report',
-        payload: createEvent({ type: 'ReportUpdated' }),
-        published: false,
-        attempts: 0,
-        occurredAt: new Date(),
-        createdAt: new Date(),
-      };
-
-      mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
-      mocks.mockOutboxFindUnique.mockResolvedValue({ published: false });
-      mocks.mockOutboxUpdate.mockResolvedValue({});
-      mocks.mockReportFindUnique.mockResolvedValueOnce({
-        id: 'report-1',
-        reportId: 'report-1',
-        siteId: 'site-1',
-        userId: 'user-1',
-        status: 'submitted',
-        date: '2026-04-09',
-        piles: [{ id: 'p1', count: 5 }],
-        drillings: [{ id: 'd1', meters: 10 }],
-        downtimes: [
-          { id: 'dt1', reasonId: 'reason-1', duration: 30 },
-          { id: 'dt2', reasonId: 'reason-1', duration: 20 },
-          { id: 'dt3', reasonId: 'reason-2', duration: 10 },
-        ],
-      });
-
-      const worker = startProjectionWorker(500);
-      await vi.advanceTimersByTimeAsync(500);
-
-      // DowntimeSummary should be upserted with reason-1 as top
-      expect(mocks.mockUpsert).toHaveBeenCalled();
-
-      worker.stop();
-    });
-  });
+  // Блоки «OperatorPerformance projection» и «Downtime projection» удалены
+  // 17.08.2026 вместе с самими проекциями: они проверяли поведение, которого
+  // больше нет. Их предмет — агрегация по рабочей дате отчёта и вычисление
+  // главной причины простоя — сохранён в истории git на случай, если экран
+  // производительности когда-нибудь понадобится.
 });

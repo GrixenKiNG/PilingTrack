@@ -56,26 +56,19 @@ export const DELETE = withMutation(
 
     // Recompute derived projections so deleting a report doesn't leave
     // orphaned analytics rows (ReportAnalytics is keyed per-report;
-    // SiteDailySummary / OperatorPerformance rebuild from the remaining
-    // reports for this site+date, dropping the row if it was the last).
+    // SiteDailySummary rebuilds from the remaining reports for this
+    // site+date, dropping the row if it was the last).
+    //
+    // Пересчёт OperatorPerformance отсюда убран 17.08.2026 вместе с самой
+    // проекцией: её не читала ни одна витрина.
+    //
     // Best-effort: the report is already gone, and the nightly rebuild is a
     // backstop — a recompute failure must not turn a successful delete into
     // a 500.
     try {
-      const [{ recomputeSiteDailySummary }, { projectOperatorPerformanceFull }] = await Promise.all([
-        import('@/services/reports/event-handlers'),
-        import('@/modules/reports/application/projections/projection-worker'),
-      ]);
+      const { recomputeSiteDailySummary } = await import('@/services/reports/event-handlers');
       await db.reportAnalytics.deleteMany({ where: { reportId: parsed.data.reportId } });
       await recomputeSiteDailySummary(report.siteId, report.date);
-      // Drop the operator row first, then rebuild it from whatever reports
-      // remain for this operator+site+day — projectOperatorPerformanceFull
-      // no-ops on an empty set, so deleting up-front is what clears the row
-      // when the last report for the day is the one being removed.
-      await db.operatorPerformance.deleteMany({
-        where: { userId: report.userId, siteId: report.siteId, date: report.date },
-      });
-      await projectOperatorPerformanceFull(report.userId, report.siteId, report.date);
     } catch (err) {
       const { logger } = await import('@/lib/logger');
       logger.error('Report delete: projection recompute failed', err, {

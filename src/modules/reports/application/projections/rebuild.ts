@@ -9,40 +9,19 @@
  * aggregate from the Report table. Safe to re-run.
  */
 import { db } from '@/lib/db';
-import { projectOperatorPerformanceFull } from './projection-worker';
 
+// 'operator-performance' и 'report-stats' убраны 17.08.2026 вместе с самими
+// проекциями: их никто не читал. Пересобирать нечего.
 export type ProjectionName =
-  | 'operator-performance'
   | 'site-daily'
   | 'site-weekly'
   | 'report-analytics'
-  | 'report-stats'
   | 'all';
 
 export interface RebuildResult {
   name: ProjectionName;
   rowsWritten: number;
   durationMs: number;
-}
-
-/** Rebuild OperatorPerformance from every Report's (userId, siteId, date) triple. */
-export async function rebuildOperatorPerformance(): Promise<RebuildResult> {
-  const start = Date.now();
-  const reports = await db.report.findMany({
-    select: { userId: true, siteId: true, date: true },
-  });
-  const triples = new Map<string, { userId: string; siteId: string; date: string }>();
-  for (const r of reports) {
-    triples.set(`${r.userId}|${r.siteId}|${r.date}`, r);
-  }
-  for (const t of triples.values()) {
-    await projectOperatorPerformanceFull(t.userId, t.siteId, t.date);
-  }
-  return {
-    name: 'operator-performance',
-    rowsWritten: triples.size,
-    durationMs: Date.now() - start,
-  };
 }
 
 /** Rebuild SiteDailySummary from Report aggregates per (siteId, date). */
@@ -208,81 +187,10 @@ export async function rebuildReportAnalytics(): Promise<RebuildResult> {
   return { name: 'report-analytics', rowsWritten: rows, durationMs: Date.now() - start };
 }
 
-/**
- * Rebuild ReportStats — per-report stats with shift productivity used by
- * analytics dashboards. Mirrors projection-worker.ts:projectReportStats.
- */
-export async function rebuildReportStats(): Promise<RebuildResult> {
-  const start = Date.now();
-  const reports = await db.report.findMany({
-    include: { piles: true, drillings: true, downtimes: true },
-  });
-
-  let rows = 0;
-  for (const r of reports) {
-    if (!r.siteId || !r.userId) continue;
-
-    let topReasonId: string | null = null;
-    let topReasonDuration: number | null = null;
-    if (r.downtimes.length > 0) {
-      const byReason = new Map<string, number>();
-      for (const dt of r.downtimes) byReason.set(dt.reasonId, (byReason.get(dt.reasonId) || 0) + dt.duration);
-      let maxDur = 0;
-      for (const [reasonId, dur] of byReason) if (dur > maxDur) { maxDur = dur; topReasonId = reasonId; topReasonDuration = dur; }
-    }
-
-    let pilesPerHour: number | null = null;
-    let drillingPerHour: number | null = null;
-    if (r.shiftStart && r.shiftEnd) {
-      const [sh, sm] = r.shiftStart.split(':').map(Number);
-      const [eh, em] = r.shiftEnd.split(':').map(Number);
-      let hrs = (eh * 60 + em - sh * 60 - sm) / 60;
-      if (hrs < 0) hrs += 24;
-      if (hrs > 0) {
-        const tp = r.piles.reduce((s, p) => s + p.count, 0);
-        const td = r.drillings.reduce((s, d) => s + d.meters, 0);
-        pilesPerHour = Math.round((tp / hrs) * 100) / 100;
-        drillingPerHour = Math.round((td / hrs) * 100) / 100;
-      }
-    }
-
-    const totalPiles = r.piles.reduce((s, p) => s + p.count, 0);
-    const totalDrilling = r.drillings.reduce((s, d) => s + d.meters, 0);
-    const totalDowntime = r.downtimes.reduce((s, d) => s + d.duration, 0);
-
-    await db.reportStats.upsert({
-      where: { reportId: r.reportId },
-      create: {
-        reportId: r.reportId,
-        siteId: r.siteId, userId: r.userId, tenantId: r.tenantId || null,
-        date: r.date, shiftType: r.shiftType,
-        totalPiles, totalDrilling, totalDowntime,
-        downtimeCount: r.downtimes.length,
-        pileGradeCount: new Set(r.piles.map((p) => p.pileGradeId)).size,
-        drillingCount: r.drillings.length,
-        pilesPerHour, drillingPerHour,
-        topDowntimeReasonId: topReasonId, topDowntimeDuration: topReasonDuration,
-      },
-      update: {
-        totalPiles, totalDrilling, totalDowntime,
-        downtimeCount: r.downtimes.length,
-        pileGradeCount: new Set(r.piles.map((p) => p.pileGradeId)).size,
-        drillingCount: r.drillings.length,
-        pilesPerHour, drillingPerHour,
-        topDowntimeReasonId: topReasonId, topDowntimeDuration: topReasonDuration,
-      },
-    });
-    rows++;
-  }
-  return { name: 'report-stats', rowsWritten: rows, durationMs: Date.now() - start };
-}
-
 /** Rebuild everything (daily must come before weekly — weekly reads from daily). */
 export async function rebuildAll(): Promise<RebuildResult[]> {
   const analytics = await rebuildReportAnalytics();
-  const stats = await rebuildReportStats();
-  const op = await rebuildOperatorPerformance();
   const daily = await rebuildSiteDailySummary();
   const weekly = await rebuildSiteWeeklyTrend();
-  return [analytics, stats, op, daily, weekly];
+  return [analytics, daily, weekly];
 }
