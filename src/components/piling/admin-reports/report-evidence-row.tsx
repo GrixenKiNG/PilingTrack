@@ -7,6 +7,7 @@
 
 import {
   Clock,
+  Download,
   Drill,
   Eye,
   FileText,
@@ -34,10 +35,14 @@ import { shortDate, shiftLabel } from './report-list-format';
 export function ReportsHeader({
   reportWord,
   onPrint,
+  onExport,
+  exporting,
   onCreate,
 }: {
   reportWord: string;
   onPrint: () => void;
+  onExport: () => void;
+  exporting: boolean;
   onCreate: () => void;
 }) {
   return (
@@ -63,6 +68,15 @@ export function ReportsHeader({
         >
           <Printer className="mr-1.5 h-4 w-4" />
           Печать
+        </Button>
+        <Button
+          onClick={onExport}
+          disabled={exporting}
+          variant="outline"
+          className="h-10 border-border bg-card text-foreground"
+        >
+          <Download className="mr-1.5 h-4 w-4" />
+          {exporting ? 'Готовим…' : 'Выгрузить CSV'}
         </Button>
         <Button
           onClick={onCreate}

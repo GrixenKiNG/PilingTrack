@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -54,6 +55,44 @@ export function AdminReports() {
   const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
+  const [exporting, setExporting] = useState(false);
+
+  // Выгрузка CSV. Диапазон дат у /api/reports/export обязателен и ограничен
+  // 92 днями, поэтому без выбранного периода берём последние 30 дней: молча
+  // отдать всю историю эндпоинт всё равно не может, а внятный период понятнее
+  // ошибки «dateFrom and dateTo are required».
+  //
+  // Скачиваем через blob, а не переходом по ссылке: заголовок «Действую как»
+  // ставит authFetch, и при 403 переход увёл бы админа со страницы вместо
+  // сообщения.
+  const handleExport = async () => {
+    const dateTo = periodTo || todayYmd();
+    const dateFrom = periodFrom || shiftYmd(-30);
+    setExporting(true);
+    let objectUrl: string | null = null;
+    try {
+      const params = new URLSearchParams({ dateFrom, dateTo });
+      if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+
+      const response = await authFetch(`/api/reports/export?${params.toString()}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Сервер ответил ${response.status}`);
+      }
+
+      objectUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.csv`;
+      link.click();
+      toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось выгрузить отчёты');
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setExporting(false);
+    }
+  };
   // The preview pane shows the user-selected report, falling back to the first
   // one when nothing is selected (so it's never empty while reports exist).
   const effectivePreview = previewReport ?? reports[0] ?? null;
@@ -163,6 +202,8 @@ export function AdminReports() {
           <ReportsHeader
             reportWord={reportWord}
             onPrint={() => window.print()}
+            onExport={() => { void handleExport(); }}
+            exporting={exporting}
             onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
           />
           <QueryErrorBanner
@@ -178,6 +219,8 @@ export function AdminReports() {
           <ReportsHeader
             reportWord={reportWord}
             onPrint={() => window.print()}
+            onExport={() => { void handleExport(); }}
+            exporting={exporting}
             onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
           />
 
