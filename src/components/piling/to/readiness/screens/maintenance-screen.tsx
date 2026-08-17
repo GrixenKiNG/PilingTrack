@@ -12,14 +12,29 @@ import { formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { PRIORITY_LABEL, STATUS_LABEL, type MaintenancePriority, type MaintenanceStatus } from '@/components/piling/maintenance/maintenance-labels';
 import type { MaintenanceSummary } from '../../readiness-design-views';
+import { DefectsPanel } from './defects-panel';
 import { EquipmentPhoto, RefKpi } from './shared';
 import type { ReferenceUiProps } from './types';
+
+/**
+ * За сколько моточасов до ТО полоса пробега желтеет.
+ *
+ * Это порог показа, а не правило: блокировку даёт перепробег
+ * (`MAINTENANCE_OVERDUE_50H`), а здесь мы лишь заранее подсвечиваем. Значение
+ * равно интервалу ТО-1 — предупреждение появляется примерно за один цикл.
+ */
+const MAINTENANCE_SOON_HOURS = 250;
 
 export function MaintenanceScreen(props: ReferenceUiProps) {
   const [maintenanceFilter, setMaintenanceFilter] = useState<'ALL' | 'CRITICAL' | 'ACTIVE' | 'PLANNED'>('ALL');
   const [maintenanceQuery, setMaintenanceQuery] = useState('');
   const open = props.maintenance.filter((record) => !['DONE', 'CANCELLED'].includes(record.status));
   const critical = open.filter((record) => ['CRITICAL', 'HIGH'].includes(record.priority));
+  // Плитка «Критические дефекты» считала наряды ТО высокого приоритета —
+  // подпись обещала не то, что показывала. Дефекты — отдельная сущность, и
+  // теперь они приходят с сервера.
+  const openDefects = props.defects.filter((defect) => defect.status === 'OPEN' || defect.status === 'IN_WORK');
+  const blockingDefects = openDefects.filter((defect) => defect.severity === 'CRITICAL');
   const planned = open.filter((record) => ['PLANNED', 'ASSIGNED'].includes(record.status));
   const servicePercent = props.equipment.length ? Math.round(((props.equipment.length - critical.length) / props.equipment.length) * 100) : 0;
   const timezone = props.bootstrap?.tenant.timezone;
@@ -73,11 +88,14 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
     <>
       <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance">+ Создать заявку</Link></Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={critical.length} alert={critical.length > 0} />
+        <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={blockingDefects.length} detail={`открытых замечаний: ${openDefects.length}`} alert={blockingDefects.length > 0} />
         <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={todayWork.length} />
         <RefKpi icon="maintenance-due" label="Ближайшие ТО" tone="info" value={planned.length} />
         <RefKpi icon="technical-readiness" label="Готовность сервиса" tone="success" value={`${Math.max(0, servicePercent)}%`} />
       </section>
+      <div className="mt-2">
+        <DefectsPanel {...props} />
+      </div>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'p-3')}>
           <h2 className="font-bold">Заявки и работы</h2>
@@ -118,7 +136,7 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
                 .slice(0, 5)
                 .map(({ item, left }) => {
                   const overdue = left != null && left <= 0;
-                  const soon = left != null && left > 0 && left <= 250;
+                  const soon = left != null && left > 0 && left <= MAINTENANCE_SOON_HOURS;
                   const progress = left != null && item.nextMaintenanceAtHours
                     ? Math.min(100, Math.max(0, (item.engineHoursTotal ?? 0) / item.nextMaintenanceAtHours * 100))
                     : 0;

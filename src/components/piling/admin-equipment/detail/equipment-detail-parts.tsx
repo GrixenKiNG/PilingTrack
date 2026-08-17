@@ -20,17 +20,21 @@ import { computeOperatorRotation } from './operator-rotation';
 // --------------------------------------------------------------------------
 
 export function Section({
-  icon: Icon, title, children, collapsible = false, defaultOpen = true,
+  icon: Icon, title, children, collapsible = false, defaultOpen = true, anchor,
 }: {
   icon: LucideIcon;
   title: string;
   children: React.ReactNode;
   collapsible?: boolean;
   defaultOpen?: boolean;
+  /** Якорь для ссылок вида `/admin/equipment/{id}#history`. */
+  anchor?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <Card>
+    // scroll-mt: страница со липкой шапкой, и без отступа заголовок раздела
+    // уезжает под неё при переходе по якорю.
+    <Card id={anchor} className={anchor ? 'scroll-mt-20' : undefined}>
       <CardContent className="p-4 sm:p-5">
         {collapsible ? (
           <button

@@ -52,6 +52,13 @@ interface WorkOrderRecord {
   engineHoursAtService: number | null;
   laborHours: number | null;
   cost: string | number | null;
+  createdById: string | null;
+  closedById: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Имена участников по id — createdById / assigneeId / closedById / acceptedById. */
+  people?: Record<string, string>;
   equipment: { id: string; name: string; model: string | null } | null;
 }
 
@@ -93,6 +100,8 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   const [savingQuick, setSavingQuick] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // null — отмену не запрашивали; строка — открыто поле «почему».
+  const [cancelDraft, setCancelDraft] = useState<string | null>(null);
   const isAdmin = usePilingStore((s) => s.currentUser?.role === 'ADMIN');
 
   const names = useMemo(() => new Map(assignees.map((u) => [u.id, u.name])), [assignees]);
@@ -137,11 +146,12 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     return true;
   };
 
-  const changeStatus = async (status: MaintenanceStatus) => {
+  const changeStatus = async (status: MaintenanceStatus, extra: Record<string, unknown> = {}) => {
     if (!record) return;
     setSavingStatus(status);
-    if (await putFields(record.equipmentId, { status })) {
+    if (await putFields(record.equipmentId, { status, ...extra })) {
       toast.success('Статус обновлён');
+      setCancelDraft(null);
       await load();
     }
     setSavingStatus(null);
@@ -207,6 +217,29 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   }
 
   const actions = nextStatusActions(record.status);
+  // Имена приходят с записью (people); справочник исполнителей — запасной путь
+  // для тех, кого уже нет среди назначаемых.
+  const person = (id: string | null): string | null =>
+    (id ? record.people?.[id] ?? names.get(id) ?? 'вне справочника' : null);
+  const closed = record.status === 'DONE';
+  const accepted = Boolean(record.acceptedAt);
+  const noWorkDescribed = (record.workDone ?? '').trim() === '';
+  // Принятая запись закрыта для правок (409 на любой PUT), поэтому советовать
+  // «заполните» здесь было бы враньём: остаётся только честно сказать, что
+  // доказательства по наряду нет.
+  // У отменённого наряда «что осталось» нет по определению: он снят с работы,
+  // причина записана рядом с тем, кто снял.
+  const blockers = record.status === 'CANCELLED' ? [] : accepted
+    ? (noWorkDescribed
+      ? ['Наряд принят без описания работ. Запись закрыта для правок — доказательства выполнения по ней не осталось.']
+      : [])
+    : [
+      !record.assigneeId && 'Исполнитель не назначен — выберите его в блоке «Исполнение».',
+      noWorkDescribed && (closed
+        ? 'Наряд закрыт без описания работ. Пока «Стадия 2 — выполненные работы» пуста, принять его нельзя.'
+        : 'Работы не описаны — без «Стадия 2 — выполненные работы» наряд не закрыть.'),
+      closed && 'Ожидает приёмки администратором — до неё работа не считается принятой.',
+    ].filter((text): text is string => typeof text === 'string');
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
@@ -232,12 +265,20 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           {record.completedAt && <span>факт {formatRuDate(record.completedAt)}</span>}
         </div>
         {record.description && <p className="mt-2 text-sm text-muted-foreground">{record.description}</p>}
+        {record.status === 'CANCELLED' && (
+          <p className="mt-2 rounded-lg border border-border bg-muted/40 p-2 text-sm">
+            <b>Причина отмены: </b>
+            {record.cancelReason ?? 'не указана — наряд отменён до того, как причина стала обязательной'}
+          </p>
+        )}
 
         {actions.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
             {actions.map((s) => (
               <Button key={s} size="sm" variant="outline" disabled={savingStatus !== null}
-                onClick={() => changeStatus(s)}>
+                // Отмена — единственный переход, который сначала спрашивает «почему»:
+                // сервер её без причины не примет, и лучше спросить до отказа.
+                onClick={() => (s === 'CANCELLED' ? setCancelDraft('') : changeStatus(s))}>
                 {savingStatus === s && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
                 {STATUS_LABEL[s]}
               </Button>
@@ -247,11 +288,57 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
             </Button>
           </div>
         )}
+        {cancelDraft !== null && (
+          <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
+            <Label htmlFor="wo-cancel">Почему наряд отменяется?</Label>
+            <Textarea id="wo-cancel" rows={2} value={cancelDraft} autoFocus
+              placeholder="Напр. работа выполнена по другому наряду; узел заменён целиком"
+              onChange={(e) => setCancelDraft(e.target.value)} />
+            <div className="mt-2 flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setCancelDraft(null)} disabled={savingStatus !== null}>
+                Не отменять
+              </Button>
+              <Button size="sm" variant="destructive" disabled={savingStatus !== null || cancelDraft.trim() === ''}
+                onClick={() => changeStatus('CANCELLED', { cancelReason: cancelDraft.trim() })}>
+                {savingStatus === 'CANCELLED' && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
+                Отменить наряд
+              </Button>
+            </div>
+          </div>
+        )}
         {actions.length === 0 && (
           <div className="mt-3 flex border-t border-border pt-3">
             <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
+          </div>
+        )}
+      </div>
+
+      {/*
+        «Кто и когда» — ответ на вопрос «кто это завёл и кто держит».
+        Раньше карточка не называла ни одного человека: id автора, исполнителя,
+        закрывшего и принявшего лежали в базе, но наружу не выходили — наряд
+        выглядел ничьим. Список ниже показывает, чего не хватает до завершения,
+        рядом с именем того, кто должен это сделать.
+      */}
+      <div className="mt-4 rounded-xl border bg-card p-4">
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Кто и когда</h2>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+          <PersonRow label="Заявку открыл" name={person(record.createdById)} at={record.createdAt}
+            fallback="создано по регламенту, без автора" />
+          <PersonRow label="Исполнитель" name={person(record.assigneeId)} fallback="не назначен" />
+          <PersonRow label="Закрыл наряд" name={person(record.closedById)} at={record.completedAt}
+            fallback="не закрыт" />
+          <PersonRow label="Принял работу" name={person(record.acceptedById)} at={record.acceptedAt}
+            fallback="не принята" />
+        </dl>
+        {blockers.length > 0 && (
+          <div className="mt-3 rounded-lg border border-warning/40 bg-warning/5 p-3">
+            <p className="text-xs font-semibold text-warning-strong">Что осталось сделать</p>
+            <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+              {blockers.map((text) => <li key={text}>• {text}</li>)}
+            </ul>
           </div>
         )}
       </div>
@@ -349,6 +436,23 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         editingId={recordId}
         onSaved={load}
       />
+    </div>
+  );
+}
+
+function PersonRow({ label, name, at, fallback }: {
+  label: string;
+  name: string | null;
+  at?: string | null;
+  fallback: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5">
+      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn('text-right text-sm', name ? 'font-medium text-foreground' : 'text-muted-foreground')}>
+        {name ?? fallback}
+        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatRuDate(at)}</span>}
+      </dd>
     </div>
   );
 }

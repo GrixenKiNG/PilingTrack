@@ -12,6 +12,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
 
 export type MeterSource = 'MANUAL' | 'TELEMETRY';
 
@@ -89,6 +90,19 @@ export async function recordMeterReadingInTx(
     });
   }
 
+  // Наработка — 15 баллов готовности и вход в расчёт просрочки ТО, поэтому
+  // новое показание обязано пересчитать снимок. Заказываем в этой же
+  // транзакции: точка одна на ручной ввод и на моточасы, снятые осмотром.
+  await requestReadinessSnapshot(tx, {
+    tenantId: ctx.tenantId,
+    equipmentId,
+    aggregateId: reading.id,
+    aggregateType: 'MeterReading',
+    triggerType: 'METER_READING_RECORDED',
+    triggerId: reading.id,
+    occurredAt: recordedAt,
+  });
+
   return { reading, warning };
 }
 
@@ -131,6 +145,16 @@ export async function deleteMeterReading(
     await tx.equipment.update({
       where: { id: equipmentId },
       data: { engineHoursTotal: latest?.engineHours ?? null },
+    });
+    // Удаление ошибочного показания меняет наработку так же, как ввод нового.
+    await requestReadinessSnapshot(tx as typeof db, {
+      tenantId: ctx.tenantId,
+      equipmentId,
+      aggregateId: readingId,
+      aggregateType: 'MeterReading',
+      triggerType: 'METER_READING_REMOVED',
+      triggerId: readingId,
+      occurredAt: new Date(),
     });
   });
 }

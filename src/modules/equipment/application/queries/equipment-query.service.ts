@@ -306,7 +306,33 @@ export async function getMaintenanceById(id: string, tenantId: string) {
   if (!record || record.tenantId !== tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
   }
-  return record;
+  return { ...record, people: await resolveMaintenancePeople(record) };
+}
+
+/**
+ * Имена участников наряда: кто завёл, кому назначено, кто закрыл, кто принял.
+ *
+ * У MaintenanceRecord нет relation на User — поля хранят голый id, — поэтому
+ * имена подтягиваются отдельным запросом. Без них карточка наряда не называла
+ * ни одного человека, хотя все четыре id в базе есть: работа висела «ничья».
+ *
+ * Идентификаторы взяты из уже проверенной по тенанту записи, поэтому
+ * дополнительный фильтр по tenantId здесь ничего не защищает (а с учётом
+ * дрейфа User.tenantId — только терял бы имена).
+ */
+async function resolveMaintenancePeople(record: {
+  createdById: string | null;
+  assigneeId: string | null;
+  closedById: string | null;
+  acceptedById: string | null;
+}): Promise<Record<string, string>> {
+  const ids = [...new Set(
+    [record.createdById, record.assigneeId, record.closedById, record.acceptedById]
+      .filter((id): id is string => Boolean(id)),
+  )];
+  if (ids.length === 0) return {};
+  const users = await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+  return Object.fromEntries(users.map((user) => [user.id, user.name]));
 }
 
 export async function listAllMaintenance(tenantId: string, filter: MaintenanceListFilter = {}) {

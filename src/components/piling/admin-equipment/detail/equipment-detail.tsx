@@ -81,6 +81,44 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
     void refresh();
   }, [refresh]);
 
+  /**
+   * Вкладка из адреса: `/admin/equipment/{id}#documents`.
+   *
+   * Такие ссылки уже ведут из контура техготовности (кнопки «История» и
+   * «Документы» в правой панели «Техники»), но якорь никто не читал — обе
+   * открывали «Обзор». Нажатие обещало одно, показывало другое.
+   *
+   * Читаем в эффекте, а не в инициализаторе useState: на сервере `location`
+   * нет, и разметка первого рендера должна совпасть с клиентской.
+   */
+  useEffect(() => {
+    const applyHash = () => {
+      const key = window.location.hash.replace('#', '');
+      if (!TABS.some((item) => item.key === key)) return;
+      // Компактный вид — вкладки; полная страница — один свиток с якорями.
+      setTab(key as TabKey);
+      // Скроллим сами: раздел появляется только после загрузки данных, а
+      // штатный переход по якорю происходит сразу после навигации, когда
+      // элемента ещё нет — поэтому переход «по кнопке Документы» и не работал.
+      document.getElementById(key)?.scrollIntoView({ block: 'start' });
+      // Второй проход: разделы выше якоря (мониторинг, ТО, осмотры) грузят
+      // свои данные сами и подрастают уже после первого скролла, утаскивая
+      // раздел вниз. Один повтор возвращает его на место.
+      settle = window.setTimeout(
+        () => document.getElementById(key)?.scrollIntoView({ block: 'start' }),
+        700,
+      );
+    };
+    let settle: number | undefined;
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => {
+      window.removeEventListener('hashchange', applyHash);
+      if (settle !== undefined) window.clearTimeout(settle);
+    };
+    // details в зависимостях: до загрузки скроллить не к чему.
+  }, [details]);
+
   const handleEditSubmit = async (id: string, payload: Record<string, unknown>) => {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
@@ -350,7 +388,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       </Section>
 
       {/* Full work history */}
-      <Section icon={History} title="История работ">
+      <Section icon={History} title="История работ" anchor="history">
         {details.timeline.length > 0 ? (
           <HistoryTable rows={details.timeline} />
         ) : (
@@ -414,7 +452,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       </Section>
 
       {/* Документы */}
-      <Section icon={FileText} title="Документы">
+      <Section icon={FileText} title="Документы" anchor="documents">
         <EquipmentDocuments
           equipmentId={equipmentId}
           documents={details.documents}

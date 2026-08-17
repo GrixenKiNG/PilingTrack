@@ -11,6 +11,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { evaluatePlanDue } from '@/lib/pm-due';
+import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
 
 export { evaluatePlanDue } from '@/lib/pm-due';
 export type { PmTriggerType, PmDueStatus, PlanForEval, PlanDueResult } from '@/lib/pm-due';
@@ -21,6 +22,14 @@ export interface PmSchedulerResult {
   evaluated: number;
   due: number;
   created: number;
+  /**
+   * Просроченные регламенты — для оповещения. Порог берётся из самого
+   * регламента (интервал плана), а не из правила готовности
+   * MAINTENANCE_OVERDUE_50H: это разные вещи. Первое отвечает «работа
+   * просрочена по нормативу», второе — «насколько сильно, чтобы влиять на
+   * допуск». Планировщик знает интервал каждого плана и считает его ежедневно.
+   */
+  overdue: Array<{ equipmentId: string; title: string; hoursOverdue: number | null; daysOverdue: number | null }>;
 }
 
 /**
@@ -50,12 +59,21 @@ export async function runPmScheduler(tenantId: string, now: Date = new Date()): 
 
   let due = 0;
   let created = 0;
+  const overdue: PmSchedulerResult['overdue'] = [];
 
   for (const plan of plans) {
     const latestHours = plan.equipment.meterReadings[0]?.engineHours ?? plan.equipment.engineHoursTotal ?? null;
     const result = evaluatePlanDue(plan, latestHours, now);
     if (result.status === 'ok') continue;
     due++;
+    if (result.status === 'overdue') {
+      overdue.push({
+        equipmentId: plan.equipmentId,
+        title: plan.title,
+        hoursOverdue: result.hoursRemaining != null ? Math.abs(result.hoursRemaining) : null,
+        daysOverdue: result.daysRemaining != null ? Math.abs(result.daysRemaining) : null,
+      });
+    }
 
     // Dedup: skip if an open work order of this type already exists for the rig.
     const existingOpen = await db.maintenanceRecord.findFirst({
@@ -71,19 +89,33 @@ export async function runPmScheduler(tenantId: string, now: Date = new Date()): 
 
     const dueLabel =
       result.status === 'overdue' ? 'просрочено' : 'подходит срок';
-    await db.maintenanceRecord.create({
-      data: {
+    await db.$transaction(async (tx) => {
+      const record = await tx.maintenanceRecord.create({
+        data: {
+          tenantId,
+          equipmentId: plan.equipmentId,
+          type: plan.type,
+          status: 'PLANNED',
+          title: `${plan.title} (${dueLabel})`,
+          description: 'Создано планировщиком ТО по регламенту.',
+          scheduledAt: result.dueDate ?? null,
+        },
+      });
+      // Планировщик открывает наряд без участия человека, и с этого момента
+      // машина считается имеющей незакрытую работу. Балл готовности обязан
+      // это увидеть, не дожидаясь следующего осмотра или запуска смены.
+      await requestReadinessSnapshot(tx as typeof db, {
         tenantId,
         equipmentId: plan.equipmentId,
-        type: plan.type,
-        status: 'PLANNED',
-        title: `${plan.title} (${dueLabel})`,
-        description: 'Создано планировщиком ТО по регламенту.',
-        scheduledAt: result.dueDate ?? null,
-      },
+        aggregateId: record.id,
+        aggregateType: 'MaintenanceRecord',
+        triggerType: 'MAINTENANCE_CHANGED',
+        triggerId: `${record.id}:scheduled:${record.updatedAt.toISOString()}`,
+        occurredAt: record.updatedAt,
+      });
     });
     created++;
   }
 
-  return { evaluated: plans.length, due, created };
+  return { evaluated: plans.length, due, created, overdue };
 }

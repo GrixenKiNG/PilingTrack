@@ -326,7 +326,9 @@ export function MaintenanceBoard() {
               <Plus className="mr-1.5 h-4 w-4" /> Задача ТО
             </Button>
             <Button variant="outline" size="sm" className="h-9" asChild>
-              <Link href="/admin/checklists"><CalendarDays className="mr-1.5 h-4 w-4" /> План-график</Link>
+              {/* План-график ТО — это регламенты в модуле техготовности, а не
+                  редактор чек-листов осмотра, куда вела кнопка раньше. */}
+              <Link href="/admin/to?view=plans"><CalendarDays className="mr-1.5 h-4 w-4" /> План-график</Link>
             </Button>
           </div>
         </section>

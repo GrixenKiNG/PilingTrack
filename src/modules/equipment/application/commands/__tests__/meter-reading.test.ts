@@ -1,17 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findUniqueEquipmentMock, findFirstMock, createReadingMock, updateEquipmentMock, txMock } = vi.hoisted(() => ({
+const {
+  findUniqueEquipmentMock, findFirstMock, createReadingMock, updateEquipmentMock,
+  outboxCreateManyMock, deleteReadingMock, txMock,
+} = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   findFirstMock: vi.fn(),
   createReadingMock: vi.fn(),
   updateEquipmentMock: vi.fn(),
+  // Показание меняет наработку — вход критерия готовности «Моточасы», поэтому
+  // команда заказывает пересчёт снимка в той же транзакции.
+  outboxCreateManyMock: vi.fn(),
+  deleteReadingMock: vi.fn(),
   txMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
   const tx = {
-    meterReading: { findFirst: findFirstMock, create: createReadingMock },
+    meterReading: { findFirst: findFirstMock, create: createReadingMock, delete: deleteReadingMock },
     equipment: { update: updateEquipmentMock },
+    outboxEvent: { createMany: outboxCreateManyMock },
   };
   return {
     db: {
@@ -33,8 +41,22 @@ describe('addMeterReading', () => {
     findFirstMock.mockReset();
     createReadingMock.mockReset();
     updateEquipmentMock.mockReset();
+    outboxCreateManyMock.mockReset();
+    deleteReadingMock.mockReset();
     findUniqueEquipmentMock.mockResolvedValue({ id: 'eq_1' });
     createReadingMock.mockResolvedValue({ id: 'mr_1', engineHours: 5670, recordedAt: new Date() });
+    outboxCreateManyMock.mockResolvedValue({ count: 1 });
+  });
+
+  it('заказывает пересчёт готовности в той же транзакции', async () => {
+    findFirstMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ engineHours: 5670 });
+    await addMeterReading('eq_1', { engineHours: 5670 }, { tenantId: 'orion' });
+    const [{ data }] = outboxCreateManyMock.mock.calls[0];
+    expect(data[0]).toMatchObject({
+      type: 'ReadinessSnapshotRequested',
+      tenantId: 'orion',
+      payload: expect.objectContaining({ triggerType: 'METER_READING_RECORDED', equipmentId: 'eq_1' }),
+    });
   });
 
   it('checks equipment existence scoped by tenantId (fail-closed IDOR guard)', async () => {
