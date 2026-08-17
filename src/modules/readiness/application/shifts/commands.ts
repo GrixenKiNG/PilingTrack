@@ -1,5 +1,6 @@
+import type {ReadinessAccessMatrix} from '../../domain/access-matrix';
 import type {Prisma} from '@/generated/postgres-client/client';
-import {recordChainedReadinessAudit} from '@/core/infrastructure/audit-log-service';
+import {recordChainedReadinessAudit} from '../../infrastructure/audit/record-audit';
 import {effectiveReadinessCapabilities} from '../capabilities';
 import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from '../command-pipeline/idempotency';
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
@@ -20,6 +21,9 @@ import type {AuditJsonValue} from '../../domain/audit/types';
 export interface ShiftCommandContext {
   tenantId: string; actorId: string; actorName: string; actorRole: string;
   actingAs: string | null; requestId: string; correlationId: string;
+  /** Матрица доступов организации; приходит из контекста запроса.
+   *  Не задана — действуют значения по умолчанию из кода. */
+  accessMatrix?: ReadinessAccessMatrix;
 }
 
 const asAuditJson = (value: unknown): AuditJsonValue => JSON.parse(JSON.stringify(value)) as AuditJsonValue;
@@ -34,11 +38,12 @@ export const serializeShift = (row: ShiftRow) => ({...row,
   plannedStartAt: row.plannedStartAt?.toISOString() ?? null, plannedEndAt: row.plannedEndAt?.toISOString() ?? null,
   requestedAt: row.requestedAt?.toISOString() ?? null, declinedAt: row.declinedAt?.toISOString() ?? null,
   startedAt: row.startedAt?.toISOString() ?? null, closedAt: row.closedAt?.toISOString() ?? null,
-  cancelledAt: row.cancelledAt?.toISOString() ?? null, createdAt: row.createdAt.toISOString(),
+  cancelledAt: row.cancelledAt?.toISOString() ?? null, autoClosedAt: row.autoClosedAt?.toISOString() ?? null,
+  createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(), handovers: row.handovers.map(serializeHandover)});
 
 function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.manage' | 'readiness.handover.prepare' | 'readiness.handover.decide') {
-  if (!effectiveReadinessCapabilities(context.actorRole, context.actingAs).has(ability)) {
+  if (!effectiveReadinessCapabilities(context.actorRole, context.actingAs, context.accessMatrix).has(ability)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, `Недостаточно прав: ${ability}`);
   }
 }
@@ -274,7 +279,7 @@ async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCo
         ? await handovers.accept({tenantId: input.context.tenantId, id: input.id, version: expected,
           actorId: input.context.actorId, now})
         : await handovers.rework({tenantId: input.context.tenantId, id: input.id, version: expected,
-          actorId: input.context.actorId, reason: requireReworkReason(input.reason!), now});
+          actorId: input.context.actorId, reason: requireReworkReason(input.reason), now});
       const shift = input.action === 'accept'
         ? await shifts.close(input.context.tenantId, shiftBefore.id, shiftBefore.version, input.context.actorId, now)
         : await shifts.reopen(input.context.tenantId, shiftBefore.id, shiftBefore.version);

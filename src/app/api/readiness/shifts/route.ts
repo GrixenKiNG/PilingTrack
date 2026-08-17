@@ -15,7 +15,7 @@ const json = async (request: NextRequest) => { try { return await request.json()
 
 export async function GET(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request); if (resolved.response) return resolved.response;
-  const context = resolved.context!;
+  const context = resolved.context;
   try { const p = request.nextUrl.searchParams; const allowed = new Set(['equipmentId', 'state', 'type', 'limit', 'status', 'from', 'to', 'shiftType']);
     if ([...p.keys()].some((key) => !allowed.has(key))) throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный фильтр смен');
     const limit = p.has('limit') ? Number(p.get('limit')) : 50;
@@ -40,7 +40,15 @@ export async function GET(request: NextRequest) {
 
 export const POST = withReadinessCommand(async (request, context) => {
   const parsed = createShiftSchema.safeParse(await json(request));
-  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные смены', {fieldErrors: parsed.error.flatten().fieldErrors});
+  if (!parsed.success) {
+    // formErrors, а не только fieldErrors: схема строгая, и лишний ключ в теле
+    // даёт ошибку уровня формы («Unrecognized key»). Раньше наружу уходил
+    // пустой список полей — пользователь видел «Некорректные данные смены» и
+    // ни слова о том, что именно не так.
+    const flat = parsed.error.flatten();
+    throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные данные смены',
+      {fieldErrors: flat.fieldErrors, formErrors: flat.formErrors});
+  }
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => createShiftCommand({tx, context,
     key: request.headers.get('idempotency-key'), payload: parsed.data}));
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,

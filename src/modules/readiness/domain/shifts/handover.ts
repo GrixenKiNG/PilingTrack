@@ -8,8 +8,15 @@ export function validateHandoverSummary(value: string): string {
   return summary;
 }
 
-export function requireReworkReason(value: string): string {
-  const reason = value.trim();
+/*
+  Принимает и отсутствующую причину. Вызывающий передавал `input.reason!` —
+  утверждение «причина точно есть» поверх типа, который её допускал не быть.
+  Обещание держалось на вызове через revokeHandover; при обращении мимо него
+  сюда пришёл бы undefined и `value.trim()` упал бы TypeError вместо понятного
+  отказа. Проверка причины — работа этой функции, ей и разбираться с пустотой.
+*/
+export function requireReworkReason(value: string | undefined): string {
+  const reason = value?.trim() ?? '';
   if (reason.length < 3 || reason.length > 1000) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Причина возврата: от 3 до 1000 символов');
   }

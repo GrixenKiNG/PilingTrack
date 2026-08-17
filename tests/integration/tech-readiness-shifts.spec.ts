@@ -18,6 +18,10 @@ const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730107000_readiness_start_snapshot_fk/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260808130000_readiness_snapshot_facts/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260809120000_shift_pre_start_acceptance/migration.sql'),
+  // Список миграций здесь ручной: одноразовая база поднимается только из
+  // перечисленных файлов. Новая колонка Shift обязана попасть и сюда, иначе
+  // клиент Prisma выбирает поле, которого в базе нет, и падают все тесты смен.
+  resolve(process.cwd(), 'prisma/migrations/20260815120000_shift_auto_close/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
@@ -76,7 +80,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
         "publishedAt" TIMESTAMPTZ(3), "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW());
       CREATE TABLE "ReadinessScoreSnapshot" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "equipmentId" TEXT NOT NULL,
         "shiftId" TEXT, "ruleSetId" TEXT NOT NULL, "ruleSetVersion" TEXT NOT NULL, "triggerType" TEXT NOT NULL,
-        "triggerId" TEXT NOT NULL, "status" TEXT NOT NULL, "score" INTEGER NOT NULL, "blockers" JSONB NOT NULL,
+        "triggerId" TEXT NOT NULL, "status" TEXT NOT NULL, "verdict" TEXT, "score" INTEGER NOT NULL, "blockers" JSONB NOT NULL,
         "warnings" JSONB NOT NULL, "evidence" JSONB NOT NULL, "factsHash" BYTEA NOT NULL,
         "calculatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW(), UNIQUE ("tenantId", "equipmentId", "triggerType", "triggerId"), UNIQUE ("tenantId", "id"));
       CREATE TABLE "IdempotencyKey" ("id" TEXT PRIMARY KEY, "key" TEXT NOT NULL, "scope" TEXT NOT NULL,

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
 import { formatDateInTimezone, getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
 import { SHIFT_STATE_LABEL } from '../readiness-labels';
 import type { ReadinessShiftDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
@@ -76,7 +77,20 @@ export function ShiftsScreen(props: ReferenceUiProps) {
     return () => clearInterval(timer);
   }, [timezone]);
   const createShift = async () => {
-    if (!props.selectedId || !props.bootstrap?.capabilities.entities.shift.manage) return;
+    // Раньше здесь стоял немой `return`: администратор нажимал «Создать смену»
+    // и не происходило ничего — ни смены, ни ошибки, ни подсказки. Отсюда
+    // жалоба «создать смену невозможно». Право открывать смену есть только у
+    // оператора, и это сознательно: администратор проводит её через «Действую
+    // как → Оператор», чтобы в журнале осталось, кто на самом деле нажал. Но
+    // об этом надо сказать вслух, а не молчать.
+    if (!props.selectedId) {
+      return toast.error('Сначала выберите установку в списке');
+    }
+    if (!props.bootstrap?.capabilities.entities.shift.manage) {
+      return toast.error(
+        'Смену открывает оператор. Администратору: переключитесь в «Действую как → Оператор» — замещение подпишется в журнале',
+      );
+    }
     const hour = new Date().getHours();
     const response = await authFetch('/api/readiness/shifts', {
       method: 'POST',
@@ -258,6 +272,8 @@ export function ShiftsScreen(props: ReferenceUiProps) {
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-5">
           {activeCrews.length > 0 ? activeCrews.slice(0, 5).map((crew) => {
             const state = crew.equipment ? props.readinessByEquipment[crew.equipment.id] : null;
+            // `load` — историческое имя: это балл готовности установки экипажа,
+            // а не загрузка бригады.
             const load = state?.score ?? 0;
             return (
               <article key={crew.id} className="rounded-lg border border-border p-2">
@@ -267,7 +283,7 @@ export function ShiftsScreen(props: ReferenceUiProps) {
                 </div>
                 <div className="mt-2 truncate text-2xs text-muted-foreground">{crew.equipment?.name || 'Техника не назначена'}</div>
                 <div className="mt-1 text-3xs text-muted-foreground">{crew.site?.name || 'Объект не назначен'}</div>
-                <div className="mt-2 flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border"><div className={cn('h-full rounded-full', load >= 85 ? 'bg-success-strong' : 'bg-signal-strong')} style={{ width: `${load}%` }} /></div><b className="text-3xs">{load}%</b></div>
+                <div className="mt-2 flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border"><div className={cn('h-full rounded-full', load >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal-strong')} style={{ width: `${load}%` }} /></div><b className="text-3xs">{load}%</b></div>
               </article>
             );
           }) : <div className="col-span-5 py-8 text-center text-sm text-muted-foreground">Активные экипажи не назначены.</div>}
