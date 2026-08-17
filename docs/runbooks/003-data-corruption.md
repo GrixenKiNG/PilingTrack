@@ -15,6 +15,20 @@ alias dc='docker compose --env-file .env -f docker-compose.yml -f docker-compose
 alias psql='dc exec postgres psql -U piling -d pilingtrack'
 ```
 
+> **Таблицы техготовности требуют назвать тенанта.** С миграции
+> `20260813030000_readiness_rls_fail_closed` политики `Shift`, `ShiftHandover`,
+> `WorkPermit`, `WorkPermitApproval`, `ReadinessScoreSnapshot`,
+> `CurrentReadiness` закрыты наглухо, и `FORCE ROW LEVEL SECURITY` действует в
+> том числе на владельца таблиц. Поэтому `SELECT * FROM "Shift"` вернёт **0
+> строк**, пока в начале сессии не сказано:
+>
+> ```sql
+> SET app.current_tenant = 'orion';
+> ```
+>
+> Пустая выборка здесь — не потеря данных. Первое, что нужно проверить, увидев
+> ноль строк на этих шести таблицах. Обоснование охвата: ADR-0044.
+
 ---
 
 ## Симптомы
@@ -133,6 +147,57 @@ psql -c 'SELECT
 - [ ] Как возникло повреждение? (баг в upsert? гонка? ручная правка?)
 - [ ] Добавить тест, воспроизводящий причину
 - [ ] Если повреждение от событийной рассинхронизации — проверить DLQ (004)
+
+---
+
+## Проверка изоляции тенанта (RLS)
+
+Суперпользователь обходит RLS **всегда**, даже при `FORCE`. Поэтому проверять
+политики из-под `postgres` (или из-под `piling`, если это суперпользователь)
+бессмысленно — выборка всегда полная, и это ничего не доказывает.
+
+Сначала выяснить, действует ли RLS вообще:
+
+```sql
+SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname IN ('piling','postgres','pilingtrack_app');
+```
+
+`rolsuper = t` у роли приложения означает, что вся работа по RLS на этом
+контуре декоративна (см. открытый вопрос в ADR-0044).
+
+**Если роль `pilingtrack_app` уже заведена** (ранбук 011), проверка — готовым
+скриптом, он же покажет и права:
+
+```bash
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U piling -d pilingtrack < scripts/app-role-verify.sql
+```
+
+Ниже — та же проверка вручную, временной ролью; годится и до появления
+`pilingtrack_app`:
+
+```sql
+CREATE ROLE rls_probe LOGIN PASSWORD 'probe';
+GRANT USAGE ON SCHEMA public TO rls_probe;
+GRANT SELECT ON "CurrentReadiness", "Shift", "Equipment" TO rls_probe;
+
+SET ROLE rls_probe;
+-- 1. Без тенанта: закрытые таблицы дают 0, Equipment (режим аудита) — всё
+SELECT count(*) FROM "CurrentReadiness";   -- ожидаем 0
+SELECT count(*) FROM "Equipment";          -- ожидаем полное число
+-- 2. Со своим тенантом — свои строки
+SET app.current_tenant = 'orion';
+SELECT count(*) FROM "CurrentReadiness";   -- ожидаем > 0
+-- 3. С чужим — ноль
+SET app.current_tenant = 'somebody-else';
+SELECT count(*) FROM "CurrentReadiness";   -- ожидаем 0
+RESET ROLE;
+
+REVOKE ALL ON "CurrentReadiness", "Shift", "Equipment" FROM rls_probe;
+REVOKE USAGE ON SCHEMA public FROM rls_probe;
+DROP ROLE rls_probe;
+```
+
+Пройдено локально 13.08.2026: 0 / 9 / 0 при 9 видимых `Equipment` в первом шаге.
 
 ---
 
