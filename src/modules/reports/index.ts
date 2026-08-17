@@ -43,21 +43,7 @@ export {
   exportReportsCsv,
   getDashboardStats,
   reportDetailInclude,
-  // CQRS Read Model queries
-  getReportStats,
-  getSiteDailyStats,
-  getSiteDashboard,
-  getOperatorPerformance,
-  getSiteOperatorPerformance,
-  getOperatorLeaderboard,
-  getDowntimeSummary,
-  getDowntimeTrend,
-  getTopDowntimeReasons,
-  getWeeklyTrend,
-  getWeeklyTrends,
-  getFullDashboard,
 } from './application';
-export type { DashboardData } from './application';
 
 // Event Bus — re-exported from the legacy bus (per ADR-0006 addendum
 // 2026-05-21, the modern wrapper at ./application/event-bus was deleted).
