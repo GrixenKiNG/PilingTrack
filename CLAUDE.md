@@ -168,7 +168,7 @@ You can write unit tests. Flag if you need integration test infrastructure.
 
 **Respect existing patterns:**
 - `src/lib/cache-strategies.ts` for caching decisions
-- `src/lib/db-optimization.ts` for DB query patterns (`$queryRaw` over `$queryRawUnsafe`)
+- `src/core/infrastructure/raw-queries.ts` for DB query patterns (`$queryRaw` over `$queryRawUnsafe`). This replaced `src/lib/db-optimization.ts`, deleted 2026-08-13: all nine of its exports were unreachable and not one filtered by `tenantId`, while this guideline pointed newcomers straight at it. `raw-queries.ts` takes `tenantId` as a required argument.
 - Redis is used for cache + rate limiting, not database replacement
 
 **Don't optimize prematurely.** Profile if slow, then fix.
@@ -226,7 +226,7 @@ If disk tight (>85%): `docker builder prune -af` (~2 GB), `docker image prune -a
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **PilingTrack** (11262 symbols, 24552 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **PilingTrack** (11904 symbols, 26322 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

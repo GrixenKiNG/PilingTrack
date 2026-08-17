@@ -28,7 +28,6 @@ import { NextResponse } from 'next/server';
 const CSRF_EXEMPT_PATHS = [
   '/api/ready',
   '/api/health',
-  '/api/recognize',
   '/api/auth/login',
   '/api/auth/pin',
   '/api/auth/me',

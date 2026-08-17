@@ -62,7 +62,6 @@ describe('withCsrf — gating', () => {
   it.each([
     '/api/ready',
     '/api/health',
-    '/api/recognize',
     '/api/auth/login',
     '/api/auth/pin',
     '/api/auth/me',

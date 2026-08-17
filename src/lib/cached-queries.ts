@@ -191,16 +191,12 @@ export async function getCachedReport(reportId: string) {
 // Equipment
 // ============================================================
 
-export async function getCachedEquipmentAll() {
-  return cacheAside(
-    'equipment:all',
-    () => db.equipment.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-    { ttl: TTL.equipment }
-  );
-}
+// getCachedEquipmentAll удалена вместе с маршрутом GET /api/equipment/all.
+// Запрос не фильтровал по тенанту и клал результат под общий ключ
+// 'equipment:all': любой аутентифицированный пользователь получал парк всех
+// организаций, а общий ключ кэша протащил бы утечку даже после починки
+// условия. Потребителей у маршрута не было; парк отдаёт GET /api/equipment,
+// где tenantId в условии.
 
 // ============================================================
 // Cache Invalidation — Call after mutations
@@ -231,10 +227,8 @@ export async function invalidateReport(reportId: string): Promise<void> {
   recordDeletion();
 }
 
-export async function invalidateEquipment(): Promise<void> {
-  await cacheAsideInvalidate('equipment:all');
-  recordDeletion();
-}
+// invalidateEquipment сбрасывала тот же ключ 'equipment:all' и вызывающих не
+// имела — удалена вместе с ним.
 
 /**
  * Write-through update: update DB and cache simultaneously.
