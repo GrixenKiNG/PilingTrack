@@ -19,8 +19,17 @@ describe('Tech Readiness Task 01 contract slice [TR-200, TR-201, TR-204]', () =>
     });
   });
 
+  // Администратор с 16.08.2026 получает все полномочия модуля по умолчанию
+  // (`ADMIN: READINESS_ABILITIES` в domain/capability-defaults.ts), поэтому
+  // `readiness.shift.manage` у него теперь есть. Ограничивает его не отсутствие
+  // права, а режим «Действую как» и журнал замещения.
+  //
+  // Требование «повышенный риск подписывают двое» это НЕ ослабляет: оно
+  // проверяет человека, а не роль — `approval-policy.ts` сверяет `approvedById`
+  // и требует `users.size >= roles.length`. Администратор с обоими правами всё
+  // равно не закроет наряд на две подписи в одиночку.
   it.each([
-    ['ADMIN', false, true],
+    ['ADMIN', true, true],
     ['MECHANIC', false, false],
     ['DISPATCHER', false, false],
     ['OPERATOR', true, false],

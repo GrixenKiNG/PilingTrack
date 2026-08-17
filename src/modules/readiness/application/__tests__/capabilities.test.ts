@@ -64,7 +64,13 @@ describe('readiness capabilities', () => {
     });
     expect(abilities).toContain('readiness.maintenance.manage');
     expect(abilities).not.toContain('readiness.shift.manage');
-    expect(abilities).toContain('readiness.permit.approve_admin');
+    // Замещение ЗАМЕНЯЕТ права, а не добавляет их к своим. Проверяем на
+    // полномочиях, которые есть у администратора и нет у механика: раньше
+    // объединение оставляло их, и «Действую как механик» ничего не
+    // ограничивало — из режима механика можно было менять матрицу доступов.
+    expect(abilities).not.toContain('readiness.permit.approve_admin');
+    expect(abilities).not.toContain('readiness.rules.manage');
+    expect(abilities).not.toContain('readiness.audit.export');
   });
 
   it('does not audit or grant acting capabilities to another role', async () => {
@@ -82,8 +88,10 @@ describe('readiness capabilities', () => {
   // именно выбранная роль (а не всегда механик), и чужим ролям исполнение
   // по-прежнему запрещено.
   it.each([
-    ['FOREMAN', 'readiness.defect.report', 'readiness.maintenance.manage'],
-    ['SAFETY_ENGINEER', 'readiness.inspection.manage', 'readiness.handover.decide'],
+    // «Запрещённое» берём из прав САМОГО администратора: иначе проверка
+    // проходит и при объединении наборов, а именно так ошибка и жила.
+    ['FOREMAN', 'readiness.defect.report', 'readiness.rules.manage'],
+    ['SAFETY_ENGINEER', 'readiness.inspection.manage', 'readiness.rules.manage'],
   ] as const)('администратор в роли %s получает её права и только их', async (actingAs, granted, denied) => {
     const audit = vi.fn();
     const abilities = await resolveAuditedReadinessCapabilities(

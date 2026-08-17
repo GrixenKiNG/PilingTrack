@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle2, ChevronRight } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
@@ -13,6 +14,7 @@ import {
   type ReadinessRole,
   resolveReadinessCapabilities,
 } from '@/modules/readiness/application/capabilities';
+import type { AccessMatrixState } from '@/modules/readiness/application/access-matrix-service';
 import type { ReadinessBootstrap } from '../api/contracts';
 import { handoverRoleLabel } from '../handover-journal';
 import { ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
@@ -76,6 +78,21 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
   // лежат id, имя и роль. Право `users.manage` есть не у всех, кому открыт
   // раздел, — на отказ просто не показываем колонку.
   const [directory, setDirectory] = useState<DirectoryUser[] | null>(null);
+  const [state, setState] = useState<AccessMatrixState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void authFetch('/api/readiness/access-matrix')
+      .then(async (response) => {
+        // 403 у роли без права настраивать — раздел остаётся «только смотреть».
+        if (!response.ok) return;
+        const body = await response.json() as { data?: AccessMatrixState };
+        if (active && body.data) setState(body.data);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -116,8 +133,55 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
       .filter((role) => !MATRIX_ROLES.includes(role as ReadinessRole))
       .map((role) => ({ role: role as ReadinessRole, users: byRole.get(role) ?? [] })));
 
-  const abilitiesByRole = new Map(MATRIX_ROLES.map((role) => [role, resolveReadinessCapabilities(role)]));
+  // Матрица правится в черновике и применяется публикацией — тот же приём, что
+  // у правил готовности. Пока состояние не загружено, показываем значения из
+  // кода: они же действуют на сервере, если организация ничего не публиковала.
+  const grants = state?.draft?.grants ?? state?.published.grants ?? null;
+  const abilitiesByRole = new Map(MATRIX_ROLES.map((role) => [
+    role,
+    grants ? new Set(grants[role] ?? []) : resolveReadinessCapabilities(role),
+  ]));
   const selectedUsers = byRole.get(selectedRole) ?? [];
+  const canEdit = bootstrap?.capabilities.entities.rules.manage === true;
+
+  const toggle = async (role: ReadinessRole, ability: ReadinessAbility) => {
+    if (!grants || !canEdit || busy) return;
+    const current = new Set(grants[role] ?? []);
+    if (current.has(ability)) current.delete(ability); else current.add(ability);
+    const next = { ...grants, [role]: [...current] };
+    setBusy(true);
+    try {
+      const response = await authFetch('/api/readiness/access-matrix', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+        body: JSON.stringify({ grants: next }),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error?.message ?? 'Не удалось сохранить');
+      setState((await response.json()).data as AccessMatrixState);
+      toast.success('Сохранено в черновик');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось сохранить');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publish = async () => {
+    setBusy(true);
+    try {
+      const response = await authFetch('/api/readiness/access-matrix', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error?.message ?? 'Не удалось опубликовать');
+      setState((await response.json()).data as AccessMatrixState);
+      toast.success('Матрица опубликована — права применяются сразу');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось опубликовать');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
@@ -141,8 +205,31 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-hidden')}>
           <div className="border-b border-border p-4">
-            <h2 className="font-bold">Матрица полномочий</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Что роль может сделать в модуле. Ровно те правила, по которым сервер пропускает или отклоняет команду.</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-bold">Матрица полномочий</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Что роль может сделать в модуле. Ровно те правила, по которым сервер пропускает или отклоняет команду.
+                  {canEdit && ' Щелчок по клетке меняет право и сохраняется в черновик.'}
+                </p>
+              </div>
+              {canEdit && state && (
+                <div className="flex items-center gap-2">
+                  {state.pendingChanges > 0
+                    ? <StatusPill tone="warning">Черновик: {state.pendingChanges} {pluralizeRu(state.pendingChanges, ['правка', 'правки', 'правок'])}</StatusPill>
+                    : <StatusPill tone={state.publishedInDb ? 'success' : 'neutral'}>
+                      {state.publishedInDb ? 'Опубликована' : 'Значения по умолчанию'}
+                    </StatusPill>}
+                  <Button
+                    onClick={() => void publish()}
+                    disabled={busy || (state.pendingChanges === 0 && state.publishedInDb)}
+                    className="bg-signal-strong hover:bg-signal-strong"
+                  >
+                    Опубликовать
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <div className="grid min-w-[820px] grid-cols-[minmax(0,1fr)_repeat(7,90px)] items-end gap-1 border-b border-border px-4 py-2 text-3xs font-semibold text-muted-foreground">
@@ -155,13 +242,33 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
                   <span className="block font-medium">{ABILITY_LABEL[ability]}</span>
                   <span className="block font-mono text-3xs text-muted-foreground">{ability}</span>
                 </span>
-                {MATRIX_ROLES.map((role) => (
-                  <span key={role} className="flex justify-center">
-                    {abilitiesByRole.get(role)?.has(ability)
-                      ? <CheckCircle2 className="h-4 w-4 text-success-strong" aria-label={`${handoverRoleLabel(role)}: разрешено`} />
-                      : <span className="text-muted-foreground" aria-label={`${handoverRoleLabel(role)}: недоступно`}>—</span>}
-                  </span>
-                ))}
+                {MATRIX_ROLES.map((role) => {
+                  const allowed = abilitiesByRole.get(role)?.has(ability) ?? false;
+                  const mark = allowed
+                    ? <CheckCircle2 className="h-4 w-4 text-success-strong" />
+                    : <span className="text-muted-foreground">—</span>;
+                  if (!canEdit || !grants) {
+                    return (
+                      <span key={role} className="flex justify-center"
+                        aria-label={`${handoverRoleLabel(role)}: ${allowed ? 'разрешено' : 'недоступно'}`}>
+                        {mark}
+                      </span>
+                    );
+                  }
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void toggle(role, ability)}
+                      aria-pressed={allowed}
+                      aria-label={`${handoverRoleLabel(role)} — ${ABILITY_LABEL[ability]}: ${allowed ? 'разрешено' : 'недоступно'}`}
+                      className="flex min-h-9 items-center justify-center rounded hover:bg-signal/10 disabled:opacity-50"
+                    >
+                      {mark}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>

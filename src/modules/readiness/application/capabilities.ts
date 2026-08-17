@@ -1,99 +1,21 @@
 import type { ActingRole } from '@/lib/types';
+import {
+  DEFAULT_ACCESS_MATRIX,
+  abilitiesForRole,
+  isReadinessRole,
+  type ReadinessAccessMatrix,
+} from '../domain/access-matrix';
+import {
+  READINESS_ABILITIES,
+  type ReadinessAbility,
+  type ReadinessRole,
+} from '../domain/capability-defaults';
 
-export const READINESS_ABILITIES = [
-  'readiness.read',
-  'readiness.shift.manage',
-  'readiness.handover.prepare',
-  'readiness.handover.decide',
-  'readiness.inspection.manage',
-  // Зафиксировать замечание может любой, кто работает со сменой; разбирать,
-  // закрывать и отклонять — только диспетчер, механик и администратор.
-  'readiness.defect.report',
-  'readiness.defect.manage',
-  'readiness.meter.manage',
-  'readiness.maintenance.manage',
-  'readiness.permit.edit',
-  'readiness.permit.approve_dispatcher',
-  'readiness.permit.approve_admin',
-  'readiness.rules.manage',
-  'readiness.audit.read',
-  'readiness.audit.export',
-] as const;
-
-export type ReadinessAbility = (typeof READINESS_ABILITIES)[number];
-export type ReadinessRole =
-  | 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'ASSISTANT'
-  | 'MECHANIC' | 'FOREMAN' | 'SAFETY_ENGINEER';
-
-const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> = {
-  ADMIN: [
-    'readiness.read',
-    // В ОРИОНе обязанности механика исполняет администратор, поэтому разбор
-    // дефектов у него прямой, а не только через режим «действую за механика».
-    'readiness.defect.report',
-    'readiness.defect.manage',
-    'readiness.permit.approve_admin',
-    'readiness.rules.manage',
-    'readiness.audit.read',
-    'readiness.audit.export',
-  ],
-  DISPATCHER: [
-    'readiness.read',
-    'readiness.defect.report',
-    'readiness.defect.manage',
-    'readiness.handover.decide',
-    'readiness.permit.approve_dispatcher',
-    'readiness.audit.read',
-  ],
-  OPERATOR: [
-    'readiness.read',
-    'readiness.shift.manage',
-    'readiness.handover.prepare',
-    'readiness.defect.report',
-  ],
-  ASSISTANT: ['readiness.defect.report'],
-  MECHANIC: [
-    'readiness.read',
-    // Механик возвращает технику после ремонта — это та же передача смены,
-    // что готовит оператор. Раньше право было зашито в команду отдельной
-    // проверкой «администратор за механика» и в матрице не значилось.
-    'readiness.handover.prepare',
-    'readiness.permit.edit',
-    'readiness.inspection.manage',
-    'readiness.defect.report',
-    'readiness.defect.manage',
-    'readiness.meter.manage',
-    'readiness.maintenance.manage',
-  ],
-  // Мастер отвечает за ход работ на участке: видит контур и фиксирует
-  // замечания, но не закрывает дефекты и не решает по допуску — это
-  // диспетчер и механик.
-  FOREMAN: [
-    'readiness.read',
-    'readiness.defect.report',
-    'readiness.audit.read',
-  ],
-  // Инженер ОТ — охрана труда: осмотры и наряды-допуски, разбор замечаний
-  // по безопасности. Смену не запускает и не принимает.
-  SAFETY_ENGINEER: [
-    'readiness.read',
-    'readiness.permit.edit',
-    'readiness.inspection.manage',
-    'readiness.defect.report',
-    'readiness.defect.manage',
-    'readiness.audit.read',
-  ],
-};
-
-const READINESS_ROLES = new Set<ReadinessRole>([
-  'ADMIN',
-  'DISPATCHER',
-  'OPERATOR',
-  'ASSISTANT',
-  'MECHANIC',
-  'FOREMAN',
-  'SAFETY_ENGINEER',
-]);
+// Словарь полномочий и значения по умолчанию переехали в домен: ими
+// пользуется и проверка прав, и редактируемая матрица доступов. Переэкспорт
+// оставлен, чтобы прежние импорты из этого модуля продолжали работать.
+export { READINESS_ABILITIES, isReadinessRole };
+export type { ReadinessAbility, ReadinessRole };
 
 export interface ReadinessActor {
   id: string;
@@ -106,15 +28,17 @@ export interface ReadinessActingAudit {
   actingAs: ActingRole;
 }
 
-export function isReadinessRole(role: string): role is ReadinessRole {
-  return READINESS_ROLES.has(role as ReadinessRole);
-}
-
-export function resolveReadinessCapabilities(role: string): ReadonlySet<ReadinessAbility> {
-  if (!isReadinessRole(role)) {
-    return new Set();
-  }
-  return new Set(ROLE_ABILITIES[role]);
+/**
+ * Права роли по действующей матрице.
+ *
+ * `matrix` не задан — берутся значения по умолчанию из кода. Так работает
+ * контур у организации, которая свою матрицу ещё не публиковала.
+ */
+export function resolveReadinessCapabilities(
+  role: string,
+  matrix: ReadinessAccessMatrix = DEFAULT_ACCESS_MATRIX,
+): ReadonlySet<ReadinessAbility> {
+  return abilitiesForRole(matrix, role);
 }
 
 /**
@@ -128,21 +52,30 @@ export function resolveReadinessCapabilities(role: string): ReadonlySet<Readines
  */
 export function effectiveReadinessCapabilities(
   actorRole: string,
-  actingAs: string | null | undefined
+  actingAs: string | null | undefined,
+  matrix: ReadinessAccessMatrix = DEFAULT_ACCESS_MATRIX,
 ): ReadonlySet<ReadinessAbility> {
-  const own = resolveReadinessCapabilities(actorRole);
+  const own = resolveReadinessCapabilities(actorRole, matrix);
   if (!actingAs) return own;
   // Замещать роль может только администратор — то же правило, что в canActAs.
   if (actorRole !== 'ADMIN' || !isReadinessRole(actingAs)) return own;
-  return new Set([...own, ...ROLE_ABILITIES[actingAs]]);
+  // Права ИСПОЛНЯЕМОЙ роли, а не сумма со своими.
+  //
+  // Раньше здесь было объединение, и «Действую как механик» ничего не
+  // ограничивало: администратор сохранял все свои полномочия и мог, например,
+  // менять матрицу доступов из режима механика. Журнал при этом писал
+  // «действует как механик» — то есть подпись расходилась с тем, что человек
+  // на самом деле мог. Замещение — исполнение роли, а не добавка к своей.
+  return abilitiesForRole(matrix, actingAs);
 }
 
 export async function resolveAuditedReadinessCapabilities(
   actor: ReadinessActor,
   actingAs: ActingRole | null,
-  recordAudit: (entry: ReadinessActingAudit) => Promise<void>
+  recordAudit: (entry: ReadinessActingAudit) => Promise<void>,
+  matrix: ReadinessAccessMatrix = DEFAULT_ACCESS_MATRIX,
 ): Promise<ReadonlySet<ReadinessAbility>> {
-  const actual = resolveReadinessCapabilities(actor.role);
+  const actual = resolveReadinessCapabilities(actor.role, matrix);
   if (actingAs === null) {
     return actual;
   }
@@ -159,18 +92,19 @@ export async function resolveAuditedReadinessCapabilities(
     actingAs,
   });
 
-  return new Set([...actual, ...ROLE_ABILITIES[actingAs]]);
+  // Как и в effectiveReadinessCapabilities — права исполняемой роли, а не сумма.
+  return abilitiesForRole(matrix, actingAs);
 }
 
 export function hasReadinessCapability(
   capabilities: ReadonlySet<ReadinessAbility>,
-  ability: ReadinessAbility
+  ability: ReadinessAbility,
 ): boolean {
   return capabilities.has(ability);
 }
 
 export function serializeReadinessCapabilities(
-  capabilities: ReadonlySet<ReadinessAbility>
+  capabilities: ReadonlySet<ReadinessAbility>,
 ): ReadinessAbility[] {
   return READINESS_ABILITIES.filter((ability) => capabilities.has(ability));
 }
