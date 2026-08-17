@@ -15,3 +15,19 @@ export {
 } from '@/services/users/user-service';
 // eslint-disable-next-line no-restricted-imports -- intentional public re-export facade during the services-to-modules migration
 export type { UpdateUserInput } from '@/services/users/user-service';
+
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
+export {
+  listUserDocuments,
+  listUserDocumentTypes,
+  listUserDocumentTypesForAdmin,
+  listDocumentsNeedingAttention,
+  createUserDocument,
+  updateUserDocument,
+  deleteUserDocument,
+  createUserDocumentType,
+  updateUserDocumentType,
+  deleteUserDocumentType,
+} from '@/services/users/user-documents';
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade during the services-to-modules migration
+export type { UserDocumentInput, UserDocumentContext, UserDocumentTypeInput } from '@/services/users/user-documents';

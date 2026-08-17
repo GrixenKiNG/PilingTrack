@@ -12,6 +12,7 @@ import {
   resolveRisk,
   useEntityHistory,
 } from '@/components/piling/ops-shell';
+import { UserDocuments } from './user-documents';
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -51,13 +52,18 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
       status={<OpsRiskBadge level={risk.level} label={risk.label} />}
     >
       <Tabs defaultValue="overview" className="gap-3">
-        <TabsList className="grid h-auto w-full grid-cols-5 rounded-md bg-muted p-1">
+        <TabsList className="grid h-auto w-full grid-cols-6 rounded-md bg-muted p-1">
           <TabsTrigger value="overview" className="min-w-0 px-1 text-xs">Обзор</TabsTrigger>
+          <TabsTrigger value="documents" className="min-w-0 px-1 text-xs">Документы</TabsTrigger>
           <TabsTrigger value="assignment" className="min-w-0 px-1 text-xs">Закрепление</TabsTrigger>
           <TabsTrigger value="activity" className="min-w-0 px-1 text-xs">Активность</TabsTrigger>
           <TabsTrigger value="access" className="min-w-0 px-1 text-xs">Доступ</TabsTrigger>
           <TabsTrigger value="history" className="min-w-0 px-1 text-xs">История</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="documents">
+          <UserDocuments userId={user.id} />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-2">
           <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">

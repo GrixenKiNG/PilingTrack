@@ -33,6 +33,7 @@ import {
 } from '@/components/piling/ops-shell';
 import { useUsersList } from './use-users-list';
 import { CreateUserDialog, EditUserDialog, DeleteUserDialog } from './user-dialogs';
+import { UserDocumentTypesDialog } from './user-document-types-dialog';
 import {
   computeUserKpis,
   filterOperationalUsers,
@@ -89,6 +90,7 @@ export function AdminUsers() {
   const [search, setSearch] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showTypes, setShowTypes] = useState(false);
   const [editUser, setEditUser] = useState<OperationalUserDTO | null>(null);
   const [deleteUser, setDeleteUser] = useState<OperationalUserDTO | null>(null);
 
@@ -208,9 +210,17 @@ export function AdminUsers() {
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['запись', 'записи', 'записей'])}`}
       subtitle="Доступы, закрепления и фактическая активность сотрудников"
       actions={
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
-          <Plus className="h-4 w-4" />Новый пользователь
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {/* Справочник видов документов живёт здесь, а не в «Справочниках»:
+              там перечни свайных работ (марки свай, типы бурения, причины
+              простоя), а это перечень про людей и он нужен рядом с ними. */}
+          <Button variant="outline" className="h-10" onClick={() => setShowTypes(true)}>
+            Виды документов
+          </Button>
+          <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
+            <Plus className="h-4 w-4" />Новый пользователь
+          </Button>
+        </div>
       }
     />
   );
@@ -258,6 +268,7 @@ export function AdminUsers() {
         />
       </OpsPage>
 
+      <UserDocumentTypesDialog open={showTypes} onOpenChange={setShowTypes} />
       <CreateUserDialog open={showCreate} onOpenChange={setShowCreate} onSubmit={create} />
       <EditUserDialog open={editUser !== null} user={editUser} onOpenChange={(open) => !open && setEditUser(null)} onSubmit={update} />
       <DeleteUserDialog open={deleteUser !== null} user={deleteUser} onOpenChange={(open) => !open && setDeleteUser(null)} onConfirm={remove} />
