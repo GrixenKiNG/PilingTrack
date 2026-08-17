@@ -87,6 +87,42 @@ export async function assertCanAccessMediaEntity(
  * media is the source of truth once it exists, and entity ownership might
  * not exist (draft) or may have changed (admin reassigned the report).
  */
+export interface ReadableMediaRow extends MediaContext {
+  id: string;
+  key: string;
+  thumbnailKey: string | null;
+  isDeleted: boolean;
+  uploadStatus: string;
+}
+
+/**
+ * Отобрать из пачки записи, которые актору можно читать.
+ *
+ * Пакетная выдача ссылок отличается от выдачи по одной тем, что проверка
+ * доступа перестаёт быть «пропустить или ответить 403» и становится отбором:
+ * одна чужая запись в ответе утечёт молча, её никто не заметит. Поэтому
+ * решение по каждой строке принимает тот же `assertCanAccessMedia`, что и
+ * одиночный маршрут, — своей копии правил здесь нет и быть не должно.
+ *
+ * Запрещённая запись именно выбрасывается, а не роняет весь запрос: список из
+ * двадцати миниатюр не должен переставать работать целиком из-за одной чужой
+ * строки. Заодно ответ не сообщает, существует ли недоступный id.
+ */
+export function filterReadableMedia(
+  actor: ActorLike,
+  rows: ReadableMediaRow[],
+): ReadableMediaRow[] {
+  return rows.filter((media) => {
+    if (media.isDeleted || media.uploadStatus !== 'completed') return false;
+    try {
+      assertCanAccessMedia(actor, media, 'read');
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 export function assertCanAccessMedia(
   actor: ActorLike,
   media: MediaContext,

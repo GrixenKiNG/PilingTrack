@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Image as ImageIcon, X } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
+import { getThumbnailUrl } from '@/lib/media-thumbnails';
 
 interface Props {
   reportId: string;
@@ -35,8 +36,10 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
         }
         if (!photoId || cancelled) return;
         setMediaId(photoId);
-        const dl = await authFetch(`/api/media/${photoId}/download?thumb=1`);
-        if (dl.ok && !cancelled) setThumbUrl((await dl.json()).url);
+        // Через накопитель, а не своим запросом: строки списка монтируются
+        // одновременно, и их ссылки уезжают на сервер одной пачкой.
+        const url = await getThumbnailUrl(photoId);
+        if (url && !cancelled) setThumbUrl(url);
       } catch {
         /* silent — list view is best-effort */
       }

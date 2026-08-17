@@ -15,6 +15,7 @@ import Image from 'next/image';
 import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { getThumbnailUrl } from '@/lib/media-thumbnails';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 interface MediaRecord {
@@ -60,9 +61,10 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       const list: MediaRecord[] = json.data || [];
       const tiles = await Promise.all(
         list.map(async (m): Promise<PhotoTile> => {
-          const which = m.thumbnailKey ? '?thumb=1' : '';
-          const dl = await authFetch(`/api/media/${m.id}/download${which}`);
-          const thumbUrl = dl.ok ? (await dl.json()).url : null;
+          // Через накопитель: плитки грузятся разом, и ссылки на них уезжают
+          // одним запросом вместо одного на плитку. Про отсутствующую
+          // миниатюру решает сервер — он сам откатывается к оригиналу.
+          const thumbUrl = await getThumbnailUrl(m.id);
           return { ...m, thumbUrl, fullUrl: null };
         })
       );
