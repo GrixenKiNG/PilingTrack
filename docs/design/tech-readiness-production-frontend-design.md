@@ -1,3 +1,9 @@
+> ⚠️ **Документ заменён.** Действующая спецификация модуля —
+> [`docs/product/tech-readiness-module-spec.md`](../product/tech-readiness-module-spec.md).
+> Этот файл — проектный документ, написанный до реализации; он местами разошёлся
+> с кодом и сохранён как история проектирования. Требования из него брать нельзя.
+
+---
 # Frontend Design: production-модуль «Техготовность»
 
 **Статус:** Approval-ready design; implementation is blocked until the contracts in §10.8 are resolved  

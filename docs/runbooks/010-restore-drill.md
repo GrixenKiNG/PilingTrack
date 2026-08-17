@@ -53,6 +53,7 @@ docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_
 | Дата | Дамп | Результат | Время restore | Проверил |
 |---|---|---|---|---|
 | **2026-07-17** | `pilingtrack-20260717-033347.sql.gz` (221 KB) | ✅ Без ошибок. 58 таблиц; Report=131, Crew=8, Equipment=8, User=13, Media(equipment)=19, ModuleLayoutTemplate=7, SiteWeeklyTrend=17; last migration `20260712090000_tenant_settings` (= v2.7.0). Дамп захватил данные, загруженные накануне (фото техники, раскладки) — цикл «изменение → ночной бэкап → восстановление» подтверждён. | ~1 с (БД 16 МБ) | Claude + владелец |
+| **2026-08-13** — **источник: off-site копия из R2**, а не файл с VPS | `pilingtrack-20260813-033928.sql.gz` (253 KB) | ✅ Без ошибок. Копия скачана из `R2:pilingtrack/db-backups/`, sha256 совпал с ночным дампом на VPS (`2b48de3f…`), `pg_restore --list` показал 481 объект. Восстановлено в чистую `pilingtrack_r2drill`: 58 таблиц; Report=153, Crew=8, Equipment=8, User=13, Inspection=1, MaintenanceRecord=1; last migration `20260712090000_tenant_settings`, применено 35 из 54 миграций репозитория (прод на v2.8.0). Всего в R2 44 копии, 9.85 МБ. | ~1 с | Claude |
 
 ## Ограничения (честно)
 
@@ -61,5 +62,22 @@ docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_
   отдельное решение (см. docs/audit.md A-1).
 - Драйв на локальном Docker-Postgres той же мажорной версии; на чужом хосте
   восстановление не репетировалось.
-- Off-site копию из R2 стоит проверить тем же способом при следующем драйве
-  (скачивание через rclone/aws-cli с VPS).
+- ~~Off-site копию из R2 стоит проверить тем же способом~~ — сделано
+  13.08.2026, см. журнал выше. Off-site копия побайтово равна ночному дампу и
+  восстанавливается. Процедура проверки:
+
+  ```bash
+  # на VPS: скачать копию из R2 теми же ключами, что использует backup-postgres.sh
+  ENV_FILE=/opt/pilingtrack/.env
+  export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
+         RCLONE_CONFIG_R2_REGION=auto RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+  export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$(grep -E '^S3_ACCESS_KEY_ID=' $ENV_FILE | tail -1 | cut -d= -f2-)"
+  export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$(grep -E '^S3_SECRET_ACCESS_KEY=' $ENV_FILE | tail -1 | cut -d= -f2-)"
+  export RCLONE_CONFIG_R2_ENDPOINT="$(grep -E '^S3_ENDPOINT=' $ENV_FILE | tail -1 | cut -d= -f2-)"
+  rclone lsl R2:pilingtrack/db-backups/ | tail -5
+  rclone copy R2:pilingtrack/db-backups/<файл> /tmp/r2pull/
+  sha256sum /tmp/r2pull/<файл> /var/backups/pilingtrack/<файл>   # должны совпасть
+  ```
+
+  Дальше — обычная процедура выше, но `scp` берёт файл из `/tmp/r2pull/`, а
+  не из `/var/backups/`. Не забыть `rm -rf /tmp/r2pull` в конце.
