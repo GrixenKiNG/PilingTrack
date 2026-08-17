@@ -17,7 +17,7 @@ const endpoints = [
   '/api/sites/all',
   '/api/crews/all',
   '/api/dictionary/all',
-  '/api/equipment/all',
+  '/api/equipment',
 ];
 
 let authToken = '';

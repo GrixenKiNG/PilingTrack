@@ -188,7 +188,7 @@ async function testAdminFlow() {
   text = await getPageText();
   log('Equipment Page', text.length > 30 ? 'PASS' : 'WARN', `page text length: ${text.length}`);
   
-  const equipResp = await apiCall(adminCookies, 'GET', '/api/equipment/all');
+  const equipResp = await apiCall(adminCookies, 'GET', '/api/equipment');
   if (equipResp.ok && equipResp.json) {
     const equip = Array.isArray(equipResp.json) ? equipResp.json : (equipResp.json.equipment || []);
     log('Equipment API', 'PASS', `${equip.length} equipment items`);
@@ -260,7 +260,7 @@ async function testAdminFlow() {
   text = await getPageText();
   log('Users Page', text.length > 30 ? 'PASS' : 'WARN', `page text length: ${text.length}`);
   
-  const usersResp = await apiCall(adminCookies, 'GET', '/api/users/manage');
+  const usersResp = await apiCall(adminCookies, 'GET', '/api/users');
   if (usersResp.status !== 405 && usersResp.ok && usersResp.json) {
     const users = Array.isArray(usersResp.json) ? usersResp.json : (usersResp.json.users || []);
     log('Users API', 'PASS', `${users.length} users loaded`);
@@ -382,7 +382,7 @@ async function testRBAC() {
   
   // Endpoints operator should NOT access
   const forbiddenForOperator = [
-    { path: '/api/users/manage', method: 'GET', name: 'User Management' },
+    { path: '/api/users', method: 'GET', name: 'User Management' },
     { path: '/api/reports/all', method: 'GET', name: 'All Reports (admin)' },
     { path: '/api/reports/admin-upsert', method: 'POST', name: 'Admin Report Upsert' },
   ];

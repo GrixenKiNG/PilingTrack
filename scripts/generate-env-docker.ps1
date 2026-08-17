@@ -43,6 +43,14 @@ POSTGRES_DB=pilingtrack
 DATABASE_URL=postgresql://piling:$pgPassword@postgres:5432/pilingtrack?schema=public
 DATABASE_URL_POSTGRES=postgresql://piling:$pgPassword@postgres:5432/pilingtrack?schema=public
 DATABASE_PROVIDER=postgres
+# Роль рантайма без BYPASSRLS — только под ней политики tenant_isolation_*
+# реально работают. Оставлено закомментированным намеренно: роли ещё нет,
+# на чистой машине приложение бы не поднялось. Завести её после первого
+# запуска migrate — docs/runbooks/011-app-db-role.md, там же пароль.
+# ВНИМАНИЕ: если перегенерировать этот файл на работающем контуре, строки
+# ниже пропадут и рантайм молча вернётся к роли-владельцу.
+#APP_DB_USER=pilingtrack_app
+#APP_DB_PASSWORD=
 DATABASE_LOG_QUERIES=false
 
 # ============================================================

@@ -16,11 +16,8 @@ const routes = [
   'src/app/api/dictionary/manage/route.ts',
   'src/app/api/equipment/route.ts',
   'src/app/api/equipment/[id]/route.ts',
-  'src/app/api/equipment/all/route.ts',
-  'src/app/api/equipment/manage/route.ts',
   'src/app/api/feedback/events/route.ts',
   'src/app/api/feedback/stream/route.ts',
-  'src/app/api/recognize/route.ts',
   'src/app/api/reports/admin-upsert/route.ts',
   'src/app/api/reports/all/route.ts',
   'src/app/api/reports/edit/route.ts',
@@ -37,7 +34,6 @@ const routes = [
   'src/app/api/system/route.ts',
   'src/app/api/telegram/configs/route.ts',
   'src/app/api/users/route.ts',
-  'src/app/api/users/manage/route.ts',
   'src/app/api/analytics/sites/route.ts',
 ];
 

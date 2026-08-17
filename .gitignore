@@ -162,3 +162,13 @@ public/prototypes/
 # и не должны публиковаться на orionpiling.ru
 /public/orion-*-concept.html
 /public/orion-tender-industrial-preview.html
+
+# Инструменты агентов — как и .claude/ выше, в репозиторий не идут:
+# это установленные библиотеки навыков и кэши, а не код продукта.
+.agents/
+skills/
+skills-lock.json
+segments.json
+.cluster/
+.opencode/
+config/mcp-tools-cache.json

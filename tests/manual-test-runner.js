@@ -291,7 +291,7 @@ async function testRBAC() {
   
   // Test admin API endpoints
   const adminEndpoints = [
-    '/api/users/manage',
+    '/api/users',
     '/api/reports/admin-upsert',
   ];
   

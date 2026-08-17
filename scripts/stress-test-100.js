@@ -15,7 +15,7 @@ const endpoints = [
   '/api/sites/all',
   '/api/crews/all',
   '/api/dictionary/all',
-  '/api/equipment/all',
+  '/api/equipment',
 ];
 
 let total = 0, errors = 0, successes = 0;

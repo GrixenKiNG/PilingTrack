@@ -55,7 +55,7 @@ CODE=$(HTTP "$BASE/api/auth/pin" -X POST -H 'Content-Type: application/json' -d 
 echo ""
 echo -e "${CYAN}${BOLD}[3/9] Защита API (без токена → 401)${NC}"
 
-for EP in "equipment/all" "sites/all" "reports/all" "crews/all" "users" "analytics/sites" "dictionary/all" "telegram/configs"; do
+for EP in "equipment" "sites/all" "reports/all" "crews/all" "users" "analytics/sites" "dictionary/all" "telegram/configs"; do
   CODE=$(HTTP "$BASE/api/$EP")
   [ "$CODE" = "401" ] && pass "GET /api/$EP → 401" || fail "GET /api/$EP" "got $CODE"
 done
@@ -76,21 +76,24 @@ CODE=$(HTTP "$BASE/api/users" -H "Authorization: Bearer $ADMIN_ID")
 echo ""
 echo -e "${CYAN}${BOLD}[5/9] Оборудование CRUD${NC}"
 
-EQ_LIST=$(JSON "$BASE/api/equipment/all" -H "Authorization: Bearer $ADMIN_ID")
-EQ_COUNT=$(echo "$EQ_LIST" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('equipment',[])))" 2>/dev/null || echo "0")
+# /api/equipment/all и /api/equipment/manage удалены как дубли без
+# потребителей (у первого вдобавок не было фильтра по тенанту).
+# Живой контур: список — GET /api/equipment, запись — POST /api/equipment и
+# PUT/DELETE /api/equipment/{id}.
+EQ_LIST=$(JSON "$BASE/api/equipment" -H "Authorization: Bearer $ADMIN_ID")
+EQ_COUNT=$(echo "$EQ_LIST" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('data',[])))" 2>/dev/null || echo "0")
 [ "$EQ_COUNT" -ge 1 ] && pass "GET equipment → $EQ_COUNT items" || fail "GET equipment" "got $EQ_COUNT"
 
-CREATE_RESP=$(JSON "$BASE/api/equipment/manage" -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_ID" \
+CREATE_RESP=$(JSON "$BASE/api/equipment" -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_ID" \
   -d '{"name":"TestUnit","model":"T-100","qty":1,"description":"Тестовая единица"}')
 NEW_EQ_ID=$(echo "$CREATE_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('equipment',{}).get('id','FAIL'))" 2>/dev/null || echo "FAIL")
 [ "$NEW_EQ_ID" != "FAIL" ] && pass "CREATE equipment → id=$NEW_EQ_ID" || fail "CREATE equipment" "$CREATE_RESP"
 
-CODE=$(HTTP "$BASE/api/equipment/manage" -X PUT -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_ID" \
-  -d "{\"id\":\"$NEW_EQ_ID\",\"name\":\"TestUnit-Updated\"}")
+CODE=$(HTTP "$BASE/api/equipment/$NEW_EQ_ID" -X PUT -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_ID" \
+  -d "{\"name\":\"TestUnit-Updated\"}")
 [ "$CODE" = "200" ] && pass "UPDATE equipment → 200" || fail "UPDATE equipment" "got $CODE"
 
-CODE=$(HTTP "$BASE/api/equipment/manage" -X DELETE -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_ID" \
-  -d "{\"id\":\"$NEW_EQ_ID\"}")
+CODE=$(HTTP "$BASE/api/equipment/$NEW_EQ_ID" -X DELETE -H "Authorization: Bearer $ADMIN_ID")
 [ "$CODE" = "200" ] && pass "DELETE equipment → 200" || fail "DELETE equipment" "got $CODE"
 
 # ═══════════ SITES ═══════════
