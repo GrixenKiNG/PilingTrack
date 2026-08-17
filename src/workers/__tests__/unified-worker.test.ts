@@ -159,27 +159,41 @@ describe('Unified Worker Service', () => {
   });
 
   describe('Health check endpoint', () => {
+    // 15s timeout, not the default 5s: this is the FIRST test in the file, so its
+    // `import('@/workers/unified-worker')` is the one that pays Vite's transform
+    // cost for the whole worker module graph (unified-worker/* → @/lib/db,
+    // @/modules/equipment, @/modules/reports/.../rebuild, @/lib/pdf-generator —
+    // only the leaf modules are mocked, the graph itself is still transformed).
+    // The later tests re-import after vi.resetModules(), but the transform cache
+    // is already warm, so they cost ~0 and need no extra timeout.
+    //
+    // That cost scales with how many vitest workers compete for the transform
+    // pipeline — measured on a 16-core box: 1 worker 376ms, 8 → 608ms,
+    // 16 → 1.4s, 32 → 3.4s, 48 → 8.4s. It degrades smoothly and always completes
+    // (verified with a heartbeat probe: the event loop stays responsive the whole
+    // time, it is queueing on transforms, not hanging), so this is a cost, not a
+    // deadlock — do not "fix" it by chasing a bug in the worker module graph.
+    //
+    // Лимит стоит на тесте, а не на vi.waitFor ниже: дорогой здесь сам import,
+    // и он выполняется ДО ожидания — таймаут внутри waitFor до него не дошёл бы.
+    //
+    // If a test is ever added *before* this one, move this timeout to it: the cost
+    // belongs to whichever test imports the graph first, not to this test's assertions.
     it('returns health status with worker information', async () => {
       // Import to trigger server creation
       await import('@/workers/unified-worker');
 
-      // Wait for initialization.
-      //
-      // Таймаут задан явно: это первый тест в файле, и именно он оплачивает
-      // холодный импорт всего графа модулей воркера. Остальные waitFor ниже
-      // работают с уже загруженным модулем и укладываются в стандартную
-      // секунду, а этот на загруженной машине в неё иногда не попадал — один
-      // плавающий провал на пять полных прогонов.
+      // Wait for initialization
       await vi.waitFor(() => {
         expect(mocks.mockHttpListen).toHaveBeenCalled();
-      }, { timeout: 10_000 });
+      });
 
       // Health server should be created with correct port
       expect(mocks.mockHttpListen).toHaveBeenCalledWith(
         0, // WORKER_HEALTH_PORT
         expect.any(Function)
       );
-    });
+    }, 15_000);
   });
 
   describe('Worker lifecycle', () => {
