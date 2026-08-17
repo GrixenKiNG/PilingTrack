@@ -20,6 +20,9 @@ const itemSchema = z.object({
   provenance: z.string().max(120).optional().nullable(),
   photoRequired: z.boolean().default(false),
   required: z.boolean().default(true),
+  // Отрицательный ответ на такой пункт заводит дефект установки.
+  createsDefect: z.boolean().default(false),
+  defectSeverity: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional().nullable(),
   order: z.number().int().min(0),
 });
 const sectionSchema = z.object({

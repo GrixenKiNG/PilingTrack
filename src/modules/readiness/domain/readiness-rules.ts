@@ -64,6 +64,36 @@ export interface ReadinessBlockerRule {
   isActive: boolean;
 }
 
+/**
+ * Системная политика безопасности — правила, которые тенант не может ни
+ * отключить, ни смягчить.
+ *
+ * До этого все блокеры лежали в одном списке с флагом `isActive`, и
+ * администратор организации мог снять галочку с «Критический дефект» в
+ * «Настройки → Правила готовности». После этого машина с незакрытой
+ * критической неисправностью получала вердикт ALLOWED, и система честно
+ * разрешала запуск — то есть настройка позволяла легально отключить
+ * единственное правило, которое существует ради безопасности людей.
+ *
+ * Здесь только то, что защищает жизнь и здоровье. Всё остальное —
+ * операционная политика организации: требовать ли наряд-допуск вообще,
+ * останавливать ли работу из-за просроченного ТО, возвращать ли оператору
+ * неполный осмотр. Эти решения принимает владелец, и они остаются в его руках.
+ */
+export const SYSTEM_SAFETY_BLOCKERS: Partial<Record<BlockerCondition, {
+  action: BlockerAction;
+  reason: string;
+}>> = {
+  CRITICAL_DEFECT: {
+    action: 'DENY_START',
+    reason: 'Незакрытая критическая неисправность запрещает эксплуатацию. Правило системное и не отключается.',
+  },
+};
+
+export function isSystemSafetyBlocker(condition: BlockerCondition): boolean {
+  return SYSTEM_SAFETY_BLOCKERS[condition] !== undefined;
+}
+
 export type RuleSetStatus = 'DRAFT' | 'PUBLISHED';
 
 export interface ReadinessRuleSet {
@@ -88,8 +118,18 @@ export const DEFAULT_READINESS_RULES: ReadinessRuleSet = {
   ],
   blockers: [
     { condition: 'CRITICAL_DEFECT', action: 'DENY_START', isActive: true },
+    // Наряд-допуск — информационный фактор, а не пропуск на работу: решение
+    // владельца от 15.08.2026. Без наряда оператор работать может.
+    //
+    // Правило «наряд обязателен» остаётся выключенным: при выключенном правиле
+    // оценщик сам выдаёт замечание «наряд не оформлен, по правилам не
+    // требуется» (WORK_PERMIT_MISSING_OPTIONAL). Включать его с действием
+    // WARN_ONLY нельзя — интерфейс тогда пишет «наряд обязателен» и при этом
+    // ничего не запрещает, то есть противоречит сам себе.
     { condition: 'VALID_WORK_PERMIT_REQUIRED', action: 'DENY_START', isActive: false },
-    { condition: 'PERMIT_EXPIRED', action: 'DENY_START', isActive: true },
+    // Просроченный наряд — замечание, а не остановка смены. Тенант может
+    // ужесточить оба правила в «Настройки → Правила готовности», не трогая код.
+    { condition: 'PERMIT_EXPIRED', action: 'WARN_ONLY', isActive: true },
     // Просроченное ТО снижает балл и показывает замечание, но установку не
     // останавливает — решение владельца от 2026-08-08. Тенант может ужесточить
     // правило в «Настройки → Правила готовности», не трогая код.
@@ -162,6 +202,13 @@ export function sanitizeRuleSet(
   const blockersInput = Array.isArray(raw.blockers) ? raw.blockers : fallback.blockers;
   const blockersByCondition = new Map(blockersInput.map((item) => [item?.condition, item]));
   const blockers = BLOCKER_CONDITIONS.map((condition) => {
+    // Системное правило безопасности не берёт значения из входных данных
+    // вообще: ни из присланного набора, ни из предыдущего сохранённого. Иначе
+    // однажды сохранённое «отключено» пережило бы введение этого слоя.
+    const system = SYSTEM_SAFETY_BLOCKERS[condition];
+    if (system) {
+      return { condition, action: system.action, isActive: true } satisfies ReadinessBlockerRule;
+    }
     const found = blockersByCondition.get(condition);
     const base = fallback.blockers.find((item) => item.condition === condition);
     const action = found?.action ?? base?.action ?? 'DENY_START';

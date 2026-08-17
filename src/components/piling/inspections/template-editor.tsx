@@ -74,6 +74,8 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           provenance: it.provenance ?? '',
           photoRequired: it.photoRequired ?? false,
           required: it.required ?? true,
+          createsDefect: it.createsDefect ?? false,
+          defectSeverity: (it.defectSeverity ?? 'NORMAL') as 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL',
         })),
       })));
     } catch {
@@ -131,6 +133,8 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           provenance: it.provenance.trim() || null,
           photoRequired: it.photoRequired,
           required: it.required,
+          createsDefect: it.createsDefect,
+          defectSeverity: it.createsDefect ? it.defectSeverity : null,
           order: ii,
         })),
       })),

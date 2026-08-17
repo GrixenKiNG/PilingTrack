@@ -1,5 +1,6 @@
+import type {ReadinessAccessMatrix} from '../../domain/access-matrix';
 import type {Prisma} from '@/generated/postgres-client/client';
-import {recordChainedReadinessAudit} from '@/core/infrastructure/audit-log-service';
+import {recordChainedReadinessAudit} from '../../infrastructure/audit/record-audit';
 import {resolveReadinessCapabilities} from '../capabilities';
 import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from '../command-pipeline/idempotency';
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
@@ -16,6 +17,9 @@ import type {
 export interface DefectCommandContext {
   tenantId: string; actorId: string; actorName: string; actorRole: string;
   actingAs: string | null; requestId: string; correlationId: string;
+  /** Матрица доступов организации; приходит из контекста запроса.
+   *  Не задана — действуют значения по умолчанию из кода. */
+  accessMatrix?: ReadinessAccessMatrix;
 }
 
 export const serializeDefect = (row: DefectRow) => ({

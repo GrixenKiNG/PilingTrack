@@ -48,6 +48,9 @@ export interface ItemDraft {
   provenance: string;
   photoRequired: boolean;
   required: boolean;
+  /** Отрицательный ответ на пункт заводит дефект установки. */
+  createsDefect: boolean;
+  defectSeverity: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
 }
 
 export interface SectionDraft {
@@ -70,6 +73,8 @@ export const emptyItem = (): ItemDraft => ({
   provenance: '',
   photoRequired: false,
   required: true,
+  createsDefect: false,
+  defectSeverity: 'NORMAL',
 });
 
 export const emptySection = (): SectionDraft => ({
@@ -173,6 +178,43 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           />
           Требуется фото
         </label>
+      </div>
+
+      {/*
+        Связь пункта с дефектом. До этого осмотр видел неисправность и не мог о
+        ней сообщить: ответ «нет» снижал балл и на этом всё заканчивалось.
+        Уровень «Критичный» останавливает эксплуатацию системным правилом.
+      */}
+      <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-2">
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs select-none">
+          <input
+            type="checkbox"
+            checked={item.createsDefect}
+            onChange={(e) => onChange({ createsDefect: e.target.checked })}
+            className="rounded"
+          />
+          Ответ «нет» заводит дефект
+        </label>
+        {item.createsDefect && (
+          <label className="flex items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">Уровень</span>
+            <select
+              value={item.defectSeverity}
+              onChange={(e) => onChange({ defectSeverity: e.target.value as ItemDraft['defectSeverity'] })}
+              className="rounded border border-input bg-background px-2 py-1 text-xs"
+            >
+              <option value="LOW">Низкий — наблюдение</option>
+              <option value="NORMAL">Обычный — в плановом порядке</option>
+              <option value="HIGH">Высокий — как можно скорее</option>
+              <option value="CRITICAL">Критичный — эксплуатация запрещена</option>
+            </select>
+          </label>
+        )}
+        {item.createsDefect && item.defectSeverity === 'CRITICAL' && (
+          <span className="text-3xs text-destructive-strong">
+            Незакрытый дефект этого уровня заблокирует запуск установки.
+          </span>
+        )}
       </div>
     </div>
   );

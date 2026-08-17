@@ -2,7 +2,9 @@ import { db } from '@/lib/db';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { recordMeterReadingInTx } from '@/modules/equipment';
+import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
+import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } from '../../domain/defect-rules';
 import {
   composeChecklist, selectBlocks, requiredBlockTypes, type CandidateBlock,
 } from '../../domain/block-composition';
@@ -45,7 +47,8 @@ export async function startToInspection(
       title: s.title, order: s.order,
       items: s.items.map((i) => ({
         id: i.id, text: i.text, answerType: i.answerType, unit: i.unit, norm: i.norm,
-        provenance: i.provenance, required: i.required, photoRequired: i.photoRequired, order: i.order,
+        provenance: i.provenance, required: i.required, photoRequired: i.photoRequired,
+        createsDefect: i.createsDefect, defectSeverity: i.defectSeverity, order: i.order,
       })),
     })),
   }));
@@ -73,21 +76,34 @@ export async function startToInspection(
   const baseTemplateId = baseBlock.id;
 
   // Sequential create (record → inspection): the FK needs the record id first.
-  const record = await db.maintenanceRecord.create({
-    data: {
-      tenantId: ctx.tenantId, equipmentId: eq.id, type: input.level,
-      status: 'IN_PROGRESS', title: LEVEL_TITLE[input.level],
-      createdById: ctx.userId, startedAt: new Date(),
-    },
-  });
-  return db.inspection.create({
-    data: {
-      tenantId: ctx.tenantId, equipmentId: eq.id, templateId: baseTemplateId,
-      maintenanceRecordId: record.id, level: input.level, performedById: ctx.userId,
-      inspectionDate: toDate(input.inspectionDate),
-      shift: input.shift ?? null, engineHours: input.engineHours ?? null,
-      status: 'DRAFT', templateSnapshot: snapshot as unknown as Prisma.InputJsonValue,
-    },
+  // Обе записи и заказ снимка — одной транзакцией: начатый осмотр открывает
+  // наряд ТО, а открытый наряд авторитетный расчёт считает незакрытой работой.
+  // Без пересчёта брошенный осмотр держал бы балл готовности на прежнем
+  // значении, хотя запись висит «в работе» (симптом «24 зависших записи ТО»).
+  return db.$transaction(async (tx) => {
+    const record = await tx.maintenanceRecord.create({
+      data: {
+        tenantId: ctx.tenantId, equipmentId: eq.id, type: input.level,
+        status: 'IN_PROGRESS', title: LEVEL_TITLE[input.level],
+        createdById: ctx.userId, startedAt: new Date(),
+      },
+    });
+    const inspection = await tx.inspection.create({
+      data: {
+        tenantId: ctx.tenantId, equipmentId: eq.id, templateId: baseTemplateId,
+        maintenanceRecordId: record.id, level: input.level, performedById: ctx.userId,
+        inspectionDate: toDate(input.inspectionDate),
+        shift: input.shift ?? null, engineHours: input.engineHours ?? null,
+        status: 'DRAFT', templateSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+      },
+    });
+    await requestReadinessSnapshot(tx as typeof db, {
+      tenantId: ctx.tenantId, equipmentId: eq.id,
+      aggregateId: inspection.id, aggregateType: 'Inspection',
+      triggerType: 'INSPECTION_STARTED', triggerId: inspection.id,
+      occurredAt: record.startedAt ?? new Date(),
+    });
+    return inspection;
   });
 }
 
@@ -108,6 +124,7 @@ export async function startInspection(
     s.items.map((i) => ({
       id: i.id, sectionTitle: s.title, text: i.text, answerType: i.answerType,
       unit: i.unit, norm: i.norm, provenance: i.provenance, required: i.required, photoRequired: i.photoRequired,
+      createsDefect: i.createsDefect, defectSeverity: i.defectSeverity,
     })),
   );
 
@@ -169,6 +186,12 @@ export async function completeInspection(
     );
   }
   const healthScore = computeHealthScore(items, answers);
+  // Отрицательные ответы на пункты, помеченные администратором, превращаются в
+  // дефекты установки. Правило чистое и лежит в домене (defect-rules.ts).
+  const plannedDefects = planDefectsFromInspection({
+    items: ins.templateSnapshot as unknown as DefectRuleItem[],
+    answers: ins.answers.map((a) => ({ itemId: a.itemId, result: a.result, note: a.note })),
+  });
   const now = new Date();
   return db.$transaction(async (tx) => {
     const inspection = await tx.inspection.update({
@@ -198,6 +221,53 @@ export async function completeInspection(
         source: 'MANUAL',
         note: `Снято при осмотре ${ins.level}`,
       }, { tenantId: ctx.tenantId, recordedById: ins.performedById });
+    }
+    // Дефекты по отрицательным ответам. Дедупликация обязательна: без неё
+    // каждый сменный осмотр заводил бы новую запись на ту же неисправность и
+    // журнал утонул бы за неделю. Пока прежний дефект по этому пункту открыт,
+    // новый не создаётся — вместо этого запись остаётся одна и живёт своим
+    // циклом (разбор → устранение).
+    if (plannedDefects.length > 0) {
+      const openByKey = await tx.equipmentDefect.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          equipmentId: ins.equipmentId,
+          status: { in: ['OPEN', 'IN_WORK'] },
+          sourceKey: { in: plannedDefects.map((item) => inspectionDefectKey(ins.equipmentId, item.itemId)) },
+        },
+        select: { sourceKey: true },
+      });
+      const alreadyOpen = new Set(openByKey.map((row) => row.sourceKey));
+      const toCreate = plannedDefects.filter((item) =>
+        !alreadyOpen.has(inspectionDefectKey(ins.equipmentId, item.itemId)));
+      for (const planned of toCreate) {
+        const defect = await tx.equipmentDefect.create({
+          data: {
+            tenantId: ctx.tenantId,
+            equipmentId: ins.equipmentId,
+            severity: planned.severity,
+            title: planned.title,
+            description: planned.description,
+            node: planned.node,
+            inspectionId: id,
+            reportedById: ins.performedById,
+            sourceKey: inspectionDefectKey(ins.equipmentId, planned.itemId),
+          },
+          select: { id: true },
+        });
+        await tx.outboxEvent.createMany({
+          skipDuplicates: true,
+          data: [{
+            type: 'ReadinessSnapshotRequested', aggregateId: defect.id, aggregateType: 'EquipmentDefect',
+            tenantId: ctx.tenantId,
+            dedupeKey: `readiness.snapshot:${ctx.tenantId}:${ins.equipmentId}:DEFECT_CHANGED:${defect.id}:created`,
+            payload: {
+              triggerType: 'DEFECT_CHANGED', triggerId: `${defect.id}:created`,
+              equipmentId: ins.equipmentId, triggerOccurredAt: now.toISOString(),
+            } as Prisma.InputJsonValue,
+          }],
+        });
+      }
     }
     // Осмотр — четверть балла готовности и условие запуска смены, поэтому его
     // завершение обязано пересчитать снимок. Раньше снимок заказывали только

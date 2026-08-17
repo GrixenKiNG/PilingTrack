@@ -26,6 +26,8 @@ export interface BlockItem {
   provenance: string | null;
   required: boolean;
   photoRequired: boolean;
+  createsDefect?: boolean;
+  defectSeverity?: string | null;
   order: number;
 }
 
@@ -54,6 +56,13 @@ export interface ComposedItem {
   provenance: string | null;
   required: boolean;
   photoRequired: boolean;
+  /**
+   * Отрицательный ответ на пункт заводит дефект установки. Признак попадает в
+   * снимок шаблона: осмотр, начатый по старой редакции, должен закрываться по
+   * тем правилам, по которым его начали.
+   */
+  createsDefect: boolean;
+  defectSeverity: string | null;
 }
 
 const BLOCK_ORDER: Record<BlockType, number> = { BASE: 0, HAMMER: 1, ROTARY: 2 };
@@ -128,6 +137,8 @@ export function composeChecklist(blocks: TemplateBlock[]): ComposedItem[] {
           provenance: item.provenance,
           required: item.required,
           photoRequired: item.photoRequired,
+          createsDefect: item.createsDefect ?? false,
+          defectSeverity: item.defectSeverity ?? null,
         });
       }
     }

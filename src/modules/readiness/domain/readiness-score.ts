@@ -63,12 +63,41 @@ export interface ReadinessScoreResult {
   ruleVersion: string;
 }
 
-const VERDICT_LABELS: Record<ReadinessVerdict, string> = {
+export const VERDICT_LABELS: Record<ReadinessVerdict, string> = {
   ALLOWED: 'Запуск разрешён',
   CONFIRMATION_REQUIRED: 'Требуется подтверждение',
   RETURN_TO_OPERATOR: 'Возврат оператору',
   DENIED: 'Запуск запрещён',
 };
+
+/**
+ * Итог для оператора одним словом.
+ *
+ * Раньше снимок хранил только READY/BLOCKED, и три разных исхода —
+ * «запрещено», «нужно подтверждение диспетчера», «вернуть оператору на
+ * доработку» — выглядели на экране одинаково красным. Плюс машина с
+ * замечанием, которое работу не останавливает, показывалась просто зелёной,
+ * и замечание было некому заметить.
+ */
+export type ReadinessOutcome = 'READY' | 'READY_WITH_WARNING' | 'ATTENTION' | 'BLOCKED';
+
+export const OUTCOME_LABELS: Record<ReadinessOutcome, string> = {
+  READY: 'Готова к работе',
+  READY_WITH_WARNING: 'Готова с замечанием',
+  ATTENTION: 'Требует решения',
+  BLOCKED: 'Запуск заблокирован',
+};
+
+export function resolveReadinessOutcome(input: {
+  verdict: ReadinessVerdict;
+  warningCount: number;
+}): ReadinessOutcome {
+  if (input.verdict === 'DENIED') return 'BLOCKED';
+  // Подтверждение диспетчера и возврат оператору — это не запрет, а
+  // незакрытое решение: работа встала, но кто-то может её продолжить.
+  if (input.verdict === 'CONFIRMATION_REQUIRED' || input.verdict === 'RETURN_TO_OPERATOR') return 'ATTENTION';
+  return input.warningCount > 0 ? 'READY_WITH_WARNING' : 'READY';
+}
 
 const VERDICT_RANK: Record<ReadinessVerdict, number> = {
   ALLOWED: 0,

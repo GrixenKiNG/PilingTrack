@@ -5,6 +5,9 @@ import type { AnswerType, BlockType, ChecklistLevel, HammerKind } from '@/genera
 export interface TemplateItemInput {
   text: string; answerType: AnswerType; unit?: string | null; norm?: string | null;
   provenance?: string | null; photoRequired: boolean; required: boolean; order: number;
+  /** Отрицательный ответ на пункт заводит дефект установки. */
+  createsDefect?: boolean;
+  defectSeverity?: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL' | null;
 }
 export interface TemplateSectionInput { title: string; order: number; items: TemplateItemInput[] }
 export interface TemplateInput {
@@ -45,6 +48,10 @@ export async function createTemplate(input: TemplateInput, ctx: { tenantId: stri
               provenance: i.provenance?.trim() || null,
               photoRequired: i.photoRequired,
               required: i.required,
+              createsDefect: i.createsDefect ?? false,
+              // Уровень по умолчанию — NORMAL: заводить каждый ответ «нет»
+              // критическим значило бы останавливать парк на мелочах.
+              defectSeverity: i.createsDefect ? (i.defectSeverity ?? 'NORMAL') : null,
               order: i.order,
             })),
           },

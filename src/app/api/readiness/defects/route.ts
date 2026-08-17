@@ -1,5 +1,4 @@
 import type {NextRequest} from 'next/server';
-import {resolveReadinessCapabilities} from '@/modules/readiness/application/capabilities';
 import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
 import {createDefectCommand} from '@/modules/readiness/application/defects/commands';
 import {queryDefects} from '@/modules/readiness/application/defects/queries';
@@ -27,7 +26,7 @@ export async function GET(request: NextRequest) {
     );
   }
   try {
-    if (!resolveReadinessCapabilities(context.actorRole).has('readiness.read')) {
+    if (!context.capabilities.has('readiness.read')) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
     }
     const parsed = listDefectsQuerySchema.safeParse(

@@ -1,3 +1,8 @@
+import {
+  OUTCOME_LABELS,
+  resolveReadinessOutcome,
+  type ReadinessOutcome,
+} from '@/modules/readiness';
 import type {
   CurrentReadinessDto,
   ReadinessSnapshotDto,
@@ -31,6 +36,12 @@ export interface PresentationEvidence {
 export interface AuthoritativeReadinessPresentation {
   mode: 'authoritative' | 'historical-incomplete' | 'missing' | 'malformed';
   status: 'READY' | 'BLOCKED' | 'UNCONFIRMED';
+  /**
+   * Исход для человека: готова / готова с замечанием / требует решения /
+   * заблокирована. `status` остаётся двоичным для совместимости со старыми
+   * снимками и внешними потребителями.
+   */
+  outcome: ReadinessOutcome | 'UNCONFIRMED';
   score: number | null;
   title: string;
   description: string;
@@ -119,6 +130,7 @@ function unconfirmed(
   return {
     mode,
     status: 'UNCONFIRMED',
+    outcome: 'UNCONFIRMED',
     score: null,
     ...copy,
     blockers: [],
@@ -202,18 +214,36 @@ export function buildAuthoritativeReadinessPresentation(
       }))});
   }
 
+  // Исход из полного вердикта, если снимок его знает. У снимков до 2026-08-13
+  // колонки нет — для них остаётся прежнее двоичное прочтение.
+  const outcome: ReadinessOutcome = snapshot.verdict
+    ? resolveReadinessOutcome({verdict: snapshot.verdict, warningCount: warnings.length})
+    : snapshot.status === 'READY'
+      ? (warnings.length > 0 ? 'READY_WITH_WARNING' : 'READY')
+      : 'BLOCKED';
+
+  const OUTCOME_DESCRIPTION: Record<ReadinessOutcome, string> = {
+    READY: 'Решение подтверждено сохранёнными фактами и доказательствами.',
+    READY_WITH_WARNING: 'Работать можно. Есть замечания, которые не останавливают запуск, но требуют внимания.',
+    ATTENTION: 'Запуск не запрещён, но решение не закрыто: требуется действие ответственного.',
+    BLOCKED: 'До запуска необходимо устранить авторитетные блокирующие условия.',
+  };
+
+  const OUTCOME_NEXT: Record<ReadinessOutcome, string> = {
+    READY: 'Авторитетная оценка подтверждает готовность к работе',
+    READY_WITH_WARNING: 'Можно работать — разберите замечания в ближайшую смену',
+    ATTENTION: 'Требуется решение ответственного',
+    BLOCKED: 'Устранить блокирующие условия и выполнить новую оценку',
+  };
+
   return {
     mode: 'authoritative',
     status: snapshot.status,
+    outcome,
     score: snapshot.score,
-    title: snapshot.status === 'READY' ? 'Готовность подтверждена' : 'Запуск заблокирован',
-    description: snapshot.status === 'READY'
-      ? 'Решение подтверждено сохранёнными фактами и доказательствами.'
-      : 'До запуска необходимо устранить авторитетные блокирующие условия.',
-    nextAction: blockers[0]?.actionLabel
-      ?? (snapshot.status === 'READY'
-        ? 'Авторитетная оценка подтверждает готовность к работе'
-        : 'Устранить блокирующие условия и выполнить новую оценку'),
+    title: OUTCOME_LABELS[outcome],
+    description: OUTCOME_DESCRIPTION[outcome],
+    nextAction: blockers[0]?.actionLabel ?? OUTCOME_NEXT[outcome],
     blockers,
     warnings,
     stages,
