@@ -11,6 +11,7 @@
 
 import type { Prisma as PostgresPrisma, PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { applyTenantGuc, wrapTransaction } from '@/core/security/tenant-rls';
 
 // Guard against client-side imports (Next.js only, not Node.js workers).
 // Fire-and-forget so this file can be compiled to CJS (workers via tsx)
@@ -114,7 +115,12 @@ function createPrismaClient(): PostgresPrismaClient {
 
 function getPrismaClient(): PostgresPrismaClient {
   if (!globalForPrisma.prisma) {
-    globalForPrisma.prisma = createPrismaClient();
+    // Расширение доставляет тенанта в `app.current_tenant` на каждой операции.
+    // Пока политики RLS в режиме аудита, операции без известного тенанта
+    // проходят как раньше — см. core/security/tenant-rls.
+    globalForPrisma.prisma = applyTenantGuc(
+      createPrismaClient() as unknown as Parameters<typeof applyTenantGuc>[0]
+    ) as unknown as PostgresPrismaClient;
   }
 
   return globalForPrisma.prisma;
@@ -157,6 +163,17 @@ function createClientProxy(props: PropertyKey[] = []): unknown {
       if (typeof current !== 'function') {
         throw new TypeError(
           `Database property "${props.map(String).join('.')}" is not callable`
+        );
+      }
+
+      // Интерактивная транзакция выставляет тенанта первым оператором внутри
+      // себя. Расширение при этом обязано отойти в сторону: обернуть операцию
+      // в ещё одну транзакцию нельзя. Оба условия обеспечивает wrapTransaction.
+      if (props.length === 1 && props[0] === '$transaction') {
+        return wrapTransaction(
+          client as unknown as Parameters<typeof wrapTransaction>[0],
+          current as (...callArgs: unknown[]) => Promise<unknown>,
+          argArray
         );
       }
 
