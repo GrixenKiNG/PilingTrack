@@ -48,36 +48,36 @@ describe('ReportAggregate', () => {
       const report = createTestReport();
       expect(() =>
         report.addPileWork({ pileGradeId: 'grade-1', count: 0 }, 'user-1')
-      ).toThrow('Pile count must be at least 1');
+      ).toThrow('Количество свай должно быть не меньше 1');
     });
 
     it('should reject excessive pile count', () => {
       const report = createTestReport();
       expect(() =>
         report.addPileWork({ pileGradeId: 'grade-1', count: 10000 }, 'user-1')
-      ).toThrow('Pile count cannot exceed 9999');
+      ).toThrow('Количество свай не может превышать 9999');
     });
   });
 
   describe('downtime', () => {
     it('should add downtime to draft report', () => {
       const report = createTestReport();
-      report.addDowntime({ reasonId: 'reason-1', duration: 60 }, 'user-1');
-      expect(report.getTotalDowntime()).toBe(60);
+      report.addDowntime({ reasonId: 'reason-1', duration: 6 }, 'user-1');
+      expect(report.getTotalDowntime()).toBe(6);
     });
 
     it('should reject negative downtime', () => {
       const report = createTestReport();
       expect(() =>
         report.addDowntime({ reasonId: 'reason-1', duration: -10 }, 'user-1')
-      ).toThrow('Downtime duration cannot be negative');
+      ).toThrow('Простой не может быть отрицательным');
     });
 
     it('should reject downtime exceeding 24h', () => {
       const report = createTestReport();
       expect(() =>
-        report.addDowntime({ reasonId: 'reason-1', duration: 1441 }, 'user-1')
-      ).toThrow('Downtime cannot exceed 1440 minutes');
+        report.addDowntime({ reasonId: 'reason-1', duration: 25 }, 'user-1')
+      ).toThrow('Простой не может превышать 24 ч');
     });
   });
 
@@ -99,7 +99,7 @@ describe('ReportAggregate', () => {
     it('should reject submit with no entries', () => {
       const report = createTestReport();
       expect(() => report.submit('user-1')).toThrow(
-        'Report must contain at least pile work, drilling, or a downtime entry'
+        'Отчёт должен содержать хотя бы сваи, бурение или простой'
       );
     });
 
@@ -116,7 +116,7 @@ describe('ReportAggregate', () => {
       report.submit('user-1');
       expect(() =>
         report.addPileWork({ pileGradeId: 'grade-2', count: 3 }, 'user-1')
-      ).toThrow('Report is already submitted and cannot be modified');
+      ).toThrow('Отчёт уже сдан и не может быть изменён');
     });
 
     it('should generate ReportSubmitted event', () => {
@@ -133,14 +133,14 @@ describe('ReportAggregate', () => {
       const report = createTestReport();
       expect(() =>
         report.addDrilling({ typeId: 'type-1', count: 1, metersPerUnit: 10, meters: -5 }, 'user-1')
-      ).toThrow('Drilling meters cannot be negative');
+      ).toThrow('Метры бурения не могут быть отрицательными');
     });
 
     it('should reject excessive drilling meters', () => {
       const report = createTestReport();
       expect(() =>
         report.addDrilling({ typeId: 'type-1', count: 1, metersPerUnit: 1, meters: 100000 }, 'user-1')
-      ).toThrow('Drilling meters cannot exceed 99999');
+      ).toThrow('Метры бурения не могут превышать 99999');
     });
   });
 
@@ -158,8 +158,69 @@ describe('ReportAggregate', () => {
       const initialVersion = report.getState().version;
       report.addPileWork({ pileGradeId: 'grade-1', count: 1 }, 'user-1');
       expect(report.getState().version).toBe(initialVersion + 1);
-      report.addDowntime({ reasonId: 'reason-1', duration: 30 }, 'user-1');
+      report.addDowntime({ reasonId: 'reason-1', duration: 3 }, 'user-1');
       expect(report.getState().version).toBe(initialVersion + 2);
+    });
+  });
+
+  // Проверки ниже закрывают то, чего прежние не могли поймать: они брали
+  // простой в минутах (60, 30, 1441), а форма, база и служба проверки
+  // работают в часах. При такой подстановке ни один заслон агрегата не
+  // срабатывал — тесты были зелёными на мёртвом коде.
+  describe('простой считается в часах', () => {
+    it('суммарный простой больше смены — отказ', () => {
+      const report = createTestReport(); // смена 08:00–20:00, то есть 12 часов
+      report.addDowntime({ reasonId: 'reason-1', duration: 8 }, 'user-1');
+
+      expect(() =>
+        report.addDowntime({ reasonId: 'reason-2', duration: 5 }, 'user-1'),
+      ).toThrow('Суммарный простой (13 ч) превышает продолжительность смены (12 ч)');
+    });
+
+    it('простой во всю смену — принимается', () => {
+      const report = createTestReport();
+      report.addDowntime({ reasonId: 'reason-1', duration: 12 }, 'user-1');
+
+      expect(report.getTotalDowntime()).toBe(12);
+    });
+
+    it('правдоподобный простой из базы (11 ч) не отклоняется', () => {
+      const report = createTestReport();
+      report.addDowntime({ reasonId: 'reason-1', duration: 11 }, 'user-1');
+
+      expect(report.getTotalDowntime()).toBe(11);
+    });
+  });
+
+  // Отказ по бизнес-правилу — это ответ клиенту, а не поломка сервера.
+  // Раньше агрегат бросал голый Error, обёртка не могла отличить его от
+  // промаха в коде и отвечала 500 «Internal server error», попутно заводя
+  // событие в Sentry на каждую обычную ошибку заполнения.
+  describe('отказы агрегата несут код ответа', () => {
+    it('пустой отчёт — 400, а не отказ сервера', () => {
+      const report = createTestReport();
+
+      expect(() => report.submit('user-1')).toThrowError(
+        expect.objectContaining({ status: 400 }),
+      );
+    });
+
+    it('правка сданного отчёта — 409', () => {
+      const report = createTestReport();
+      report.addPileWork({ pileGradeId: 'grade-1', count: 5 }, 'user-1');
+      report.submit('user-1');
+
+      expect(() =>
+        report.addPileWork({ pileGradeId: 'grade-2', count: 3 }, 'user-1'),
+      ).toThrowError(expect.objectContaining({ status: 409 }));
+    });
+
+    it('превышение простоя — 400', () => {
+      const report = createTestReport();
+
+      expect(() =>
+        report.addDowntime({ reasonId: 'reason-1', duration: 25 }, 'user-1'),
+      ).toThrowError(expect.objectContaining({ status: 400 }));
     });
   });
 });

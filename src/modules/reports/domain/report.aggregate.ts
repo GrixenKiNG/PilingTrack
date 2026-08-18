@@ -10,6 +10,7 @@
  * НЕ знает о БД, API, UI — чистая бизнес-логика.
  */
 
+import { ServiceError } from '@/lib/service-error';
 import { createReportEvent, ReportDomainEvent } from './report.events';
 
 // ============================================================
@@ -76,7 +77,12 @@ interface ReportState {
 // Business Rules
 // ============================================================
 
-const MAX_DOWNTIME_PER_SHIFT = 1440; // minutes (24h)
+// Простой измеряется в ЧАСАХ — так его пишет форма, так он лежит в
+// ReportDowntime.duration (в базе значения 0.5…11) и так его считает
+// report-validation.service. Здесь стояло 1440 «минут», и обе проверки ниже
+// были мертвы: 11 никогда не больше 1440, а 11 никогда не больше 12*60.
+// Настоящий заслон держала только служба проверки; агрегат лишь делал вид.
+const MAX_DOWNTIME_PER_SHIFT_HOURS = 24;
 const MAX_PILE_COUNT = 9999;
 const MAX_DRILLING_METERS = 99999;
 
@@ -158,8 +164,8 @@ export class ReportAggregate {
   addPileWork(entry: PileWorkEntry, userId: string): void {
     this.assertDraft();
 
-    if (entry.count < 1) throw new Error('Pile count must be at least 1');
-    if (entry.count > MAX_PILE_COUNT) throw new Error(`Pile count cannot exceed ${MAX_PILE_COUNT}`);
+    if (entry.count < 1) throw new ServiceError('Количество свай должно быть не меньше 1', 400);
+    if (entry.count > MAX_PILE_COUNT) throw new ServiceError(`Количество свай не может превышать ${MAX_PILE_COUNT}`, 400);
 
     this.state.piles.push(entry);
     this.touch(userId);
@@ -180,8 +186,8 @@ export class ReportAggregate {
   addDrilling(entry: DrillingEntry, userId: string): void {
     this.assertDraft();
 
-    if (entry.meters < 0) throw new Error('Drilling meters cannot be negative');
-    if (entry.meters > MAX_DRILLING_METERS) throw new Error(`Drilling meters cannot exceed ${MAX_DRILLING_METERS}`);
+    if (entry.meters < 0) throw new ServiceError('Метры бурения не могут быть отрицательными', 400);
+    if (entry.meters > MAX_DRILLING_METERS) throw new ServiceError(`Метры бурения не могут превышать ${MAX_DRILLING_METERS}`, 400);
 
     this.state.drillings.push(entry);
     this.touch(userId);
@@ -204,15 +210,16 @@ export class ReportAggregate {
   addDowntime(entry: DowntimeEntry, userId: string): void {
     this.assertDraft();
 
-    if (entry.duration < 0) throw new Error('Downtime duration cannot be negative');
-    if (entry.duration > MAX_DOWNTIME_PER_SHIFT) throw new Error(`Downtime cannot exceed ${MAX_DOWNTIME_PER_SHIFT} minutes`);
+    if (entry.duration < 0) throw new ServiceError('Простой не может быть отрицательным', 400);
+    if (entry.duration > MAX_DOWNTIME_PER_SHIFT_HOURS) throw new ServiceError(`Простой не может превышать ${MAX_DOWNTIME_PER_SHIFT_HOURS} ч`, 400);
 
     const totalDowntime = this.getTotalDowntime() + entry.duration;
     const shiftHours = this.getShiftDurationHours();
 
-    if (shiftHours && totalDowntime > shiftHours * 60) {
-      throw new Error(
-        `Total downtime (${totalDowntime}min) exceeds shift duration (${shiftHours * 60}min)`
+    if (shiftHours && totalDowntime > shiftHours) {
+      throw new ServiceError(
+        `Суммарный простой (${totalDowntime} ч) превышает продолжительность смены (${shiftHours} ч)`,
+        400
       );
     }
 
@@ -240,7 +247,7 @@ export class ReportAggregate {
       this.state.drillings.length === 0 &&
       this.state.downtimes.length === 0
     ) {
-      throw new Error('Report must contain at least pile work, drilling, or a downtime entry');
+      throw new ServiceError('Отчёт должен содержать хотя бы сваи, бурение или простой', 400);
     }
 
     this.state.status = 'submitted';
@@ -342,7 +349,7 @@ export class ReportAggregate {
 
   private assertDraft(): void {
     if (this.state.status !== 'draft') {
-      throw new Error('Report is already submitted and cannot be modified');
+      throw new ServiceError('Отчёт уже сдан и не может быть изменён', 409);
     }
   }
 
