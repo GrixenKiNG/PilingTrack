@@ -4,6 +4,8 @@ import { hashSync } from 'bcryptjs';
 import { initializeTenantDictionaries } from '../src/services/dictionaries/tenant-dictionary-initializer';
 import { updateUser } from '../src/services/users/user-service';
 import { db as serviceDb } from '../src/lib/db';
+import { applyTenantGuc } from '../src/core/security/tenant-rls';
+import { runWithTenantContext, setRequestTenantId } from '../src/core/security/tenant-context';
 
 // Prisma 7 requires an adapter when driverAdapters is set in the schema.
 // Without this, `new PrismaClient()` throws and the migrate container had
@@ -14,9 +16,15 @@ const connectionString =
 if (!connectionString) {
   throw new Error('DATABASE_URL_POSTGRES (or DATABASE_URL) is required to seed.');
 }
-const db = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+// Клиент оборачивается тем же расширением, что и рабочий: оно доставляет
+// организацию в `app.current_tenant`. Без обёртки сид ходил бы в базу
+// «безымянно» — сейчас это сходит с рук, потому что и локально, и в CI
+// подключение идёт суперпользователем, для которого RLS не действует. Но
+// стоит перевести dev на роль без BYPASSRLS, как строгие политики отвергли
+// бы каждую вставку.
+const db = applyTenantGuc(
+  new PrismaClient({ adapter: new PrismaPg({ connectionString }) }) as never,
+) as unknown as PrismaClient;
 
 /**
  * Generate a random secure password.
@@ -91,6 +99,17 @@ async function seed() {
   console.log('Seeding database...');
 
   const tenantId = process.env.DEFAULT_TENANT_ID ?? 'orion';
+
+  // Контекст открывается на весь сид: у него нет запроса, а значит и обёртки
+  // маршрута, которая обычно заводит контекст. Внутрь попадает и serviceDb —
+  // хранилище контекста одно на процесс.
+  return runWithTenantContext(async () => {
+    setRequestTenantId(tenantId);
+    return seedScoped(tenantId);
+  });
+}
+
+async function seedScoped(tenantId: string) {
 
   // Тенант должен существовать до пользователей: User.tenantId ссылается на
   // Tenant.id внешним ключом (User_tenantId_fkey, живёт с init-миграции).
@@ -245,10 +264,7 @@ async function seed() {
 
   console.log(`Users: ${[admin, dispatcher, operator1, operator2, assistant].length}`);
 
-  await initializeTenantDictionaries(
-    db,
-    process.env.DEFAULT_TENANT_ID ?? 'orion'
-  );
+  await initializeTenantDictionaries(db, tenantId);
 
   console.log('Dictionaries seeded');
 
@@ -477,6 +493,7 @@ async function seed() {
     },
     create: {
       id: 'site-demo-1',
+      tenantId,
       name: 'МКАД-Юг, Участок 3',
       plannedPiles: 240,
       plannedDrilling: 180.5,
@@ -496,6 +513,7 @@ async function seed() {
     },
     create: {
       id: 'site-demo-2',
+      tenantId,
       name: 'М-11, Переезд через реку',
       plannedPiles: 150,
       plannedDrilling: 120,
@@ -691,7 +709,7 @@ async function seed() {
 
   console.log('Crews created');
 
-  await seedHydraulicHammerEO(db, process.env.DEFAULT_TENANT_ID ?? 'orion');
+  await seedHydraulicHammerEO(db, tenantId);
   console.log('Checklist templates seeded');
 
   console.log('Seed complete');
