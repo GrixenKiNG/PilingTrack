@@ -52,8 +52,13 @@ if [ ! -f .env.docker ]; then
 POSTGRES_USER=piling
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=pilingtrack
-DATABASE_URL=postgresql://piling:${POSTGRES_PASSWORD}@postgres:5432/pilingtrack?schema=public
-DATABASE_URL_POSTGRES=postgresql://piling:${POSTGRES_PASSWORD}@postgres:5432/pilingtrack?schema=public
+# DATABASE_URL здесь намеренно НЕ задаётся. Для app/workers/ws адрес собирается
+# в docker-compose.yml из APP_DB_USER / APP_DB_PASSWORD и ведёт на pgbouncer, а
+# секция environment: перекрывает всё, что написано в .env. Прежде эти две
+# строки записывались сюда со ролью-владельцем piling и читались как рабочая
+# настройка: 18.08.2026 это стоило неверного вывода, будто прод ходит
+# суперпользователем и RLS не действует. Роль проверяется у контейнера:
+#   docker exec pilingtrack-app printenv DATABASE_URL
 DATABASE_PROVIDER=postgres
 DATABASE_LOG_QUERIES=false
 
