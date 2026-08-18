@@ -5,6 +5,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { withApi, withMutation } from '../api-wrapper';
+import {
+  hasTenantContext,
+  getRequestTenantId,
+  setRequestTenantId,
+} from '@/core/security/tenant-context';
 
 // Mock ServiceError
 vi.mock('@/lib/service-error', () => ({
@@ -280,5 +285,61 @@ describe('withMutation', () => {
     const res = await handler(mockRequest());
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe('контекст тенанта', () => {
+  it('withApi открывает контекст на время обработчика', async () => {
+    let insideHandler: boolean | null = null;
+
+    const handler = withApi(async () => {
+      insideHandler = hasTenantContext();
+      return NextResponse.json({ ok: true });
+    });
+
+    await handler(mockRequest());
+
+    expect(insideHandler).toBe(true);
+    // За пределами запроса контекста быть не должно.
+    expect(hasTenantContext()).toBe(false);
+  });
+
+  it('withMutation тоже под контекстом — он проходит через withApi', async () => {
+    let insideHandler: boolean | null = null;
+
+    const handler = withMutation(async () => {
+      insideHandler = hasTenantContext();
+      return NextResponse.json({ ok: true });
+    });
+
+    await handler(mockRequest());
+
+    expect(insideHandler).toBe(true);
+  });
+
+  it('тенант, записанный внутри обработчика, виден дальше по стеку', async () => {
+    let seen: string | null = null;
+
+    const handler = withApi(async () => {
+      // Так это делает requireAuth, разобрав сессию.
+      setRequestTenantId('orion');
+      seen = getRequestTenantId();
+      return NextResponse.json({ ok: true });
+    });
+
+    await handler(mockRequest());
+
+    expect(seen).toBe('orion');
+  });
+
+  it('упавший обработчик не оставляет контекст открытым', async () => {
+    const handler = withApi(async () => {
+      throw new Error('boom');
+    });
+
+    const res = await handler(mockRequest());
+
+    expect(res.status).toBe(500);
+    expect(hasTenantContext()).toBe(false);
   });
 });
