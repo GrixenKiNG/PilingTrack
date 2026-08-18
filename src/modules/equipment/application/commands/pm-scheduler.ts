@@ -12,6 +12,10 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { evaluatePlanDue } from '@/lib/pm-due';
 import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
+import {
+  runWithTenantContext,
+  setRequestTenantId,
+} from '@/core/security/tenant-context';
 
 export { evaluatePlanDue } from '@/lib/pm-due';
 export type { PmTriggerType, PmDueStatus, PlanForEval, PlanDueResult } from '@/lib/pm-due';
@@ -39,6 +43,18 @@ export interface PmSchedulerResult {
  */
 export async function runPmScheduler(tenantId: string, now: Date = new Date()): Promise<PmSchedulerResult> {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
+
+  // Планировщик запускается без запроса, поэтому контекст, который открывает
+  // withApi, здесь не заведён — тенант известен только из параметра. Без этого
+  // все запросы ниже уходят в базу «безымянными», и после перевода политик RLS
+  // в fail-closed планировщик молча не нашёл бы ни одного плана.
+  return runWithTenantContext(async () => {
+    setRequestTenantId(tenantId);
+    return runPmSchedulerScoped(tenantId, now);
+  });
+}
+
+async function runPmSchedulerScoped(tenantId: string, now: Date): Promise<PmSchedulerResult> {
 
   const plans = await db.maintenancePlan.findMany({
     where: { tenantId, isActive: true },

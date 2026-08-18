@@ -18,6 +18,10 @@ import { db } from '@/lib/db';
 import { ReportDomainEvent } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 import { moveToDlq } from '@/core/outbox/dead-letter-queue';
+import {
+  runWithTenantContext,
+  setRequestTenantId,
+} from '@/core/security/tenant-context';
 
 const MAX_RETRIES = 5;
 const RETRY_BASE_DELAY_MS = 1000; // 1s base
@@ -132,7 +136,18 @@ async function consumeOutboxEvents(
         data: looksLikeFullEvent ? (payloadObj.data ?? {}) : payloadObj,
       } as unknown as ReportDomainEvent;
 
-      await handler(event);
+      // Тенант события — из канонической колонки outbox, а не из полезной
+      // нагрузки: у воркера нет запроса, а значит и контекста, который
+      // открывает withApi. Без этого обработчик уходит в базу «безымянным»,
+      // и после перевода политик RLS в fail-closed увидел бы пустоту.
+      //
+      // Контекст заводится на каждое событие отдельно: в одной пачке идут
+      // события разных тенантов, и общий на всю пачку контекст смешал бы их.
+      // Строки без тенанта (написанные до появления колонки) идут как раньше.
+      await runWithTenantContext(async () => {
+        setRequestTenantId(outboxEvent.tenantId ?? null);
+        await handler(event);
+      });
 
       // Atomic claim: only this consumer's column is touched. updateMany
       // (not update) so a losing race returns {count:0} instead of
