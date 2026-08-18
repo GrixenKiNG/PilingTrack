@@ -9,6 +9,7 @@
  * aggregate from the Report table. Safe to re-run.
  */
 import { db } from '@/lib/db';
+import { forEachTenant } from '@/lib/tenant-iteration';
 
 // 'operator-performance' и 'report-stats' убраны 17.08.2026 вместе с самими
 // проекциями: их никто не читал. Пересобирать нечего.
@@ -24,10 +25,21 @@ export interface RebuildResult {
   durationMs: number;
 }
 
+
 /** Rebuild SiteDailySummary from Report aggregates per (siteId, date). */
 export async function rebuildSiteDailySummary(): Promise<RebuildResult> {
   const start = Date.now();
+  const written = await forEachTenant(rebuildSiteDailySummaryForTenant);
+  return {
+    name: 'site-daily',
+    rowsWritten: written.reduce((a, b) => a + b, 0),
+    durationMs: Date.now() - start,
+  };
+}
+
+async function rebuildSiteDailySummaryForTenant(tenantId: string): Promise<number> {
   const reports = await db.report.findMany({
+    where: { tenantId },
     select: {
       siteId: true, date: true,
       piles: { select: { count: true } },
@@ -53,13 +65,19 @@ export async function rebuildSiteDailySummary(): Promise<RebuildResult> {
     agg.set(key, cur);
   }
 
+  // У SiteDailySummary нет своей колонки организации — её граница проходит
+  // через объект. Поэтому чистим не всю таблицу, а строки объектов этой
+  // организации: иначе пересчёт одной стирал бы проекцию остальных.
+  const siteIds = (await db.site.findMany({ where: { tenantId }, select: { id: true } }))
+    .map((site) => site.id);
+
   // Wipe and rebuild atomically — a non-transactional wipe followed by a
   // failing insert would leave the projection empty until the next run.
   await db.$transaction(async (tx) => {
-    await tx.siteDailySummary.deleteMany({});
+    await tx.siteDailySummary.deleteMany({ where: { siteId: { in: siteIds } } });
     await tx.siteDailySummary.createMany({ data: [...agg.values()] });
   });
-  return { name: 'site-daily', rowsWritten: agg.size, durationMs: Date.now() - start };
+  return agg.size;
 }
 
 /**
@@ -68,15 +86,25 @@ export async function rebuildSiteDailySummary(): Promise<RebuildResult> {
  */
 export async function rebuildSiteWeeklyTrend(): Promise<RebuildResult> {
   const start = Date.now();
-  const daily = await db.siteDailySummary.findMany();
+  const written = await forEachTenant(rebuildSiteWeeklyTrendForTenant);
+  return {
+    name: 'site-weekly',
+    rowsWritten: written.reduce((a, b) => a + b, 0),
+    durationMs: Date.now() - start,
+  };
+}
 
+async function rebuildSiteWeeklyTrendForTenant(tenantId: string): Promise<number> {
   // SiteWeeklyTrend.tenantId is NOT NULL on prod (schema drift: nullable in
   // schema.prisma). Creating rows without it wiped the projection nightly and
   // then crashed on the first insert — resolve it from Site, exactly like the
   // live path in projection-worker does.
-  const sites = await db.site.findMany({ select: { id: true, tenantId: true } });
+  const sites = await db.site.findMany({ where: { tenantId }, select: { id: true, tenantId: true } });
   const tenantBySite = new Map(sites.map((s) => [s.id, s.tenantId]));
-  const fallbackTenant = process.env.DEFAULT_TENANT_ID || null;
+  const siteIds = sites.map((site) => site.id);
+  const fallbackTenant = tenantId;
+
+  const daily = await db.siteDailySummary.findMany({ where: { siteId: { in: siteIds } } });
 
   const mondayOf = (isoDate: string) => {
     const d = new Date(`${isoDate}T00:00:00Z`);
@@ -130,10 +158,10 @@ export async function rebuildSiteWeeklyTrend(): Promise<RebuildResult> {
   // Atomic wipe+rebuild: the old delete-then-create-in-a-loop left the table
   // empty when any insert failed (which is exactly what happened on prod).
   await db.$transaction(async (tx) => {
-    await tx.siteWeeklyTrend.deleteMany({});
+    await tx.siteWeeklyTrend.deleteMany({ where: { tenantId } });
     await tx.siteWeeklyTrend.createMany({ data: rows });
   });
-  return { name: 'site-weekly', rowsWritten: weekly.size, durationMs: Date.now() - start };
+  return weekly.size;
 }
 
 /**
@@ -144,7 +172,17 @@ export async function rebuildSiteWeeklyTrend(): Promise<RebuildResult> {
  */
 export async function rebuildReportAnalytics(): Promise<RebuildResult> {
   const start = Date.now();
+  const written = await forEachTenant(rebuildReportAnalyticsForTenant);
+  return {
+    name: 'report-analytics',
+    rowsWritten: written.reduce((a, b) => a + b, 0),
+    durationMs: Date.now() - start,
+  };
+}
+
+async function rebuildReportAnalyticsForTenant(tenantId: string): Promise<number> {
   const reports = await db.report.findMany({
+    where: { tenantId },
     select: {
       id: true, reportId: true, siteId: true, userId: true, tenantId: true, status: true, updatedAt: true,
       piles: { select: { count: true } },
@@ -184,7 +222,7 @@ export async function rebuildReportAnalytics(): Promise<RebuildResult> {
     });
     rows++;
   }
-  return { name: 'report-analytics', rowsWritten: rows, durationMs: Date.now() - start };
+  return rows;
 }
 
 /** Rebuild everything (daily must come before weekly — weekly reads from daily). */

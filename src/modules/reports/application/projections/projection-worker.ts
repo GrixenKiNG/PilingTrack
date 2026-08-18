@@ -17,6 +17,7 @@ import {
 import { projectOutboxEvents } from '@/services/reports/outbox-publisher';
 import { projectWeeklyTrend } from './projection-handlers';
 import {consumeReadinessProjectionEvent} from '@/modules/readiness/application/projection/consumer';
+import { forEachTenant } from '@/lib/tenant-iteration';
 
 function shouldLogProjectionLifecycle(): boolean {
   return process.env.LOG_WORKER_LIFECYCLE === 'true';
@@ -170,12 +171,19 @@ export function startProjectionWorker(intervalMs = 5000) {
   void processOnce();
   const interval = setInterval(processOnce, intervalMs);
 
+  // Ежечасный пересчёт недельного тренда идёт по организациям, а не по всем
+  // объектам разом: у фоновой задачи нет запроса, значит нет и контекста,
+  // который заводит обёртка маршрута. Без него после перевода политик RLS в
+  // fail-closed выборка объектов вернулась бы пустой, и тренд молча перестал
+  // бы обновляться.
   const weeklyInterval = setInterval(async () => {
     try {
-      const sites = await db.site.findMany({ select: { id: true } });
-      for (const site of sites) {
-        await projectWeeklyTrend(site.id);
-      }
+      await forEachTenant(async (tenantId) => {
+        const sites = await db.site.findMany({ where: { tenantId }, select: { id: true } });
+        for (const site of sites) {
+          await projectWeeklyTrend(site.id);
+        }
+      });
     } catch (error) {
       logger.error('Weekly trend recomputation failed', error);
     }
