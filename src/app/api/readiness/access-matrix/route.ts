@@ -7,6 +7,7 @@ import {
 } from '@/modules/readiness/application/access-matrix-service';
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {withReadinessCommand} from '../_shared/route-adapter';
+import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +18,7 @@ export const runtime = 'nodejs';
  * по той же, которую этот маршрут и меняет. Так владелец может передать
  * настройку доступов другой роли, опубликовав изменение.
  */
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
   const context = resolved.context;
@@ -50,3 +51,5 @@ export const POST = withReadinessCommand(async (_request, context) => {
   });
   return NextResponse.json({data: state});
 }, {domain: 'readiness-access-matrix'});
+
+export const GET = withApi(handleGet, {domain: 'readiness-access-matrix'});

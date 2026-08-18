@@ -10,12 +10,13 @@ import {
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
 import {withReadinessCommand} from '../_shared/route-adapter';
+import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
 const DEFAULT_LIMIT = 50;
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const {context, response} = await resolveReadinessRequestContext(request);
   // Резолвер возвращает либо готовый отказ, либо контекст: проверяем сам
   // контекст, чтобы не утверждать его наличие восклицательным знаком.
@@ -78,3 +79,5 @@ export const POST = withReadinessCommand(async (request: NextRequest, context) =
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,
     correlationId: context.correlationId, requestId: context.requestId});
 }, {domain: 'readiness-defects', rateLimit: {maxAttempts: 30, windowMs: 60_000, blockDurationMs: 60_000}});
+
+export const GET = withApi(handleGet, {domain: 'readiness-defects'});

@@ -7,10 +7,11 @@ import {withReadinessRequestTransaction, withReadinessSerializableTransaction} f
 import {resolveReadinessRequestContext} from '../../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../../_shared/response';
 import {withReadinessCommand} from '../../_shared/route-adapter';
+import {withApi} from '@/core/api-wrapper';
 
 type Params = {params: Promise<{id: string}>};
 
-export async function GET(request: NextRequest, {params}: Params) {
+async function handleGet(request: NextRequest, {params}: Params) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
   const context = resolved.context;
@@ -39,3 +40,5 @@ export const PATCH = withReadinessCommand(async (request, context, {params}: Par
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,
     correlationId: context.correlationId, requestId: context.requestId});
 }, {domain: 'readiness-permits'});
+
+export const GET = withApi(handleGet, {domain: 'readiness-work-permits'});

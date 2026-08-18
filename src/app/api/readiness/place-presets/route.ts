@@ -5,6 +5,7 @@ import {withReadinessRequestTransaction} from '@/modules/readiness/infrastructur
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
 import {withReadinessCommand} from '../_shared/route-adapter';
+import {withMutation} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -63,7 +64,7 @@ export const POST = withReadinessCommand(async (request, context) => {
 }, {domain: 'readiness-place-presets'});
 
 /** Удалить своё сохранённое место: список личный, чужое не тронуть. */
-export async function DELETE(request: NextRequest) {
+async function handleDelete(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
   const context = resolved.context;
@@ -86,3 +87,5 @@ export async function DELETE(request: NextRequest) {
     throw error;
   }
 }
+
+export const DELETE = withMutation(handleDelete, {domain: 'readiness-place-presets'});

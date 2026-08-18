@@ -6,6 +6,7 @@ import { canActAs, isActingRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
 import { queryReadinessBootstrap } from '@/modules/readiness/application/bootstrap-query';
 import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
+import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -13,7 +14,7 @@ function response(body: unknown, status: number, requestId: string) {
   return attachRequestIdHeader(NextResponse.json(body, { status }), requestId);
 }
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const requestId = getRequestId(request);
   const { user, error } = await requireAuth(request);
   if (error) {
@@ -58,3 +59,5 @@ export async function GET(request: NextRequest) {
     return response({ error: 'Readiness bootstrap failed' }, 500, requestId);
   }
 }
+
+export const GET = withApi(handleGet, {domain: 'readiness-bootstrap'});

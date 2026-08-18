@@ -8,6 +8,7 @@ import {withReadinessRequestTransaction, withReadinessSerializableTransaction} f
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
 import {withReadinessCommand} from '../_shared/route-adapter';
+import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -16,7 +17,7 @@ const readJson = async (request: NextRequest) => {
   catch { throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Тело запроса должно быть в формате JSON'); }
 };
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
   const context = resolved.context;
@@ -68,3 +69,5 @@ export const POST = withReadinessCommand(async (request, context) => {
   return readinessResponse({body: result.body, status: result.status,
     headers: result.headers, correlationId: context.correlationId, requestId: context.requestId});
 }, {domain: 'readiness-permits'});
+
+export const GET = withApi(handleGet, {domain: 'readiness-work-permits'});

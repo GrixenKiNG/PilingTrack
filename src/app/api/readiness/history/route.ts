@@ -4,10 +4,11 @@ import { parseReadinessReadFilters, serializeReadinessFilters } from '@/modules/
 import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
 import { resolveReadinessRequestContext } from '../_shared/request-context';
 import { readinessErrorResponse, readinessResponse } from '../_shared/response';
+import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response;
   const context = resolved.context;
@@ -69,3 +70,5 @@ export async function GET(request: NextRequest) {
     throw error;
   }
 }
+
+export const GET = withApi(handleGet, {domain: 'readiness-history'});

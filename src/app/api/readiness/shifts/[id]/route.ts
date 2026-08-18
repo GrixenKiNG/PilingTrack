@@ -7,10 +7,11 @@ import {withReadinessRequestTransaction, withReadinessSerializableTransaction} f
 import {resolveReadinessRequestContext} from '../../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../../_shared/response';
 import {withReadinessCommand} from '../../_shared/route-adapter';
+import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 type Params = {params: Promise<{id: string}>};
-export async function GET(request: NextRequest, route: {params: Promise<{id: string}>}) {
+async function handleGet(request: NextRequest, route: {params: Promise<{id: string}>}) {
   const resolved = await resolveReadinessRequestContext(request); if (resolved.response) return resolved.response;
   const context = resolved.context;
   try { const {id} = await route.params; const data = await withReadinessRequestTransaction(context.tenantId,
@@ -27,3 +28,5 @@ export const PATCH = withReadinessCommand(async (request: NextRequest, context, 
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,
     correlationId: context.correlationId, requestId: context.requestId});
 }, {domain: 'readiness-shifts'});
+
+export const GET = withApi(handleGet, {domain: 'readiness-shifts'});
