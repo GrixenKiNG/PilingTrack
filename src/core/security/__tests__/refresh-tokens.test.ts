@@ -18,6 +18,7 @@ const {
   updateManyMock,
   updateMock,
   createMock,
+  deleteManyMock,
   userFindUniqueMock,
   createSessionTokenMock,
 } = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ const {
   updateManyMock: vi.fn(),
   updateMock: vi.fn(),
   createMock: vi.fn(),
+  deleteManyMock: vi.fn(),
   userFindUniqueMock: vi.fn(),
   createSessionTokenMock: vi.fn(),
 }));
@@ -38,6 +40,7 @@ vi.mock('@/lib/db', () => ({
       updateMany: updateManyMock,
       update: updateMock,
       create: createMock,
+      deleteMany: deleteManyMock,
     },
     user: { findUnique: userFindUniqueMock },
   },
@@ -46,7 +49,15 @@ vi.mock('@/services/auth/session-service', () => ({
   createSessionToken: createSessionTokenMock,
 }));
 
-import { rotateRefreshToken } from '../refresh-tokens';
+import {
+  rotateRefreshToken,
+  createRefreshToken,
+  revokeRefreshToken,
+  revokeAllUserTokens,
+  revokeTokenFamily,
+  cleanupExpiredRefreshTokens,
+  getUserActiveSessions,
+} from '../refresh-tokens';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -207,5 +218,144 @@ describe('rotateRefreshToken — concurrent rotation of the SAME token (audit fi
     expect(updateManyMock).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: baseToken.id, revoked: false } })
     );
+  });
+});
+
+/**
+ * Выдача, отзыв и перечисление сессий.
+ *
+ * До 18.08.2026 файл покрывал только предельный срок жизни семьи и гонку
+ * отзыва: 52.6% строк и 27.3% функций. Ниже закрыты остальные функции, и
+ * прежде всего то, что важнее процентов, — сырой токен нигде не оседает.
+ */
+
+const SESSION_USER = {
+  id: 'u1', email: 'op@piling.ru', name: 'Оператор',
+  role: 'OPERATOR', tenantId: 'orion', sessionVersion: 1,
+};
+
+function sha256(value: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- узкий помощник теста
+  return require('node:crypto').createHash('sha256').update(value).digest('hex');
+}
+
+describe('createRefreshToken — выдача', () => {
+  beforeEach(() => {
+    createMock.mockReset().mockResolvedValue({});
+    createSessionTokenMock.mockReset().mockResolvedValue('access-jwt');
+  });
+
+  it('в базу кладётся ХЕШ, а не сам токен', async () => {
+    // Главное свойство файла: чтения базы недостаточно для входа. Если бы
+    // хранился сырой токен, дамп базы означал бы захват любой сессии.
+    const pair = await createRefreshToken(SESSION_USER);
+
+    const stored = createMock.mock.calls[0][0].data.token as string;
+    expect(stored).not.toBe(pair.refreshToken);
+    expect(stored).toBe(sha256(pair.refreshToken));
+    expect(stored).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('каждая выдача — новый токен и новая семья', async () => {
+    const first = await createRefreshToken(SESSION_USER);
+    const second = await createRefreshToken(SESSION_USER);
+
+    expect(first.refreshToken).not.toBe(second.refreshToken);
+    const families = createMock.mock.calls.map((c) => c[0].data.family);
+    expect(families[0]).not.toBe(families[1]);
+  });
+
+  it('срок жизни токена — 30 дней', async () => {
+    const pair = await createRefreshToken(SESSION_USER);
+    const days = (pair.expiresAt.getTime() - Date.now()) / DAY;
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThan(30.1);
+  });
+
+  it('запоминает адрес и клиент, пустые значения пишет как null', async () => {
+    await createRefreshToken(SESSION_USER, '10.0.0.5', 'Chrome');
+    expect(createMock.mock.calls[0][0].data).toMatchObject({
+      ipAddress: '10.0.0.5', userAgent: 'Chrome',
+    });
+
+    createMock.mockClear();
+    await createRefreshToken(SESSION_USER);
+    expect(createMock.mock.calls[0][0].data).toMatchObject({
+      ipAddress: null, userAgent: null,
+    });
+  });
+});
+
+describe('отзыв токенов', () => {
+  beforeEach(() => { updateManyMock.mockReset().mockResolvedValue({ count: 1 }); });
+
+  it('одиночный отзыв ищет по хешу, а не по сырому токену', async () => {
+    // Поиск по сырому значению не нашёл бы ничего, и выход из системы молча
+    // не сработал бы — токен остался бы действующим.
+    await revokeRefreshToken('raw-token-value');
+
+    expect(updateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { token: sha256('raw-token-value'), revoked: false },
+      }),
+    );
+  });
+
+  it('отзыв всех токенов ограничен пользователем и не трогает уже отозванные', async () => {
+    await revokeAllUserTokens('u1', 'Смена пароля');
+
+    const call = updateManyMock.mock.calls[0][0];
+    expect(call.where).toEqual({ userId: 'u1', revoked: false });
+    expect(call.data.revokedReason).toBe('Смена пароля');
+  });
+
+  it('отзыв семьи берёт её целиком, включая уже отозванные', async () => {
+    // При подозрении на компрометацию условие revoked:false оставило бы
+    // часть цепочки нетронутой.
+    await revokeTokenFamily('fam-1', 'Повторное использование');
+
+    expect(updateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { family: 'fam-1' } }),
+    );
+  });
+});
+
+describe('уборка и список сессий', () => {
+  it('уборка сносит просроченные и давно отозванные, возвращая количество', async () => {
+    deleteManyMock.mockReset().mockResolvedValue({ count: 7 });
+
+    const removed = await cleanupExpiredRefreshTokens();
+
+    expect(removed).toBe(7);
+    const where = deleteManyMock.mock.calls[0][0].where;
+    // Действующие токены под условие не попадают: только истёкшие ИЛИ
+    // отозванные больше недели назад.
+    expect(where.OR).toHaveLength(2);
+    expect(where.OR[0]).toHaveProperty('expiresAt.lt');
+    expect(where.OR[1]).toMatchObject({ revoked: true });
+  });
+
+  it('список сессий не отдаёт хеш токена наружу', async () => {
+    findManyMock.mockReset().mockResolvedValue([{
+      id: 't1', family: 'fam-1', expiresAt: daysAhead(10), createdAt: daysAgo(1),
+      lastUsedAt: daysAgo(0), ipAddress: '10.0.0.5', userAgent: 'Chrome',
+    }]);
+
+    const sessions = await getUserActiveSessions('u1');
+
+    expect(findManyMock.mock.calls[0][0].select).not.toHaveProperty('token');
+    expect(sessions[0]).not.toHaveProperty('token');
+    expect(sessions[0].isCurrentSession).toBe(false);
+  });
+
+  it('список сессий берёт только действующие', async () => {
+    findManyMock.mockReset().mockResolvedValue([]);
+
+    await getUserActiveSessions('u1');
+
+    expect(findManyMock.mock.calls[0][0].where).toMatchObject({
+      userId: 'u1', revoked: false,
+    });
+    expect(findManyMock.mock.calls[0][0].where.expiresAt).toHaveProperty('gt');
   });
 });
