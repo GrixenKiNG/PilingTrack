@@ -1,7 +1,6 @@
 import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { attachRequestIdHeader } from '@/lib/request-context';
 import {
   attachSessionCookie,
@@ -11,6 +10,7 @@ import {
 } from '@/services/auth/session-service';
 import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT, LOGIN_IP_RATE_LIMIT } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
+import { withIdentityRole } from '@/core/security/identity-role';
 
 const BCRYPT_ROUNDS = 12;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
@@ -136,12 +136,10 @@ async function upgradeLegacyPasswordIfNeeded(userId: string, plainTextPassword: 
     return;
   }
 
-  await db.user.update({
-    where: { id: userId },
-    data: {
-      password: await hashPassword(plainTextPassword),
-    },
-  });
+  const hashed = await hashPassword(plainTextPassword);
+  await withIdentityRole((client) =>
+    client.user.update({ where: { id: userId }, data: { password: hashed } }),
+  );
 }
 
 function toSessionUser(user: {
@@ -187,19 +185,23 @@ export async function authenticateUserByEmailPassword(
     return { user: null, rateLimited: true, retryAfter: rateLimit.retryAfter };
   }
 
-  const user = await db.user.findUnique({
-    where: { email: email.toLowerCase() },
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      name: true,
-      role: true,
-      isActive: true,
-      tenantId: true,
-      sessionVersion: true,
-    },
-  });
+  // Опознание идёт под ролью, которой политики RLS не писаны: организация
+  // ещё неизвестна — она лежит в той самой строке, которую мы ищем.
+  const user = await withIdentityRole((client) =>
+    client.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        role: true,
+        isActive: true,
+        tenantId: true,
+        sessionVersion: true,
+      },
+    }),
+  );
 
   if (!user || !user.isActive) {
     return { user: null, rateLimited: false };
@@ -255,7 +257,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     sessionVersion: number;
   } | null = null;
 
-  const indexedCandidate = await db.user.findUnique({
+  const indexedCandidate = await withIdentityRole((client) => client.user.findUnique({
     where: { pinLookup },
     select: {
       id: true,
@@ -269,7 +271,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
       tenantId: true,
       sessionVersion: true,
     },
-  }).catch(() => null);
+  })).catch(() => null);
 
   if (indexedCandidate && indexedCandidate.isActive && indexedCandidate.pin) {
     const isBcrypt = indexedCandidate.pin.startsWith(PIN_HASH_PREFIX);
@@ -283,7 +285,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
   // Scans only users whose pinLookup is null (backfilled users are excluded
   // from the scan path so repeated PIN logins never re-hit it).
   if (!matchedUser) {
-    const unindexedUsers = await db.user.findMany({
+    const unindexedUsers = await withIdentityRole((client) => client.user.findMany({
       where: {
         isActive: true,
         pinLookup: null,
@@ -301,7 +303,7 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
         tenantId: true,
         sessionVersion: true,
       },
-    });
+    }));
 
     for (const u of unindexedUsers) {
       if (!u.pin) continue;
@@ -329,10 +331,10 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     const updateData: Record<string, unknown> = {};
     if (needsBcryptUpgrade) updateData.pin = await hashPin(pin);
     if (needsLookupBackfill) updateData.pinLookup = pinLookup;
-    await db.user.update({
+    await withIdentityRole((client) => client.user.update({
       where: { id: matchedUser.id },
       data: updateData,
-    }).catch(() => {
+    })).catch(() => {
       // Best-effort upgrade — retry on next login if it fails.
     });
   }

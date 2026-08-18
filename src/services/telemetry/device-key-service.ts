@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
+import { withIdentityRole } from '@/core/security/identity-role';
 
 const KEY_BYTES = 32; // 256-bit random key — `${prefix}_${base64url}` ~ 43 chars
 const KEY_PREFIX = 'pkdk'; // pilingtrack device key
@@ -113,7 +114,10 @@ export async function authenticateDeviceByKey(
   if (!plaintextKey || plaintextKey.length < 40) return null;
 
   const keyHash = hashDeviceKey(plaintextKey);
-  const device = await db.deviceKey.findUnique({
+  // Как и вход по паролю: организация лежит в самой строке ключа, поэтому
+  // искать её приходится под ролью, которой политики RLS не писаны.
+  // Контроллер телеметрии токена сессии не предъявляет никогда.
+  const device = await withIdentityRole((client) => client.deviceKey.findUnique({
     where: { keyHash },
     select: {
       id: true,
@@ -123,7 +127,7 @@ export async function authenticateDeviceByKey(
       siteId: true,
       tenantId: true,
     },
-  });
+  }));
 
   if (!device || device.revoked) return null;
 
@@ -135,9 +139,9 @@ export async function authenticateDeviceByKey(
 
   // Best-effort lastUsedAt — fire-and-forget so a slow write doesn't
   // delay telemetry ingestion.
-  void db.deviceKey
-    .update({ where: { id: device.id }, data: { lastUsedAt: new Date() } })
-    .catch(() => { /* ignore */ });
+  void withIdentityRole((client) =>
+    client.deviceKey.update({ where: { id: device.id }, data: { lastUsedAt: new Date() } }),
+  ).catch(() => { /* ignore */ });
 
   return {
     deviceKeyId: device.id,
