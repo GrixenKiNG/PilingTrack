@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { readSessionToken, verifySessionToken } from '@/services/auth/session-service';
 import { canActAs } from '@/lib/types';
+import { setRequestTenantId } from '@/core/security/tenant-context';
 
 interface AuthenticatedUser {
   id: string;
@@ -170,6 +171,13 @@ export async function requireAuth(request: NextRequest): Promise<AuthResult> {
     // администратора и только известную роль.
     const requestedActingAs = request.headers.get('x-acting-as');
     const actingAs = canActAs(user.role, requestedActingAs) ? requestedActingAs : null;
+
+    // Тенант становится известен только здесь, поэтому здесь же он попадает в
+    // контекст запроса — слой доступа к данным читает его оттуда, не получая
+    // параметром через всю цепочку вызовов. Замещение роли (actingAs) тенанта
+    // не меняет: администратор смотрит чужими глазами, оставаясь в своём.
+    setRequestTenantId(user.tenantId);
+
     return { user: { ...user, actingAs }, error: null };
   } catch {
     return {

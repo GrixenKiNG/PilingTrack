@@ -10,6 +10,7 @@ import { getResponseCache } from '@/core/cache';
 import { recordHttpRequest } from '@/core/observability/http-metrics';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { readSessionToken } from '@/services/auth/session-service';
+import { runWithTenantContext } from '@/core/security/tenant-context';
 
 export interface ApiWrapperOptions {
   domain?: string;
@@ -46,7 +47,10 @@ export function withApi<T extends any[]>(
   handler: (request: NextRequest, ...args: T) => Promise<NextResponse>,
   _opts?: ApiWrapperOptions
 ) {
-  return async (request: NextRequest, ...args: T) => {
+  // Контекст тенанта открывается здесь, на внешнем краю запроса: через withApi
+  // проходит каждый маршрут, включая withMutation. Пустым — тенанта положит
+  // requireAuth, когда разберёт сессию. Подробности: core/security/tenant-context.
+  return async (request: NextRequest, ...args: T) => runWithTenantContext(async () => {
     const domain = _opts?.domain || 'unknown';
     const startedAt = performance.now();
     let response: NextResponse;
@@ -108,7 +112,7 @@ export function withApi<T extends any[]>(
     // would carry real entity IDs and grow the label set unboundedly).
     recordHttpRequest(request.method, domain, response.status, (performance.now() - startedAt) / 1000);
     return response;
-  };
+  });
 }
 
 /**
