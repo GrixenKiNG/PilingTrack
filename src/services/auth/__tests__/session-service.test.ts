@@ -73,7 +73,7 @@ describe('session-service', () => {
       expect(payload.name).toBe('Test User');
       expect(payload.role).toBe('OPERATOR');
       expect(payload.type).toBe('session');
-      expect(payload.v).toBe(1);
+      expect(payload.v).toBe(2);
       expect(payload.exp).toBeGreaterThan(payload.iat);
     });
 

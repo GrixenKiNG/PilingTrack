@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
-import { readSessionToken, verifySessionToken } from '@/services/auth/session-service';
+import { readSessionToken, tokenTenantId, verifySessionToken } from '@/services/auth/session-service';
 import { canActAs } from '@/lib/types';
 import { setRequestTenantId } from '@/core/security/tenant-context';
 
@@ -78,6 +78,16 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
       return { payloadValid: false, user: null };
     }
 
+    // Организация выставляется ДО чтения строки пользователя, а не после.
+    // Иначе получается замкнутый круг: строгая политика RLS требует контекст,
+    // чтобы отдать строку, а контекст берётся из этой самой строки. Токен
+    // версии 1 организацию не несёт — там порядок прежний, и это работает,
+    // пока политики в режиме аудита.
+    const claimedTenantId = tokenTenantId(payload);
+    if (claimedTenantId !== undefined) {
+      setRequestTenantId(claimedTenantId);
+    }
+
     const user = await db.user.findUnique({
       where: { id: payload.sub },
       select: {
@@ -93,6 +103,16 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
     });
 
     if (!user || !user.isActive || (payload.sv ?? 0) !== user.sessionVersion) {
+      authUserCache.delete(token);
+      return { payloadValid: true, user: null };
+    }
+
+    // Токен утверждает одну организацию, строка говорит другую — значит
+    // пользователя перевели, а токен остался старый. Продолжать нельзя: весь
+    // запрос уже идёт под организацией из токена. Штатно этот случай
+    // закрывает отзыв по sessionVersion, проверка здесь — на случай, если
+    // счётчик забыли увеличить.
+    if (claimedTenantId !== undefined && user.tenantId !== claimedTenantId) {
       authUserCache.delete(token);
       return { payloadValid: true, user: null };
     }

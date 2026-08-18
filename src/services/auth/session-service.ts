@@ -16,15 +16,48 @@ export interface SessionUser {
   sessionVersion: number;
 }
 
+/**
+ * Версия формата токена.
+ *
+ * 1 — без организации. Такой токен заставлял каждый запрос сначала читать
+ *     строку пользователя, чтобы узнать организацию.
+ * 2 — организация внутри токена: контекст выставляется до первого обращения
+ *     к базе. Это условие перевода политик RLS в fail-closed — иначе чтение
+ *     строки пользователя само требовало бы контекста, который из неё же и
+ *     берётся.
+ */
+const SESSION_TOKEN_VERSION = 2;
+
+/**
+ * Какие версии принимаем при проверке.
+ *
+ * Единица остаётся принятой на время смены формата: токены живут 12 часов,
+ * значит выданные до выкладки рассосутся сами за половину суток. Убрать 1 из
+ * списка можно любым следующим изменением — но не раньше, иначе выкладка
+ * разлогинит всех разом.
+ */
+const ACCEPTED_SESSION_TOKEN_VERSIONS: readonly number[] = [1, SESSION_TOKEN_VERSION];
+
 interface SessionPayload extends JWTPayload {
   sub: string;
   email: string;
   name: string;
   role: string;
   type: 'session';
-  v: 1;
+  v: number;
   sv: number;
+  /** Организация. Отсутствует в токенах версии 1. */
+  tenantId?: string | null;
   jti?: string;
+}
+
+/**
+ * Организация, которую утверждает токен, или `undefined`, если он её не несёт
+ * (версия 1). Различие важное: `null` — «пользователь без организации», а
+ * `undefined` — «токен об этом не говорит, спрашивай базу».
+ */
+export function tokenTenantId(payload: SessionPayload): string | null | undefined {
+  return payload.v >= SESSION_TOKEN_VERSION ? payload.tenantId ?? null : undefined;
 }
 
 let devFallbackWarned = false;
@@ -160,8 +193,9 @@ export async function createSessionToken(user: SessionUser) {
     name: user.name,
     role: user.role,
     sv: user.sessionVersion,
+    tenantId: user.tenantId ?? null,
     type: 'session',
-    v: 1,
+    v: SESSION_TOKEN_VERSION,
   })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(user.id)
@@ -181,7 +215,10 @@ export async function verifyTokenSignature(token: string): Promise<SessionPayloa
   try {
     const secret = getSecretKey();
     const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
-    if (payload.type !== 'session' || payload.v !== 1) return null;
+    if (payload.type !== 'session') return null;
+    if (typeof payload.v !== 'number' || !ACCEPTED_SESSION_TOKEN_VERSIONS.includes(payload.v)) {
+      return null;
+    }
     return payload as SessionPayload;
   } catch {
     return null;

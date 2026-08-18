@@ -9,7 +9,8 @@ import * as http from 'http';
 import { IncomingMessage } from 'http';
 import { parse as parseCookie } from 'cookie';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { SESSION_COOKIE_NAME, verifySessionToken } from '@/services/auth/session-service';
+import { SESSION_COOKIE_NAME, tokenTenantId, verifySessionToken } from '@/services/auth/session-service';
+import { setRequestTenantId } from '@/core/security/tenant-context';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 
@@ -66,6 +67,13 @@ export async function authenticateWS(req: IncomingMessage): Promise<WSAuthResult
       return null;
     }
 
+    // Тот же порядок, что и в HTTP-пути: организация из токена попадает в
+    // контекст до чтения строки пользователя.
+    const claimedTenantId = tokenTenantId(payload);
+    if (claimedTenantId !== undefined) {
+      setRequestTenantId(claimedTenantId);
+    }
+
     // Fetch full user context
     const user = await db.user.findUnique({
       where: { id: payload.sub },
@@ -84,6 +92,11 @@ export async function authenticateWS(req: IncomingMessage): Promise<WSAuthResult
     // or deactivation bumps it, which must kill live WS sessions too, not
     // just future HTTP requests.
     if (!user || !user.isActive || (payload.sv ?? 0) !== user.sessionVersion) {
+      return null;
+    }
+
+    // Токен со старой организацией — сессия недействительна (см. lib/auth.ts).
+    if (claimedTenantId !== undefined && user.tenantId !== claimedTenantId) {
       return null;
     }
 
