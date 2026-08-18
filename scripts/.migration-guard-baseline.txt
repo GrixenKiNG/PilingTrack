@@ -10,3 +10,10 @@
 # migration 20260529000000_restore_report_journal_photo. Cannot be
 # edited (Prisma checksums applied migrations), so it is allowlisted.
 20260526202204_equipment_maintenance
+
+# Снос трёх проекций (ReportStats, OperatorPerformance, DowntimeSummary),
+# у которых не осталось ни одного читателя: обработчики удалены 17.08.2026,
+# последний живой писатель — incrementReportCountersRaw — снят 18.08.2026.
+# Данные выводимы из Report, внешних ключей нет. На проде перед накаткой
+# снять дамп: в двух таблицах по 115 строк.
+20260817220000_drop_unread_projections

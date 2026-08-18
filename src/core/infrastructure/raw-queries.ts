@@ -248,33 +248,6 @@ export async function upsertReportRaw(params: {
 }
 
 // ============================================================
-// Increment Counters — быстрое обновление статистики
-// ============================================================
-
-export async function incrementReportCountersRaw(
-  reportId: string,
-  pileDelta: number,
-  drillingDelta: number,
-  downtimeDelta: number
-): Promise<void> {
-  const start = Date.now();
-
-  await db.$executeRaw`
-    UPDATE "ReportStats" SET
-      "totalPiles" = "totalPiles" + ${pileDelta},
-      "totalDrilling" = "totalDrilling" + ${drillingDelta},
-      "totalDowntime" = "totalDowntime" + ${downtimeDelta},
-      "lastEventAt" = NOW()
-    WHERE "reportId" = ${reportId}
-  `;
-
-  const elapsed = Date.now() - start;
-  if (elapsed > 10) {
-    logger.warn('RawQuery: incrementCounters slow', { elapsedMs: elapsed });
-  }
-}
-
-// ============================================================
 // Bulk Delete Reports — удаление с каскадом
 // ============================================================
 

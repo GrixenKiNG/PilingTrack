@@ -38,7 +38,6 @@ vi.mock('@/lib/logger', () => ({
 import {
   getReportsByPeriodRaw,
   upsertReportRaw,
-  incrementReportCountersRaw,
   bulkDeleteReportsRaw,
 } from '../raw-queries';
 
@@ -147,28 +146,6 @@ describe('upsertReportRaw', () => {
     });
 
     expect(result).toEqual({ id: 'row-a', reportId: 'r1' });
-  });
-});
-
-describe('incrementReportCountersRaw', () => {
-  beforeEach(() => {
-    executeRawMock.mockReset();
-    executeRawMock.mockResolvedValue(1);
-  });
-
-  it('uses parameterised tagged template for the UPDATE', async () => {
-    await incrementReportCountersRaw('report-1', 5, 10, 0);
-
-    expect(executeRawMock).toHaveBeenCalledTimes(1);
-    const strings = executeRawMock.mock.calls[0][0] as TemplateStringsArray;
-    expect(strings.raw).toBeDefined();
-  });
-
-  it('passes numeric deltas and reportId as template placeholders', async () => {
-    await incrementReportCountersRaw('report-1', 5, 10, 0);
-
-    const [, ...values] = executeRawMock.mock.calls[0];
-    expect(values).toEqual([5, 10, 0, 'report-1']);
   });
 });
 
