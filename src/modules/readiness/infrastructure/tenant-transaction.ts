@@ -1,6 +1,7 @@
 import type { Prisma } from '@/generated/postgres-client/client';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import {ReadinessCommandError} from '../application/command-pipeline/errors';
+import { requireTenantId } from '@/lib/tenant-scope';
 
 export type ReadinessTransaction = Prisma.TransactionClient;
 
@@ -10,13 +11,10 @@ type SerializableTransactionOptions = {
   resolveConflictDetails?: () => Promise<Record<string, unknown> | undefined>;
 };
 
-function requireSessionTenantId(tenantId: string | null | undefined): string {
-  const value = tenantId?.trim();
-  if (!value) {
-    throw new Error('Readiness tenant context is required');
-  }
-  return value;
-}
+// Общая проверка вместо здешней копии: та бросала голый Error, из-за чего
+// отсутствие тенанта превращалось в 500 «Internal server error» вместо
+// ответа 400. При наличии тенанта поведение не изменилось.
+const requireSessionTenantId = requireTenantId;
 
 export async function runReadinessTenantTransaction<T>(
   client: TransactionClient,

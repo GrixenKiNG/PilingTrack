@@ -5,11 +5,7 @@ import { computePinLookup, hashPassword, hashPin } from '@/services/auth/auth-se
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { OperationalUserDTO, UserRole } from '@/lib/types';
-
-function requireTenantId(tenantId: string | null | undefined): string {
-  if (!tenantId) throw new ServiceError('Tenant context missing', 400);
-  return tenantId;
-}
+import { requireTenantId } from '@/lib/tenant-scope';
 
 function isUniqueConstraintError(message: string) {
   return message.includes('Unique') || message.includes('unique constraint');

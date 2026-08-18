@@ -8,7 +8,7 @@ describe('readiness tenant transaction', () => {
   it('fails closed without a session-owned tenant', async () => {
     const client = { $transaction: vi.fn() };
     await expect(runReadinessTenantTransaction(client as never, '', vi.fn()))
-      .rejects.toThrow('tenant context is required');
+      .rejects.toThrow('Контекст организации не определён');
     expect(client.$transaction).not.toHaveBeenCalled();
   });
 

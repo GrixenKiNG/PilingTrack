@@ -3,6 +3,7 @@ import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '../commands/equipment-maintenance';
+import { requireTenantId } from '@/lib/tenant-scope';
 
 // Safety cap for the cross-fleet work order list. Single-tenant volumes are
 // low today; revisit with cursor pagination if a tenant exceeds this.
@@ -372,17 +373,25 @@ export async function listAllMaintenance(tenantId: string, filter: MaintenanceLi
   });
 }
 
+/**
+ * Список установок организации.
+ *
+ * `tenantId` обязателен и проверяется до запроса. Раньше он был
+ * необязательным и применялся как `if (tenantId) where.tenantId = tenantId`:
+ * при пустом значении условие просто исчезало, и выборка возвращала технику
+ * всех организаций сразу. Пустое значение приходило двумя путями — из
+ * маршрута, где тенант собирался как `?? ''`, и из телеметрии, которая
+ * вызывала эту функцию вообще без четвёртого аргумента.
+ */
 export async function listAllEquipment(
+  tenantId: string | null | undefined,
   pagination?: CursorPaginationResult,
   siteId?: string | null,
   operatorUserId?: string | null,
-  tenantId?: string,
 ) {
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
-  const where: Record<string, unknown> = {};
-
-  if (tenantId) where.tenantId = tenantId;
+  const where: Record<string, unknown> = { tenantId: requireTenantId(tenantId) };
 
   if (operatorUserId) {
     where.crews = {

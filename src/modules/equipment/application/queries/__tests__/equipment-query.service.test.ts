@@ -29,23 +29,25 @@ describe('listAllEquipment — operator scope', () => {
   });
 
   it('returns all equipment when no operatorUserId is passed', async () => {
-    await listAllEquipment();
+    await listAllEquipment('orion');
     const args = findManyMock.mock.calls[0][0];
-    expect(args.where).toEqual({});
+    expect(args.where).toEqual({ tenantId: 'orion' });
   });
 
   it('filters by active crew assignment when operatorUserId is provided', async () => {
-    await listAllEquipment(undefined, null, 'user_op_42');
+    await listAllEquipment('orion', undefined, null, 'user_op_42');
     const args = findManyMock.mock.calls[0][0];
     expect(args.where).toEqual({
+      tenantId: 'orion',
       crews: { some: { isActive: true, operatorId: 'user_op_42' } },
     });
   });
 
   it('narrows operator scope further when siteId is provided', async () => {
-    await listAllEquipment(undefined, 'site_1', 'user_op_42');
+    await listAllEquipment('orion', undefined, 'site_1', 'user_op_42');
     const args = findManyMock.mock.calls[0][0];
     expect(args.where).toEqual({
+      tenantId: 'orion',
       crews: {
         some: { isActive: true, operatorId: 'user_op_42', siteId: 'site_1' },
       },
@@ -55,9 +57,26 @@ describe('listAllEquipment — operator scope', () => {
   it('does NOT add operator filter when operatorUserId is null', async () => {
     // Regression guard: passing null (admin path) must not accidentally
     // produce a `crews.some` filter that would silently hide equipment.
-    await listAllEquipment(undefined, 'site_1', null);
+    await listAllEquipment('orion', undefined, 'site_1', null);
     const args = findManyMock.mock.calls[0][0];
-    expect(args.where).toEqual({});
+    expect(args.where).toEqual({ tenantId: 'orion' });
+  });
+
+  // Раньше тенант был необязательным и применялся через `if (tenantId)`:
+  // при пустом значении условие исчезало, и в ответ уходила техника всех
+  // организаций. Проверки ниже требуют отказа, а не общей выборки.
+  describe('без тенанта запрос не выполняется', () => {
+    it.each([
+      ['не передан', undefined],
+      ['null', null],
+      ['пустая строка', ''],
+      ['одни пробелы', '   '],
+    ])('%s — отказ, а не список всех организаций', async (_label, tenantId) => {
+      await expect(listAllEquipment(tenantId as string | null | undefined)).rejects.toThrow(
+        'Контекст организации не определён',
+      );
+      expect(findManyMock).not.toHaveBeenCalled();
+    });
   });
 });
 

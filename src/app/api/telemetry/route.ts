@@ -278,6 +278,8 @@ export const GET = withApi(async (request: NextRequest) => {
       const { listAllEquipment } = await import('@/modules/equipment');
       // Page through accessible equipment — typically small for an operator.
       const owned = await listAllEquipment(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        user!.tenantId ?? process.env.DEFAULT_TENANT_ID,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         { limit: 200, getNextCursor: () => null } as any,
         null,

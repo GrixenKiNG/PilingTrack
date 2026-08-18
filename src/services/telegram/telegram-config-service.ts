@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 import { encrypt, decrypt, isEncrypted } from '@/core/security/encryption';
+import { requireTenantId } from '@/lib/tenant-scope';
 
 function normalizeText(value: unknown, field: string) {
   const normalized = String(value || '').trim();
@@ -8,13 +9,6 @@ function normalizeText(value: unknown, field: string) {
     throw new ServiceError(`${field} required`, 400);
   }
   return normalized;
-}
-
-function requireTenantId(tenantId: string) {
-  if (!tenantId) {
-    throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
-  }
-  return tenantId;
 }
 
 /**

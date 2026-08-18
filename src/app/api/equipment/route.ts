@@ -14,12 +14,12 @@ export const GET = withApi(
     if (error) return error;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const siteId = request.nextUrl.searchParams.get('siteId');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const operatorUserId = user!.role === 'OPERATOR' ? user!.id : null;
-    const equipment = await listAllEquipment(pagination, siteId, operatorUserId, tenantId);
+    const equipment = await listAllEquipment(tenantId, pagination, siteId, operatorUserId);
     const nextCursor = pagination.getNextCursor(equipment);
     return NextResponse.json({ data: equipment, nextCursor });
   },
