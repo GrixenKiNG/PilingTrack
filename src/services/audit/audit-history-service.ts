@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { requireTenantId } from '@/lib/tenant-scope';
 
 /** Normalized history entry — matches OpsHistoryEntry consumed by OpsHistoryList. */
 export interface AuditHistoryEntry {
@@ -69,8 +70,14 @@ function formatAt(d: Date): string {
 export async function getEntityHistory(
   scope: string,
   targetId: string,
+  tenantId: string | null | undefined,
   limit = 20,
 ): Promise<AuditHistoryEntry[]> {
+  // Карты имён сужены по организации смотрящего. Раньше они грузились
+  // целиком: открытие истории любой записи вытягивало всех пользователей,
+  // все объекты и всю технику системы. Идентификатор из другой организации
+  // теперь останется идентификатором — это правильнее, чем показать чужое имя.
+  const tenantScope = { tenantId: requireTenantId(tenantId) };
   const events = await db.feedbackEvent.findMany({
     where: { scope, targetId },
     orderBy: { createdAt: 'desc' },
@@ -80,9 +87,9 @@ export async function getEntityHistory(
 
   // Name maps for resolving actor + id-valued change fields (small tables).
   const [users, sites, equipment] = await Promise.all([
-    db.user.findMany({ select: { id: true, name: true } }),
-    db.site.findMany({ select: { id: true, name: true } }),
-    db.equipment.findMany({ select: { id: true, name: true } }),
+    db.user.findMany({ where: tenantScope, select: { id: true, name: true } }),
+    db.site.findMany({ where: tenantScope, select: { id: true, name: true } }),
+    db.equipment.findMany({ where: tenantScope, select: { id: true, name: true } }),
   ]);
   const userMap = toMap(users);
   const siteMap = toMap(sites);

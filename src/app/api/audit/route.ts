@@ -25,7 +25,8 @@ export const GET = withApi(
     const limitRaw = Number(request.nextUrl.searchParams.get('limit'));
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 20;
 
-    const entries = await getEntityHistory(scope, targetId, limit);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const entries = await getEntityHistory(scope, targetId, user!.tenantId, limit);
     return NextResponse.json({ entries });
   },
   { domain: 'audit', cache: false },

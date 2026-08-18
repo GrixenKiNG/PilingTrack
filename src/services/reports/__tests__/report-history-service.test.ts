@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/db', () => ({
   db: {
+    report: { findUnique: vi.fn() },
     reportAudit: { findMany: vi.fn() },
     reportVersion: { findMany: vi.fn() },
     pileGrade: { findMany: vi.fn() },
@@ -75,6 +76,7 @@ describe('getReportHistory', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns humanized events (newest first) and versions', async () => {
+    (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: 'orion' });
     (db.reportAudit.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'a1', action: 'updated', actorName: 'Админ', actorRole: 'ADMIN', createdAt: new Date('2026-05-02'), diff: { status: { old: 'draft', new: 'submitted' } } },
       { id: 'a0', action: 'created', actorName: 'Иванов', actorRole: 'OPERATOR', createdAt: new Date('2026-05-01'), diff: null },
@@ -92,5 +94,31 @@ describe('getReportHistory', () => {
     expect(res.events[0].changes).toEqual([{ label: 'Статус', before: 'Черновик', after: 'Отправлен' }]);
     expect(res.events[1].changes).toEqual([]);
     expect(res.versions).toEqual([{ version: 2, actorId: 'u1', createdAt: '2026-05-02T00:00:00.000Z' }]);
+  });
+
+  // Карты имён раньше грузились целиком: открытие истории одного отчёта
+  // вытягивало справочники, объекты, пользователей и технику всех организаций.
+  it('карты имён сужены организацией самого отчёта', async () => {
+    (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: 'orion' });
+    (db.reportAudit.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (db.reportVersion.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    for (const m of [db.pileGrade, db.drillingType, db.downtimeReason, db.site, db.user, db.equipment]) {
+      (m.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    }
+
+    await getReportHistory('rep-1');
+
+    for (const m of [db.pileGrade, db.drillingType, db.downtimeReason, db.site, db.user, db.equipment]) {
+      expect(m.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { tenantId: 'orion' } }),
+      );
+    }
+  });
+
+  it('отчёт без организации — отказ, а не карты по всем организациям', async () => {
+    (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: null });
+
+    await expect(getReportHistory('rep-1')).rejects.toThrow('Контекст организации не определён');
+    expect(db.user.findMany).not.toHaveBeenCalled();
   });
 });
