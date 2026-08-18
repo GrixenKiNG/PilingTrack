@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { listTemplates, createTemplate } from '@/modules/inspections';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
@@ -63,7 +63,7 @@ export const POST = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    const parsed = createSchema.safeParse(await request.json());
+    const parsed = createSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },

@@ -9,7 +9,7 @@ import {
   listDictionaries, getDictionaryUsage,
   type DictFilter, type UsageMap,
 } from '@/services/dictionaries/dictionary-service';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -79,7 +79,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   assertCan(user!, 'dictionary.manage');
   if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
   const context = { tenantId: user.tenantId, actorId: user.id };
-  const validated = createSchema.safeParse(await request.json());
+  const validated = createSchema.safeParse(await readJsonBody(request));
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
   const { type, ...input } = validated.data;
   const item = await createDictionaryItem(context, type, input);
@@ -94,7 +94,7 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   assertCan(user!, 'dictionary.manage');
   if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
   const context = { tenantId: user.tenantId, actorId: user.id };
-  const validated = patchSchema.safeParse(await request.json());
+  const validated = patchSchema.safeParse(await readJsonBody(request));
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
 
   const { type, id, name, isActive, lengthMm, sectionOrDiameter } = validated.data;
@@ -117,7 +117,7 @@ export const DELETE = withMutation(async (request: NextRequest) => {
   assertCan(user!, 'dictionary.manage');
   if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
   const context = { tenantId: user.tenantId, actorId: user.id };
-  const validated = deleteSchema.safeParse(await request.json());
+  const validated = deleteSchema.safeParse(await readJsonBody(request));
   if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
   const result = await deleteDictionaryItem(context, validated.data.type, validated.data.id);
   await invalidateDictionaries(context.tenantId);

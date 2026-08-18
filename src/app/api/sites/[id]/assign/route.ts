@@ -4,7 +4,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { assignUserToSite, unassignUserFromSite } from '@/modules/sites';
 import { siteAssignSchema } from '@/lib/validation-schemas';
 import { invalidateSites } from '@/lib/cached-queries';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
@@ -20,7 +20,7 @@ export const POST = withMutation(
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validated = siteAssignSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json({ error: 'Validation failed', details: validated.error.flatten() }, { status: 400 });

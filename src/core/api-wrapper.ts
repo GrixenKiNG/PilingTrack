@@ -111,6 +111,27 @@ export function withApi<T extends any[]>(
   };
 }
 
+/**
+ * Разобрать тело запроса как JSON — и ответить 400, а не 500.
+ *
+ * `request.json()` на битом теле бросает SyntaxError, а withApi выше не
+ * отличает его от промаха в коде: клиент получал «Internal server error», в
+ * Sentry падало событие, и любой кривой запрос выглядел как отказ сервера.
+ * Ошибка на стороне клиента — это 400.
+ *
+ * Отдельная функция, а не общий `catch (SyntaxError)` в обёртке: тем же
+ * исключением отзывается разбор битого JSON из базы — настройки, шаблоны
+ * раскладки, полезная нагрузка телеметрии. Ловить его целиком значило бы
+ * выдавать испорченные данные за ошибку клиента и прятать их от Sentry.
+ */
+export async function readJsonBody<T = unknown>(request: NextRequest): Promise<T> {
+  try {
+    return (await request.json()) as T;
+  } catch {
+    throw new ServiceError('Тело запроса должно быть корректным JSON', 400);
+  }
+}
+
 const MUTATION_RATE_LIMIT = { maxAttempts: 100, windowMs: 60_000, blockDurationMs: 60_000 };
 
 /**

@@ -5,7 +5,7 @@ import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { ingestTelemetryBatch, telemetryBuffer, findForeignEquipmentIds } from '@/services/telemetry/telemetry-ingestion-service';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { logger } from '@/lib/logger';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 const telemetryRecordSchema = z.object({
@@ -87,7 +87,7 @@ export const POST = withApi(async (request: NextRequest) => {
     const circuitResponse = checkCircuitBreaker();
     if (circuitResponse) return circuitResponse;
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     if (!Array.isArray(body)) {
       return NextResponse.json(

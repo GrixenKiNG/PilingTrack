@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { getEquipmentByIdOrThrow, updateEquipment, updateEquipmentMetadata, deleteEquipment } from '@/modules/equipment';
 import { equipmentManageSchema } from '@/lib/validation-schemas';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -31,7 +31,7 @@ export const PUT = withMutation(
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     const validation = equipmentManageSchema.partial().safeParse(body);
     if (!validation.success) {

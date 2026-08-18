@@ -6,7 +6,7 @@ import { getSiteWithHierarchy, updateSite, activateSite, deactivateSite, hardDel
 import { updateSiteWithPlans, setSiteCompleted } from '@/modules/sites/application/commands';
 import { updateSiteSchema } from '@/lib/validation-schemas';
 import { invalidateSites } from '@/lib/cached-queries';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
@@ -40,7 +40,7 @@ export const PUT = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const commandContext = { tenantId, actorId: user!.id };
     const { id } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validated = updateSiteSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(

@@ -8,13 +8,13 @@ import { pinAuthSchema } from '@/lib/validation-schemas';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 import { getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, readJsonBody } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
 export const POST = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const tenantContext = resolveTenantContext(request);
 
   const validation = pinAuthSchema.safeParse(body);

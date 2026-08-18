@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rotateRefreshToken } from '@/core/security/refresh-tokens';
 import { attachSessionCookie } from '@/services/auth/session-service';
 import { z } from 'zod';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 
 const refreshSchema = z.object({
   refreshToken: z.string().min(1),
@@ -27,7 +27,7 @@ export const runtime = 'nodejs';
 
 export const POST = withMutation(
   async (request: NextRequest) => {
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validated = refreshSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(

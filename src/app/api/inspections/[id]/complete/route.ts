@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { completeInspection } from '@/modules/inspections';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
@@ -19,7 +19,7 @@ export const POST = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     const { id } = await params;
-    const parsed = schema.safeParse(await request.json());
+    const parsed = schema.safeParse(await readJsonBody(request));
     if (!parsed.success) return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

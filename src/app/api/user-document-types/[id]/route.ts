@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { deleteUserDocumentType, updateUserDocumentType } from '@/modules/users';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
 import { documentTypeSchema } from '../route';
 
@@ -18,7 +18,7 @@ export const PATCH = withMutation(
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
-    const parsed = patchSchema.safeParse(await request.json());
+    const parsed = patchSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
     }

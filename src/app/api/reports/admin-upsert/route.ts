@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'node:crypto';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { reportAdminUpsertSchema } from '@/lib/validation-schemas';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
@@ -18,7 +19,7 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'reports.manage_all');
-    const dto = await request.json();
+    const dto = await readJsonBody(request);
     const validated = reportAdminUpsertSchema.safeParse(dto);
     if (!validated.success) {
       return NextResponse.json(
@@ -26,6 +27,13 @@ export const POST = withMutation(
         { status: 400 }
       );
     }
+    // Дальше читаем validated.data, а не сырое тело. Схема проставляет
+    // значения по умолчанию — shiftType 'DAY', пустые массивы piles,
+    // drillings, downtimes, — и раньше они терялись: админский маршрут брал
+    // поля из необработанного dto, тогда как операторский рядом (upsert)
+    // всегда работал с разобранными. Отчёт, сохранённый админом без раздела
+    // свай, уходил в команду с undefined вместо пустого списка.
+    const data = validated.data;
     const { upsertReport } = await getReportCommandService();
     // Same tenantId-from-session fix as in the operator route — admin
     // edits were also writing NULL tenantId, hiding the edited report
@@ -34,19 +42,21 @@ export const POST = withMutation(
     const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || undefined;
     const result = await upsertReport(
       {
-        reportId: dto.reportId,
-        siteId: dto.siteId,
-        userId: dto.userId,
+        // Тот же порядок, что и в операторском маршруте: свой идентификатор,
+        // затем id, затем новый — админ тоже может создавать отчёт с нуля.
+        reportId: data.reportId || data.id || crypto.randomUUID(),
+        siteId: data.siteId,
+        userId: data.userId,
         tenantId,
-        expectedVersion: validated.data.version,
-        date: dto.date,
-        shiftType: dto.shiftType,
-        shiftStart: dto.shiftStart,
-        shiftEnd: dto.shiftEnd,
-        equipmentId: dto.equipmentId,
-        piles: dto.piles,
-        drillings: dto.drillings,
-        downtimes: dto.downtimes,
+        expectedVersion: data.version,
+        date: data.date,
+        shiftType: data.shiftType,
+        shiftStart: data.shiftStart,
+        shiftEnd: data.shiftEnd,
+        equipmentId: data.equipmentId,
+        piles: data.piles,
+        drillings: data.drillings,
+        downtimes: data.downtimes,
       },
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       { enforceEditWindow: false, actor: user! }

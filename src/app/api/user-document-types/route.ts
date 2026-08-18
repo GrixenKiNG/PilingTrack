@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { createUserDocumentType, listUserDocumentTypes, listUserDocumentTypesForAdmin } from '@/modules/users';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
 
 export const runtime = 'nodejs';
@@ -56,7 +56,7 @@ export const POST = withMutation(
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
-    const parsed = documentTypeSchema.safeParse(await request.json());
+    const parsed = documentTypeSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Validation failed', details: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })) }, { status: 400 });
     }

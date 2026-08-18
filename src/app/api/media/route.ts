@@ -12,7 +12,7 @@ import { requireAuth } from '@/lib/auth';
 import { getMediaService } from '@/core/media/media-service';
 import { assertCanAccessMediaEntity } from '@/core/media/media-auth';
 import { getRequestId } from '@/lib/request-context';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const POST = withMutation(async (request: NextRequest) => {
@@ -20,7 +20,16 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (error) return error;
 
   const requestId = getRequestId(request);
-  const body = await request.json();
+  // Тело описано здесь, а не выведено из `any`: имя файла и тип содержимого
+  // проверяются ниже, а ключ в хранилище собирается не из них (см.
+  // buildMediaKey — там же и обеззараживание), поэтому схемы zod тут нет.
+  const body = await readJsonBody<{
+    fileName?: string;
+    contentType?: string;
+    fileSize?: number;
+    entityType?: string;
+    entityId?: string;
+  }>(request);
 
   if (!body.fileName || !body.contentType) {
     return NextResponse.json({ error: 'fileName and contentType are required' }, { status: 400 });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { updateMaintenance, deleteMaintenance } from '@/modules/equipment';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
@@ -44,7 +44,7 @@ export const PUT = withMutation(
     const { id, recordId } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

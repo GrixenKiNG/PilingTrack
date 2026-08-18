@@ -9,7 +9,7 @@ import {
   updateTelegramConfig,
 } from '@/services/telegram/telegram-config-service';
 import { telegramConfigSchema } from '@/lib/validation-schemas';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { getResponseCache } from '@/core/cache';
 
 const telegramConfigIdSchema = telegramConfigSchema.partial().extend({ id: z.string().min(1) });
@@ -48,7 +48,7 @@ export const POST = withMutation(
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     const validation = telegramConfigSchema.safeParse(body);
     if (!validation.success) {
@@ -77,7 +77,7 @@ export const PUT = withMutation(
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     const validation = telegramConfigIdSchema.safeParse(body);
     if (!validation.success) {
@@ -107,7 +107,7 @@ export const DELETE = withMutation(
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     const validation = deleteIdSchema.safeParse(body);
     if (!validation.success) {

@@ -7,7 +7,7 @@ import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { loginSchema } from '@/lib/validation-schemas';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { getRateLimitIdentifier } from '@/lib/rate-limiter';
 
 
@@ -17,7 +17,7 @@ export const POST = withApi(
   async (request: NextRequest) => {
     const requestId = getRequestId(request);
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const tenantContext = resolveTenantContext(request);
 
     // Zod validation

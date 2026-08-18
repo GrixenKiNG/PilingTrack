@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createCrewSchema } from '@/lib/validation-schemas';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 import { invalidateCrewsCache } from './cache';
 
@@ -39,7 +39,7 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.manage');
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     const validation = createCrewSchema.safeParse(body);
     if (!validation.success) {

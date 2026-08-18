@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import {
   getPendingDlqEntries,
   getDlqStats,
@@ -68,7 +68,7 @@ export const POST = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'dlq.manage');
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validation = actionSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(

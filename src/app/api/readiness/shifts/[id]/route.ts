@@ -7,7 +7,7 @@ import {withReadinessRequestTransaction, withReadinessSerializableTransaction} f
 import {resolveReadinessRequestContext} from '../../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../../_shared/response';
 import {withReadinessCommand} from '../../_shared/route-adapter';
-import {withApi} from '@/core/api-wrapper';
+import {withApi, readJsonBody } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 type Params = {params: Promise<{id: string}>};
@@ -21,7 +21,7 @@ async function handleGet(request: NextRequest, route: {params: Promise<{id: stri
   } catch (error) { if (error instanceof ReadinessCommandError) return readinessErrorResponse(error, context.correlationId, context.requestId); throw error; }
 }
 export const PATCH = withReadinessCommand(async (request: NextRequest, context, {params}: Params) => { const {id} = await params;
-  const parsed = updateShiftSchema.safeParse(await request.json());
+  const parsed = updateShiftSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Некорректные изменения смены', {fieldErrors: parsed.error.flatten().fieldErrors});
   const result = await withReadinessSerializableTransaction(context.tenantId, (tx) => updateShiftCommand({tx, context, id,
     key: request.headers.get('idempotency-key'), ifMatch: request.headers.get('if-match'), payload: parsed.data}));

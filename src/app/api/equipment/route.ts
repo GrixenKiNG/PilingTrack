@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createEquipment, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
 import { createEquipmentSchema } from '@/lib/validation-schemas';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 
 export const runtime = 'nodejs';
@@ -39,7 +39,7 @@ export const POST = withMutation(
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validation = createEquipmentSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(

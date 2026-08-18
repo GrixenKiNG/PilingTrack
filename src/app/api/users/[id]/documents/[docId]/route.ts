@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { updateUserDocument, deleteUserDocument } from '@/modules/users';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
 
 export const runtime = 'nodejs';
@@ -34,7 +34,7 @@ export const PUT = withMutation(
     if (!ctx) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
     const { id, docId } = await params;
-    const parsed = updateSchema.safeParse(await request.json());
+    const parsed = updateSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },

@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
@@ -18,7 +18,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
-    const dto = await request.json();
+    const dto = await readJsonBody(request);
 
     // Zod validation
     const validation = reportUpsertSchema.safeParse(dto);

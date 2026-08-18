@@ -25,7 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { authenticateDeviceByKey } from '@/services/telemetry/device-key-service';
 
 export const runtime = 'nodejs';
@@ -108,7 +108,7 @@ export const POST = withApi(async (request: NextRequest) => {
   const { identity, error } = await authenticateDevice(request);
   if (!identity) return error as NextResponse;
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
 
   // Validate telemetry payload
   const validation = validateTelemetry(body);
@@ -149,7 +149,7 @@ export const PATCH = withApi(async (request: NextRequest) => {
   const { identity, error } = await authenticateDevice(request);
   if (!identity) return error as NextResponse;
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
 
   if (!Array.isArray(body)) {
     return createJsonResponse(

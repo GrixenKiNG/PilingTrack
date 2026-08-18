@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import {
   provisionDeviceKey,
   revokeDeviceKey,
@@ -68,7 +68,7 @@ export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => 
 
   const { id: equipmentId } = await ctx.params;
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const parsed = provisionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -132,7 +132,7 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: RouteCtx) =
 
   const { id: equipmentId } = await ctx.params;
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const parsed = revokeSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

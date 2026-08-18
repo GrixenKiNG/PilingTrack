@@ -5,7 +5,7 @@ import { createSiteWithPlans } from '@/modules/sites';
 import { createSiteSchema } from '@/lib/validation-schemas';
 import { invalidateSites } from '@/lib/cached-queries';
 import { withDbProtection } from '@/core/infrastructure/circuit-breakers';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 
 
 export const runtime = 'nodejs';
@@ -21,7 +21,7 @@ export const POST = withMutation(
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validation = createSiteSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(

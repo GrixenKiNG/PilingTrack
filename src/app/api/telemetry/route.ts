@@ -19,7 +19,7 @@ import {
   findForeignEquipmentIds,
 } from '@/services/telemetry/telemetry-ingestion-service';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
-import { withApi } from '@/core/api-wrapper';
+import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { z } from 'zod';
 
 const telemetryRecordSchema = z.object({
@@ -118,7 +118,7 @@ export const POST = withApi(async (request: NextRequest) => {
     if (circuitResponse) return circuitResponse;
 
     // Check if this is a batch or single record
-    const body = await request.json();
+    const body = await readJsonBody(request);
 
     if (Array.isArray(body)) {
       // Batch ingestion — enforce max batch size

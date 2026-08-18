@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { ensureTenantAccess } from '@/services/auth/resource-access-service';
 import { updateCrewSchema } from '@/lib/validation-schemas';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { invalidateCrewsCache } from '../cache';
 
 
@@ -41,7 +41,7 @@ export const PUT = withMutation(
     const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const validated = updateCrewSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(

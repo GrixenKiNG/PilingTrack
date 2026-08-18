@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createEquipmentDocument } from '@/modules/equipment';
-import { withMutation } from '@/core/api-wrapper';
+import { withMutation, readJsonBody } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
@@ -31,7 +31,7 @@ export const POST = withMutation(
     assertCan(user!, 'equipment.manage');
 
     const { id } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

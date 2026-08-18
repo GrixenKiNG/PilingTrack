@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { addMeterReading, listMeterReadings } from '@/modules/equipment';
 import { getCrewForOperator } from '@/modules/crews';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
@@ -67,7 +67,7 @@ export const POST = withMutation(
     assertCan(user!, 'meter.record');
 
     const { id } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

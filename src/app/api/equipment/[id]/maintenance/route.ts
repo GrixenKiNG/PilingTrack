@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createMaintenance, listMaintenance } from '@/modules/equipment';
-import { withApi, withMutation } from '@/core/api-wrapper';
+import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
 export const runtime = 'nodejs';
@@ -57,7 +57,7 @@ export const POST = withMutation(
     assertCan(user!, 'maintenance.manage');
 
     const { id } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
