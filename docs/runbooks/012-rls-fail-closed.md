@@ -93,6 +93,22 @@ grep -q '^DB_IDENTITY_ROLE=' .env || echo 'DB_IDENTITY_ROLE=pilingtrack_identity
 grep '^DB_IDENTITY_ROLE=' .env
 ```
 
+⚠️ **Одного `.env` НЕ достаточно.** `env_file` у сервисов не объявлен, поэтому
+в контейнер попадает только то, что перечислено в блоке `environment:`
+docker-compose.yml. Переменная там уже есть (добавлена вместе с ADR-0046), но
+проверить обязательно — если её не окажется, приложение поднимется без роли
+опознания и войти не сможет никто:
+
+```bash
+grep -c 'DB_IDENTITY_ROLE' docker-compose.yml   # ждём 3: app, workers, ws
+```
+
+После подъёма контейнеров переменная обязана быть видна изнутри:
+
+```bash
+docker compose exec -T app printenv DB_IDENTITY_ROLE   # pilingtrack_identity
+```
+
 Перезапуск приложения и воркеров, чтобы переменная доехала:
 
 ```bash

@@ -101,6 +101,14 @@ services:
       # dropped, even though the config exists and the workers service had
       # the var. (Also used as the tenant fallback on background paths.)
       - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID:-}
+      # Роль опознания: на неё приложение переключается на время одной
+      # транзакции для трёх запросов, которым организация неизвестна по
+      # устройству — поиск пользователя по email, по ПИН-коду и поиск ключа
+      # устройства (см. core/security/identity-role.ts, ADR-0046).
+      # Переменная обязана быть ЗДЕСЬ, а не только в .env: env_file у сервисов
+      # не объявлен, поэтому в контейнер попадает лишь то, что перечислено в
+      # этом блоке. Пустое значение = переключения нет, поведение как раньше.
+      - DB_IDENTITY_ROLE=${DB_IDENTITY_ROLE:-}
       # Shared secret Alertmanager uses to authenticate to /api/alerts/webhook.
       # MUST be present on the app too — the webhook fails closed (401) when it's
       # unset, silently dropping every alert. Kept optional (empty default) so
@@ -173,6 +181,14 @@ services:
       # is silently skipped.
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID:-}
+      # Роль опознания: на неё приложение переключается на время одной
+      # транзакции для трёх запросов, которым организация неизвестна по
+      # устройству — поиск пользователя по email, по ПИН-коду и поиск ключа
+      # устройства (см. core/security/identity-role.ts, ADR-0046).
+      # Переменная обязана быть ЗДЕСЬ, а не только в .env: env_file у сервисов
+      # не объявлен, поэтому в контейнер попадает лишь то, что перечислено в
+      # этом блоке. Пустое значение = переключения нет, поведение как раньше.
+      - DB_IDENTITY_ROLE=${DB_IDENTITY_ROLE:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -224,6 +240,14 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
       - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
+      # Роль опознания: на неё приложение переключается на время одной
+      # транзакции для трёх запросов, которым организация неизвестна по
+      # устройству — поиск пользователя по email, по ПИН-коду и поиск ключа
+      # устройства (см. core/security/identity-role.ts, ADR-0046).
+      # Переменная обязана быть ЗДЕСЬ, а не только в .env: env_file у сервисов
+      # не объявлен, поэтому в контейнер попадает лишь то, что перечислено в
+      # этом блоке. Пустое значение = переключения нет, поведение как раньше.
+      - DB_IDENTITY_ROLE=${DB_IDENTITY_ROLE:-}
     depends_on:
       postgres:
         condition: service_healthy
