@@ -39,9 +39,11 @@ ORDER BY 1;
 
 \echo
 \echo '== 2. Таблицы с tenantId, но без RLS =================================='
-\echo '-- Ожидаются ровно пять, каждая — осознанное решение (ADR-0046):'
-\echo '-- IdempotencyKey, OutboxEvent, ReadinessAccessMatrix,'
-\echo '-- ReadinessBackfillProgress, TenantAuditChain.'
+\echo '-- Ожидаются ровно две, обе — осознанное решение (ADR-0046):'
+\echo '-- OutboxEvent (воркер разбирает очередь сквозь все организации) и'
+\echo '-- IdempotencyKey (мёртвая: пять экспортов, ноль вызывающих).'
+\echo '-- У обеих tenantId допускает пустоту — строгое сравнение прятало бы'
+\echo '-- такие строки навсегда.'
 
 SELECT c.relname AS "таблица"
 FROM pg_class c

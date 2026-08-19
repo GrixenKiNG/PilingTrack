@@ -1,8 +1,12 @@
 # Runbook 012 — перевод RLS в fail-closed на бою
 
-**Что делаем.** 37 политик `tenant_isolation_*` переводим из режима аудита
-(«не назвал организацию — покажем всё») в строгий («не назвал — не покажем
-ничего»). Обоснование и разбор — ADR-0046.
+**Что делаем.** Две миграции подряд. Первая переводит 37 политик
+`tenant_isolation_*` из режима аудита («не назвал организацию — покажем всё») в
+строгий («не назвал — не покажем ничего»). Вторая включает RLS на трёх
+таблицах, у которых его не было вовсе: `ReadinessAccessMatrix`,
+`ReadinessBackfillProgress`, `TenantAuditChain`. Итог — 46 строгих политик и
+две таблицы без RLS осознанно (`OutboxEvent`, `IdempotencyKey`). Обоснование и
+разбор — ADR-0046.
 
 **Порядок критичен и необратим по последствиям.** Сначала роль опознания и
 переменная окружения, только потом миграция. Наоборот — вход перестанет
@@ -89,8 +93,8 @@ curl -si https://orionpiling.ru/api/health | head -3
 
 ## Этап 3. Миграция
 
-⚠️ В диффе новая папка `prisma/migrations/20260819120000_rls_fail_closed_all`,
-значит образ `migrate` надо пересобрать — иначе он скажет «нет ожидающих
+⚠️ В диффе две новые папки в `prisma/migrations` (`20260819120000_rls_fail_closed_all`
+и `20260819140000_rls_remaining_tenant_tables`), значит образ `migrate` надо пересобрать — иначе он скажет «нет ожидающих
 миграций» и молча пропустит её (см. ранбук 008, раздел «Миграции»).
 
 ```bash
@@ -112,7 +116,8 @@ docker compose exec -T postgres psql -U piling -d pilingtrack -c \
   "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 3;"
 ```
 
-Верхней строкой обязан быть `20260819120000_rls_fail_closed_all`.
+Верхними двумя строками обязаны быть `20260819140000_rls_remaining_tenant_tables`
+и `20260819120000_rls_fail_closed_all`.
 
 ```bash
 docker compose up -d app workers ws
@@ -127,8 +132,8 @@ docker compose exec -T postgres psql -U piling -d pilingtrack < scripts/rls-stat
 diff /tmp/rls-before.txt /tmp/rls-after.txt
 ```
 
-Ждём: 43 строгих, ноль в режиме аудита, тот же список из пяти таблиц без RLS,
-пусто в разделе «RLS без FORCE».
+Ждём: 46 строгих, ноль в режиме аудита, в списке таблиц без RLS остались
+только `OutboxEvent` и `IdempotencyKey`, пусто в разделе «RLS без FORCE».
 
 Дальше — руками, в браузере, под живой учётной записью. Порядок такой, потому
 что каждый следующий шаг опирается на предыдущий:
@@ -159,8 +164,12 @@ docker compose logs --since=15m app workers | grep -iE "permission denied|row-le
 это быстрее, чем ждать сборку.
 
 ```bash
-# Возврат 37 политик в режим аудита. Строгие шесть таблиц техготовности
-# (ADR-0044) не трогаем — они работали так с 13.08.2026.
+# Возврат 37 политик в режим аудита. Шесть таблиц техготовности (ADR-0044) не
+# трогаем — они работали строго с 13.08.2026. Три новые (ReadinessAccessMatrix,
+# ReadinessBackfillProgress, TenantAuditChain) тоже: у них строгий режим с
+# рождения, промежуточного состояния для них не существует. Если понадобится
+# откатить и их — снять RLS целиком:
+#   ALTER TABLE "<имя>" DISABLE ROW LEVEL SECURITY;
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U piling -d pilingtrack -c "
 DO \$\$
 DECLARE r record; n int := 0;
@@ -169,7 +178,8 @@ BEGIN
     SELECT tablename, policyname FROM pg_policies
     WHERE schemaname='public' AND qual NOT LIKE '%IS NULL%'
       AND tablename NOT IN ('Shift','ShiftHandover','WorkPermit',
-                            'WorkPermitApproval','ReadinessScoreSnapshot','CurrentReadiness')
+                            'WorkPermitApproval','ReadinessScoreSnapshot','CurrentReadiness',
+                            'ReadinessAccessMatrix','ReadinessBackfillProgress','TenantAuditChain')
   LOOP
     EXECUTE format('DROP POLICY %I ON public.%I', r.policyname, r.tablename);
     EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING ('

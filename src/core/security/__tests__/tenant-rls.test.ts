@@ -150,7 +150,7 @@ describe('обёртка транзакции: массивная форма', (
 
   it('без тенанта пакет уходит нетронутым', async () => {
     const client = makeClient();
-    const original = vi.fn(async () => ['результат']);
+    const original = vi.fn(async (_batch: unknown) => ['результат']);
 
     await wrapTransaction(client as never, original as never, [['запрос']]);
 
