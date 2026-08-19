@@ -6,6 +6,7 @@
  */
 
 import { logger } from '@/lib/logger';
+import { forEachTenant } from '@/lib/tenant-iteration';
 import { db } from '@/lib/db';
 import { runPmScheduler } from '@/modules/equipment';
 
@@ -61,18 +62,18 @@ async function notifyOverdue(
 
 async function runOnce(): Promise<void> {
   try {
-    const tenants = await db.maintenancePlan.findMany({
-      where: { isActive: true },
-      distinct: ['tenantId'],
-      select: { tenantId: true },
-    });
-    for (const { tenantId } of tenants) {
+    // Перечень организаций — из таблицы Tenant, а не из MaintenancePlan:
+    // под строгими политиками RLS запрос без объявленной организации вернул бы
+    // ноль строк, и суточный прогон молча не делал бы ничего. forEachTenant
+    // заводит контекст на каждую организацию отдельно — его же ждут и
+    // runPmScheduler, и notifyOverdue.
+    await forEachTenant(async (tenantId) => {
       const result = await runPmScheduler(tenantId);
       if (result.created > 0 || result.due > 0) {
         logger.info('PM scheduler pass', { tenantId, created: result.created, due: result.due });
       }
       await notifyOverdue(tenantId, result.overdue);
-    }
+    });
   } catch (error) {
     logger.error('PM scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),

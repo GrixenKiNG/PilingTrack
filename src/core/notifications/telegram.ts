@@ -14,6 +14,11 @@
  */
 
 import { logger } from '@/lib/logger';
+import {
+  getRequestTenantId,
+  runWithTenantContext,
+  setRequestTenantId,
+} from '@/core/security/tenant-context';
 
 // ============================================================
 // Configuration
@@ -35,9 +40,25 @@ async function getConfig(): Promise<TelegramBotConfig | null> {
     // Callers (webhook, DLQ, alert engine, report event handlers) run without
     // a user session, so there's no per-request tenant — fall back to the
     // deployment's default tenant, same as every other background path.
-    const tenantId = process.env.DEFAULT_TENANT_ID;
+    const tenantId = getRequestTenantId() ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return null;
 
+    // Контекст открывается здесь, а не у вызывающего: половина вызовов идёт
+    // из мест без обёртки маршрута (webhook Alertmanager, публичная форма
+    // заявки, очередь недоставленных). Без него под строгими политиками RLS
+    // настройка бота не читается и уведомления молча пропадают.
+    return runWithTenantContext(async () => {
+      setRequestTenantId(tenantId);
+      return loadConfigForTenant(tenantId);
+    });
+  } catch (err) {
+    logger.error('Failed to load Telegram config', err);
+    return null;
+  }
+}
+
+async function loadConfigForTenant(tenantId: string): Promise<TelegramBotConfig | null> {
+  try {
     const db = await getDbClient();
     const { decrypt, isEncrypted } = await import('@/core/security/encryption');
     const configs = await db.telegramConfig.findMany({

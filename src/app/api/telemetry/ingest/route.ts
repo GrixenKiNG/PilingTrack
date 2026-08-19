@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
+import { setRequestTenantId } from '@/core/security/tenant-context';
 import { authenticateDeviceByKey } from '@/services/telemetry/device-key-service';
 
 export const runtime = 'nodejs';
@@ -283,6 +284,12 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
   if (!tenantId) {
     throw new Error('ingestTelemetry (device): tenant context missing for this device key');
   }
+
+  // Организация известна из ключа устройства, но контекст её ещё не знает:
+  // маршрут не проходит через requireAuth — контроллер предъявляет ключ, а не
+  // сессию. Без этой строки вставка под строгими политиками RLS отклоняется
+  // (FOR ALL без явного WITH CHECK применяет то же условие и к записи).
+  setRequestTenantId(tenantId);
 
   const records = Array.isArray(data) ? data : [data];
 

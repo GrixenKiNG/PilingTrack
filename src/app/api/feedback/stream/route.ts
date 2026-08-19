@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getRequestId } from '@/lib/request-context';
+import { runWithTenantContext } from '@/core/security/tenant-context';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -9,7 +10,11 @@ export async function GET(request: NextRequest) {
   const requestId = getRequestId(request);
 
   try {
-    const { error } = await requireAuth(request);
+    // Контекст организации открывается вручную: обёртки withApi здесь нет —
+    // она дождалась бы конца потока. Без контекста requireAuth не смог бы
+    // прочитать строку пользователя под строгими политиками RLS. Сам поток
+    // в базу не ходит, поэтому контекст нужен ровно на время проверки.
+    const { error } = await runWithTenantContext(async () => requireAuth(request));
     if (error) return error;
   } catch (caughtError) {
     logger.error('feedback/stream: auth failed', caughtError, { requestId });

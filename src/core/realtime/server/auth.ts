@@ -10,7 +10,7 @@ import { IncomingMessage } from 'http';
 import { parse as parseCookie } from 'cookie';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { SESSION_COOKIE_NAME, tokenTenantId, verifySessionToken } from '@/services/auth/session-service';
-import { setRequestTenantId } from '@/core/security/tenant-context';
+import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 
@@ -46,6 +46,14 @@ export function validateWSOrigin(req: IncomingMessage): boolean {
  * Extracts session cookie, verifies token, returns user context.
  */
 export async function authenticateWS(req: IncomingMessage): Promise<WSAuthResult | null> {
+  // Контекст организации открывается здесь, а не у вызывающего: у сервера
+  // сокетов нет обёртки withApi, а без открытого контекста setRequestTenantId
+  // ниже молча ничего не делает — и под строгими политиками RLS строка
+  // пользователя не читается вовсе, то есть рукопожатие не проходит ни у кого.
+  return runWithTenantContext(() => authenticateWSScoped(req));
+}
+
+async function authenticateWSScoped(req: IncomingMessage): Promise<WSAuthResult | null> {
   try {
     // Parse cookies from upgrade request
     const cookieHeader = req.headers.cookie || '';

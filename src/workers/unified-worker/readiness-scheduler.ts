@@ -7,7 +7,7 @@
  */
 
 import { logger } from '@/lib/logger';
-import { db } from '@/lib/db';
+import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';
 
 const INTERVAL = parseInt(process.env.READINESS_SCHEDULER_INTERVAL_MS || String(24 * 60 * 60 * 1000), 10);
@@ -15,10 +15,11 @@ const STARTUP_DELAY = parseInt(process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS 
 
 async function runOnce(): Promise<void> {
   try {
-    // Тенанты берём по сменам: там, где смен нет, закрывать и просрочивать
-    // нечего.
-    const tenants = await db.shift.findMany({ distinct: ['tenantId'], select: { tenantId: true } });
-    for (const { tenantId } of tenants) {
+    // Перечень организаций берётся из таблицы Tenant, а не из Shift.
+    // Politики RLS на Shift строгие: запрос без объявленной организации
+    // возвращает ноль строк, и планировщик молча не делал бы ничего.
+    // forEachTenant заводит контекст на каждую организацию отдельно.
+    await forEachTenant(async (tenantId) => {
       const result = await runReadinessScheduler(tenantId);
       if (result.permitsExpired > 0 || result.shiftsAutoClosed > 0) {
         logger.info('Readiness scheduler pass', {
@@ -27,7 +28,7 @@ async function runOnce(): Promise<void> {
           shiftsAutoClosed: result.shiftsAutoClosed,
         });
       }
-    }
+    });
   } catch (error) {
     logger.error('Readiness scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),

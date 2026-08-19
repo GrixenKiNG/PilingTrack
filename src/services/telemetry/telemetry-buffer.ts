@@ -16,6 +16,7 @@ import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-
 import type { Prisma } from '@/generated/postgres-client';
 import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
+import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 
 export interface TelemetryBufferConfig {
   maxBufferSize?: number;
@@ -37,6 +38,18 @@ function toJsonMetadata(
   metadata: TelemetryRecord['metadata']
 ): Prisma.InputJsonValue | undefined {
   return metadata as Prisma.InputJsonValue | undefined;
+}
+
+/** Разложить пачку по организациям — одна транзакция на организацию. */
+function groupByTenant(batch: TelemetryRecord[]): Map<string, TelemetryRecord[]> {
+  const groups = new Map<string, TelemetryRecord[]>();
+  for (const record of batch) {
+    const key = record.tenantId;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(record);
+    else groups.set(key, [record]);
+  }
+  return groups;
 }
 
 export class TelemetryBuffer {
@@ -122,26 +135,36 @@ export class TelemetryBuffer {
 
       try {
         await this.circuitBreaker.execute(async () => {
-          await db.$transaction(
-            batch.map((record) =>
-              db.telemetryRecord.create({
-                data: {
-                  type: record.type,
-                  tenantId: record.tenantId,
-                  equipmentId: record.equipmentId,
-                  siteId: record.siteId || null,
-                  value: record.value,
-                  unit: record.unit || null,
-                  latitude: record.latitude || null,
-                  longitude: record.longitude || null,
-                  ...(record.metadata !== undefined
-                    ? { metadata: toJsonMetadata(record.metadata) }
-                    : {}),
-                  timestamp: record.timestamp || new Date(),
-                },
-              })
-            )
-          );
+          // Сброс буфера идёт по таймеру, а не внутри запроса, — контекста
+          // организации здесь нет, и под строгими политиками RLS вставка была
+          // бы отклонена. Пачка режется по организациям: в буфер попадают
+          // записи от разных устройств, и одна транзакция на всех означала бы
+          // либо отказ, либо запись под чужой организацией.
+          for (const [tenantId, records] of groupByTenant(batch)) {
+            await runWithTenantContext(async () => {
+              setRequestTenantId(tenantId);
+              await db.$transaction(
+                records.map((record) =>
+                  db.telemetryRecord.create({
+                    data: {
+                      type: record.type,
+                      tenantId: record.tenantId,
+                      equipmentId: record.equipmentId,
+                      siteId: record.siteId || null,
+                      value: record.value,
+                      unit: record.unit || null,
+                      latitude: record.latitude || null,
+                      longitude: record.longitude || null,
+                      ...(record.metadata !== undefined
+                        ? { metadata: toJsonMetadata(record.metadata) }
+                        : {}),
+                      timestamp: record.timestamp || new Date(),
+                    },
+                  })
+                )
+              );
+            });
+          }
         });
         flushedCount += batch.length;
       } catch (error) {
