@@ -26,7 +26,31 @@ interface TenantContextStore {
   tenantId: string | null;
 }
 
-const storage = new AsyncLocalStorage<TenantContextStore>();
+/**
+ * Хранилище живёт в globalThis, а не в переменной модуля.
+ *
+ * Next.js собирает маршруты, instrumentation и фоновые задачи разными
+ * сборками, и каждая получает СВОЙ экземпляр каждого модуля. Обычная
+ * `const storage = new AsyncLocalStorage()` дала бы три независимых
+ * хранилища: обёртка маршрута кладёт организацию в своё, а расширение
+ * Prisma (оно приходит из `lib/db`, который сам кэшируется в globalThis и
+ * потому создаётся сборкой, дотянувшейся первой) читает из чужого и всегда
+ * видит пусто. Замерено 19.08.2026 на стенде: три экземпляра, тенант до базы
+ * не доходил ни разу.
+ *
+ * Пока политики RLS в режиме аудита, это незаметно — доставка не работает,
+ * но и не требуется. После перевода в fail-closed это был бы отказ на каждом
+ * запросе.
+ *
+ * Клиент Prisma спасается ровно тем же приёмом (`globalForPrisma.prisma`).
+ */
+const globalForTenant = globalThis as unknown as {
+  tenantContextStorage?: AsyncLocalStorage<TenantContextStore>;
+};
+
+const storage: AsyncLocalStorage<TenantContextStore> =
+  globalForTenant.tenantContextStorage ??
+  (globalForTenant.tenantContextStorage = new AsyncLocalStorage<TenantContextStore>());
 
 /**
  * Открыть контекст на время запроса. Тенант пока неизвестен — его положит

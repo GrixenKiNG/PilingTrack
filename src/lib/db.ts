@@ -11,7 +11,7 @@
 
 import type { Prisma as PostgresPrisma, PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { applyTenantGuc, wrapTransaction } from '@/core/security/tenant-rls';
+import { applyTenantGuc, isRawMethod, wrapRawQuery, wrapTransaction } from '@/core/security/tenant-rls';
 
 // Guard against client-side imports (Next.js only, not Node.js workers).
 // Fire-and-forget so this file can be compiled to CJS (workers via tsx)
@@ -173,6 +173,17 @@ function createClientProxy(props: PropertyKey[] = []): unknown {
         return wrapTransaction(
           client as unknown as Parameters<typeof wrapTransaction>[0],
           current as (...callArgs: unknown[]) => Promise<unknown>,
+          argArray
+        );
+      }
+
+      // Сырой SQL мимо расширения — доставляем тенанта отдельно. Внутри уже
+      // открытой транзакции вызывается tx.$queryRaw, а не этот прокси, так
+      // что двойной обёртки не возникает.
+      if (props.length === 1 && isRawMethod(props[0])) {
+        return wrapRawQuery(
+          client as unknown as Parameters<typeof wrapRawQuery>[0],
+          current as (...callArgs: unknown[]) => unknown,
           argArray
         );
       }

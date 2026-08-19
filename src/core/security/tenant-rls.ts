@@ -28,7 +28,15 @@ import { getRequestTenantId } from './tenant-context';
  * выставлена» держится в отдельном хранилище: оно отличает «тенант известен»
  * от «тенант уже доставлен в базу».
  */
-const gucApplied = new AsyncLocalStorage<true>();
+// В globalThis по той же причине, что и хранилище тенанта: сборок несколько,
+// экземпляр должен быть один. См. core/security/tenant-context.
+const globalForGuc = globalThis as unknown as {
+  gucAppliedStorage?: AsyncLocalStorage<true>;
+};
+
+const gucApplied: AsyncLocalStorage<true> =
+  globalForGuc.gucAppliedStorage ??
+  (globalForGuc.gucAppliedStorage = new AsyncLocalStorage<true>());
 
 /** Пометить область, где `app.current_tenant` уже выставлен в базе. */
 export function runWithGucApplied<T>(fn: () => T): T {
@@ -92,12 +100,13 @@ export function applyTenantGuc<C extends RlsCapableClient>(client: C): C {
 }
 
 /**
- * Обернуть интерактивную транзакцию: выставить тенанта первым оператором и
- * пометить область, чтобы расширение внутрь не лезло.
+ * Обернуть транзакцию: выставить тенанта первым оператором и пометить область,
+ * чтобы расширение внутрь не лезло.
  *
- * Массивной формы `$transaction([...])` в коде нет (проверено), поэтому здесь
- * разбирается только форма с функцией; всё прочее уходит в исходный вызов
- * нетронутым.
+ * Разбираются обе формы. С функцией — переменная ставится первым оператором
+ * внутри, дальше работает исходный код. С массивом — оператор `set_config`
+ * просто встаёт в начало пакета, а его результат отбрасывается; расширение
+ * туда не достаёт, потому что элементы массива создаются до вызова.
  */
 export function wrapTransaction(
   client: RlsCapableClient,
@@ -107,7 +116,23 @@ export function wrapTransaction(
   const [first, ...rest] = callArgs;
   const tenantId = resolveGucTenantId();
 
-  if (typeof first !== 'function' || !tenantId) {
+  if (!tenantId) {
+    return original.apply(client, callArgs);
+  }
+
+  if (Array.isArray(first)) {
+    return original
+      .apply(client, [
+        [
+          client.$executeRaw`SELECT set_config('app.current_tenant', ${tenantId}, true)`,
+          ...first,
+        ],
+        ...rest,
+      ])
+      .then((results) => (results as unknown[]).slice(1));
+  }
+
+  if (typeof first !== 'function') {
     return original.apply(client, callArgs);
   }
 
@@ -123,4 +148,50 @@ export function wrapTransaction(
     },
     ...rest,
   ]);
+}
+
+/**
+ * Имена методов сырого SQL. Расширение Prisma до них не достаёт: `$allModels`
+ * охватывает только операции над моделями, а `$queryRaw` моделью не является.
+ */
+const RAW_METHODS = new Set([
+  '$queryRaw',
+  '$queryRawUnsafe',
+  '$executeRaw',
+  '$executeRawUnsafe',
+]);
+
+/** Метод сырого SQL, которому нужна доставка тенанта? */
+export function isRawMethod(name: PropertyKey): boolean {
+  return typeof name === 'string' && RAW_METHODS.has(name);
+}
+
+/**
+ * Обернуть сырой запрос так, чтобы он нёс тенанта.
+ *
+ * Почему это отдельно от расширения. Сырых запросов в приложении немного, но
+ * они обслуживают самые заметные экраны: аналитика по объектам и по технике
+ * собирается одним большим SQL ради скорости. Расширение их не перехватывает,
+ * поэтому после перевода политик в fail-closed оба экрана молча показали бы
+ * ноль (проверено на стенде 19.08.2026: «Объекты» отдавали пустой список при
+ * двух живых объектах и 174 отчётах).
+ *
+ * Приём тот же, что и для моделей: пакет `$transaction([...])` — одна
+ * транзакция на `set_config` и сам запрос, потому что `set_config(..., true)`
+ * живёт ровно до её конца.
+ */
+export function wrapRawQuery(
+  client: RlsCapableClient,
+  original: (...callArgs: unknown[]) => unknown,
+  callArgs: unknown[]
+): unknown {
+  const tenantId = resolveGucTenantId();
+  if (!tenantId) return original.apply(client, callArgs);
+
+  return client
+    .$transaction([
+      client.$executeRaw`SELECT set_config('app.current_tenant', ${tenantId}, true)`,
+      original.apply(client, callArgs),
+    ])
+    .then((results) => (results as unknown[])[1]);
 }

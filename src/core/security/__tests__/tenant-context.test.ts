@@ -77,3 +77,33 @@ describe('контекст тенанта запроса', () => {
     });
   });
 });
+
+describe('хранилище одно на процесс', () => {
+  /**
+   * Next.js собирает маршруты, instrumentation и фоновые задачи разными
+   * сборками, и каждая получает свой экземпляр модуля. Если хранилище держать
+   * в переменной модуля, обёртка маршрута положит тенанта в одно, а
+   * расширение Prisma прочитает из другого — и никогда ничего не найдёт.
+   * Замерено на стенде 19.08.2026: три экземпляра, тенант до базы не доходил.
+   *
+   * Проверяем не «две сборки» (в тестах их не создать), а сам приём: экземпляр
+   * лежит в globalThis, а не заводится модулем заново.
+   */
+  it('лежит в globalThis, а не в переменной модуля', () => {
+    const stored = (globalThis as { tenantContextStorage?: unknown }).tenantContextStorage;
+    expect(stored).toBeDefined();
+  });
+
+  it('запись через модуль видна через экземпляр из globalThis', () => {
+    const storage = (globalThis as {
+      tenantContextStorage?: { getStore(): { tenantId: string | null } | undefined };
+    }).tenantContextStorage;
+
+    runWithTenantContext(() => {
+      setRequestTenantId('orion');
+      // Вторая сборка добралась бы до тенанта именно так — через общий
+      // экземпляр. Если он окажется другим, здесь будет undefined.
+      expect(storage?.getStore()?.tenantId).toBe('orion');
+    });
+  });
+});
