@@ -192,6 +192,7 @@ export class PrismaReportRepository implements ReportRepository {
             siteId: state.siteId,
             tenantId: state.tenantId,
             crewId: state.crewId,
+            shiftId: state.shiftId,
             date: state.date,
             shiftType: state.shiftType,
             shiftStart: state.shiftStart,

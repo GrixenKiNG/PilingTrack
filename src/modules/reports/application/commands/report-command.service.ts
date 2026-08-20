@@ -154,8 +154,24 @@ export async function upsertReport(
     // edited or the crew is reassigned. Null when the operator has no crew.
     const operatorCrew = await db.crew.findUnique({
       where: { operatorId: input.userId },
-      select: { id: true },
+      select: { id: true, equipmentId: true },
     });
+
+    // Смена контура готовности, идущая на установке этой бригады. Тем же
+    // правилом, что и crewId: замораживаем на момент создания. Нет активной
+    // смены — пишем null и не мешаем работать: отчёт задним числом и работа
+    // вне контура остаются возможными.
+    const activeShift = operatorCrew?.equipmentId
+      ? await db.shift.findFirst({
+          where: {
+            tenantId: input.tenantId ?? undefined,
+            equipmentId: operatorCrew.equipmentId,
+            state: { in: ['STARTED', 'HANDOVER_PENDING'] },
+          },
+          orderBy: { startedAt: 'desc' },
+          select: { id: true },
+        })
+      : null;
 
     aggregate = ReportAggregate.create({
       reportId: input.reportId,
@@ -163,6 +179,7 @@ export async function upsertReport(
       siteId: input.siteId,
       tenantId: input.tenantId,
       crewId: operatorCrew?.id ?? null,
+      shiftId: activeShift?.id ?? null,
       date: input.date,
       shiftType: input.shiftType,
       shiftStart: input.shiftStart,

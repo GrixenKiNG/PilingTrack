@@ -56,6 +56,13 @@ interface ReportState {
    * historical reports. Null when the operator had no crew at the time.
    */
   crewId?: string | null;
+  /**
+   * Смена контура готовности, в которой сделан отчёт. Замораживается при
+   * создании, как и crewId: отчёт — документ, и перезапуск или отмена смены
+   * не должны переписывать то, что уже подписано. Null, когда активной смены
+   * не было (отчёт задним числом, работа вне контура).
+   */
+  shiftId?: string | null;
   date: string;
   shiftType: ShiftType;
   shiftStart?: string | null;
@@ -108,6 +115,7 @@ export class ReportAggregate {
     siteId: string;
     tenantId?: string;
     crewId?: string | null;
+    shiftId?: string | null;
     date: string;
     shiftType?: ShiftType;
     shiftStart?: string | null;
@@ -122,6 +130,7 @@ export class ReportAggregate {
       siteId: params.siteId,
       tenantId: params.tenantId,
       crewId: params.crewId,
+      shiftId: params.shiftId,
       date: params.date,
       shiftType: params.shiftType || 'DAY',
       shiftStart: params.shiftStart,
@@ -325,6 +334,7 @@ export class ReportAggregate {
       siteId: this.state.siteId,
       tenantId: this.state.tenantId,
       crewId: this.state.crewId,
+      shiftId: this.state.shiftId,
       date: this.state.date,
       shiftType: this.state.shiftType,
       shiftStart: this.state.shiftStart,

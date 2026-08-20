@@ -1389,6 +1389,11 @@ model Report {
   lastEditedByName    String?
   lastEditedByRole    String?
   journalPhotoMediaId String?
+  /// Смена контура готовности, в которой сделан отчёт. Необязательна:
+  /// отчёты, созданные до 20.08.2026, смены не знают, и восстанавливать
+  /// связь задним числом нечем. Внешнего ключа намеренно нет — как у
+  /// lastEditedById рядом; смена живёт в своём модуле со своими правилами.
+  shiftId             String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -1410,6 +1415,7 @@ model Report {
   @@index([status])
   @@index([crewId])
   @@index([equipmentId])
+  @@index([tenantId, shiftId])
 }
 
 // ============================================================
