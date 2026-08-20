@@ -817,6 +817,31 @@ model Shift {
   @@index([tenantId, state, updatedAt])
 }
 
+/// Разрешение диспетчера на пуск заблокированной машины.
+///
+/// Единственный законный путь из отказа в работу: оператор обойти блокировку
+/// не может, а решение должно оставлять след — кто выпустил, почему и на какие
+/// именно препятствия. Отсюда обязательная причина и отпечаток препятствий:
+/// появилось новое препятствие — разрешение его не покрывает.
+///
+/// Запись неизменяемая, поэтому у неё нет ни version, ни updatedAt: разрешение
+/// не правят, выдают новое. Действует на одну смену — отсюда уникальность.
+model ShiftStartWaiver {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  shiftId            String
+  /// Снимок готовности, на который смотрел диспетчер, когда решал.
+  snapshotId         String
+  /// Отсортированный список условий блокировщиков на момент выдачи.
+  blockerFingerprint String
+  reason             String   @db.Text
+  issuedById         String
+  issuedAt           DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([tenantId, shiftId])
+  @@index([tenantId, issuedAt])
+}
+
 model ShiftHandover {
   id            String             @id @default(cuid())
   tenantId      String

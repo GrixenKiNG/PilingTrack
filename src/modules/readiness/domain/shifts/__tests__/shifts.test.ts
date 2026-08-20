@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {assertHandoverAcceptedByAnotherPerson, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../handover';
 import {requireCancellationReason, validateShiftWindow} from '../shift';
 import {tenantProductionDate} from '../tenant-production-date';
+import {blockerFingerprint, requireWaiverReason, waiverCoversBlockers} from '../waiver';
 import {transitionHandover, transitionShift} from '../transitions';
 
 describe('shift and handover domain', () => {
@@ -58,6 +59,22 @@ describe('shift and handover domain', () => {
     expect(() => assertShiftReportSubmitted('OPERATOR', true)).not.toThrow();
     expect(() => assertShiftReportSubmitted('MECHANIC', false)).not.toThrow();
     expect(() => assertShiftReportSubmitted('ADMIN', false)).not.toThrow();
+  });
+
+  // Разрешение на пуск выдаётся на конкретный набор препятствий, а не машине
+  // вообще: появилось новое препятствие — нужно новое решение диспетчера.
+  it('applies a start waiver only to the blockers it was issued for', () => {
+    const issued = blockerFingerprint([{condition: 'criticalDefect'}, {condition: 'maintenanceOverdue'}]);
+    expect(issued).toBe('criticalDefect,maintenanceOverdue');
+    expect(waiverCoversBlockers(issued, 'criticalDefect')).toBe(true);
+    expect(waiverCoversBlockers(issued, '')).toBe(true);
+    expect(waiverCoversBlockers(issued, 'criticalDefect,inspectionMissing')).toBe(false);
+  });
+
+  it('demands a readable reason for a start waiver', () => {
+    expect(() => requireWaiverReason('ок')).toThrow(/от 10 до 1000/i);
+    expect(requireWaiverReason('  Течь устранена временно, едем на базу  '))
+      .toBe('Течь устранена временно, едем на базу');
   });
 
   it('validates windows, summaries and required reasons', () => {

@@ -33,6 +33,7 @@ const ABILITY_LABEL: Record<ReadinessAbility, string> = {
   'readiness.handover.prepare': 'Готовить передачу',
   'readiness.handover.decide': 'Принимать смену от оператора',
   'readiness.shift.authorize': 'Допускать смену к пуску',
+  'readiness.shift.waive': 'Разрешать пуск при блокировке',
   'readiness.inspection.manage': 'Проводить осмотр',
   'readiness.defect.report': 'Фиксировать замечание',
   'readiness.defect.manage': 'Разбирать и закрывать дефекты',

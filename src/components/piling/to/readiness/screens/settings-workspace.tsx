@@ -150,6 +150,7 @@ const ROLE_MATRIX: ReadonlyArray<{ permission: string; ability: ReadinessAbility
   { permission: 'Открывать смену', ability: 'readiness.shift.manage' },
   { permission: 'Принимать технику', ability: 'readiness.handover.decide' },
   { permission: 'Допускать смену к пуску', ability: 'readiness.shift.authorize' },
+  { permission: 'Разрешать пуск при блокировке', ability: 'readiness.shift.waive' },
   { permission: 'Закрывать дефекты', ability: 'readiness.defect.manage' },
   { permission: 'Изменять правила', ability: 'readiness.rules.manage' },
 ];

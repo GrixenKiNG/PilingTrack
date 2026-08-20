@@ -6,6 +6,7 @@ export const READINESS_ABILITIES = [
   'readiness.handover.prepare',
   'readiness.handover.decide',
   'readiness.shift.authorize',
+  'readiness.shift.waive',
   'readiness.inspection.manage',
   // Список обязан совпадать с READINESS_ABILITIES на сервере: клиент
   // отвергает весь ответ, если встретит незнакомое право, и модуль

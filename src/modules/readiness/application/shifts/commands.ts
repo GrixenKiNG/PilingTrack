@@ -7,6 +7,7 @@ import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipel
 import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag';
 import {ReadinessCommandError} from '../command-pipeline/errors';
 import {assertHandoverAcceptedByAnotherPerson, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
+import {blockerFingerprint, requireWaiverReason} from '../../domain/shifts/waiver';
 import {requireCancellationReason, validateShiftWindow} from '../../domain/shifts/shift';
 import {normalizeTenantTimezone, tenantProductionDate} from '../../domain/shifts/tenant-production-date';
 import {assertHandoverTransition, assertShiftTransition} from '../../domain/shifts/transitions';
@@ -42,7 +43,7 @@ export const serializeShift = (row: ShiftRow) => ({...row,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(), handovers: row.handovers.map(serializeHandover)});
 
-function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.manage' | 'readiness.handover.prepare' | 'readiness.handover.decide' | 'readiness.shift.authorize') {
+function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.manage' | 'readiness.handover.prepare' | 'readiness.handover.decide' | 'readiness.shift.authorize' | 'readiness.shift.waive') {
   if (!effectiveReadinessCapabilities(context.actorRole, context.actingAs, context.accessMatrix).has(ability)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, `Недостаточно прав: ${ability}`);
   }
@@ -186,6 +187,59 @@ export function requestShiftAcceptanceCommand(input: {tx: ReadinessTransaction; 
         entityId: row.id, entityVersion: row.version, equipmentId: row.equipmentId,
         triggerOccurredAt: row.requestedAt ?? now, before: serializeShift(before), after});
       return {status: 200, body: {data: after}, headers: {ETag: formatStrongEtag('shift', row.id, row.version)}};
+    }});
+}
+
+/**
+ * Письменное разрешение выпустить машину, которой контур запретил пуск.
+ *
+ * Смену не запускает — только снимает запрет. Пуск остаётся отдельным
+ * действием и отдельным решением: одно дело разрешить исключение, другое —
+ * выпустить машину на линию.
+ *
+ * Разрешение выдаётся на набор препятствий из последнего снимка готовности.
+ * Если к моменту пуска появится новое препятствие, разрешение его не покроет.
+ */
+export function waiveShiftStartCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
+  key: string | null; reason: string; now?: Date}) {
+  requireAbility(input.context, 'readiness.shift.waive');
+  const reason = requireWaiverReason(input.reason);
+  return runCommand({tx: input.tx, context: input.context, method: 'POST',
+    routeTemplate: '/api/readiness/shifts/:id/waiver', aggregateId: input.id, key: input.key,
+    body: {reason}, execute: async (key) => {
+      const repo = new ShiftRepository(input.tx);
+      const shift = await repo.get(input.context.tenantId, input.id);
+      const snapshot = await input.tx.readinessScoreSnapshot.findFirst({
+        where: {tenantId: input.context.tenantId, equipmentId: shift.equipmentId},
+        orderBy: {calculatedAt: 'desc'},
+        select: {id: true, blockers: true, status: true},
+      });
+      if (!snapshot) {
+        throw new ReadinessCommandError('VALIDATION_ERROR', 409,
+          'Готовность ещё не рассчитана — разрешать нечего');
+      }
+      const blockers = Array.isArray(snapshot.blockers)
+        ? (snapshot.blockers as Array<{condition?: string; code?: string}>)
+        : [];
+      if (blockers.length === 0) {
+        throw new ReadinessCommandError('VALIDATION_ERROR', 409,
+          'Препятствий нет — машина допущена и без разрешения');
+      }
+      const now = input.now ?? new Date();
+      const waiver = await input.tx.shiftStartWaiver.upsert({
+        where: {tenantId_shiftId: {tenantId: input.context.tenantId, shiftId: shift.id}},
+        create: {tenantId: input.context.tenantId, shiftId: shift.id, snapshotId: snapshot.id,
+          blockerFingerprint: blockerFingerprint(blockers), reason,
+          issuedById: input.context.actorId, issuedAt: now},
+        update: {snapshotId: snapshot.id, blockerFingerprint: blockerFingerprint(blockers),
+          reason, issuedById: input.context.actorId, issuedAt: now},
+      });
+      await effects({tx: input.tx, context: input.context, key, action: 'start-waived', entityType: 'Shift',
+        entityId: shift.id, entityVersion: shift.version, equipmentId: shift.equipmentId, shiftId: shift.id,
+        triggerOccurredAt: now,
+        after: {waiverId: waiver.id, reason, blockers: waiver.blockerFingerprint} as unknown as AuditJsonValue});
+      return {status: 201, body: {data: {id: waiver.id, shiftId: shift.id, reason,
+        blockers: waiver.blockerFingerprint, issuedAt: waiver.issuedAt.toISOString()}}};
     }});
 }
 

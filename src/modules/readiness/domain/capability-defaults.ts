@@ -18,6 +18,10 @@ export const READINESS_ABILITIES = [
   // выдача оператору права принимать технику молча дала бы ему ещё и право
   // выпускать машину на линию. Разные решения — разные полномочия.
   'readiness.shift.authorize',
+  // Письменное разрешение выпустить машину, которой контур запретил пуск.
+  // Отдельно от `shift.authorize`: обычный допуск подтверждает, что всё в
+  // порядке, а это — осознанное исключение под ответственность выдавшего.
+  'readiness.shift.waive',
   'readiness.inspection.manage',
   // Зафиксировать замечание может любой, кто работает со сменой; разбирать,
   // закрывать и отклонять — только диспетчер, механик и администратор.
@@ -64,6 +68,7 @@ export const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> 
     'readiness.defect.manage',
     'readiness.handover.decide',
     'readiness.shift.authorize',
+    'readiness.shift.waive',
     'readiness.permit.approve_dispatcher',
     'readiness.audit.read',
   ],
