@@ -373,3 +373,50 @@ describe('Контракт маршрутов — списки исключен�
     expect(empty).toEqual([]);
   });
 });
+
+/**
+ * Серверные раскладки и страницы — отдельный класс путей к базе.
+ *
+ * Обёртка `withApi` открывает контекст организации, но через неё проходят
+ * только маршруты API. Серверный компонент страницы читает базу напрямую, и
+ * под строгими политиками RLS его запрос возвращает пусто. На бою 19.08.2026
+ * это уронило весь раздел администратора: раскладка не находила пользователя,
+ * уходила на /login, страница входа возвращала на /admin — три перехода в
+ * секунду, пока браузер не закроют.
+ *
+ * Проверка простая: серверный компонент вне `api/` не имеет права дёргать
+ * `db.` напрямую. Ему полагается `readPageSessionUser` (lib/page-session) или
+ * собственный `runWithTenantContext`.
+ */
+describe('серверные страницы не ходят в базу без организации', () => {
+  const APP_DIR = join(process.cwd(), 'src', 'app');
+
+  function collectPageFiles(dir: string, found: string[] = []): string[] {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'api' || entry.name === '__tests__') continue;
+        collectPageFiles(full, found);
+      } else if (entry.name.endsWith('.tsx') || entry.name.endsWith('.ts')) {
+        found.push(full);
+      }
+    }
+    return found;
+  }
+
+  it('ни один серверный компонент страницы не обращается к db напрямую', () => {
+    const offenders = collectPageFiles(APP_DIR)
+      .filter((file) => {
+        const source = readFileSync(file, 'utf8');
+        if (source.includes("'use client'")) return false;
+        // Вызов модели: db.user., db.report. и подобное. Строки в комментариях
+        // отсекаются тем, что ищем именно вызов с открывающей скобкой.
+        return /\bdb\.[a-zA-Z]+\.(findUnique|findFirst|findMany|count|create|update|delete|upsert|aggregate|groupBy)\(/.test(
+          source
+        );
+      })
+      .map((file) => relative(process.cwd(), file).split(sep).join('/'));
+
+    expect(offenders).toEqual([]);
+  });
+});

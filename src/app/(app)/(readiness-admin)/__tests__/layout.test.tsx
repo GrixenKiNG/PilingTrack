@@ -14,6 +14,10 @@ vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 vi.mock('@/services/auth/session-service', () => ({
   verifySessionToken: verifySessionTokenMock,
   SESSION_COOKIE_NAME: 'pt-session',
+  // Проверка сессии переехала в lib/page-session, которая читает организацию
+  // из токена перед обращением к базе. Без этой заглушки тест падал бы не по
+  // сути, а на отсутствующем экспорте.
+  tokenTenantId: () => 'orion',
 }));
 vi.mock('@/lib/db', () => ({ db: { user: { findUnique: findUniqueMock } } }));
 
@@ -22,7 +26,7 @@ import ReadinessAdminLayout from '../layout';
 function withUser(role: string, sessionVersion = 1) {
   cookiesMock.mockResolvedValue({ get: () => ({ value: 'valid-token' }) });
   verifySessionTokenMock.mockResolvedValue({ sub: 'user-1', role, sv: sessionVersion });
-  findUniqueMock.mockResolvedValue({ role, isActive: true, sessionVersion });
+  findUniqueMock.mockResolvedValue({ tenantId: 'orion', role, isActive: true, sessionVersion });
 }
 
 describe('ReadinessAdminLayout', () => {
@@ -54,7 +58,7 @@ describe('ReadinessAdminLayout', () => {
 
   it('rejects a stale mechanic session', async () => {
     withUser('MECHANIC', 1);
-    findUniqueMock.mockResolvedValue({ role: 'MECHANIC', isActive: true, sessionVersion: 2 });
+    findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'MECHANIC', isActive: true, sessionVersion: 2 });
     await expect(
       ReadinessAdminLayout({ children: null })
     ).rejects.toThrow('REDIRECT:/login');

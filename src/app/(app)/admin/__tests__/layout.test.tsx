@@ -25,6 +25,10 @@ vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 vi.mock('@/services/auth/session-service', () => ({
   verifySessionToken: verifySessionTokenMock,
   SESSION_COOKIE_NAME: 'pt-session',
+  // Проверка сессии переехала в lib/page-session, которая читает организацию
+  // из токена перед обращением к базе. Без этой заглушки тест падал бы не по
+  // сути, а на отсутствующем экспорте.
+  tokenTenantId: () => 'orion',
 }));
 vi.mock('@/lib/db', () => ({ db: { user: { findUnique: findUniqueMock } } }));
 
@@ -45,7 +49,7 @@ describe('AdminSectionLayout — sessionVersion check', () => {
   it('redirects to /login when sessionVersion no longer matches (revoked)', async () => {
     withCookie('stale-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'user-1', role: 'ADMIN', sv: 0 });
-    findUniqueMock.mockResolvedValue({ role: 'ADMIN', isActive: true, sessionVersion: 1 });
+    findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'ADMIN', isActive: true, sessionVersion: 1 });
 
     await expect(AdminSectionLayout({ children: null })).rejects.toThrow('REDIRECT:/login');
   });
@@ -53,7 +57,7 @@ describe('AdminSectionLayout — sessionVersion check', () => {
   it('redirects to /login when the user was deactivated', async () => {
     withCookie('valid-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'user-1', role: 'ADMIN', sv: 0 });
-    findUniqueMock.mockResolvedValue({ role: 'ADMIN', isActive: false, sessionVersion: 0 });
+    findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'ADMIN', isActive: false, sessionVersion: 0 });
 
     await expect(AdminSectionLayout({ children: null })).rejects.toThrow('REDIRECT:/login');
   });
@@ -61,7 +65,7 @@ describe('AdminSectionLayout — sessionVersion check', () => {
   it('redirects to /operator for a non-admin role even with a fresh sessionVersion', async () => {
     withCookie('valid-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'user-1', role: 'OPERATOR', sv: 0 });
-    findUniqueMock.mockResolvedValue({ role: 'OPERATOR', isActive: true, sessionVersion: 0 });
+    findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'OPERATOR', isActive: true, sessionVersion: 0 });
 
     await expect(AdminSectionLayout({ children: null })).rejects.toThrow('REDIRECT:/operator');
   });
@@ -69,7 +73,7 @@ describe('AdminSectionLayout — sessionVersion check', () => {
   it('renders children when role and sessionVersion both check out', async () => {
     withCookie('valid-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'user-1', role: 'ADMIN', sv: 1 });
-    findUniqueMock.mockResolvedValue({ role: 'ADMIN', isActive: true, sessionVersion: 1 });
+    findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'ADMIN', isActive: true, sessionVersion: 1 });
 
     const result = await AdminSectionLayout({ children: 'CONTENT' as unknown as React.ReactNode });
     expect(result).toBeTruthy();
@@ -78,7 +82,7 @@ describe('AdminSectionLayout — sessionVersion check', () => {
   it('keeps mechanics out of the shared admin route tree', async () => {
     withCookie('mechanic-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'mechanic-1', role: 'MECHANIC', sv: 2 });
-    findUniqueMock.mockResolvedValue({ role: 'MECHANIC', isActive: true, sessionVersion: 2 });
+    findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'MECHANIC', isActive: true, sessionVersion: 2 });
 
     await expect(
       AdminSectionLayout({ children: 'ADMIN' as unknown as React.ReactNode })
