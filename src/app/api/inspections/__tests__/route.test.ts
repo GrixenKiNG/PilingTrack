@@ -103,7 +103,7 @@ describe('POST /api/inspections', () => {
     const res = await POST(post({ equipmentId: 'e1', templateId: 't1', inspectionDate: '2026-04-05' }));
     expect(res.status).toBe(201);
     expect((await res.json()).inspection).toEqual({ id: 'insp-1' });
-    expect(startMock).toHaveBeenCalledWith(expect.objectContaining({ templateId: 't1' }), { tenantId: 'orion', userId: 'a' });
+    expect(startMock).toHaveBeenCalledWith(expect.objectContaining({ templateId: 't1' }), { tenantId: 'orion', userId: 'a', role: 'ADMIN' });
     expect(startToMock).not.toHaveBeenCalled();
   });
 
@@ -114,7 +114,7 @@ describe('POST /api/inspections', () => {
     const res = await POST(post({ equipmentId: 'e1', level: 'TO1', inspectionDate: '2026-04-05' }));
     expect(res.status).toBe(201);
     expect((await res.json()).inspection).toEqual({ id: 'to-1' });
-    expect(startToMock).toHaveBeenCalledWith(expect.objectContaining({ level: 'TO1' }), { tenantId: 'orion', userId: 'a' });
+    expect(startToMock).toHaveBeenCalledWith(expect.objectContaining({ level: 'TO1' }), { tenantId: 'orion', userId: 'a', role: 'ADMIN' });
     expect(startMock).not.toHaveBeenCalled();
   });
 

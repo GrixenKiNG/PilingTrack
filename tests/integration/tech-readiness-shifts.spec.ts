@@ -22,6 +22,9 @@ const migrationPaths = [
   // перечисленных файлов. Новая колонка Shift обязана попасть и сюда, иначе
   // клиент Prisma выбирает поле, которого в базе нет, и падают все тесты смен.
   resolve(process.cwd(), 'prisma/migrations/20260815120000_shift_auto_close/migration.sql'),
+  // То же и про новые таблицы, а не только колонки: без этой строки решение о
+  // пуске падает на запросе разрешения, которого в одноразовой базе нет.
+  resolve(process.cwd(), 'prisma/migrations/20260820120000_shift_start_waiver/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
