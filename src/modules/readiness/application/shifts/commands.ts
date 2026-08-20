@@ -8,6 +8,7 @@ import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag
 import {ReadinessCommandError} from '../command-pipeline/errors';
 import {assertHandoverAcceptedByAnotherPerson, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
 import {blockerFingerprint, requireWaiverReason} from '../../domain/shifts/waiver';
+import {diffInspectionStates, type StateAnswer} from '@/modules/inspections/domain/state-diff';
 import {requireCancellationReason, validateShiftWindow} from '../../domain/shifts/shift';
 import {normalizeTenantTimezone, tenantProductionDate} from '../../domain/shifts/tenant-production-date';
 import {assertHandoverTransition, assertShiftTransition} from '../../domain/shifts/transitions';
@@ -301,8 +302,14 @@ export function submitHandoverCommand(input: {tx: ReadinessTransaction; context:
       });
       assertShiftReportSubmitted(input.context.actingAs ?? input.context.actorRole, Boolean(submittedReport));
       const now = input.now ?? new Date();
+      // Что изменилось в машине за смену — считает система, а не память
+      // человека в конце дня. Ухудшения попадают в передачу сами.
+      const stateChanges = await collectShiftStateChanges(input.tx, input.context.tenantId, input.shiftId);
       const summary = validateHandoverSummary(input.payload.summary);
-      const evidence = (input.payload.evidence ?? {}) as Prisma.InputJsonValue;
+      const evidence = {
+        ...(input.payload.evidence ?? {}),
+        ...(stateChanges.length > 0 ? {stateChanges} : {}),
+      } as Prisma.InputJsonValue;
       // Возвращённую на доработку передачу переоформляем той же записью:
       // состояние REWORK_REQUIRED домен считает пригодным для повторной
       // передачи, а второй живой строки по смене индекс не разрешает.
@@ -323,6 +330,34 @@ export function submitHandoverCommand(input: {tx: ReadinessTransaction; context:
       return {status: 201, body: {data: after, shift: serializeShift(shift)},
         headers: {ETag: formatStrongEtag('handover', handover.id, handover.version), Location: `/api/readiness/handovers/${handover.id}`}};
     }});
+}
+
+/**
+ * Сравнивает осмотр до работ и осмотр после работ этой смены.
+ *
+ * Пустой список — не «всё хорошо», а «сравнивать нечего»: один из осмотров не
+ * закрыт. Утверждать по этому поводу нечего, и молчание честнее выдумки.
+ */
+async function collectShiftStateChanges(tx: ReadinessTransaction, tenantId: string, shiftId: string) {
+  const inspections = await tx.inspection.findMany({
+    where: {tenantId, shiftId, status: 'COMPLETED'},
+    select: {phase: true, templateSnapshot: true, answers: {select: {itemId: true, result: true}}},
+  });
+  const answersOf = (phase: 'PRE_SHIFT' | 'POST_SHIFT'): StateAnswer[] => {
+    const found = inspections.find((item) => item.phase === phase);
+    if (!found) return [];
+    const items = Array.isArray(found.templateSnapshot)
+      ? (found.templateSnapshot as Array<{id?: string; text?: string}>)
+      : [];
+    const textById = new Map(items.map((item) => [item.id ?? '', item.text ?? '']));
+    return found.answers
+      .map((answer) => ({text: textById.get(answer.itemId) ?? '', result: answer.result}))
+      .filter((answer) => answer.text !== '');
+  };
+  const before = answersOf('PRE_SHIFT');
+  const after = answersOf('POST_SHIFT');
+  if (before.length === 0 || after.length === 0) return [];
+  return diffInspectionStates(before, after).filter((change) => change.worsened);
 }
 
 async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
