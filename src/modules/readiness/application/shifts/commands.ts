@@ -6,7 +6,7 @@ import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from 
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
 import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag';
 import {ReadinessCommandError} from '../command-pipeline/errors';
-import {requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
+import {assertHandoverAcceptedByAnotherPerson, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
 import {requireCancellationReason, validateShiftWindow} from '../../domain/shifts/shift';
 import {normalizeTenantTimezone, tenantProductionDate} from '../../domain/shifts/tenant-production-date';
 import {assertHandoverTransition, assertShiftTransition} from '../../domain/shifts/transitions';
@@ -42,7 +42,7 @@ export const serializeShift = (row: ShiftRow) => ({...row,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(), handovers: row.handovers.map(serializeHandover)});
 
-function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.manage' | 'readiness.handover.prepare' | 'readiness.handover.decide') {
+function requireAbility(context: ShiftCommandContext, ability: 'readiness.shift.manage' | 'readiness.handover.prepare' | 'readiness.handover.decide' | 'readiness.shift.authorize') {
   if (!effectiveReadinessCapabilities(context.actorRole, context.actingAs, context.accessMatrix).has(ability)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, `Недостаточно прав: ${ability}`);
   }
@@ -143,7 +143,7 @@ export function updateShiftCommand(input: {tx: ReadinessTransaction; context: Sh
 export function startShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
   key: string | null; ifMatch: string | null; expectedVersion?: number; now?: Date}) {
   // Запуск — решение принимающей стороны, а не того, кто готовил установку.
-  requireAbility(input.context, 'readiness.handover.decide');
+  requireAbility(input.context, 'readiness.shift.authorize');
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch, expectedVersion: input.expectedVersion,
     kind: 'shift', id: input.id});
   return runCommand({tx: input.tx, context: input.context, method: 'POST', routeTemplate: '/api/readiness/shifts/:id/start',
@@ -191,7 +191,8 @@ export function requestShiftAcceptanceCommand(input: {tx: ReadinessTransaction; 
 
 export function declineShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
   key: string | null; ifMatch: string | null; expectedVersion?: number; reason: string; now?: Date}) {
-  requireAbility(input.context, 'readiness.handover.decide');
+  // Отказ в допуске — обратная сторона пуска, полномочие то же.
+  requireAbility(input.context, 'readiness.shift.authorize');
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch, expectedVersion: input.expectedVersion,
     kind: 'shift', id: input.id});
   const reason = requireCancellationReason(input.reason);
@@ -269,6 +270,9 @@ async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCo
     aggregateId: input.id, key: input.key, body: commandBody, expectedVersion: expected,
     execute: async (key) => { const handovers = new HandoverRepository(input.tx); const shifts = new ShiftRepository(input.tx);
       const before = await handovers.get(input.context.tenantId, input.id);
+      if (input.action === 'accept') {
+        assertHandoverAcceptedByAnotherPerson(before.submittedById, input.context.actorId);
+      }
       if (before.version !== expected || before.state !== 'SUBMITTED') {
         throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Передача изменилась. Обновите страницу и повторите действие',
           {current: serializeHandover(before)});

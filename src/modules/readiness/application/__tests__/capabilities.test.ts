@@ -22,14 +22,28 @@ describe('readiness capabilities', () => {
     expect(abilities).not.toContain('readiness.permit.approve_admin');
   });
 
-  it('lets operators prepare and transfer shifts while dispatchers decide handovers', () => {
+  // Владелец 20.08.2026: работают в основном в одну смену, а при второй технику
+  // принимает следующий оператор. Запрет принимать СВОЮ передачу живёт в
+  // команде (`decideHandover`), потому что проверяет человека, а не роль.
+  it('lets operators prepare and accept shifts while dispatchers keep deciding', () => {
     const operator = resolveReadinessCapabilities('OPERATOR');
     const dispatcher = resolveReadinessCapabilities('DISPATCHER');
     expect(operator).toContain('readiness.shift.manage');
     expect(operator).toContain('readiness.handover.prepare');
-    expect(operator).not.toContain('readiness.handover.decide');
+    expect(operator).toContain('readiness.handover.decide');
     expect(dispatcher).toContain('readiness.handover.decide');
     expect(dispatcher).not.toContain('readiness.handover.prepare');
+  });
+
+  // Осмотр ведёт тот, кто управляет машиной. Право само по себе ничего не
+  // расширяет: уровень и установка сужены в startToInspection. Планирование
+  // работ и разбор дефектов оператору по-прежнему недоступны.
+  it('lets operators run ЕО but not maintenance planning', () => {
+    const operator = resolveReadinessCapabilities('OPERATOR');
+    expect(operator).toContain('readiness.inspection.manage');
+    expect(operator).not.toContain('readiness.maintenance.manage');
+    expect(operator).not.toContain('readiness.defect.manage');
+    expect(operator).not.toContain('readiness.rules.manage');
   });
 
   // Замечание с поля не должно упираться в права: потерянная неисправность

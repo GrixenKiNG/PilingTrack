@@ -13,6 +13,11 @@ export const READINESS_ABILITIES = [
   'readiness.shift.manage',
   'readiness.handover.prepare',
   'readiness.handover.decide',
+  // Допуск смены к пуску и отказ в допуске. Отделено от приёмки передачи
+  // 20.08.2026: раньше пуск смены требовал `readiness.handover.decide`, и
+  // выдача оператору права принимать технику молча дала бы ему ещё и право
+  // выпускать машину на линию. Разные решения — разные полномочия.
+  'readiness.shift.authorize',
   'readiness.inspection.manage',
   // Зафиксировать замечание может любой, кто работает со сменой; разбирать,
   // закрывать и отклонять — только диспетчер, механик и администратор.
@@ -58,6 +63,7 @@ export const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> 
     'readiness.defect.report',
     'readiness.defect.manage',
     'readiness.handover.decide',
+    'readiness.shift.authorize',
     'readiness.permit.approve_dispatcher',
     'readiness.audit.read',
   ],
@@ -65,6 +71,15 @@ export const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> 
     'readiness.read',
     'readiness.shift.manage',
     'readiness.handover.prepare',
+    // Приёмка смены: работают в основном в одну смену, а при второй технику
+    // принимает следующий оператор, а не диспетчер. Свою собственную передачу
+    // принять нельзя — это проверяет команда, а не список прав.
+    'readiness.handover.decide',
+    // Ежесменный осмотр ведёт тот, кто управляет машиной. Право не расширяет
+    // доступ: `startToInspection` пропускает оператора только на уровень ЕО и
+    // только на его установку по бригаде. Ограничение стоит там намеренно —
+    // эту матрицу администратор правит и публикует на ходу.
+    'readiness.inspection.manage',
     'readiness.defect.report',
   ],
   ASSISTANT: ['readiness.defect.report'],

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {requireReworkReason, validateHandoverSummary} from '../handover';
+import {assertHandoverAcceptedByAnotherPerson, requireReworkReason, validateHandoverSummary} from '../handover';
 import {requireCancellationReason, validateShiftWindow} from '../shift';
 import {tenantProductionDate} from '../tenant-production-date';
 import {transitionHandover, transitionShift} from '../transitions';
@@ -41,6 +41,14 @@ describe('shift and handover domain', () => {
     expect(tenantProductionDate(instant, 'Europe/Moscow').toISOString()).toBe('2026-08-02T00:00:00.000Z');
     expect(tenantProductionDate(instant, 'UTC').toISOString()).toBe('2026-08-01T00:00:00.000Z');
     expect(tenantProductionDate(instant, 'invalid/timezone').toISOString()).toBe('2026-08-02T00:00:00.000Z');
+  });
+
+  // Оператор принимает технику от предыдущей смены, но не от себя самого:
+  // иначе он закрывал бы собственную смену своей же подписью.
+  it('refuses a handover accepted by the person who submitted it', () => {
+    expect(() => assertHandoverAcceptedByAnotherPerson('user-1', 'user-1'))
+      .toThrow(/другой оператор или диспетчер/i);
+    expect(() => assertHandoverAcceptedByAnotherPerson('user-1', 'user-2')).not.toThrow();
   });
 
   it('validates windows, summaries and required reasons', () => {

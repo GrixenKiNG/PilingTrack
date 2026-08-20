@@ -8,10 +8,13 @@ const context = (actorRole: string): ShiftCommandContext => ({
 
 describe('shift command contract', () => {
   // Допуск к работе даёт диспетчер: ни механик, ни оператор смену не запускают.
-  it.each(['MECHANIC', 'OPERATOR'] as const)('denies shift start to %s without handover.decide', (role) => {
+  // С 20.08.2026 это отдельное полномочие: оператор получил право ПРИНИМАТЬ
+  // технику от предыдущей смены, и без разделения он заодно получил бы право
+  // выпускать машину на линию.
+  it.each(['MECHANIC', 'OPERATOR'] as const)('denies shift start to %s without shift.authorize', (role) => {
     expect(() => startShiftCommand({tx: null as never, context: context(role), id: 'shift-a',
       key: `task04-${role.toLowerCase()}-denied`, ifMatch: '"shift-shift-a-v1"', expectedVersion: 1}))
-      .toThrow(/Недостаточно прав: readiness\.handover\.decide/i);
+      .toThrow(/Недостаточно прав: readiness\.shift\.authorize/i);
   });
 
   it('requires a strong matching aggregate ETag', () => {
