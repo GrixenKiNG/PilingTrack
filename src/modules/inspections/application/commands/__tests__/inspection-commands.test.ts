@@ -4,6 +4,7 @@ const m = vi.hoisted(() => ({
   insCreate: vi.fn(), insFindUnique: vi.fn(), insUpdate: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
+  crewFindUnique: vi.fn(),
 }));
 vi.mock('@/lib/db', () => {
   const client = {
@@ -12,6 +13,7 @@ vi.mock('@/lib/db', () => {
     inspection: { create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
+    crew: { findUnique: m.crewFindUnique },
     outboxEvent: { createMany: m.outboxCreate },
     $transaction: (run: (tx: unknown) => unknown) => run(client),
   };
@@ -28,7 +30,7 @@ describe('startInspection', () => {
       sections: [{ title: 'Гидросистема', items: [{ id: 'i1', text: 'x', answerType: 'YES_NO', required: true, photoRequired: false, unit: null, norm: null, provenance: null }] }] });
     m.insCreate.mockResolvedValue({ id: 'ins1' });
     await startInspection({ equipmentId: 'eq1', templateId: 't1', inspectionDate: '2026-06-03' },
-      { tenantId: 'orion', userId: 'u1' });
+      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' });
     const data = m.insCreate.mock.calls[0][0].data;
     expect(data.tenantId).toBe('orion');
     expect(data.status).toBe('DRAFT');
@@ -38,7 +40,7 @@ describe('startInspection', () => {
   it('throws 404 if equipment cross-tenant', async () => {
     m.eqFindUnique.mockResolvedValue(null);
     await expect(startInspection({ equipmentId: 'x', templateId: 't1', inspectionDate: '2026-06-03' },
-      { tenantId: 'orion', userId: 'u1' })).rejects.toThrow('Equipment not found');
+      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' })).rejects.toThrow('Equipment not found');
   });
 });
 
@@ -62,7 +64,7 @@ describe('startToInspection', () => {
     m.recCreate.mockResolvedValue({ id: 'rec1' });
     m.insCreate.mockResolvedValue({ id: 'ins1' });
 
-    await startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1' });
+    await startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1', role: 'ADMIN' });
 
     const recData = m.recCreate.mock.calls[0][0].data;
     expect(recData).toMatchObject({ tenantId: 'orion', equipmentId: 'eq1', type: 'EO', status: 'IN_PROGRESS' });
@@ -73,7 +75,7 @@ describe('startToInspection', () => {
 
   it('throws 404 for cross-tenant equipment; writes nothing', async () => {
     m.eqFindUnique.mockResolvedValue(null);
-    await expect(startToInspection({ equipmentId: 'x', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1' }))
+    await expect(startToInspection({ equipmentId: 'x', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1', role: 'ADMIN' }))
       .rejects.toThrow('Equipment not found');
     expect(m.recCreate).not.toHaveBeenCalled();
     expect(m.insCreate).not.toHaveBeenCalled();
@@ -82,7 +84,7 @@ describe('startToInspection', () => {
   it('throws 400 when no BASE block exists for the machine; writes nothing', async () => {
     m.eqFindUnique.mockResolvedValue({ id: 'eq1', model: 'Banut 655', hammerKind: 'HYDRAULIC', isCombined: false });
     m.tplFindMany.mockResolvedValue([hammerTpl]); // only hammer, no base
-    await expect(startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1' }))
+    await expect(startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1', role: 'ADMIN' }))
       .rejects.toThrow(/база/i);
     expect(m.recCreate).not.toHaveBeenCalled();
   });
@@ -136,5 +138,31 @@ describe('completeInspection', () => {
     expect(data.healthScore).toBe(100);
     expect(data.signedByName).toBe('Иванов');
     expect(res.healthScore).toBe(100);
+  });
+});
+
+describe('startToInspection: границы оператора', () => {
+  it('оператор не может открыть ТО-1 — только ежесменный осмотр', async () => {
+    await expect(startToInspection(
+      { equipmentId: 'eq1', level: 'TO1', inspectionDate: '2026-08-20' },
+      { tenantId: 'orion', userId: 'op1', role: 'OPERATOR' },
+    )).rejects.toThrow(/ежесменный/i);
+    expect(m.eqFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('оператор не может открыть ЕО на чужой установке', async () => {
+    m.crewFindUnique.mockResolvedValue({ equipmentId: 'eq-чужая', isActive: true });
+    await expect(startToInspection(
+      { equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-08-20' },
+      { tenantId: 'orion', userId: 'op1', role: 'OPERATOR' },
+    )).rejects.toThrow(/не назначены/i);
+  });
+
+  it('оператор без активной бригады не открывает осмотр вовсе', async () => {
+    m.crewFindUnique.mockResolvedValue(null);
+    await expect(startToInspection(
+      { equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-08-20' },
+      { tenantId: 'orion', userId: 'op1', role: 'OPERATOR' },
+    )).rejects.toThrow(/не назначены/i);
   });
 });

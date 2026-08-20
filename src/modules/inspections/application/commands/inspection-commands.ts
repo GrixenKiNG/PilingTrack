@@ -21,14 +21,45 @@ const LEVEL_TITLE: Record<MaintenanceLevel, string> = {
 };
 
 /**
+ * Границы осмотра для оператора: только ежесменный (ЕО) и только своя машина.
+ *
+ * Проверка живёт здесь, а не в списках прав, потому что списков два и оба
+ * редактируемы: `services/auth/authorization-service.ts` выдаёт оператору
+ * `inspection.perform`, а матрица контура готовности публикуется
+ * администратором на ходу. Сужение, живущее только в списке, снимается
+ * правкой списка — команда единственное место, которое настройкой не обойти.
+ *
+ * Механик, инженер ОТ, диспетчер и администратор проходят без ограничений:
+ * ТО-1..ТО-3 и сезонное — их работа.
+ */
+async function assertOperatorInspectionScope(
+  ctx: { userId: string; role: string },
+  equipmentId: string,
+  level: MaintenanceLevel,
+) {
+  if (ctx.role !== 'OPERATOR') return;
+  if (level !== 'EO') {
+    throw new ServiceError('Оператору доступен только ежесменный осмотр (ЕО)', 403);
+  }
+  const crew = await db.crew.findUnique({
+    where: { operatorId: ctx.userId },
+    select: { equipmentId: true, isActive: true },
+  });
+  if (!crew?.isActive || crew.equipmentId !== equipmentId) {
+    throw new ServiceError('Вы не назначены на эту установку', 403);
+  }
+}
+
+/**
  * Start an ЕО/ТО: compose the checklist from blocks (BASE + HAMMER + ROTARY)
  * matching the machine, then create the ТО journal record + its inspection (1:1).
  */
 export async function startToInspection(
   input: { equipmentId: string; level: MaintenanceLevel; inspectionDate: string | Date; shift?: string | null; engineHours?: number | null },
-  ctx: { tenantId: string; userId: string },
+  ctx: { tenantId: string; userId: string; role: string },
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  await assertOperatorInspectionScope(ctx, input.equipmentId, input.level);
   const eq = await db.equipment.findUnique({
     where: { id: input.equipmentId, tenantId: ctx.tenantId },
     select: { id: true, model: true, hammerKind: true, isCombined: true },
@@ -109,7 +140,7 @@ export async function startToInspection(
 
 export async function startInspection(
   input: { equipmentId: string; templateId: string; inspectionDate: string | Date; shift?: string | null; engineHours?: number | null },
-  ctx: { tenantId: string; userId: string },
+  ctx: { tenantId: string; userId: string; role: string },
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const eq = await db.equipment.findUnique({ where: { id: input.equipmentId, tenantId: ctx.tenantId }, select: { id: true } });
@@ -119,6 +150,9 @@ export async function startInspection(
     include: { sections: { orderBy: { order: 'asc' }, include: { items: { orderBy: { order: 'asc' } } } } },
   });
   if (!tpl || tpl.tenantId !== ctx.tenantId) throw new ServiceError('Template not found', 404);
+  // Та же граница, что и в блочном старте: иначе оператор обходит сужение,
+  // выбрав шаблон ТО напрямую через устаревший маршрут.
+  await assertOperatorInspectionScope(ctx, input.equipmentId, tpl.level as MaintenanceLevel);
 
   const snapshot = tpl.sections.flatMap((s) =>
     s.items.map((i) => ({

@@ -67,9 +67,9 @@ export const POST = withMutation(
     try {
       const inspection = isBlockStart
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-        ? await startToInspection(parsed.data as z.infer<typeof blockStartSchema>, { tenantId, userId: user!.id })
+        ? await startToInspection(parsed.data as z.infer<typeof blockStartSchema>, { tenantId, userId: user!.id, role: user!.role })
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-        : await startInspection(parsed.data as z.infer<typeof legacyStartSchema>, { tenantId, userId: user!.id });
+        : await startInspection(parsed.data as z.infer<typeof legacyStartSchema>, { tenantId, userId: user!.id, role: user!.role });
       return NextResponse.json({ inspection }, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
