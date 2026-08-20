@@ -1240,6 +1240,12 @@ model Site {
   id              String    @id @default(cuid())
   tenantId        String?
   name            String
+  /// Координаты площадки. Нужны, чтобы тянуть скорость ветра из погодного
+  /// сервиса: у Liebherr работы прекращают при 20 м/с, а стрелу переводят в
+  /// транспортное положение при 36 м/с. Необязательны — объект без координат
+  /// работает как прежде, оператор вписывает ветер руками.
+  latitude        Float?
+  longitude       Float?
   isActive        Boolean   @default(true)
   plannedPiles    Int       @default(0)
   plannedDrilling Float     @default(0)

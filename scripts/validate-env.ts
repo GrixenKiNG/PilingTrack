@@ -116,6 +116,11 @@ const ENV_CONFIG: Record<string, EnvVarConfig> = {
   WS_URL: { required: false, description: 'WebSocket server URL' },
   NEXT_PUBLIC_WS_URL: { required: false, description: 'Public WebSocket URL (client-facing)' },
 
+  // Погода — optional. Не задан — используется https://api.open-meteo.com.
+  // Переменная существует на случай блокировки провайдером, как это уже
+  // случилось с api.telegram.org: тогда сюда ставится адрес прокси.
+  WEATHER_API_BASE: { required: false, description: 'Базовый адрес погодного сервиса (Open-Meteo или прокси)' },
+
   // S3 — optional
   S3_ENDPOINT: { required: false, description: 'S3 endpoint (MinIO, R2, etc.)' },
   S3_ACCESS_KEY_ID: { required: false, description: 'S3 access key' },
