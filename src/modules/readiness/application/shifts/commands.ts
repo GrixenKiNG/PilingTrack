@@ -143,7 +143,14 @@ export function updateShiftCommand(input: {tx: ReadinessTransaction; context: Sh
 
 export function startShiftCommand(input: {tx: ReadinessTransaction; context: ShiftCommandContext; id: string;
   key: string | null; ifMatch: string | null; expectedVersion?: number; now?: Date}) {
-  // Запуск — решение принимающей стороны, а не того, кто готовил установку.
+  // Пуск даёт тот, кто выходит в смену: при чистой готовности оператор
+  // запускает машину сам (решение владельца 20.08.2026). Раньше здесь стояло
+  // «запуск — решение принимающей стороны», и каждое утро смена ждала
+  // диспетчера у компьютера.
+  //
+  // Дисциплину держит не роль, а сам контур: при блокировке `allowed` ложно,
+  // и пуск не пройдёт ни у кого, пока диспетчер не выдаст письменное
+  // разрешение (`readiness.shift.waive`, оператору не выдаётся).
   requireAbility(input.context, 'readiness.shift.authorize');
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch, expectedVersion: input.expectedVersion,
     kind: 'shift', id: input.id});

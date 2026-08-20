@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {startShiftCommand, type ShiftCommandContext} from '../commands';
+import {startShiftCommand, waiveShiftStartCommand, type ShiftCommandContext} from '../commands';
 
 const context = (actorRole: string): ShiftCommandContext => ({
   tenantId: 'tenant-a', actorId: 'actor-a', actorName: 'Actor', actorRole,
@@ -7,14 +7,20 @@ const context = (actorRole: string): ShiftCommandContext => ({
 });
 
 describe('shift command contract', () => {
-  // Допуск к работе даёт диспетчер: ни механик, ни оператор смену не запускают.
-  // С 20.08.2026 это отдельное полномочие: оператор получил право ПРИНИМАТЬ
-  // технику от предыдущей смены, и без разделения он заодно получил бы право
-  // выпускать машину на линию.
-  it.each(['MECHANIC', 'OPERATOR'] as const)('denies shift start to %s without shift.authorize', (role) => {
-    expect(() => startShiftCommand({tx: null as never, context: context(role), id: 'shift-a',
-      key: `task04-${role.toLowerCase()}-denied`, ifMatch: '"shift-shift-a-v1"', expectedVersion: 1}))
+  // Пуск даёт тот, кто выходит в смену: оператор запускает чистую готовность
+  // сам. Механик машину не пускает — он её обслуживает, и права допуска у него
+  // нет. Заблокированную машину не пускает никто без письменного разрешения.
+  it('denies shift start to MECHANIC without shift.authorize', () => {
+    expect(() => startShiftCommand({tx: null as never, context: context('MECHANIC'), id: 'shift-a',
+      key: 'task04-mechanic-denied', ifMatch: '"shift-shift-a-v1"', expectedVersion: 1}))
       .toThrow(/Недостаточно прав: readiness\.shift\.authorize/i);
+  });
+
+  // Разрешение выпустить заблокированную машину — не операторское решение.
+  it('denies a start waiver to the operator who needs it', () => {
+    expect(() => waiveShiftStartCommand({tx: null as never, context: context('OPERATOR'), id: 'shift-a',
+      key: 'task07-operator-waiver-denied', reason: 'Течь небольшая, доедем до базы'}))
+      .toThrow(/Недостаточно прав: readiness\.shift\.waive/i);
   });
 
   it('requires a strong matching aggregate ETag', () => {

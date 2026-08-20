@@ -75,6 +75,11 @@ export const ROLE_ABILITIES: Record<ReadinessRole, readonly ReadinessAbility[]> 
   OPERATOR: [
     'readiness.read',
     'readiness.shift.manage',
+    // Владелец 20.08.2026: чистую готовность оператор пускает сам — ждать
+    // диспетчера в шесть утра незачем. Исключение из отказа остаётся за
+    // диспетчером: `readiness.shift.waive` оператору не выдаётся, и без
+    // письменного разрешения заблокированная машина не стартует.
+    'readiness.shift.authorize',
     'readiness.handover.prepare',
     // Приёмка смены: работают в основном в одну смену, а при второй технику
     // принимает следующий оператор, а не диспетчер. Свою собственную передачу
