@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {assertHandoverAcceptedByAnotherPerson, requireReworkReason, validateHandoverSummary} from '../handover';
+import {assertHandoverAcceptedByAnotherPerson, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../handover';
 import {requireCancellationReason, validateShiftWindow} from '../shift';
 import {tenantProductionDate} from '../tenant-production-date';
 import {transitionHandover, transitionShift} from '../transitions';
@@ -49,6 +49,15 @@ describe('shift and handover domain', () => {
     expect(() => assertHandoverAcceptedByAnotherPerson('user-1', 'user-1'))
       .toThrow(/другой оператор или диспетчер/i);
     expect(() => assertHandoverAcceptedByAnotherPerson('user-1', 'user-2')).not.toThrow();
+  });
+
+  // Отчёт — содержание передачи, а не второй параллельный документ. Требование
+  // адресное: механик возвращает технику той же командой, и отчёта у него нет.
+  it('holds the operator to a submitted report, but not the mechanic', () => {
+    expect(() => assertShiftReportSubmitted('OPERATOR', false)).toThrow(/сменный отчёт/i);
+    expect(() => assertShiftReportSubmitted('OPERATOR', true)).not.toThrow();
+    expect(() => assertShiftReportSubmitted('MECHANIC', false)).not.toThrow();
+    expect(() => assertShiftReportSubmitted('ADMIN', false)).not.toThrow();
   });
 
   it('validates windows, summaries and required reasons', () => {

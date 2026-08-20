@@ -6,7 +6,7 @@ import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from 
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
 import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag';
 import {ReadinessCommandError} from '../command-pipeline/errors';
-import {assertHandoverAcceptedByAnotherPerson, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
+import {assertHandoverAcceptedByAnotherPerson, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
 import {requireCancellationReason, validateShiftWindow} from '../../domain/shifts/shift';
 import {normalizeTenantTimezone, tenantProductionDate} from '../../domain/shifts/tenant-production-date';
 import {assertHandoverTransition, assertShiftTransition} from '../../domain/shifts/transitions';
@@ -234,6 +234,11 @@ export function submitHandoverCommand(input: {tx: ReadinessTransaction; context:
     aggregateId: input.shiftId, key: input.key, body: input.payload, expectedVersion: expected, execute: async (key) => {
       const shifts = new ShiftRepository(input.tx); const handovers = new HandoverRepository(input.tx);
       const before = await shifts.get(input.context.tenantId, input.shiftId); assertShiftTransition(before.state, 'handover');
+      const submittedReport = await input.tx.report.findFirst({
+        where: {tenantId: input.context.tenantId, shiftId: input.shiftId, status: 'submitted'},
+        select: {id: true},
+      });
+      assertShiftReportSubmitted(input.context.actingAs ?? input.context.actorRole, Boolean(submittedReport));
       const now = input.now ?? new Date();
       const summary = validateHandoverSummary(input.payload.summary);
       const evidence = (input.payload.evidence ?? {}) as Prisma.InputJsonValue;

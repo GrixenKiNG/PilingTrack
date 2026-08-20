@@ -39,3 +39,22 @@ export function assertHandoverAcceptedByAnotherPerson(submittedById: string, act
       'Свою передачу принимает другой оператор или диспетчер');
   }
 }
+
+/**
+ * Оператор не сдаёт смену, пока не отправлен сменный отчёт.
+ *
+ * Требование адресное, а не общее: этой же командой механик возвращает
+ * технику после ремонта, и у его передачи сменного отчёта нет и быть не
+ * должно. Проверяется исполняемая роль, а не учётная: администратор в режиме
+ * «действую как оператор» сдаёт смену по тем же правилам, что оператор.
+ */
+export function assertShiftReportSubmitted(
+  effectiveRole: string,
+  hasSubmittedReport: boolean,
+): void {
+  if (effectiveRole !== 'OPERATOR') return;
+  if (!hasSubmittedReport) {
+    throw new ReadinessCommandError('VALIDATION_ERROR', 409,
+      'Сначала отправьте сменный отчёт — он и есть содержание передачи');
+  }
+}
