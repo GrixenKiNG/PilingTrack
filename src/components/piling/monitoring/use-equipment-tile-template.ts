@@ -27,8 +27,6 @@ import {
 } from './equipment-tile-asset-storage';
 import { uploadEquipmentPhoto } from './equipment-photo-upload';
 
-const UNLOCK_KEY = 'monitoring-design-unlocked';
-
 function imageBlockIds(template: EquipmentTileTemplate): Set<string> {
   return new Set(template.blocks.filter((block) => block.kind === 'image').map((block) => block.id));
 }
@@ -50,7 +48,6 @@ function deleteUnreferencedImageAssets(
 }
 
 export interface EquipmentTileTemplateController extends LayoutController<EquipmentTileTemplate> {
-  unlocked: boolean;
   assetStorage: EquipmentTileAssetStorage;
   addImage(file: File, equipmentId: string): Promise<LayoutBlock>;
   replaceImage(blockId: string, file: File, equipmentId: string): Promise<void>;
@@ -60,17 +57,14 @@ export function useEquipmentTileTemplate(
   providedAssetStorage?: EquipmentTileAssetStorage,
   onPhotoUploaded?: () => void,
 ): EquipmentTileTemplateController {
-  const queryUnlock =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('design') === '1';
-  const [unlocked, setUnlocked] = useState(false);
   const [assetStorage] = useState(() => providedAssetStorage ?? getDefaultEquipmentTileAssetStorage());
 
+  // Скрытого замка (?design=1 и флажок в localStorage) больше нет: редактор
+  // переехал в «Настройки → Шаблоны плиток», где вход и так закрыт ролью
+  // администратора. На экране мониторинга шаблон теперь только отрисовывается.
   useEffect(() => {
-    if (queryUnlock) localStorage.setItem(UNLOCK_KEY, '1');
     migrateLegacyCardDesign(localStorage);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads localStorage (client-only) after mount; SSR renders locked by design
-    setUnlocked(queryUnlock || localStorage.getItem(UNLOCK_KEY) === '1');
-  }, [queryUnlock]);
+  }, []);
 
   const core = useLayoutTemplate<EquipmentTileTemplate>({
     surfaceId: 'monitoring-equipment-tile',
@@ -111,7 +105,6 @@ export function useEquipmentTileTemplate(
 
   return {
     ...core,
-    unlocked,
     assetStorage,
     addImage,
     replaceImage,

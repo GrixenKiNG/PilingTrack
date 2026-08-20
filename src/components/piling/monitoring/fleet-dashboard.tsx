@@ -28,7 +28,6 @@ import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { KpiTile, KPI_GRID, kpiGridStyle } from '@/components/piling/kpi-tile';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentCard } from './equipment-card';
-import { EquipmentTileEditor } from './equipment-tile-editor';
 import { useEquipmentTileTemplate } from './use-equipment-tile-template';
 
 type SortBy = 'status' | 'name' | 'lastReport';
@@ -269,7 +268,6 @@ export function FleetDashboard() {
         ))}
       </div>
 
-      {visibleCards[0] && <EquipmentTileEditor cards={visibleCards} controller={tile} />}
 
       {visibleCards.length === 0 && (
         <div className="rounded-xl border bg-muted/30 p-6 text-center text-sm text-muted-foreground">

@@ -1,9 +1,13 @@
 'use client';
 
 /**
- * Monitoring wrapper around the shared LayoutEditor: gates by design-unlock +
- * ADMIN, binds block content to the selected equipment card and wires photo
- * upload to that equipment. Public API unchanged.
+ * Обёртка над общим LayoutEditor для плитки установки: закрыта ролью
+ * администратора, привязывает содержимое блоков к выбранной карточке и
+ * подключает загрузку фото именно к этой установке.
+ *
+ * Живёт в «Настройки → Шаблоны плиток». На экране мониторинга редактора нет:
+ * раньше он висел там плавающей кнопкой за скрытым замком `?design=1`, и
+ * найти его можно было только зная адрес.
  */
 
 import { useState } from 'react';
@@ -25,7 +29,18 @@ const DATA_BLOCKS: Array<{ key: EquipmentTileDataKey; label: string }> = [
   { key: 'maintenanceAlert', label: 'Предупреждение ТО' },
 ];
 
-export function EquipmentTileEditor({ cards, controller }: { cards: FleetCard[]; controller: EquipmentTileTemplateController }) {
+export function EquipmentTileEditor({
+  cards,
+  controller,
+  autoOpen = false,
+  onClose,
+}: {
+  cards: FleetCard[];
+  controller: EquipmentTileTemplateController;
+  /** Открыть сразу при монтировании — режим окна, которым управляет родитель. */
+  autoOpen?: boolean;
+  onClose?: () => void;
+}) {
   const [selectedCardId, setSelectedCardId] = useState(() => cards[0]?.id ?? '');
   const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
   const selectedCard = cards.find((card) => card.id === selectedCardId) ?? cards[0] ?? null;
@@ -37,7 +52,9 @@ export function EquipmentTileEditor({ cards, controller }: { cards: FleetCard[];
     <LayoutEditor
       title="Редактор плитки установки"
       controller={controller}
-      visible={controller.unlocked && isAdmin}
+      visible={isAdmin}
+      autoOpen={autoOpen}
+      onClose={onClose}
       dataBlocks={DATA_BLOCKS}
       renderBlockContent={(block) => (
         <EquipmentTileBlockContent block={block as EquipmentTileBlock} card={selectedCard} assetStorage={controller.assetStorage} />

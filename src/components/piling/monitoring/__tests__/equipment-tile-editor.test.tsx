@@ -114,18 +114,27 @@ describe('EquipmentTileEditor', () => {
     storeState.role = 'ADMIN';
   });
 
-  it('stays hidden until design mode is unlocked', async () => {
-    const { rerender } = render(<Harness />);
-    expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
-
-    window.history.replaceState({}, '', '/monitoring?design=1');
-    rerender(<Harness />);
+  /*
+    Скрытого замка `?design=1` больше нет: редактор переехал в «Настройки →
+    Шаблоны плиток», где вход закрыт ролью. Проверяем то, что осталось
+    единственной защитой, — роль. Сохранение и загрузка фото и так закрыты на
+    сервере (403), но показывать неработающие кнопки нельзя.
+  */
+  it('доступен администратору без всяких скрытых адресов', async () => {
+    storeState.role = 'ADMIN';
+    render(<Harness />);
 
     expect(await screen.findByRole('button', { name: 'Редактировать шаблон' })).toBeInTheDocument();
   });
 
+  it('не показывается тому, кто не администратор', async () => {
+    storeState.role = 'DISPATCHER';
+    render(<Harness />);
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument());
+  });
+
   it('adds and edits arbitrary text, then saves it to the server', async () => {
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
@@ -143,7 +152,6 @@ describe('EquipmentTileEditor', () => {
   });
 
   it('undoes and redoes block creation', async () => {
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
@@ -156,7 +164,6 @@ describe('EquipmentTileEditor', () => {
   });
 
   it('resets a saved customization to the default template', async () => {
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
@@ -173,7 +180,6 @@ describe('EquipmentTileEditor', () => {
   });
 
   it('uploads a photo via the media API and saves its presentation settings', async () => {
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     const file = new File(['image'], 'crane.png', { type: 'image/png' });
@@ -197,7 +203,6 @@ describe('EquipmentTileEditor', () => {
   });
 
   it('shows a validation error for an unsupported photo file', async () => {
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.change(screen.getByLabelText('Загрузить фото'), {
@@ -209,7 +214,6 @@ describe('EquipmentTileEditor', () => {
   });
 
   it('uploads the photo against the selected installation', async () => {
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness cards={[card, secondCard]} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
 
@@ -227,7 +231,6 @@ describe('EquipmentTileEditor', () => {
 
   it('hides the editor entry for non-ADMIN users', async () => {
     storeState.role = 'OPERATOR';
-    window.history.replaceState({}, '', '/monitoring?design=1');
     render(<Harness />);
 
     await waitFor(() => expect(calls.some((call) => call.url === '/api/layout/monitoring-equipment-tile')).toBe(true));

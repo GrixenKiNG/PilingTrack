@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
@@ -32,6 +32,10 @@ const snapshot: FleetSnapshot = {
 };
 
 describe('FleetDashboard shared equipment template', () => {
+  /** Шаблон, который «уже сохранён на сервере» к моменту отрисовки. */
+  let serverTemplate: unknown;
+  const savedTemplate = (template: unknown) => { serverTemplate = template; };
+
   beforeEach(() => {
     const values = new Map<string, string>();
     Object.defineProperty(window, 'localStorage', {
@@ -42,8 +46,8 @@ describe('FleetDashboard shared equipment template', () => {
         removeItem: (key: string) => void values.delete(key),
       },
     });
-    window.history.replaceState({}, '', '/monitoring?design=1');
-    let serverTemplate: unknown = DEFAULT_EQUIPMENT_TILE_TEMPLATE;
+    window.history.replaceState({}, '', '/monitoring');
+    serverTemplate = DEFAULT_EQUIPMENT_TILE_TEMPLATE;
     mocks.authFetch.mockReset();
     mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET';
@@ -62,16 +66,42 @@ describe('FleetDashboard shared equipment template', () => {
   });
 
   it('applies one saved template to all visible equipment cards', async () => {
+    // Шаблон приходит с сервера уже сохранённым: редактор переехал в
+    // «Настройки → Шаблоны плиток», и на мониторинге его больше нет. Проверяем
+    // то, ради чего тест и написан, — один шаблон раскрывается на все
+    // видимые карточки.
+    savedTemplate({
+      ...DEFAULT_EQUIPMENT_TILE_TEMPLATE,
+      blocks: [
+        ...DEFAULT_EQUIPMENT_TILE_TEMPLATE.blocks,
+        {
+          id: 'text-1',
+          kind: 'text' as const,
+          text: 'Общий шаблон',
+          x: 0,
+          y: 9,
+          width: 12,
+          height: 2,
+          visible: true,
+          style: DEFAULT_EQUIPMENT_TILE_TEMPLATE.blocks[0].style,
+        },
+      ],
+    });
+
     render(<FleetDashboard />);
     await waitFor(() => expect(screen.getAllByTestId('equipment-tile')).toHaveLength(2));
     expect(screen.getAllByText('Объект №1').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Объект №2').length).toBeGreaterThan(0);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
-    fireEvent.change(screen.getByLabelText('Текст блока'), { target: { value: 'Общий шаблон' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
-
     await waitFor(() => expect(screen.getAllByText('Общий шаблон')).toHaveLength(2));
+  });
+
+  it('редактора на экране мониторинга больше нет', async () => {
+    render(<FleetDashboard />);
+    await waitFor(() => expect(screen.getAllByTestId('equipment-tile')).toHaveLength(2));
+
+    // Плавающая кнопка за скрытым замком `?design=1` уехала в настройки.
+    // Диспетчеру, который следит за сменой, она под руку больше не попадётся.
+    expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
   });
 });
