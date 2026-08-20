@@ -52,6 +52,9 @@ export function OperatorDashboard() {
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState('');
   const [meterOpen, setMeterOpen] = useState(false);
+  // Заведение осмотра — сетевой вызов: без блокировки двойное нажатие
+  // заводит два осмотра одной фазы.
+  const [stepBusy, setStepBusy] = useState(false);
   const [shiftFacts, setShiftFacts] = useState<OperatorShiftFacts | null>(null);
   // Установка берётся из экипажа: оператор не выбирает машину, он на ней стоит.
   const [crew, setCrew] = useState<{ equipmentId: string; equipmentName: string } | null>(null);
@@ -125,13 +128,52 @@ export function OperatorDashboard() {
   // Шаг смены считает чистая функция, покрытая тестами: правило «что делать
   // дальше» — самое дорогое на этом экране, и в разметке его не проверишь.
   const phase = shiftFacts && user ? resolveShiftPhase(shiftFacts, user.id) : null;
-  const openInspection = () => {
-    const existing = shiftFacts?.inspection.preShift ?? shiftFacts?.inspection.postShift;
-    router.push(existing ? `/inspections/${existing.id}` : '/inspections/new?level=EO');
+  // Смена идёт — значит следующий осмотр это осмотр после работ. Признак берём
+  // из состояния смены, а не из номера шага: шаг считается от него же.
+  const inspectionPhase = shiftFacts?.shift?.state === 'STARTED' ? 'POST_SHIFT' : 'PRE_SHIFT';
+
+  /**
+   * Открыть осмотр нужной половины смены, при необходимости заведя его.
+   *
+   * Осмотр заводится здесь, а не на общей форме /inspections/new: та требует
+   * выбрать установку руками и не проставляет смену. Без `shiftId` осмотр не
+   * привязан к смене — экран его не находит и снова предлагает «начать
+   * осмотр», а сравнение состояния до и после работ остаётся без данных.
+   */
+  const openShiftInspection = async (wanted: 'PRE_SHIFT' | 'POST_SHIFT') => {
+    const existing = wanted === 'POST_SHIFT'
+      ? shiftFacts?.inspection.postShift
+      : shiftFacts?.inspection.preShift;
+    if (existing) return router.push(`/inspections/${existing.id}`);
+    const equipmentId = shiftFacts?.equipment?.id;
+    const shiftId = shiftFacts?.shift?.id;
+    // Нет смены или машины — заводить осмотр не от чего; общая форма хотя бы
+    // даст выбрать вручную.
+    if (!equipmentId || !shiftId) return router.push('/inspections/new?level=EO');
+    setStepBusy(true);
+    try {
+      const res = await authFetch('/api/inspections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipmentId, level: 'EO', inspectionDate: today || getTodayInTimezone(),
+          shiftId, phase: wanted,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Не удалось начать осмотр');
+      router.push(`/inspections/${body.inspection.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось начать осмотр');
+    } finally {
+      setStepBusy(false);
+    }
   };
+
   const runPhaseAction = () => {
     if (!phase) return;
-    if (phase.target === 'inspection' || phase.target === 'post-inspection') return openInspection();
+    if (phase.target === 'inspection') return void openShiftInspection('PRE_SHIFT');
+    if (phase.target === 'post-inspection') return void openShiftInspection('POST_SHIFT');
     if (phase.target === 'meter') return setMeterOpen(true);
     if (phase.target === 'report') return openReport();
     if (phase.target === 'handover' || phase.target === 'handover-accept' || phase.target === 'start') {
@@ -176,7 +218,7 @@ export function OperatorDashboard() {
           </div>
 
           <ShiftPhaseStrip phase={phase.phase} />
-          <ShiftStepCard phase={phase} onAction={runPhaseAction} />
+          <ShiftStepCard phase={phase} onAction={runPhaseAction} busy={stepBusy} />
         </>
       ) : (
         <motion.button
@@ -213,7 +255,7 @@ export function OperatorDashboard() {
               type="button"
               onClick={() => {
                 if (action.action === 'meter') return setMeterOpen(true);
-                if (action.action === 'inspection') return openInspection();
+                if (action.action === 'inspection') return void openShiftInspection(inspectionPhase);
                 return openReport(action.target);
               }}
               disabled={disabled}

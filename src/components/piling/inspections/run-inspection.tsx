@@ -58,6 +58,8 @@ interface InspectionDetail {
   engineHours: number | null;
   healthScore: number | null;
   equipment: { id: string; name: string; model: string | null } | null;
+  /** Половина смены: осмотр приёмки или осмотр после работ. */
+  phase: 'PRE_SHIFT' | 'POST_SHIFT' | null;
   templateSnapshot: SnapItem[];
   answers: SavedAnswer[];
 }
@@ -265,6 +267,13 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
           </h1>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{LEVEL_LABEL[inspection.level]}</span>
+            {/* Осмотр после работ короче предсменного и спрашивает другое —
+                человек должен видеть, какой из двух перед ним. */}
+            {inspection.phase === 'POST_SHIFT' && (
+              <span className="rounded bg-signal/10 px-1.5 py-0.5 font-medium text-signal-strong">
+                После смены
+              </span>
+            )}
             <span>{inspection.inspectionDate.slice(0, 10).split('-').reverse().join('.')}</span>
             {inspection.shift && <span>Смена: {inspection.shift}</span>}
             {inspection.engineHours != null && <span>{inspection.engineHours} мч</span>}

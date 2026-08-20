@@ -1074,7 +1074,7 @@ model Inspection {
   @@index([tenantId])
   @@index([tenantId, equipmentId])
   @@index([tenantId, status])
-  @@index([tenantId, shiftId, phase])
+  @@unique([tenantId, shiftId, phase])
 }
 
 model InspectionAnswer {

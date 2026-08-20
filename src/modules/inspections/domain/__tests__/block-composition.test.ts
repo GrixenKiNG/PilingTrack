@@ -6,6 +6,7 @@ import {
   type TemplateBlock,
   type CandidateBlock,
 } from '../block-composition';
+import { sectionPhase, itemsForPhase } from '../phase-split';
 
 describe('requiredBlockTypes', () => {
   it('always includes BASE', () => {
@@ -117,5 +118,39 @@ describe('selectBlocks', () => {
     ];
     const picked = selectBlocks(pool, { model: 'M', hammerKind: 'NONE', isCombined: false });
     expect(picked.map((b) => b.name)).toEqual(['B']);
+  });
+});
+
+describe('phase split', () => {
+  // Заголовки взяты из живых шаблонов: правило читает то, что администратор
+  // действительно пишет, а не то, что удобно правилу.
+  it('recognises the real end-of-shift section titles', () => {
+    expect(sectionPhase('После смены')).toBe('POST_SHIFT');
+    expect(sectionPhase('После окончания смены')).toBe('POST_SHIFT');
+    expect(sectionPhase('После работы')).toBe('POST_SHIFT');
+    expect(sectionPhase('Контроль в процессе работы')).toBe('DURING_WORK');
+  });
+
+  it('keeps an unrecognised title in the pre-shift half', () => {
+    // Непонятый заголовок должен спрашиваться, а не теряться.
+    expect(sectionPhase('Гидросистема')).toBe('PRE_SHIFT');
+    expect(sectionPhase('Проверка перед забивкой')).toBe('PRE_SHIFT');
+  });
+
+  it('splits a checklist into two halves that never overlap', () => {
+    // Порядок как после сборки блоков: база (с её «После смены») идёт раньше
+    // молота (с его контролем в процессе работы).
+    const items = [
+      { sectionTitle: 'Внешний осмотр' },
+      { sectionTitle: 'После смены' },
+      { sectionTitle: 'Контроль в процессе работы' },
+    ];
+    expect(itemsForPhase(items, 'PRE_SHIFT')).toEqual([{ sectionTitle: 'Внешний осмотр' }]);
+    // Порядок вопросов — порядок работ: наблюдения смены раньше постановки
+    // машины, даже если сборка блоков дала обратный.
+    expect(itemsForPhase(items, 'POST_SHIFT')).toEqual([
+      { sectionTitle: 'Контроль в процессе работы' },
+      { sectionTitle: 'После смены' },
+    ]);
   });
 });

@@ -8,6 +8,7 @@ import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } f
 import {
   composeChecklist, selectBlocks, requiredBlockTypes, type CandidateBlock,
 } from '../../domain/block-composition';
+import { itemsForPhase, type ShiftInspectionPhase } from '../../domain/phase-split';
 
 const toDate = (v: string | Date) => (v instanceof Date ? v : new Date(v));
 
@@ -56,7 +57,7 @@ async function assertOperatorInspectionScope(
  */
 export async function startToInspection(
   input: { equipmentId: string; level: MaintenanceLevel; inspectionDate: string | Date; shift?: string | null;
-    engineHours?: number | null; shiftId?: string | null; phase?: 'PRE_SHIFT' | 'POST_SHIFT' },
+    engineHours?: number | null; shiftId?: string | null; phase?: ShiftInspectionPhase },
   ctx: { tenantId: string; userId: string; role: string },
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
@@ -66,6 +67,19 @@ export async function startToInspection(
     select: { id: true, model: true, hammerKind: true, isCombined: true },
   });
   if (!eq) throw new ServiceError('Equipment not found', 404);
+
+  const phase: ShiftInspectionPhase = input.phase ?? 'PRE_SHIFT';
+
+  // Одна фаза смены — один осмотр. Повторное нажатие или второй телефон не
+  // должны заводить вторую запись: экран выбирает осмотр фазы первым
+  // совпадением и молча показал бы произвольный из двух. Возвращаем уже
+  // начатый — человек продолжает с того места, где остановился.
+  if (input.shiftId) {
+    const existing = await db.inspection.findUnique({
+      where: { tenantId_shiftId_phase: { tenantId: ctx.tenantId, shiftId: input.shiftId, phase } },
+    });
+    if (existing) return existing;
+  }
 
   const types = requiredBlockTypes(eq);
   const candidatesRaw = await db.checklistTemplate.findMany({
@@ -99,11 +113,27 @@ export async function startToInspection(
     );
   }
 
-  let snapshot;
+  let composed;
   try {
-    snapshot = composeChecklist(blocks);
+    composed = composeChecklist(blocks);
   } catch (e) {
     throw new ServiceError(e instanceof Error ? e.message : 'Не удалось собрать чек-лист', 400);
+  }
+
+  // Осмотр смены — половина чек-листа: до работ спрашиваем приёмку, после работ
+  // — разделы «После смены» и контроль в процессе работы. Осмотр вне смены
+  // (механик открыл ЕО сам, ТО-1..ТО-3) остаётся целым: делить там нечего.
+  const splitByPhase = input.phase != null || input.shiftId != null;
+  const snapshot = splitByPhase ? itemsForPhase(composed, phase) : composed;
+  if (snapshot.length === 0) {
+    const names = blocks.map((b) => `«${b.name}»`).join(', ');
+    throw new ServiceError(
+      phase === 'POST_SHIFT'
+        ? `В чек-листе этой машины нет раздела на конец смены. Добавьте в разделе «Чек-листы» `
+          + `раздел с названием «После смены» в один из блоков: ${names}.`
+        : `Чек-лист для этой машины пуст — проверьте блоки: ${names}.`,
+      400,
+    );
   }
   const baseTemplateId = baseBlock.id;
 
@@ -116,7 +146,10 @@ export async function startToInspection(
     const record = await tx.maintenanceRecord.create({
       data: {
         tenantId: ctx.tenantId, equipmentId: eq.id, type: input.level,
-        status: 'IN_PROGRESS', title: LEVEL_TITLE[input.level],
+        status: 'IN_PROGRESS',
+        // Смена заводит две записи ЕО, и в журнале обслуживания их надо
+        // различать: иначе механик видит два одинаковых наряда за день.
+        title: phase === 'POST_SHIFT' ? `${LEVEL_TITLE[input.level]} — после смены` : LEVEL_TITLE[input.level],
         createdById: ctx.userId, startedAt: new Date(),
       },
     });
@@ -126,7 +159,7 @@ export async function startToInspection(
         maintenanceRecordId: record.id, level: input.level, performedById: ctx.userId,
         inspectionDate: toDate(input.inspectionDate),
         shift: input.shift ?? null, engineHours: input.engineHours ?? null,
-        shiftId: input.shiftId ?? null, phase: input.phase ?? 'PRE_SHIFT',
+        shiftId: input.shiftId ?? null, phase,
         status: 'DRAFT', templateSnapshot: snapshot as unknown as Prisma.InputJsonValue,
       },
     });

@@ -5,4 +5,6 @@ export { startInspection, startToInspection, saveAnswers, completeInspection,
   type AnswerInput, type MaintenanceLevel } from './application/commands/inspection-commands';
 export { requiredBlockTypes, selectBlocks, composeChecklist,
   type BlockType, type HammerKind, type TemplateBlock, type CandidateBlock, type ComposedItem } from './domain/block-composition';
+export { sectionPhase, itemsForPhase,
+  type ShiftInspectionPhase, type SectionPhase } from './domain/phase-split';
 export { listInspections, getInspection, listToJournal } from './application/queries/inspection-query.service';
