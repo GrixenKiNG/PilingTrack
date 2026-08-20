@@ -523,6 +523,13 @@ enum PmTriggerType {
 // INSPECTIONS — Checklist engine (ЕО/ТО)
 // ============================================================
 
+/// Фаза смены, в которой проведён осмотр. Нужна, чтобы сравнить состояние
+/// машины на входе и на выходе: без неё два осмотра одной смены неразличимы.
+enum InspectionPhase {
+  PRE_SHIFT
+  POST_SHIFT
+}
+
 enum ChecklistLevel {
   EO
   TO1
@@ -1018,6 +1025,10 @@ model Inspection {
   equipmentId         String
   templateId          String
   maintenanceRecordId String?            @unique // 1:1 с записью ТО (ЕО/ТО)
+  /// Смена, к которой относится осмотр. Необязательна: осмотры до 20.08.2026
+  /// смены не знают, и ТО механика вне смены её тоже не имеет.
+  shiftId             String?
+  phase               InspectionPhase    @default(PRE_SHIFT)
   level               ChecklistLevel
   performedById       String
   shift               String?
@@ -1038,6 +1049,7 @@ model Inspection {
   @@index([tenantId])
   @@index([tenantId, equipmentId])
   @@index([tenantId, status])
+  @@index([tenantId, shiftId, phase])
 }
 
 model InspectionAnswer {

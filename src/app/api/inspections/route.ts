@@ -23,6 +23,10 @@ const blockStartSchema = z.object({
   inspectionDate: z.coerce.date(),
   shift: z.string().max(20).optional().nullable(),
   engineHours: z.coerce.number().int().min(0).optional().nullable(),
+  // Смена и фаза приходят с экрана оператора: предсменный осмотр и осмотр
+  // после работ — две записи одной смены, и различает их именно фаза.
+  shiftId: z.string().min(1).optional().nullable(),
+  phase: z.enum(['PRE_SHIFT', 'POST_SHIFT']).optional(),
 });
 
 export const GET = withApi(

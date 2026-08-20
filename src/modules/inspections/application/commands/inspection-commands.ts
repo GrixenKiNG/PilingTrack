@@ -55,7 +55,8 @@ async function assertOperatorInspectionScope(
  * matching the machine, then create the ТО journal record + its inspection (1:1).
  */
 export async function startToInspection(
-  input: { equipmentId: string; level: MaintenanceLevel; inspectionDate: string | Date; shift?: string | null; engineHours?: number | null },
+  input: { equipmentId: string; level: MaintenanceLevel; inspectionDate: string | Date; shift?: string | null;
+    engineHours?: number | null; shiftId?: string | null; phase?: 'PRE_SHIFT' | 'POST_SHIFT' },
   ctx: { tenantId: string; userId: string; role: string },
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
@@ -125,6 +126,7 @@ export async function startToInspection(
         maintenanceRecordId: record.id, level: input.level, performedById: ctx.userId,
         inspectionDate: toDate(input.inspectionDate),
         shift: input.shift ?? null, engineHours: input.engineHours ?? null,
+        shiftId: input.shiftId ?? null, phase: input.phase ?? 'PRE_SHIFT',
         status: 'DRAFT', templateSnapshot: snapshot as unknown as Prisma.InputJsonValue,
       },
     });
