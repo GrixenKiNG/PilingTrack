@@ -31,6 +31,7 @@ interface TypeRow {
   requiresExpiry: boolean;
   defaultValidMonths: number | null;
   leadTimeDays: number;
+  requiredForOperator: boolean;
   isActive: boolean;
   documentCount: number;
 }
@@ -154,8 +155,18 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                       {row.defaultValidMonths ? `${row.defaultValidMonths} мес.` : 'срок не задан'}
                       {' · '}предупреждение за {row.leadTimeDays} дн.
                       {' · '}документов: {row.documentCount}
+                      {row.requiredForOperator && (
+                        <span className="ml-1 font-semibold text-destructive-strong">· обязателен для смены</span>
+                      )}
                     </div>
                   </div>
+                  {/* Обязательность останавливает работу людей: без действующего
+                      документа оператор не начнёт смену. Поэтому переключатель
+                      стоит рядом со списком, а не прячется в отдельной форме. */}
+                  <Button variant="outline" className="h-8 text-2xs"
+                    onClick={() => void patch(row, { requiredForOperator: !row.requiredForOperator })}>
+                    {row.requiredForOperator ? 'Не требовать' : 'Требовать для смены'}
+                  </Button>
                   <Button variant="outline" className="h-8 text-2xs"
                     onClick={() => void patch(row, { isActive: !row.isActive })}>
                     {row.isActive ? 'Отключить' : 'Включить'}

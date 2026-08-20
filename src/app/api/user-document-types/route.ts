@@ -12,6 +12,7 @@ export const documentTypeSchema = z.object({
   requiresExpiry: z.boolean().optional(),
   defaultValidMonths: z.number().int().min(1).max(600).nullable().optional(),
   leadTimeDays: z.number().int().min(0).max(365).optional(),
+  requiredForOperator: z.boolean().optional(),
   isActive: z.boolean().optional(),
   notes: z.string().max(2000).optional(),
 });

@@ -19,6 +19,15 @@ import { ServiceError } from '@/lib/service-error';
 import { can, type SessionActor } from '@/services/auth/authorization-service';
 import { documentExpiry } from '@/lib/document-expiry';
 import { recordAuditEvent } from '@/services/audit/audit-service';
+import { evaluateOperatorClearance, type OperatorClearance } from './operator-clearance';
+
+/**
+ * Достаточно двух таблиц — поэтому принимаем не весь клиент, а его срез.
+ * Так вызов проходит и снаружи транзакции, и внутри чужой: контур готовности
+ * считает допуск в той же транзакции, что и пуск смены, иначе проверка шла бы
+ * по другому снимку данных, чем сам переход.
+ */
+type DocumentReader = Pick<typeof db, 'userDocumentType' | 'userDocument'>;
 
 export interface UserDocumentInput {
   typeId: string;
@@ -104,6 +113,8 @@ export interface UserDocumentTypeInput {
   requiresExpiry?: boolean;
   defaultValidMonths?: number | null;
   leadTimeDays?: number;
+  /** Без документа этого вида оператор к смене не допускается. */
+  requiredForOperator?: boolean;
   isActive?: boolean;
   notes?: string;
 }
@@ -145,6 +156,7 @@ export async function createUserDocumentType(input: UserDocumentTypeInput, ctx: 
       requiresExpiry: input.requiresExpiry ?? true,
       defaultValidMonths: input.defaultValidMonths ?? null,
       leadTimeDays: input.leadTimeDays ?? 30,
+      requiredForOperator: input.requiredForOperator ?? false,
       notes: input.notes?.trim() ?? '',
     },
   });
@@ -184,6 +196,7 @@ export async function updateUserDocumentType(
   if (input.requiresExpiry !== undefined) data.requiresExpiry = input.requiresExpiry;
   if (input.defaultValidMonths !== undefined) data.defaultValidMonths = input.defaultValidMonths;
   if (input.leadTimeDays !== undefined) data.leadTimeDays = input.leadTimeDays;
+  if (input.requiredForOperator !== undefined) data.requiredForOperator = input.requiredForOperator;
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if (input.notes !== undefined) data.notes = input.notes.trim();
 
@@ -267,6 +280,39 @@ export async function listDocumentsNeedingAttention(ctx: UserDocumentContext, no
     .filter((row) => row.user.isActive)
     .map((row) => ({ ...row, expiry: documentExpiry(row.expiresAt, row.type.leadTimeDays, now) }))
     .filter((row) => row.expiry.status === 'expired' || row.expiry.status === 'expiring');
+}
+
+/**
+ * Допущен ли работник к смене по документам.
+ *
+ * Прав здесь не спрашиваем сознательно: функция вызывается серверной командой
+ * пуска смены и экраном самого оператора, наружу отдаются только названия видов
+ * документов и сроки — ни номеров, ни сканов. Вызывающий обязан ограничить
+ * выборку своим тенантом, что и делает аргумент `tenantId`.
+ *
+ * Нет обязательных видов — допуск чист: система не выдумывает требований,
+ * которых администратор не заводил.
+ */
+export async function getOperatorClearance(
+  tenantId: string,
+  userId: string,
+  now: Date = new Date(),
+  client: DocumentReader = db,
+): Promise<OperatorClearance> {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+
+  const required = await client.userDocumentType.findMany({
+    where: { tenantId, isActive: true, requiredForOperator: true },
+    select: { id: true, name: true, leadTimeDays: true },
+  });
+  if (required.length === 0) return { cleared: true, blockers: [], warnings: [] };
+
+  const held = await client.userDocument.findMany({
+    where: { tenantId, userId, typeId: { in: required.map((type) => type.id) } },
+    select: { typeId: true, expiresAt: true },
+  });
+
+  return evaluateOperatorClearance(required, held, now);
 }
 
 export async function createUserDocument(

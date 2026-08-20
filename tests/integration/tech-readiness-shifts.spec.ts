@@ -106,6 +106,23 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
         "recordedAt" TIMESTAMPTZ(3), "actorId" TEXT, "actingAs" TEXT, "entityType" TEXT, "entityVersion" INTEGER,
         "correlationId" TEXT, "idempotencyKeyHash" BYTEA, "metadata" JSONB, "prevHash" BYTEA, "hash" BYTEA,
         UNIQUE ("tenantId", "sequence"), UNIQUE ("tenantId", "hash"));
+      -- Пуск смены спрашивает, кто поведёт машину и допущен ли он по
+      -- документам. Таблицы заводим здесь, а не подкладывая миграцию: в
+      -- одноразовой базе нет ни "UserDocumentType", ни "Crew", и ALTER из
+      -- миграции падал бы на пустом месте.
+      CREATE TABLE "Crew" ("id" TEXT PRIMARY KEY, "operatorId" TEXT NOT NULL, "equipmentId" TEXT NOT NULL,
+        "siteId" TEXT NOT NULL DEFAULT 'site-a', "name" TEXT NOT NULL DEFAULT '',
+        "isActive" BOOLEAN NOT NULL DEFAULT TRUE);
+      CREATE TABLE "UserDocumentType" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "name" TEXT NOT NULL,
+        "normalizedName" TEXT NOT NULL, "requiresExpiry" BOOLEAN NOT NULL DEFAULT TRUE,
+        "defaultValidMonths" INTEGER, "leadTimeDays" INTEGER NOT NULL DEFAULT 30,
+        "requiredForOperator" BOOLEAN NOT NULL DEFAULT FALSE, "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+        "notes" TEXT NOT NULL DEFAULT '', "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW());
+      CREATE TABLE "UserDocument" ("id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL,
+        "typeId" TEXT NOT NULL, "number" TEXT NOT NULL DEFAULT '', "issuedAt" TIMESTAMPTZ(3),
+        "expiresAt" TIMESTAMPTZ(3), "mediaId" TEXT, "notes" TEXT NOT NULL DEFAULT '',
+        "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT NOW());
       INSERT INTO "Tenant" ("id", "slug") VALUES ('tenant-a', 'tenant-a');
       INSERT INTO "User" ("id", "tenantId") VALUES ('operator-a','tenant-a'),('dispatcher-a','tenant-a'),('dispatcher-b','tenant-a');
       INSERT INTO "Equipment" ("id", "tenantId", "engineHoursTotal") VALUES ('equipment-a','tenant-a',100);

@@ -13,12 +13,34 @@ const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => (
   meterKnownToday: false,
   incomingHandover: null,
   startWaiver: null,
+  clearance: { blockers: [], warnings: [] },
   ...patch,
 });
 
 const completed = { id: 'ins-1', status: 'COMPLETED', answered: 39, total: 39 };
 
 describe('resolveShiftPhase', () => {
+  it('просроченное удостоверение не пускает к работе', () => {
+    const phase = resolveShiftPhase(
+      facts({ clearance: { blockers: ['Просрочен: Удостоверение машиниста — 12 дней'], warnings: [] } }),
+      'op-1',
+    );
+    expect(phase.phase).toBe(1);
+    expect(phase.target).toBeNull();
+    expect(phase.blockers[0]).toMatch(/просрочен/i);
+  });
+
+  it('начатую смену просроченный документ не останавливает', () => {
+    const phase = resolveShiftPhase(
+      facts({
+        shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20' },
+        clearance: { blockers: ['Просрочен: Удостоверение машиниста — 1 день'], warnings: [] },
+      }),
+      'op-1',
+    );
+    expect(phase.phase).toBe(5);
+  });
+
   it('без закреплённой установки зовёт к администратору, а не показывает пустой экран', () => {
     const phase = resolveShiftPhase(facts({ assignments: [], equipment: null }), 'op-1');
     expect(phase.phase).toBe(1);

@@ -14,6 +14,7 @@ import {normalizeTenantTimezone, tenantProductionDate} from '../../domain/shifts
 import {assertHandoverTransition, assertShiftTransition} from '../../domain/shifts/transitions';
 import {PrismaCommandIdempotencyRepository} from '../../infrastructure/command-pipeline/idempotency-repository';
 import {HandoverRepository, type HandoverRow} from '../../infrastructure/shifts/handover-repository';
+import {getOperatorClearance} from '@/modules/users';
 import {ShiftRepository, type ShiftRow} from '../../infrastructure/shifts/shift-repository';
 import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction';
 import {evaluateAuthoritativeShiftStart} from './start-decision';
@@ -167,6 +168,27 @@ export function startShiftCommand(input: {tx: ReadinessTransaction; context: Shi
       if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Смена изменилась. Обновите страницу и повторите действие',
         {current: serializeShift(beforeRow)});
       assertShiftTransition(beforeRow.state, 'start'); const now = input.now ?? new Date();
+      // Допуск человека по документам — до правил готовности машины и вне их.
+      //
+      // ПОЧЕМУ ОТДЕЛЬНО ОТ `decision`. Разрешение диспетчера (`waiver`) снимает
+      // блокировку по состоянию техники — на то оно и письменное решение под
+      // ответственность. Просроченное удостоверение машиниста таким решением не
+      // снимается ничьим: это требование закона, а не оценка исправности.
+      // Смешав их в одном списке, мы дали бы диспетчеру кнопку, которой у него
+      // нет права быть.
+      const operatorId = await repo.crewOperatorId(beforeRow.equipmentId);
+      if (operatorId) {
+        const clearance = await getOperatorClearance(input.context.tenantId, operatorId, now, input.tx);
+        if (!clearance.cleared) {
+          await effects({tx: input.tx, context: input.context, key, action: 'start-blocked', entityType: 'Shift',
+            entityId: beforeRow.id, entityVersion: beforeRow.version, equipmentId: beforeRow.equipmentId,
+            triggerOccurredAt: now, before: serializeShift(beforeRow),
+            after: asAuditJson({shift: serializeShift(beforeRow), clearance})});
+          return {status: 422, body: asAuditJson({error: {code: 'OPERATOR_NOT_CLEARED',
+            message: 'Оператор не допущен к работе по документам',
+            details: {blockers: clearance.blockers.map((issue) => issue.label)}}})};
+        }
+      }
       const decision = await evaluateAuthoritativeShiftStart({tx: input.tx, tenantId: input.context.tenantId,
         equipmentId: beforeRow.equipmentId, shiftId: beforeRow.id, now, timezone: beforeRow.timezone});
       if (!decision.allowed) {

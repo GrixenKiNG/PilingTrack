@@ -38,6 +38,20 @@ export class ShiftRepository {
     }
   }
 
+  /**
+   * Кто поведёт эту машину: оператор активного экипажа.
+   *
+   * `null` — экипажа нет. Тогда проверять допуск не у кого, и смену заводит
+   * диспетчер под свою ответственность: выдумывать оператора система не должна.
+   */
+  async crewOperatorId(equipmentId: string): Promise<string | null> {
+    const crew = await this.tx.crew.findFirst({
+      where: {equipmentId, isActive: true},
+      select: {operatorId: true},
+    });
+    return crew?.operatorId ?? null;
+  }
+
   async tenantTimezone(tenantId: string): Promise<string | null> {
     return (await this.tx.tenantSettings.findUnique({where: {tenantId}, select: {timezone: true}}))?.timezone ?? null;
   }

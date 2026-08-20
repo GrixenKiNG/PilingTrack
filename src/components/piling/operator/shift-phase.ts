@@ -51,6 +51,22 @@ const inspectionProgress = (item: { answered: number; total: number } | null) =>
 export function resolveShiftPhase(facts: OperatorShiftFacts, viewerId: string): ShiftPhase {
   const blockers = facts.readiness?.blockers.map((item) => item.label) ?? [];
 
+  // Допуск по документам — первое, что проверяем: удостоверение просрочено,
+  // значит человеку нельзя за рычаги, и обсуждать осмотр незачем.
+  //
+  // ПОЧЕМУ ТОЛЬКО ДО ПУСКА. Начатую смену просроченный документ не
+  // останавливает: снимать оператора с машины посреди сваи хуже, чем дать
+  // доработать под присмотром диспетчера, который увидит то же предупреждение
+  // у себя. Запрет действует там, где он что-то решает, — на входе.
+  const started = facts.shift?.state === 'STARTED' || facts.shift?.state === 'HANDOVER_PENDING';
+  if (facts.clearance.blockers.length > 0 && !started) {
+    return {
+      phase: 1, title: PHASE_TITLES[1], action: 'Обратитесь к администратору',
+      target: null, progress: null,
+      blockers: facts.clearance.blockers,
+    };
+  }
+
   // Ни одной закреплённой машины — работать не с чем. Это не поломка:
   // администратор ещё не закрепил, и человеку надо сказать именно это.
   if (facts.assignments.length === 0) {

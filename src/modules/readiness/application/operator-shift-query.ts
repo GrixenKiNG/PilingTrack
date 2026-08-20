@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { getOperatorClearance } from '@/modules/users';
 
 /**
  * Состояние смены глазами оператора — всё, что нужно его экрану, одним запросом.
@@ -48,6 +49,12 @@ export interface OperatorShiftFacts {
   incomingHandover: { id: string; shiftId: string; summary: string; submittedById: string } | null;
   /** Разрешение диспетчера на пуск, выданное этой смене. */
   startWaiver: { id: string; reason: string } | null;
+  /**
+   * Допуск работника по документам. Препятствия останавливают пуск смены,
+   * предупреждения только показываются: истекающее удостоверение — повод
+   * заняться продлением, а не повод не выйти на работу.
+   */
+  clearance: { blockers: string[]; warnings: string[] };
 }
 
 const startOfLocalDay = (now: Date) =>
@@ -67,10 +74,21 @@ export async function getOperatorShiftFacts(
 ): Promise<OperatorShiftFacts> {
   if (!tenantId) throw new Error('tenantId is required');
 
+  // Допуск по документам считаем до всего остального: он не зависит ни от
+  // машины, ни от смены, и нужен даже тогда, когда ни того ни другого нет —
+  // человек должен узнать о просроченном удостоверении заранее, а не в момент
+  // нажатия «начать смену».
+  const clearanceResult = await getOperatorClearance(tenantId, operatorId, now);
+  const clearance = {
+    blockers: clearanceResult.blockers.map((issue) => issue.label),
+    warnings: clearanceResult.warnings.map((issue) => issue.label),
+  };
+
   const empty: OperatorShiftFacts = {
     assignments: [], equipment: null, shift: null, readiness: null,
     inspection: { preShift: null, postShift: null },
     report: null, meterKnownToday: false, incomingHandover: null, startWaiver: null,
+    clearance,
   };
 
   // Машина чужой организации к этому оператору отношения не имеет. Сравнение
@@ -194,5 +212,6 @@ export async function getOperatorShiftFacts(
     meterKnownToday: meterToday > 0,
     incomingHandover: incoming,
     startWaiver: waiver,
+    clearance,
   };
 }
