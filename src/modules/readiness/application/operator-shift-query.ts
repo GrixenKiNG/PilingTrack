@@ -75,8 +75,11 @@ export async function getOperatorShiftFacts(
 
   // Машина чужой организации к этому оператору отношения не имеет. Сравнение
   // строгое по обеим связям: тенант обязателен, «или NULL» здесь недопустимо.
+  // isActive у самой установки — не придирка: смену на списанной машине
+  // команда всё равно не откроет («Запись не найдена»), и предлагать её в
+  // списке значит вести человека в тупик.
   const crews = await db.crew.findMany({
-    where: { operatorId, isActive: true, equipment: { tenantId }, site: { tenantId } },
+    where: { operatorId, isActive: true, equipment: { tenantId, isActive: true }, site: { tenantId } },
     select: {
       equipment: { select: { id: true, name: true, model: true } },
       site: { select: { id: true, name: true } },

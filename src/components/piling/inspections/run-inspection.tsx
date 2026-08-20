@@ -96,6 +96,9 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
   const [signedByName, setSignedByName] = useState('');
   const [showSign, setShowSign] = useState(false);
 
+  // Текущий раздел («узел») при пошаговом обходе.
+  const [step, setStep] = useState(0);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -106,6 +109,12 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
 
       // Initialize answer state from saved answers
       const init: Record<string, ItemAnswer> = {};
+      // Счётчик фото — тоже из сохранённых ответов, а не только из виджета.
+      // Виджет фото монтируется лишь у видимых пунктов, а при пошаговом обходе
+      // виден один раздел: без этого сохранение черновика обнулило бы фото у
+      // всех остальных, а полоса разделов показывала бы «осталось» там, где
+      // фото давно снято.
+      const initPhotos: Record<string, number> = {};
       for (const item of data.templateSnapshot) {
         const saved = data.answers.find((a) => a.itemId === item.id);
         init[item.id] = {
@@ -113,8 +122,10 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
           value: saved?.value ?? '',
           note: saved?.note ?? '',
         };
+        initPhotos[item.id] = saved?.photoCount ?? 0;
       }
       setAnswers(init);
+      setPhotoCounts(initPhotos);
       setSignedByName(currentUser?.name ?? '');
     } catch {
       toast.error('Не удалось загрузить осмотр');
@@ -163,7 +174,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
     });
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (options?: { silent?: boolean }) => {
     setSaving(true);
     try {
       const res = await authFetch(`/api/inspections/${inspectionId}`, {
@@ -172,7 +183,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
         body: JSON.stringify({ answers: buildAnswerPayload() }),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Ошибка сохранения');
-      toast.success('Черновик сохранён');
+      if (!options?.silent) toast.success('Черновик сохранён');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Ошибка');
     } finally {
@@ -231,6 +242,43 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
     return Array.from(map.entries());
   }, [inspection]);
 
+  /**
+   * Пошаговый обход по узлам.
+   *
+   * ЗАЧЕМ. Ежесменный осмотр установки с молотом — около ста пунктов. Одной
+   * страницей это простыня, которую в шесть утра проходят не читая: человек
+   * листает и жмёт «норма» подряд. Раздел за раз — тот же список, но обозримый,
+   * и видно, сколько осталось.
+   *
+   * ЗАВЕРШЁННЫЙ ОСМОТР НЕ ДЕЛИТСЯ. Подписанный осмотр читают целиком — искать
+   * в нём пункт, перелистывая пятнадцать экранов, незачем.
+   */
+  const stepped = !isDone && sections.length > 1;
+  const current = Math.min(step, Math.max(sections.length - 1, 0));
+
+  // Сколько в разделе осталось до того, чтобы осмотр можно было закрыть.
+  // Правило то же, что на сервере (`findMissing`): обязательный пункт без
+  // ответа и пункт без обязательного фото. Иначе полоса обещала бы одно, а
+  // завершение требовало другого.
+  const sectionProgress = useMemo(() => sections.map(([title, items]) => {
+    let remaining = 0;
+    for (const item of items) {
+      const answered = item.answerType === 'MEASURE' || Boolean(answers[item.id]?.result);
+      if (item.required && !answered) remaining += 1;
+      if (item.photoRequired && (photoCounts[item.id] ?? 0) < 1) remaining += 1;
+    }
+    return { title, total: items.length, remaining };
+  }), [sections, answers, photoCounts]);
+
+  // Переход между разделами сохраняет черновик молча: сто ответов, потерянных
+  // из-за уснувшего телефона, — это сто ответов заново.
+  const goToStep = async (next: number) => {
+    if (next === current || next < 0 || next >= sections.length) return;
+    setStep(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await saveDraft({ silent: true });
+  };
+
   if (loading) {
     return (
       <div className="flex h-40 items-center justify-center text-muted-foreground">
@@ -249,7 +297,7 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6">
+    <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-28">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
         <Link
@@ -292,9 +340,46 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
         </div>
       </div>
 
+      {/* Полоса узлов: где я и что осталось. Номера — крупные, их жмут в перчатке. */}
+      {stepped && (
+        <nav aria-label="Разделы осмотра" className="mb-4">
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+            <span className="font-semibold text-foreground">
+              Раздел {current + 1} из {sections.length}
+            </span>
+            <span className="text-muted-foreground">
+              {sectionProgress[current]?.remaining === 0
+                ? 'раздел заполнен'
+                : `осталось ${sectionProgress[current]?.remaining ?? 0}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {sectionProgress.map((section, index) => (
+              <button
+                key={section.title || index}
+                type="button"
+                onClick={() => void goToStep(index)}
+                aria-current={index === current ? 'step' : undefined}
+                aria-label={`${section.title || `Раздел ${index + 1}`}: ${
+                  section.remaining === 0 ? 'заполнен' : `осталось ${section.remaining}`}`}
+                className={`h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold transition ${
+                  index === current
+                    ? 'border-signal bg-signal text-white'
+                    : section.remaining === 0
+                      ? 'border-success/30 bg-success/10 text-success-strong'
+                      : 'border-border bg-card text-muted-foreground'
+                }`}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
       {/* Sections */}
       <div className="space-y-6">
-        {sections.map(([sectionTitle, items]) => (
+        {(stepped ? sections.slice(current, current + 1) : sections).map(([sectionTitle, items]) => (
           <div key={sectionTitle}>
             {sectionTitle && (
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -402,12 +487,42 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
         ))}
       </div>
 
+      {/* Переход между узлами */}
+      {stepped && (
+        <div className="mt-6 flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void goToStep(current - 1)}
+            disabled={current === 0 || isBusy}
+            className="min-h-12 flex-1"
+          >
+            Назад
+          </Button>
+          {current < sections.length - 1 && (
+            <Button
+              onClick={() => void goToStep(current + 1)}
+              disabled={isBusy}
+              aria-label={`Далее: ${sections[current + 1]?.[0] || `раздел ${current + 2}`}`}
+              className="min-h-12 min-w-0 flex-[2] bg-signal hover:bg-signal-strong text-white"
+            >
+              {/* min-w-0 и на кнопке, и на строке: без него flex-элемент
+                  растягивается под неразрывный текст, кнопка становится шире
+                  экрана телефона и страница едет вбок. «Гидросистема и
+                  двигатель (CAT C7.1 / Liebherr D936)» — 450 px при экране 375. */}
+              <span className="min-w-0 truncate">
+                Далее: {sections[current + 1]?.[0] || `раздел ${current + 2}`}
+              </span>
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       {!isDone && (
         <div className="mt-6 space-y-3">
           <Button
             variant="outline"
-            onClick={saveDraft}
+            onClick={() => void saveDraft()}
             disabled={isBusy}
             className="w-full"
           >
@@ -415,7 +530,9 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
             Сохранить черновик
           </Button>
 
-          {!showSign ? (
+          {/* Завершение — только на последнем узле: подписывать осмотр, не дойдя
+              до конца обхода, незачем, а кнопка на каждом экране к этому зовёт. */}
+          {stepped && current < sections.length - 1 ? null : !showSign ? (
             <Button
               onClick={() => setShowSign(true)}
               disabled={isBusy}

@@ -245,15 +245,21 @@ export function OperatorDashboard() {
             }`}
           >
             <span className="text-sm font-medium text-foreground">
-              {shiftFacts?.equipment?.name ?? 'Установка не назначена'}
+              {shiftFacts?.equipment?.name
+                ?? (shiftFacts?.assignments.length ? 'Установка не выбрана' : 'Установка не закреплена')}
             </span>
-            <span
-              className={`text-xs font-semibold uppercase tracking-wider ${
-                phase.blockers.length > 0 ? 'text-destructive-strong' : 'text-muted-foreground'
-              }`}
-            >
-              {phase.blockers.length > 0 ? `не допущена · ${phase.blockers.length}` : 'допущена'}
-            </span>
+            {/* Пока машина не выбрана, о допуске говорить нечего: готовность
+                считается по конкретной установке, и «допущена» здесь было бы
+                утверждением ни о чём. */}
+            {shiftFacts?.equipment && (
+              <span
+                className={`text-xs font-semibold uppercase tracking-wider ${
+                  phase.blockers.length > 0 ? 'text-destructive-strong' : 'text-muted-foreground'
+                }`}
+              >
+                {phase.blockers.length > 0 ? `не допущена · ${phase.blockers.length}` : 'допущена'}
+              </span>
+            )}
           </div>
 
           <ShiftPhaseStrip phase={phase.phase} />
