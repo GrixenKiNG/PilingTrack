@@ -661,7 +661,8 @@ async function seedScoped(tenantId: string) {
   console.log('User-site assignments created');
 
   const crew1 = await db.crew.upsert({
-    where: { operatorId: operator1.id },
+    // По id, а не по оператору: за оператором может быть несколько бригад.
+    where: { id: 'crew-ivanov' },
     update: {
       name: 'Экипаж Иванова',
       equipmentId: 'eq-pve-50pr',
@@ -669,6 +670,7 @@ async function seedScoped(tenantId: string) {
       isActive: true,
     },
     create: {
+      id: 'crew-ivanov',
       name: 'Экипаж Иванова',
       operatorId: operator1.id,
       equipmentId: 'eq-pve-50pr',
@@ -686,7 +688,7 @@ async function seedScoped(tenantId: string) {
   });
 
   const crew2 = await db.crew.upsert({
-    where: { operatorId: operator2.id },
+    where: { id: 'crew-gerasimov' },
     update: {
       name: 'Экипаж Герасимова',
       equipmentId: 'eq-lrh-100-1',
@@ -694,6 +696,7 @@ async function seedScoped(tenantId: string) {
       isActive: true,
     },
     create: {
+      id: 'crew-gerasimov',
       name: 'Экипаж Герасимова',
       operatorId: operator2.id,
       equipmentId: 'eq-lrh-100-1',

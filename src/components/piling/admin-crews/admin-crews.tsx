@@ -50,10 +50,10 @@ function crewRisk(crew: Crew) {
 
 export function AdminCrews() {
   const {
-    crews, setCrews, users, equipmentList, sites,
+    crews, setCrews, equipmentList, sites,
     loading, loadingReferenceData, loadReferenceData,
     availableOperators, assistantUsers, activeEquipment, activeSites,
-    getAssignedOperatorIds, toggleActive, createCrew, updateCrew, deleteCrew,
+    toggleActive, createCrew, updateCrew, deleteCrew,
   } = useCrewsData();
 
   const [quick, setQuick] = useState<QuickKey>('all');
@@ -141,10 +141,6 @@ export function AdminCrews() {
   ];
 
   const handleCreate = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantUserIds?: string[]; assistantNames?: string[] }) => {
-    if (getAssignedOperatorIds().has(data.operatorId)) {
-      toast.error(`Оператор ${users.find((u) => u.id === data.operatorId)?.name || ''} уже назначен в другую бригаду`);
-      return;
-    }
     setSubmitting(true);
     try {
       const crew = await createCrew(data);
@@ -157,10 +153,6 @@ export function AdminCrews() {
 
   const handleEdit = async (data: { operatorId: string; equipmentId: string; siteId: string; name?: string; assistantUserIds?: string[]; assistantNames?: string[]; isActive: boolean }) => {
     if (!editItem) return;
-    if (getAssignedOperatorIds(editItem.id).has(data.operatorId)) {
-      toast.error(`Оператор ${users.find((u) => u.id === data.operatorId)?.name || ''} уже назначен в другую бригаду`);
-      return;
-    }
     setSubmitting(true);
     try {
       const crew = await updateCrew(editItem.id, data);
@@ -237,12 +229,12 @@ export function AdminCrews() {
 
       <CrewFormDialog open={showCreate} onClose={() => setShowCreate(false)} mode="create"
         editItem={null} operators={availableOperators} equipment={activeEquipment} sites={activeSites}
-        assistants={assistantUsers} assignedOperatorIds={getAssignedOperatorIds()}
+        assistants={assistantUsers}
         loadingReferenceData={loadingReferenceData} onSubmit={handleCreate} submitting={submitting} />
 
       <CrewFormDialog open={!!editItem} onClose={() => setEditItem(null)} mode="edit"
         editItem={editItem} operators={availableOperators} equipment={equipmentList} sites={sites}
-        assistants={assistantUsers} assignedOperatorIds={getAssignedOperatorIds(editItem?.id)} excludeCrewId={editItem?.id}
+        assistants={assistantUsers} excludeCrewId={editItem?.id}
         loadingReferenceData={loadingReferenceData} onSubmit={handleEdit} submitting={submitting} />
 
       <DeleteDialog open={!!deleteItem} onClose={() => setDeleteItem(null)}

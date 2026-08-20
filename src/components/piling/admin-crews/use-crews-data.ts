@@ -18,7 +18,6 @@ export interface UseCrewsDataReturn {
   activeEquipment: EquipmentDTO[];
   activeSites: SiteDTO[];
   loadReferenceData: () => Promise<void>;
-  getAssignedOperatorIds: (excludeCrewId?: string) => Set<string>;
   toggleActive: (crew: CrewDTO) => Promise<void>;
   createCrew: (data: {
     operatorId: string;
@@ -140,20 +139,6 @@ export function useCrewsData(): UseCrewsDataReturn {
     };
   }, []);
 
-  const getAssignedOperatorIds = useCallback((excludeCrewId?: string) => {
-    const ids = new Set<string>();
-
-    crews
-      .filter(crew => crew.isActive && (!excludeCrewId || crew.id !== excludeCrewId))
-      .forEach(crew => {
-        if (crew.operatorId) {
-          ids.add(crew.operatorId);
-        }
-      });
-
-    return ids;
-  }, [crews]);
-
   const availableOperators = useMemo(
     () => users.filter(user => user.role === 'OPERATOR' && user.isActive),
     [users],
@@ -261,7 +246,6 @@ export function useCrewsData(): UseCrewsDataReturn {
     activeEquipment,
     activeSites,
     loadReferenceData,
-    getAssignedOperatorIds,
     toggleActive,
     createCrew,
     updateCrew,

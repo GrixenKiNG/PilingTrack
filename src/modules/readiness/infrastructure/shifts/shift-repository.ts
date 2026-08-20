@@ -24,6 +24,20 @@ export class ShiftRepository {
     }
   }
 
+  /**
+   * Оператор открывает смену только на закреплённой за ним установке.
+   *
+   * Проверка живёт в команде, а не в списке прав: `readiness.shift.manage`
+   * говорит «может заводить смены», но не «на любой машине организации».
+   * Без этой границы оператор открыл бы смену на чужой установке — и увёл бы
+   * её из-под другого экипажа.
+   */
+  async requireOperatorAssignment(operatorId: string, equipmentId: string): Promise<void> {
+    if (!await this.tx.crew.findFirst({where: {operatorId, equipmentId, isActive: true}, select: {id: true}})) {
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Эта установка за вами не закреплена');
+    }
+  }
+
   async tenantTimezone(tenantId: string): Promise<string | null> {
     return (await this.tx.tenantSettings.findUnique({where: {tenantId}, select: {timezone: true}}))?.timezone ?? null;
   }

@@ -42,11 +42,11 @@ async function assertOperatorInspectionScope(
   if (level !== 'EO') {
     throw new ServiceError('Оператору доступен только ежесменный осмотр (ЕО)', 403);
   }
-  const crew = await db.crew.findUnique({
-    where: { operatorId: ctx.userId },
-    select: { equipmentId: true, isActive: true },
+  const crew = await db.crew.findFirst({
+    where: { operatorId: ctx.userId, equipmentId, isActive: true },
+    select: { id: true },
   });
-  if (!crew?.isActive || crew.equipmentId !== equipmentId) {
+  if (!crew) {
     throw new ServiceError('Вы не назначены на эту установку', 403);
   }
 }

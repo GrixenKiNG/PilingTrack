@@ -106,13 +106,13 @@ describe('listUsers', () => {
       createdAt: new Date('2026-06-01T08:00:00.000Z'),
       updatedAt: new Date('2026-06-02T09:00:00.000Z'),
       sites: [{ site: { id: 'site-a', name: 'ВСМЖ' } }],
-      crew: {
+      crews: [{
         id: 'crew-a',
         name: 'Экипаж',
         isActive: true,
         equipment: { name: 'LRH-100' },
         site: { name: 'ВСМЖ' },
-      },
+      }],
       _count: { reports: 4, sites: 1 },
       reports: [{ updatedAt: new Date('2026-06-20T10:00:00.000Z') }],
     }]);
@@ -304,7 +304,7 @@ describe('deleteUser', () => {
   it('rejects hard delete when the user has operational links', async () => {
     findFirstUserMock.mockResolvedValue({
       ...existingUser,
-      crew: null,
+      crews: [],
       _count: { reports: 1, sites: 0 },
     });
 
@@ -316,7 +316,7 @@ describe('deleteUser', () => {
   it('keeps the tenant scope in the successful delete mutation', async () => {
     findFirstUserMock.mockResolvedValue({
       ...existingUser,
-      crew: null,
+      crews: [],
       _count: { reports: 0, sites: 0 },
     });
 

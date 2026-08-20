@@ -4,7 +4,7 @@ const m = vi.hoisted(() => ({
   insCreate: vi.fn(), insFindUnique: vi.fn(), insUpdate: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
-  crewFindUnique: vi.fn(),
+  crewFindFirst: vi.fn(),
 }));
 vi.mock('@/lib/db', () => {
   const client = {
@@ -13,7 +13,7 @@ vi.mock('@/lib/db', () => {
     inspection: { create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
-    crew: { findUnique: m.crewFindUnique },
+    crew: { findFirst: m.crewFindFirst },
     outboxEvent: { createMany: m.outboxCreate },
     $transaction: (run: (tx: unknown) => unknown) => run(client),
   };
@@ -150,19 +150,16 @@ describe('startToInspection: границы оператора', () => {
     expect(m.eqFindUnique).not.toHaveBeenCalled();
   });
 
-  it('оператор не может открыть ЕО на чужой установке', async () => {
-    m.crewFindUnique.mockResolvedValue({ equipmentId: 'eq-чужая', isActive: true });
+  // Запрос сужен по машине: и чужая установка, и отсутствие активной бригады
+  // дают один и тот же пустой ответ — и один и тот же отказ.
+  it('оператор не открывает ЕО на установке, которая за ним не закреплена', async () => {
+    m.crewFindFirst.mockResolvedValue(null);
     await expect(startToInspection(
       { equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-08-20' },
       { tenantId: 'orion', userId: 'op1', role: 'OPERATOR' },
     )).rejects.toThrow(/не назначены/i);
-  });
-
-  it('оператор без активной бригады не открывает осмотр вовсе', async () => {
-    m.crewFindUnique.mockResolvedValue(null);
-    await expect(startToInspection(
-      { equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-08-20' },
-      { tenantId: 'orion', userId: 'op1', role: 'OPERATOR' },
-    )).rejects.toThrow(/не назначены/i);
+    expect(m.crewFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { operatorId: 'op1', equipmentId: 'eq1', isActive: true },
+    }));
   });
 });

@@ -149,29 +149,33 @@ export async function upsertReport(
     });
   } else {
     // Provenance: freeze the operator's crew onto the report at creation time.
-    // Crew.operatorId is @unique, so an operator maps to at most one crew; the
-    // link is point-in-time and is not rewritten when the report is later
+    // Link is point-in-time and is not rewritten when the report is later
     // edited or the crew is reassigned. Null when the operator has no crew.
-    const operatorCrew = await db.crew.findUnique({
-      where: { operatorId: input.userId },
+    //
+    // За оператором может быть закреплено несколько установок (20.08.2026),
+    // поэтому бригаду выбирает идущая смена: на какой машине человек сегодня
+    // работает, той бригадой отчёт и подписан. Смены нет и машин несколько —
+    // угадывать нельзя, пишем null: неверная бригада в отчёте хуже пустой.
+    const operatorCrews = await db.crew.findMany({
+      where: { operatorId: input.userId, isActive: true },
       select: { id: true, equipmentId: true },
     });
 
-    // Смена контура готовности, идущая на установке этой бригады. Тем же
-    // правилом, что и crewId: замораживаем на момент создания. Нет активной
-    // смены — пишем null и не мешаем работать: отчёт задним числом и работа
-    // вне контура остаются возможными.
-    const activeShift = operatorCrew?.equipmentId
+    const activeShift = operatorCrews.length > 0
       ? await db.shift.findFirst({
           where: {
             tenantId: input.tenantId ?? undefined,
-            equipmentId: operatorCrew.equipmentId,
+            equipmentId: { in: operatorCrews.map((crew) => crew.equipmentId) },
             state: { in: ['STARTED', 'HANDOVER_PENDING'] },
           },
           orderBy: { startedAt: 'desc' },
-          select: { id: true },
+          select: { id: true, equipmentId: true },
         })
       : null;
+
+    const operatorCrew = activeShift
+      ? operatorCrews.find((crew) => crew.equipmentId === activeShift.equipmentId) ?? null
+      : operatorCrews.length === 1 ? operatorCrews[0] : null;
 
     aggregate = ReportAggregate.create({
       reportId: input.reportId,

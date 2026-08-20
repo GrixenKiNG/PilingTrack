@@ -47,7 +47,10 @@ export async function listUsers(
       sites: {
         select: { site: { select: { id: true, name: true } } },
       },
-      crew: {
+      // За оператором может быть закреплено несколько установок; в карточке
+      // показываем действующие бригады.
+      crews: {
+        where: { isActive: true },
         select: {
           id: true,
           name: true,
@@ -55,6 +58,7 @@ export async function listUsers(
           equipment: { select: { name: true } },
           site: { select: { name: true } },
         },
+        orderBy: { createdAt: 'asc' },
       },
       _count: { select: { reports: true, sites: true } },
       reports: {
@@ -99,7 +103,7 @@ export async function listUsers(
       activity.at !== null
     );
     const latestActivity = activities.sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null;
-    const activeCrew = user.crew?.isActive ? user.crew : null;
+    const activeCrew = user.crews[0] ?? null;
 
     return {
       id: user.id,
@@ -119,7 +123,7 @@ export async function listUsers(
           }
         : null,
       reportCount: user._count.reports,
-      canHardDelete: user._count.reports === 0 && user._count.sites === 0 && user.crew === null,
+      canHardDelete: user._count.reports === 0 && user._count.sites === 0 && user.crews.length === 0,
       lastReportAt: lastReport?.toISOString() ?? null,
       lastLoginAt: lastLogin?.toISOString() ?? null,
       lastActivityAt: latestActivity?.at.toISOString() ?? null,
@@ -277,14 +281,14 @@ export async function deleteUser(tenantId: string, actorUserId: string, targetUs
       id: true,
       email: true,
       role: true,
-      crew: { select: { id: true } },
+      crews: { select: { id: true } },
       _count: { select: { reports: true, sites: true } },
     },
   });
   if (!user) {
     throw new ServiceError('User not found', 404);
   }
-  if (user.crew || user._count.reports > 0 || user._count.sites > 0) {
+  if (user.crews.length > 0 || user._count.reports > 0 || user._count.sites > 0) {
     throw new ServiceError('Cannot delete user with reports or assignments; block the user instead', 409);
   }
 

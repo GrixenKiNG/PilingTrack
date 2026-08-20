@@ -12,6 +12,15 @@ import { db } from '@/lib/db';
  * функция. Сервер отдаёт факты, экран решает, что предложить нажать.
  */
 export interface OperatorShiftFacts {
+  /**
+   * Установки, закреплённые за оператором администратором. Из этого списка он
+   * выбирает машину, открывая смену. Пусто — администратор ещё не закрепил.
+   */
+  assignments: Array<{ equipmentId: string; equipmentName: string; model: string; siteId: string; siteName: string }>;
+  /**
+   * Машина сегодняшней смены. Пока смены нет и закреплённых машин несколько —
+   * `null`: выбирать за человека нельзя, он выбирает сам.
+   */
   equipment: { id: string; name: string; model: string } | null;
   shift: {
     id: string;
@@ -59,32 +68,49 @@ export async function getOperatorShiftFacts(
   if (!tenantId) throw new Error('tenantId is required');
 
   const empty: OperatorShiftFacts = {
-    equipment: null, shift: null, readiness: null,
+    assignments: [], equipment: null, shift: null, readiness: null,
     inspection: { preShift: null, postShift: null },
     report: null, meterKnownToday: false, incomingHandover: null, startWaiver: null,
   };
 
-  const crew = await db.crew.findUnique({
-    where: { operatorId },
-    select: {
-      isActive: true,
-      equipment: { select: { id: true, name: true, model: true, tenantId: true } },
-    },
-  });
   // Машина чужой организации к этому оператору отношения не имеет. Сравнение
-  // строгое: тенант обязателен, «или NULL» здесь недопустимо.
-  if (!crew?.isActive || !crew.equipment || crew.equipment.tenantId !== tenantId) return empty;
-  const equipment = crew.equipment;
+  // строгое по обеим связям: тенант обязателен, «или NULL» здесь недопустимо.
+  const crews = await db.crew.findMany({
+    where: { operatorId, isActive: true, equipment: { tenantId }, site: { tenantId } },
+    select: {
+      equipment: { select: { id: true, name: true, model: true } },
+      site: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (crews.length === 0) return empty;
 
+  const assignments = crews.map((crew) => ({
+    equipmentId: crew.equipment.id,
+    equipmentName: crew.equipment.name,
+    model: crew.equipment.model,
+    siteId: crew.site.id,
+    siteName: crew.site.name,
+  }));
+
+  // Смена ищется по всем закреплённым машинам сразу: какая открыта — на той
+  // человек сегодня и работает.
   const shift = await db.shift.findFirst({
     where: {
       tenantId,
-      equipmentId: equipment.id,
+      equipmentId: { in: crews.map((crew) => crew.equipment.id) },
       state: { in: ['PLANNED', 'PENDING_ACCEPTANCE', 'STARTED', 'HANDOVER_PENDING'] },
     },
     orderBy: { productionDate: 'desc' },
-    select: { id: true, state: true, version: true, type: true, productionDate: true },
+    select: { id: true, state: true, version: true, type: true, productionDate: true, equipmentId: true },
   });
+
+  // Машина смены; без смены — единственная закреплённая, иначе выбор за
+  // человеком и подставлять произвольную нельзя.
+  const equipment = shift
+    ? crews.find((crew) => crew.equipment.id === shift.equipmentId)?.equipment ?? null
+    : crews.length === 1 ? crews[0].equipment : null;
+  if (!equipment) return { ...empty, assignments };
 
   const [current, meterToday, incoming] = await Promise.all([
     db.currentReadiness.findFirst({
@@ -117,6 +143,7 @@ export async function getOperatorShiftFacts(
   if (!shift) {
     return {
       ...empty,
+      assignments,
       equipment: { id: equipment.id, name: equipment.name, model: equipment.model },
       readiness: current
         ? { verdict: current.verdict, status: current.status, score: current.score, blockers }
@@ -150,6 +177,7 @@ export async function getOperatorShiftFacts(
   };
 
   return {
+    assignments,
     equipment: { id: equipment.id, name: equipment.name, model: equipment.model },
     shift: {
       id: shift.id, state: shift.state, version: shift.version, type: shift.type,

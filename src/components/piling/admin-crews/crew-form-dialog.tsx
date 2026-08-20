@@ -39,7 +39,6 @@ interface CrewFormDialogProps {
   equipment: EquipmentDTO[];
   sites: SiteDTO[];
   assistants: UserDTO[];
-  assignedOperatorIds: Set<string>;
   excludeCrewId?: string;
   loadingReferenceData: boolean;
   onSubmit: (data: {
@@ -108,7 +107,6 @@ export function CrewFormDialog({
   equipment,
   sites,
   assistants,
-  assignedOperatorIds,
   loadingReferenceData,
   onSubmit,
   submitting,
@@ -138,9 +136,10 @@ export function CrewFormDialog({
     }
   }, [open, editItem]);
 
-  const availableOps = operators.filter(
-    operator => !assignedOperatorIds.has(operator.id) || operator.id === editItem?.operatorId,
-  );
+  // Оператор может вести несколько бригад: администратор закрепляет за ним
+  // список установок, а машину на смену выбирает сам оператор. Обратное
+  // ограничение остаётся за сервером — установка принадлежит одной бригаде.
+  const availableOps = operators;
 
   // Selected assistants are tracked by user id; resolve display names from the
   // assistant user list (also sent as a back-compat snapshot).

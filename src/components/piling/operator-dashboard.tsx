@@ -55,6 +55,9 @@ export function OperatorDashboard() {
   // Заведение осмотра — сетевой вызов: без блокировки двойное нажатие
   // заводит два осмотра одной фазы.
   const [stepBusy, setStepBusy] = useState(false);
+  // Список закреплённых установок раскрывается по кнопке, а не висит всегда:
+  // у большинства машина одна, и лишний выбор ей только мешает.
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [shiftFacts, setShiftFacts] = useState<OperatorShiftFacts | null>(null);
   // Установка берётся из экипажа: оператор не выбирает машину, он на ней стоит.
   const [crew, setCrew] = useState<{ equipmentId: string; equipmentName: string } | null>(null);
@@ -170,8 +173,44 @@ export function OperatorDashboard() {
     }
   };
 
+  /**
+   * Открыть смену на выбранной установке.
+   *
+   * Смену заводит сам оператор (решение владельца 20.08.2026): ждать в шесть
+   * утра, пока её создаст диспетчер, — значит стоять у машины без дела.
+   * Границу «только своя установка» держит команда на сервере, здесь список
+   * приходит уже суженным.
+   */
+  const openShift = async (equipmentId: string) => {
+    setStepBusy(true);
+    try {
+      const hour = new Date().getHours();
+      const res = await authFetch('/api/readiness/shifts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+        body: JSON.stringify({ equipmentId, type: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message ?? 'Не удалось открыть смену');
+      }
+      setPickerOpen(false);
+      toast.success('Смена открыта');
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось открыть смену');
+    } finally {
+      setStepBusy(false);
+    }
+  };
+
   const runPhaseAction = () => {
     if (!phase) return;
+    if (phase.target === 'open-shift') {
+      const assignments = shiftFacts?.assignments ?? [];
+      if (assignments.length === 1) return void openShift(assignments[0].equipmentId);
+      return setPickerOpen(true);
+    }
     if (phase.target === 'inspection') return void openShiftInspection('PRE_SHIFT');
     if (phase.target === 'post-inspection') return void openShiftInspection('POST_SHIFT');
     if (phase.target === 'meter') return setMeterOpen(true);
@@ -219,6 +258,33 @@ export function OperatorDashboard() {
 
           <ShiftPhaseStrip phase={phase.phase} />
           <ShiftStepCard phase={phase} onAction={runPhaseAction} busy={stepBusy} />
+
+          {pickerOpen && phase.target === 'open-shift' && (
+            <section aria-label="Выбор установки" className="space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                На какой установке работаете
+              </h2>
+              {(shiftFacts?.assignments ?? []).map((assignment) => (
+                <button
+                  key={assignment.equipmentId}
+                  type="button"
+                  onClick={() => void openShift(assignment.equipmentId)}
+                  disabled={stepBusy}
+                  className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm transition hover:border-signal/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-base font-semibold text-foreground">
+                      {assignment.equipmentName}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {assignment.model} · {assignment.siteName}
+                    </span>
+                  </span>
+                  <PilingIcon name="equipment" size={44} decorative />
+                </button>
+              ))}
+            </section>
+          )}
         </>
       ) : (
         <motion.button

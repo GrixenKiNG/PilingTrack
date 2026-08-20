@@ -20,7 +20,7 @@ export interface ShiftPhase {
   /** Подпись кнопки — говорит ровно то, что произойдёт по нажатию. */
   action: string;
   /** Куда ведёт кнопка. `null` — действие выполняется на месте. */
-  target: 'inspection' | 'meter' | 'handover-accept' | 'start' | 'report' | 'post-inspection' | 'handover' | null;
+  target: 'open-shift' | 'inspection' | 'meter' | 'handover-accept' | 'start' | 'report' | 'post-inspection' | 'handover' | null;
   /** Что мешает двигаться дальше. Пусто — путь открыт. */
   blockers: string[];
   /** Подсказка под заголовком: сколько сделано. */
@@ -51,20 +51,29 @@ const inspectionProgress = (item: { answered: number; total: number } | null) =>
 export function resolveShiftPhase(facts: OperatorShiftFacts, viewerId: string): ShiftPhase {
   const blockers = facts.readiness?.blockers.map((item) => item.label) ?? [];
 
-  // Нет машины или нет смены — работать не с чем. Это не поломка: диспетчер
-  // ещё не назначил, и человеку надо сказать именно это.
-  if (!facts.equipment) {
+  // Ни одной закреплённой машины — работать не с чем. Это не поломка:
+  // администратор ещё не закрепил, и человеку надо сказать именно это.
+  if (facts.assignments.length === 0) {
     return {
       phase: 1, title: PHASE_TITLES[1], action: 'Обновить',
       target: null, progress: null,
-      blockers: ['Вы не назначены на установку — обратитесь к диспетчеру'],
+      blockers: ['Установка не закреплена — обратитесь к администратору'],
     };
   }
+
+  // Смену открывает сам оператор: ждать, пока её заведёт диспетчер, значит
+  // стоять у машины без дела. Машина берётся из закреплённого списка — одна
+  // подставляется сразу, из нескольких человек выбирает.
   if (!facts.shift) {
+    const single = facts.assignments.length === 1;
     return {
-      phase: 1, title: PHASE_TITLES[1], action: 'Обновить',
-      target: null, progress: null,
-      blockers: ['На сегодня смена не запланирована'],
+      phase: 1, title: PHASE_TITLES[1],
+      action: single ? 'Открыть смену' : 'Выбрать установку',
+      target: 'open-shift',
+      progress: single
+        ? facts.assignments[0].equipmentName
+        : `Закреплено установок: ${facts.assignments.length}`,
+      blockers: [],
     };
   }
 

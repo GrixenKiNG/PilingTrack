@@ -105,7 +105,7 @@ model User {
   tenant          Tenant?              @relation(fields: [tenantId], references: [id])
   reports         Report[]
   sites           UserSiteAssignment[]
-  crew            Crew?                @relation("CrewOperator")
+  crews           Crew[]               @relation("CrewOperator")
   crewAssistantOf CrewAssistant[]      @relation("CrewAssistantUser")
   feedbackReads   FeedbackEventRead[]
   documents       UserDocument[]
@@ -1352,7 +1352,11 @@ model Crew {
   id          String  @id @default(cuid())
   name        String  @default("")
   isActive    Boolean @default(true)
-  operatorId  String  @unique
+  /// Не уникален с 20.08.2026: администратор закрепляет за оператором список
+  /// установок, а оператор выбирает из него ту, на которой работает сегодня.
+  /// Обратное ограничение сохраняется: установка остаётся за одной активной
+  /// бригадой (`assertEquipmentNotDoubleBooked`).
+  operatorId  String
   equipmentId String
   siteId      String
 

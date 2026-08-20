@@ -187,15 +187,19 @@ describe('Crew Command Service', () => {
       })).rejects.toThrow('User must have OPERATOR role');
     });
 
-    it('should reject crew if operator already has a crew', async () => {
-      mockDb.crew.findUnique.mockResolvedValue({ id: 'existing-crew' });
-
-      await expect(createCrew({
-        name: 'Alpha',
+    // За оператором закрепляется список установок (20.08.2026): вторая бригада
+    // на того же человека — норма, из этого списка он и выбирает машину на
+    // смену. Ограничение осталось только со стороны машины.
+    it('заводит вторую бригаду тому же оператору', async () => {
+      await createCrew({
+        name: 'Вторая машина',
         operatorId: 'operator-1',
-        equipmentId: 'equip-1',
+        equipmentId: 'equip-2',
         siteId: 'site-1',
-      })).rejects.toThrow('Operator already has a crew');
+        userId: 'user-1',
+      });
+
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
     });
 
     it('should reject crew if equipment not found', async () => {
@@ -482,16 +486,15 @@ describe('Crew Command Service', () => {
   // 4. Idempotency
   // --------------------------------------------------------
   describe('idempotency', () => {
-    it('should not create duplicate crews for same operator (unique constraint)', async () => {
-      mockDb.crew.findUnique.mockResolvedValue({ id: 'existing-crew' });
+    it('не отдаёт установку второй активной бригаде', async () => {
+      mockDb.crew.findFirst.mockResolvedValue({ id: 'existing-crew', name: 'Альфа' });
 
-      // First call should fail due to conflict check
       await expect(createCrew({
-        name: 'Alpha',
-        operatorId: 'operator-1',
+        name: 'Бета',
+        operatorId: 'operator-2',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('Operator already has a crew');
+      })).rejects.toThrow(/уже закреплена/);
     });
 
     it('deactivate should be idempotent — reject on second call', async () => {

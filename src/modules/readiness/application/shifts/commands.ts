@@ -102,6 +102,11 @@ export function createShiftCommand(input: {tx: ReadinessTransaction; context: Sh
       const repo = new ShiftRepository(input.tx); const now = input.now ?? new Date();
       await repo.requireActor(input.context.tenantId, input.context.actorId);
       await repo.requireEquipment(input.context.tenantId, input.payload.equipmentId);
+      // Смену открывает сам оператор (владелец, 20.08.2026) — но только на
+      // своей машине. Диспетчер и администратор заводят смены на любой.
+      if ((input.context.actingAs ?? input.context.actorRole) === 'OPERATOR') {
+        await repo.requireOperatorAssignment(input.context.actorId, input.payload.equipmentId);
+      }
       const timezone = normalizeTenantTimezone(await repo.tenantTimezone(input.context.tenantId));
       const plannedStartAt = input.payload.plannedStartAt ? new Date(input.payload.plannedStartAt) : null;
       const plannedEndAt = input.payload.plannedEndAt ? new Date(input.payload.plannedEndAt) : null;

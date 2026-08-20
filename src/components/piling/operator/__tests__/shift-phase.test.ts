@@ -3,6 +3,8 @@ import type { OperatorShiftFacts } from '@/modules/readiness/application/operato
 import { resolveShiftPhase } from '../shift-phase';
 
 const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => ({
+  assignments: [{ equipmentId: 'eq-1', equipmentName: 'Liebherr LRH 100 №1', model: 'LRH 100',
+    siteId: 'site-1', siteName: 'Объект 1' }],
   equipment: { id: 'eq-1', name: 'Liebherr LRH 100 №1', model: 'LRH 100' },
   shift: { id: 'shift-1', state: 'PENDING_ACCEPTANCE', version: 1, type: 'DAY', productionDate: '2026-08-20' },
   readiness: { verdict: 'ALLOWED', status: 'READY', score: 100, blockers: [] },
@@ -17,10 +19,17 @@ const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => (
 const completed = { id: 'ins-1', status: 'COMPLETED', answered: 39, total: 39 };
 
 describe('resolveShiftPhase', () => {
-  it('без бригады зовёт к диспетчеру, а не показывает пустой экран', () => {
-    const phase = resolveShiftPhase(facts({ equipment: null }), 'op-1');
+  it('без закреплённой установки зовёт к администратору, а не показывает пустой экран', () => {
+    const phase = resolveShiftPhase(facts({ assignments: [], equipment: null }), 'op-1');
     expect(phase.phase).toBe(1);
-    expect(phase.blockers[0]).toMatch(/не назначены/i);
+    expect(phase.blockers[0]).toMatch(/не закреплена/i);
+  });
+
+  it('без смены предлагает открыть её самому', () => {
+    const phase = resolveShiftPhase(facts({ shift: null }), 'op-1');
+    expect(phase.phase).toBe(1);
+    expect(phase.target).toBe('open-shift');
+    expect(phase.blockers).toEqual([]);
   });
 
   it('ведёт в осмотр, пока он не закрыт', () => {
