@@ -154,7 +154,7 @@ export function LayoutEditor({
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>
         <button type="button" className={toolbarButton} aria-pressed={preview} onClick={() => setPreview((value) => !value)}>Предпросмотр</button>
         <button type="button" className={toolbarButton} onClick={() => { void controller.reset(); setSelectedBlockId(null); }}>Сбросить</button>
-        <button type="button" className="min-h-11 rounded-lg bg-info-strong px-4 text-sm font-semibold text-white hover:bg-info-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" onClick={() => void controller.saveDraft()}>Сохранить</button>
+        <button type="button" className="min-h-11 rounded-lg bg-info-strong px-4 text-sm font-semibold text-white hover:bg-info-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" onClick={() => void controller.saveDraft()}>Сохранить шаблон</button>
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('library')}>Блоки</button>}
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('inspector')}>Свойства</button>}
         <button type="button" className={toolbarButton} onClick={closeEditor}>Закрыть</button>

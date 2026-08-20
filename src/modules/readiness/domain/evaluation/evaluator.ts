@@ -5,7 +5,7 @@ import {
   type ReadinessVerdict,
   type TriggeredBlocker,
 } from '../readiness-score';
-import type {ReadinessRuleSet} from '../readiness-rules';
+import {BLOCKER_ACTION_LABELS, type ReadinessRuleSet} from '../readiness-rules';
 import type {EvaluationClock} from './clock';
 import type {ReadinessEvidence} from './evidence';
 import type {AuthoritativeReadinessFacts} from './facts';
@@ -49,9 +49,11 @@ export function evaluateReadiness(input: {
       score: 0,
       blockers: [{
         code: 'READINESS_RULES_NOT_PUBLISHED',
-        label: 'Published readiness rules are required',
+        // Строку видит оператор в карточке готовности, поэтому по-русски: до
+        // правки в поле «Следующее действие» стояло «Deny start».
+        label: 'Правила готовности не опубликованы',
         action: 'DENY_START',
-        actionLabel: 'Deny start',
+        actionLabel: BLOCKER_ACTION_LABELS.DENY_START,
       }],
       warnings: [], evidence, facts: input.facts, calculatedAt, ruleSetVersion: 'unpublished',
     };

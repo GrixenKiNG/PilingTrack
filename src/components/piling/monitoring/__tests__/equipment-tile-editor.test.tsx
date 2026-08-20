@@ -143,7 +143,7 @@ describe('EquipmentTileEditor', () => {
     fireEvent.change(textInput, { target: { value: 'Контрольная подпись' } });
     fireEvent.change(screen.getByLabelText('Размер шрифта'), { target: { value: '18' } });
     fireEvent.change(screen.getByLabelText('Выравнивание текста'), { target: { value: 'center' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить шаблон' }));
 
     await waitFor(() => expect(lastPut(calls)).toBeDefined());
     expect(lastPut(calls)?.blocks).toEqual(expect.arrayContaining([
@@ -167,7 +167,7 @@ describe('EquipmentTileEditor', () => {
     render(<Harness />);
     fireEvent.click(await screen.findByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить шаблон' }));
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Редактировать шаблон' })).toBeInTheDocument());
 
@@ -189,7 +189,7 @@ describe('EquipmentTileEditor', () => {
     expect(altInput).toHaveValue('crane.png');
     fireEvent.change(altInput, { target: { value: 'Кран на объекте' } });
     fireEvent.change(screen.getByLabelText('Режим изображения'), { target: { value: 'cover' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить шаблон' }));
 
     await waitFor(() => expect(lastPut(calls)).toBeDefined());
     const imageBlock = lastPut(calls)?.blocks.find((block) => block.kind === 'image');

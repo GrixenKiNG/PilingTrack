@@ -29,7 +29,13 @@ describe('authoritative readiness evaluator', () => {
     const result = evaluateReadiness({facts, rules: null, evidence,
       clock: capturedClock(new Date('2026-10-25T00:30:00.000Z'))});
     expect(result.allowed).toBe(false);
-    expect(result.blockers).toContainEqual(expect.objectContaining({code: 'READINESS_RULES_NOT_PUBLISHED'}));
+    // Текст попадает прямо в карточку готовности, поэтому проверяем и его:
+    // до 20.08.2026 здесь стояло английское «Deny start».
+    expect(result.blockers).toContainEqual(expect.objectContaining({
+      code: 'READINESS_RULES_NOT_PUBLISHED',
+      label: 'Правила готовности не опубликованы',
+      actionLabel: 'Запретить запуск',
+    }));
   });
 
   it('warns but allows a missing optional permit', () => {
