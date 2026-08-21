@@ -121,7 +121,14 @@ export function resolveShiftPhase(facts: OperatorShiftFacts, viewerId: string): 
 
     // Работа идёт, пока не закрыт осмотр после работ: именно он открывает
     // завершение смены, а не наоборот.
-    if (!postDone) {
+    //
+    // ТРЕБУЕМ ТОЛЬКО ВЫПОЛНИМОЕ. Если в чек-листе машины нет ни одного раздела
+    // конца смены, осмотра после работ для неё не существует. Раньше кнопка
+    // всё равно предлагалась, отвечала ошибкой «нет раздела на конец смены», и
+    // смена оставалась на шаге «Работа» навсегда: сдать её было нельзя.
+    // Настройку правит механик, а человек у машины ждать этого не должен
+    // (обход пути 21.08.2026, Bauer RTG RM20).
+    if (!postDone && facts.postShiftAvailable) {
       return {
         phase: 5, title: PHASE_TITLES[5], action: 'Осмотр после работ',
         target: 'post-inspection',
@@ -129,16 +136,20 @@ export function resolveShiftPhase(facts: OperatorShiftFacts, viewerId: string): 
         blockers: [],
       };
     }
+    // Пропущенный осмотр называем вслух: оператору он ничем не грозит, но
+    // механик и диспетчер видят тот же экран, и умолчание об отсутствующей
+    // проверке — это ровно то, за что спрашивают при разборе.
+    const skipped = facts.postShiftAvailable ? null : 'Осмотр после работ для этой машины не настроен';
     if (!reportSubmitted) {
       return {
         phase: 6, title: PHASE_TITLES[6], action: 'Заполнить отчёт',
-        target: 'report', progress: null,
+        target: 'report', progress: skipped,
         blockers: ['Сменный отчёт не отправлен'],
       };
     }
     return {
       phase: 6, title: PHASE_TITLES[7], action: 'Сдать смену',
-      target: 'handover', progress: 'Отчёт отправлен', blockers: [],
+      target: 'handover', progress: skipped ?? 'Отчёт отправлен', blockers: [],
     };
   }
 

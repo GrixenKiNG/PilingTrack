@@ -14,12 +14,26 @@ const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => (
   incomingHandover: null,
   startWaiver: null,
   clearance: { blockers: [], warnings: [] },
+  postShiftAvailable: true,
   ...patch,
 });
 
 const completed = { id: 'ins-1', status: 'COMPLETED', answered: 39, total: 39 };
 
 describe('resolveShiftPhase', () => {
+  it('без раздела «После смены» смена не застревает на работе', () => {
+    const phase = resolveShiftPhase(
+      facts({
+        shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20' },
+        postShiftAvailable: false,
+        report: { id: 'rep-1', status: 'submitted' },
+      }),
+      'op-1',
+    );
+    expect(phase.action).toBe('Сдать смену');
+    expect(phase.progress).toMatch(/не настроен/i);
+  });
+
   it('просроченное удостоверение не пускает к работе', () => {
     const phase = resolveShiftPhase(
       facts({ clearance: { blockers: ['Просрочен: Удостоверение машиниста — 12 дней'], warnings: [] } }),

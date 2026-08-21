@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { getOperatorClearance } from '@/modules/users';
+import { hasPostShiftSection } from '@/modules/inspections';
 
 /**
  * Состояние смены глазами оператора — всё, что нужно его экрану, одним запросом.
@@ -55,6 +56,14 @@ export interface OperatorShiftFacts {
    * заняться продлением, а не повод не выйти на работу.
    */
   clearance: { blockers: string[]; warnings: string[] };
+  /**
+   * У чек-листа этой машины есть раздел на конец смены.
+   *
+   * `false` — осмотра после работ для неё не существует, и требовать его перед
+   * сдачей нельзя: смена застряла бы навсегда. Настройку правит механик, а
+   * человек у машины ждать этого не должен.
+   */
+  postShiftAvailable: boolean;
 }
 
 const startOfLocalDay = (now: Date) =>
@@ -88,7 +97,7 @@ export async function getOperatorShiftFacts(
     assignments: [], equipment: null, shift: null, readiness: null,
     inspection: { preShift: null, postShift: null },
     report: null, meterKnownToday: false, incomingHandover: null, startWaiver: null,
-    clearance,
+    clearance, postShiftAvailable: false,
   };
 
   // Машина чужой организации к этому оператору отношения не имеет. Сравнение
@@ -190,6 +199,10 @@ export async function getOperatorShiftFacts(
     }),
   ]);
 
+  // Признак читаем один раз на сборку фактов: он зависит от шаблонов, а не от
+  // хода смены, и на каждом шаге не меняется.
+  const postShiftAvailable = await hasPostShiftSection(tenantId, equipment.id);
+
   const byPhase = (phase: 'PRE_SHIFT' | 'POST_SHIFT') => {
     const found = inspections.find((item) => item.phase === phase);
     if (!found) return null;
@@ -213,5 +226,6 @@ export async function getOperatorShiftFacts(
     incomingHandover: incoming,
     startWaiver: waiver,
     clearance,
+    postShiftAvailable,
   };
 }

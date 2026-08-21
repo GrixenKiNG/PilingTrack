@@ -7,4 +7,4 @@ export { requiredBlockTypes, selectBlocks, composeChecklist,
   type BlockType, type HammerKind, type TemplateBlock, type CandidateBlock, type ComposedItem } from './domain/block-composition';
 export { sectionPhase, itemsForPhase,
   type ShiftInspectionPhase, type SectionPhase } from './domain/phase-split';
-export { listInspections, getInspection, listToJournal } from './application/queries/inspection-query.service';
+export { listInspections, getInspection, listToJournal, hasPostShiftSection } from './application/queries/inspection-query.service';

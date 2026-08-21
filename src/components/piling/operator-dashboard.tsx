@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { MeterReadingDialog } from '@/components/piling/operator/meter-reading-dialog';
+import { HandoverDialog } from '@/components/piling/operator/handover-dialog';
 import { OperatorDocumentReminder } from '@/components/piling/operator-document-reminder';
 import { ShiftPhaseStrip, ShiftStepCard } from '@/components/piling/operator/shift-step-card';
 import { resolveShiftPhase } from '@/components/piling/operator/shift-phase';
@@ -52,6 +53,7 @@ export function OperatorDashboard() {
   const [loading, setLoading] = useState(true);
   const [today, setToday] = useState('');
   const [meterOpen, setMeterOpen] = useState(false);
+  const [handoverOpen, setHandoverOpen] = useState(false);
   // Заведение осмотра — сетевой вызов: без блокировки двойное нажатие
   // заводит два осмотра одной фазы.
   const [stepBusy, setStepBusy] = useState(false);
@@ -204,6 +206,106 @@ export function OperatorDashboard() {
     }
   };
 
+  /**
+   * Команда контура готовности с экрана оператора.
+   *
+   * Контур требует версию агрегата (`if-match`) и ключ идемпотентности: без
+   * первого две вкладки затрут работу друг друга, без второго повторное
+   * нажатие заведёт вторую запись. Оба заголовка ставим здесь, чтобы каждое
+   * место вызова не помнило об этом само.
+   */
+  const runShiftCommand = async (
+    path: string, version: number, body: Record<string, unknown> = {},
+  ) => {
+    const shiftId = shiftFacts?.shift?.id;
+    if (!shiftId) throw new Error('Смена не найдена');
+    const res = await authFetch(`/api/readiness/shifts/${shiftId}/${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': crypto.randomUUID(),
+        'if-match': `"shift-${shiftId}-v${version}"`,
+      },
+      body: JSON.stringify({ expectedVersion: version, ...body }),
+    });
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(payload?.error?.message ?? 'Команда не выполнена');
+    return payload?.data as { version: number; state: string } | undefined;
+  };
+
+  /**
+   * Пуск смены одним нажатием.
+   *
+   * В машине состояний пуск идёт из `PENDING_ACCEPTANCE`, а смена заводится в
+   * `PLANNED`: сначала запрос допуска, потом сам пуск. Это два разных события в
+   * журнале, и слепить их в одно нельзя — допуск обошёлся бы стороной. Но для
+   * человека это одно действие: он и просит, и допускает сам (решение
+   * владельца 20.08.2026), поэтому оба шага делает одна кнопка.
+   *
+   * Раньше кнопка «Начать смену» уводила оператора в администраторский центр
+   * готовности — экран обещал пуск и открывал чужой раздел (обход 21.08.2026).
+   */
+  const startShift = async () => {
+    const shift = shiftFacts?.shift;
+    if (!shift) return;
+    setStepBusy(true);
+    try {
+      let version = shift.version;
+      if (shift.state === 'PLANNED') {
+        const requested = await runShiftCommand('request-acceptance', version);
+        version = requested?.version ?? version + 1;
+      }
+      await runShiftCommand('start', version);
+      toast.success('Смена начата');
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось начать смену');
+    } finally {
+      setStepBusy(false);
+    }
+  };
+
+  /** Принять машину от предыдущей смены. */
+  const acceptIncomingHandover = async () => {
+    const incoming = shiftFacts?.incomingHandover;
+    if (!incoming) return;
+    setStepBusy(true);
+    try {
+      const res = await authFetch(`/api/readiness/handovers/${incoming.id}/accept`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? 'Не удалось принять машину');
+      }
+      toast.success('Машина принята');
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось принять машину');
+    } finally {
+      setStepBusy(false);
+    }
+  };
+
+  /** Передать смену: состояние машины словами уходит следующему оператору. */
+  const submitHandover = async (summary: string) => {
+    const shift = shiftFacts?.shift;
+    if (!shift) return;
+    setStepBusy(true);
+    try {
+      await runShiftCommand('handover', shift.version, { summary });
+      setHandoverOpen(false);
+      toast.success('Смена передана');
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось передать смену');
+    } finally {
+      setStepBusy(false);
+    }
+  };
+
   const runPhaseAction = () => {
     if (!phase) return;
     if (phase.target === 'open-shift') {
@@ -215,11 +317,9 @@ export function OperatorDashboard() {
     if (phase.target === 'post-inspection') return void openShiftInspection('POST_SHIFT');
     if (phase.target === 'meter') return setMeterOpen(true);
     if (phase.target === 'report') return openReport();
-    if (phase.target === 'handover' || phase.target === 'handover-accept' || phase.target === 'start') {
-      // Команды смены живут в контуре готовности и требуют версии агрегата,
-      // поэтому выполняются на его экране, а не отсюда.
-      return router.push('/admin/to?view=shifts');
-    }
+    if (phase.target === 'start') return void startShift();
+    if (phase.target === 'handover-accept') return void acceptIncomingHandover();
+    if (phase.target === 'handover') return setHandoverOpen(true);
     void loadData();
   };
 
@@ -405,11 +505,22 @@ export function OperatorDashboard() {
         </section>
       )}
 
+      {/* Установка берётся из фактов смены, а не из экипажа: у оператора их
+          теперь может быть несколько, и `crew` возвращает произвольный —
+          показание ушло бы на чужую машину. */}
       <MeterReadingDialog
         open={meterOpen}
         onOpenChange={setMeterOpen}
-        equipmentId={crew?.equipmentId ?? null}
-        equipmentName={crew?.equipmentName ?? null}
+        equipmentId={shiftFacts?.equipment?.id ?? crew?.equipmentId ?? null}
+        equipmentName={shiftFacts?.equipment?.name ?? crew?.equipmentName ?? null}
+        onRecorded={() => void loadData()}
+      />
+      <HandoverDialog
+        open={handoverOpen}
+        onOpenChange={setHandoverOpen}
+        equipmentName={shiftFacts?.equipment?.name ?? null}
+        busy={stepBusy}
+        onSubmit={(summary) => void submitHandover(summary)}
       />
     </div>
   );
