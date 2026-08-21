@@ -319,7 +319,14 @@ export function OperatorDashboard() {
           // показываем пунктиром и словом «позже», а не одной прозрачностью:
           // приглушённая кнопка читается как «сломалось», а пунктир с подписью
           // честно говорит «сюда пока нельзя».
-          const locked = phase ? phase.phase < action.fromPhase : false;
+          // Не допущен по документам — закрыты все плитки, а не только те, до
+          // которых смена не дошла. Осмотр машины человеком без действующего
+          // удостоверения — такая же работа на установке, как и всё остальное:
+          // открытая плитка звала бы делать то, чего ему сейчас нельзя.
+          const notCleared = (shiftFacts?.clearance.blockers.length ?? 0) > 0
+            && shiftFacts?.shift?.state !== 'STARTED'
+            && shiftFacts?.shift?.state !== 'HANDOVER_PENDING';
+          const locked = notCleared || (phase ? phase.phase < action.fromPhase : false);
           const disabled = locked || (action.action ? false : ctaDisabled);
           return (
             <button
@@ -331,7 +338,11 @@ export function OperatorDashboard() {
                 return openReport(action.target);
               }}
               disabled={disabled}
-              aria-label={locked ? `${action.label} — недоступно на этом шаге` : action.label}
+              aria-label={
+                notCleared ? `${action.label} — недоступно без допуска`
+                  : locked ? `${action.label} — недоступно на этом шаге`
+                    : action.label
+              }
               className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl bg-card p-3 shadow-sm transition active:scale-[0.99] ${
                 locked
                   ? 'border border-dashed border-border opacity-60'
@@ -340,7 +351,11 @@ export function OperatorDashboard() {
             >
               <PilingIcon name={action.icon} size={82} decorative />
               <span className="mt-1 text-base font-semibold text-foreground">{action.label}</span>
-              {locked && <span className="text-xs text-muted-foreground">позже</span>}
+              {locked && (
+                <span className="text-xs text-muted-foreground">
+                  {notCleared ? 'нет допуска' : 'позже'}
+                </span>
+              )}
             </button>
           );
         })}
