@@ -87,6 +87,7 @@ db/*.db-journal
 .claude.local.md
 .codex/
 .openclaw/
+.openclaw-attachments/
 .bin/
 andrej-karpathy-skills-main/
 zai-provider-extension/
