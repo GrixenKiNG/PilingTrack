@@ -15,6 +15,7 @@ import { HandoverDialog } from '@/components/piling/operator/handover-dialog';
 import { OperatorDocumentReminder } from '@/components/piling/operator-document-reminder';
 import { ShiftPhaseStrip, ShiftStepCard } from '@/components/piling/operator/shift-step-card';
 import { resolveShiftPhase } from '@/components/piling/operator/shift-phase';
+import { ShiftTaskScreen, type ShiftTask } from '@/components/piling/operator/shift-task-screen';
 import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
 
@@ -54,6 +55,9 @@ export function OperatorDashboard() {
   const [today, setToday] = useState('');
   const [meterOpen, setMeterOpen] = useState(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
+  // Работа текущего шага — осмотр или отчёт — открывается здесь же, а не
+  // отдельным маршрутом: смена должна проходиться в одном окне.
+  const [task, setTask] = useState<ShiftTask | null>(null);
   // Заведение осмотра — сетевой вызов: без блокировки двойное нажатие
   // заводит два осмотра одной фазы.
   const [stepBusy, setStepBusy] = useState(false);
@@ -113,6 +117,26 @@ export function OperatorDashboard() {
     void loadData();
   }, [loadData]);
 
+  /** Закрыть работу шага и перечитать факты: шаг мог сдвинуться. */
+  const dismissTask = useCallback(() => {
+    setTask(null);
+    window.scrollTo({ top: 0 });
+    void loadData();
+  }, [loadData]);
+
+  /**
+   * Системная кнопка «назад» закрывает работу шага, а не экран смены.
+   *
+   * Пока осмотр и отчёт были отдельными страницами, «назад» возвращало к
+   * смене само. Теперь адрес не меняется, и без записи в истории та же кнопка
+   * выбрасывала бы человека из приложения посреди осмотра.
+   */
+  useEffect(() => {
+    if (!task) return;
+    window.addEventListener('popstate', dismissTask);
+    return () => window.removeEventListener('popstate', dismissTask);
+  }, [task, dismissTask]);
+
   if (loading) {
     return (
       <div className="mx-auto max-w-xl space-y-4 p-4">
@@ -128,7 +152,24 @@ export function OperatorDashboard() {
   const ctaDisabled = noSite || !currentSite;
   const active = Boolean(todayReport);
   const displayName = user?.name?.trim() || 'Оператор';
-  const openReport = (target?: string) => router.push(target ? `/report#${target}` : '/report');
+  // Отчёт и осмотр открываются слоем поверх шага, а не переходом. Запись в
+  // истории нужна ровно для системной кнопки «назад» — адрес остаётся `/operator`.
+  const openTask = (next: ShiftTask) => {
+    setTask(next);
+    window.history.pushState({ operatorTask: true }, '');
+    window.scrollTo({ top: 0 });
+  };
+
+  // Адресная строка не меняется, поэтому раздел отчёта передаём параметром,
+  // а не якорем `#photo`, как было при переходе на `/report`.
+  const openReport = (target?: string) => openTask({ kind: 'report', anchor: target });
+
+  // Закрываем через историю, чтобы лишняя запись не копилась; сам слой снимет
+  // обработчик `popstate`.
+  const closeTask = () => {
+    if (window.history.state?.operatorTask) window.history.back();
+    else dismissTask();
+  };
 
   // Шаг смены считает чистая функция, покрытая тестами: правило «что делать
   // дальше» — самое дорогое на этом экране, и в разметке его не проверишь.
@@ -146,10 +187,12 @@ export function OperatorDashboard() {
    * осмотр», а сравнение состояния до и после работ остаётся без данных.
    */
   const openShiftInspection = async (wanted: 'PRE_SHIFT' | 'POST_SHIFT') => {
+    const title = wanted === 'POST_SHIFT' ? 'Осмотр после работ' : 'Предсменный осмотр';
+    const openInspection = (inspectionId: string) => openTask({ kind: 'inspection', inspectionId, title });
     const existing = wanted === 'POST_SHIFT'
       ? shiftFacts?.inspection.postShift
       : shiftFacts?.inspection.preShift;
-    if (existing) return router.push(`/inspections/${existing.id}`);
+    if (existing) return openInspection(existing.id);
     const equipmentId = shiftFacts?.equipment?.id;
     const shiftId = shiftFacts?.shift?.id;
     // Нет смены или машины — заводить осмотр не от чего; общая форма хотя бы
@@ -167,7 +210,7 @@ export function OperatorDashboard() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Не удалось начать осмотр');
-      router.push(`/inspections/${body.inspection.id}`);
+      openInspection(body.inspection.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Не удалось начать осмотр');
     } finally {
@@ -322,6 +365,19 @@ export function OperatorDashboard() {
     if (phase.target === 'handover') return setHandoverOpen(true);
     void loadData();
   };
+
+  // Работа шага занимает экран целиком: одно окно — одна задача. Полосу шагов
+  // рисует сама рамка, поэтому шаг смены здесь не дублируется.
+  if (task) {
+    return (
+      <ShiftTaskScreen
+        task={task}
+        phase={phase?.phase ?? (task.kind === 'report' ? 6 : 3)}
+        equipmentName={shiftFacts?.equipment?.name ?? crew?.equipmentName ?? null}
+        onExit={closeTask}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
