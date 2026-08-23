@@ -7,17 +7,27 @@
  *   - strict length caps + HTML-escaping before the text reaches Telegram
  *     (the notifier sends parse_mode=HTML, so raw user input must be escaped).
  *
- * Delivery: forwards to the tenant's configured Telegram chat via the existing
- * notifier. Every lead is also logged, so nothing is lost even when Telegram
- * is not configured (e.g. local dev). Server-side email is not wired yet —
- * add it here once an SMTP/transactional-email transport exists.
+ * СОХРАНЕНИЕ ИДЁТ ПЕРВЫМ. Раньше единственным экземпляром заявки было
+ * сообщение в Telegram: отправка шла «в никуда» (`void`), ответ «принято»
+ * уходил посетителю независимо от результата, а в журнал попадал лишь признак
+ * «текст есть» — ни имени, ни контакта. Недоступный Telegram (у этого
+ * провайдера он ходит через прокси) означал потерянного клиента, уверенного,
+ * что его услышали. Теперь строка пишется в `OrionLead` до отправки, а исход
+ * доставки записывается в ту же строку: `deliveredAt IS NULL` — это список
+ * заявок, о которых компания могла не узнать.
+ *
+ * Ответ посетителю остаётся успешным даже при сбое Telegram: заявка сохранена,
+ * и предлагать человеку отправить её заново — значит плодить дубли.
+ * Серверная почта не подключена; появится транспорт — добавляется здесь.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { telegramNotifier } from '@/core/notifications/telegram';
+import { withTenantContext } from '@/core/security/tenant-enforcement';
 import { rateLimiter, getRateLimitIdentifier, type RateLimitConfig } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
+import type { PrismaClient } from '@/generated/postgres-client/client';
 
 export const runtime = 'nodejs';
 
@@ -64,13 +74,40 @@ export async function POST(request: NextRequest) {
   }
 
   const { name, contact, message, website } = parsed.data;
+  const isSpam = Boolean(website);
 
-  // Honeypot tripped — pretend success, drop silently so bots get no signal.
-  if (website) {
-    return NextResponse.json({ ok: true });
+  const tenantId = process.env.DEFAULT_TENANT_ID;
+  if (!tenantId) {
+    // Без тенанта строку не записать, а терять заявку молча нельзя: пишем всё
+    // в журнал и признаёмся посетителю, что приняли ненадёжно.
+    logger.error('ORION lead cannot be stored: DEFAULT_TENANT_ID is not set', { name, contact, message });
+    return NextResponse.json({ error: 'Заявка не сохранена. Позвоните нам, пожалуйста.' }, { status: 500 });
   }
 
-  logger.info('ORION lead received', { hasMessage: message.length > 0 });
+  // Сохраняем ДО отправки — включая заявки, на которых сработала ловушка.
+  // Ловушка ошибается (менеджер паролей заполняет скрытое поле), и тихо терять
+  // настоящего клиента дороже, чем хранить спам с пометкой.
+  let leadId: string;
+  try {
+    leadId = await withTenantContext(tenantId, async (tx) => {
+      const created = await (tx as PrismaClient).orionLead.create({
+        data: { tenantId, name, contact, message, isSpam },
+        select: { id: true },
+      });
+      return created.id;
+    });
+  } catch (error) {
+    logger.error('ORION lead could not be stored', { error, name, contact, message });
+    return NextResponse.json({ error: 'Заявка не сохранена. Позвоните нам, пожалуйста.' }, { status: 500 });
+  }
+
+  logger.info('ORION lead stored', { leadId, isSpam, hasMessage: message.length > 0 });
+
+  // Боту подтверждаем успех и не тревожим чат: заявка уже лежит в базе с
+  // пометкой, разбирать её будет человек, а не Telegram.
+  if (isSpam) {
+    return NextResponse.json({ ok: true });
+  }
 
   const text =
     '🏗 <b>Новая заявка с сайта ОРИОН</b>\n\n' +
@@ -79,11 +116,36 @@ export async function POST(request: NextRequest) {
     (message ? `💬 ${escapeHtml(message)}\n` : '') +
     `\n⏰ ${new Date().toLocaleString('ru-RU')}`;
 
-  // Fire delivery but never fail the request on a transport error — the lead is
-  // already in the logs, and the visitor should see a clean confirmation.
-  void telegramNotifier.sendMessage(text).catch((err) => {
-    logger.error('Failed to forward ORION lead to Telegram', err);
-  });
+  // Ждём отправку, чтобы записать её исход. Ответ посетителю всё равно
+  // успешный: заявка сохранена, и просить отправить заново — плодить дубли.
+  //
+  // ВНИМАНИЕ НА ВОЗВРАТ. `sendMessage` не бросает исключение, а возвращает
+  // `false` — и когда Telegram ответил ошибкой, и когда бот вообще не настроен.
+  // Полагаться на try/catch здесь нельзя: заявка помечалась бы доставленной,
+  // хотя её никто не получил, а именно от этого таблица и заводилась.
+  let deliveryError: string | null = null;
+  try {
+    const sent = await telegramNotifier.sendMessage(text);
+    if (!sent) deliveryError = 'Telegram не принял сообщение или бот не настроен';
+  } catch (error) {
+    deliveryError = error instanceof Error ? error.message : String(error);
+  }
+  if (deliveryError) {
+    logger.error('Failed to forward ORION lead to Telegram', { leadId, deliveryError });
+  }
+
+  // Пометка доставки не должна ронять запрос: заявка уже сохранена, и отказ
+  // посетителю из-за неудачного UPDATE был бы враньём.
+  try {
+    await withTenantContext(tenantId, (tx) =>
+      (tx as PrismaClient).orionLead.update({
+        where: { id: leadId },
+        data: deliveryError ? { deliveryError } : { deliveredAt: new Date() },
+      }),
+    );
+  } catch (error) {
+    logger.error('Failed to record ORION lead delivery status', { leadId, error });
+  }
 
   return NextResponse.json({ ok: true });
 }
