@@ -8,10 +8,18 @@ export interface NavigationItem {
   tone?: PilingIconTone;
 }
 
+// Меню оператора вычищено 22.08.2026 до того, что относится к его работе.
+//
+// «Отчёт» убран: это шаг 6 смены и живёт внутри «Смены». Вторая дверь к той же
+// форме уводила с экрана смены и делала из одного процесса два окна.
+//
+// «Техготовность» убрана: `/admin/to` — центр готовности парка, рабочее место
+// механика и диспетчера. Оператору там нечего решать, а своя машина и её
+// препятствия к пуску и так показаны на экране смены. Маршрут по-прежнему
+// открыт оператору (см. `(readiness-admin)/layout.tsx`) — убран пункт меню, а
+// не доступ: по ссылке из уведомления человек попадёт куда звали.
 const operatorNavigation: NavigationItem[] = [
-  { label: 'Главная', href: '/operator', icon: 'home' },
-  { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
-  { label: 'Отчёт', href: '/report', icon: 'shift-start', tone: 'primary' },
+  { label: 'Смена', href: '/operator', icon: 'home' },
   { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring', tone: 'info' },
   { label: 'История', href: '/history', icon: 'history' },
 ];
