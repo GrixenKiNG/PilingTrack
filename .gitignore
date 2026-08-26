@@ -172,3 +172,8 @@ segments.json
 .cluster/
 .opencode/
 config/mcp-tools-cache.json
+
+# Артефакты переезда со старой машины и черновики — на диске нужны, в истории нет
+_migration/
+.openclaw-attachments/
+public/__concept-preview.html
