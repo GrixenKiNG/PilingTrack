@@ -4,6 +4,7 @@ const {
   findUniqueEquipmentMock, createRecMock, findUniqueRecMock, updateRecMock,
   deleteRecMock, outboxCreateManyMock,
   findFirstEquipmentMock, updateEquipmentMock, findManyPlanMock, updatePlanMock,
+  findFirstReadingMock, createReadingMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   createRecMock: vi.fn(),
@@ -16,6 +17,10 @@ const {
   updateEquipmentMock: vi.fn(),
   findManyPlanMock: vi.fn(),
   updatePlanMock: vi.fn(),
+  // Наработка, снятая при закрытии наряда, уходит в журнал показаний тем же
+  // путём, что ручной ввод и осмотр.
+  findFirstReadingMock: vi.fn(),
+  createReadingMock: vi.fn(),
   // Открытый наряд ТО — вход критерия готовности «Обслуживание»: команды
   // заказывают пересчёт снимка в той же транзакции, что и саму запись.
   outboxCreateManyMock: vi.fn(),
@@ -29,6 +34,7 @@ vi.mock('@/lib/db', () => {
       update: updateEquipmentMock,
     },
     maintenancePlan: { findMany: findManyPlanMock, update: updatePlanMock },
+    meterReading: { findFirst: findFirstReadingMock, create: createReadingMock },
     maintenanceRecord: {
       create: createRecMock,
       findUnique: findUniqueRecMock,
@@ -55,6 +61,10 @@ beforeEach(() => {
   findManyPlanMock.mockResolvedValue([]);
   updatePlanMock.mockResolvedValue({});
   updateEquipmentMock.mockResolvedValue({});
+  findFirstReadingMock.mockReset();
+  createReadingMock.mockReset();
+  findFirstReadingMock.mockResolvedValue(null);
+  createReadingMock.mockResolvedValue({ id: 'mr_1', engineHours: 0, recordedAt: new Date() });
 });
 
 describe('createMaintenance — work order fields', () => {
@@ -277,6 +287,38 @@ describe('регламент ТО сдвигается при закрытии �
 
     expect(updatePlanMock.mock.calls[0][0].data.lastDoneHours).toBe(1250);
     expect(updateEquipmentMock.mock.calls[0][0].data.nextMaintenanceAtHours).toBe(1500);
+  });
+
+  // Наработка при закрытии — настоящее показание счётчика. Раньше оно оставалось
+  // внутри наряда, и журнал наработки о нём не знал.
+  it('заводит показание в журнал датой закрытия, а не «сейчас»', async () => {
+    await updateMaintenance('eq_1', 'rec_1', { status: 'DONE' }, { tenantId: 'orion', userId: 'usr_9' });
+
+    expect(createReadingMock).toHaveBeenCalledTimes(1);
+    expect(createReadingMock.mock.calls[0][0].data).toMatchObject({
+      equipmentId: 'eq_1',
+      engineHours: 1250,
+      recordedAt: doneRecord.completedAt,
+      recordedById: 'usr_9',
+      tenantId: 'orion',
+    });
+  });
+
+  it('наряд без наработки показания не заводит', async () => {
+    updateRecMock.mockResolvedValue({ ...doneRecord, engineHoursAtService: null });
+    await updateMaintenance('eq_1', 'rec_1', { status: 'DONE' }, { tenantId: 'orion', userId: 'usr_9' });
+
+    expect(createReadingMock).not.toHaveBeenCalled();
+  });
+
+  it('приёмка уже закрытого наряда не заводит второе показание', async () => {
+    findUniqueRecMock.mockResolvedValue({
+      id: 'rec_1', tenantId: 'orion', acceptedById: null,
+      completedAt: doneRecord.completedAt, workDone: 'ТО-1 по регламенту', status: 'DONE',
+    });
+    await acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' });
+
+    expect(createReadingMock).not.toHaveBeenCalled();
   });
 
   it('повторный проход (приёмка после закрытия) не сдвигает порог второй раз', async () => {

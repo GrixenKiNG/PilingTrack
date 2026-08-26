@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { addMeterReading, listMeterReadings } from '@/modules/equipment';
+import { addMeterReading, canDecreaseMeter, listMeterReadings } from '@/modules/equipment';
 import { getCrewForOperator } from '@/modules/crews';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
@@ -85,8 +85,14 @@ export const POST = withMutation(
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       await assertOperatorOwnsEquipment(user!, id);
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      const result = await addMeterReading(id, parsed.data, { tenantId, recordedById: user!.id });
+      const result = await addMeterReading(id, parsed.data, {
+        tenantId,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        recordedById: user!.id,
+        // Оператору счётчик назад не отмотать: цифра меньше предыдущей — опечатка.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        allowDecrease: canDecreaseMeter(user!.role),
+      });
       return NextResponse.json(result, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

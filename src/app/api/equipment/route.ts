@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { createEquipment, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
+import { canDecreaseMeter, createEquipment, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
 import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
@@ -59,7 +59,15 @@ export const POST = withMutation(
     });
 
     if (equipment) {
-      await updateEquipmentMetadata(equipment.id, validation.data);
+      await updateEquipmentMetadata(equipment.id, validation.data, {
+        tenantId,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        actorId: user!.id,
+        // Заведение техники: журнал пуст, сравнивать не с чем — снижение
+        // не возникает. Флаг оставлен по роли для единообразия.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        allowDecrease: canDecreaseMeter(user!.role),
+      });
     }
 
     return NextResponse.json({ equipment }, { status: 201 });

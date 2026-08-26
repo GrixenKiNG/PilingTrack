@@ -87,8 +87,13 @@ export const POST = withMutation(
 
     // Optional end-of-shift engine hours → the rig's MeterReading journal.
     // Non-fatal by design: the shift report must never be lost because a
-    // meter reading failed; the monotonicity check inside only warns anyway.
+    // meter reading failed.
+    //
+    // Отказ правила учёта (счётчик назад) при этом обязан дойти до оператора:
+    // раньше любая осечка уходила в лог, и человек считал, что часы записаны.
+    // Отчёт сохраняем, а причину возвращаем в ответе — `meterError`.
     let meterWarning: string | null = null;
+    let meterError: string | null = null;
     if (validatedDto.engineHours != null && validatedDto.equipmentId && tenantId) {
       try {
         const { addMeterReading } = await import('@/modules/equipment');
@@ -98,17 +103,23 @@ export const POST = withMutation(
             engineHours: validatedDto.engineHours,
             note: `Показание из сменного отчёта за ${validatedDto.date}`,
           },
+          // Отчёт заполняет оператор — снижение счётчика ему недоступно.
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-          { tenantId, recordedById: user!.id },
+          { tenantId, recordedById: user!.id, allowDecrease: false },
         );
         meterWarning = meterResult.warning;
       } catch (err) {
-        const { logger } = await import('@/lib/logger');
-        logger.warn('meter reading from report failed', {
-          equipmentId: validatedDto.equipmentId,
-          engineHours: validatedDto.engineHours,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        const { ServiceError } = await import('@/lib/service-error');
+        if (err instanceof ServiceError && err.status === 422) {
+          meterError = err.message;
+        } else {
+          const { logger } = await import('@/lib/logger');
+          logger.warn('meter reading from report failed', {
+            equipmentId: validatedDto.equipmentId,
+            engineHours: validatedDto.engineHours,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     }
 
@@ -132,7 +143,7 @@ export const POST = withMutation(
       },
     });
 
-    return createJsonResponse({ report: result, meterWarning, requestId }, { status: 200 }, requestId);
+    return createJsonResponse({ report: result, meterWarning, meterError, requestId }, { status: 200 }, requestId);
   },
   { domain: 'reports' }
 );

@@ -5,9 +5,14 @@
  * остаётся денормализованным кэшем «последнего показания» (по recordedAt),
  * который синхронизируется здесь на каждое добавление/удаление.
  *
- * Монотонность не форсируется жёстко (счётчик могли заменить, показание могли
- * внести задним числом) — но команда возвращает warning, если новое показание
- * меньше прежде известного максимума. Tenant — строгим равенством (IDOR guard).
+ * Монотонность форсируется для тех, кто снимает показание с машины: счётчик
+ * назад не идёт, и цифра меньше предыдущей — это опечатка, а не событие.
+ * Исключение остаётся у администратора и механика (`allowDecrease`): счётчик
+ * физически меняют, и новый начинает с нуля. Им снижение проходит с warning.
+ *
+ * Скачок вверх больше `METER_JUMP_WARN_HOURS` не запрещаем — смена столько не
+ * идёт, но пропущенный день или ввод задним числом дают законную прибавку.
+ * Поэтому предупреждение, а не отказ. Tenant — строгим равенством (IDOR guard).
  */
 
 import { db } from '@/lib/db';
@@ -16,12 +21,42 @@ import { requestReadinessSnapshot } from '@/modules/readiness/application/projec
 
 export type MeterSource = 'MANUAL' | 'TELEMETRY';
 
+/**
+ * Прибавка за одно показание, выше которой цифра выглядит опечаткой.
+ * Двадцать часов — заведомо больше самой длинной смены, так что честная запись
+ * в такую прибавку не укладывается почти никогда.
+ */
+export const METER_JUMP_WARN_HOURS = 20;
+
 export interface MeterReadingInput {
   engineHours: number;
   recordedAt?: string | Date | null;
   source?: MeterSource;
   note?: string | null;
 }
+
+/**
+ * Кто пишет показание — от этого зависит, разрешено ли снижение.
+ *
+ * Роль сюда не передаём намеренно: команда не должна знать состав ролей, это
+ * дело слоя запроса. Он и решает, положено ли этому актору снижать счётчик.
+ */
+export interface MeterReadingContext {
+  tenantId: string;
+  recordedById?: string | null;
+  /** Снижение разрешено (замена счётчика). Для оператора — никогда. */
+  allowDecrease?: boolean;
+}
+
+/**
+ * Кому позволено снижать счётчик. Замену счётчика оформляет администратор или
+ * механик; оператор и помощник только снимают показание с прибора.
+ *
+ * Правило живёт здесь, чтобы у двух точек входа — журнала и карточки установки
+ * — оно было одно, а не две разъезжающиеся копии.
+ */
+export const canDecreaseMeter = (role: string | null | undefined): boolean =>
+  role === 'ADMIN' || role === 'MECHANIC';
 
 const toDate = (v: string | Date | null | undefined): Date | null => {
   if (v == null || v === '') return null;
@@ -43,8 +78,40 @@ async function latestReading(
 
 export interface AddMeterReadingResult {
   reading: { id: string; engineHours: number; recordedAt: Date };
-  /** Set when the new reading is below the previously-known latest (possible misread). */
+  /** Показание принято, но выглядит подозрительно — текст для оператора. */
   warning: string | null;
+}
+
+/**
+ * Проверка показания против предыдущего. Чистая — чтобы правило можно было
+ * покрыть тестами и переиспользовать на форме, не открывая транзакцию.
+ *
+ * Возвращает `reject`, если показание принимать нельзя, либо текст
+ * предупреждения, либо ничего.
+ */
+export function checkMeterReading(
+  engineHours: number,
+  previousHours: number | null,
+  options: { allowDecrease?: boolean } = {},
+): { reject: string | null; warning: string | null } {
+  if (previousHours == null) return { reject: null, warning: null };
+
+  if (engineHours < previousHours) {
+    const text = `Показание ${engineHours} м/ч меньше предыдущего (${previousHours} м/ч). Счётчик назад не идёт — проверьте цифру.`;
+    return options.allowDecrease
+      ? { reject: null, warning: text }
+      : { reject: text, warning: null };
+  }
+
+  const jump = engineHours - previousHours;
+  if (jump > METER_JUMP_WARN_HOURS) {
+    return {
+      reject: null,
+      warning: `Прибавка ${jump} м/ч за одно показание — больше ${METER_JUMP_WARN_HOURS} м/ч. Проверьте, не опечатка ли.`,
+    };
+  }
+
+  return { reject: null, warning: null };
 }
 
 /**
@@ -58,14 +125,16 @@ export async function recordMeterReadingInTx(
   tx: typeof db,
   equipmentId: string,
   input: MeterReadingInput,
-  ctx: { tenantId: string; recordedById?: string | null },
+  ctx: MeterReadingContext,
 ): Promise<AddMeterReadingResult> {
   const recordedAt = toDate(input.recordedAt) ?? new Date();
   const prev = await latestReading(tx, equipmentId);
-  const warning =
-    prev && input.engineHours < prev.engineHours
-      ? `Новое показание (${input.engineHours} м.ч.) меньше предыдущего (${prev.engineHours} м.ч.)`
-      : null;
+  const verdict = checkMeterReading(input.engineHours, prev?.engineHours ?? null, {
+    allowDecrease: ctx.allowDecrease,
+  });
+  // 422, а не 400: число само по себе корректно, его отвергает правило учёта.
+  if (verdict.reject) throw new ServiceError(verdict.reject, 422);
+  const warning = verdict.warning;
 
   const reading = await tx.meterReading.create({
     data: {
@@ -109,7 +178,7 @@ export async function recordMeterReadingInTx(
 export async function addMeterReading(
   equipmentId: string,
   input: MeterReadingInput,
-  ctx: { tenantId: string; recordedById?: string | null },
+  ctx: MeterReadingContext,
 ): Promise<AddMeterReadingResult> {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   if (!Number.isInteger(input.engineHours) || input.engineHours < 0) {

@@ -10,6 +10,7 @@ import { ServiceError } from '@/lib/service-error';
 import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
 import { OPEN_MAINTENANCE } from '@/modules/readiness/application/readiness-score';
 import { advanceMaintenanceRegulation } from './maintenance-regulation';
+import { recordMeterReadingInTx } from './meter-reading';
 
 const OPEN_MAINTENANCE_STATUSES = new Set<string>(OPEN_MAINTENANCE);
 
@@ -145,6 +146,37 @@ function assertCancelExplained(reason: string | null | undefined): void {
   throw new ServiceError('Нельзя отменить наряд без причины: укажите, почему работа не нужна', 422);
 }
 
+/**
+ * Наработка при закрытии наряда → журнал показаний.
+ *
+ * ЗАЧЕМ. Механик вписывает моточасы на момент работ, и это настоящее показание
+ * счётчика — ровно как снятое осмотром. Раньше оно оставалось внутри наряда:
+ * `Equipment.engineHoursTotal` и критерий «Моточасы» в готовности не знали о
+ * нём ничего.
+ *
+ * ДАТА — `completedAt`, а не «сейчас». Наряд закрывают задним числом, и его
+ * наработка законно ниже сегодняшней. С датой работ показание встаёт в журнал
+ * своим местом и не перебивает более свежее: кэш синхронизируется по
+ * последнему `recordedAt`, а не по последней записи.
+ *
+ * По той же причине снижение здесь разрешено — и путь закрыт для оператора
+ * правом `maintenance.manage`.
+ */
+async function recordServiceHours(
+  tx: typeof db,
+  record: { equipmentId: string; engineHoursAtService: number | null; completedAt: Date | null },
+  tenantId: string,
+  userId: string | null | undefined,
+): Promise<void> {
+  if (record.engineHoursAtService == null) return;
+  await recordMeterReadingInTx(tx, record.equipmentId, {
+    engineHours: record.engineHoursAtService,
+    recordedAt: record.completedAt ?? new Date(),
+    source: 'MANUAL',
+    note: 'Снято при закрытии наряда ТО',
+  }, { tenantId, recordedById: userId ?? null, allowDecrease: true });
+}
+
 export async function updateMaintenance(
   equipmentId: string,
   recordId: string,
@@ -209,6 +241,12 @@ export async function updateMaintenance(
         tenantId: ctx.tenantId, equipmentId: record.equipmentId, record,
       });
     }
+    // Наработка, снятая механиком при закрытии, — такое же показание счётчика,
+    // как снятое осмотром, и обязано попасть в журнал. Только на переходе в
+    // DONE: повторное сохранение закрытого наряда не должно плодить показания.
+    if (statusChanged && data.status === 'DONE') {
+      await recordServiceHours(tx as typeof db, record, ctx.tenantId, ctx.userId);
+    }
     // Пересчитываем только на смене статуса: правка заголовка или стоимости
     // на готовность не влияет, а лишний снимок засоряет доказательный журнал.
     if (statusChanged) await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'status-changed');
@@ -228,7 +266,9 @@ export async function acceptMaintenance(
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, tenantId: true, acceptedById: true, completedAt: true, workDone: true },
+    // `status` нужен, чтобы приёмка уже закрытого наряда не завела второе
+    // показание счётчика: сдвиг регламента идемпотентен, а запись в журнал нет.
+    select: { id: true, tenantId: true, acceptedById: true, completedAt: true, workDone: true, status: true },
   });
   if (!existing || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
@@ -255,6 +295,11 @@ export async function acceptMaintenance(
     await advanceMaintenanceRegulation(tx as typeof db, {
       tenantId: ctx.tenantId, equipmentId: record.equipmentId, record,
     });
+    // Только если наряд закрывается приёмкой, а не был закрыт раньше: иначе
+    // показание уже записано переходом в DONE.
+    if (existing.status !== 'DONE') {
+      await recordServiceHours(tx as typeof db, record, ctx.tenantId, ctx.userId);
+    }
     await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'accepted');
     return record;
   });

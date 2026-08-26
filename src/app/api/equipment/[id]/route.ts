@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { getEquipmentByIdOrThrow, updateEquipment, updateEquipmentMetadata, deleteEquipment } from '@/modules/equipment';
+import { canDecreaseMeter, getEquipmentByIdOrThrow, updateEquipment, updateEquipmentMetadata, deleteEquipment } from '@/modules/equipment';
 import { equipmentManageSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 
@@ -53,7 +53,13 @@ export const PUT = withMutation(
       tenantId,
     });
 
-    await updateEquipmentMetadata(id, validation.data);
+    await updateEquipmentMetadata(id, validation.data, {
+      tenantId,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      actorId: user!.id,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      allowDecrease: canDecreaseMeter(user!.role),
+    });
 
     const equipment = await getEquipmentByIdOrThrow(id, tenantId);
     return NextResponse.json({ equipment });

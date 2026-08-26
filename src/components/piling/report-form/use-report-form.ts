@@ -405,9 +405,15 @@ export function useReportForm(): UseReportFormReturn {
       }
       if (!res.ok) throw new Error(result?.error || 'Ошибка отправки отчёта');
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
-      // Reading saved but looks suspicious (below the previous maximum) —
-      // tell the operator without failing anything.
+      // Reading saved but looks suspicious (unusually large jump) — tell the
+      // operator without failing anything.
       if (result?.meterWarning) toast.warning(result.meterWarning);
+      // Показание отвергнуто правилом учёта: отчёт сохранён, а моточасы — нет.
+      // Молчать нельзя, иначе человек уверен, что счётчик записан.
+      if (result?.meterError) {
+        toast.error(`Моточасы не записаны. ${result.meterError}`);
+        hapticError();
+      }
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });
       if (user && selectedSiteId && date) {
         localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);

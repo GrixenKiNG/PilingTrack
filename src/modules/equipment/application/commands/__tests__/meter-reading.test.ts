@@ -33,7 +33,7 @@ vi.mock('@/lib/db', () => {
   };
 });
 
-import { addMeterReading } from '../meter-reading';
+import { addMeterReading, canDecreaseMeter, checkMeterReading } from '../meter-reading';
 
 describe('addMeterReading', () => {
   beforeEach(() => {
@@ -80,16 +80,74 @@ describe('addMeterReading', () => {
     });
   });
 
-  it('warns (but still saves) when the new reading is below the previous latest', async () => {
-    findFirstMock.mockResolvedValueOnce({ engineHours: 6000 }).mockResolvedValueOnce({ engineHours: 6000 });
-    const result = await addMeterReading('eq_1', { engineHours: 5800 }, { tenantId: 'orion' });
+  it('отклоняет показание ниже предыдущего и ничего не пишет', async () => {
+    findFirstMock.mockResolvedValueOnce({ engineHours: 6000 });
+    await expect(
+      addMeterReading('eq_1', { engineHours: 5800 }, { tenantId: 'orion' }),
+    ).rejects.toThrow(/меньше предыдущего/);
+    expect(createReadingMock).not.toHaveBeenCalled();
+    expect(updateEquipmentMock).not.toHaveBeenCalled();
+  });
+
+  it('разрешает снижение с предупреждением, когда счётчик заменили', async () => {
+    findFirstMock.mockResolvedValueOnce({ engineHours: 6000 }).mockResolvedValueOnce({ engineHours: 12 });
+    const result = await addMeterReading(
+      'eq_1', { engineHours: 12 }, { tenantId: 'orion', allowDecrease: true },
+    );
     expect(result.warning).toMatch(/меньше предыдущего/);
     expect(createReadingMock).toHaveBeenCalled();
   });
 
-  it('does not warn when the reading is monotonic (>= previous)', async () => {
+  it('предупреждает о прибавке больше 20 м/ч, но показание принимает', async () => {
     findFirstMock.mockResolvedValueOnce({ engineHours: 5000 }).mockResolvedValueOnce({ engineHours: 5670 });
     const result = await addMeterReading('eq_1', { engineHours: 5670 }, { tenantId: 'orion' });
+    expect(result.warning).toMatch(/Прибавка 670 м\/ч/);
+    expect(createReadingMock).toHaveBeenCalled();
+  });
+
+  it('не предупреждает при обычной сменной прибавке', async () => {
+    findFirstMock.mockResolvedValueOnce({ engineHours: 5000 }).mockResolvedValueOnce({ engineHours: 5008 });
+    const result = await addMeterReading('eq_1', { engineHours: 5008 }, { tenantId: 'orion' });
     expect(result.warning).toBeNull();
+  });
+});
+
+describe('checkMeterReading', () => {
+  it('первое показание принимает без замечаний', () => {
+    expect(checkMeterReading(100, null)).toEqual({ reject: null, warning: null });
+  });
+
+  it('равное предыдущему — не снижение', () => {
+    expect(checkMeterReading(5000, 5000)).toEqual({ reject: null, warning: null });
+  });
+
+  it('ровно 20 м/ч прибавки — ещё не повод предупреждать', () => {
+    expect(checkMeterReading(5020, 5000).warning).toBeNull();
+  });
+
+  it('21 м/ч прибавки — уже повод', () => {
+    expect(checkMeterReading(5021, 5000).warning).toMatch(/Прибавка 21 м\/ч/);
+  });
+
+  it('снижение без права — отказ, с правом — предупреждение', () => {
+    expect(checkMeterReading(4999, 5000).reject).toMatch(/Счётчик назад не идёт/);
+    expect(checkMeterReading(4999, 5000).warning).toBeNull();
+
+    const allowed = checkMeterReading(4999, 5000, { allowDecrease: true });
+    expect(allowed.reject).toBeNull();
+    expect(allowed.warning).toMatch(/меньше предыдущего/);
+  });
+});
+
+describe('canDecreaseMeter', () => {
+  it('снижать счётчик может администратор и механик', () => {
+    expect(canDecreaseMeter('ADMIN')).toBe(true);
+    expect(canDecreaseMeter('MECHANIC')).toBe(true);
+  });
+
+  it('оператору и остальным — нельзя', () => {
+    for (const role of ['OPERATOR', 'ASSISTANT', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER', null]) {
+      expect(canDecreaseMeter(role)).toBe(false);
+    }
   });
 });
