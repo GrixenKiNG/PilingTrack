@@ -1,8 +1,8 @@
 /**
  * Projection rebuild safety-net.
  *
- * The analytics read-models (OperatorPerformance / SiteWeeklyTrend /
- * SiteDailySummary) are rebuild-style projections: historical events stay
+ * The analytics read-models (ReportAnalytics / SiteDailySummary /
+ * SiteWeeklyTrend) are rebuild-style projections: historical events stay
  * `projected=true`, so the live worker does not replay them. After a DB restore
  * from a dump — or if the projection worker ever lags/restarts — these tables
  * silently go stale with no auto-heal (the analytics screen shows empty/zeros
