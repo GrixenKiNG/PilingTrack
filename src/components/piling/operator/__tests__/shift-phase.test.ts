@@ -12,6 +12,8 @@ const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => (
   report: null,
   meterKnownToday: false,
   meterCurrent: 8421,
+  meterSource: 'reading',
+  meterRecordedAt: '2026-08-20T05:00:00.000Z',
   pilesToday: 0,
   incomingHandover: null,
   startWaiver: null,
@@ -70,15 +72,41 @@ describe('resolveShiftPhase', () => {
     expect(phase.blockers).toEqual([]);
   });
 
-  it('ведёт в осмотр, пока он не закрыт', () => {
+  // Приёмка обязательна всегда, а не только когда предыдущая смена оставила
+  // передачу. Первая смена на машине, смена после простоя, смена после
+  // ремонта — передачи нет, и раньше шаг молча пропускался.
+  it('без передачи всё равно требует принять машину — до осмотра', () => {
+    const phase = resolveShiftPhase(facts({ incomingHandover: null }), 'op-1');
+    expect(phase.phase).toBe(2);
+    expect(phase.title).toBe('Приёмка машины');
+    expect(phase.target).toBe('meter');
+  });
+
+  it('на приёмке показывает наработку и запас до ТО', () => {
     const phase = resolveShiftPhase(facts(), 'op-1');
+    expect(phase.progress).toBe('8421 м/ч · до ТО 279 ч');
+  });
+
+  it('на приёмке называет перепробег, а не отрицательный остаток', () => {
+    const phase = resolveShiftPhase(facts({
+      equipment: { id: 'eq-1', name: 'Bauer RTG RM20', model: 'RM20', engineHoursTotal: 3218, nextMaintenanceAtHours: 1450 },
+    }), 'op-1');
+    expect(phase.progress).toBe('3218 м/ч · перепробег 1768 ч');
+  });
+
+  it('ведёт в осмотр только после приёмки', () => {
+    const phase = resolveShiftPhase(facts({ meterKnownToday: true }), 'op-1');
     expect(phase.phase).toBe(3);
     expect(phase.target).toBe('inspection');
   });
 
-  it('после осмотра просит снять моточасы', () => {
-    const phase = resolveShiftPhase(facts({ inspection: { preShift: completed, postShift: null } }), 'op-1');
-    expect(phase.target).toBe('meter');
+  // Регрессия: счётчик снимался ПОСЛЕ осмотра и спрашивался повторно.
+  it('после осмотра моточасы второй раз не спрашивает', () => {
+    const phase = resolveShiftPhase(
+      facts({ meterKnownToday: true, inspection: { preShift: completed, postShift: null } }),
+      'op-1',
+    );
+    expect(phase.target).toBe('start');
   });
 
   // Чистая готовность — оператор пускает смену сам, ждать диспетчера незачем.

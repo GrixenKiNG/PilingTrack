@@ -44,6 +44,26 @@ const inspectionProgress = (item: { answered: number; total: number } | null) =>
   item && item.total > 0 ? `${item.answered} из ${item.total} пунктов` : null;
 
 /**
+ * Подпись под «Приёмкой машины»: наработка и запас до ТО.
+ *
+ * Оператор принимает машину, а не строку в списке. «Сколько осталось до ТО» он
+ * должен видеть до того, как распишется, — иначе перепробег обнаружится уже
+ * посреди смены, когда машина в забое.
+ */
+const acceptanceProgress = (
+  equipment: { engineHoursTotal: number | null; nextMaintenanceAtHours: number | null } | null,
+): string | null => {
+  const hours = equipment?.engineHoursTotal;
+  if (hours == null) return null;
+
+  const limit = equipment?.nextMaintenanceAtHours;
+  if (limit == null) return `${hours} м/ч`;
+
+  const left = limit - hours;
+  return left >= 0 ? `${hours} м/ч · до ТО ${left} ч` : `${hours} м/ч · перепробег ${-left} ч`;
+};
+
+/**
  * @param facts состояние смены с сервера
  * @param viewerId кто смотрит: свою передачу принять нельзя, и предлагать это
  *   бессмысленно — кнопка была бы обманом
@@ -153,7 +173,31 @@ export function resolveShiftPhase(facts: OperatorShiftFacts, viewerId: string): 
     };
   }
 
-  // До пуска: сначала осмотр и счётчик, потом решение о допуске.
+  // До пуска: сначала приёмка машины, потом осмотр, потом решение о допуске.
+
+  // ПРИЁМКА — ВСЕГДА, А НЕ ТОЛЬКО ПОД ПЕРЕДАЧУ.
+  //
+  // Раньше шаг «Приёмка машины» существовал лишь тогда, когда предыдущая смена
+  // оставила передачу (блок `incomingHandover` выше). Первая смена на машине,
+  // смена после простоя, смена после ремонта — передачи нет, и шаг молча
+  // пропускался: человек открывал смену и сразу оказывался на осмотре. Отсюда
+  // жалоба «нет получения установки».
+  //
+  // Оператор в любом случае принимает машину: смотрит на неё, сверяет счётчик
+  // и расписывается. Передача от предыдущей смены — дополнительные сведения на
+  // том же шаге, а не условие его существования.
+  //
+  // Отметкой приёмки служит снятое сегодня показание счётчика. Это не подмена
+  // понятий, а единственный след приёмки, который переживает перезагрузку
+  // страницы: своей таблицы у неё нет, а признак «принял» в состоянии экрана
+  // терялся бы при каждом обновлении.
+  if (!facts.meterKnownToday) {
+    return {
+      phase: 2, title: PHASE_TITLES[2], action: 'Снять моточасы',
+      target: 'meter', progress: acceptanceProgress(facts.equipment), blockers: [],
+    };
+  }
+
   const pre = facts.inspection.preShift;
   const inspectionDone = pre?.status === 'COMPLETED';
   if (!inspectionDone) {
@@ -161,12 +205,6 @@ export function resolveShiftPhase(facts: OperatorShiftFacts, viewerId: string): 
       phase: 3, title: PHASE_TITLES[3],
       action: pre ? 'Продолжить осмотр' : 'Начать осмотр',
       target: 'inspection', progress: inspectionProgress(pre), blockers: [],
-    };
-  }
-  if (!facts.meterKnownToday) {
-    return {
-      phase: 3, title: 'Показание счётчика', action: 'Снять моточасы',
-      target: 'meter', progress: null, blockers: [],
     };
   }
 
