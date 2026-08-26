@@ -31,34 +31,34 @@ async function handleGet(request: NextRequest) {
       throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права оформлять наряд-допуск');
     }
     const data = await withReadinessRequestTransaction(context.tenantId, async (tx) => {
-      const [workTypes, people, presets, sites] = await Promise.all([
-        tx.permitWorkType.findMany({
-          where: {tenantId: context.tenantId, isActive: true},
-          orderBy: [{sortOrder: 'asc'}, {name: 'asc'}],
-          select: {
-            id: true, name: true, hint: true, icon: true, defaultRisk: true,
-            hazardPresets: true, requiredApprovals: true, allowAuthorApproval: true,
-          },
-        }),
-        tx.user.findMany({
-          where: {tenantId: context.tenantId, isActive: true},
-          orderBy: {name: 'asc'},
-          select: {id: true, name: true, role: true},
-        }),
-        // Личные шаблоны мест: только свои. Чужие площадки в подсказках мешали
-        // бы, а не помогали, и раскрывали бы, кто где работает.
-        tx.userPlacePreset.findMany({
-          where: {tenantId: context.tenantId, userId: context.actorId},
-          orderBy: {usedAt: 'desc'},
-          take: 50,
-          select: {id: true, location: true, objectName: true},
-        }),
-        tx.site.findMany({
-          where: {tenantId: context.tenantId, isActive: true},
-          orderBy: {name: 'asc'},
-          select: {name: true},
-        }),
-      ]);
+      // Последовательно, а не Promise.all: транзакция держит одно соединение pg,
+      // параллельные запросы в него deprecated и ломаются на pg@9.
+      const workTypes = await tx.permitWorkType.findMany({
+        where: {tenantId: context.tenantId, isActive: true},
+        orderBy: [{sortOrder: 'asc'}, {name: 'asc'}],
+        select: {
+          id: true, name: true, hint: true, icon: true, defaultRisk: true,
+          hazardPresets: true, requiredApprovals: true, allowAuthorApproval: true,
+        },
+      });
+      const people = await tx.user.findMany({
+        where: {tenantId: context.tenantId, isActive: true},
+        orderBy: {name: 'asc'},
+        select: {id: true, name: true, role: true},
+      });
+      // Личные шаблоны мест: только свои. Чужие площадки в подсказках мешали
+      // бы, а не помогали, и раскрывали бы, кто где работает.
+      const presets = await tx.userPlacePreset.findMany({
+        where: {tenantId: context.tenantId, userId: context.actorId},
+        orderBy: {usedAt: 'desc'},
+        take: 50,
+        select: {id: true, location: true, objectName: true},
+      });
+      const sites = await tx.site.findMany({
+        where: {tenantId: context.tenantId, isActive: true},
+        orderBy: {name: 'asc'},
+        select: {name: true},
+      });
       return {
         workTypes,
         people,

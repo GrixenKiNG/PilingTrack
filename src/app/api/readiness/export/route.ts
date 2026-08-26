@@ -97,21 +97,21 @@ async function handleGet(request: NextRequest) {
           ]),
         ];
       } else {
-        const [snapshots, audit] = await Promise.all([
-          tx.readinessScoreSnapshot.findMany({
-            where: {
-              tenantId: context.tenantId,
-              ...(filters.equipmentId ? {equipmentId: filters.equipmentId} : {}),
-              ...(filters.status ? {status: filters.status} : {}),
-              ...(filters.from || filters.to ? {calculatedAt: {
-                ...(filters.from ? {gte: filters.from} : {}),
-                ...(filters.to ? {lte: filters.to} : {}),
-              }} : {}),
-            },
-            orderBy: [{calculatedAt: 'desc'}, {id: 'desc'}],
-          }),
-          new PrismaAuditRepository(tx).readChain(context.tenantId),
-        ]);
+        // Последовательно, а не Promise.all: транзакция держит одно соединение pg,
+        // параллельные запросы в него deprecated и ломаются на pg@9.
+        const snapshots = await tx.readinessScoreSnapshot.findMany({
+          where: {
+            tenantId: context.tenantId,
+            ...(filters.equipmentId ? {equipmentId: filters.equipmentId} : {}),
+            ...(filters.status ? {status: filters.status} : {}),
+            ...(filters.from || filters.to ? {calculatedAt: {
+              ...(filters.from ? {gte: filters.from} : {}),
+              ...(filters.to ? {lte: filters.to} : {}),
+            }} : {}),
+          },
+          orderBy: [{calculatedAt: 'desc'}, {id: 'desc'}],
+        });
+        const audit = await new PrismaAuditRepository(tx).readChain(context.tenantId);
         const decisionEvents = audit.events.filter((event) => {
           const occurredAt = new Date(event.occurredAt);
           return (!filters.from || occurredAt >= filters.from)

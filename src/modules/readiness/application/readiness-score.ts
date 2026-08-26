@@ -21,51 +21,52 @@ export async function evaluateAuthoritativeReadiness(input: {
   clock: EvaluationClock;
 }) {
   const now = input.clock.now();
-  const [
-    equipment, inspection, openRecords, permit, publishedRow, startApproval, blockingDefect,
-  ] = await Promise.all([
-    input.tx.equipment.findFirst({
-      where: {tenantId: input.tenantId, id: input.equipmentId, isActive: true},
-      select: {id: true, engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true},
-    }),
-    input.tx.inspection.findFirst({
-      where: {tenantId: input.tenantId, equipmentId: input.equipmentId, status: 'COMPLETED'},
-      orderBy: {inspectionDate: 'desc'},
-      select: {id: true, inspectionDate: true, healthScore: true},
-    }),
-    input.tx.maintenanceRecord.findMany({
-      where: {tenantId: input.tenantId, equipmentId: input.equipmentId, status: {in: [...OPEN_MAINTENANCE]}},
-      select: {id: true, type: true, priority: true},
-    }),
-    input.tx.workPermit.findFirst({
-      where: {
-        tenantId: input.tenantId, equipmentId: input.equipmentId, state: {in: ['APPROVED', 'EXPIRED']},
-        validFrom: {lte: now},
-        OR: input.shiftId ? [{shiftId: null}, {shiftId: input.shiftId}] : [{shiftId: null}],
-      },
-      orderBy: {validTo: 'desc'}, select: {id: true, state: true, validFrom: true, validTo: true},
-    }),
-    input.tx.readinessRuleSet.findFirst({
-      where: {tenantId: input.tenantId, status: 'PUBLISHED'}, orderBy: {updatedAt: 'desc'},
-    }),
-    // «Приёмка» — это предсменный допуск диспетчера, а не сдача смены в конце.
-    // Раньше признак брался из принятой передачи, но приёмка передачи закрывает
-    // смену: десять баллов начислялись уже после того, как работа окончена.
-    input.shiftId ? input.tx.shift.findFirst({
-      where: {tenantId: input.tenantId, id: input.shiftId, startedById: {not: null}},
-      select: {id: true},
-    }) : Promise.resolve(null),
-    // Незакрытый критичный дефект из журнала. Без него запись в журнале
-    // ничего не меняла бы в оценке: блокировка держалась только на нарядах
-    // ремонта с приоритетом CRITICAL, а дефект — отдельная сущность.
-    input.tx.equipmentDefect.findFirst({
-      where: {
-        tenantId: input.tenantId, equipmentId: input.equipmentId,
-        severity: 'CRITICAL', status: {in: ['OPEN', 'IN_WORK']},
-      },
-      select: {id: true},
-    }),
-  ]);
+  // Запросы идут последовательно, а не через Promise.all. Транзакция закрепляет
+  // за собой одно соединение pg, и параллельная выдача в него — то самое
+  // `client.query() when the client is already executing a query`, которое
+  // в pg@9 станет ошибкой. Выигрыша от параллельности здесь всё равно не было:
+  // драйвер сериализует запросы по тому же соединению.
+  const equipment = await input.tx.equipment.findFirst({
+    where: {tenantId: input.tenantId, id: input.equipmentId, isActive: true},
+    select: {id: true, engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true},
+  });
+  const inspection = await input.tx.inspection.findFirst({
+    where: {tenantId: input.tenantId, equipmentId: input.equipmentId, status: 'COMPLETED'},
+    orderBy: {inspectionDate: 'desc'},
+    select: {id: true, inspectionDate: true, healthScore: true},
+  });
+  const openRecords = await input.tx.maintenanceRecord.findMany({
+    where: {tenantId: input.tenantId, equipmentId: input.equipmentId, status: {in: [...OPEN_MAINTENANCE]}},
+    select: {id: true, type: true, priority: true},
+  });
+  const permit = await input.tx.workPermit.findFirst({
+    where: {
+      tenantId: input.tenantId, equipmentId: input.equipmentId, state: {in: ['APPROVED', 'EXPIRED']},
+      validFrom: {lte: now},
+      OR: input.shiftId ? [{shiftId: null}, {shiftId: input.shiftId}] : [{shiftId: null}],
+    },
+    orderBy: {validTo: 'desc'}, select: {id: true, state: true, validFrom: true, validTo: true},
+  });
+  const publishedRow = await input.tx.readinessRuleSet.findFirst({
+    where: {tenantId: input.tenantId, status: 'PUBLISHED'}, orderBy: {updatedAt: 'desc'},
+  });
+  // «Приёмка» — это предсменный допуск диспетчера, а не сдача смены в конце.
+  // Раньше признак брался из принятой передачи, но приёмка передачи закрывает
+  // смену: десять баллов начислялись уже после того, как работа окончена.
+  const startApproval = input.shiftId ? await input.tx.shift.findFirst({
+    where: {tenantId: input.tenantId, id: input.shiftId, startedById: {not: null}},
+    select: {id: true},
+  }) : null;
+  // Незакрытый критичный дефект из журнала. Без него запись в журнале
+  // ничего не меняла бы в оценке: блокировка держалась только на нарядах
+  // ремонта с приоритетом CRITICAL, а дефект — отдельная сущность.
+  const blockingDefect = await input.tx.equipmentDefect.findFirst({
+    where: {
+      tenantId: input.tenantId, equipmentId: input.equipmentId,
+      severity: 'CRITICAL', status: {in: ['OPEN', 'IN_WORK']},
+    },
+    select: {id: true},
+  });
   if (!equipment) throw new Error('Authoritative equipment row is unavailable');
 
   const inspectionSameTenantDay = inspection

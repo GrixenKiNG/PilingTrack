@@ -112,51 +112,45 @@ export async function queryReadinessBootstrap(
     throw new ServiceError('Readiness access denied', 403);
   }
 
-  const [
-    settings,
-    equipment,
-    sites,
-    actors,
-    equipmentCount,
-    siteCount,
-    crewCount,
-    publishedRuleSetCount,
-    draftRuleSetCount,
-  ] = await Promise.all([
-    tx.tenantSettings.findUnique({
-      where: { tenantId: actor.tenantId },
-      select: { timezone: true, companyName: true },
-    }),
-    tx.equipment.findMany({
-      where: { tenantId: actor.tenantId, isActive: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, model: true },
-    }),
-    tx.site.findMany({
-      where: { tenantId: actor.tenantId, isActive: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true },
-    }),
-    // Все действующие пользователи тенанта, а не только принимающие решения:
-    // по этому списку журнал передач разворачивает идентификатор автора в имя,
-    // а операторы и помощники тоже совершают действия.
-    tx.user.findMany({
-      where: { tenantId: actor.tenantId, isActive: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, role: true },
-    }),
-    tx.equipment.count({ where: { tenantId: actor.tenantId, isActive: true } }),
-    tx.site.count({ where: { tenantId: actor.tenantId, isActive: true } }),
-    tx.crew.count({
-      where: { isActive: true, equipment: { tenantId: actor.tenantId } },
-    }),
-    tx.readinessRuleSet.count({
-      where: { tenantId: actor.tenantId, status: 'PUBLISHED' },
-    }),
-    tx.readinessRuleSet.count({
-      where: { tenantId: actor.tenantId, status: 'DRAFT' },
-    }),
-  ]);
+  // Последовательно, а не Promise.all: транзакция держит одно соединение pg,
+  // параллельные запросы в него deprecated и ломаются на pg@9.
+  const settings = await tx.tenantSettings.findUnique({
+    where: { tenantId: actor.tenantId },
+    select: { timezone: true, companyName: true },
+  });
+  const equipment = await tx.equipment.findMany({
+    where: { tenantId: actor.tenantId, isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, model: true },
+  });
+  const sites = await tx.site.findMany({
+    where: { tenantId: actor.tenantId, isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true },
+  });
+  // Все действующие пользователи тенанта, а не только принимающие решения:
+  // по этому списку журнал передач разворачивает идентификатор автора в имя,
+  // а операторы и помощники тоже совершают действия.
+  const actors = await tx.user.findMany({
+    where: { tenantId: actor.tenantId, isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, role: true },
+  });
+  const equipmentCount = await tx.equipment.count({
+    where: { tenantId: actor.tenantId, isActive: true },
+  });
+  const siteCount = await tx.site.count({
+    where: { tenantId: actor.tenantId, isActive: true },
+  });
+  const crewCount = await tx.crew.count({
+    where: { isActive: true, equipment: { tenantId: actor.tenantId } },
+  });
+  const publishedRuleSetCount = await tx.readinessRuleSet.count({
+    where: { tenantId: actor.tenantId, status: 'PUBLISHED' },
+  });
+  const draftRuleSetCount = await tx.readinessRuleSet.count({
+    where: { tenantId: actor.tenantId, status: 'DRAFT' },
+  });
 
   if (!settings) {
     throw new ServiceError('Tenant settings are not configured', 503);
