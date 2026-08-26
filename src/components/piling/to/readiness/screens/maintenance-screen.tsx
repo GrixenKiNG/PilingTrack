@@ -86,7 +86,12 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance">+ Создать заявку</Link></Button></div>} />
+      {/* Кнопка ведёт на форму заявки, а не на доску нарядов. Раньше здесь
+          стояла ссылка на `/admin/maintenance`: страница менялась, формы не
+          появлялось, и заявка не создавалась — отсюда «создать заявку ничего
+          не делает». Сама заявка заводилась кнопкой «Задача ТО» на той доске,
+          найти которую по подписи было нельзя. */}
+      <ScreenTitle heading="Обслуживание" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance/new">+ Создать заявку</Link></Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={blockingDefects.length} detail={`открытых замечаний: ${openDefects.length}`} alert={blockingDefects.length > 0} />
         <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={todayWork.length} />

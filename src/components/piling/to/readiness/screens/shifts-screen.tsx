@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
@@ -76,35 +77,6 @@ export function ShiftsScreen(props: ReferenceUiProps) {
     const timer = setInterval(update, 60_000);
     return () => clearInterval(timer);
   }, [timezone]);
-  const createShift = async () => {
-    // Раньше здесь стоял немой `return`: администратор нажимал «Создать смену»
-    // и не происходило ничего — ни смены, ни ошибки, ни подсказки. Отсюда
-    // жалоба «создать смену невозможно». Право открывать смену есть только у
-    // оператора, и это сознательно: администратор проводит её через «Действую
-    // как → Оператор», чтобы в журнале осталось, кто на самом деле нажал. Но
-    // об этом надо сказать вслух, а не молчать.
-    if (!props.selectedId) {
-      return toast.error('Сначала выберите установку в списке');
-    }
-    if (!props.bootstrap?.capabilities.entities.shift.manage) {
-      return toast.error(
-        'Смену открывает оператор. Администратору: переключитесь в «Действую как → Оператор» — замещение подпишется в журнале',
-      );
-    }
-    const hour = new Date().getHours();
-    const response = await authFetch('/api/readiness/shifts', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'idempotency-key': crypto.randomUUID(),
-        ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
-      },
-      body: JSON.stringify({ equipmentId: props.selectedId, type: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY' }),
-    });
-    if (!response.ok) return toast.error((await response.json().catch(() => null))?.error?.message ?? 'Не удалось создать смену');
-    toast.success('Смена создана');
-    props.onRetry();
-  };
   const acceptHandover = async (handover: ReadinessShiftDto['handovers'][number]) => {
     const response = await authFetch(`/api/readiness/handovers/${handover.id}/accept`, {
       method: 'POST',
@@ -190,7 +162,13 @@ export function ShiftsScreen(props: ReferenceUiProps) {
       <ScreenTitle
         heading="Смены"
         subtitle={period === 'day' ? `Сегодня, ${formatDateInTimezone(new Date(), props.bootstrap?.tenant.timezone, {day: 'numeric', month: 'long'})}` : 'Последние 7 дней'}
-        actions={<div className="flex flex-wrap items-center gap-2"><div className="flex overflow-hidden rounded-lg border border-border bg-background"><button type="button" aria-pressed={period === 'day'} onClick={() => setPeriod('day')} className={cn('min-h-11 px-5 text-xs font-semibold', period === 'day' && 'bg-signal/10 text-signal-strong')}>День</button><button type="button" aria-pressed={period === 'week'} onClick={() => setPeriod('week')} className={cn('min-h-11 border-l border-border px-5 text-xs', period === 'week' ? 'bg-signal/10 font-semibold text-signal-strong' : 'text-muted-foreground')}>Неделя</button></div><Button type="button" disabled={!props.selectedId || !props.bootstrap?.capabilities.entities.shift.manage} onClick={() => void createShift()} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать смену</Button></div>}
+        actions={<div className="flex flex-wrap items-center gap-2"><div className="flex overflow-hidden rounded-lg border border-border bg-background"><button type="button" aria-pressed={period === 'day'} onClick={() => setPeriod('day')} className={cn('min-h-11 px-5 text-xs font-semibold', period === 'day' && 'bg-signal/10 text-signal-strong')}>День</button><button type="button" aria-pressed={period === 'week'} onClick={() => setPeriod('week')} className={cn('min-h-11 border-l border-border px-5 text-xs', period === 'week' ? 'bg-signal/10 font-semibold text-signal-strong' : 'text-muted-foreground')}>Неделя</button></div>{/* Ссылка на форму, а не немедленная команда. Прежняя кнопка была
+    выключена, пока в другой вкладке не выбрана установка, — человек нажимал
+    и не получал ничего, даже подсказки. А когда установка была выбрана, она
+    молча заводила смену с умолчаниями: тип по текущему часу, дата по
+    серверу, окно не задано. Теперь установка, дата и окно выбираются в
+    форме, и до «Создать» ничего не сохраняется. */}
+<Button asChild disabled={!props.bootstrap?.capabilities.entities.shift.manage} className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href={props.selectedId ? `/admin/to/shifts/new?equipmentId=${props.selectedId}` : '/admin/to/shifts/new'}>+ Создать смену</Link></Button></div>}
       />
       <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-card px-2 py-1">Дневная 08:00–20:00</span><span className="rounded border border-border bg-card px-2 py-1">Ночная 20:00–08:00</span><span className="rounded border border-border bg-card px-2 py-1">Часовой пояс: {timezone}</span></div>
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
