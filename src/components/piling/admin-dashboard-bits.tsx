@@ -20,6 +20,10 @@ export interface FleetCard {
   assignedSiteName: string | null;
   assignedOperatorName: string | null;
   assignedCrewName: string | null;
+  // Наработка и предел по регламенту — по ним плитка ТО считает перепробег.
+  // Наряд для этого не годится: у моточасовых регламентов `scheduledAt` пуст.
+  engineHoursTotal: number | null;
+  nextMaintenanceAtHours: number | null;
   todaysReports?: number;
   todayTotals: { piles: number; drillingMeters: number; downtimeHours: number } | null;
   latestReport: { date: string; siteName: string | null; operatorName: string | null; updatedAt?: string } | null;

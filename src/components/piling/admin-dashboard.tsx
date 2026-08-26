@@ -176,7 +176,7 @@ export function AdminDashboard() {
   // Production numbers come from analytics (period-aware). Operational numbers
   // come from fleet/maintenance and are always "now".
   const kpis = useMemo(
-    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig),
+    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig, fleet?.equipment ?? []),
     [analytics, fleet, maintByRig],
   );
 

@@ -29,6 +29,27 @@ export interface DashboardMaintFlag {
   overdue?: boolean;
 }
 
+/**
+ * Моточасы установки — второй источник признака «просрочено», рядом с нарядами.
+ *
+ * ЗАЧЕМ ОТДЕЛЬНО. Наряд считается просроченным по `scheduledAt`, а он у
+ * моточасовых регламентов пуст: `evaluatePlanDue` возвращает `dueDate` только
+ * для триггера CALENDAR, планировщик пишет `scheduledAt: dueDate ?? null`, и на
+ * парке с одними HOURS-регламентами дата не появляется никогда. Перепробег при
+ * этом реален — воркер шлёт по нему оповещение, а плитка показывала ноль.
+ */
+export interface DashboardRigHours {
+  id: string;
+  engineHoursTotal: number | null;
+  nextMaintenanceAtHours: number | null;
+}
+
+/** Наработка перевалила за предел, назначенный регламентом. */
+const hoursOverrun = (rig: DashboardRigHours): boolean =>
+  rig.engineHoursTotal != null
+  && rig.nextMaintenanceAtHours != null
+  && rig.engineHoursTotal > rig.nextMaintenanceAtHours;
+
 export interface DashboardKpis {
   shiftsDone: number;
   reportsExpected: number;
@@ -57,10 +78,20 @@ export function computeDashboardKpis(
   analytics: DashboardAnalyticsRow[],
   fleetTotals: DashboardFleetTotals | null,
   maintByRig: Map<string, DashboardMaintFlag>,
+  rigs: DashboardRigHours[],
 ): DashboardKpis {
   const activeToday = fleetTotals?.activeToday ?? 0;
   const expected = fleetTotals?.expected ?? 0;
-  const toRisk = [...maintByRig.values()].filter((v) => v.repair || v.overdue).length;
+  // Считаем установки, а не поводы: машина в ремонте и с перепробегом
+  // одновременно — это одна установка в риске, а не две.
+  const atRisk = new Set<string>();
+  for (const [equipmentId, flag] of maintByRig) {
+    if (flag.repair || flag.overdue) atRisk.add(equipmentId);
+  }
+  for (const rig of rigs) {
+    if (hoursOverrun(rig)) atRisk.add(rig.id);
+  }
+  const toRisk = atRisk.size;
   return {
     shiftsDone: activeToday,
     reportsExpected: activeToday + expected,

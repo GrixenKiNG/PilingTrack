@@ -3,7 +3,12 @@ import {
   computeDashboardKpis,
   type DashboardAnalyticsRow,
   type DashboardFleetTotals,
+  type DashboardRigHours,
 } from '../dashboard-kpis';
+
+const rig = (
+  id: string, engineHoursTotal: number | null, nextMaintenanceAtHours: number | null,
+): DashboardRigHours => ({ id, engineHoursTotal, nextMaintenanceAtHours });
 
 function row(over: Partial<DashboardAnalyticsRow>): DashboardAnalyticsRow {
   return {
@@ -25,6 +30,7 @@ describe('computeDashboardKpis', () => {
       ],
       null,
       new Map(),
+      [],
     );
     expect(k.actualPiles).toBe(8);
     expect(k.actualPileMeters).toBe(90.5);
@@ -35,12 +41,12 @@ describe('computeDashboardKpis', () => {
   });
 
   it('treats null totalDowntime as zero', () => {
-    const k = computeDashboardKpis([row({ totalDowntime: null }), row({ totalDowntime: 4 })], null, new Map());
+    const k = computeDashboardKpis([row({ totalDowntime: null }), row({ totalDowntime: 4 })], null, new Map(), []);
     expect(k.downtime).toBe(4);
   });
 
   it('reads shift/rig/crew counts from fleet totals', () => {
-    const k = computeDashboardKpis([], fleet, new Map());
+    const k = computeDashboardKpis([], fleet, new Map(), []);
     expect(k.shiftsDone).toBe(3);
     expect(k.rigsWorking).toBe(3);
     expect(k.reportsExpected).toBe(5); // activeToday + expected
@@ -49,7 +55,7 @@ describe('computeDashboardKpis', () => {
   });
 
   it('defaults fleet-derived KPIs to zero when fleet is null', () => {
-    const k = computeDashboardKpis([], null, new Map());
+    const k = computeDashboardKpis([], null, new Map(), []);
     expect(k).toMatchObject({ shiftsDone: 0, reportsExpected: 0, rigsWorking: 0, rigsTotal: 0, crews: 0 });
   });
 
@@ -59,6 +65,35 @@ describe('computeDashboardKpis', () => {
       ['b', { repair: false, overdue: true }],
       ['c', { repair: false, overdue: false }],
     ]);
-    expect(computeDashboardKpis([], fleet, maint).toRisk).toBe(2);
+    expect(computeDashboardKpis([], fleet, maint, []).toRisk).toBe(2);
+  });
+
+  it('counts a rig whose engine hours passed the maintenance limit', () => {
+    const rigs = [
+      rig('a', 1400, 1300), // перепробег на 100 м/ч
+      rig('b', 1200, 1300), // предел ещё не достигнут
+      rig('c', 1300, 1300), // ровно предел — это не перепробег
+    ];
+    expect(computeDashboardKpis([], fleet, new Map(), rigs).toRisk).toBe(1);
+  });
+
+  it('ignores rigs with unknown hours or no limit set', () => {
+    const rigs = [
+      rig('a', null, 1300),
+      rig('b', 1400, null),
+      rig('c', null, null),
+    ];
+    expect(computeDashboardKpis([], fleet, new Map(), rigs).toRisk).toBe(0);
+  });
+
+  it('counts a rig once when it is both in repair and over its hour limit', () => {
+    const maint = new Map([['a', { repair: true, overdue: false }]]);
+    expect(computeDashboardKpis([], fleet, maint, [rig('a', 1400, 1300)]).toRisk).toBe(1);
+  });
+
+  it('unions both sources of risk', () => {
+    const maint = new Map([['a', { repair: true, overdue: false }]]);
+    const rigs = [rig('a', 1200, 1300), rig('b', 1400, 1300)];
+    expect(computeDashboardKpis([], fleet, maint, rigs).toRisk).toBe(2);
   });
 });
