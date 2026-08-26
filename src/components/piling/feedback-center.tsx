@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
@@ -19,31 +19,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { FeedbackEventDTO, FeedbackEventPriority } from '@/lib/types';
-
-// Shape of GET /api/ready (see src/app/api/ready) — the old ok/session fields
-// never existed in the response, so the panel permanently showed "unknown / not set".
-interface ReadyPayload {
-  ready: boolean;
-  checks?: {
-    database?: { status?: string; latencyMs?: number };
-    environment?: { status?: string };
-  };
-}
-
-interface FeedbackSummary {
-  total: number;
-  unread: number;
-  error: number;
-  warn: number;
-  success: number;
-  critical: number;
-  ackPending: number;
-}
-
-const OPEN_POLL_INTERVAL_MS = 30_000;
-const CLOSED_POLL_INTERVAL_MS = 180_000;
-const HIDDEN_POLL_INTERVAL_MS = 300_000;
-const HEALTH_REFRESH_INTERVAL_MS = 300_000;
+import {
+  loadFeedbackFeed,
+  replaceFeedbackEvent,
+  replaceFeedbackFeed,
+  useFeedbackFeed,
+} from '@/components/piling/use-feedback-feed';
 
 function getLevelIcon(level: FeedbackEventDTO['level']) {
   switch (level) {
@@ -94,66 +75,16 @@ export function FeedbackCenter() {
   const clearLocalFeedbackEvents = usePilingStore((state) => state.clearLocalFeedbackEvents);
 
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [serverEvents, setServerEvents] = useState<FeedbackEventDTO[]>([]);
-  const [summary, setSummary] = useState<FeedbackSummary | null>(null);
-  const [health, setHealth] = useState<ReadyPayload | null>(null);
 
-  const isMountedRef = useRef(false);
-  const inFlightRef = useRef(false);
-  const healthFetchedAtRef = useRef(0);
-
-  const loadFeedback = useCallback(async (options?: { includeHealth?: boolean; silent?: boolean }) => {
-    if (!user) {
-      return;
-    }
-
-    if (inFlightRef.current) {
-      return;
-    }
-
-    const includeHealth = options?.includeHealth ?? false;
-    const silent = options?.silent ?? false;
-    const shouldLoadHealth =
-      includeHealth &&
-      (user.role === 'ADMIN' || user.role === 'DISPATCHER') &&
-      (healthFetchedAtRef.current === 0 || Date.now() - healthFetchedAtRef.current >= HEALTH_REFRESH_INTERVAL_MS);
-
-    inFlightRef.current = true;
-    if (!silent) {
-      setLoading(true);
-    }
-
-    try {
-      const requests: Promise<Response>[] = [authFetch('/api/feedback/events?limit=25')];
-      if (shouldLoadHealth) {
-        requests.push(fetch('/api/ready', { credentials: 'same-origin' }));
-      }
-
-      const [eventsRes, readyRes] = await Promise.all(requests);
-
-      if (eventsRes.ok) {
-        const eventsData = await eventsRes.json();
-        if (isMountedRef.current) {
-          setServerEvents(eventsData.events || []);
-          setSummary(eventsData.summary || null);
-        }
-      }
-
-      if (readyRes?.ok) {
-        const readyData = (await readyRes.json()) as ReadyPayload;
-        healthFetchedAtRef.current = Date.now();
-        if (isMountedRef.current) {
-          setHealth(readyData);
-        }
-      }
-    } finally {
-      inFlightRef.current = false;
-      if (!silent && isMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [user]);
+  // Лента, сводка и состояние системы общие для всех экземпляров: в админской
+  // оболочке их два (десктопная и мобильная шапки живут в дереве
+  // одновременно). См. `use-feedback-feed`.
+  const {
+    events: serverEvents,
+    summary,
+    health,
+    loading,
+  } = useFeedbackFeed({ enabled: Boolean(user), isPrivileged, open });
 
   const updateEventState = useCallback(
     async (eventId: string, operation: 'read' | 'acknowledge') => {
@@ -167,12 +98,10 @@ export function FeedbackCenter() {
       }
 
       const payload = await response.json();
-      setServerEvents((current) =>
-        current.map((event) => (event.id === eventId ? payload.event : event))
-      );
-      await loadFeedback();
+      replaceFeedbackEvent(eventId, payload.event);
+      await loadFeedbackFeed();
     },
-    [loadFeedback]
+    []
   );
 
   const markAllRead = useCallback(async () => {
@@ -186,58 +115,15 @@ export function FeedbackCenter() {
     }
 
     const payload = await response.json();
-    setServerEvents(payload.events || []);
-    setSummary(payload.summary || null);
+    replaceFeedbackFeed(payload.events || [], payload.summary || null);
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
-    isMountedRef.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
-    void loadFeedback({ includeHealth: true });
-
-    const getIntervalMs = () => {
-      if (document.hidden) return HIDDEN_POLL_INTERVAL_MS;
-      return open ? OPEN_POLL_INTERVAL_MS : CLOSED_POLL_INTERVAL_MS;
-    };
-
-    let intervalId = window.setInterval(() => {
-      void loadFeedback({ includeHealth: open, silent: true });
-    }, getIntervalMs());
-
-    const restartInterval = () => {
-      window.clearInterval(intervalId);
-      intervalId = window.setInterval(() => {
-        void loadFeedback({ includeHealth: open, silent: true });
-      }, getIntervalMs());
-    };
-
-    const handleVisibilityChange = () => {
-      restartInterval();
-      if (!document.hidden) {
-        void loadFeedback({ includeHealth: true, silent: true });
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      isMountedRef.current = false;
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.clearInterval(intervalId);
-    };
-  }, [loadFeedback, open, user]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
-    void loadFeedback({ includeHealth: true, silent: true });
+    void loadFeedbackFeed({ includeHealth: true, silent: true });
 
     let cancelled = false;
     let source: EventSource | null = null;
@@ -249,7 +135,7 @@ export function FeedbackCenter() {
       source = new EventSource('/api/feedback/stream', { withCredentials: true });
       source.addEventListener('sync', () => {
         attempt = 0;
-        void loadFeedback();
+        void loadFeedbackFeed();
       });
       source.onerror = () => {
         source?.close();
@@ -267,7 +153,7 @@ export function FeedbackCenter() {
       if (retryTimer) clearTimeout(retryTimer);
       source?.close();
     };
-  }, [loadFeedback, open]);
+  }, [open]);
 
   const mergedEvents = useMemo(() => {
     const combined = [...localFeedbackEvents, ...serverEvents];
@@ -307,7 +193,7 @@ export function FeedbackCenter() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={() => void loadFeedback({ includeHealth: true })} size="sm" variant="outline" className="h-8 text-xs">
+              <Button onClick={() => void loadFeedbackFeed({ includeHealth: true })} size="sm" variant="outline" className="h-8 text-xs">
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
               </Button>
