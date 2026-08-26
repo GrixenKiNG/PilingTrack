@@ -121,3 +121,36 @@ describe('health-tracker backup monitoring', () => {
     expect(status.status).toBe('degraded');
   });
 });
+
+describe('shouldLogHealthSnapshot', () => {
+  it('пишет первую поломку — предыдущей картины ещё нет', async () => {
+    const { shouldLogHealthSnapshot } = await import('../health-tracker/tracker');
+
+    expect(shouldLogHealthSnapshot('unhealthy|up|down', null, 0)).toBe(true);
+  });
+
+  it('молчит, пока картина не изменилась и час не прошёл', async () => {
+    const { shouldLogHealthSnapshot, HEALTH_LOG_REMINDER_MS } = await import(
+      '../health-tracker/tracker'
+    );
+
+    const same = 'unhealthy|up|down';
+    expect(shouldLogHealthSnapshot(same, same, 15_000)).toBe(false);
+    expect(shouldLogHealthSnapshot(same, same, HEALTH_LOG_REMINDER_MS - 1)).toBe(false);
+  });
+
+  it('напоминает о неизменившейся поломке раз в час', async () => {
+    const { shouldLogHealthSnapshot, HEALTH_LOG_REMINDER_MS } = await import(
+      '../health-tracker/tracker'
+    );
+
+    const same = 'unhealthy|up|down';
+    expect(shouldLogHealthSnapshot(same, same, HEALTH_LOG_REMINDER_MS)).toBe(true);
+  });
+
+  it('пишет смену картины немедленно, не дожидаясь часа', async () => {
+    const { shouldLogHealthSnapshot } = await import('../health-tracker/tracker');
+
+    expect(shouldLogHealthSnapshot('unhealthy|up|down', 'unhealthy|down|down', 1_000)).toBe(true);
+  });
+});
