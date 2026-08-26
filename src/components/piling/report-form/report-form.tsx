@@ -55,7 +55,24 @@ function useTempState() {
   };
 }
 
-export function ReportForm() {
+interface ReportFormProps {
+  /**
+   * Раздел, к которому проскроллить при открытии: `inspection`, `defect`,
+   * `photo` или `submit`.
+   *
+   * На своём маршруте эту роль играет хеш адреса (`/report#photo`), но экран
+   * смены показывает отчёт внутри себя, без своего адреса, — и передаёт раздел
+   * пропом. Не задан — работает прежний разбор хеша.
+   */
+  anchor?: string;
+  /**
+   * Куда уходить по «Готово» и по кнопке назад, когда отчёт вложен в чужой
+   * экран. Без него — на `/operator`, как с отдельного маршрута.
+   */
+  onExit?: () => void;
+}
+
+export function ReportForm({ anchor, onExit }: ReportFormProps) {
   const {
     reportId,
     date, setDate, shiftStart, setShiftStart, shiftEnd, setShiftEnd,
@@ -137,13 +154,15 @@ export function ReportForm() {
   ]);
 
   useEffect(() => {
-    if (loading || !window.location.hash) return;
-    const targetId = window.location.hash.slice(1);
+    // Проп важнее хеша: вложенный отчёт своего адреса не имеет, а чужой хеш,
+    // оставшийся в строке от предыдущего экрана, увёл бы не туда.
+    const targetId = anchor ?? (window.location.hash ? window.location.hash.slice(1) : '');
+    if (loading || !targetId) return;
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [loading]);
+  }, [loading, anchor]);
 
   // Computed
   const totalPiles = piles.reduce((s, p) => s + p.count, 0);
@@ -218,7 +237,7 @@ export function ReportForm() {
         totalPiles={totalPiles} totalPileMeters={totalPileMeters}
         totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
         totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
-        onDone={() => router.push('/operator')}
+        onDone={() => (onExit ? onExit() : router.push('/operator'))}
       />
     );
   }
@@ -227,7 +246,7 @@ export function ReportForm() {
     <div className="flex flex-col min-h-screen bg-muted">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card border-b px-4 py-3 pt-safe flex items-center gap-3">
-        <button onClick={() => router.push('/operator')}
+        <button onClick={() => (onExit ? onExit() : router.push('/operator'))}
           aria-label="Вернуться к операторской смене"
           className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
           <ArrowLeft className="w-5 h-5 text-muted-foreground" />

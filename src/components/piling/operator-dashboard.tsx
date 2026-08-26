@@ -13,7 +13,8 @@ import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { MeterReadingDialog } from '@/components/piling/operator/meter-reading-dialog';
 import { HandoverDialog } from '@/components/piling/operator/handover-dialog';
 import { OperatorDocumentReminder } from '@/components/piling/operator-document-reminder';
-import { ShiftPhaseStrip, ShiftStepCard } from '@/components/piling/operator/shift-step-card';
+import { ShiftPhaseStrip, ShiftStepScreen, ShiftClosedCard } from '@/components/piling/operator/shift-step-screens';
+import { ShiftTaskScreen, type ShiftTask } from '@/components/piling/operator/shift-task-screen';
 import { resolveShiftPhase } from '@/components/piling/operator/shift-phase';
 import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
@@ -61,6 +62,14 @@ export function OperatorDashboard() {
   // у большинства машина одна, и лишний выбор ей только мешает.
   const [pickerOpen, setPickerOpen] = useState(false);
   const [shiftFacts, setShiftFacts] = useState<OperatorShiftFacts | null>(null);
+  /**
+   * Работа текущего шага — осмотр или отчёт — показывается внутри этого экрана.
+   *
+   * Раньше оба уводили на свой маршрут (`/inspections/[id]`, `/report`), и цикл
+   * смены разваливался на три окна с разными шапками. Маршруты никуда не
+   * делись: по ним ходят диспетчер и механик.
+   */
+  const [task, setTask] = useState<ShiftTask | null>(null);
   // Установка берётся из экипажа: оператор не выбирает машину, он на ней стоит.
   const [crew, setCrew] = useState<{ equipmentId: string; equipmentName: string } | null>(null);
 
@@ -128,7 +137,10 @@ export function OperatorDashboard() {
   const ctaDisabled = noSite || !currentSite;
   const active = Boolean(todayReport);
   const displayName = user?.name?.trim() || 'Оператор';
-  const openReport = (target?: string) => router.push(target ? `/report#${target}` : '/report');
+  // Отчёт открывается внутри экрана смены, а не по своему маршруту: уход на
+  // /report разрывал цикл смены и, что хуже, позволял начать отчёт до пуска —
+  // такой отчёт заводился без shiftId и уже никогда к смене не привязывался.
+  const openReport = (anchor?: string) => setTask({ kind: 'report', anchor });
 
   // Шаг смены считает чистая функция, покрытая тестами: правило «что делать
   // дальше» — самое дорогое на этом экране, и в разметке его не проверишь.
@@ -149,7 +161,8 @@ export function OperatorDashboard() {
     const existing = wanted === 'POST_SHIFT'
       ? shiftFacts?.inspection.postShift
       : shiftFacts?.inspection.preShift;
-    if (existing) return router.push(`/inspections/${existing.id}`);
+    const title = wanted === 'POST_SHIFT' ? 'Послесменный осмотр' : 'Предсменный осмотр';
+    if (existing) return setTask({ kind: 'inspection', inspectionId: existing.id, title });
     const equipmentId = shiftFacts?.equipment?.id;
     const shiftId = shiftFacts?.shift?.id;
     // Нет смены или машины — заводить осмотр не от чего; общая форма хотя бы
@@ -167,7 +180,7 @@ export function OperatorDashboard() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Не удалось начать осмотр');
-      router.push(`/inspections/${body.inspection.id}`);
+      setTask({ kind: 'inspection', inspectionId: body.inspection.id, title });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Не удалось начать осмотр');
     } finally {
@@ -323,6 +336,23 @@ export function OperatorDashboard() {
     void loadData();
   };
 
+  /** Быстрые действия экрана работы. Все ведут в нужный раздел отчёта. */
+  const runQuickAction = (action: 'defect' | 'downtime' | 'pile') =>
+    openReport(action === 'defect' ? 'defect' : action === 'downtime' ? 'defect' : 'submit');
+
+  // Работа шага занимает экран целиком: две шапки на телефоне съедают треть
+  // высоты, а полоса шагов внутри задачи и так показывает, где человек.
+  if (task && phase) {
+    return (
+      <ShiftTaskScreen
+        task={task}
+        phase={phase.phase}
+        equipmentName={shiftFacts?.equipment?.name ?? null}
+        onExit={() => { setTask(null); void loadData(); }}
+      />
+    );
+  }
+
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
       <header className="flex items-center justify-between">
@@ -363,7 +393,19 @@ export function OperatorDashboard() {
           </div>
 
           <ShiftPhaseStrip phase={phase.phase} />
-          <ShiftStepCard phase={phase} onAction={runPhaseAction} busy={stepBusy} />
+          {/* Смена уже передана — показываем итог дня, а не очередной шаг:
+              делать больше нечего, и кнопка «ждём приёмки» об этом молчала. */}
+          {shiftFacts && shiftFacts.shift?.state === 'HANDOVER_PENDING' ? (
+            <ShiftClosedCard facts={shiftFacts} onOpenReport={() => openReport()} />
+          ) : shiftFacts ? (
+            <ShiftStepScreen
+              facts={shiftFacts}
+              phase={phase}
+              onAction={runPhaseAction}
+              busy={stepBusy}
+              onQuick={runQuickAction}
+            />
+          ) : null}
 
           {pickerOpen && phase.target === 'open-shift' && (
             <section aria-label="Выбор установки" className="space-y-2">

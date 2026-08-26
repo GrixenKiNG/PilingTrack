@@ -5,12 +5,14 @@ import { resolveShiftPhase } from '../shift-phase';
 const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => ({
   assignments: [{ equipmentId: 'eq-1', equipmentName: 'Liebherr LRH 100 №1', model: 'LRH 100',
     siteId: 'site-1', siteName: 'Объект 1' }],
-  equipment: { id: 'eq-1', name: 'Liebherr LRH 100 №1', model: 'LRH 100' },
-  shift: { id: 'shift-1', state: 'PENDING_ACCEPTANCE', version: 1, type: 'DAY', productionDate: '2026-08-20' },
+  equipment: { id: 'eq-1', name: 'Liebherr LRH 100 №1', model: 'LRH 100', engineHoursTotal: 8421, nextMaintenanceAtHours: 8700 },
+  shift: { id: 'shift-1', state: 'PENDING_ACCEPTANCE', version: 1, type: 'DAY', productionDate: '2026-08-20', startedAt: null },
   readiness: { verdict: 'ALLOWED', status: 'READY', score: 100, blockers: [] },
   inspection: { preShift: null, postShift: null },
   report: null,
   meterKnownToday: false,
+  meterCurrent: 8421,
+  pilesToday: 0,
   incomingHandover: null,
   startWaiver: null,
   clearance: { blockers: [], warnings: [] },
@@ -24,7 +26,7 @@ describe('resolveShiftPhase', () => {
   it('без раздела «После смены» смена не застревает на работе', () => {
     const phase = resolveShiftPhase(
       facts({
-        shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20' },
+        shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20', startedAt: null },
         postShiftAvailable: false,
         report: { id: 'rep-1', status: 'submitted' },
       }),
@@ -47,7 +49,7 @@ describe('resolveShiftPhase', () => {
   it('начатую смену просроченный документ не останавливает', () => {
     const phase = resolveShiftPhase(
       facts({
-        shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20' },
+        shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20', startedAt: null },
         clearance: { blockers: ['Просрочен: Удостоверение машиниста — 1 день'], warnings: [] },
       }),
       'op-1',
@@ -113,19 +115,19 @@ describe('resolveShiftPhase', () => {
   // Свою передачу принять нельзя — и предлагать это кнопкой было бы обманом.
   it('свою передачу не предлагает принимать', () => {
     const mine = resolveShiftPhase(facts({
-      incomingHandover: { id: 'h-1', shiftId: 'shift-0', summary: 'Течь шланга', submittedById: 'op-1' },
+      incomingHandover: { id: 'h-1', shiftId: 'shift-0', summary: 'Течь шланга', submittedById: 'op-1', submittedByName: 'Иванов И.И.' },
     }), 'op-1');
     expect(mine.target).toBeNull();
     expect(mine.blockers[0]).toMatch(/другой оператор/i);
 
     const foreign = resolveShiftPhase(facts({
-      incomingHandover: { id: 'h-1', shiftId: 'shift-0', summary: 'Течь шланга', submittedById: 'op-2' },
+      incomingHandover: { id: 'h-1', shiftId: 'shift-0', summary: 'Течь шланга', submittedById: 'op-2', submittedByName: 'Петров П.П.' },
     }), 'op-1');
     expect(foreign.target).toBe('handover-accept');
   });
 
   it('в идущей смене ведёт к осмотру после работ, затем к отчёту, затем к сдаче', () => {
-    const working = facts({ shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20' } });
+    const working = facts({ shift: { id: 'shift-1', state: 'STARTED', version: 2, type: 'DAY', productionDate: '2026-08-20', startedAt: null } });
     expect(resolveShiftPhase(working, 'op-1').target).toBe('post-inspection');
 
     const afterInspection = { ...working, inspection: { preShift: completed, postShift: completed } };

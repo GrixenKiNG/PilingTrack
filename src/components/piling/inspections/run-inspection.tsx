@@ -75,7 +75,20 @@ const emptyAnswer = (): ItemAnswer => ({ result: '', value: '', note: '' });
 
 // ---------- main component ----------
 
-export function RunInspection({ inspectionId }: { inspectionId: string }) {
+interface RunInspectionProps {
+  inspectionId: string;
+  /**
+   * Куда уходить по завершении осмотра, когда компонент вложен в чужой экран.
+   *
+   * Без него осмотр уводит на `/inspections` — так он и работает на своём
+   * маршруте у диспетчера и механика. Экран смены оператора показывает осмотр
+   * внутри себя, и уход на список там разорвал бы цикл смены: человек оказался
+   * бы в чужом разделе вместо следующего шага.
+   */
+  onExit?: () => void;
+}
+
+export function RunInspection({ inspectionId, onExit }: RunInspectionProps) {
   const router = useRouter();
   const currentUser = usePilingStore((s) => s.currentUser);
 
@@ -217,7 +230,8 @@ export function RunInspection({ inspectionId }: { inspectionId: string }) {
         throw new Error(err.error || 'Ошибка завершения');
       }
       toast.success('Осмотр завершён');
-      router.push('/inspections');
+      if (onExit) onExit();
+      else router.push('/inspections');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Ошибка');
     } finally {

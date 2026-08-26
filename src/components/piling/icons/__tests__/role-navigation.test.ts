@@ -16,12 +16,24 @@ describe('ROLE_NAVIGATION', () => {
   it('covers the operator workflow routes', () => {
     expect(ROLE_NAVIGATION.OPERATOR.map(({ href, icon }) => [href, icon])).toEqual([
       ['/operator', 'home'],
-      ['/admin/to', 'technical-readiness'],
-      ['/report', 'shift-start'],
-      ['/monitoring', 'monitoring'],
       ['/history', 'history'],
     ]);
     expect(ROLE_NAVIGATION.ASSISTANT).toEqual(ROLE_NAVIGATION.OPERATOR);
+  });
+
+  /**
+   * Обходных путей мимо шага смены быть не должно.
+   *
+   * Экран смены закрывает недоступные шаги замком, но замок держит, только
+   * пока те же места не открыты из панели снизу. Отчёт, начатый до пуска,
+   * заводился без `shiftId` и к смене уже не привязывался — смену нельзя было
+   * сдать. Тест сторожит именно это, а не длину списка.
+   */
+  it('keeps the operator out of routes that bypass the shift step', () => {
+    const routes = ROLE_NAVIGATION.OPERATOR.map((item) => item.href);
+    for (const bypass of ['/report', '/admin/to', '/monitoring']) {
+      expect(routes).not.toContain(bypass);
+    }
   });
 
   it('keeps administrator-only destinations out of dispatcher navigation', () => {

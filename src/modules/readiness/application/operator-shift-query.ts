@@ -22,14 +22,24 @@ export interface OperatorShiftFacts {
   /**
    * Машина сегодняшней смены. Пока смены нет и закреплённых машин несколько —
    * `null`: выбирать за человека нельзя, он выбирает сам.
+   *
+   * Наработка и порог следующего ТО — для карточки приёмки: оператор принимает
+   * машину, а не строку в списке, и «сколько осталось до ТО» он должен видеть
+   * до того, как распишется за неё.
    */
-  equipment: { id: string; name: string; model: string } | null;
+  equipment: {
+    id: string; name: string; model: string;
+    engineHoursTotal: number | null;
+    nextMaintenanceAtHours: number | null;
+  } | null;
   shift: {
     id: string;
     state: string;
     version: number;
     type: string;
     productionDate: string;
+    /** Когда смена фактически пущена — от него считается время в работе. */
+    startedAt: string | null;
   } | null;
   readiness: {
     verdict: string | null;
@@ -46,8 +56,23 @@ export interface OperatorShiftFacts {
   report: { id: string; status: string } | null;
   /** Показание счётчика за сегодня снято. */
   meterKnownToday: boolean;
-  /** Передача от предыдущей смены, ожидающая приёмки. */
-  incomingHandover: { id: string; shiftId: string; summary: string; submittedById: string } | null;
+  /**
+   * Последнее показание счётчика моточасов. Экран показывает его на пуске
+   * («на старт») и в работе — из него же видно наработку за смену.
+   */
+  meterCurrent: number | null;
+  /** Свай зачтено в сегодняшнем отчёте — счётчик на экране работы. */
+  pilesToday: number;
+  /**
+   * Передача от предыдущей смены, ожидающая приёмки.
+   *
+   * Имя сдающего, а не только его идентификатор: «Принять машину у Петрова
+   * П.П.» — это разговор двух людей, и второго надо назвать.
+   */
+  incomingHandover: {
+    id: string; shiftId: string; summary: string;
+    submittedById: string; submittedByName: string | null;
+  } | null;
   /** Разрешение диспетчера на пуск, выданное этой смене. */
   startWaiver: { id: string; reason: string } | null;
   /**
@@ -96,7 +121,8 @@ export async function getOperatorShiftFacts(
   const empty: OperatorShiftFacts = {
     assignments: [], equipment: null, shift: null, readiness: null,
     inspection: { preShift: null, postShift: null },
-    report: null, meterKnownToday: false, incomingHandover: null, startWaiver: null,
+    report: null, meterKnownToday: false, meterCurrent: null, pilesToday: 0,
+    incomingHandover: null, startWaiver: null,
     clearance, postShiftAvailable: false,
   };
 
@@ -108,7 +134,12 @@ export async function getOperatorShiftFacts(
   const crews = await db.crew.findMany({
     where: { operatorId, isActive: true, equipment: { tenantId, isActive: true }, site: { tenantId } },
     select: {
-      equipment: { select: { id: true, name: true, model: true } },
+      equipment: {
+        select: {
+          id: true, name: true, model: true,
+          engineHoursTotal: true, nextMaintenanceAtHours: true,
+        },
+      },
       site: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: 'asc' },
@@ -132,7 +163,10 @@ export async function getOperatorShiftFacts(
       state: { in: ['PLANNED', 'PENDING_ACCEPTANCE', 'STARTED', 'HANDOVER_PENDING'] },
     },
     orderBy: { productionDate: 'desc' },
-    select: { id: true, state: true, version: true, type: true, productionDate: true, equipmentId: true },
+    select: {
+      id: true, state: true, version: true, type: true, productionDate: true,
+      equipmentId: true, startedAt: true,
+    },
   });
 
   // Машина смены; без смены — единственная закреплённая, иначе выбор за
@@ -142,7 +176,7 @@ export async function getOperatorShiftFacts(
     : crews.length === 1 ? crews[0].equipment : null;
   if (!equipment) return { ...empty, assignments };
 
-  const [current, meterToday, incoming] = await Promise.all([
+  const [current, meterToday, incoming, lastMeter] = await Promise.all([
     db.currentReadiness.findFirst({
       where: { tenantId, equipmentId: equipment.id },
       select: { verdict: true, status: true, score: true, snapshotId: true },
@@ -157,7 +191,36 @@ export async function getOperatorShiftFacts(
       orderBy: { submittedAt: 'desc' },
       select: { id: true, shiftId: true, summary: true, submittedById: true },
     }),
+    // Последнее показание счётчика — не только за сегодня: на карточке приёмки
+    // машины показание вчерашней смены честнее прочерка.
+    db.meterReading.findFirst({
+      where: { tenantId, equipmentId: equipment.id },
+      orderBy: { recordedAt: 'desc' },
+      select: { engineHours: true },
+    }),
   ]);
+
+  // Имя сдающего — отдельным запросом: у `ShiftHandover` нет связи с `User`,
+  // там только идентификатор. Спрашиваем, лишь когда есть кого называть.
+  const submitter = incoming
+    ? await db.user.findFirst({
+        where: { id: incoming.submittedById, tenantId },
+        select: { name: true },
+      })
+    : null;
+  const handover = incoming
+    ? {
+        id: incoming.id, shiftId: incoming.shiftId, summary: incoming.summary,
+        submittedById: incoming.submittedById,
+        submittedByName: submitter?.name ?? null,
+      }
+    : null;
+  const meterCurrent = lastMeter?.engineHours ?? equipment.engineHoursTotal ?? null;
+  const equipmentDto = {
+    id: equipment.id, name: equipment.name, model: equipment.model,
+    engineHoursTotal: equipment.engineHoursTotal,
+    nextMaintenanceAtHours: equipment.nextMaintenanceAtHours,
+  };
 
   const snapshot = current
     ? await db.readinessScoreSnapshot.findFirst({
@@ -174,12 +237,13 @@ export async function getOperatorShiftFacts(
     return {
       ...empty,
       assignments,
-      equipment: { id: equipment.id, name: equipment.name, model: equipment.model },
+      equipment: equipmentDto,
       readiness: current
         ? { verdict: current.verdict, status: current.status, score: current.score, blockers }
         : null,
       meterKnownToday: meterToday > 0,
-      incomingHandover: incoming,
+      meterCurrent,
+      incomingHandover: handover,
     };
   }
 
@@ -191,7 +255,9 @@ export async function getOperatorShiftFacts(
     db.report.findFirst({
       where: { tenantId, shiftId: shift.id },
       orderBy: { updatedAt: 'desc' },
-      select: { id: true, status: true },
+      // Сваи считаем суммой по строкам работ отчёта, а не числом строк: в одной
+      // строке может стоять «пикет 12, свай 4», и подсчёт строк дал бы 1.
+      select: { id: true, status: true, piles: { select: { count: true } } },
     }),
     db.shiftStartWaiver.findFirst({
       where: { tenantId, shiftId: shift.id },
@@ -212,18 +278,21 @@ export async function getOperatorShiftFacts(
 
   return {
     assignments,
-    equipment: { id: equipment.id, name: equipment.name, model: equipment.model },
+    equipment: equipmentDto,
     shift: {
       id: shift.id, state: shift.state, version: shift.version, type: shift.type,
       productionDate: shift.productionDate.toISOString().slice(0, 10),
+      startedAt: shift.startedAt?.toISOString() ?? null,
     },
     readiness: current
       ? { verdict: current.verdict, status: current.status, score: current.score, blockers }
       : null,
     inspection: { preShift: byPhase('PRE_SHIFT'), postShift: byPhase('POST_SHIFT') },
-    report,
+    report: report ? { id: report.id, status: report.status } : null,
     meterKnownToday: meterToday > 0,
-    incomingHandover: incoming,
+    meterCurrent,
+    pilesToday: report?.piles.reduce((sum, row) => sum + row.count, 0) ?? 0,
+    incomingHandover: handover,
     startWaiver: waiver,
     clearance,
     postShiftAvailable,
