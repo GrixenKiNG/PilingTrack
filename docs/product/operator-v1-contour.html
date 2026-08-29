@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Контур смены оператора</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=PT+Sans:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+  :root {
+    --ground: #f3f4f6;
+    --surface: #ffffff;
+    --surface-2: #e9ebee;
+    --ink: #16181a;
+    --ink-muted: #5e6469;
+    --ink-faint: #8c9196;
+    --line: #d5d9dd;
+    --line-strong: #b6bcc2;
+    --signal: #c04300;
+    --signal-fill: #e2650f;
+    --signal-wash: #fbeade;
+    --keep: #1c6b4f;
+    --keep-wash: #e3f0eb;
+    --stop: #a3261f;
+    --stop-wash: #f8e6e4;
+    --shadow: 0 1px 2px color-mix(in oklab, var(--ink) 10%, transparent),
+              0 8px 24px color-mix(in oklab, var(--ink) 6%, transparent);
+
+    --f-display: "Oswald", "Arial Narrow", system-ui, sans-serif;
+    --f-body: "PT Sans", "Segoe UI", system-ui, sans-serif;
+    --f-mono: "JetBrains Mono", "Consolas", ui-monospace, monospace;
+
+    --measure: 62ch;
+    --pad: clamp(1.25rem, 4vw, 3rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1113;
+      --surface: #171a1d;
+      --surface-2: #22262a;
+      --ink: #e7eaec;
+      --ink-muted: #9aa0a5;
+      --ink-faint: #6f757a;
+      --line: #2c3135;
+      --line-strong: #3d4348;
+      --signal: #f5893c;
+      --signal-fill: #e2650f;
+      --signal-wash: #2c1a0f;
+      --keep: #58c398;
+      --keep-wash: #14261f;
+      --stop: #ef7b6e;
+      --stop-wash: #2a1614;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1113;
+    --surface: #171a1d;
+    --surface-2: #22262a;
+    --ink: #e7eaec;
+    --ink-muted: #9aa0a5;
+    --ink-faint: #6f757a;
+    --line: #2c3135;
+    --line-strong: #3d4348;
+    --signal: #f5893c;
+    --signal-fill: #e2650f;
+    --signal-wash: #2c1a0f;
+    --keep: #58c398;
+    --keep-wash: #14261f;
+    --stop: #ef7b6e;
+    --stop-wash: #2a1614;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 var(--pad) 6rem;
+  }
+
+  .eyebrow {
+    font-family: var(--f-display);
+    font-weight: 500;
+    font-size: .74rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--signal);
+    margin: 0;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--f-display);
+    font-weight: 500;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.12;
+  }
+
+  /* ---------- шапка ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: clamp(2.5rem, 7vw, 5rem) 0 2rem;
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .masthead h1 {
+    font-size: clamp(2.6rem, 8vw, 5rem);
+    letter-spacing: -.01em;
+    text-transform: uppercase;
+  }
+
+  .masthead .lede {
+    max-width: var(--measure);
+    color: var(--ink-muted);
+    margin: 0;
+    font-size: 1.06rem;
+  }
+
+  .stamp {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    font-family: var(--f-mono);
+    font-size: .78rem;
+    color: var(--ink-faint);
+    letter-spacing: .02em;
+  }
+
+  .stamp b { color: var(--ink-muted); font-weight: 500; }
+
+  /* ---------- тезис ---------- */
+
+  .thesis {
+    margin: 3.5rem 0 0;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 6px solid var(--signal-fill);
+    box-shadow: var(--shadow);
+  }
+
+  .thesis p {
+    margin: 0;
+    font-family: var(--f-display);
+    font-weight: 400;
+    font-size: clamp(1.35rem, 3.4vw, 2rem);
+    line-height: 1.28;
+    text-wrap: balance;
+  }
+
+  .thesis .why {
+    font-family: var(--f-body);
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--ink-muted);
+    margin-top: 1rem;
+    max-width: var(--measure);
+  }
+
+  /* ---------- секции ---------- */
+
+  section { margin-top: clamp(3.5rem, 8vw, 6rem); }
+
+  .sec-head {
+    display: grid;
+    gap: .6rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--line-strong);
+    margin-bottom: 2rem;
+  }
+
+  .sec-head h2 {
+    font-size: clamp(1.5rem, 4vw, 2.1rem);
+    text-transform: uppercase;
+    letter-spacing: .01em;
+  }
+
+  .sec-head p {
+    margin: 0;
+    max-width: var(--measure);
+    color: var(--ink-muted);
+  }
+
+  /* ---------- реестр «убираем» ---------- */
+
+  .ledger { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    background: var(--surface);
+    padding: 1.5rem clamp(1rem, 3vw, 1.75rem);
+  }
+
+  @media (min-width: 800px) {
+    .row { grid-template-columns: 15rem minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; align-items: start; }
+  }
+
+  .row .what { display: grid; gap: .5rem; align-content: start; }
+
+  .row h3 {
+    font-size: 1.12rem;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+  }
+
+  .ref {
+    font-family: var(--f-mono);
+    font-size: .72rem;
+    color: var(--ink-faint);
+  }
+
+  .col-label {
+    font-family: var(--f-display);
+    font-size: .68rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: .4rem;
+  }
+
+  .row p { margin: 0; font-size: .95rem; }
+  .row .fix { color: var(--ink); }
+  .row .fix strong { color: var(--keep); font-weight: 700; }
+  .row .broken { color: var(--ink-muted); }
+
+  .verdict {
+    display: inline-block;
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: .22rem .5rem;
+    border: 1px solid currentColor;
+    width: max-content;
+  }
+
+  .verdict.cut { color: var(--stop); background: var(--stop-wash); }
+  .verdict.trim { color: var(--signal); background: var(--signal-wash); }
+
+  /* ---------- контур: настоящая последовательность ---------- */
+
+  .steps { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+
+  .step {
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    gap: 1rem 1.25rem;
+    padding: 1.25rem clamp(1rem, 3vw, 1.75rem);
+    align-items: baseline;
+  }
+
+  @media (min-width: 860px) {
+    .step { grid-template-columns: 3.5rem 16rem minmax(0, 1fr); }
+  }
+
+  .step .num {
+    font-family: var(--f-mono);
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--signal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .step h3 { font-size: 1.1rem; text-transform: uppercase; }
+
+  .step .stores {
+    margin: 0;
+    font-size: .93rem;
+    color: var(--ink-muted);
+    grid-column: 2 / -1;
+  }
+
+  @media (min-width: 860px) {
+    .step .stores { grid-column: 3; }
+  }
+
+  .step .stores code {
+    font-family: var(--f-mono);
+    font-size: .82em;
+    background: var(--surface-2);
+    padding: .1em .35em;
+    color: var(--ink);
+  }
+
+  .step.is-new { border-left: 4px solid var(--signal-fill); }
+
+  .tag-new {
+    font-family: var(--f-mono);
+    font-size: .62rem;
+    letter-spacing: .1em;
+    color: var(--signal);
+    text-transform: uppercase;
+    display: block;
+    margin-top: .25rem;
+  }
+
+  /* ---------- телефоны ---------- */
+
+  .phones-scroll {
+    overflow-x: auto;
+    padding-bottom: 1.5rem;
+    margin: 0 calc(var(--pad) * -1);
+    padding-left: var(--pad);
+    padding-right: var(--pad);
+  }
+
+  .phones {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 360px;
+    gap: 1.75rem;
+    width: max-content;
+    align-items: start;
+  }
+
+  .phone-block { display: grid; gap: .9rem; }
+
+  .phone-cap { display: grid; gap: .3rem; }
+  .phone-cap h3 { font-size: 1rem; text-transform: uppercase; }
+  .phone-cap p { margin: 0; font-size: .88rem; color: var(--ink-muted); }
+
+  .phone {
+    width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    font-size: 15px;
+  }
+
+  .phone .status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .55rem 1rem;
+    background: var(--surface-2);
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dot {
+    display: inline-block;
+    width: .5rem; height: .5rem;
+    border-radius: 50%;
+    background: var(--keep);
+    margin-right: .35rem;
+    vertical-align: middle;
+  }
+
+  .dot.off { background: var(--signal-fill); }
+
+  .phone .top {
+    padding: .9rem 1rem;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: .2rem;
+  }
+
+  .phone .machine {
+    font-family: var(--f-display);
+    font-size: 1.02rem;
+    text-transform: uppercase;
+    letter-spacing: .01em;
+  }
+
+  .phone .where { font-size: .8rem; color: var(--ink-muted); }
+
+  .phone .body { padding: 1rem; display: grid; gap: .85rem; }
+
+  .stepchip {
+    font-family: var(--f-mono);
+    font-size: .7rem;
+    letter-spacing: .06em;
+    color: var(--signal);
+    text-transform: uppercase;
+  }
+
+  .task {
+    font-family: var(--f-display);
+    font-size: 1.5rem;
+    line-height: 1.15;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .meta {
+    font-family: var(--f-mono);
+    font-size: .82rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 1rem;
+    background: var(--signal-fill);
+    color: #fff;
+    font-family: var(--f-display);
+    font-size: 1.05rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 4px;
+    cursor: default;
+  }
+
+  .btn.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+  }
+
+  .btn.danger { background: var(--stop); }
+
+  .note {
+    margin: 0;
+    font-size: .82rem;
+    color: var(--ink-muted);
+    border-left: 3px solid var(--line-strong);
+    padding-left: .7rem;
+  }
+
+  .note.warn { border-left-color: var(--signal-fill); color: var(--ink); }
+
+  .handoff {
+    background: var(--surface-2);
+    padding: .7rem .8rem;
+    display: grid;
+    gap: .2rem;
+    border-radius: 4px;
+  }
+
+  .handoff .lbl {
+    font-family: var(--f-display);
+    font-size: .66rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .handoff p { margin: 0; font-size: .86rem; }
+
+  /* пункты осмотра */
+  .checkitem {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .6rem;
+    align-items: center;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .checkitem:last-of-type { border-bottom: none; }
+  .checkitem .txt { font-size: .93rem; line-height: 1.35; }
+  .crit { color: var(--stop); font-weight: 700; }
+
+  .answers { display: flex; gap: .3rem; }
+
+  .ans {
+    font-family: var(--f-mono);
+    font-size: .7rem;
+    padding: .45rem .55rem;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-muted);
+    border-radius: 3px;
+  }
+
+  .ans.on { background: var(--keep); border-color: var(--keep); color: #fff; }
+  .ans.bad { background: var(--stop); border-color: var(--stop); color: #fff; }
+
+  .progressbar { height: 4px; background: var(--surface-2); overflow: hidden; }
+  .progressbar i { display: block; height: 100%; background: var(--signal-fill); }
+
+  /* блокировка */
+  .blocked-head {
+    background: var(--stop);
+    color: #fff;
+    padding: 1rem;
+    display: grid;
+    gap: .25rem;
+  }
+
+  .blocked-head .t {
+    font-family: var(--f-display);
+    font-size: 1.55rem;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+
+  .blocked-head .s { font-size: .86rem; opacity: .92; }
+
+  .chain { display: grid; gap: 0; border: 1px solid var(--line); }
+
+  .chain div {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: .6rem;
+    padding: .6rem .7rem;
+    border-bottom: 1px solid var(--line);
+    font-size: .85rem;
+  }
+
+  .chain div:last-child { border-bottom: none; }
+
+  .chain .k {
+    font-family: var(--f-display);
+    font-size: .66rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-top: .15rem;
+  }
+
+  /* ---------- список «нельзя переопределить» ---------- */
+
+  .never {
+    border: 2px solid var(--stop);
+    background: var(--stop-wash);
+    padding: clamp(1.25rem, 3vw, 2rem);
+    display: grid;
+    gap: 1rem;
+  }
+
+  .never h3 {
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    color: var(--stop);
+  }
+
+  .never ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: .5rem;
+  }
+
+  @media (min-width: 700px) { .never ul { grid-template-columns: 1fr 1fr; gap: .5rem 2rem; } }
+
+  .never li {
+    font-size: .95rem;
+    padding-left: 1.4rem;
+    position: relative;
+  }
+
+  .never li::before {
+    content: "■";
+    position: absolute;
+    left: 0;
+    color: var(--stop);
+    font-size: .7rem;
+    top: .35rem;
+  }
+
+  .never p { margin: 0; font-size: .92rem; color: var(--ink-muted); max-width: var(--measure); }
+
+  /* ---------- отложено ---------- */
+
+  .parked { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+
+  .parked > div {
+    background: var(--surface);
+    padding: 1.15rem clamp(1rem, 3vw, 1.5rem);
+    display: grid;
+    gap: .35rem;
+  }
+
+  @media (min-width: 760px) {
+    .parked > div { grid-template-columns: 18rem minmax(0, 1fr); gap: 1.5rem; align-items: baseline; }
+  }
+
+  .parked h3 { font-size: 1rem; text-transform: uppercase; }
+  .parked p { margin: 0; font-size: .93rem; color: var(--ink-muted); }
+
+  footer {
+    margin-top: clamp(3.5rem, 8vw, 6rem);
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--ink);
+    font-family: var(--f-mono);
+    font-size: .78rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: space-between;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">PilingTrack · предложение по спецификации 3.0</p>
+    <h1>Контур смены оператора</h1>
+    <p class="lede">
+      Спецификация 3.0 написана на организацию, где есть механик, мастер и инженер по охране труда.
+      В «Орионе» их нет: их работу делает администратор через «Действую как». Ниже — что из спецификации
+      остаётся рабочим, что превращается в ритуал, и как контур выглядит на телефоне у машины.
+    </p>
+    <p class="stamp">
+      <span><b>Основание:</b> спецификация 3.0 «Сборка»</span>
+      <span><b>Проверено по коду:</b> operator/v2, modules/readiness</span>
+      <span><b>Дата:</b> 29.08.2026</span>
+    </p>
+  </header>
+
+  <div class="thesis">
+    <p>Система хранит сроки и факты, но не имитирует процессы, которых нет.</p>
+    <p class="why">
+      Проверка на каждый раздел одна: <em>кто именно, живой и отдельный от оператора, выполняет это
+      действие?</em> Если ответа нет — раздел даёт подписи без содержания. Такой аудит опаснее, чем его
+      отсутствие: при разборе он покажет «инструктаж проведён», хотя инструктажа не было.
+    </p>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Реестр правок</p>
+      <h2>Что убираем и чем заменяем</h2>
+      <p>
+        Пять разделов спецификации опираются на разделение обязанностей — контроль работает, потому что
+        проверяющий и проверяемый разные люди. При одной паре глаз на организацию разделение вырождается
+        в ритуал: те же экраны, те же подписи, ноль контроля.
+      </p>
+    </div>
+
+    <div class="ledger">
+
+      <div class="row">
+        <div class="what">
+          <h3>Инструктажи<br>и знания</h3>
+          <span class="ref">§6 · целиком</span>
+          <span class="verdict trim">свернуть в даты</span>
+        </div>
+        <div>
+          <span class="col-label">Почему не работает</span>
+          <p class="broken">
+            Инструктаж по определению проводит один человек другому: спецификация требует «кто провёл,
+            кто прошёл, программа, подписи». Проводит администратор, галочку прохождения ставит он же.
+          </p>
+        </div>
+        <div>
+          <span class="col-label">Что вместо</span>
+          <p class="fix">
+            Поля на операторе: <strong>дата проверки знаний, дата инструктажа, срок, скан протокола</strong>.
+            Заполняются, когда бумага подписана в реальном мире. Просрочено — блокировка на входе.
+            Не заполнено — предупреждение. Система говорит «бумага просрочена», а не «инструктаж не проведён».
+          </p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <h3>Тест знаний<br>5 вопросов</h3>
+          <span class="ref">§6 · оперативный</span>
+          <span class="verdict cut">убрать из v1</span>
+        </div>
+        <div>
+          <span class="col-label">Почему не работает</span>
+          <p class="broken">
+            Правило «FAIL → блокировка до повторного инструктажа» плюс запрет переопределения из §11 дают
+            тупик: оператор ошибается в двух вопросах из пяти в семь утра, установка блокируется, и снять
+            блокировку некому по правилам самой спецификации. Машина стоит, пока кто-то не полезет в базу.
+          </p>
+        </div>
+        <div>
+          <span class="col-label">Что вместо</span>
+          <p class="fix">
+            <strong>Ничего.</strong> Вернуть, когда появится живой инженер по охране труда, который сможет
+            провести повторный инструктаж и снять блокировку.
+          </p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <h3>Цепочка<br>дефекта</h3>
+          <span class="ref">§9 · шаги 4–6</span>
+          <span class="verdict trim">оборвать честно</span>
+        </div>
+        <div>
+          <span class="col-label">Почему не работает</span>
+          <p class="broken">
+            «Заявка механику → устранение механиком → проверка устранения». Механика нет: чинит подрядчик
+            или сам оператор, и в системе его нет вовсе. Шаги 4–6 выполняет тот же человек, который дефект
+            и нашёл, — то есть самопроверка, ради предотвращения которой шаг 6 и придуман.
+          </p>
+        </div>
+        <div>
+          <span class="col-label">Что вместо</span>
+          <p class="fix">
+            Дефект с фото → уведомление администратору → отметка устранения с указанием, <em>кто чинил</em>,
+            текстом → <strong>проверку делает оператор следующей смены, а самопроверка помечается в
+            журнале</strong>. Тот же приём, что уже принят для самоприёмки передачи. Некрасиво, но не врёт.
+          </p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <h3>Второй<br>одобрант</h3>
+          <span class="ref">§11 · исключения</span>
+          <span class="verdict cut">заменить</span>
+        </div>
+        <div>
+          <span class="col-label">Почему не работает</span>
+          <p class="broken">
+            Второй одобрант — это вторая пара глаз. У вас одна пара на всю организацию, и она же
+            заинтересована в том, чтобы машина работала.
+          </p>
+        </div>
+        <div>
+          <span class="col-label">Что вместо</span>
+          <p class="fix">
+            Не подпись, а след: причина текстом, обязательный срок действия, немедленное уведомление
+            владельцу. И главное — <strong>список непереопределяемых блокировок расширяется, а не
+            сужается</strong>: когда одобряющий один, единственная защита — та, где система не спрашивает
+            разрешения вообще.
+          </p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <h3>Чек-листы ТБ<br>CL-TB-01/02</h3>
+          <span class="ref">§7 · перед видами работ</span>
+          <span class="verdict cut">отложить</span>
+        </div>
+        <div>
+          <span class="col-label">Почему не работает</span>
+          <p class="broken">
+            Состав утверждает инженер по охране труда. Некому. Плюс замер: в базе 13 закрытых ЕО, медиана
+            «от создания до подписи» — <strong>ноль минут</strong>. Люди не проходят осмотр, а протыкивают
+            список из 91 пункта. Добавлять к нему ещё четыре чек-листа — растить не доказательность,
+            а объём непрочитанных подписей.
+          </p>
+        </div>
+        <div>
+          <span class="col-label">Что вместо</span>
+          <p class="fix">
+            Предсменный осмотр в объёме диеты от 20.08 — <strong>3–5 минут, с подписью механика</strong>
+            (то есть вашей). Подпись делается дорогой не длиной списка, а обязательным фото на критичных
+            пунктах и расхождением с телеметрией.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Что остаётся</p>
+      <h2>Контур v1 — семь шагов</h2>
+      <p>
+        Нумерация здесь настоящая: это порядок, в котором оператор проходит смену, и следующий шаг всегда
+        ровно один. Справа — что каждый шаг обязан оставить <em>на сервере</em>, а не в памяти экрана.
+      </p>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <span class="num">01</span>
+        <h3>Допуск</h3>
+        <p class="stores">
+          Сроки удостоверения, медсправки и проверки знаний. Просрочено — блокировка до пуска.
+          Уже работает через <code>clearance.blockers</code>.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="num">02</span>
+        <h3>Приёмка машины</h3>
+        <p class="stores">
+          Показание счётчика на начало, запас до ТО, подпись. Передача от предыдущей смены — сведения на
+          том же шаге, а не условие его существования.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="num">03</span>
+        <h3>Предсменный осмотр</h3>
+        <p class="stores">
+          <code>Inspection</code> + <code>InspectionAnswer</code>. Критичный пункт с дефектом требует фото
+          и сразу поднимает блокировку.
+        </p>
+      </div>
+
+      <div class="step is-new">
+        <span class="num">04</span>
+        <h3>Рабочая зона<span class="tag-new">нужно доделать</span></h3>
+        <p class="stores">
+          Основание, уклон, ЛЭП, ограждение опасной зоны. <strong>Сегодня экран есть, а результат живёт
+          в памяти вкладки и исчезает при перезагрузке</strong> — это главный разрыв v2 и первое, что
+          переносится на сервер.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="num">05</span>
+        <h3>Пуск смены</h3>
+        <p class="stores">
+          Решение о допуске принимает сервер, экран его только показывает. Разрешение при блокировке —
+          <code>ShiftStartWaiver</code> с причиной и сроком.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="num">06</span>
+        <h3>Работа и отчёт</h3>
+        <p class="stores">
+          Сваи, метры бурения, простои, топливо, дефекты. Отчёт собирается из записанного, а не
+          переписывается вручную в конце дня.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="num">07</span>
+        <h3>Осмотр после работ и сдача</h3>
+        <p class="stores">
+          Послесменный осмотр (до минуты), передача следующей смене, неизменяемый снимок. Если раздела на
+          конец смены у машины нет — шаг честно называется пропущенным, а не блокирует сдачу.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Как это выглядит у машины</p>
+      <h2>Четыре экрана на телефоне</h2>
+      <p>
+        Контрольная ширина 360 px, перчатки, мороз, солнце в экран. Правило одно: на экране виден текущий
+        шаг, одно основное действие и причина, если пути дальше нет. Технические состояния смены
+        (<code>STARTED</code>, <code>HANDOVER_PENDING</code>) человеку не показываются никогда.
+      </p>
+    </div>
+
+    <div class="phones-scroll">
+      <div class="phones">
+
+        <!-- 1. Приёмка -->
+        <div class="phone-block">
+          <div class="phone">
+            <div class="status">
+              <span><span class="dot"></span>На связи</span>
+              <span>07:12</span>
+            </div>
+            <div class="top">
+              <div class="machine">Liebherr LRH 100 · №4</div>
+              <div class="where">Объект «Северный» · поле 3</div>
+            </div>
+            <div class="body">
+              <span class="stepchip">Шаг 2 из 7 · Приёмка машины</span>
+              <p class="task">Снять моточасы</p>
+              <p class="meta">1284 м/ч · до ТО 116 ч</p>
+              <div class="handoff">
+                <span class="lbl">Передача от смены</span>
+                <p>Петров И. · замечаний нет · вчера 19:40</p>
+              </div>
+              <button class="btn" type="button">Принять машину</button>
+              <p class="note">Приёмка записывается на сервер вместе с показанием счётчика.</p>
+            </div>
+          </div>
+          <div class="phone-cap">
+            <h3>Шаг 2 · Приёмка</h3>
+            <p>Запас до ТО виден <em>до</em> подписи, а не посреди смены, когда машина уже в забое.</p>
+          </div>
+        </div>
+
+        <!-- 2. Осмотр -->
+        <div class="phone-block">
+          <div class="phone">
+            <div class="status">
+              <span><span class="dot off"></span>Автономно · в очереди 3</span>
+              <span>07:26</span>
+            </div>
+            <div class="progressbar"><i style="width: 52%"></i></div>
+            <div class="top">
+              <div class="machine">Предсменный осмотр</div>
+              <div class="where">12 из 23 пунктов · осталось ~2 мин</div>
+            </div>
+            <div class="body">
+              <div class="checkitem">
+                <span class="txt">Уровень гидромасла</span>
+                <span class="answers"><span class="ans on">Норма</span><span class="ans">Дефект</span></span>
+              </div>
+              <div class="checkitem">
+                <span class="txt"><span class="crit">▲</span> Троса: обрывы, заломы, коррозия</span>
+                <span class="answers"><span class="ans">Норма</span><span class="ans bad">Дефект</span></span>
+              </div>
+              <p class="note warn">
+                Критичный пункт с дефектом — обязательно фото. Без снимка пункт не закрывается.
+              </p>
+              <button class="btn" type="button">Снять трос на фото</button>
+              <button class="btn ghost" type="button">Дальше</button>
+            </div>
+          </div>
+          <div class="phone-cap">
+            <h3>Шаг 3 · Осмотр</h3>
+            <p>23 пункта вместо 91. Дорогой делает подпись фото на критичном, а не длина списка.</p>
+          </div>
+        </div>
+
+        <!-- 3. Блокировка -->
+        <div class="phone-block">
+          <div class="phone">
+            <div class="status">
+              <span><span class="dot"></span>На связи</span>
+              <span>07:31</span>
+            </div>
+            <div class="blocked-head">
+              <div class="t">Работать нельзя</div>
+              <div class="s">Трос: обрыв прядей выше нормы</div>
+            </div>
+            <div class="body">
+              <div class="chain">
+                <div><span class="k">Условие</span><span>Троса без обрывов — CL-EO-01, п. 14</span></div>
+                <div><span class="k">Подтвердил</span><span>Фото 07:29 · Сидоров А.</span></div>
+                <div><span class="k">Правило</span><span>Критичный пункт → жёсткий стоп</span></div>
+                <div><span class="k">Результат</span><span>Смена не открывается</span></div>
+              </div>
+              <button class="btn danger" type="button">Открыть дефект</button>
+              <p class="note warn">
+                Эту блокировку нельзя снять разрешением. Только ремонт, фото работ и проверка устранения
+                следующей сменой.
+              </p>
+            </div>
+          </div>
+          <div class="phone-cap">
+            <h3>Блокировка</h3>
+            <p>Цепочка «условие → подтверждение → правило → результат» открыта прямо на экране, а не в аудите.</p>
+          </div>
+        </div>
+
+        <!-- 4. Проверка устранения -->
+        <div class="phone-block">
+          <div class="phone">
+            <div class="status">
+              <span><span class="dot"></span>На связи</span>
+              <span>06:58</span>
+            </div>
+            <div class="top">
+              <div class="machine">Дефект №142 · трос</div>
+              <div class="where">Устранён вчера 16:20</div>
+            </div>
+            <div class="body">
+              <span class="stepchip">Ждёт проверки устранения</span>
+              <p class="task">Проверить трос</p>
+              <div class="handoff">
+                <span class="lbl">Кто чинил</span>
+                <p>Подрядчик «СтальСервис» · 2 фото работ</p>
+              </div>
+              <button class="btn" type="button">Проверил, дефект закрыт</button>
+              <button class="btn ghost" type="button">Не устранён</button>
+              <p class="note warn">
+                Вы проверяете ремонт, который заказывали сами. В журнале это будет отмечено как
+                самопроверка.
+              </p>
+            </div>
+          </div>
+          <div class="phone-cap">
+            <h3>Проверка устранения</h3>
+            <p>Живого механика нет, поэтому система не делает вид, что проверял кто-то другой.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Компенсация за одну пару глаз</p>
+      <h2>Что нельзя снять разрешением</h2>
+    </div>
+
+    <div class="never">
+      <h3>Система не спрашивает согласия</h3>
+      <ul>
+        <li>Обрыв прядей троса выше нормы, повреждение оголовка</li>
+        <li>Трещины и деформации мачты, молота, крюковой обоймы</li>
+        <li>Отказ тормоза лебёдки, поворота, аварийного стопа</li>
+        <li>Утечка гидравлики под давлением</li>
+        <li>Уровень масла или охлаждающей жидкости ниже минимума после долива</li>
+        <li>Просроченное удостоверение машиниста или медсправка</li>
+        <li>Разрушение стекла в зоне обзора</li>
+        <li>Основание не держит нагрузку, уклон выше паспортного</li>
+      </ul>
+      <p>
+        Пороги — версионируемые данные справочника, а не числа в коде: ветер 15 м/с в <code>if</code>
+        правится релизом, в справочнике — механиком. Погода из внешнего источника даёт
+        <em>предупреждение и запись в снимок</em>; жёсткий стоп по ветру фиксирует человек с указанием,
+        чем мерил, — иначе ложные стопы посреди дня, а ложные стопы учатся обходить.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Не выброшено, а отложено</p>
+      <h2>Вернём, когда появятся люди</h2>
+      <p>Каждый пункт ждёт не разработки, а конкретного живого человека в организации.</p>
+    </div>
+
+    <div class="parked">
+      <div>
+        <h3>Журнал инструктажей</h3>
+        <p>Ждёт инженера по охране труда, который проводит инструктаж и подписывается отдельно от того, кто его прошёл.</p>
+      </div>
+      <div>
+        <h3>Тест знаний и банк вопросов</h3>
+        <p>Ждёт того же человека: без него провал теста создаёт блокировку, которую некому снять.</p>
+      </div>
+      <div>
+        <h3>Чек-листы ТБ перед видами работ</h3>
+        <p>Ждёт того, кто утвердит состав и отвечает за него. Список без ответственного — ещё одна галочка.</p>
+      </div>
+      <div>
+        <h3>Второй одобрант исключений</h3>
+        <p>Ждёт второго руководителя. До тех пор компенсируется расширенным списком непереопределяемого.</p>
+      </div>
+      <div>
+        <h3>Заявка механику и его наряд</h3>
+        <p>Ждёт штатного механика. Сейчас — уведомление администратору и текстовое указание, кто чинил.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Предложение к спецификации 3.0 · сокращает объём примерно на 40 %</span>
+    <span>Оставшиеся 60 % — то, что в «Орионе» сегодня может быть не ритуалом</span>
+  </footer>
+
+</div>
+</body>
+</html>
