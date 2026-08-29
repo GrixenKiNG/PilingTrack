@@ -1665,6 +1665,11 @@ model Report {
   @@index([crewId])
   @@index([equipmentId])
   @@index([tenantId, shiftId])
+  // Кроме этого ключа в базе живёт частичный уникальный индекс
+  // Report_user_site_date_without_shift_key на (userId, siteId, date) для строк
+  // с shiftId IS NULL: у отчётов без смены новый ключ ничего не ограничивает,
+  // потому что NULL в уникальном индексе не равен другому NULL. Prisma
+  // частичные индексы не описывает — он задан миграцией и снимать его нельзя.
   @@unique([tenantId, shiftId])
 }
 
@@ -1950,6 +1955,9 @@ model ReportDowntime {
   @@index([reasonId])
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, shiftId, status])
+  // В базе есть ограничение ReportDowntime_reason_present: простой (kind =
+  // DOWNTIME) обязан иметь либо reasonId, либо reasonText. Перерыв причины не
+  // требует. CHECK Prisma не описывает — он задан миграцией.
 }
 
 // ============================================================
