@@ -48,6 +48,10 @@ model Tenant {
   userDocumentTypes UserDocumentType[]
   permitWorkTypes   PermitWorkType[]
   auditChain        TenantAuditChain?
+  operatorChecklistTemplates OperatorChecklistTemplate[]
+  operatorChecklistExecutions OperatorChecklistExecution[]
+  operatorChecklistAnswers OperatorChecklistAnswerRecord[]
+  operatorShiftEvidence OperatorShiftEvidence[]
 
   @@index([slug])
   @@index([isActive])
@@ -110,6 +114,10 @@ model User {
   feedbackReads   FeedbackEventRead[]
   documents       UserDocument[]
   placePresets    UserPlacePreset[]
+  operatorChecklistTemplatesCreated OperatorChecklistTemplate[] @relation("OperatorChecklistTemplateCreatedBy")
+  operatorChecklistExecutionsStarted OperatorChecklistExecution[] @relation("OperatorChecklistExecutionStartedBy")
+  operatorChecklistAnswersRecorded OperatorChecklistAnswerRecord[] @relation("OperatorChecklistAnswerRecordedBy")
+  operatorShiftEvidenceRecorded OperatorShiftEvidence[] @relation("OperatorShiftEvidenceRecordedBy")
 
   @@unique([tenantId, id])
   @@index([email])
@@ -256,6 +264,8 @@ model Equipment {
   defects               EquipmentDefect[]
   meterReadings         MeterReading[]
   maintenancePlans      MaintenancePlan[]
+  operatorChecklistExecutions OperatorChecklistExecution[]
+  operatorShiftEvidence OperatorShiftEvidence[]
 
   @@unique([tenantId, id])
   @@index([tenantId])
@@ -418,6 +428,13 @@ model EquipmentDefect {
   // По нему повторный осмотр узнаёт уже заведённый дефект и не плодит копии —
   // иначе одна незакрытая течь давала бы новую запись каждую смену.
   sourceKey    String?
+  /// Наблюдаемые оператором признаки. Критичность вычисляет серверное правило,
+  /// оператор её не выбирает.
+  observedSigns            Json    @default("[]")
+  safeStopApplied          Boolean @default(false)
+  classificationRuleId     String?
+  classificationRuleVersion String?
+  evidenceMediaIds         Json    @default("[]")
 
   // разбор диспетчером
   triagedById         String?
@@ -805,6 +822,7 @@ model Shift {
   closedById      String?
   cancelledAt     DateTime?       @db.Timestamptz(3)
   cancelledById   String?
+  closeExceptionReason String? @db.Text
   cancelReason    String?
   /// Смена закрыта планировщиком по окончании производственных суток, потому
   /// что её не сдали. Отличает «закрыто по факту сдачи» от «закрыто временем»:
@@ -816,6 +834,8 @@ model Shift {
   updatedAt       DateTime        @updatedAt @db.Timestamptz(3)
   handovers       ShiftHandover[]
   permits         WorkPermit[]
+  operatorChecklistExecutions OperatorChecklistExecution[]
+  operatorShiftEvidence OperatorShiftEvidence[]
 
   @@unique([tenantId, id])
   @@index([tenantId, equipmentId, productionDate])
@@ -869,6 +889,181 @@ model ShiftHandover {
   @@unique([tenantId, id])
   @@index([tenantId, shiftId, state])
   @@index([tenantId, state, updatedAt])
+}
+
+enum OperatorEvidenceKind {
+  KNOWLEDGE_TEST
+  WEATHER_SNAPSHOT
+  SITE_CHECK
+  STARTUP_READING
+  MAINTENANCE_ACTION
+  FLUID_READING
+  PILE_DRIVING
+  LEADER_DRILLING
+}
+
+model OperatorChecklistTemplate {
+  id             String   @id @default(cuid())
+  tenantId       String
+  templateKey    String
+  version        String
+  stage          String
+  equipmentModel String
+  technology     String?
+  definition     Json
+  createdById    String
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy   User                         @relation("OperatorChecklistTemplateCreatedBy", fields: [tenantId, createdById], references: [tenantId, id], onDelete: Restrict)
+  executions  OperatorChecklistExecution[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, templateKey, version])
+  @@index([tenantId, stage, equipmentModel])
+}
+
+model OperatorChecklistExecution {
+  id               String   @id @default(cuid())
+  tenantId         String
+  shiftId          String
+  equipmentId      String
+  templateId       String
+  clientCommandId  String
+  status            String   @default("IN_PROGRESS")
+  templateSnapshot Json
+  startedById      String
+  startedAt        DateTime @db.Timestamptz(3)
+  completedAt      DateTime? @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  shift      Shift                        @relation(fields: [tenantId, shiftId], references: [tenantId, id], onDelete: Restrict)
+  equipment  Equipment                    @relation(fields: [tenantId, equipmentId], references: [tenantId, id], onDelete: Restrict)
+  template   OperatorChecklistTemplate    @relation(fields: [tenantId, templateId], references: [tenantId, id], onDelete: Restrict)
+  startedBy  User                         @relation("OperatorChecklistExecutionStartedBy", fields: [tenantId, startedById], references: [tenantId, id], onDelete: Restrict)
+  answers    OperatorChecklistAnswerRecord[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, shiftId, status, startedAt])
+  @@index([tenantId, equipmentId, startedAt])
+}
+
+model OperatorChecklistAnswerRecord {
+  id              String   @id @default(cuid())
+  tenantId        String
+  executionId     String
+  itemId          String
+  clientCommandId String
+  result          String
+  value           Json?
+  note            String?  @db.Text
+  mediaIds        Json     @default("[]")
+  itemSnapshot    Json
+  answeredAt      DateTime @db.Timestamptz(3)
+  answeredById    String
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  execution   OperatorChecklistExecution @relation(fields: [tenantId, executionId], references: [tenantId, id], onDelete: Restrict)
+  answeredBy  User                       @relation("OperatorChecklistAnswerRecordedBy", fields: [tenantId, answeredById], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, clientCommandId])
+  @@unique([tenantId, executionId, itemId])
+  @@index([tenantId, executionId, answeredAt])
+}
+
+model OperatorShiftEvidence {
+  id              String               @id @default(cuid())
+  tenantId        String
+  shiftId         String
+  equipmentId     String
+  kind            OperatorEvidenceKind
+  payload         Json
+  occurredAt      DateTime             @db.Timestamptz(3)
+  recordedById    String
+  clientCommandId String
+  createdAt       DateTime             @default(now()) @db.Timestamptz(3)
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  shift       Shift     @relation(fields: [tenantId, shiftId], references: [tenantId, id], onDelete: Restrict)
+  equipment   Equipment @relation(fields: [tenantId, equipmentId], references: [tenantId, id], onDelete: Restrict)
+  recordedBy  User      @relation("OperatorShiftEvidenceRecordedBy", fields: [tenantId, recordedById], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, shiftId, kind, occurredAt])
+  @@index([tenantId, equipmentId, kind, occurredAt])
+}
+
+/// Отдельный процесс безопасности. Это не дефект установки: событие может
+/// относиться к человеку, рабочей зоне или организации работ.
+model SafetyIncident {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  shiftId               String?
+  equipmentId           String?
+  siteId                String?
+  relatedDefectId       String?
+  category              String
+  state                 String
+  severity              String
+  description           String   @db.Text
+  observedSigns         Json
+  stopRequired          Boolean
+  emergencyStopApplied  Boolean  @default(false)
+  injured               Boolean  @default(false)
+  safeStateDescription  String?  @db.Text
+  evidenceMediaIds      Json     @default("[]")
+  classificationRuleId  String
+  classificationRuleVersion String
+  stoppedAt             DateTime? @db.Timestamptz(3)
+  stoppedById           String?
+  resumeSnapshotId      String?
+  occurredAt            DateTime @db.Timestamptz(3)
+  receivedAt            DateTime @default(now()) @db.Timestamptz(3)
+  reportedById          String
+  deviceId              String?
+  clientCommandId       String
+  version               Int      @default(1)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, shiftId, state])
+  @@index([tenantId, equipmentId, occurredAt])
+  @@index([tenantId, relatedDefectId])
+}
+
+model RepairVerification {
+  id String @id @default(cuid())
+  tenantId String
+  incidentId String
+  shiftId String?
+  equipmentId String
+  repairStatus String @default("NOT_STARTED")
+  repairSummary String? @db.Text
+  repairedById String?
+  repairedAt DateTime? @db.Timestamptz(3)
+  verificationStatus String @default("NOT_REQUESTED")
+  verificationRevision Int @default(0)
+  verifiedById String?
+  verifiedAt DateTime? @db.Timestamptz(3)
+  verificationNote String? @db.Text
+  evidenceMediaIds Json @default("[]")
+  readinessRequestedAt DateTime? @db.Timestamptz(3)
+  readinessSnapshotId String?
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([tenantId, incidentId])
+  @@unique([tenantId, id])
+  @@index([tenantId, equipmentId, updatedAt])
 }
 
 /// Личный шаблон места работ: пара «место работы + объект», сохранённая
@@ -1446,6 +1641,9 @@ model Report {
   /// связь задним числом нечем. Внешнего ключа намеренно нет — как у
   /// lastEditedById рядом; смена живёт в своём модуле со своими правилами.
   shiftId             String?
+  endingEngineHours   Int?
+  closingComment      String? @db.Text
+  submittedAt         DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -1459,7 +1657,6 @@ model Report {
   piles     PileWork[]
   drillings LeaderDrilling[]
 
-  @@unique([userId, siteId, date], name: "unique_user_site_date")
   @@index([tenantId])
   @@index([tenantId, updatedAt])
   @@index([userId, date])
@@ -1468,6 +1665,7 @@ model Report {
   @@index([crewId])
   @@index([equipmentId])
   @@index([tenantId, shiftId])
+  @@unique([tenantId, shiftId])
 }
 
 // ============================================================
@@ -1656,9 +1854,21 @@ model SiteWeeklyTrend {
 model PileWork {
   id          String  @id @default(cuid())
   reportId    String
+  tenantId    String?
+  shiftId     String?
+  clientCommandId String?
   picketId    String?
   pileGradeId String
   count       Int
+  workTypeId  String?
+  depth       Float?
+  workStartedAt DateTime? @db.Timestamptz(3)
+  workEndedAt DateTime? @db.Timestamptz(3)
+  result      String?
+  comment     String? @db.Text
+  correctionReason String? @db.Text
+  occurredAt  DateTime? @db.Timestamptz(3)
+  receivedAt  DateTime  @default(now()) @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
@@ -1669,6 +1879,8 @@ model PileWork {
   @@index([reportId])
   @@index([picketId])
   @@index([pileGradeId])
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, shiftId, occurredAt])
 }
 
 // ============================================================
@@ -1678,11 +1890,16 @@ model PileWork {
 model LeaderDrilling {
   id            String  @id @default(cuid())
   reportId      String
+  tenantId      String?
+  shiftId       String?
+  clientCommandId String?
   picketId      String?
   typeId        String
   count         Int     @default(1)
   metersPerUnit Float   @default(0)
   meters        Float
+  occurredAt    DateTime? @db.Timestamptz(3)
+  receivedAt    DateTime  @default(now()) @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
@@ -1693,6 +1910,8 @@ model LeaderDrilling {
   @@index([reportId])
   @@index([picketId])
   @@index([typeId])
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, shiftId, occurredAt])
 }
 
 // ============================================================
@@ -1702,17 +1921,35 @@ model LeaderDrilling {
 model ReportDowntime {
   id       String  @id @default(cuid())
   reportId String
-  reasonId String
-  duration Float
+  tenantId String?
+  shiftId String?
+  clientCommandId String?
+  reasonId String?
+  duration Float @default(0)
   comment  String?
+  kind String?
+  status String?
+  startedAt DateTime? @db.Timestamptz(3)
+  endedAt DateTime? @db.Timestamptz(3)
+  durationSeconds Int?
+  reasonText String? @db.Text
+  category String?
+  sourceResponsibility String?
+  defectId String?
+  maintenanceRecordId String?
+  occurredAt DateTime? @db.Timestamptz(3)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  version Int @default(1)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   report Report         @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  reason DowntimeReason @relation(fields: [reasonId], references: [id], onDelete: Restrict)
+  reason DowntimeReason? @relation(fields: [reasonId], references: [id], onDelete: Restrict)
 
   @@index([reportId])
   @@index([reasonId])
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, shiftId, status])
 }
 
 // ============================================================
@@ -1954,6 +2191,41 @@ model DeviceSyncState {
   @@index([tenantId])
   @@index([syncStatus])
   @@index([lastSyncAt])
+}
+
+model TrustedOperatorDeviceRecord {
+  id String @id
+  tenantId String
+  operatorId String
+  keyId String
+  publicKeyPem String @db.Text
+  state String @default("ACTIVE")
+  registeredAt DateTime @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  lastAcceptedSequence Int @default(0)
+  @@index([tenantId,operatorId,state])
+}
+
+model ServerOfflineAuthorizationKey {
+  keyId String @id
+  algorithm String
+  publicKeyPem String @db.Text
+  state String @default("ACTIVE")
+  tenantId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model OfflineWorkAuthorizationRecord {
+  id String @id
+  tenantId String
+  operatorId String
+  deviceId String
+  shiftId String
+  equipmentId String
+  authorization Json
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([tenantId,operatorId,deviceId,expiresAt])
 }
 
 // ============================================================

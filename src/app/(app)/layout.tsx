@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { operatorRouteOwnsNavigation } from './operator-layout-policy';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { usePilingStore } from '@/lib/store';
 import { resolveEffectiveRole, type UserRole } from '@/lib/types';
@@ -125,7 +126,13 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
       </main>
 
-      {nav}
+      {/*
+        Модуль-кандидат `/operator/v2` держит собственную нижнюю панель («Смена
+        / Журнал / Ещё» из макета). Две панели одна поверх другой не просто
+        дублировались: `fixed bottom-0` этой накрывала кнопку модуля, и нажать
+        её было невозможно. Экран, у которого своя навигация, свою и рисует.
+      */}
+      {!operatorRouteOwnsNavigation(pathname) && nav}
     </div>
   );
 }

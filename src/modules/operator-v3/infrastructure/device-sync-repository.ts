@@ -1,0 +1,6 @@
+import type {ReadinessTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
+import {OperatorCommandError} from '../application/commands/operator-command-errors';
+export class DeviceSyncRepository{constructor(private readonly tx:ReadinessTransaction){}
+ async requireNext(tenantId:string,operatorId:string,deviceId:string,sequence:number){const device=await this.tx.trustedOperatorDeviceRecord.findFirst({where:{id:deviceId,tenantId,operatorId,state:'ACTIVE',revokedAt:null}});if(!device)throw new OperatorCommandError('FORBIDDEN',403,'Устройство не зарегистрировано для синхронизации');if(sequence!==device.lastAcceptedSequence+1)throw new OperatorCommandError('VERSION_CONFLICT',409,sequence<=device.lastAcceptedSequence?'Команда устройства уже обработана':'Нарушен порядок команд устройства',{lastAcceptedSequence:device.lastAcceptedSequence});return device;}
+ async accept(deviceId:string,expected:number){const changed=await this.tx.trustedOperatorDeviceRecord.updateMany({where:{id:deviceId,lastAcceptedSequence:expected},data:{lastAcceptedSequence:expected+1}});if(changed.count!==1)throw new OperatorCommandError('VERSION_CONFLICT',409,'Порядок команд устройства изменился');}
+}

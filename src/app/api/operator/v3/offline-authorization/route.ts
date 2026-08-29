@@ -1,0 +1,4 @@
+import {NextResponse,type NextRequest} from 'next/server';
+import {db} from '@/lib/db';
+import {resolveOperatorV3RequestContext} from '../_shared/request-context';
+export async function GET(request:NextRequest){const resolved=await resolveOperatorV3RequestContext(request);if(resolved.response)return resolved.response;const deviceId=request.nextUrl.searchParams.get('deviceId');if(!deviceId)return NextResponse.json({error:{code:'VALIDATION_ERROR',message:'Не указано устройство'}},{status:422});const row=await db.offlineWorkAuthorizationRecord.findFirst({where:{tenantId:resolved.context.tenantId,operatorId:resolved.context.actorId,deviceId,expiresAt:{gt:new Date()}},orderBy:{expiresAt:'desc'}});if(!row)return NextResponse.json({error:{code:'NOT_FOUND',message:'Действующее разрешение на работу без связи не найдено'}},{status:404});return NextResponse.json({authorization:row.authorization,serverTime:new Date().toISOString()});}

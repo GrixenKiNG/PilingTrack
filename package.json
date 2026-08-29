@@ -9,6 +9,7 @@
     "prestart": "node scripts/kill-port.js 3000",
     "start": "npx tsx scripts/validate-env.ts && node .next/standalone/server.js",
     "validate:env": "npx tsx scripts/validate-env.ts",
+    "operator:v3:preflight": "npx tsx scripts/operator-v3-preflight.ts",
     "db:use-prod": "node scripts/switch-db.js prod",
     "db:use-dev": "node scripts/switch-db.js dev",
     "db:status": "node scripts/switch-db.js status",
