@@ -26,7 +26,16 @@ export function KnowledgeScreen({busy, error, onDone, onBack}: {
   const attempt = useMemo(() => buildAttempt(), []);
   const [queue, setQueue] = useState<KnowledgeQuestion[]>(attempt);
   const [picked, setPicked] = useState<number | null>(null);
-  const [picks, setPicks] = useState<{questionId: string; picked: number}[]>([]);
+  /**
+   * По одному ответу на вопрос — последнему.
+   *
+   * Список всех нажатий подряд сюда не годится: вопрос с ошибкой повторяется,
+   * и в отправку уходили бы обе попытки. Сервер, который требует верного
+   * ответа на всё, отклонял бы такую проверку — экран показывал бы «пройдена»,
+   * а записать результат было бы нельзя. Тупик, из которого оператор не
+   * выберется никаким нажатием.
+   */
+  const [picks, setPicks] = useState<Record<string, number>>({});
   const [mistakes, setMistakes] = useState(0);
 
   const question = queue[0];
@@ -38,7 +47,7 @@ export function KnowledgeScreen({busy, error, onDone, onBack}: {
         title="Проверка пройдена"
         subtitle={`${attempt.length} из ${attempt.length}${mistakes > 0 ? ` · ошибок по ходу: ${mistakes}` : ''}`}
         footer={(
-          <BigButton onClick={() => onDone(picks)} disabled={busy}>
+          <BigButton onClick={() => onDone(Object.entries(picks).map(([questionId, value]) => ({questionId, picked: value})))} disabled={busy}>
             {busy ? 'Записываем…' : 'Записать результат'}
           </BigButton>
         )}
@@ -57,7 +66,7 @@ export function KnowledgeScreen({busy, error, onDone, onBack}: {
   const submitAnswer = () => {
     if (picked === null) return;
     const correct = picked === question.correct;
-    setPicks((current) => [...current, {questionId: question.id, picked}]);
+    setPicks((current) => ({...current, [question.id]: picked}));
     setPicked(null);
     if (correct) {
       setQueue((current) => current.slice(1));

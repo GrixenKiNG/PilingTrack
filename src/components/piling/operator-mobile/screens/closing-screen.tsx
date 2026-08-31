@@ -68,12 +68,13 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error}: {
             meters={state.production.drilling.meters}
           />
           <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} unit="ч" />
-          <Fact
-            label="Топливо на конец"
-            value={state.assignment?.fuelPercent ?? '—'}
-            unit={state.assignment?.fuelPercent == null ? undefined : '%'}
-          />
         </div>
+        {/*
+          Остатка топлива здесь намеренно нет. Поле `fuelPercent` — это остаток
+          ПРЕДЫДУЩЕЙ смены: текущий попадает в отчёт только при закрытии.
+          Строка «Топливо на конец» с прошлым числом читалась бы как итог этой
+          смены и врала бы ровно в том месте, ради которого её и заводили.
+        */}
       </Panel>
 
       {serviceDone ? (
