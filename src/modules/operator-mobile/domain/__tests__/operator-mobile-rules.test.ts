@@ -75,6 +75,20 @@ describe('препятствия к работе', () => {
     expect(isWorkAllowed(collectBlockers({...base, windMs: 12}))).toBe(true);
   });
 
+  it('просроченный допуск не снимается разрешением диспетчера', () => {
+    const expired = checkOperatorDocuments(
+      [requiredType],
+      [{typeId: 'type-driver', number: '77', expiresAt: new Date('2026-08-01T00:00:00.000Z')}],
+      NOW,
+    );
+    const blockers = collectBlockers({
+      ...base,
+      documents: expired,
+      waivedCodes: ['DOCUMENT_INVALID'],
+    });
+    expect(isWorkAllowed(blockers)).toBe(false);
+  });
+
   it('разрешение диспетчера понижает запрет, но не прячет причину', () => {
     const blockers = collectBlockers({
       ...base,

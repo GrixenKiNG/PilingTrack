@@ -35,6 +35,22 @@ export interface WorkBlocker {
 /** Порог, при котором работы прекращают. Из руководств Liebherr LB 20 / LRH 100. */
 export const WIND_STOP_MS = 20;
 
+/**
+ * Запреты, которые диспетчер снять не может.
+ *
+ * ПОЧЕМУ НЕ ВСЁ СНИМАЕТСЯ. Разрешение диспетчера — инструмент против
+ * остановки работ из-за формальности: разбитого зеркала, спорной царапины.
+ * Оно не может дать право управления человеку без действующего удостоверения
+ * или медсправки — это уже не производственное решение, а подлог, и
+ * диспетчеру нельзя давать кнопку, которой он его совершит. То же с машиной,
+ * выведенной из эксплуатации: её вывели не для того, чтобы на ней ездили.
+ */
+export const NON_OVERRIDABLE: BlockerCode[] = [
+  'DOCUMENT_INVALID',
+  'NO_EQUIPMENT_ADMISSION',
+  'EQUIPMENT_INACTIVE',
+];
+
 export interface BlockerInput {
   documents: DocumentCheck[];
   /** Оператор закреплён за этой установкой (бригада). */
@@ -121,8 +137,9 @@ export function collectBlockers(input: BlockerInput): WorkBlocker[] {
 
   // Разрешение диспетчера не удаляет препятствие, а понижает его до
   // предупреждения: причина никуда не делась, и оператор должен её видеть.
+  // Неотменяемые запреты не понижаются даже при выданном разрешении.
   return blockers.map((blocker) => (
-    input.waivedCodes.includes(blocker.code)
+    input.waivedCodes.includes(blocker.code) && !NON_OVERRIDABLE.includes(blocker.code)
       ? {...blocker, severity: 'WARN' as const, resolution: 'Работа разрешена диспетчером под его ответственность.'}
       : blocker
   ));
