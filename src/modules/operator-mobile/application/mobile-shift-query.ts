@@ -1,16 +1,22 @@
 import {db} from '@/lib/db';
-import {checkOperatorDocuments, isIdentityValid} from '../domain/operator-admission';
+import {checkMaintenanceDue} from '@/lib/maintenance-due';
+import {pileLengthMeters} from '@/lib/pile-length';
+import {checkOperatorDocuments} from '../domain/operator-admission';
 import {OPERATOR_CHECKLISTS} from '../domain/checklist-catalog';
 import type {ChecklistStage} from '../domain/checklist-types';
 import {
-  resolveShiftConditions, selectChecklistItems, type EquipmentCapabilities,
+  BRIEFING_DOCUMENT_TYPE, briefingUpToDate, KNOWLEDGE_DOCUMENT_TYPE, knowledgeValid,
+} from '../domain/operator-credentials';
+import {SAFETY_BRIEFING} from '../domain/safety-briefing';
+import {
+  resolveShiftConditions, selectChecklistSections, type EquipmentCapabilities,
 } from '../domain/shift-conditions';
 import {
   completedPhases, derivePhase, PHASE_LABELS, PHASE_ORDER, type OperatorPhase,
 } from '../domain/shift-phases';
-import {collectBlockers, isWorkAllowed, type BlockerCode, type WorkBlocker} from '../domain/work-blockers';
+import {collectWarnings, isWorkAllowed} from '../domain/work-warnings';
 import type {
-  ChecklistView, OperatorMobileState, ReadWeather, WeatherView,
+  ChecklistView, OperatorMobileState, ReadWeather, WeatherView, WorkVolume,
 } from '../domain/view-contracts';
 
 /**
@@ -18,19 +24,23 @@ import type {
  *
  * ПОЧЕМУ ОДИН ЗАПРОС, А НЕ ДЕСЯТЬ. Телефон на площадке сидит на одной палке
  * сети. Десять запросов — это десять шансов, что экран соберётся наполовину и
- * оператор увидит «работа разрешена» рядом с незагруженным списком препятствий.
+ * оператор увидит «работа разрешена» рядом с незагруженным списком нарушений.
  * Здесь состояние собирается целиком либо не собирается вовсе.
  */
 
+const DAY_MS = 86_400_000;
 
-function todayInTimezone(timezone: string): Date {
+function todayInTimezone(timezone: string, now: Date): Date {
   // Производственные сутки считаем по часовому поясу пользователя, а не по UTC:
   // ночная смена в Сибири иначе уезжает во «вчера».
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date());
+  }).format(now);
   return new Date(`${parts}T00:00:00.000Z`);
 }
+
+/** Ненулевой простой без перерывов: перерыв — не потеря времени объекта. */
+const DOWNTIME_ONLY = {OR: [{kind: null}, {kind: {not: 'BREAK'}}]};
 
 export async function queryOperatorMobileState(input: {
   tenantId: string;
@@ -48,10 +58,7 @@ export async function queryOperatorMobileState(input: {
   const now = input.now ?? new Date();
   const {tenantId, operatorId} = input;
 
-  // Часовой пояс берём из карточки пользователя, а не с телефона: от него
-  // зависит, к каким производственным суткам отнести смену, и подставлять
-  // сюда значение из браузера значит позволить телефону выбирать дату отчёта.
-  const [profile, documentTypes, documents, crews] = await Promise.all([
+  const [profile, documentTypes, documents, crews, dictionaries] = await Promise.all([
     db.user.findFirst({where: {tenantId, id: operatorId}, select: {timezone: true}}),
     db.userDocumentType.findMany({
       where: {tenantId, isActive: true},
@@ -60,7 +67,8 @@ export async function queryOperatorMobileState(input: {
     }),
     db.userDocument.findMany({
       where: {tenantId, userId: operatorId},
-      select: {typeId: true, number: true, expiresAt: true},
+      select: {typeId: true, number: true, expiresAt: true, type: {select: {name: true}}},
+      orderBy: {createdAt: 'desc'},
     }),
     db.crew.findMany({
       where: {operatorId, isActive: true, equipment: {tenantId}},
@@ -71,16 +79,44 @@ export async function queryOperatorMobileState(input: {
           select: {
             id: true, name: true, model: true, isActive: true,
             hammerKind: true, isCombined: true, engineHoursTotal: true,
+            nextMaintenanceDate: true, nextMaintenanceAtHours: true,
           },
         },
         assistants: {select: {name: true}},
       },
       orderBy: {createdAt: 'asc'},
     }),
+    loadDictionaries(tenantId),
   ]);
 
-  const checks = checkOperatorDocuments(documentTypes, documents, now);
-  const identityValid = isIdentityValid(checks);
+  // Инструктаж и проверка знаний — документы работника, а не отдельная сущность.
+  const briefingDoc = documents.find((d) => d.type.name === BRIEFING_DOCUMENT_TYPE);
+  const knowledgeDoc = documents.find((d) => d.type.name === KNOWLEDGE_DOCUMENT_TYPE);
+  const briefingOk = briefingUpToDate(briefingDoc?.number ?? null, SAFETY_BRIEFING.version);
+  const knowledgeOk = knowledgeValid(knowledgeDoc?.expiresAt ?? null, now);
+
+  // Служебные виды документов не показываем в списке допусков: они и так
+  // отдельными карточками выше, а дублирование удлиняет экран вдвое.
+  const visibleTypes = documentTypes.filter(
+    (type) => type.name !== BRIEFING_DOCUMENT_TYPE && type.name !== KNOWLEDGE_DOCUMENT_TYPE,
+  );
+  const checks = checkOperatorDocuments(visibleTypes, documents, now);
+
+  const identity = {
+    documents: checks,
+    briefing: {
+      code: SAFETY_BRIEFING.code,
+      title: SAFETY_BRIEFING.title,
+      version: SAFETY_BRIEFING.version,
+      acknowledgedVersion: briefingDoc?.number ?? null,
+      ok: briefingOk,
+    },
+    knowledge: {
+      validUntil: knowledgeDoc?.expiresAt?.toISOString() ?? null,
+      lastResult: knowledgeDoc?.number ?? null,
+      ok: knowledgeOk,
+    },
+  };
 
   const options = crews.map((crew) => ({
     crewId: crew.id,
@@ -93,61 +129,68 @@ export async function queryOperatorMobileState(input: {
     ? crews.find((candidate) => candidate.equipment.id === input.equipmentId)
     : crews[0];
 
-  const emptyState = (blockers: WorkBlocker[]): OperatorMobileState => {
-    const phase: OperatorPhase = identityValid ? 'ADMISSION' : 'IDENTITY';
+  const buildProgress = (current: OperatorPhase) => {
+    const done = completedPhases(current);
+    return PHASE_ORDER.filter((phase) => phase !== 'CLOSED').map((phase) => ({
+      phase,
+      label: PHASE_LABELS[phase],
+      done: done.includes(phase),
+      current: phase === current,
+    }));
+  };
+
+  if (!crew) {
+    const phase: OperatorPhase = briefingOk && knowledgeOk ? 'ADMISSION' : 'IDENTITY';
     return {
       operator: {id: operatorId, name: input.operatorName},
       phase,
       progress: buildProgress(phase),
-      identity: {documents: checks, valid: identityValid},
+      identity,
       options,
       assignment: null,
       weather: null,
       conditions: [],
       shift: null,
       checklists: [],
-      blockers,
-      workAllowed: false,
-      production: {piles: 0, drillingMeters: 0, downtimeHours: 0},
+      warnings: collectWarnings({
+        documents: checks,
+        hasEquipmentAssignment: false,
+        equipmentActive: true,
+        equipmentName: 'Установка',
+        openDefects: [],
+        windMs: null,
+        temperatureC: null,
+        maintenance: {overdue: false, soon: false, daysLeft: null},
+      }),
+      workAllowed: true,
+      production: {piles: {count: 0, meters: 0}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
+      dictionaries,
     };
-  };
-
-  if (!crew) {
-    return emptyState(collectBlockers({
-      documents: checks,
-      hasEquipmentAdmission: false,
-      equipmentActive: true,
-      equipmentName: 'Установка',
-      criticalDefectTitles: [],
-      blockingFaultTexts: [],
-      windMs: null,
-      waivedCodes: [],
-    }));
   }
 
   const equipmentId = crew.equipment.id;
-  const productionDate = todayInTimezone(profile?.timezone ?? 'Europe/Moscow');
+  const siteId = crew.site.id;
+  const productionDate = todayInTimezone(profile?.timezone ?? 'Europe/Moscow', now);
 
-  const [lastMeter, previousPiles, shift, criticalDefects] = await Promise.all([
-    db.meterReading.findFirst({
-      where: {tenantId, equipmentId},
-      orderBy: {recordedAt: 'desc'},
-      select: {engineHours: true, recordedAt: true},
+  const [sitePiles, siteDrilling, siteDowntime, lastFuel, shift, openDefects] = await Promise.all([
+    sitePileVolume(tenantId, siteId, dictionaries.pileGrades),
+    db.leaderDrilling.aggregate({
+      _sum: {count: true, meters: true},
+      where: {report: {tenantId, siteId}},
     }),
-    db.pileWork.aggregate({
-      _sum: {count: true},
-      where: {
-        report: {tenantId, equipmentId, date: {lt: productionDate.toISOString().slice(0, 10)}},
-      },
+    db.reportDowntime.aggregate({
+      _sum: {duration: true},
+      where: {report: {tenantId, siteId}, ...DOWNTIME_ONLY},
+    }),
+    db.report.findFirst({
+      where: {tenantId, equipmentId, endingFuelPercent: {not: null}},
+      orderBy: {date: 'desc'},
+      select: {endingFuelPercent: true},
     }),
     // Сначала — открытая смена этой машины на любую дату. База допускает
     // только одну такую (Shift_one_active_per_equipment_key), и если она за
-    // вчера, оператор обязан её увидеть и сдать: иначе он упрётся в отказ при
-    // открытии сегодняшней и не поймёт почему.
-    //
-    // Открытой нет — берём сегодняшнюю в любом состоянии, кроме отменённой:
-    // фильтр «только открытые» прятал бы смену, сданную полчаса назад, и экран
-    // предлагал бы открыть вторую за день.
+    // вчера, оператор обязан её увидеть и сдать. Открытой нет — берём
+    // сегодняшнюю в любом состоянии, кроме отменённой.
     db.shift.findFirst({
       where: {
         tenantId,
@@ -161,9 +204,10 @@ export async function queryOperatorMobileState(input: {
       select: {id: true, state: true, startedAt: true, productionDate: true},
     }),
     db.equipmentDefect.findMany({
-      where: {tenantId, equipmentId, severity: 'CRITICAL', status: {in: ['OPEN', 'IN_WORK']}},
-      select: {title: true},
-      take: 5,
+      where: {tenantId, equipmentId, status: {in: ['OPEN', 'IN_WORK']}},
+      select: {title: true, severity: true},
+      orderBy: [{severity: 'desc'}, {reportedAt: 'desc'}],
+      take: 10,
     }),
   ]);
 
@@ -173,17 +217,17 @@ export async function queryOperatorMobileState(input: {
       ? {latitude: crew.site.latitude, longitude: crew.site.longitude}
       : null;
 
-  const conditionsReading = coordinates && input.readWeather
+  const reading = coordinates && input.readWeather
     ? await input.readWeather(coordinates.latitude, coordinates.longitude)
     : null;
 
-  const weather: WeatherView | null = conditionsReading
+  const weather: WeatherView | null = reading
     ? {
-      temperatureC: conditionsReading.temperatureC,
-      windMs: conditionsReading.windMs,
-      precipitationMmPerHour: conditionsReading.precipitationMmPerHour,
-      isDay: conditionsReading.isDay,
-      at: conditionsReading.at,
+      temperatureC: reading.temperatureC,
+      windMs: reading.windMs,
+      precipitationMmPerHour: reading.precipitationMmPerHour,
+      isDay: reading.isDay,
+      at: reading.at,
     }
     : null;
 
@@ -199,57 +243,59 @@ export async function queryOperatorMobileState(input: {
     hasRotator: crew.equipment.isCombined,
   };
 
-  const [executions, waiver, report] = shift
+  const [executions, report] = shift
     ? await Promise.all([
       db.operatorChecklistExecution.findMany({
         where: {tenantId, shiftId: shift.id},
-        select: {id: true, status: true, templateSnapshot: true, answers: {
-          select: {itemId: true, result: true, itemSnapshot: true},
-        }},
-      }),
-      db.shiftStartWaiver.findFirst({
-        where: {tenantId, shiftId: shift.id},
-        select: {blockerFingerprint: true},
+        select: {status: true, templateSnapshot: true},
       }),
       db.report.findFirst({
         where: {tenantId, shiftId: shift.id},
         select: {
-          piles: {select: {count: true}},
-          drillings: {select: {meters: true}},
+          piles: {select: {count: true, pileGradeId: true}},
+          drillings: {select: {count: true, meters: true}},
           downtimes: {select: {duration: true, kind: true}},
         },
       }),
     ])
-    : [[], null, null];
+    : [[], null];
 
   const completedStages = executions
     .filter((execution) => execution.status === 'COMPLETED')
     .map((execution) => (execution.templateSnapshot as {stage?: ChecklistStage}).stage)
     .filter((stage): stage is ChecklistStage => Boolean(stage));
 
-  const blockingFaultTexts = executions.flatMap((execution) => execution.answers
-    .filter((answer) => answer.result === 'FAULT'
-      && (answer.itemSnapshot as {blocking?: boolean}).blocking === true)
-    .map((answer) => (answer.itemSnapshot as {text?: string}).text ?? answer.itemId));
+  const maintenanceDue = checkMaintenanceDue({
+    nextMaintenanceDate: crew.equipment.nextMaintenanceDate?.toISOString() ?? null,
+    nextMaintenanceAtHours: crew.equipment.nextMaintenanceAtHours,
+    engineHoursTotal: crew.equipment.engineHoursTotal,
+  }, now);
+  const maintenanceDaysLeft = crew.equipment.nextMaintenanceDate
+    ? Math.round((crew.equipment.nextMaintenanceDate.getTime() - now.getTime()) / DAY_MS)
+    : null;
+  const maintenance = {
+    overdue: maintenanceDue.overdue,
+    soon: maintenanceDue.soon,
+    daysLeft: maintenanceDaysLeft,
+  };
 
-  const waivedCodes = (waiver?.blockerFingerprint.split(',').filter(Boolean) ?? []) as BlockerCode[];
-
-  const blockers = collectBlockers({
+  const warnings = collectWarnings({
     documents: checks,
-    hasEquipmentAdmission: true,
+    hasEquipmentAssignment: true,
     equipmentActive: crew.equipment.isActive,
     equipmentName: crew.equipment.name,
-    criticalDefectTitles: criticalDefects.map((defect) => defect.title),
-    blockingFaultTexts,
+    openDefects,
     windMs: weather?.windMs ?? null,
-    waivedCodes,
+    temperatureC: weather?.temperatureC ?? null,
+    maintenance,
   });
 
   const phase = derivePhase({
-    identityValid,
+    briefingAcknowledged: briefingOk,
+    knowledgeValid: knowledgeOk,
     admissionAccepted: Boolean(shift),
     completedStages,
-    closingRequested: shift?.state === 'HANDOVER_PENDING',
+    workFinished: shift?.state === 'HANDOVER_PENDING',
     shiftClosed: shift?.state === 'CLOSED',
   });
 
@@ -259,18 +305,20 @@ export async function queryOperatorMobileState(input: {
     purpose: definition.purpose,
     version: definition.version,
     done: completedStages.includes(definition.stage),
-    items: selectChecklistItems(definition, conditions, capabilities),
+    sections: selectChecklistSections(definition, conditions, capabilities),
   }));
+
+  const gradeLength = new Map(dictionaries.pileGrades.map((g) => [g.id, g.lengthMm]));
 
   return {
     operator: {id: operatorId, name: input.operatorName},
     phase,
     progress: buildProgress(phase),
-    identity: {documents: checks, valid: identityValid},
+    identity,
     options,
     assignment: {
       crewId: crew.id,
-      siteId: crew.site.id,
+      siteId,
       siteName: crew.site.name,
       equipmentId,
       equipmentName: crew.equipment.name,
@@ -278,9 +326,14 @@ export async function queryOperatorMobileState(input: {
       hasHammer: capabilities.hasHammer,
       hasRotator: capabilities.hasRotator,
       assistants: crew.assistants.map((assistant) => assistant.name),
-      lastEngineHours: lastMeter?.engineHours ?? crew.equipment.engineHoursTotal ?? null,
-      lastEngineHoursAt: lastMeter?.recordedAt.toISOString() ?? null,
-      previousShiftPiles: previousPiles._sum.count ?? 0,
+      sitePiles,
+      siteDrilling: {
+        count: siteDrilling._sum.count ?? 0,
+        meters: round1(siteDrilling._sum.meters ?? 0),
+      },
+      siteDowntimeHours: round1(siteDowntime._sum.duration ?? 0),
+      fuelPercent: lastFuel?.endingFuelPercent ?? null,
+      maintenance,
     },
     weather,
     conditions,
@@ -293,24 +346,83 @@ export async function queryOperatorMobileState(input: {
       }
       : null,
     checklists,
-    blockers,
-    workAllowed: isWorkAllowed(blockers) && phase === 'WORK',
+    warnings,
+    workAllowed: isWorkAllowed(warnings),
     production: {
-      piles: report?.piles.reduce((sum, pile) => sum + pile.count, 0) ?? 0,
-      drillingMeters: report?.drillings.reduce((sum, drilling) => sum + drilling.meters, 0) ?? 0,
-      downtimeHours: report?.downtimes
+      piles: {
+        count: report?.piles.reduce((sum, pile) => sum + pile.count, 0) ?? 0,
+        meters: round1(report?.piles.reduce(
+          (sum, pile) => sum + pile.count * pileLengthMeters({gradeLengthMm: gradeLength.get(pile.pileGradeId) ?? null}),
+          0,
+        ) ?? 0),
+      },
+      drilling: {
+        count: report?.drillings.reduce((sum, drill) => sum + drill.count, 0) ?? 0,
+        meters: round1(report?.drillings.reduce((sum, drill) => sum + drill.meters, 0) ?? 0),
+      },
+      downtimeHours: round1(report?.downtimes
         .filter((downtime) => downtime.kind !== 'BREAK')
-        .reduce((sum, downtime) => sum + downtime.duration, 0) ?? 0,
+        .reduce((sum, downtime) => sum + downtime.duration, 0) ?? 0),
     },
+    dictionaries,
   };
 }
 
-function buildProgress(current: OperatorPhase) {
-  const done = completedPhases(current);
-  return PHASE_ORDER.filter((phase) => phase !== 'CLOSED').map((phase) => ({
-    phase,
-    label: PHASE_LABELS[phase],
-    done: done.includes(phase),
-    current: phase === current,
-  }));
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Забито на объекте за всё время: штуки и метры погонные.
+ *
+ * Считаем группировкой по марке, а не выборкой всех строк: на объекте, где
+ * забито десять тысяч свай, второе означало бы десять тысяч строк в память
+ * ради одной суммы. Метры разворачиваются из длины марки — единственного
+ * источника длины в продукте.
+ */
+async function sitePileVolume(
+  tenantId: string,
+  siteId: string,
+  grades: {id: string; lengthMm: number | null}[],
+): Promise<WorkVolume> {
+  const groups = await db.pileWork.groupBy({
+    by: ['pileGradeId'],
+    _sum: {count: true},
+    where: {report: {tenantId, siteId}},
+  });
+  const length = new Map(grades.map((grade) => [grade.id, grade.lengthMm]));
+
+  let count = 0;
+  let meters = 0;
+  for (const group of groups) {
+    const piles = group._sum.count ?? 0;
+    count += piles;
+    meters += piles * pileLengthMeters({gradeLengthMm: length.get(group.pileGradeId) ?? null});
+  }
+  return {count, meters: round1(meters)};
+}
+
+/**
+ * Справочники приезжают вместе с состоянием, а не отдельным запросом: экран
+ * учёта выработки без них бесполезен, а второй запрос — второй шанс не доехать.
+ */
+async function loadDictionaries(tenantId: string) {
+  const [pileGrades, drillingTypes, downtimeReasons] = await Promise.all([
+    db.pileGrade.findMany({
+      where: {tenantId, isActive: true},
+      select: {id: true, name: true, lengthMm: true},
+      orderBy: {name: 'asc'},
+    }),
+    db.drillingType.findMany({
+      where: {tenantId, isActive: true},
+      select: {id: true, name: true},
+      orderBy: {name: 'asc'},
+    }),
+    db.downtimeReason.findMany({
+      where: {tenantId, isActive: true},
+      select: {id: true, name: true},
+      orderBy: {name: 'asc'},
+    }),
+  ]);
+  return {pileGrades, drillingTypes, downtimeReasons};
 }

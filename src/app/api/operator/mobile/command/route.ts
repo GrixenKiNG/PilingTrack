@@ -3,7 +3,8 @@ import {z} from 'zod';
 import {withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
 import {
-  acceptEquipment, closeShift, logProduction, OperatorCommandError, requestClosing, submitChecklist,
+  acceptEquipment, acknowledgeBriefing, closeShift, finishWork, logProduction,
+  OperatorCommandError, removeProduction, submitChecklist, submitKnowledgeTest,
 } from '@/modules/operator-mobile';
 
 export const runtime = 'nodejs';
@@ -21,11 +22,18 @@ const answerSchema = z.object({
 });
 
 const commandSchema = z.discriminatedUnion('command', [
+  z.object({command: z.literal('acknowledge-briefing')}),
+  z.object({
+    command: z.literal('submit-knowledge'),
+    picks: z.array(z.object({
+      questionId: z.string().min(1),
+      picked: z.number().int().min(0).max(9),
+    })).min(1).max(20),
+  }),
   z.object({
     command: z.literal('accept-equipment'),
     clientCommandId: z.string().min(8).max(64),
     equipmentId: z.string().min(1),
-    engineHours: z.number().int().min(0).max(1_000_000),
     shiftType: z.enum(['DAY', 'NIGHT']),
   }),
   z.object({
@@ -47,27 +55,32 @@ const commandSchema = z.discriminatedUnion('command', [
         kind: z.literal('PILES'),
         pileGradeId: z.string().min(1),
         count: z.number().int().min(1).max(500),
-        picketId: z.string().optional(),
         comment: z.string().max(500).optional(),
       }),
       z.object({
         kind: z.literal('DRILLING'),
         typeId: z.string().min(1),
         count: z.number().int().min(1).max(500),
-        meters: z.number().min(0.1).max(10_000),
-        picketId: z.string().optional(),
+        // Как в отчёте за смену: метры на одну скважину, объём считает сервер.
+        metersPerUnit: z.number().min(0.1).max(200),
       }),
       z.object({
         kind: z.literal('DOWNTIME'),
         reasonId: z.string().min(1),
-        // Простой измеряется в часах во всём приложении. Здесь тоже часы,
-        // и максимум в 24 отсекает опечатку «ввёл минуты».
+        // Простой измеряется в часах во всём приложении. Максимум в 24
+        // отсекает опечатку «ввёл минуты».
         hours: z.number().min(0.1).max(24),
         comment: z.string().max(500).optional(),
       }),
     ]),
   }),
-  z.object({command: z.literal('request-closing'), shiftId: z.string().min(1)}),
+  z.object({
+    command: z.literal('remove-production'),
+    shiftId: z.string().min(1),
+    kind: z.enum(['PILES', 'DRILLING', 'DOWNTIME']),
+    id: z.string().min(1),
+  }),
+  z.object({command: z.literal('finish-work'), shiftId: z.string().min(1)}),
   z.object({
     command: z.literal('close-shift'),
     shiftId: z.string().min(1),
@@ -79,8 +92,8 @@ const commandSchema = z.discriminatedUnion('command', [
  * Единственная точка записи для мобильного места.
  *
  * ПОЧЕМУ ОДИН МАРШРУТ НА ВСЕ КОМАНДЫ. Команд немного, и у всех одна и та же
- * обвязка: кто ты, твоя ли смена, не повтор ли это. Пять маршрутов означали бы
- * пять мест, где эту обвязку можно забыть.
+ * обвязка: кто ты, твоя ли смена, не повтор ли это. Восемь маршрутов означали
+ * бы восемь мест, где эту обвязку можно забыть.
  */
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -108,14 +121,20 @@ export const POST = withMutation(
 
     try {
       switch (body.command) {
+        case 'acknowledge-briefing':
+          return NextResponse.json({data: await acknowledgeBriefing(actor)});
+        case 'submit-knowledge':
+          return NextResponse.json({data: await submitKnowledgeTest({...actor, ...body})});
         case 'accept-equipment':
           return NextResponse.json({data: await acceptEquipment({...actor, ...body})});
         case 'submit-checklist':
           return NextResponse.json({data: await submitChecklist({...actor, ...body})});
         case 'log-production':
           return NextResponse.json({data: await logProduction({...actor, ...body})});
-        case 'request-closing':
-          return NextResponse.json({data: await requestClosing({...actor, ...body})});
+        case 'remove-production':
+          return NextResponse.json({data: await removeProduction({...actor, ...body})});
+        case 'finish-work':
+          return NextResponse.json({data: await finishWork({...actor, ...body})});
         case 'close-shift':
           return NextResponse.json({data: await closeShift({...actor, ...body})});
       }

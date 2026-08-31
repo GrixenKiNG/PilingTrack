@@ -1,4 +1,6 @@
-import type {ChecklistDefinition, ChecklistItem, ShiftCondition} from './checklist-types';
+import type {
+  ChecklistDefinition, ChecklistItem, ChecklistSection, ShiftCondition,
+} from './checklist-types';
 
 /**
  * Пороги, при которых смена считается «зимней», «мокрой» или «тёмной».
@@ -6,6 +8,9 @@ import type {ChecklistDefinition, ChecklistItem, ShiftCondition} from './checkli
  * Здесь собраны все числа, которые владелец захочет однажды подвинуть.
  * Отдельная константа лучше числа посреди условия: её видно, её можно
  * обсудить, и на неё ссылается объяснение оператору на экране.
+ *
+ * Это пороги ПОКАЗА сезонных пунктов. Пороги запрета работы — другие и живут
+ * в work-warnings.ts: работать нельзя при ветре выше 15 м/с и морозе ниже −25.
  */
 export const CONDITION_THRESHOLDS = {
   /** Ниже этой температуры добавляем зимние пункты. */
@@ -61,23 +66,46 @@ export interface EquipmentCapabilities {
   hasRotator: boolean;
 }
 
+function itemApplies(
+  item: ChecklistItem,
+  conditions: ShiftCondition[],
+  capabilities: EquipmentCapabilities,
+): boolean {
+  if (item.unit === 'HAMMER' && !capabilities.hasHammer) return false;
+  if (item.unit === 'ROTATOR' && !capabilities.hasRotator) return false;
+  if (!item.onlyWhen) return true;
+  return item.onlyWhen.some((condition) => conditions.includes(condition));
+}
+
 /**
- * Пункты чек-листа, применимые к этой машине в этих условиях.
+ * Секции чек-листа, применимые к этой машине в этих условиях. Секция, из
+ * которой выпали все пункты, не показывается вовсе — пустой заголовок хуже,
+ * чем его отсутствие.
  *
- * Пункт про молот на буровой не показываем вовсе, а не помечаем «н/п»:
- * лишняя строка в списке из десяти — это минус одна прочитанная строка.
+ * Пункт про молот на буровой не показываем, а не помечаем «н/п»: лишняя
+ * строка в списке из десяти — это минус одна прочитанная строка.
  */
+export function selectChecklistSections(
+  definition: ChecklistDefinition,
+  conditions: ShiftCondition[],
+  capabilities: EquipmentCapabilities,
+): ChecklistSection[] {
+  return definition.sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => itemApplies(item, conditions, capabilities)),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+/** Те же пункты одним списком — для проверок и записи ответов. */
 export function selectChecklistItems(
   definition: ChecklistDefinition,
   conditions: ShiftCondition[],
   capabilities: EquipmentCapabilities,
 ): ChecklistItem[] {
-  return definition.items.filter((item) => {
-    if (item.unit === 'HAMMER' && !capabilities.hasHammer) return false;
-    if (item.unit === 'ROTATOR' && !capabilities.hasRotator) return false;
-    if (!item.onlyWhen) return true;
-    return item.onlyWhen.some((condition) => conditions.includes(condition));
-  });
+  return selectChecklistSections(definition, conditions, capabilities)
+    .flatMap((section) => section.items);
 }
 
 /** Человеческое объяснение, почему в списке появились лишние пункты. */

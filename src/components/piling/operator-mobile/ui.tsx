@@ -4,14 +4,13 @@ import type {ReactNode} from 'react';
 import {cn} from '@/lib/utils';
 
 /**
- * Мелкие части экрана оператора.
+ * Части экрана машиниста.
  *
- * ПОЧЕМУ НЕ ОБЩИЕ КОМПОНЕНТЫ ПРОДУКТА. Те рассчитаны на мышь и монитор в
- * конторе: кнопка высотой 36 точек, подписи серым по светло-серому. На
- * площадке экран держат в перчатке, а солнце по снегу гасит любой оттенок
- * серого. Отсюда собственный набор: цель нажатия не меньше 60 точек,
- * состояние обозначено цветом и словом одновременно — цвета на морозе через
- * поляризационные очки не всегда видно.
+ * Оформление — токены продукта: `bg-card`, `border-border`, семантические
+ * success/warning/destructive и бренд-оранжевый `signal` на первичном действии.
+ * Отличие от остального приложения одно и намеренное: цель нажатия не меньше
+ * 44 точек, а у главной кнопки — 48. Экран держат в перчатке на морозе, и
+ * кнопка высотой 36 точек, нормальная для мыши, здесь промахивается.
  */
 
 export function Screen({title, subtitle, children, footer}: {
@@ -21,14 +20,14 @@ export function Screen({title, subtitle, children, footer}: {
   footer?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-white text-neutral-900">
-      <header className="border-b-2 border-neutral-900 px-4 pb-3 pt-4">
-        <h1 className="text-2xl font-bold leading-tight">{title}</h1>
-        {subtitle ? <p className="mt-1 text-base text-neutral-600">{subtitle}</p> : null}
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="border-b px-4 pb-3 pt-3">
+        <h1 className="text-2xl font-bold leading-tight tracking-tight text-balance">{title}</h1>
+        {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
       </header>
-      <main className="flex-1 space-y-4 px-4 py-4 pb-40">{children}</main>
+      <main className="flex-1 space-y-3 px-4 py-4 pb-40">{children}</main>
       {footer ? (
-        <div className="sticky bottom-0 border-t-2 border-neutral-900 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="sticky bottom-0 space-y-2 border-t bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {footer}
         </div>
       ) : null}
@@ -40,7 +39,7 @@ export function BigButton({children, onClick, disabled, tone = 'primary', type =
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  tone?: 'primary' | 'danger' | 'ghost';
+  tone?: 'primary' | 'ghost' | 'danger';
   type?: 'button' | 'submit';
 }) {
   return (
@@ -49,11 +48,11 @@ export function BigButton({children, onClick, disabled, tone = 'primary', type =
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'min-h-[60px] w-full rounded-2xl px-5 text-lg font-bold transition-colors',
-        'disabled:cursor-not-allowed disabled:opacity-40',
-        tone === 'primary' && 'bg-neutral-900 text-white active:bg-neutral-700',
-        tone === 'danger' && 'bg-red-700 text-white active:bg-red-800',
-        tone === 'ghost' && 'border-2 border-neutral-900 bg-white text-neutral-900 active:bg-neutral-100',
+        'min-h-12 w-full rounded-lg border px-4 text-base font-semibold shadow-xs transition-colors',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        tone === 'primary' && 'border-signal bg-signal text-white hover:bg-signal-strong',
+        tone === 'ghost' && 'bg-card text-foreground hover:bg-secondary',
+        tone === 'danger' && 'border-destructive bg-destructive text-white hover:bg-destructive-strong',
       )}
     >
       {children}
@@ -61,19 +60,20 @@ export function BigButton({children, onClick, disabled, tone = 'primary', type =
   );
 }
 
+export type PanelTone = 'plain' | 'ok' | 'warning' | 'danger';
+
 export function Panel({children, tone = 'plain', className}: {
   children: ReactNode;
-  tone?: 'plain' | 'warning' | 'stop' | 'ok';
+  tone?: PanelTone;
   className?: string;
 }) {
   return (
     <section
       className={cn(
-        'rounded-2xl border-2 p-4',
-        tone === 'plain' && 'border-neutral-300 bg-white',
-        tone === 'ok' && 'border-emerald-700 bg-emerald-50',
-        tone === 'warning' && 'border-amber-600 bg-amber-50',
-        tone === 'stop' && 'border-red-700 bg-red-50',
+        'rounded-lg border bg-card p-4 shadow-xs',
+        tone === 'ok' && 'border-success/45 bg-success/8',
+        tone === 'warning' && 'border-warning/50 bg-warning/10',
+        tone === 'danger' && 'border-destructive/45 bg-destructive/8',
         className,
       )}
     >
@@ -82,14 +82,45 @@ export function Panel({children, tone = 'plain', className}: {
   );
 }
 
-/** Строка «показатель — значение». Значение всегда крупнее подписи. */
-export function Fact({label, value, hint}: {label: string; value: ReactNode; hint?: string}) {
+export function PanelTitle({children, tone = 'plain'}: {children: ReactNode; tone?: PanelTone}) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-neutral-200 py-2 last:border-b-0">
-      <span className="text-base text-neutral-600">{label}</span>
+    <h2
+      className={cn(
+        'text-base font-semibold leading-snug tracking-tight',
+        tone === 'ok' && 'text-success-strong',
+        tone === 'warning' && 'text-warning-strong',
+        tone === 'danger' && 'text-destructive-strong',
+      )}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/** Строка «показатель — значение». Значение крупнее подписи и моноширинное. */
+export function Fact({label, value, unit}: {label: string; value: ReactNode; unit?: string}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 last:pb-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-right">
-        <span className="text-xl font-bold tabular-nums">{value}</span>
-        {hint ? <span className="ml-1 text-sm text-neutral-500">{hint}</span> : null}
+        <span className="text-base font-semibold tabular-nums">{value}</span>
+        {unit ? <span className="ml-1 text-2xs text-muted-foreground">{unit}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+/** Объём работ в двух единицах сразу: штуки и метры погонные. */
+export function VolumeFact({label, count, meters}: {label: string; count: number; meters: number}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 last:pb-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-right tabular-nums">
+        <span className="text-base font-semibold">{count}</span>
+        <span className="ml-1 text-2xs text-muted-foreground">шт</span>
+        <span className="mx-1.5 text-muted-foreground">·</span>
+        <span className="text-base font-semibold">{meters.toFixed(1)}</span>
+        <span className="ml-1 text-2xs text-muted-foreground">м.п.</span>
       </span>
     </div>
   );
@@ -98,32 +129,51 @@ export function Fact({label, value, hint}: {label: string; value: ReactNode; hin
 export function PhaseBar({progress}: {
   progress: {phase: string; label: string; done: boolean; current: boolean}[];
 }) {
+  const current = progress.find((step) => step.current);
   return (
-    <ol className="flex gap-1 px-4 pt-3" aria-label="Ход смены">
-      {progress.map((step) => (
-        <li key={step.phase} className="flex-1">
-          <div
+    <div className="bg-background px-4 pt-3">
+      <ol className="flex gap-1" aria-label="Ход смены">
+        {progress.map((step) => (
+          <li
+            key={step.phase}
             className={cn(
-              'h-2 rounded-full',
-              step.done && 'bg-emerald-600',
-              step.current && 'bg-neutral-900',
-              !step.done && !step.current && 'bg-neutral-200',
+              'h-1 flex-1 rounded-full',
+              step.done && 'bg-success',
+              step.current && 'bg-signal',
+              !step.done && !step.current && 'bg-border',
             )}
           />
-          {step.current ? (
-            <p className="mt-1 truncate text-xs font-semibold text-neutral-900">{step.label}</p>
-          ) : null}
-        </li>
-      ))}
-    </ol>
+        ))}
+      </ol>
+      <p className="mt-2 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {current?.label ?? ''}
+      </p>
+    </div>
   );
 }
 
 export function ErrorNote({message}: {message: string | null}) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-xl border-2 border-red-700 bg-red-50 p-3 text-base font-semibold text-red-900">
+    <p role="alert" className="rounded-lg border border-destructive/45 bg-destructive/8 p-3 text-sm font-medium text-destructive-strong">
       {message}
     </p>
+  );
+}
+
+/** Кружок со знаком: цвет читают не все, галочку и восклицательный знак — все. */
+export function Sign({tone}: {tone: 'ok' | 'warning' | 'danger'}) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold text-white',
+        tone === 'ok' && 'bg-success',
+        tone === 'warning' && 'bg-warning text-warning-foreground',
+        tone === 'danger' && 'bg-destructive',
+      )}
+    >
+      {tone === 'ok' ? '✓' : tone === 'warning' ? '!' : '✕'}
+    </span>
   );
 }

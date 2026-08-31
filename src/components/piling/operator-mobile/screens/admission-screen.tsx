@@ -2,44 +2,47 @@
 
 import {useState} from 'react';
 import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {BigButton, ErrorNote, Fact, Panel, Screen} from '../ui';
-import {BlockersPanel} from '../blockers-panel';
+import {cn} from '@/lib/utils';
+import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
+import {WarningsPanel} from '../warnings-panel';
 
 /**
- * Приём установки: объект, машина, наработка, погода.
+ * Приём установки: объект, машина, состояние парка, погода.
  *
- * ПОЧЕМУ МОТОЧАСЫ ВВОДЯТСЯ РУКАМИ, А НЕ БЕРУТСЯ ИЗ ПРОШЛОЙ СМЕНЫ. Расхождение
- * между тем, что в системе, и тем, что на приборной панели, — это и есть
- * ценная информация: машину гоняли без смены, счётчик врёт, кто-то ошибся
- * вчера. Подставленное значение это расхождение прячет.
+ * ПОЧЕМУ ЗДЕСЬ СВОДКА ПО ОБЪЕКТУ, А НЕ ПО МАШИНЕ. План ведётся по объекту, и
+ * первое, что оператор хочет знать утром, — сколько на нём уже забито и сколько
+ * осталось. Наработка машины важна механику, а не машинисту в семь утра.
+ *
+ * ПОЧЕМУ НЕТ ВВОДА МОТОЧАСОВ. Их снимают при пуске, в ЕО перед работой. Два
+ * ввода подряд про одно и то же заполняют не глядя.
  */
 export function AdmissionScreen({state, onAccept, busy, error}: {
   state: OperatorMobileState;
-  onAccept: (input: {equipmentId: string; engineHours: number; shiftType: 'DAY' | 'NIGHT'}) => void;
+  onAccept: (input: {equipmentId: string; shiftType: 'DAY' | 'NIGHT'}) => void;
   busy: boolean;
   error: string | null;
 }) {
-  const [equipmentId, setEquipmentId] = useState(state.assignment?.equipmentId ?? '');
-  const [engineHours, setEngineHours] = useState('');
-  const [shiftType, setShiftType] = useState<'DAY' | 'NIGHT'>('DAY');
-
   const assignment = state.assignment;
-  const previous = assignment?.lastEngineHours ?? null;
-  // Пустое поле — это не ноль: `Number('')` даёт 0, и без этой проверки
-  // предупреждение «моточасы меньше предыдущего» встречало оператора ещё до
-  // того, как он ввёл хоть одну цифру.
-  const filled = engineHours.trim() !== '' && Number.isFinite(Number(engineHours));
-  const entered = Number(engineHours);
-  const belowPrevious = filled && previous !== null && entered < previous;
-  const valid = filled && entered >= 0 && !belowPrevious;
+  const [equipmentId, setEquipmentId] = useState(assignment?.equipmentId ?? '');
+  const [shiftType, setShiftType] = useState<'DAY' | 'NIGHT'>('DAY');
 
   if (!assignment) {
     return (
       <Screen title="Приём установки">
-        <BlockersPanel blockers={state.blockers} />
+        <WarningsPanel warnings={state.warnings} />
+        <Panel>
+          <p className="text-sm text-muted-foreground">
+            За вами не закреплена ни одна установка. Работать не на чем.
+          </p>
+        </Panel>
       </Screen>
     );
   }
+
+  const maintenance = assignment.maintenance;
+  const maintenanceValue = maintenance.daysLeft === null
+    ? '—'
+    : maintenance.daysLeft < 0 ? `просрочено на ${Math.abs(maintenance.daysLeft)}` : maintenance.daysLeft;
 
   return (
     <Screen
@@ -47,80 +50,100 @@ export function AdmissionScreen({state, onAccept, busy, error}: {
       subtitle={`${assignment.siteName} · ${new Date().toLocaleDateString('ru-RU')}`}
       footer={(
         <BigButton
-          onClick={() => onAccept({equipmentId: equipmentId || assignment.equipmentId, engineHours: entered, shiftType})}
-          disabled={!valid || busy}
+          onClick={() => onAccept({equipmentId: equipmentId || assignment.equipmentId, shiftType})}
+          disabled={busy}
         >
           {busy ? 'Открываем смену…' : 'Принять и открыть смену'}
         </BigButton>
       )}
     >
-      <BlockersPanel blockers={state.blockers} />
+      <WarningsPanel warnings={state.warnings} />
 
       {state.options.length > 1 ? (
         <div className="space-y-2">
-          <h2 className="text-lg font-bold">На какой машине работаете</h2>
+          <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+            На какой машине работаете
+          </h2>
           {state.options.map((option) => (
             <button
               key={option.crewId}
               type="button"
               onClick={() => setEquipmentId(option.equipmentId)}
-              className={`min-h-[60px] w-full rounded-2xl border-2 px-4 text-left ${
+              className={cn(
+                'min-h-12 w-full rounded-lg border bg-card px-4 py-2 text-left shadow-xs transition-colors',
                 (equipmentId || assignment.equipmentId) === option.equipmentId
-                  ? 'border-neutral-900 bg-neutral-900 text-white'
-                  : 'border-neutral-300 bg-white'
-              }`}
+                  ? 'border-signal bg-signal/10'
+                  : 'hover:bg-secondary',
+              )}
             >
-              <span className="block text-lg font-bold">{option.equipmentName}</span>
-              <span className="block text-sm opacity-80">{option.siteName}</span>
+              <span className="block text-sm font-semibold">{option.equipmentName}</span>
+              <span className="block text-2xs text-muted-foreground">{option.siteName}</span>
             </button>
           ))}
         </div>
       ) : null}
 
       <Panel>
-        <h2 className="text-lg font-bold">{assignment.equipmentName}</h2>
-        <p className="text-base text-neutral-600">{assignment.equipmentModel || 'Модель не указана'}</p>
+        <PanelTitle>{assignment.equipmentName}</PanelTitle>
+        <p className="text-2xs text-muted-foreground">
+          {assignment.equipmentModel || 'модель не указана'}
+        </p>
         <div className="mt-3">
           <Fact label="Объект" value={assignment.siteName} />
-          <Fact
-            label="Моточасы в системе"
-            value={previous ?? '—'}
-            hint={previous !== null ? 'м/ч' : undefined}
+          <VolumeFact
+            label="Свай забито ранее"
+            count={assignment.sitePiles.count}
+            meters={assignment.sitePiles.meters}
           />
-          <Fact label="Свай забито ранее" value={assignment.previousShiftPiles} hint="шт" />
+          <VolumeFact
+            label="Лидерное бурение"
+            count={assignment.siteDrilling.count}
+            meters={assignment.siteDrilling.meters}
+          />
+          <Fact label="Простой" value={assignment.siteDowntimeHours.toFixed(1)} unit="ч" />
+          <Fact
+            label="Топливо"
+            value={assignment.fuelPercent === null ? '—' : assignment.fuelPercent}
+            unit={assignment.fuelPercent === null ? undefined : '%'}
+          />
+          <Fact label="Следующее ТО через" value={maintenanceValue} unit="дней" />
           {assignment.assistants.length > 0 ? (
             <Fact label="Помощник" value={assignment.assistants.join(', ')} />
           ) : null}
         </div>
+        <p className="mt-2 text-2xs text-muted-foreground">
+          Свай, бурение и простой — накопительно по объекту. Топливо — остаток на конец предыдущей
+          смены этой машины.
+        </p>
       </Panel>
 
       <Panel tone={state.weather ? 'plain' : 'warning'}>
-        <h2 className="text-lg font-bold">Погода на площадке</h2>
+        <PanelTitle>Погода на площадке</PanelTitle>
         {state.weather ? (
           <>
             <div className="mt-2 flex gap-6">
               <div>
-                <p className="text-3xl font-bold tabular-nums">
+                <p className="text-2xl font-bold tabular-nums leading-none">
                   {state.weather.temperatureC !== null ? `${state.weather.temperatureC}°` : '—'}
                 </p>
-                <p className="text-sm text-neutral-600">температура</p>
+                <p className="mt-1 text-2xs text-muted-foreground">температура</p>
               </div>
               <div>
-                <p className="text-3xl font-bold tabular-nums">
+                <p className="text-2xl font-bold tabular-nums leading-none">
                   {state.weather.windMs !== null ? state.weather.windMs : '—'}
                 </p>
-                <p className="text-sm text-neutral-600">ветер, м/с</p>
+                <p className="mt-1 text-2xs text-muted-foreground">ветер, м/с</p>
               </div>
             </div>
             {state.conditions.length > 0 ? (
-              <p className="mt-3 text-base">
+              <p className="mt-3 text-sm">
                 Условия смены: {state.conditions.map((condition) => CONDITION_LABELS[condition]).join(', ')}.
                 В чек-листы добавлены сезонные пункты.
               </p>
             ) : null}
           </>
         ) : (
-          <p className="mt-1 text-base">
+          <p className="mt-1 text-sm">
             Погода недоступна: нет координат либо сервис молчит. Сезонные пункты чек-листов
             не добавлены — оцените условия сами.
           </p>
@@ -128,36 +151,17 @@ export function AdmissionScreen({state, onAccept, busy, error}: {
       </Panel>
 
       <div className="space-y-2">
-        <label htmlFor="engine-hours" className="block text-lg font-bold">
-          Моточасы по счётчику
-        </label>
-        <input
-          id="engine-hours"
-          type="number"
-          inputMode="numeric"
-          value={engineHours}
-          onChange={(event) => setEngineHours(event.target.value)}
-          placeholder={previous !== null ? String(previous) : '0'}
-          className="h-[60px] w-full rounded-2xl border-2 border-neutral-900 px-4 text-2xl font-bold tabular-nums"
-        />
-        {belowPrevious ? (
-          <p className="text-base font-semibold text-red-800">
-            Меньше предыдущего показания ({previous}). Счётчик назад не крутится — проверьте цифру.
-          </p>
-        ) : null}
-      </div>
-
-      <div className="space-y-2">
-        <span className="block text-lg font-bold">Смена</span>
-        <div className="flex gap-2">
+        <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Смена</h2>
+        <div className="flex gap-2 rounded-lg bg-secondary p-1">
           {(['DAY', 'NIGHT'] as const).map((type) => (
             <button
               key={type}
               type="button"
               onClick={() => setShiftType(type)}
-              className={`min-h-[60px] flex-1 rounded-2xl border-2 text-lg font-bold ${
-                shiftType === type ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300'
-              }`}
+              className={cn(
+                'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
+                shiftType === type ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
+              )}
             >
               {type === 'DAY' ? 'Дневная' : 'Ночная'}
             </button>

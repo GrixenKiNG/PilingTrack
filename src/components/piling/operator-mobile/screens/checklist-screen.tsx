@@ -1,21 +1,24 @@
 'use client';
 
 import {useMemo, useRef, useState} from 'react';
-import type {ChecklistAnswer, ChecklistItem, ChecklistView, WorkBlocker} from '@/modules/operator-mobile/contracts';
+import {
+  measureRequired,
+  type ChecklistAnswer, type ChecklistItem, type ChecklistView,
+  type OperatorAnswer, type WorkWarning,
+} from '@/modules/operator-mobile/contracts';
+import {cn} from '@/lib/utils';
 import {uploadPhoto} from '../api';
-import {BigButton, ErrorNote, Panel, Screen} from '../ui';
-import {BlockersPanel} from '../blockers-panel';
+import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
+import {WarningsPanel} from '../warnings-panel';
 
-type Verdict = 'OK' | 'REMARK' | 'FAULT';
-
-const VERDICTS: {value: Verdict; label: string; className: string; active: string}[] = [
-  {value: 'OK', label: 'Норма', className: 'border-emerald-700 text-emerald-900', active: 'bg-emerald-700 text-white border-emerald-700'},
-  {value: 'REMARK', label: 'Замечание', className: 'border-amber-600 text-amber-900', active: 'bg-amber-600 text-white border-amber-600'},
-  {value: 'FAULT', label: 'Неисправность', className: 'border-red-700 text-red-900', active: 'bg-red-700 text-white border-red-700'},
+const ANSWERS: {value: OperatorAnswer; label: string}[] = [
+  {value: 'OK', label: 'Норма'},
+  {value: 'REMARK', label: 'Замечание'},
+  {value: 'FAULT', label: 'Отказ'},
 ];
 
 interface Draft {
-  answer?: Verdict;
+  answer?: OperatorAnswer;
   note: string;
   measures: Record<string, string>;
   mediaIds: string[];
@@ -25,20 +28,24 @@ interface Draft {
 const emptyDraft = (): Draft => ({note: '', measures: {}, mediaIds: [], uploading: false});
 
 /**
+ * Пустая строка — это не ноль. `Number('')` даёт 0, и без этой проверки
+ * незаполненное поле долива считалось бы заполненным нулём.
+ */
+function filled(raw: string | undefined): boolean {
+  return raw !== undefined && raw.trim() !== '' && Number.isFinite(Number(raw));
+}
+
+/**
  * Универсальный экран чек-листа: один и тот же для осмотра, ЕО и ТБ.
  *
- * ПОЧЕМУ СПИСОК, А НЕ МАСТЕР ПО ОДНОМУ ПУНКТУ. Мастер экономит место на экране
- * и отнимает у оператора картину целиком: сколько осталось, что уже отмечено,
- * можно ли вернуться. На осмотре из двенадцати пунктов вернуться приходится
- * постоянно — вспомнил про течь, увидев соседний пункт.
- *
- * ПОЧЕМУ ТРИ ОТВЕТА, А НЕ ЧЕТЫРЕ. «Не применимо» здесь нет: пункты, которых на
- * этой машине или при этой погоде быть не должно, отсеяны заранее. Кнопка
- * «неприменимо» на осмотре мачты — это способ не осматривать мачту.
+ * ПОЧЕМУ СПИСОК С СЕКЦИЯМИ, А НЕ МАСТЕР ПО ОДНОМУ ПУНКТУ. Мастер экономит место
+ * и отнимает картину целиком: сколько осталось и можно ли вернуться. На осмотре
+ * возвращаться приходится постоянно — вспомнил про течь, увидев соседний пункт.
+ * Секции по узлам дают ориентир: течь была «где-то в гидравлике».
  */
-export function ChecklistScreen({checklist, blockers, onSubmit, busy, error, commandId, onBack}: {
+export function ChecklistScreen({checklist, warnings, onSubmit, busy, error, commandId, onBack}: {
   checklist: ChecklistView;
-  blockers: WorkBlocker[];
+  warnings: WorkWarning[];
   onSubmit: (answers: ChecklistAnswer[]) => void;
   busy: boolean;
   error: string | null;
@@ -49,33 +56,33 @@ export function ChecklistScreen({checklist, blockers, onSubmit, busy, error, com
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [showGaps, setShowGaps] = useState(false);
 
+  const items = useMemo(
+    () => checklist.sections.flatMap((section) => section.items),
+    [checklist.sections],
+  );
+
   const update = (itemId: string, patch: Partial<Draft>) => {
     setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...patch}}));
   };
 
-  const answered = useMemo(
-    () => checklist.items.filter((item) => drafts[item.id]?.answer).length,
-    [checklist.items, drafts],
-  );
-
-  const gaps = useMemo(() => collectGaps(checklist.items, drafts), [checklist.items, drafts]);
-  const ready = gaps.length === 0;
+  const answered = items.filter((item) => drafts[item.id]?.answer).length;
+  const gaps = useMemo(() => collectGaps(items, drafts), [items, drafts]);
 
   const submit = () => {
-    if (!ready) {
+    if (gaps.length > 0) {
       setShowGaps(true);
       return;
     }
-    onSubmit(checklist.items.map((item) => {
+    onSubmit(items.map((item) => {
       const draft = drafts[item.id] ?? emptyDraft();
       const measures = Object.fromEntries(
         Object.entries(draft.measures)
-          .filter(([, value]) => isFilledNumber(value))
+          .filter(([, value]) => filled(value))
           .map(([key, value]) => [key, Number(value)] as const),
       );
       return {
         itemId: item.id,
-        answer: draft.answer as Verdict,
+        answer: draft.answer as OperatorAnswer,
         note: draft.note.trim() || undefined,
         measures: Object.keys(measures).length > 0 ? measures : undefined,
         mediaIds: draft.mediaIds.length > 0 ? draft.mediaIds : undefined,
@@ -88,37 +95,43 @@ export function ChecklistScreen({checklist, blockers, onSubmit, busy, error, com
       title={checklist.title}
       subtitle={checklist.purpose}
       footer={(
-        <div className="space-y-2">
-          <p className="text-center text-base font-semibold">
-            Отмечено {answered} из {checklist.items.length}
+        <>
+          <p className="text-center text-2xs font-medium text-muted-foreground">
+            Отмечено {answered} из {items.length}
           </p>
-          <BigButton onClick={submit} disabled={busy}>
-            {busy ? 'Отправляем…' : 'Завершить'}
+          <BigButton onClick={submit} disabled={busy || gaps.length > 0}>
+            {busy ? 'Отправляем…' : gaps.length > 0 ? `Осталось заполнить: ${gaps.length}` : 'Завершить'}
           </BigButton>
           {onBack ? <BigButton tone="ghost" onClick={onBack}>Назад</BigButton> : null}
-        </div>
+        </>
       )}
     >
-      <BlockersPanel blockers={blockers} />
+      <WarningsPanel warnings={warnings} />
 
       {showGaps && gaps.length > 0 ? (
         <Panel tone="warning">
-          <p className="text-base font-bold">Чек-лист не завершён</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
+          <PanelTitle tone="warning">Чек-лист не завершён</PanelTitle>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             {gaps.slice(0, 5).map((gap) => <li key={gap}>{gap}</li>)}
           </ul>
         </Panel>
       ) : null}
 
-      {checklist.items.map((item, index) => (
-        <ItemCard
-          key={item.id}
-          index={index + 1}
-          item={item}
-          draft={drafts[item.id] ?? emptyDraft()}
-          commandId={commandId}
-          onChange={(patch) => update(item.id, patch)}
-        />
+      {checklist.sections.map((section) => (
+        <section key={section.id} className="space-y-2">
+          <h2 className="border-b pb-1.5 pt-2 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {section.title}
+          </h2>
+          {section.items.map((item) => (
+            <ItemCard
+              key={item.id}
+              item={item}
+              draft={drafts[item.id] ?? emptyDraft()}
+              commandId={commandId}
+              onChange={(patch) => update(item.id, patch)}
+            />
+          ))}
+        </section>
       ))}
 
       <ErrorNote message={error} />
@@ -126,9 +139,8 @@ export function ChecklistScreen({checklist, blockers, onSubmit, busy, error, com
   );
 }
 
-function ItemCard({item, index, draft, commandId, onChange}: {
+function ItemCard({item, draft, commandId, onChange}: {
   item: ChecklistItem;
-  index: number;
   draft: Draft;
   commandId: string;
   onChange: (patch: Partial<Draft>) => void;
@@ -136,8 +148,7 @@ function ItemCard({item, index, draft, commandId, onChange}: {
   const fileInput = useRef<HTMLInputElement>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const isIssue = draft.answer === 'REMARK' || draft.answer === 'FAULT';
-  const measureRequired = item.measure
-    && (item.measure.requiredOn ?? ['OK', 'REMARK', 'FAULT']).includes(draft.answer ?? 'OK');
+  const wantsMeasure = Boolean(item.measure) && measureRequired(item, draft.answer ?? 'OK');
 
   const attach = async (file: File | undefined) => {
     if (!file) return;
@@ -153,55 +164,83 @@ function ItemCard({item, index, draft, commandId, onChange}: {
   };
 
   return (
-    <Panel tone={draft.answer === 'FAULT' ? 'stop' : draft.answer === 'REMARK' ? 'warning' : 'plain'}>
-      <div className="flex gap-3">
-        <span className="text-lg font-bold text-neutral-400 tabular-nums">{index}</span>
-        <div className="flex-1">
-          <h3 className="text-lg font-bold leading-snug">{item.text}</h3>
-          {item.hint ? <p className="mt-1 text-base text-neutral-600">{item.hint}</p> : null}
-          {item.blocking ? (
-            <p className="mt-1 text-sm font-bold uppercase tracking-wide text-red-800">
-              Неисправность останавливает работу
-            </p>
-          ) : null}
-        </div>
+    <div
+      className={cn(
+        'rounded-lg border bg-card p-3 shadow-xs',
+        draft.answer === 'REMARK' && 'border-warning/50',
+        draft.answer === 'FAULT' && 'border-destructive/50',
+      )}
+    >
+      <p className="text-sm font-medium leading-snug">{item.text}</p>
+      {item.hint ? <p className="mt-1 text-2xs text-muted-foreground">{item.hint}</p> : null}
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {item.severity === 'ALERT' ? (
+          <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-destructive">
+            Критично
+          </span>
+        ) : null}
+        {item.photoOnIssue ? (
+          <span className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-warning-strong">
+            Фото
+          </span>
+        ) : null}
+        {item.onlyWhen?.map((condition) => (
+          <span
+            key={condition}
+            className="rounded-full border border-info/30 bg-info/10 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-info-strong"
+          >
+            {condition === 'FROST' ? 'Мороз' : condition === 'RAIN' ? 'Дождь' : condition === 'DARK' ? 'Темнота' : 'Ветер'}
+          </span>
+        ))}
       </div>
 
-      <div className="mt-3 flex gap-2">
-        {VERDICTS.map((verdict) => (
+      <div className="mt-3 flex gap-1.5">
+        {ANSWERS.map((answer) => (
           <button
-            key={verdict.value}
+            key={answer.value}
             type="button"
-            onClick={() => onChange({answer: verdict.value})}
-            className={`min-h-[56px] flex-1 rounded-xl border-2 px-1 text-base font-bold leading-tight ${
-              draft.answer === verdict.value ? verdict.active : `bg-white ${verdict.className}`
-            }`}
+            onClick={() => onChange({answer: answer.value})}
+            className={cn(
+              'min-h-11 flex-1 rounded-md border bg-card text-sm font-medium text-muted-foreground transition-colors',
+              draft.answer !== answer.value && 'hover:bg-secondary',
+              draft.answer === 'OK' && answer.value === 'OK' && 'border-success bg-success/10 font-semibold text-success-strong',
+              draft.answer === 'REMARK' && answer.value === 'REMARK' && 'border-warning bg-warning/10 font-semibold text-warning-strong',
+              draft.answer === 'FAULT' && answer.value === 'FAULT' && 'border-destructive bg-destructive/10 font-semibold text-destructive',
+            )}
           >
-            {verdict.label}
+            {answer.label}
           </button>
         ))}
       </div>
 
-      {measureRequired && item.measure ? (
-        <MeasureField
-          measure={item.measure}
-          value={draft.measures[item.measure.key] ?? ''}
-          onChange={(value) => onChange({
-            measures: {...draft.measures, [item.measure?.key ?? '']: value},
-          })}
-        />
+      {wantsMeasure && item.measure ? (
+        <label className="mt-3 block">
+          <span className="text-2xs font-medium text-muted-foreground">
+            {item.measure.label}, {item.measure.unit}
+          </span>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={draft.measures[item.measure.key] ?? ''}
+            onChange={(event) => onChange({
+              measures: {...draft.measures, [item.measure?.key ?? '']: event.target.value},
+            })}
+            className="mt-1 h-11 w-full rounded-md border bg-card px-3 text-base font-semibold tabular-nums shadow-xs"
+          />
+        </label>
       ) : null}
 
       {isIssue ? (
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 space-y-2">
           <label className="block">
-            <span className="text-base font-semibold">Что именно не так</span>
+            <span className="text-2xs font-medium text-muted-foreground">Что именно не так</span>
             <textarea
               value={draft.note}
               onChange={(event) => onChange({note: event.target.value})}
               rows={2}
-              className="mt-1 w-full rounded-xl border-2 border-neutral-900 p-3 text-base"
               placeholder="Коротко: где, что видно"
+              className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
             />
           </label>
 
@@ -215,47 +254,28 @@ function ItemCard({item, index, draft, commandId, onChange}: {
                 className="hidden"
                 onChange={(event) => void attach(event.target.files?.[0])}
               />
-              <BigButton tone="ghost" onClick={() => fileInput.current?.click()} disabled={draft.uploading}>
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={draft.uploading}
+                className={cn(
+                  'min-h-11 w-full rounded-md border border-dashed bg-card text-sm font-medium text-muted-foreground',
+                  draft.mediaIds.length > 0 && 'border-solid bg-secondary text-foreground',
+                )}
+              >
                 {draft.uploading
                   ? 'Загружаем снимок…'
                   : draft.mediaIds.length > 0
                     ? `Снимков: ${draft.mediaIds.length}. Добавить ещё`
                     : 'Снять фото'}
-              </BigButton>
+              </button>
               <ErrorNote message={photoError} />
             </div>
           ) : null}
         </div>
       ) : null}
-    </Panel>
+    </div>
   );
-}
-
-function MeasureField({measure, value, onChange}: {
-  measure: NonNullable<ChecklistItem['measure']>;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="mt-3 block">
-      <span className="text-base font-semibold">{measure.label}, {measure.unit}</span>
-      <input
-        type="number"
-        inputMode="decimal"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-[56px] w-full rounded-xl border-2 border-neutral-900 px-3 text-xl font-bold tabular-nums"
-      />
-    </label>
-  );
-}
-
-/**
- * Пустая строка — это не ноль. `Number('')` даёт 0, и без этой проверки
- * незаполненное поле долива считалось бы заполненным нулём.
- */
-function isFilledNumber(raw: string | undefined): boolean {
-  return raw !== undefined && raw.trim() !== '' && Number.isFinite(Number(raw));
 }
 
 /** Чего не хватает, чтобы закрыть список. Те же правила, что и на сервере. */
@@ -274,11 +294,8 @@ function collectGaps(items: ChecklistItem[], drafts: Record<string, Draft>): str
     if (isIssue && item.photoOnIssue && draft.mediaIds.length === 0) {
       gaps.push(`«${item.text}» — нужен снимок`);
     }
-    if (item.measure) {
-      const required = (item.measure.requiredOn ?? ['OK', 'REMARK', 'FAULT']).includes(draft.answer);
-      if (required && !isFilledNumber(draft.measures[item.measure.key])) {
-        gaps.push(`«${item.text}» — укажите ${item.measure.label.toLowerCase()}`);
-      }
+    if (item.measure && measureRequired(item, draft.answer) && !filled(draft.measures[item.measure.key])) {
+      gaps.push(`«${item.text}» — укажите ${item.measure.label.toLowerCase()}`);
     }
   }
   return gaps;

@@ -1,7 +1,7 @@
-import type {ChecklistItem, ChecklistStage, ShiftCondition} from './checklist-types';
+import type {ChecklistSection, ChecklistStage, ShiftCondition} from './checklist-types';
 import type {DocumentCheck} from './operator-admission';
 import type {OperatorPhase} from './shift-phases';
-import type {WorkBlocker} from './work-blockers';
+import type {WorkWarning} from './work-warnings';
 
 /**
  * Форма ответа, которую видит телефон.
@@ -13,6 +13,12 @@ import type {WorkBlocker} from './work-blockers';
  * значения, которое пришлось бы исполнять.
  */
 
+/** Выработка в двух единицах сразу: штуки и метры погонные. */
+export interface WorkVolume {
+  count: number;
+  meters: number;
+}
+
 export interface AssignmentView {
   crewId: string;
   siteId: string;
@@ -23,11 +29,14 @@ export interface AssignmentView {
   hasHammer: boolean;
   hasRotator: boolean;
   assistants: string[];
-  /** Последнее показание счётчика: то, что оператор увидит на приборной панели. */
-  lastEngineHours: number | null;
-  lastEngineHoursAt: string | null;
-  /** Сколько свай забито на этой машине ранее. */
-  previousShiftPiles: number;
+  /** Забито на объекте за всё время, а не на этой машине: план ведётся по объекту. */
+  sitePiles: WorkVolume;
+  siteDrilling: WorkVolume;
+  siteDowntimeHours: number;
+  /** Остаток топлива на конец предыдущей смены этой машины, %. */
+  fuelPercent: number | null;
+  /** Плановое ТО: сколько дней осталось и не просрочено ли. */
+  maintenance: {overdue: boolean; soon: boolean; daysLeft: number | null};
 }
 
 export interface WeatherView {
@@ -44,20 +53,38 @@ export interface ChecklistView {
   purpose: string;
   version: string;
   done: boolean;
-  items: ChecklistItem[];
+  sections: ChecklistSection[];
 }
 
 export interface ProductionView {
-  piles: number;
-  drillingMeters: number;
+  piles: WorkVolume;
+  drilling: WorkVolume;
   downtimeHours: number;
+}
+
+/** Ознакомление с инструкцией и проверка знаний. */
+export interface IdentityView {
+  documents: DocumentCheck[];
+  briefing: {
+    code: string;
+    title: string;
+    version: string;
+    /** С какой версией оператор ознакомлен. null — ни с какой. */
+    acknowledgedVersion: string | null;
+    ok: boolean;
+  };
+  knowledge: {
+    validUntil: string | null;
+    lastResult: string | null;
+    ok: boolean;
+  };
 }
 
 export interface OperatorMobileState {
   operator: {id: string; name: string};
   phase: OperatorPhase;
   progress: {phase: OperatorPhase; label: string; done: boolean; current: boolean}[];
-  identity: {documents: DocumentCheck[]; valid: boolean};
+  identity: IdentityView;
   /** Установки, закреплённые за оператором. Пусто — работать не на чем. */
   options: {crewId: string; equipmentId: string; equipmentName: string; siteName: string}[];
   assignment: AssignmentView | null;
@@ -65,9 +92,16 @@ export interface OperatorMobileState {
   conditions: ShiftCondition[];
   shift: {id: string; productionDate: string; startedAt: string | null; state: string} | null;
   checklists: ChecklistView[];
-  blockers: WorkBlocker[];
+  /** Предупреждения смены. Запрещает работу только погода. */
+  warnings: WorkWarning[];
   workAllowed: boolean;
   production: ProductionView;
+  /** Справочники для учёта выработки — тот же источник, что у отчёта. */
+  dictionaries: {
+    pileGrades: {id: string; name: string; lengthMm: number | null}[];
+    drillingTypes: {id: string; name: string}[];
+    downtimeReasons: {id: string; name: string}[];
+  };
 }
 
 /**

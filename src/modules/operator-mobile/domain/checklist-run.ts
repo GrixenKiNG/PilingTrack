@@ -4,7 +4,7 @@ export interface ChecklistAnswer {
   itemId: string;
   answer: OperatorAnswer;
   note?: string;
-  /** Замеры пункта: долив жидкости, моточасы, время прогрева. */
+  /** Замеры пункта: долив жидкости, время прогрева, остаток топлива. */
   measures?: Record<string, number>;
   mediaIds?: string[];
 }
@@ -12,6 +12,13 @@ export interface ChecklistAnswer {
 export interface ChecklistProblem {
   itemId: string;
   message: string;
+}
+
+/** Нужен ли замер при этом ответе. Долив спрашиваем только при замечании. */
+export function measureRequired(item: ChecklistItem, answer: OperatorAnswer): boolean {
+  if (!item.measure) return false;
+  const on = item.measure.requiredOn ?? (['OK', 'REMARK', 'FAULT'] as OperatorAnswer[]);
+  return on.includes(answer);
 }
 
 /**
@@ -45,10 +52,9 @@ export function validateChecklistRun(
       problems.push({itemId: item.id, message: 'Приложите фотографию'});
     }
 
-    if (item.measure) {
-      const requiredOn = item.measure.requiredOn ?? (['OK', 'REMARK', 'FAULT'] as OperatorAnswer[]);
+    if (item.measure && measureRequired(item, answer.answer)) {
       const value = answer.measures?.[item.measure.key];
-      if (requiredOn.includes(answer.answer) && !Number.isFinite(value)) {
+      if (!Number.isFinite(value)) {
         problems.push({itemId: item.id, message: `Укажите: ${item.measure.label}, ${item.measure.unit}`});
       }
     }
@@ -57,19 +63,24 @@ export function validateChecklistRun(
   return problems;
 }
 
-/** Неисправности по пунктам, которые останавливают работу. */
-export function blockingFaults(items: ChecklistItem[], answers: ChecklistAnswer[]): ChecklistItem[] {
+/**
+ * Пункты, по которым оператор отметил неисправность в узле, где она означает
+ * опасность. Это НЕ запрет работы — телеметрии нет, и программа не может
+ * проверить состояние машины. Это красное предупреждение оператору и
+ * диспетчеру, которое висит, пока дефект не закрыт.
+ */
+export function alertingFaults(items: ChecklistItem[], answers: ChecklistAnswer[]): ChecklistItem[] {
   const faulted = new Set(
     answers.filter((answer) => answer.answer === 'FAULT').map((answer) => answer.itemId),
   );
-  return items.filter((item) => item.blocking && faulted.has(item.id));
+  return items.filter((item) => item.severity === 'ALERT' && faulted.has(item.id));
 }
 
 export interface DefectDraft {
   sourceKey: string;
   title: string;
   description: string;
-  severity: 'NORMAL' | 'CRITICAL';
+  severity: 'NORMAL' | 'HIGH';
   mediaIds: string[];
 }
 
@@ -78,11 +89,16 @@ export interface DefectDraft {
  *
  * ПОЧЕМУ АВТОМАТИЧЕСКИ. Замечание, которое живёт только внутри чек-листа, —
  * это замечание, о котором механик не узнает. Дефект — то место в системе, где
- * у проблемы появляется владелец и срок.
+ * у проблемы появляется владелец и срок, и именно его закрытие само снимает
+ * предупреждение с экрана оператора.
+ *
+ * ПОЧЕМУ НЕ CRITICAL. В продукте CRITICAL означает «эксплуатация запрещена», а
+ * запрещать по ответу в телефоне мы не беремся: проверить состояние машины
+ * программе нечем. Худшее, что ставит осмотр, — HIGH «устранить как можно
+ * скорее»; красное предупреждение при этом видят оба.
  *
  * ПОЧЕМУ sourceKey. «Этот пункт на этой установке» — устойчивый ключ. Незакрытая
  * течь на следующей смене попадёт в тот же дефект, а не заведёт третью копию.
- * Критичность считает правило, а не оператор: его дело — увидеть и описать.
  */
 export function collectDefectDrafts(
   stage: ChecklistStage,
@@ -99,13 +115,14 @@ export function collectDefectDrafts(
       if (!item) return [];
       // Заголовком дефекта служит то, что увидел оператор, а не формулировка
       // пункта: «Кабина очищена» в списке неисправностей читается как насмешка.
-      // Пункт уходит в описание — механику важно знать, на каком шаге нашли.
       const observed = answer.note?.trim();
       return [{
         sourceKey: `${equipmentId}:${stage}:${item.id}`,
         title: observed || item.text,
         description: `Пункт осмотра: ${item.text}.`,
-        severity: (answer.answer === 'FAULT' && item.blocking ? 'CRITICAL' : 'NORMAL') as DefectDraft['severity'],
+        severity: (answer.answer === 'FAULT' && item.severity === 'ALERT'
+          ? 'HIGH'
+          : 'NORMAL') as DefectDraft['severity'],
         mediaIds: answer.mediaIds ?? [],
       }];
     });

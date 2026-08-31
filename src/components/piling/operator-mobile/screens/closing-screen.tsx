@@ -2,15 +2,19 @@
 
 import {useState} from 'react';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {BigButton, ErrorNote, Fact, Panel, Screen} from '../ui';
+import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
+import {WarningsPanel} from '../warnings-panel';
 
 /**
  * Закрытие смены.
  *
+ * ПОЧЕМУ НЕТ ПЕРЕДАЧИ СМЕНЫ. Бригада работает в одну смену, и утром установку
+ * примет тот же машинист. Принимать не у кого: закрытие сразу отправляет отчёт
+ * диспетчеру, а «что осталось» оператор пишет сам себе на завтра.
+ *
  * ПОЧЕМУ ЕО ПОСЛЕ РАБОТЫ — УСЛОВИЕ, А НЕ ПОЖЕЛАНИЕ. Машина, оставленная без
  * осмотра, утром становится проблемой того, кто на неё сядет: примёрзшие
  * гусеницы, невидимая на горячем ночью течь, трещина, которую никто не искал.
- * Кнопка закрытия смены поэтому заперта до завершения списка.
  */
 export function ClosingScreen({state, onOpenService, onClose, busy, error}: {
   state: OperatorMobileState;
@@ -31,42 +35,58 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error}: {
         serviceDone
           ? (
             <BigButton onClick={() => onClose(comment)} disabled={busy}>
-              {busy ? 'Закрываем…' : 'Закрыть смену'}
+              {busy ? 'Отправляем…' : 'Закрыть смену и отправить отчёт'}
             </BigButton>
           )
           : <BigButton onClick={onOpenService}>Выполнить ЕО после работы</BigButton>
       )}
     >
+      <WarningsPanel warnings={state.warnings} />
+
       <Panel tone={serviceDone ? 'ok' : 'warning'}>
-        <h2 className="text-xl font-bold">
+        <PanelTitle tone={serviceDone ? 'ok' : 'warning'}>
           {serviceDone ? 'Послесменное обслуживание выполнено' : 'Сначала послесменное обслуживание'}
-        </h2>
-        <p className="mt-1 text-base">
+        </PanelTitle>
+        <p className="mt-1 text-sm">
           {serviceDone
-            ? 'Осталось записать итог смены и закрыть её.'
+            ? 'Осталось записать итог смены и отправить отчёт диспетчеру.'
             : 'Пока машина не осмотрена и не обслужена, смену закрыть нельзя.'}
         </p>
       </Panel>
 
       <Panel>
-        <h2 className="text-lg font-bold">Итог смены</h2>
+        <PanelTitle>Итог смены</PanelTitle>
         <div className="mt-2">
-          <Fact label="Свай забито" value={state.production.piles} hint="шт" />
-          <Fact label="Лидерное бурение" value={state.production.drillingMeters.toFixed(1)} hint="м" />
-          <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} hint="ч" />
-          <Fact label="Моточасы" value={state.assignment?.lastEngineHours ?? '—'} hint="м/ч" />
+          <VolumeFact
+            label="Свай забито"
+            count={state.production.piles.count}
+            meters={state.production.piles.meters}
+          />
+          <VolumeFact
+            label="Лидерное бурение"
+            count={state.production.drilling.count}
+            meters={state.production.drilling.meters}
+          />
+          <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} unit="ч" />
+          <Fact
+            label="Топливо на конец"
+            value={state.assignment?.fuelPercent ?? '—'}
+            unit={state.assignment?.fuelPercent == null ? undefined : '%'}
+          />
         </div>
       </Panel>
 
       {serviceDone ? (
         <label className="block">
-          <span className="text-lg font-bold">Что передать следующей смене</span>
+          <span className="text-2xs font-medium text-muted-foreground">
+            Что оставить себе на завтра
+          </span>
           <textarea
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             rows={4}
-            placeholder="Замечания, незаконченная работа, что подготовить"
-            className="mt-1 w-full rounded-xl border-2 border-neutral-900 p-3 text-base"
+            placeholder="Незаконченная работа, что подготовить, на что обратить внимание"
+            className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
           />
         </label>
       ) : null}
@@ -76,18 +96,26 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error}: {
   );
 }
 
-/** Экран после закрытия: смена сдана, действий больше нет. */
+/** Экран после закрытия: отчёт отправлен, действий больше нет. */
 export function ClosedScreen({state}: {state: OperatorMobileState}) {
   return (
     <Screen title="Смена закрыта" subtitle={state.assignment?.equipmentName}>
       <Panel tone="ok">
-        <p className="text-xl font-bold">Отчёт отправлен диспетчеру</p>
-        <p className="mt-1 text-base">Спасибо. Можно закрывать приложение.</p>
+        <PanelTitle tone="ok">Отчёт отправлен диспетчеру</PanelTitle>
+        <p className="mt-1 text-sm">Спасибо. Можно закрывать приложение.</p>
       </Panel>
       <Panel>
-        <Fact label="Свай забито" value={state.production.piles} hint="шт" />
-        <Fact label="Лидерное бурение" value={state.production.drillingMeters.toFixed(1)} hint="м" />
-        <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} hint="ч" />
+        <VolumeFact
+          label="Свай забито"
+          count={state.production.piles.count}
+          meters={state.production.piles.meters}
+        />
+        <VolumeFact
+          label="Лидерное бурение"
+          count={state.production.drilling.count}
+          meters={state.production.drilling.meters}
+        />
+        <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} unit="ч" />
       </Panel>
     </Screen>
   );

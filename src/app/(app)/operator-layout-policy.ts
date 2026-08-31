@@ -2,9 +2,15 @@
  * Экраны оператора с собственной нижней навигацией не должны одновременно
  * получать общую панель из layout: фиксированные панели перекрывают рабочие
  * действия и делают их недоступными для мыши и сенсорного ввода.
+ *
+ * `/operator` — рабочее место машиниста: у каждого его экрана своя кнопка
+ * основного действия внизу («Записать», «Завершить», «Закрыть смену»).
+ * Общая панель ложится ровно на неё, поэтому здесь она не выводится, а ссылка
+ * на историю живёт в шапке самого экрана.
  */
 export function operatorRouteOwnsNavigation(pathname: string): boolean {
-  return pathname === '/operator/v2'
+  return pathname === '/operator'
+    || pathname === '/operator/v2'
     || pathname.startsWith('/operator/v2/')
     || pathname === '/operator/v3'
     || pathname.startsWith('/operator/v3/');

@@ -1,15 +1,18 @@
 import {describe, expect, it} from 'vitest';
 import {getChecklist} from '../checklist-catalog';
-import {blockingFaults, collectDefectDrafts, validateChecklistRun} from '../checklist-run';
+import {alertingFaults, collectDefectDrafts, validateChecklistRun} from '../checklist-run';
+import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
 import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
+import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
 import {derivePhase} from '../shift-phases';
-import {collectBlockers, isWorkAllowed} from '../work-blockers';
+import {collectWarnings, isWorkAllowed} from '../work-warnings';
 
 /**
- * Правила, которые останавливают работу. Проверяется только то, чья поломка
- * означает «человек вышел на смену, не имея на это права» либо «машина поехала
- * с неисправностью». Остальное покрывать тестами здесь незачем.
+ * Правила, от которых зависит безопасность и учёт. Проверяется только то, чья
+ * поломка означает «человек вышел на смену, не имея на это права», «машина
+ * поехала с неисправностью, о которой никто не узнал» либо «в отчёт попало не
+ * то число». Остальное покрывать тестами здесь незачем.
  */
 
 const NOW = new Date('2026-08-31T06:00:00.000Z');
@@ -22,20 +25,14 @@ const requiredType = {
   requiredForOperator: true,
 };
 
-describe('допуск оператора', () => {
-  it('просроченный обязательный документ закрывает смену', () => {
+describe('документы оператора', () => {
+  it('просроченный обязательный документ виден как просроченный', () => {
     const checks = checkOperatorDocuments(
       [requiredType],
       [{typeId: 'type-driver', number: '77', expiresAt: new Date('2026-08-01T00:00:00.000Z')}],
       NOW,
     );
     expect(checks[0].verdict).toBe('EXPIRED');
-    expect(isIdentityValid(checks)).toBe(false);
-  });
-
-  it('отсутствие обязательного документа закрывает смену', () => {
-    const checks = checkOperatorDocuments([requiredType], [], NOW);
-    expect(checks[0].verdict).toBe('MISSING');
     expect(isIdentityValid(checks)).toBe(false);
   });
 
@@ -53,65 +50,69 @@ describe('допуск оператора', () => {
   });
 });
 
-describe('препятствия к работе', () => {
+describe('предупреждения смены', () => {
   const base = {
     documents: checkOperatorDocuments([], [], NOW),
-    hasEquipmentAdmission: true,
+    hasEquipmentAssignment: true,
     equipmentActive: true,
     equipmentName: 'Liebherr LRH 100',
-    criticalDefectTitles: [],
-    blockingFaultTexts: [],
+    openDefects: [] as {title: string; severity: string}[],
     windMs: null,
-    waivedCodes: [],
+    temperatureC: null,
+    maintenance: {overdue: false, soon: false, daysLeft: null},
   };
 
-  it('открытый критический дефект запрещает работу', () => {
-    const blockers = collectBlockers({...base, criticalDefectTitles: ['Трещина в мачте']});
-    expect(isWorkAllowed(blockers)).toBe(false);
+  it('неисправность не запрещает работу, а предупреждает', () => {
+    const warnings = collectWarnings({
+      ...base,
+      openDefects: [{title: 'Трещина в мачте', severity: 'HIGH'}],
+    });
+    expect(isWorkAllowed(warnings)).toBe(true);
+    expect(warnings.find((warning) => warning.code === 'OPEN_ALERT_DEFECT')?.level).toBe('ALERT');
   });
 
-  it('ветер выше порога запрещает работу', () => {
-    expect(isWorkAllowed(collectBlockers({...base, windMs: 22}))).toBe(false);
-    expect(isWorkAllowed(collectBlockers({...base, windMs: 12}))).toBe(true);
-  });
-
-  it('просроченный допуск не снимается разрешением диспетчера', () => {
+  it('просроченный допуск даёт красное, но не останавливает', () => {
     const expired = checkOperatorDocuments(
       [requiredType],
       [{typeId: 'type-driver', number: '77', expiresAt: new Date('2026-08-01T00:00:00.000Z')}],
       NOW,
     );
-    const blockers = collectBlockers({
-      ...base,
-      documents: expired,
-      waivedCodes: ['DOCUMENT_INVALID'],
-    });
-    expect(isWorkAllowed(blockers)).toBe(false);
+    const warnings = collectWarnings({...base, documents: expired});
+    expect(warnings.find((warning) => warning.code === 'DOCUMENT_INVALID')?.level).toBe('ALERT');
+    expect(isWorkAllowed(warnings)).toBe(true);
   });
 
-  it('разрешение диспетчера понижает запрет, но не прячет причину', () => {
-    const blockers = collectBlockers({
-      ...base,
-      criticalDefectTitles: ['Трещина в мачте'],
-      waivedCodes: ['CRITICAL_DEFECT'],
-    });
-    expect(isWorkAllowed(blockers)).toBe(true);
-    expect(blockers).toHaveLength(1);
-    expect(blockers[0].detail).toContain('Трещина в мачте');
+  it('ветер выше 15 м/с прекращает работы', () => {
+    expect(isWorkAllowed(collectWarnings({...base, windMs: 17}))).toBe(false);
+    expect(isWorkAllowed(collectWarnings({...base, windMs: 14}))).toBe(true);
+  });
+
+  it('мороз ниже −25 °C прекращает работы', () => {
+    expect(isWorkAllowed(collectWarnings({...base, temperatureC: -27}))).toBe(false);
+    expect(isWorkAllowed(collectWarnings({...base, temperatureC: -24}))).toBe(true);
+  });
+
+  it('закрытый дефект исчезает из предупреждений сам', () => {
+    const withDefect = collectWarnings({...base, openDefects: [{title: 'Течь', severity: 'HIGH'}]});
+    const withoutDefect = collectWarnings(base);
+    expect(withDefect.some((warning) => warning.code === 'OPEN_ALERT_DEFECT')).toBe(true);
+    expect(withoutDefect.some((warning) => warning.code === 'OPEN_ALERT_DEFECT')).toBe(false);
   });
 });
 
 describe('фазы смены', () => {
   const facts = {
-    identityValid: true,
+    briefingAcknowledged: true,
+    knowledgeValid: true,
     admissionAccepted: true,
     completedStages: [] as never[],
-    closingRequested: false,
+    workFinished: false,
     shiftClosed: false,
   };
 
   it('порядок этапов не обходится', () => {
-    expect(derivePhase({...facts, identityValid: false})).toBe('IDENTITY');
+    expect(derivePhase({...facts, briefingAcknowledged: false})).toBe('IDENTITY');
+    expect(derivePhase({...facts, knowledgeValid: false})).toBe('IDENTITY');
     expect(derivePhase({...facts, admissionAccepted: false})).toBe('ADMISSION');
     expect(derivePhase(facts)).toBe('PRESHIFT_INSPECTION');
     expect(derivePhase({...facts, completedStages: ['PRESHIFT_INSPECTION']})).toBe('STARTUP');
@@ -123,7 +124,8 @@ describe('фазы смены', () => {
     })).toBe('WORK');
   });
 
-  it('закрытая смена не возвращается в работу', () => {
+  it('«работа завершена» ведёт к сдаче, закрытая смена — в конец', () => {
+    expect(derivePhase({...facts, workFinished: true})).toBe('CLOSING');
     expect(derivePhase({...facts, shiftClosed: true})).toBe('CLOSED');
   });
 });
@@ -152,17 +154,18 @@ describe('состав чек-листа', () => {
       temperatureC: null, windMs: null, precipitationMmPerHour: null, daylight: null,
     })).toEqual([]);
   });
+
+  it('заглушение двигателя — последний пункт смены', () => {
+    const after = selectChecklistItems(getChecklist('EO_AFTER'), [], {hasHammer: true, hasRotator: false});
+    expect(after[after.length - 1].id).toBe('shutdown');
+  });
 });
 
 describe('заполнение чек-листа', () => {
   const items = selectChecklistItems(
     getChecklist('PRESHIFT_INSPECTION'), [], {hasHammer: true, hasRotator: false},
   );
-  const allOk = items.map((item) => ({
-    itemId: item.id,
-    answer: 'OK' as const,
-    ...(item.measure ? {measures: {[item.measure.key]: 0}} : {}),
-  }));
+  const allOk = items.map((item) => ({itemId: item.id, answer: 'OK' as const}));
 
   it('неисправность требует описания и снимка', () => {
     const answers = allOk.map((answer) => (
@@ -174,14 +177,27 @@ describe('заполнение чек-листа', () => {
     );
   });
 
-  it('неисправность блокирующего пункта останавливает работу', () => {
+  it('долив спрашивается только при замечании', () => {
+    // Все «норма» — доливать нечего, список закрывается без цифр.
+    expect(validateChecklistRun(items, allOk)).toEqual([]);
+    const withRemark = allOk.map((answer) => (
+      answer.itemId === 'engine-oil'
+        ? {...answer, answer: 'REMARK' as const, note: 'Уровень у нижней метки'}
+        : answer
+    ));
+    expect(validateChecklistRun(items, withRemark)).toContainEqual(
+      expect.objectContaining({itemId: 'engine-oil'}),
+    );
+  });
+
+  it('неисправность критичного пункта даёт красное предупреждение', () => {
     const answers = allOk.map((answer) => (
       answer.itemId === 'mast'
         ? {...answer, answer: 'FAULT' as const, note: 'Трещина', mediaIds: ['m1']}
         : answer
     ));
     expect(validateChecklistRun(items, answers)).toEqual([]);
-    expect(blockingFaults(items, answers).map((item) => item.id)).toEqual(['mast']);
+    expect(alertingFaults(items, answers).map((item) => item.id)).toEqual(['mast']);
   });
 
   it('замечание заводит дефект с устойчивым ключом источника', () => {
@@ -196,9 +212,68 @@ describe('заполнение чек-листа', () => {
     expect(drafts[0].severity).toBe('NORMAL');
   });
 
+  it('дефект осмотра никогда не критический: запрещать работу программе нечем', () => {
+    const answers = allOk.map((answer) => (
+      answer.itemId === 'mast'
+        ? {...answer, answer: 'FAULT' as const, note: 'Трещина', mediaIds: ['m1']}
+        : answer
+    ));
+    const drafts = collectDefectDrafts('PRESHIFT_INSPECTION', 'eq-1', items, answers);
+    expect(drafts[0].severity).toBe('HIGH');
+  });
+
   it('пропущенный пункт не даёт закрыть список', () => {
     expect(validateChecklistRun(items, allOk.slice(1))).toContainEqual(
       expect.objectContaining({message: 'Пункт не заполнен'}),
     );
+  });
+});
+
+describe('проверка знаний', () => {
+  it('в попытке восемь вопросов из трёх тем', () => {
+    const attempt = buildAttempt();
+    expect(attempt).toHaveLength(8);
+    expect(new Set(attempt.map((question) => question.topic))).toEqual(
+      new Set(['PILING', 'DRILLING', 'GENERAL']),
+    );
+    expect(new Set(attempt.map((question) => question.id)).size).toBe(8);
+  });
+
+  it('два набора подряд не совпадают', () => {
+    const first = buildAttempt().map((question) => question.id).join(',');
+    const second = buildAttempt().map((question) => question.id).join(',');
+    const third = buildAttempt().map((question) => question.id).join(',');
+    expect(new Set([first, second, third]).size).toBeGreaterThan(1);
+  });
+
+  it('итог считает сервер по своему банку', () => {
+    const right = KNOWLEDGE_BANK.slice(0, 3).map((question) => ({
+      questionId: question.id, picked: question.correct,
+    }));
+    expect(scoreAttempt(right)).toEqual({total: 3, correct: 3, wrongIds: []});
+
+    const wrong = [{questionId: KNOWLEDGE_BANK[0].id, picked: (KNOWLEDGE_BANK[0].correct + 1) % 3}];
+    expect(scoreAttempt(wrong).correct).toBe(0);
+    expect(scoreAttempt(wrong).wrongIds).toEqual([KNOWLEDGE_BANK[0].id]);
+  });
+
+  it('у каждого вопроса верный вариант существует', () => {
+    for (const question of KNOWLEDGE_BANK) {
+      expect(question.options[question.correct]).toBeTruthy();
+    }
+  });
+});
+
+describe('инструктаж и срок проверки знаний', () => {
+  it('отметка привязана к версии текста', () => {
+    expect(briefingUpToDate('1.0', '1.0')).toBe(true);
+    expect(briefingUpToDate('0.9', '1.0')).toBe(false);
+    expect(briefingUpToDate(null, '1.0')).toBe(false);
+  });
+
+  it('истёкшая проверка знаний недействительна', () => {
+    expect(knowledgeValid(new Date('2026-09-30T00:00:00.000Z'), NOW)).toBe(true);
+    expect(knowledgeValid(new Date('2026-08-01T00:00:00.000Z'), NOW)).toBe(false);
+    expect(knowledgeValid(null, NOW)).toBe(false);
   });
 });

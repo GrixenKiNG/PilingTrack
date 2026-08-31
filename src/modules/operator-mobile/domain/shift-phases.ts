@@ -11,13 +11,13 @@ import type {ChecklistStage} from './checklist-types';
  * туда, где остановился.
  */
 export type OperatorPhase =
-  | 'IDENTITY' // идентификация: документы и допуски человека
-  | 'ADMISSION' // принятие установки: объект, машина, моточасы, погода
+  | 'IDENTITY' // допуск: инструктаж и проверка знаний
+  | 'ADMISSION' // приём установки: объект, машина, погода
   | 'PRESHIFT_INSPECTION' // предсменный осмотр
   | 'STARTUP' // пуск, прогрев, холостая проверка (ЕО перед работой)
   | 'SITE_READY' // осмотр площадки
   | 'WORK' // работа и учёт выработки
-  | 'CLOSING' // ЕО после работы и закрытие смены
+  | 'CLOSING' // ЕО после работы и отправка отчёта
   | 'CLOSED';
 
 export const PHASE_ORDER: OperatorPhase[] = [
@@ -32,19 +32,20 @@ export const PHASE_ORDER: OperatorPhase[] = [
 ];
 
 export const PHASE_LABELS: Record<OperatorPhase, string> = {
-  IDENTITY: 'Допуск оператора',
-  ADMISSION: 'Приём установки',
-  PRESHIFT_INSPECTION: 'Осмотр машины',
-  STARTUP: 'Пуск и прогрев',
+  IDENTITY: 'Допуск',
+  ADMISSION: 'Приём',
+  PRESHIFT_INSPECTION: 'Осмотр',
+  STARTUP: 'Пуск',
   SITE_READY: 'Площадка',
   WORK: 'Работа',
-  CLOSING: 'Закрытие смены',
+  CLOSING: 'Сдача',
   CLOSED: 'Смена закрыта',
 };
 
 /**
  * Чек-лист, который закрывает фазу. Фазы допуска и работы чек-листа не имеют:
- * первую закрывают документы, вторую — решение оператора сдать смену.
+ * первую закрывают инструктаж и проверка знаний, вторую — решение оператора,
+ * что работа на сегодня закончена.
  */
 export const PHASE_CHECKLIST: Partial<Record<OperatorPhase, ChecklistStage>> = {
   PRESHIFT_INSPECTION: 'PRESHIFT_INSPECTION',
@@ -54,15 +55,17 @@ export const PHASE_CHECKLIST: Partial<Record<OperatorPhase, ChecklistStage>> = {
 };
 
 export interface ShiftFacts {
-  /** Документы оператора действительны и обязательные из них на месте. */
-  identityValid: boolean;
-  /** Оператор принял установку: подтвердил объект, машину и снял моточасы. */
+  /** Оператор ознакомился с действующей версией инструкции. */
+  briefingAcknowledged: boolean;
+  /** Результат проверки знаний действителен. */
+  knowledgeValid: boolean;
+  /** Оператор принял установку: подтвердил объект и машину. */
   admissionAccepted: boolean;
   /** Чек-листы, доведённые до конца. */
   completedStages: ChecklistStage[];
-  /** Оператор нажал «сдать смену» — дальше только послесменное обслуживание. */
-  closingRequested: boolean;
-  /** Смена сдана. */
+  /** Оператор нажал «Работа завершена» — дальше только ЕО после работы. */
+  workFinished: boolean;
+  /** Смена закрыта, отчёт отправлен. */
   shiftClosed: boolean;
 }
 
@@ -73,12 +76,16 @@ export interface ShiftFacts {
  * нельзя работать, не осмотрев площадку. Это не бюрократия — это тот порядок,
  * в котором отказы обнаруживаются дёшево: холодную течь видно на земле, а не
  * на четвёртой свае.
+ *
+ * Документы на порядок не влияют: просроченная справка даёт красное
+ * предупреждение оператору и диспетчеру, но экран не запирает — решение о
+ * работе принимает человек.
  */
 export function derivePhase(facts: ShiftFacts): OperatorPhase {
   if (facts.shiftClosed) return 'CLOSED';
-  if (!facts.identityValid) return 'IDENTITY';
+  if (!facts.briefingAcknowledged || !facts.knowledgeValid) return 'IDENTITY';
   if (!facts.admissionAccepted) return 'ADMISSION';
-  if (facts.closingRequested) return 'CLOSING';
+  if (facts.workFinished) return 'CLOSING';
   if (!facts.completedStages.includes('PRESHIFT_INSPECTION')) return 'PRESHIFT_INSPECTION';
   if (!facts.completedStages.includes('EO_BEFORE')) return 'STARTUP';
   if (!facts.completedStages.includes('SITE_READY')) return 'SITE_READY';

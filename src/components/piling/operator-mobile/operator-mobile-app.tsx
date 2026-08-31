@@ -1,12 +1,16 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState} from 'react';
-import type {ChecklistAnswer, ChecklistStage, OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {
+  ChecklistAnswer, ChecklistStage, OperatorMobileState,
+} from '@/modules/operator-mobile/contracts';
 import {
   ApiError, currentPosition, fetchState, newCommandId, sendCommand, type ProductionEntryInput,
 } from './api';
-import {BigButton, PhaseBar, Panel, Screen} from './ui';
+import {BigButton, Panel, PanelTitle, PhaseBar, Screen} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
+import {BriefingScreen} from './screens/briefing-screen';
+import {KnowledgeScreen} from './screens/knowledge-screen';
 import {AdmissionScreen} from './screens/admission-screen';
 import {ChecklistScreen} from './screens/checklist-screen';
 import {WorkScreen} from './screens/work-screen';
@@ -19,22 +23,35 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
   SITE_READY: 'SITE_READY',
 };
 
+/** Экраны, открываемые вне очереди фаз. */
+type Detour = {kind: 'BRIEFING'} | {kind: 'KNOWLEDGE'} | {kind: 'CHECKLIST'; stage: ChecklistStage};
+
 /**
  * Мобильное рабочее место машиниста.
  *
  * ПОЧЕМУ ЭКРАН ВЫБИРАЕТ СЕРВЕР, А НЕ КЛИЕНТ. Фаза приходит из ответа сервера и
  * целиком выведена из записанных фактов. У телефона нет своего мнения о том,
- * где находится смена: закрыл приложение на осмотре, открыл через час — вернулся
- * на осмотр, а не в начало и не вперёд.
+ * где находится смена: закрыл приложение на осмотре, открыл через час —
+ * вернулся на осмотр, а не в начало и не вперёд.
  */
 export function OperatorMobileApp() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  /** Чек-лист, открытый вне очереди: ТБ перед работой, ЕО перед закрытием. */
-  const [openStage, setOpenStage] = useState<ChecklistStage | null>(null);
+  const [detour, setDetour] = useState<Detour | null>(null);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
+
+  /**
+   * Ключ открытого чек-листа. К нему привязываются снимки, сделанные до
+   * отправки, поэтому он обязан пережить перерисовки — но не пережить отправку:
+   * новый ключ выдаётся после каждой удачной команды, иначе повторная сдача
+   * списка вернула бы прежний результат вместо новой записи.
+   *
+   * Хранится в состоянии, а не в ref: ref во время отрисовки читать нельзя,
+   * а ключ нужен именно при отрисовке — его получает экран чек-листа.
+   */
+  const [checklistCommandId, setChecklistCommandId] = useState(newCommandId);
 
   const reload = useCallback(async () => {
     try {
@@ -57,24 +74,13 @@ export function OperatorMobileApp() {
     })();
   }, [reload]);
 
-  /**
-   * Ключ открытого чек-листа. К нему привязываются снимки, сделанные до
-   * отправки, поэтому он обязан пережить перерисовки — но не пережить отправку:
-   * новый ключ выдаётся после каждой удачной команды, иначе повторная сдача
-   * списка вернула бы прежний результат вместо новой записи.
-   *
-   * Хранится в состоянии, а не в ref: ref во время отрисовки читать нельзя,
-   * а ключ нужен именно при отрисовке — его получает экран чек-листа.
-   */
-  const [checklistCommandId, setChecklistCommandId] = useState(newCommandId);
-
   const run = useCallback(async (work: () => Promise<unknown>) => {
     setBusy(true);
     setActionError(null);
     try {
       await work();
       setChecklistCommandId(newCommandId());
-      setOpenStage(null);
+      setDetour(null);
       await reload();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Команда не выполнена');
@@ -86,9 +92,9 @@ export function OperatorMobileApp() {
   if (loadError) {
     return (
       <Screen title="Нет связи" footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}>
-        <Panel tone="stop">
-          <p className="text-lg font-bold">{loadError}</p>
-          <p className="mt-1 text-base">
+        <Panel tone="danger">
+          <PanelTitle tone="danger">{loadError}</PanelTitle>
+          <p className="mt-1 text-sm">
             Рабочее место работает только на связи. Дождитесь сети и повторите — записывать смену
             «в стол» приложение не станет, чтобы не потерять её молча.
           </p>
@@ -100,7 +106,7 @@ export function OperatorMobileApp() {
   if (!state) {
     return (
       <Screen title="Загрузка смены">
-        <p className="text-lg text-neutral-600">Считываем допуски, машину и погоду…</p>
+        <p className="text-sm text-muted-foreground">Считываем допуски, машину и погоду…</p>
       </Screen>
     );
   }
@@ -120,22 +126,43 @@ export function OperatorMobileApp() {
     }));
   };
 
-  const stage = openStage ?? PHASE_STAGE[state.phase] ?? null;
+  const stage = detour?.kind === 'CHECKLIST' ? detour.stage : PHASE_STAGE[state.phase] ?? null;
   const checklist = stage
     ? state.checklists.find((candidate) => candidate.stage === stage)
     : undefined;
 
   const screen = () => {
+    if (detour?.kind === 'BRIEFING') {
+      return (
+        <BriefingScreen
+          busy={busy}
+          onAcknowledge={() => void run(() => sendCommand({command: 'acknowledge-briefing'}))}
+          onBack={() => setDetour(null)}
+        />
+      );
+    }
+
+    if (detour?.kind === 'KNOWLEDGE') {
+      return (
+        <KnowledgeScreen
+          busy={busy}
+          error={actionError}
+          onDone={(picks) => void run(() => sendCommand({command: 'submit-knowledge', picks}))}
+          onBack={() => setDetour(null)}
+        />
+      );
+    }
+
     if (checklist) {
       return (
         <ChecklistScreen
           checklist={checklist}
-          blockers={state.blockers}
+          warnings={state.warnings}
           onSubmit={submitChecklist(checklist.stage)}
           busy={busy}
           error={actionError}
           commandId={checklistCommandId}
-          onBack={openStage ? () => setOpenStage(null) : undefined}
+          onBack={detour ? () => setDetour(null) : undefined}
         />
       );
     }
@@ -144,9 +171,11 @@ export function OperatorMobileApp() {
       case 'IDENTITY':
         return (
           <IdentityScreen
+            identity={state.identity}
             operatorName={state.operator.name}
-            documents={state.identity.documents}
-            valid={state.identity.valid}
+            warnings={state.warnings}
+            onBriefing={() => setDetour({kind: 'BRIEFING'})}
+            onKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
             onContinue={() => void reload()}
           />
         );
@@ -164,7 +193,7 @@ export function OperatorMobileApp() {
           />
         );
       case 'WORK':
-        if (!shift) return <Screen title="Смена"><p className="text-lg">Смена не найдена.</p></Screen>;
+        if (!shift) return <Screen title="Смена"><p className="text-sm">Смена не найдена.</p></Screen>;
         return (
           <WorkScreen
             state={state}
@@ -176,21 +205,18 @@ export function OperatorMobileApp() {
               shiftId: shift.id,
               entry,
             }))}
-            onOpenSafety={(safetyStage) => setOpenStage(safetyStage)}
-            onRequestClosing={() => void run(() => sendCommand({
-              command: 'request-closing',
-              shiftId: shift.id,
-            }))}
+            onOpenSafety={(safetyStage) => setDetour({kind: 'CHECKLIST', stage: safetyStage})}
+            onFinish={() => void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}))}
           />
         );
       case 'CLOSING':
-        if (!shift) return <Screen title="Смена"><p className="text-lg">Смена не найдена.</p></Screen>;
+        if (!shift) return <Screen title="Смена"><p className="text-sm">Смена не найдена.</p></Screen>;
         return (
           <ClosingScreen
             state={state}
             busy={busy}
             error={actionError}
-            onOpenService={() => setOpenStage('EO_AFTER')}
+            onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
             onClose={(comment) => void run(() => sendCommand({
               command: 'close-shift',
               shiftId: shift.id,
@@ -201,12 +227,12 @@ export function OperatorMobileApp() {
       case 'CLOSED':
         return <ClosedScreen state={state} />;
       default:
-        return <Screen title="Смена"><p className="text-lg">Экран готовится…</p></Screen>;
+        return <Screen title="Смена"><p className="text-sm">Экран готовится…</p></Screen>;
     }
   };
 
   return (
-    <div className="mx-auto max-w-[560px] bg-white">
+    <div className="mx-auto min-h-dvh max-w-[560px] bg-background">
       <PhaseBar progress={state.progress} />
       {screen()}
     </div>

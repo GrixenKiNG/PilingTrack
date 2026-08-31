@@ -4,8 +4,13 @@ import {withReadinessTenantTransaction} from '@/modules/readiness/infrastructure
 import {getChecklist} from '../domain/checklist-catalog';
 import type {ChecklistStage} from '../domain/checklist-types';
 import {
-  blockingFaults, collectDefectDrafts, validateChecklistRun, type ChecklistAnswer,
+  alertingFaults, collectDefectDrafts, validateChecklistRun, type ChecklistAnswer,
 } from '../domain/checklist-run';
+import {
+  BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE, SYSTEM_DOCUMENT_TYPES,
+} from '../domain/operator-credentials';
+import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../domain/knowledge-bank';
+import {SAFETY_BRIEFING} from '../domain/safety-briefing';
 import {selectChecklistItems} from '../domain/shift-conditions';
 
 /**
@@ -32,20 +37,24 @@ export class OperatorCommandError extends Error {
 
 type Tx = Prisma.TransactionClient;
 
+const DAY_MS = 86_400_000;
+
 async function requireCrew(tx: Tx, tenantId: string, operatorId: string, equipmentId: string) {
   const crew = await tx.crew.findFirst({
     where: {operatorId, equipmentId, isActive: true, equipment: {tenantId}},
-    select: {id: true, siteId: true, equipment: {select: {isActive: true, hammerKind: true, isCombined: true, model: true}}},
+    select: {
+      id: true, siteId: true,
+      equipment: {select: {isActive: true, hammerKind: true, isCombined: true}},
+    },
   });
   if (!crew) throw new OperatorCommandError(403, 'Эта установка за вами не закреплена');
-  if (!crew.equipment.isActive) throw new OperatorCommandError(409, 'Установка выведена из эксплуатации');
   return crew;
 }
 
 async function requireOpenShift(tx: Tx, tenantId: string, shiftId: string) {
   const shift = await tx.shift.findFirst({
     where: {tenantId, id: shiftId},
-    select: {id: true, state: true, equipmentId: true},
+    select: {id: true, state: true, equipmentId: true, productionDate: true, type: true},
   });
   if (!shift) throw new OperatorCommandError(404, 'Смена не найдена');
   if (shift.state === 'CLOSED' || shift.state === 'CANCELLED') {
@@ -63,17 +72,136 @@ function productionDateOf(timezone: string, now: Date): Date {
 }
 
 /**
- * Приём установки: оператор подтверждает машину и снимает моточасы.
+ * Вид документа, который модуль ведёт сам. Создаётся при первом использовании:
+ * заводить его руками в справочнике — лишний шаг для администратора, а
+ * молча писать документ без вида нельзя, у таблицы внешний ключ.
+ */
+async function ensureDocumentType(tx: Tx, tenantId: string, name: string) {
+  const normalizedName = name.trim().toLowerCase();
+  const existing = await tx.userDocumentType.findFirst({
+    where: {tenantId, normalizedName},
+    select: {id: true},
+  });
+  if (existing) return existing.id;
+
+  const template = SYSTEM_DOCUMENT_TYPES.find((type) => type.name === name);
+  const created = await tx.userDocumentType.create({
+    data: {
+      tenantId,
+      name,
+      normalizedName,
+      requiresExpiry: template?.requiresExpiry ?? true,
+      leadTimeDays: template?.leadTimeDays ?? 30,
+      requiredForOperator: false,
+      notes: template?.notes ?? '',
+    },
+    select: {id: true},
+  });
+  return created.id;
+}
+
+/** Одна запись на вид документа: продлеваем существующую, а не плодим копии. */
+async function upsertOperatorDocument(tx: Tx, input: {
+  tenantId: string; operatorId: string; typeId: string;
+  number: string; issuedAt: Date; expiresAt: Date | null;
+}) {
+  const existing = await tx.userDocument.findFirst({
+    where: {tenantId: input.tenantId, userId: input.operatorId, typeId: input.typeId},
+    orderBy: {createdAt: 'desc'},
+    select: {id: true},
+  });
+  if (existing) {
+    await tx.userDocument.update({
+      where: {id: existing.id},
+      data: {number: input.number, issuedAt: input.issuedAt, expiresAt: input.expiresAt},
+    });
+    return existing.id;
+  }
+  const created = await tx.userDocument.create({
+    data: {
+      tenantId: input.tenantId,
+      userId: input.operatorId,
+      typeId: input.typeId,
+      number: input.number,
+      issuedAt: input.issuedAt,
+      expiresAt: input.expiresAt,
+    },
+    select: {id: true},
+  });
+  return created.id;
+}
+
+/** Оператор прочитал инструкцию. Отметка привязана к версии текста. */
+export async function acknowledgeBriefing(input: {
+  tenantId: string; operatorId: string; now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    const typeId = await ensureDocumentType(tx, input.tenantId, BRIEFING_DOCUMENT_TYPE);
+    await upsertOperatorDocument(tx, {
+      tenantId: input.tenantId,
+      operatorId: input.operatorId,
+      typeId,
+      number: SAFETY_BRIEFING.version,
+      issuedAt: now,
+      expiresAt: null,
+    });
+    return {version: SAFETY_BRIEFING.version};
+  });
+}
+
+/**
+ * Итог проверки знаний.
  *
- * Это и есть открытие смены. Отдельной кнопки «открыть смену» нет намеренно:
- * смена без принятой машины — пустая запись, а машина, принятая вне смены,
- * никуда не относится.
+ * Считает сервер по своему банку, а не по тому, что прислал телефон: экран
+ * показывает верный ответ сразу, потому что это обучение, а не экзамен, но в
+ * журнал уходит то, что человек действительно нажал.
+ */
+export async function submitKnowledgeTest(input: {
+  tenantId: string;
+  operatorId: string;
+  picks: {questionId: string; picked: number}[];
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const result = scoreAttempt(input.picks);
+  if (result.total === 0) {
+    throw new OperatorCommandError(400, 'Проверка знаний не заполнена');
+  }
+  if (result.correct !== result.total) {
+    throw new OperatorCommandError(
+      409,
+      'Не на все вопросы дан верный ответ. Вопросы с ошибкой повторяются до верного ответа.',
+      result.wrongIds,
+    );
+  }
+
+  const validUntil = new Date(now.getTime() + KNOWLEDGE_VALID_DAYS * DAY_MS);
+  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    const typeId = await ensureDocumentType(tx, input.tenantId, KNOWLEDGE_DOCUMENT_TYPE);
+    await upsertOperatorDocument(tx, {
+      tenantId: input.tenantId,
+      operatorId: input.operatorId,
+      typeId,
+      number: `${result.correct} из ${result.total}`,
+      issuedAt: now,
+      expiresAt: validUntil,
+    });
+    return {correct: result.correct, total: result.total, validUntil: validUntil.toISOString()};
+  });
+}
+
+/**
+ * Приём установки: оператор подтверждает машину и объект.
+ *
+ * Это и есть открытие смены. Моточасы здесь не спрашиваем: на приборной панели
+ * их всё равно снимут при пуске, а два ввода подряд про одно и то же оператор
+ * заполняет не глядя.
  */
 export async function acceptEquipment(input: {
   tenantId: string;
   operatorId: string;
   equipmentId: string;
-  engineHours: number;
   shiftType: 'DAY' | 'NIGHT';
   clientCommandId: string;
   now?: Date;
@@ -90,10 +218,9 @@ export async function acceptEquipment(input: {
 
     // В базе есть частичный уникальный индекс Shift_one_active_per_equipment_key:
     // у машины может быть только одна смена в состоянии STARTED или
-    // HANDOVER_PENDING — на любую дату. Это правильное правило: машина не может
-    // работать в двух сменах сразу. Значит, незакрытая вчерашняя смена
-    // блокирует открытие сегодняшней, и сказать об этом надо словами, а не
-    // ошибкой уникальности из драйвера.
+    // HANDOVER_PENDING — на любую дату. Незакрытая вчерашняя смена блокирует
+    // открытие сегодняшней, и сказать об этом надо словами, а не ошибкой
+    // уникальности из драйвера.
     const active = await tx.shift.findFirst({
       where: {
         tenantId: input.tenantId,
@@ -125,7 +252,10 @@ export async function acceptEquipment(input: {
       if (existing.state !== 'STARTED') {
         await tx.shift.update({
           where: {tenantId_id: {tenantId: input.tenantId, id: shiftId}},
-          data: {state: 'STARTED', startedAt: now, startedById: input.operatorId, lastEditedById: input.operatorId},
+          data: {
+            state: 'STARTED', startedAt: now,
+            startedById: input.operatorId, lastEditedById: input.operatorId,
+          },
         });
       }
     } else {
@@ -146,21 +276,12 @@ export async function acceptEquipment(input: {
       });
     }
 
-    await recordMeter(tx, {
-      tenantId: input.tenantId,
-      equipmentId: input.equipmentId,
-      engineHours: input.engineHours,
-      operatorId: input.operatorId,
-      note: 'Приём установки',
-      now,
-    });
-
     await recordEvidence(tx, {
       tenantId: input.tenantId,
       shiftId,
       equipmentId: input.equipmentId,
       kind: 'STARTUP_READING',
-      payload: {engineHours: input.engineHours, siteId: crew.siteId},
+      payload: {siteId: crew.siteId},
       operatorId: input.operatorId,
       clientCommandId: input.clientCommandId,
       now,
@@ -210,10 +331,11 @@ async function recordMeter(tx: Tx, input: {
   });
 }
 
+type EvidenceKind = 'KNOWLEDGE_TEST' | 'WEATHER_SNAPSHOT' | 'SITE_CHECK' | 'STARTUP_READING'
+  | 'MAINTENANCE_ACTION' | 'FLUID_READING' | 'PILE_DRIVING' | 'LEADER_DRILLING';
+
 async function recordEvidence(tx: Tx, input: {
-  tenantId: string; shiftId: string; equipmentId: string;
-  kind: 'KNOWLEDGE_TEST' | 'WEATHER_SNAPSHOT' | 'SITE_CHECK' | 'STARTUP_READING'
-    | 'MAINTENANCE_ACTION' | 'FLUID_READING' | 'PILE_DRIVING' | 'LEADER_DRILLING';
+  tenantId: string; shiftId: string; equipmentId: string; kind: EvidenceKind;
   payload: Prisma.InputJsonValue; operatorId: string; clientCommandId: string; now: Date;
 }) {
   const existing = await tx.operatorShiftEvidence.findUnique({
@@ -242,10 +364,6 @@ async function recordEvidence(tx: Tx, input: {
  * доказывает: снимок мог не долететь в хранилище, мог принадлежать другому
  * человеку либо оказаться не изображением. Правило «неисправность требует
  * фотографии» имеет смысл, только если фотография проверена здесь.
- *
- * `entityId` снимка — `${clientCommandId}:${itemId}`: фото делается до
- * отправки чек-листа, когда записи дефекта ещё нет и привязать снимок не к
- * чему. Ключ команды даёт ту же привязку и не позволяет подставить чужой файл.
  */
 async function requireConfirmedImages(
   tx: Tx, tenantId: string, actorId: string, clientCommandId: string, answers: ChecklistAnswer[],
@@ -310,7 +428,7 @@ async function ensureTemplate(tx: Tx, tenantId: string, stage: ChecklistStage, o
  *
  * ПОЧЕМУ ЦЕЛИКОМ. Осмотр — это одно решение «машина годна», а не двенадцать
  * независимых. Пока список не дошёл до конца, его выводы ничего не значат:
- * половина пунктов «ок» не означает, что вторая половина не остановит смену.
+ * половина пунктов «норма» не означает, что вторая половина в порядке.
  */
 export async function submitChecklist(input: {
   tenantId: string;
@@ -332,14 +450,15 @@ export async function submitChecklist(input: {
       where: {tenantId_clientCommandId: {tenantId: input.tenantId, clientCommandId: input.clientCommandId}},
       select: {id: true},
     });
-    if (duplicate) return {executionId: duplicate.id, blocked: false, defects: 0};
+    if (duplicate) return {executionId: duplicate.id, alerts: 0, defects: 0};
 
     const {id: templateId, definition} = await ensureTemplate(tx, input.tenantId, input.stage, input.operatorId);
 
     // Состав пунктов пересобираем на сервере по той же машине: список,
     // присланный телефоном, доверия не заслуживает — иначе пункт про мачту
     // исчезает из ответа, и осмотр «пройден» без него.
-    const answeredConditions = definition.items
+    const answeredConditions = definition.sections
+      .flatMap((section) => section.items)
       .filter((item) => item.onlyWhen && input.answers.some((answer) => answer.itemId === item.id))
       .flatMap((item) => item.onlyWhen ?? []);
     const items = selectChecklistItems(definition, answeredConditions, {
@@ -424,17 +543,31 @@ export async function submitChecklist(input: {
       });
     }
 
-    // Моточасы и долив жидкостей — не «данные чек-листа», а события парка.
-    // Их место в журнале наработки и в свидетельствах смены, иначе механик
-    // никогда не узнает, что в двигатель доливали масло третью смену подряд.
-    const meterAnswer = input.answers.find((answer) => answer.measures?.engineHours !== undefined);
-    if (meterAnswer?.measures?.engineHours !== undefined) {
+    // Моточасы, долив жидкостей и остаток топлива — не «данные чек-листа», а
+    // события парка. Их место в журнале наработки и в свидетельствах смены,
+    // иначе механик никогда не узнает, что масло доливают третью смену подряд.
+    const meter = findMeasure(input.answers, 'engineHours');
+    if (meter !== null) {
       await recordMeter(tx, {
         tenantId: input.tenantId,
         equipmentId: input.equipmentId,
-        engineHours: Math.round(meterAnswer.measures.engineHours),
+        engineHours: Math.round(meter),
         operatorId: input.operatorId,
         note: definition.title,
+        now,
+      });
+    }
+
+    const fuel = findMeasure(input.answers, 'fuelPercent');
+    if (fuel !== null) {
+      await recordEvidence(tx, {
+        tenantId: input.tenantId,
+        shiftId: input.shiftId,
+        equipmentId: input.equipmentId,
+        kind: 'FLUID_READING',
+        payload: {fuelPercent: fuel} as Prisma.InputJsonValue,
+        operatorId: input.operatorId,
+        clientCommandId: `${input.clientCommandId}:fuel`,
         now,
       });
     }
@@ -457,10 +590,18 @@ export async function submitChecklist(input: {
 
     return {
       executionId: execution.id,
-      blocked: blockingFaults(items, input.answers).length > 0,
+      alerts: alertingFaults(items, input.answers).length,
       defects: defects.length,
     };
   });
+}
+
+function findMeasure(answers: ChecklistAnswer[], key: string): number | null {
+  for (const answer of answers) {
+    const value = answer.measures?.[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return null;
 }
 
 /** Отчёт смены — один на смену. Создаётся при первой записи выработки. */
@@ -494,8 +635,8 @@ async function ensureReport(tx: Tx, input: {
 }
 
 export type ProductionEntry =
-  | {kind: 'PILES'; pileGradeId: string; count: number; picketId?: string; comment?: string}
-  | {kind: 'DRILLING'; typeId: string; count: number; meters: number; picketId?: string}
+  | {kind: 'PILES'; pileGradeId: string; count: number; comment?: string}
+  | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
   | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
 
 /**
@@ -504,6 +645,11 @@ export type ProductionEntry =
  * ПОЧЕМУ ПО ХОДУ. Отчёт, заполняемый в 19:00 по памяти, — это оценка, а не
  * учёт. Свая, отмеченная сразу, помнит время; простой, отмеченный сразу,
  * помнит причину.
+ *
+ * ПОЧЕМУ БУРЕНИЕ СЧИТАЕТСЯ КАК В ОТЧЁТЕ. Оператор вводит количество скважин и
+ * метры на одну, объём считается умножением. Так это устроено в отчёте за
+ * смену, и вводить те же данные двумя разными способами в одном продукте — это
+ * два разных числа в аналитике.
  */
 export async function logProduction(input: {
   tenantId: string;
@@ -518,22 +664,6 @@ export async function logProduction(input: {
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
-    const shiftRow = await tx.shift.findFirst({
-      where: {tenantId: input.tenantId, id: input.shiftId},
-      select: {productionDate: true, type: true},
-    });
-    if (!shiftRow) throw new OperatorCommandError(404, 'Смена не найдена');
-
-    const reportId = await ensureReport(tx, {
-      tenantId: input.tenantId,
-      shiftId: input.shiftId,
-      operatorId: input.operatorId,
-      siteId: crew.siteId,
-      equipmentId: shift.equipmentId,
-      crewId: crew.id,
-      productionDate: shiftRow.productionDate.toISOString().slice(0, 10),
-      shiftType: shiftRow.type,
-    });
 
     // Чек-лист ТБ — пропуск к работе этого вида, а не бумажка «на потом».
     // Он спрашивается один раз за смену перед первой записью: забивка и
@@ -561,6 +691,17 @@ export async function logProduction(input: {
       }
     }
 
+    const reportId = await ensureReport(tx, {
+      tenantId: input.tenantId,
+      shiftId: input.shiftId,
+      operatorId: input.operatorId,
+      siteId: crew.siteId,
+      equipmentId: shift.equipmentId,
+      crewId: crew.id,
+      productionDate: shift.productionDate.toISOString().slice(0, 10),
+      shiftType: shift.type,
+    });
+
     const {entry} = input;
     if (entry.kind === 'PILES') {
       if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество свай должно быть больше нуля');
@@ -570,7 +711,6 @@ export async function logProduction(input: {
           tenantId: input.tenantId,
           shiftId: input.shiftId,
           clientCommandId: input.clientCommandId,
-          picketId: entry.picketId ?? null,
           pileGradeId: entry.pileGradeId,
           count: entry.count,
           comment: entry.comment ?? null,
@@ -578,18 +718,18 @@ export async function logProduction(input: {
         },
       });
     } else if (entry.kind === 'DRILLING') {
-      if (entry.meters <= 0) throw new OperatorCommandError(400, 'Метры бурения должны быть больше нуля');
+      if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество скважин должно быть больше нуля');
+      if (entry.metersPerUnit <= 0) throw new OperatorCommandError(400, 'Глубина скважины должна быть больше нуля');
       await tx.leaderDrilling.create({
         data: {
           reportId,
           tenantId: input.tenantId,
           shiftId: input.shiftId,
           clientCommandId: input.clientCommandId,
-          picketId: entry.picketId ?? null,
           typeId: entry.typeId,
           count: entry.count,
-          metersPerUnit: entry.count > 0 ? entry.meters / entry.count : 0,
-          meters: entry.meters,
+          metersPerUnit: entry.metersPerUnit,
+          meters: entry.count * entry.metersPerUnit,
           occurredAt: now,
         },
       });
@@ -624,8 +764,28 @@ export async function logProduction(input: {
   });
 }
 
-/** Оператор объявил, что работа окончена: дальше только ЕО после работы. */
-export async function requestClosing(input: {tenantId: string; operatorId: string; shiftId: string}) {
+/** Удаление ошибочной записи выработки до закрытия смены. */
+export async function removeProduction(input: {
+  tenantId: string; operatorId: string; shiftId: string;
+  kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; id: string;
+}) {
+  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+
+    const where = {tenantId: input.tenantId, shiftId: input.shiftId, id: input.id};
+    const removed = input.kind === 'PILES'
+      ? await tx.pileWork.deleteMany({where})
+      : input.kind === 'DRILLING'
+        ? await tx.leaderDrilling.deleteMany({where})
+        : await tx.reportDowntime.deleteMany({where});
+    if (removed.count === 0) throw new OperatorCommandError(404, 'Запись не найдена');
+    return {ok: true};
+  });
+}
+
+/** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
+export async function finishWork(input: {tenantId: string; operatorId: string; shiftId: string}) {
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     await requireOpenShift(tx, input.tenantId, input.shiftId);
     await tx.shift.update({
@@ -637,11 +797,14 @@ export async function requestClosing(input: {tenantId: string; operatorId: strin
 }
 
 /**
- * Закрытие смены.
+ * Закрытие смены и отправка отчёта.
+ *
+ * Смену принимать некому: бригада работает в одну смену, и утром установку
+ * примет тот же машинист. Поэтому здесь нет передачи и подтверждения —
+ * закрытие сразу отправляет отчёт диспетчеру.
  *
  * Послесменное обслуживание — условие закрытия, а не пожелание: машина,
- * оставленная без осмотра, утром становится чужой проблемой. Отсюда отказ
- * закрыть смену без завершённого ЕО после работы.
+ * оставленная без осмотра, утром становится чужой проблемой.
  */
 export async function closeShift(input: {
   tenantId: string;
@@ -653,7 +816,8 @@ export async function closeShift(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
     const done = await tx.operatorChecklistExecution.findFirst({
       where: {
@@ -668,32 +832,57 @@ export async function closeShift(input: {
       throw new OperatorCommandError(409, 'Сначала выполните ЕО после работы');
     }
 
-    const shift = await tx.shift.findFirstOrThrow({
-      where: {tenantId: input.tenantId, id: input.shiftId},
-      select: {equipmentId: true},
-    });
-    const lastMeter = await tx.meterReading.findFirst({
-      where: {tenantId: input.tenantId, equipmentId: shift.equipmentId},
-      orderBy: {recordedAt: 'desc'},
-      select: {engineHours: true},
+    // Отчёт может не существовать: смена без единой сваи — это тоже смена, и
+    // сдать её надо, иначе простой объекта нигде не отразится.
+    const reportId = await ensureReport(tx, {
+      tenantId: input.tenantId,
+      shiftId: input.shiftId,
+      operatorId: input.operatorId,
+      siteId: crew.siteId,
+      equipmentId: shift.equipmentId,
+      crewId: crew.id,
+      productionDate: shift.productionDate.toISOString().slice(0, 10),
+      shiftType: shift.type,
     });
 
-    await tx.report.updateMany({
-      where: {tenantId: input.tenantId, shiftId: input.shiftId},
+    const [lastMeter, fuelEvidence] = await Promise.all([
+      tx.meterReading.findFirst({
+        where: {tenantId: input.tenantId, equipmentId: shift.equipmentId},
+        orderBy: {recordedAt: 'desc'},
+        select: {engineHours: true},
+      }),
+      tx.operatorShiftEvidence.findFirst({
+        where: {tenantId: input.tenantId, shiftId: input.shiftId, kind: 'FLUID_READING'},
+        orderBy: {occurredAt: 'desc'},
+        select: {payload: true},
+      }),
+    ]);
+
+    const fuelPayload = fuelEvidence?.payload as {fuelPercent?: number} | null;
+    const fuelPercent = typeof fuelPayload?.fuelPercent === 'number'
+      ? Math.round(fuelPayload.fuelPercent)
+      : null;
+
+    await tx.report.update({
+      where: {id: reportId},
       data: {
         status: 'submitted',
         submittedAt: now,
         closingComment: input.comment,
         endingEngineHours: lastMeter?.engineHours ?? null,
+        endingFuelPercent: fuelPercent,
         lastEditedById: input.operatorId,
       },
     });
 
     await tx.shift.update({
       where: {tenantId_id: {tenantId: input.tenantId, id: input.shiftId}},
-      data: {state: 'CLOSED', closedAt: now, closedById: input.operatorId, lastEditedById: input.operatorId},
+      data: {
+        state: 'CLOSED', closedAt: now,
+        closedById: input.operatorId, lastEditedById: input.operatorId,
+      },
     });
 
-    return {ok: true};
+    return {ok: true, reportId};
   });
 }

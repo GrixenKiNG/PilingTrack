@@ -1,14 +1,15 @@
 'use client';
 
-import type {ChecklistAnswer, ChecklistStage, OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {
+  ChecklistAnswer, ChecklistStage, OperatorMobileState,
+} from '@/modules/operator-mobile/contracts';
 
 /**
  * Клиент мобильного места. Только онлайн: очереди и хранилища на телефоне нет.
  *
  * ПОЧЕМУ БЕЗ ОЧЕРЕДИ. Автономная работа — это отдельный продукт со своими
- * правилами разрешения конфликтов и своим сроком годности разрешения на работу.
- * Пока её нет, честнее показать «нет сети», чем принять осмотр, который
- * неизвестно когда доедет до сервера и доедет ли.
+ * правилами разрешения конфликтов. Пока её нет, честнее показать «нет сети»,
+ * чем принять осмотр, который неизвестно когда доедет до сервера и доедет ли.
  */
 
 export class ApiError extends Error {
@@ -45,17 +46,20 @@ export async function fetchState(input: {
   return parse<OperatorMobileState>(response);
 }
 
-type Command =
-  | {command: 'accept-equipment'; clientCommandId: string; equipmentId: string; engineHours: number; shiftType: 'DAY' | 'NIGHT'}
-  | {command: 'submit-checklist'; clientCommandId: string; shiftId: string; equipmentId: string; stage: ChecklistStage; answers: ChecklistAnswer[]}
-  | {command: 'log-production'; clientCommandId: string; shiftId: string; entry: ProductionEntryInput}
-  | {command: 'request-closing'; shiftId: string}
-  | {command: 'close-shift'; shiftId: string; comment: string};
-
 export type ProductionEntryInput =
   | {kind: 'PILES'; pileGradeId: string; count: number; comment?: string}
-  | {kind: 'DRILLING'; typeId: string; count: number; meters: number}
+  | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
   | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
+
+type Command =
+  | {command: 'acknowledge-briefing'}
+  | {command: 'submit-knowledge'; picks: {questionId: string; picked: number}[]}
+  | {command: 'accept-equipment'; clientCommandId: string; equipmentId: string; shiftType: 'DAY' | 'NIGHT'}
+  | {command: 'submit-checklist'; clientCommandId: string; shiftId: string; equipmentId: string; stage: ChecklistStage; answers: ChecklistAnswer[]}
+  | {command: 'log-production'; clientCommandId: string; shiftId: string; entry: ProductionEntryInput}
+  | {command: 'remove-production'; shiftId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; id: string}
+  | {command: 'finish-work'; shiftId: string}
+  | {command: 'close-shift'; shiftId: string; comment: string};
 
 export async function sendCommand<T = unknown>(command: Command): Promise<T> {
   const response = await fetch('/api/operator/mobile/command', {
