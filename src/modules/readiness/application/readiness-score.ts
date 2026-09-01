@@ -35,6 +35,21 @@ export async function evaluateAuthoritativeReadiness(input: {
     orderBy: {inspectionDate: 'desc'},
     select: {id: true, inspectionDate: true, healthScore: true},
   });
+  // Предсменный осмотр машиниста — тот же физический обход машины, только
+  // записанный рабочим местом оператора, а не журналом ЕО/ТО механика. Пока
+  // расчёт смотрел лишь в `Inspection`, машина с полностью пройденным утренним
+  // осмотром висела «Осмотр не завершён» и теряла четверть балла готовности:
+  // человек сделал работу, а система её не видела.
+  const operatorInspection = await input.tx.operatorChecklistExecution.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      equipmentId: input.equipmentId,
+      status: 'COMPLETED',
+      template: {templateKey: 'PRESHIFT_INSPECTION'},
+    },
+    orderBy: {completedAt: 'desc'},
+    select: {id: true, completedAt: true, startedAt: true},
+  });
   const openRecords = await input.tx.maintenanceRecord.findMany({
     where: {tenantId: input.tenantId, equipmentId: input.equipmentId, status: {in: [...OPEN_MAINTENANCE]}},
     select: {id: true, type: true, priority: true},
@@ -69,18 +84,55 @@ export async function evaluateAuthoritativeReadiness(input: {
   });
   if (!equipment) throw new Error('Authoritative equipment row is unavailable');
 
-  const inspectionSameTenantDay = inspection
-    ? tenantProductionDate(inspection.inspectionDate, input.timezone).getTime()
-      === tenantProductionDate(now, input.timezone).getTime()
-    : false;
+  const today = tenantProductionDate(now, input.timezone).getTime();
+  const sameDay = (at: Date | null | undefined) => at != null
+    && tenantProductionDate(at, input.timezone).getTime() === today;
+
+  const inspectionSameTenantDay = sameDay(inspection?.inspectionDate);
+  const operatorAt = operatorInspection?.completedAt ?? operatorInspection?.startedAt ?? null;
+  const operatorSameTenantDay = sameDay(operatorAt);
+  // Осмотр за сегодня — любой из двух. Наличие вчерашнего даёт половину хода,
+  // как и раньше: машину смотрели, но не сегодня.
+  const inspectedToday = inspectionSameTenantDay || operatorSameTenantDay;
+  const inspectedEver = Boolean(inspection) || Boolean(operatorInspection);
+
+  /**
+   * Состояние машины по осмотру машиниста: доля пунктов, отвеченных «норма».
+   *
+   * У журнала ЕО/ТО есть свой `healthScore`, у чек-листа оператора — нет, а от
+   * него зависит число замечаний в формуле готовности. Считаем по ответам:
+   * «норма» — единица, «замечание» — половина, «неисправность» — ноль.
+   * Замечание не равно отказу, и приравнивать их значило бы штрафовать за
+   * честно отмеченную мелочь так же, как за трещину в мачте.
+   */
+  let operatorHealthScore: number | null = null;
+  if (operatorInspection && operatorSameTenantDay) {
+    const answers = await input.tx.operatorChecklistAnswerRecord.groupBy({
+      by: ['result'],
+      _count: {_all: true},
+      where: {tenantId: input.tenantId, executionId: operatorInspection.id},
+    });
+    const weight: Record<string, number> = {OK: 1, REMARK: 0.5, FAULT: 0};
+    let total = 0;
+    let earned = 0;
+    for (const row of answers) {
+      const count = row._count._all;
+      total += count;
+      earned += count * (weight[row.result] ?? 0);
+    }
+    if (total > 0) operatorHealthScore = Math.round((earned / total) * 100);
+  }
   const overdueHours = equipment.nextMaintenanceAtHours != null && equipment.engineHoursTotal != null
     ? Math.max(0, equipment.engineHoursTotal - equipment.nextMaintenanceAtHours) : 0;
   const overdueDays = equipment.nextMaintenanceDate && equipment.nextMaintenanceDate < now
     ? Math.ceil((now.getTime() - equipment.nextMaintenanceDate.getTime()) / 86_400_000) : 0;
-  const healthScore = inspection?.healthScore ?? null;
+  // Свежий осмотр машиниста важнее вчерашнего журнала ЕО: он описывает
+  // состояние машины на сегодня, а не на позавчера.
+  const healthScore = (operatorSameTenantDay ? operatorHealthScore : null)
+    ?? inspection?.healthScore ?? null;
   const facts = {
-    inspectionCompleted: inspectionSameTenantDay,
-    inspectionProgress: inspectionSameTenantDay ? 1 : inspection ? 0.5 : 0,
+    inspectionCompleted: inspectedToday,
+    inspectionProgress: inspectedToday ? 1 : inspectedEver ? 0.5 : 0,
     healthScore,
     meterKnown: equipment.engineHoursTotal != null,
     permitValid: Boolean(permit && permit.state === 'APPROVED' && permit.validFrom <= now && permit.validTo > now),
@@ -107,7 +159,11 @@ export async function evaluateAuthoritativeReadiness(input: {
     facts, rules,
     evidence: {
       equipmentId: equipment.id,
-      inspectionId: inspection?.id ?? null,
+      // Ссылаемся на тот осмотр, который дал сегодняшний вывод: иначе в
+      // доказательствах стоял бы вчерашний журнал ЕО при свежем осмотре
+      // машиниста, и проверить вывод было бы не по чему.
+      inspectionId: (operatorSameTenantDay ? operatorInspection?.id : null)
+        ?? inspection?.id ?? null,
       permitId: permit?.id ?? null,
       maintenanceRecordIds: openRecords.map((row) => row.id),
     },

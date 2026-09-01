@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
+import {requestReadinessSnapshot} from '@/modules/readiness/application/projection/request-snapshot';
 import {getChecklist} from '../domain/checklist-catalog';
 import type {ChecklistStage} from '../domain/checklist-types';
 import {
@@ -12,6 +13,7 @@ import {
 import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../domain/knowledge-bank';
 import {SAFETY_BRIEFING} from '../domain/safety-briefing';
 import {selectChecklistItems} from '../domain/shift-conditions';
+import {shiftWindow} from '../domain/shift-window';
 
 /**
  * Команды мобильного места оператора.
@@ -227,7 +229,7 @@ export async function acceptEquipment(input: {
         equipmentId: input.equipmentId,
         state: {in: ['STARTED', 'HANDOVER_PENDING']},
       },
-      select: {id: true, state: true, productionDate: true},
+      select: {id: true, state: true, productionDate: true, plannedStartAt: true, plannedEndAt: true},
     });
     if (active && active.productionDate.getTime() !== productionDate.getTime()) {
       throw new OperatorCommandError(
@@ -244,9 +246,10 @@ export async function acceptEquipment(input: {
         productionDate,
         state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']},
       },
-      select: {id: true, state: true, productionDate: true},
+      select: {id: true, state: true, productionDate: true, plannedStartAt: true, plannedEndAt: true},
     });
 
+    const planned = shiftWindow(productionDate, input.shiftType, timezone);
     const shiftId = existing?.id ?? randomUUID();
     if (existing) {
       if (existing.state !== 'STARTED') {
@@ -255,6 +258,9 @@ export async function acceptEquipment(input: {
           data: {
             state: 'STARTED', startedAt: now,
             startedById: input.operatorId, lastEditedById: input.operatorId,
+            // У смены, заведённой диспетчером заранее, план уже свой — не трогаем.
+            plannedStartAt: existing.plannedStartAt ?? planned.plannedStartAt,
+            plannedEndAt: existing.plannedEndAt ?? planned.plannedEndAt,
           },
         });
       }
@@ -272,6 +278,10 @@ export async function acceptEquipment(input: {
           lastEditedById: input.operatorId,
           startedAt: now,
           startedById: input.operatorId,
+          // Плановое окно по расписанию продукта: без него смена не рисуется
+          // на шкале центра готовности — есть в списке, нет на графике.
+          plannedStartAt: planned.plannedStartAt,
+          plannedEndAt: planned.plannedEndAt,
         },
       });
     }
@@ -285,6 +295,18 @@ export async function acceptEquipment(input: {
       operatorId: input.operatorId,
       clientCommandId: input.clientCommandId,
       now,
+    });
+
+    // Открытие смены закрывает шаг «Приёмка» в готовности — просим пересчёт.
+    await requestReadinessSnapshot(tx as unknown as Parameters<typeof requestReadinessSnapshot>[0], {
+      tenantId: input.tenantId,
+      equipmentId: input.equipmentId,
+      aggregateId: shiftId,
+      aggregateType: 'Shift',
+      triggerType: 'SHIFT_STARTED',
+      triggerId: shiftId,
+      occurredAt: now,
+      shiftId,
     });
 
     return {shiftId};
@@ -587,6 +609,20 @@ export async function submitChecklist(input: {
         now,
       });
     }
+
+    // Осмотр — четверть балла готовности. Без заказа пересчёта снимок остаётся
+    // вчерашним: машинист прошёл обход, а центр готовности до следующего
+    // события показывает «Осмотр не завершён».
+    await requestReadinessSnapshot(tx as unknown as Parameters<typeof requestReadinessSnapshot>[0], {
+      tenantId: input.tenantId,
+      equipmentId: input.equipmentId,
+      aggregateId: execution.id,
+      aggregateType: 'OperatorChecklistExecution',
+      triggerType: 'OPERATOR_CHECKLIST_COMPLETED',
+      triggerId: execution.id,
+      occurredAt: now,
+      shiftId: input.shiftId,
+    });
 
     return {
       executionId: execution.id,

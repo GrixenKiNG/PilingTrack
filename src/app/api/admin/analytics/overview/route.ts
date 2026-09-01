@@ -85,7 +85,36 @@ async function loadPeriod(tenantId: string, from: string, to: string, siteId: st
   }));
 }
 
-interface Totals { piles: number; meters: number; drilling: number; downtimePct: number | null }
+interface Totals {
+  piles: number; meters: number; drilling: number;
+  downtimePct: number | null;
+  /** Простой превысил длительность смены — цифру ввели с ошибкой. */
+  downtimeOverrun: boolean;
+}
+
+/**
+ * Доля простоя, ограниченная сотней процентов.
+ *
+ * Простой не может занимать больше времени, чем длится смена. Пока ограничения
+ * не было, ошибка ввода — часы вместо минут, простой длиннее смены — уходила в
+ * сводку руководству как «доля простоя 7200 %». Такое число не просто
+ * бесполезно: оно ломает и сравнение периодов, и сортировку операторов.
+ *
+ * Значение срезается, а факт превышения возвращается отдельным признаком:
+ * молча показать «100 %» там, где введена чепуха, значит спрятать ошибку
+ * вместо того, чтобы дать её увидеть и исправить.
+ */
+function downtimeShare(downtimeHours: number, shiftMinutes: number): {
+  pct: number | null; overrun: boolean;
+} {
+  if (shiftMinutes <= 0) return { pct: null, overrun: false };
+  // Same formula as the OperatorPerformance projection: hours×60 ÷ minutes.
+  const raw = ((downtimeHours * 60) / shiftMinutes) * 100;
+  return {
+    pct: Math.round(Math.min(raw, 100) * 10) / 10,
+    overrun: raw > 100,
+  };
+}
 
 function totalsOf(rows: ReportRow[]): Totals {
   let piles = 0; let meters = 0; let drilling = 0;
@@ -97,9 +126,14 @@ function totalsOf(rows: ReportRow[]): Totals {
       downtimeInShift += r.downtime;
     }
   }
-  // Same formula as the OperatorPerformance projection: hours×60 ÷ minutes.
-  const downtimePct = shiftMin > 0 ? Math.round(((downtimeInShift * 60) / shiftMin) * 1000) / 10 : null;
-  return { piles, meters: Math.round(meters * 10) / 10, drilling: Math.round(drilling * 10) / 10, downtimePct };
+  const share = downtimeShare(downtimeInShift, shiftMin);
+  return {
+    piles,
+    meters: Math.round(meters * 10) / 10,
+    drilling: Math.round(drilling * 10) / 10,
+    downtimePct: share.pct,
+    downtimeOverrun: share.overrun,
+  };
 }
 
 function deltaPct(current: number, previous: number): number | null {
@@ -199,7 +233,8 @@ export const GET = withApi(async (request: NextRequest) => {
       meters: Math.round(o.meters * 10) / 10,
       piles: o.piles,
       drilling: Math.round(o.drilling * 10) / 10,
-      downtimePct: o.shiftMin > 0 ? Math.round(((o.downtimeInShift * 60) / o.shiftMin) * 1000) / 10 : null,
+      downtimePct: downtimeShare(o.downtimeInShift, o.shiftMin).pct,
+      downtimeOverrun: downtimeShare(o.downtimeInShift, o.shiftMin).overrun,
       reports: o.reports,
     }))
     .sort((a, b) => b.meters - a.meters || b.piles - a.piles);

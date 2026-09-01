@@ -6,6 +6,7 @@ import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
 import {derivePhase} from '../shift-phases';
+import {shiftWindow} from '../shift-window';
 import {collectWarnings, isWorkAllowed} from '../work-warnings';
 
 /**
@@ -275,5 +276,37 @@ describe('инструктаж и срок проверки знаний', () =>
     expect(knowledgeValid(new Date('2026-09-30T00:00:00.000Z'), NOW)).toBe(true);
     expect(knowledgeValid(new Date('2026-08-01T00:00:00.000Z'), NOW)).toBe(false);
     expect(knowledgeValid(null, NOW)).toBe(false);
+  });
+});
+
+describe('плановое окно смены', () => {
+  // Производственные сутки хранятся как полночь UTC — так их пишет продукт.
+  const day = new Date('2026-09-01T00:00:00.000Z');
+
+  it('дневная смена — 08:00–20:00 по поясу организации', () => {
+    const window = shiftWindow(day, 'DAY', 'Europe/Moscow');
+    const hour = (at: Date) => new Intl.DateTimeFormat('ru-RU', {
+      timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(at);
+    expect(hour(window.plannedStartAt)).toBe('08:00');
+    expect(hour(window.plannedEndAt)).toBe('20:00');
+  });
+
+  it('ночная смена заканчивается утром следующих суток', () => {
+    const window = shiftWindow(day, 'NIGHT', 'Europe/Moscow');
+    const local = (at: Date) => new Intl.DateTimeFormat('ru-RU', {
+      timeZone: 'Europe/Moscow', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(at);
+    expect(local(window.plannedStartAt)).toContain('20:00');
+    expect(local(window.plannedEndAt)).toContain('08:00');
+    expect(window.plannedEndAt.getTime() - window.plannedStartAt.getTime()).toBe(12 * 3600 * 1000);
+  });
+
+  it('окно считается в поясе организации, а не сервера', () => {
+    const moscow = shiftWindow(day, 'DAY', 'Europe/Moscow');
+    const krasnoyarsk = shiftWindow(day, 'DAY', 'Asia/Krasnoyarsk');
+    // Красноярск на четыре часа восточнее: его 08:00 наступают раньше.
+    expect(moscow.plannedStartAt.getTime() - krasnoyarsk.plannedStartAt.getTime())
+      .toBe(4 * 3600 * 1000);
   });
 });
