@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {
   classifyObservedHazard,
   type ObservedHazardSign,
-} from '../safety-incident';
+} from '../hazard-classification';
 
 describe('серверная классификация опасного события', () => {
   it.each<{
