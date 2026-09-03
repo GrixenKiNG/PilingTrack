@@ -7,14 +7,18 @@ import type {
 import {
   ApiError, currentPosition, fetchState, newCommandId, sendCommand, type ProductionEntryInput,
 } from './api';
-import {BigButton, Panel, PanelTitle, PhaseBar, Screen} from './ui';
+import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen} from './screens/knowledge-screen';
 import {AdmissionScreen} from './screens/admission-screen';
 import {ChecklistScreen} from './screens/checklist-screen';
 import {WorkScreen} from './screens/work-screen';
+import {isIncidentOpen} from '@/modules/operator-mobile/contracts';
 import {ClosedScreen, ClosingScreen} from './screens/closing-screen';
+import {EquipmentTab} from './screens/equipment-tab';
+import {IncidentsTab} from './screens/incidents-tab';
+import {ProfileTab} from './screens/profile-tab';
 
 /** Чек-лист, закрывающий фазу. Тот же порядок, что на сервере. */
 const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>> = {
@@ -22,6 +26,15 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
   STARTUP: 'EO_BEFORE',
   SITE_READY: 'SITE_READY',
 };
+
+/**
+ * Разделы, доступные после начала работы.
+ *
+ * До этого экран ведёт человека по порядку — допуск, приём, осмотр, пуск,
+ * площадка, — и порядок здесь не удобство, а безопасность. Когда работа
+ * началась, ведение заканчивается, и машинист сам решает, куда смотреть.
+ */
+type WorkTab = 'SHIFT' | 'EQUIPMENT' | 'INCIDENTS' | 'PROFILE';
 
 /** Экраны, открываемые вне очереди фаз. */
 type Detour = {kind: 'BRIEFING'} | {kind: 'KNOWLEDGE'} | {kind: 'CHECKLIST'; stage: ChecklistStage};
@@ -37,9 +50,17 @@ type Detour = {kind: 'BRIEFING'} | {kind: 'KNOWLEDGE'} | {kind: 'CHECKLIST'; sta
 export function OperatorMobileApp() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [detour, setDetour] = useState<Detour | null>(null);
+  /**
+   * Выбранная установка. По умолчанию её выбирает сервер (первая бригада);
+   * дальше выбор оператора едет с каждым чтением состояния, иначе экран
+   * показывает объект и объёмы не той машины, которую он отметил.
+   */
+  const [equipmentId, setEquipmentId] = useState<string | null>(null);
+  const [workTab, setWorkTab] = useState<WorkTab>('SHIFT');
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
 
   /**
@@ -53,9 +74,26 @@ export function OperatorMobileApp() {
    */
   const [checklistCommandId, setChecklistCommandId] = useState(newCommandId);
 
+  /**
+   * Ключи форм выработки и происшествия. Живут по тем же правилам, что и ключ
+   * чек-листа, и по той же причине — но эта причина стоит отдельного слова.
+   *
+   * Раньше ключ создавался прямо в обработчике нажатия. На морозе в перчатке
+   * по кнопке попадают дважды, и два нажатия давали два разных ключа: сервер
+   * видел две разные команды и записывал две пачки свай. Ключ, переживающий
+   * нажатие, делает второе нажатие безвредным — сервер узнаёт повтор и
+   * возвращает прежнюю запись. Новый ключ выдаётся только после удачи.
+   */
+  const [productionCommandId, setProductionCommandId] = useState(newCommandId);
+  const [incidentCommandId, setIncidentCommandId] = useState(newCommandId);
+  const [correctionCommandId, setCorrectionCommandId] = useState(newCommandId);
+
   const reload = useCallback(async () => {
     try {
-      const next = await fetchState({coordinates: coordinates.current});
+      const next = await fetchState({
+        coordinates: coordinates.current,
+        ...(equipmentId ? {equipmentId} : {}),
+      });
       setState(next);
       setLoadError(null);
     } catch (error) {
@@ -63,9 +101,15 @@ export function OperatorMobileApp() {
         window.location.href = '/login';
         return;
       }
+      // Отказ по роли — не обрыв связи, и показывать его как «нет сети» значит
+      // отправить помощника машиниста жать «Повторить» до вечера.
+      if (error instanceof ApiError && error.status === 403) {
+        setForbidden(error.message);
+        return;
+      }
       setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить смену');
     }
-  }, []);
+  }, [equipmentId]);
 
   useEffect(() => {
     void (async () => {
@@ -74,20 +118,48 @@ export function OperatorMobileApp() {
     })();
   }, [reload]);
 
-  const run = useCallback(async (work: () => Promise<unknown>) => {
+  /**
+   * Выполнить команду и сказать, получилось ли.
+   *
+   * ПОЧЕМУ ВОЗВРАЩАЕТ ПРИЗНАК. Экран очищает форму только по этому ответу.
+   * Пока команда была «отправил и забыл», форма очищалась сразу: оборвалась
+   * связь на последней свае — и введённое исчезло вместе с ошибкой, а
+   * набирать заново пришлось по памяти. Ошибку человек прочитает; цифры,
+   * которые он только что ввёл, восстановить неоткуда.
+   */
+  const run = useCallback(async (work: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
     try {
       await work();
       setChecklistCommandId(newCommandId());
+      setProductionCommandId(newCommandId());
+      setIncidentCommandId(newCommandId());
+      setCorrectionCommandId(newCommandId());
       setDetour(null);
       await reload();
+      return true;
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Команда не выполнена');
+      return false;
     } finally {
       setBusy(false);
     }
   }, [reload]);
+
+  if (forbidden) {
+    return (
+      <Screen title="Рабочее место машиниста">
+        <Panel>
+          <PanelTitle>{forbidden}</PanelTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах
+            подаёт он.
+          </p>
+        </Panel>
+      </Screen>
+    );
+  }
 
   if (loadError) {
     return (
@@ -131,7 +203,89 @@ export function OperatorMobileApp() {
     ? state.checklists.find((candidate) => candidate.stage === stage)
     : undefined;
 
+  // Вкладки появляются только тогда, когда работа началась, и исчезают на
+  // обходных экранах: посреди чек-листа переключаться некуда, его надо
+  // закончить.
+  const tabsVisible = Boolean(shift)
+    && (state.phase === 'WORK' || state.phase === 'CLOSING')
+    && !detour
+    && !checklist;
+
+  const alarmingIncidents = state.incidents.filter(
+    (incident) => isIncidentOpen(incident.reviewedAt),
+  ).length;
+
+  const tabBar = tabsVisible ? (
+    <TabBar<WorkTab>
+      active={workTab}
+      onSelect={setWorkTab}
+      tabs={[
+        {id: 'SHIFT', label: state.phase === 'CLOSING' ? 'Сдача' : 'Работа'},
+        {id: 'EQUIPMENT', label: 'Техника', badge: state.defects.length},
+        {
+          id: 'INCIDENTS',
+          label: 'События',
+          badge: alarmingIncidents,
+          alarming: alarmingIncidents > 0,
+        },
+        {id: 'PROFILE', label: 'Профиль'},
+      ]}
+    />
+  ) : undefined;
+
+  const correctProduction = async (input: {
+    entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
+  }): Promise<boolean> => {
+    if (!shift) return false;
+    return run(() => sendCommand({
+      command: 'correct-production',
+      clientCommandId: correctionCommandId,
+      shiftId: shift.id,
+      ...input,
+    }));
+  };
+
+  const reportIncident = async (input: {
+    category: string; signs: string[]; injured: boolean; description: string; mediaIds: string[];
+  }): Promise<boolean> => {
+    if (!shift) return false;
+    return run(() => sendCommand({
+      command: 'report-incident',
+      clientCommandId: incidentCommandId,
+      shiftId: shift.id,
+      ...input,
+    }));
+  };
+
   const screen = () => {
+    // Вкладки, кроме основной, живут в собственной рамке: у них своя шапка и
+    // нет нижней кнопки действия — действие у каждой своё и внутри.
+    if (tabsVisible && workTab !== 'SHIFT') {
+      const title = workTab === 'EQUIPMENT' ? 'Техника'
+        : workTab === 'INCIDENTS' ? 'Происшествия' : 'Мои допуски';
+      return (
+        <Screen title={title} subtitle={state.assignment?.equipmentName} tabs={tabBar}>
+          {workTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
+          {workTab === 'INCIDENTS' ? (
+            <IncidentsTab
+              state={state}
+              busy={busy}
+              error={actionError}
+              commandId={incidentCommandId}
+              onReport={reportIncident}
+            />
+          ) : null}
+          {workTab === 'PROFILE' ? (
+            <ProfileTab
+              state={state}
+              onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}
+              onOpenKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
+            />
+          ) : null}
+        </Screen>
+      );
+    }
+
     if (detour?.kind === 'BRIEFING') {
       return (
         <BriefingScreen
@@ -185,6 +339,7 @@ export function OperatorMobileApp() {
             state={state}
             busy={busy}
             error={actionError}
+            onSelectEquipment={setEquipmentId}
             onAccept={(input) => void run(() => sendCommand({
               command: 'accept-equipment',
               clientCommandId: newCommandId(),
@@ -199,14 +354,16 @@ export function OperatorMobileApp() {
             state={state}
             busy={busy}
             error={actionError}
-            onLog={(entry: ProductionEntryInput) => void run(() => sendCommand({
+            onLog={(entry: ProductionEntryInput) => run(() => sendCommand({
               command: 'log-production',
-              clientCommandId: newCommandId(),
+              clientCommandId: productionCommandId,
               shiftId: shift.id,
               entry,
             }))}
             onOpenSafety={(safetyStage) => setDetour({kind: 'CHECKLIST', stage: safetyStage})}
             onFinish={() => void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}))}
+            tabs={tabBar}
+            onCorrect={correctProduction}
           />
         );
       case 'CLOSING':
@@ -222,6 +379,7 @@ export function OperatorMobileApp() {
               shiftId: shift.id,
               comment,
             }))}
+            tabs={tabBar}
           />
         );
       case 'CLOSED':

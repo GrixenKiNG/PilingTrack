@@ -13,12 +13,13 @@
  * зная правильный ответ, а не чтобы он не прошёл. Ошибся — показываем верный
  * ответ, и вопрос возвращается в конец набора, пока не будет отвечен верно.
  */
-export type KnowledgeTopic = 'PILING' | 'DRILLING' | 'GENERAL';
+export type KnowledgeTopic = 'PILING' | 'DRILLING' | 'GENERAL' | 'SLINGING';
 
 export const TOPIC_LABELS: Record<KnowledgeTopic, string> = {
   PILING: 'Забивка свай',
   DRILLING: 'Лидерное бурение',
   GENERAL: 'Охрана труда',
+  SLINGING: 'Стропальные работы',
 };
 
 export interface KnowledgeQuestion {
@@ -283,6 +284,112 @@ export const KNOWLEDGE_BANK: KnowledgeQuestion[] = [
     options: ['На глаз машинистом', 'Нарядом-допуском', 'По длине стрелы'],
     correct: 1,
   },
+  // ---------- стропальные работы ----------
+  {
+    id: 's-tag',
+    topic: 'SLINGING',
+    text: 'Строп без бирки',
+    options: ['К работе не допускается', 'Допускается после осмотра', 'Допускается для лёгких грузов'],
+    correct: 0,
+  },
+  {
+    id: 's-angle',
+    topic: 'SLINGING',
+    text: 'Наибольший угол между ветвями стропа',
+    options: ['120°', 'Не более 90°', 'Не ограничен'],
+    correct: 1,
+  },
+  {
+    id: 's-check-lift',
+    topic: 'SLINGING',
+    text: 'Как проверяется надёжность строповки',
+    options: ['Осмотром узла перед подъёмом', 'Подъёмом на 200–300 мм с остановкой', 'Рывком на полной высоте'],
+    correct: 1,
+  },
+  {
+    id: 's-pile-points',
+    topic: 'SLINGING',
+    text: 'За что строповывается свая',
+    options: ['За монтажные петли или штропы', 'За выпуски арматуры', 'За любое удобное место'],
+    correct: 0,
+  },
+  {
+    id: 's-frozen',
+    topic: 'SLINGING',
+    text: 'Примёрзший или защемлённый груз',
+    options: ['Поднимают рывком', 'Не поднимают: фактическая нагрузка неизвестна', 'Поднимают медленно'],
+    correct: 1,
+  },
+  {
+    id: 's-hands',
+    topic: 'SLINGING',
+    text: 'Разворот груза при подъёме',
+    options: ['Руками за груз', 'Оттяжкой', 'Упором ноги'],
+    correct: 1,
+  },
+  {
+    id: 's-over-people',
+    topic: 'SLINGING',
+    text: 'Перемещение груза над людьми',
+    options: ['Запрещено', 'Разрешено после предупреждения', 'Разрешено на высоте свыше 3 м'],
+    correct: 0,
+  },
+  {
+    id: 's-pinch',
+    topic: 'SLINGING',
+    text: 'Место между грузом и стеной, штабелем или машиной',
+    options: ['Удобно для наблюдения', 'Там не встают: при качке зажмёт', 'Допустимо при малой скорости'],
+    correct: 1,
+  },
+  {
+    id: 's-signal-one',
+    topic: 'SLINGING',
+    text: 'Кто подаёт сигналы машинисту',
+    options: ['Любой, кто рядом', 'Один человек — тот, кто стропит', 'Мастер по рации'],
+    correct: 1,
+  },
+  {
+    id: 's-signal-stop',
+    topic: 'SLINGING',
+    text: 'Сигнал «Стоп»',
+    options: ['Подаёт только стропальщик', 'Подаёт любой увидевший опасность и выполняется немедленно', 'Требует подтверждения мастера'],
+    correct: 1,
+  },
+  {
+    id: 's-lost-contact',
+    topic: 'SLINGING',
+    text: 'Потерян зрительный контакт с машинистом',
+    options: ['Работа останавливается', 'Работа продолжается по памяти', 'Подаются громкие сигналы голосом'],
+    correct: 0,
+  },
+  {
+    id: 's-suspended',
+    topic: 'SLINGING',
+    text: 'Груз в подвешенном состоянии без работы',
+    options: ['Допустим кратковременно', 'Не оставляют ни на минуту', 'Допустим при опущенной стреле'],
+    correct: 1,
+  },
+  {
+    id: 's-unsling',
+    topic: 'SLINGING',
+    text: 'Когда выполняется расстроповка',
+    options: ['Как только груз коснулся земли', 'После того как груз устойчиво лёг', 'На весу для ускорения'],
+    correct: 1,
+  },
+  {
+    id: 's-stack',
+    topic: 'SLINGING',
+    text: 'Укладка свай в штабель',
+    options: ['На подкладки и прокладки, с упорами', 'Прямо на грунт вплотную', 'Пирамидой без прокладок'],
+    correct: 0,
+  },
+  {
+    id: 's-defect',
+    topic: 'SLINGING',
+    text: 'Строп с оборванными прядями',
+    options: ['Убирается с площадки', 'Откладывается для лёгких грузов', 'Используется до конца смены'],
+    correct: 0,
+  },
 ];
 
 /** Сколько вопросов в одной попытке. */
@@ -314,6 +421,33 @@ export function buildAttempt(random: () => number = Math.random): KnowledgeQuest
   };
 
   const chosen = [...pick('PILING', 3), ...pick('DRILLING', 2), ...pick('GENERAL', 3)];
+  for (let i = chosen.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
+  }
+  return chosen;
+}
+
+/**
+ * Набор для помощника машиниста.
+ *
+ * Пять вопросов по стропальным работам и три общих по охране труда.
+ * Забивку и бурение не спрашиваем: помощник не сидит в кабине, и знание
+ * порядка работы органами управления от него не требуется — требуется
+ * знание того, что происходит вокруг машины.
+ */
+export function buildSlingerAttempt(random: () => number = Math.random): KnowledgeQuestion[] {
+  const pick = (topic: KnowledgeTopic, count: number) => {
+    const pool = KNOWLEDGE_BANK.filter((question) => question.topic === topic);
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, count);
+  };
+
+  const chosen = [...pick('SLINGING', 5), ...pick('GENERAL', 3)];
   for (let i = chosen.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [chosen[i], chosen[j]] = [chosen[j], chosen[i]];

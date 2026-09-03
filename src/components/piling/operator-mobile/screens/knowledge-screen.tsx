@@ -17,13 +17,19 @@ import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
  * палке сети. Итог всё равно считает сервер по своему банку — в журнал уходит
  * то, что человек действительно нажал.
  */
-export function KnowledgeScreen({busy, error, onDone, onBack}: {
+export function KnowledgeScreen({busy, error, onDone, onBack, build = buildAttempt}: {
   busy: boolean;
   error: string | null;
   onDone: (picks: {questionId: string; picked: number}[]) => void;
   onBack: () => void;
+  /**
+   * Чем собирается набор вопросов. По умолчанию — набор машиниста
+   * (забивка, бурение, охрана труда). Помощнику собирают другой: стропы
+   * и охрана труда, потому что в кабине он не сидит.
+   */
+  build?: () => KnowledgeQuestion[];
 }) {
-  const attempt = useMemo(() => buildAttempt(), []);
+  const attempt = useMemo(() => build(), [build]);
   const [queue, setQueue] = useState<KnowledgeQuestion[]>(attempt);
   const [picked, setPicked] = useState<number | null>(null);
   /**

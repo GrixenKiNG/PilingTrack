@@ -10,15 +10,34 @@ import {BigButton, Panel, Screen} from '../ui';
  * на двадцать листов пролистывают и ставят отметку, а здесь каждое правило
  * такое, нарушение которого убивает или ломает машину.
  */
-export function BriefingScreen({busy, onAcknowledge, onBack}: {
+/** Форма инструкции: код, название, версия и разделы с правилами. */
+export interface BriefingText {
+  readonly code: string;
+  readonly title: string;
+  readonly version: string;
+  readonly readingMinutes: number;
+  readonly sections: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly rules: readonly string[];
+  }[];
+}
+
+export function BriefingScreen({busy, onAcknowledge, onBack, briefing = SAFETY_BRIEFING}: {
   busy: boolean;
   onAcknowledge: () => void;
   onBack: () => void;
+  /**
+   * Какую инструкцию читаем. По умолчанию — свайные работы: её читает
+   * машинист. Помощник читает свою, про стропальные работы, и различаются
+   * они текстом, а не устройством экрана.
+   */
+  briefing?: BriefingText;
 }) {
   return (
     <Screen
-      title={SAFETY_BRIEFING.title}
-      subtitle={`${SAFETY_BRIEFING.code} · версия ${SAFETY_BRIEFING.version} · ${SAFETY_BRIEFING.readingMinutes} мин чтения`}
+      title={briefing.title}
+      subtitle={`${briefing.code} · версия ${briefing.version} · ${briefing.readingMinutes} мин чтения`}
       footer={(
         <>
           <BigButton onClick={onAcknowledge} disabled={busy}>
@@ -28,7 +47,7 @@ export function BriefingScreen({busy, onAcknowledge, onBack}: {
         </>
       )}
     >
-      {SAFETY_BRIEFING.sections.map((section) => (
+      {briefing.sections.map((section) => (
         <Panel key={section.id}>
           <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
             {section.title}

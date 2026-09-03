@@ -54,6 +54,32 @@ export const PHASE_CHECKLIST: Partial<Record<OperatorPhase, ChecklistStage>> = {
   CLOSING: 'EO_AFTER',
 };
 
+/**
+ * Какие чек-листы должны быть завершены до этого.
+ *
+ * ПОЧЕМУ ЭТО НА СЕРВЕРЕ, А НЕ ТОЛЬКО В ЭКРАНЕ. Порядок этапов — не подсказка
+ * интерфейса, а правило: нельзя осмотреть площадку раньше, чем машина заведена.
+ * Пока проверял только экран, прямой запрос к API позволял закрыть будущий
+ * чек-лист заранее и получить смену, где послесменное обслуживание сдано до
+ * предсменного осмотра. Экран подсказывает, сервер отвечает.
+ */
+export const STAGE_PREREQUISITES: Record<ChecklistStage, ChecklistStage[]> = {
+  PRESHIFT_INSPECTION: [],
+  EO_BEFORE: ['PRESHIFT_INSPECTION'],
+  SITE_READY: ['PRESHIFT_INSPECTION', 'EO_BEFORE'],
+  TB_PILING: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
+  TB_DRILLING: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
+  EO_AFTER: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
+};
+
+/** Чего не хватает, чтобы приступить к этому чек-листу. */
+export function missingPrerequisites(
+  stage: ChecklistStage,
+  completed: ChecklistStage[],
+): ChecklistStage[] {
+  return STAGE_PREREQUISITES[stage].filter((required) => !completed.includes(required));
+}
+
 export interface ShiftFacts {
   /** Оператор ознакомился с действующей версией инструкции. */
   briefingAcknowledged: boolean;

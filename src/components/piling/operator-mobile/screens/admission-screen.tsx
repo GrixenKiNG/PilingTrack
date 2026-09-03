@@ -16,14 +16,20 @@ import {WarningsPanel} from '../warnings-panel';
  * ПОЧЕМУ НЕТ ВВОДА МОТОЧАСОВ. Их снимают при пуске, в ЕО перед работой. Два
  * ввода подряд про одно и то же заполняют не глядя.
  */
-export function AdmissionScreen({state, onAccept, busy, error}: {
+export function AdmissionScreen({state, onAccept, onSelectEquipment, busy, error}: {
   state: OperatorMobileState;
   onAccept: (input: {equipmentId: string; shiftType: 'DAY' | 'NIGHT'}) => void;
+  /**
+   * Выбор машины поднят в оболочку, потому что от него зависит не только
+   * подсветка кнопки. Пока выбор жил здесь, нажатие на вторую установку
+   * перекрашивало плитку, а объект, наработка и объём на экране оставались от
+   * первой: оператор принимал одну машину, глядя на цифры другой.
+   */
+  onSelectEquipment: (equipmentId: string) => void;
   busy: boolean;
   error: string | null;
 }) {
   const assignment = state.assignment;
-  const [equipmentId, setEquipmentId] = useState(assignment?.equipmentId ?? '');
   const [shiftType, setShiftType] = useState<'DAY' | 'NIGHT'>('DAY');
 
   if (!assignment) {
@@ -50,7 +56,7 @@ export function AdmissionScreen({state, onAccept, busy, error}: {
       subtitle={`${assignment.siteName} · ${new Date().toLocaleDateString('ru-RU')}`}
       footer={(
         <BigButton
-          onClick={() => onAccept({equipmentId: equipmentId || assignment.equipmentId, shiftType})}
+          onClick={() => onAccept({equipmentId: assignment.equipmentId, shiftType})}
           disabled={busy}
         >
           {busy ? 'Открываем смену…' : 'Принять и открыть смену'}
@@ -68,10 +74,10 @@ export function AdmissionScreen({state, onAccept, busy, error}: {
             <button
               key={option.crewId}
               type="button"
-              onClick={() => setEquipmentId(option.equipmentId)}
+              onClick={() => onSelectEquipment(option.equipmentId)}
               className={cn(
                 'min-h-12 w-full rounded-lg border bg-card px-4 py-2 text-left shadow-xs transition-colors',
-                (equipmentId || assignment.equipmentId) === option.equipmentId
+                assignment.equipmentId === option.equipmentId
                   ? 'border-signal bg-signal/10'
                   : 'hover:bg-secondary',
               )}

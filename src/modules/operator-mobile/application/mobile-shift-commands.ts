@@ -3,17 +3,27 @@ import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
 import {requestReadinessSnapshot} from '@/modules/readiness/application/projection/request-snapshot';
 import {getChecklist} from '../domain/checklist-catalog';
-import type {ChecklistStage} from '../domain/checklist-types';
+import type {ChecklistStage, ShiftCondition} from '../domain/checklist-types';
 import {
   alertingFaults, collectDefectDrafts, validateChecklistRun, type ChecklistAnswer,
 } from '../domain/checklist-run';
 import {
-  BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE, SYSTEM_DOCUMENT_TYPES,
+  BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE,
+  SLINGER_BRIEFING_DOCUMENT_TYPE, SLINGER_KNOWLEDGE_DOCUMENT_TYPE,
+  SYSTEM_DOCUMENT_TYPES,
 } from '../domain/operator-credentials';
 import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../domain/knowledge-bank';
 import {SAFETY_BRIEFING} from '../domain/safety-briefing';
-import {selectChecklistItems} from '../domain/shift-conditions';
+import {SLINGER_BRIEFING} from '../domain/slinger-briefing';
+import {resolveShiftConditions, selectChecklistItems} from '../domain/shift-conditions';
+import type {ReadWeather} from '../domain/view-contracts';
+import {weatherStop} from '../domain/work-warnings';
 import {shiftWindow} from '../domain/shift-window';
+import {missingPrerequisites} from '../domain/shift-phases';
+import {
+  classifyObservedHazard, validateIncident,
+  type IncidentCategory, type IncidentSign,
+} from '../domain/incidents';
 
 /**
  * Команды мобильного места оператора.
@@ -133,22 +143,45 @@ async function upsertOperatorDocument(tx: Tx, input: {
   return created.id;
 }
 
-/** Оператор прочитал инструкцию. Отметка привязана к версии текста. */
+/**
+ * Кто читает инструкцию: машинист или его помощник.
+ *
+ * Инструкции у них разные — про машину и про стропы, — и отметка о
+ * прочтении ложится в разные виды документов. Один параметр вместо двух
+ * почти одинаковых команд: разошлись бы они на первой же правке.
+ */
+export type BriefingAudience = 'OPERATOR' | 'ASSISTANT';
+
+const BRIEFING_BY_AUDIENCE = {
+  OPERATOR: {
+    briefing: SAFETY_BRIEFING,
+    briefingType: BRIEFING_DOCUMENT_TYPE,
+    knowledgeType: KNOWLEDGE_DOCUMENT_TYPE,
+  },
+  ASSISTANT: {
+    briefing: SLINGER_BRIEFING,
+    briefingType: SLINGER_BRIEFING_DOCUMENT_TYPE,
+    knowledgeType: SLINGER_KNOWLEDGE_DOCUMENT_TYPE,
+  },
+} as const;
+
+/** Работник прочитал свою инструкцию. Отметка привязана к версии текста. */
 export async function acknowledgeBriefing(input: {
-  tenantId: string; operatorId: string; now?: Date;
+  tenantId: string; operatorId: string; audience?: BriefingAudience; now?: Date;
 }) {
   const now = input.now ?? new Date();
+  const kind = BRIEFING_BY_AUDIENCE[input.audience ?? 'OPERATOR'];
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const typeId = await ensureDocumentType(tx, input.tenantId, BRIEFING_DOCUMENT_TYPE);
+    const typeId = await ensureDocumentType(tx, input.tenantId, kind.briefingType);
     await upsertOperatorDocument(tx, {
       tenantId: input.tenantId,
       operatorId: input.operatorId,
       typeId,
-      number: SAFETY_BRIEFING.version,
+      number: kind.briefing.version,
       issuedAt: now,
       expiresAt: null,
     });
-    return {version: SAFETY_BRIEFING.version};
+    return {version: kind.briefing.version};
   });
 }
 
@@ -163,6 +196,7 @@ export async function submitKnowledgeTest(input: {
   tenantId: string;
   operatorId: string;
   picks: {questionId: string; picked: number}[];
+  audience?: BriefingAudience;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
@@ -180,7 +214,9 @@ export async function submitKnowledgeTest(input: {
 
   const validUntil = new Date(now.getTime() + KNOWLEDGE_VALID_DAYS * DAY_MS);
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const typeId = await ensureDocumentType(tx, input.tenantId, KNOWLEDGE_DOCUMENT_TYPE);
+    const typeId = await ensureDocumentType(
+      tx, input.tenantId, BRIEFING_BY_AUDIENCE[input.audience ?? 'OPERATOR'].knowledgeType,
+    );
     await upsertOperatorDocument(tx, {
       tenantId: input.tenantId,
       operatorId: input.operatorId,
@@ -206,6 +242,7 @@ export async function acceptEquipment(input: {
   equipmentId: string;
   shiftType: 'DAY' | 'NIGHT';
   clientCommandId: string;
+  readWeather?: ReadWeather;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
@@ -286,12 +323,37 @@ export async function acceptEquipment(input: {
       });
     }
 
+    // Условия смены снимаются ОДИН РАЗ, здесь, и дальше не пересматриваются.
+    //
+    // ПОЧЕМУ НЕ ПО ХОДУ. Состав осмотра обязан быть одинаковым на экране и на
+    // сервере. Пока условия вычислялись при каждом чтении, потеплело за час —
+    // и зимний пункт исчезал из списка между показом и отправкой. Хуже того,
+    // серверная сборка списка опиралась на то, какие условные пункты телефон
+    // соизволил прислать: не прислал зимний — значит зимы нет, осмотр «полный».
+    // Снимок на момент открытия смены закрывает обе дыры разом.
+    //
+    // Предупреждения так не замораживаются: порыв ветра должен быть виден
+    // сейчас, а не таким, каким был утром.
+    const site = await tx.site.findFirst({
+      where: {tenantId: input.tenantId, id: crew.siteId},
+      select: {latitude: true, longitude: true},
+    });
+    const reading = input.readWeather && site?.latitude != null && site.longitude != null
+      ? await input.readWeather(site.latitude, site.longitude)
+      : null;
+    const conditions: ShiftCondition[] = resolveShiftConditions({
+      temperatureC: reading?.temperatureC ?? null,
+      windMs: reading?.windMs ?? null,
+      precipitationMmPerHour: reading?.precipitationMmPerHour ?? null,
+      daylight: reading?.isDay ?? null,
+    });
+
     await recordEvidence(tx, {
       tenantId: input.tenantId,
       shiftId,
       equipmentId: input.equipmentId,
       kind: 'STARTUP_READING',
-      payload: {siteId: crew.siteId},
+      payload: {siteId: crew.siteId, conditions, weather: reading ?? null},
       operatorId: input.operatorId,
       clientCommandId: input.clientCommandId,
       now,
@@ -446,6 +508,22 @@ async function ensureTemplate(tx: Tx, tenantId: string, stage: ChecklistStage, o
 }
 
 /**
+ * Условия, зафиксированные при открытии смены. Смена открыта до этой правки
+ * либо погода молчала — условий нет, и список остаётся базовым: выдумывать
+ * зиму задним числом хуже, чем её не знать.
+ */
+async function shiftConditions(tx: Tx, tenantId: string, shiftId: string): Promise<ShiftCondition[]> {
+  const evidence = await tx.operatorShiftEvidence.findFirst({
+    where: {tenantId, shiftId, kind: 'STARTUP_READING'},
+    orderBy: {occurredAt: 'asc'},
+    select: {payload: true},
+  });
+  const payload = evidence?.payload as {conditions?: unknown} | null;
+  const stored = Array.isArray(payload?.conditions) ? payload.conditions : [];
+  return stored.filter((value): value is ShiftCondition => typeof value === 'string');
+}
+
+/**
  * Сдача чек-листа целиком, а не по одному пункту.
  *
  * ПОЧЕМУ ЦЕЛИКОМ. Осмотр — это одно решение «машина годна», а не двенадцать
@@ -465,8 +543,30 @@ export async function submitChecklist(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, input.equipmentId);
-    await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    // Установка смены и установка из запроса обязаны совпадать. Раньше
+    // закрепление проверялось за присланным `equipmentId`, а смена бралась по
+    // `shiftId` отдельно: машинист, закреплённый за своей машиной, мог
+    // приложить осмотр к чужой смене, просто указав её идентификатор.
+    if (shift.equipmentId !== input.equipmentId) {
+      throw new OperatorCommandError(403, 'Осмотр относится к другой установке');
+    }
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+
+    // Порядок этапов проверяет сервер, а не только экран.
+    const completed = await tx.operatorChecklistExecution.findMany({
+      where: {tenantId: input.tenantId, shiftId: input.shiftId, status: 'COMPLETED'},
+      select: {template: {select: {templateKey: true}}},
+    });
+    const done = completed
+      .map((row) => row.template.templateKey as ChecklistStage);
+    const missing = missingPrerequisites(input.stage, done);
+    if (missing.length > 0) {
+      throw new OperatorCommandError(
+        409,
+        `Сначала завершите: ${missing.map((stage) => getChecklist(stage).title).join(', ')}`,
+      );
+    }
 
     const duplicate = await tx.operatorChecklistExecution.findUnique({
       where: {tenantId_clientCommandId: {tenantId: input.tenantId, clientCommandId: input.clientCommandId}},
@@ -476,14 +576,13 @@ export async function submitChecklist(input: {
 
     const {id: templateId, definition} = await ensureTemplate(tx, input.tenantId, input.stage, input.operatorId);
 
-    // Состав пунктов пересобираем на сервере по той же машине: список,
-    // присланный телефоном, доверия не заслуживает — иначе пункт про мачту
-    // исчезает из ответа, и осмотр «пройден» без него.
-    const answeredConditions = definition.sections
-      .flatMap((section) => section.items)
-      .filter((item) => item.onlyWhen && input.answers.some((answer) => answer.itemId === item.id))
-      .flatMap((item) => item.onlyWhen ?? []);
-    const items = selectChecklistItems(definition, answeredConditions, {
+    // Состав пунктов пересобираем на сервере: список, присланный телефоном,
+    // доверия не заслуживает — иначе пункт про мачту исчезает из ответа, и
+    // осмотр «пройден» без него. Условия берём из снимка, сделанного при
+    // открытии смены (см. acceptEquipment), а не из того, какие условные
+    // пункты телефон прислал: последнее означало бы, что сезонные пункты
+    // объявляет о себе тот, кого они проверяют.
+    const items = selectChecklistItems(definition, await shiftConditions(tx, input.tenantId, input.shiftId), {
       hasHammer: crew.equipment.hammerKind !== 'NONE',
       hasRotator: crew.equipment.isCombined,
     });
@@ -693,6 +792,7 @@ export async function logProduction(input: {
   shiftId: string;
   entry: ProductionEntry;
   clientCommandId: string;
+  readWeather?: ReadWeather;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
@@ -700,6 +800,38 @@ export async function logProduction(input: {
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+
+    // Погодный запрет проверяет сервер, а не только кнопка.
+    //
+    // Это единственное, что в модуле действительно запрещает работу, и раньше
+    // запрет существовал только как погашенная кнопка на экране: прямой запрос
+    // к API писал сваи при ветре 25 м/с. Порог измеряет внешний сервис, а не
+    // человек, поэтому запрету здесь место.
+    //
+    // Простой пишется всегда: он и есть то, чем оператор объясняет остановку
+    // по погоде. Запретить его значило бы оставить часы непогоды нигде.
+    //
+    // Обращение к погоде идёт внутри транзакции сознательно: ответ лежит в
+    // общем кэше на 15 минут и защищён предохранителем с таймаутом в 3 с, так
+    // что соединение почти всегда занято на время чтения из памяти. Ради
+    // разрыва транзакции надвое пришлось бы читать смену дважды.
+    if (input.entry.kind !== 'DOWNTIME' && input.readWeather) {
+      const site = await tx.site.findFirst({
+        where: {tenantId: input.tenantId, id: crew.siteId},
+        select: {latitude: true, longitude: true},
+      });
+      const reading = site?.latitude != null && site.longitude != null
+        ? await input.readWeather(site.latitude, site.longitude)
+        : null;
+      const stops = weatherStop(reading?.windMs ?? null, reading?.temperatureC ?? null);
+      if (stops.length > 0) {
+        throw new OperatorCommandError(
+          409,
+          `Работы прекращают: ${stops.map((stop) => stop.title).join(', ')}. `
+          + 'Отметьте простой по погоде.',
+        );
+      }
+    }
 
     // Чек-лист ТБ — пропуск к работе этого вида, а не бумажка «на потом».
     // Он спрашивается один раз за смену перед первой записью: забивка и
@@ -800,30 +932,319 @@ export async function logProduction(input: {
   });
 }
 
-/** Удаление ошибочной записи выработки до закрытия смены. */
-export async function removeProduction(input: {
-  tenantId: string; operatorId: string; shiftId: string;
-  kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; id: string;
+/**
+ * Поправка к записи выработки.
+ *
+ * ПОЧЕМУ ВСТРЕЧНОЙ ЗАПИСЬЮ, А НЕ ПРАВКОЙ НА МЕСТЕ. Исходная строка остаётся
+ * ровно такой, какой её ввёл человек, а рядом ложится разница со ссылкой и
+ * причиной. Итог даёт сумма — и это главное следствие: отчёт, аналитика,
+ * проекции и экран машиниста уже считают суммой, поэтому верный итог они
+ * получают без единой правки в себе. Схема «пометить старую, вставить новую»
+ * потребовала бы изменить каждого читателя, и первый же забытый показывал бы
+ * двойной объём.
+ *
+ * ПОЧЕМУ ОПЕРАТОР ВВОДИТ «СКОЛЬКО БЫЛО НА САМОМ ДЕЛЕ», А НЕ РАЗНИЦУ. Разницу
+ * считает сервер. Человек, ошибшийся при вводе, знает верное число; заставлять
+ * его вычитать в уме — верный способ получить вторую ошибку поверх первой.
+ */
+export async function correctProduction(input: {
+  tenantId: string;
+  operatorId: string;
+  shiftId: string;
+  kind: 'PILES' | 'DRILLING' | 'DOWNTIME';
+  entryId: string;
+  /** Сколько было на самом деле: свай, скважин либо часов простоя. */
+  actual: number;
+  reason: string;
+  clientCommandId: string;
+  now?: Date;
 }) {
+  const now = input.now ?? new Date();
+  const reason = input.reason.trim();
+  if (reason.length < 3) {
+    throw new OperatorCommandError(400, 'Напишите, почему пришлось поправить');
+  }
+  if (input.actual < 0) {
+    throw new OperatorCommandError(400, 'Итог не может быть отрицательным');
+  }
+
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
     await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
-    const where = {tenantId: input.tenantId, shiftId: input.shiftId, id: input.id};
-    const removed = input.kind === 'PILES'
-      ? await tx.pileWork.deleteMany({where})
-      : input.kind === 'DRILLING'
-        ? await tx.leaderDrilling.deleteMany({where})
-        : await tx.reportDowntime.deleteMany({where});
-    if (removed.count === 0) throw new OperatorCommandError(404, 'Запись не найдена');
-    return {ok: true};
+    const duplicate = await findByCommand(tx, input.tenantId, input.kind, input.clientCommandId);
+    if (duplicate) return {correctionId: duplicate};
+
+    const scope = {tenantId: input.tenantId, shiftId: input.shiftId, id: input.entryId};
+    if (input.kind === 'PILES') {
+      const original = await tx.pileWork.findFirst({
+        where: scope, select: {id: true, reportId: true, pileGradeId: true, correctsId: true},
+      });
+      if (!original) throw new OperatorCommandError(404, 'Запись не найдена');
+      // Поправку не поправляют: правят исходную, и все поправки к ней
+      // складываются. Цепочка «поправка поправки» читается только с
+      // калькулятором и первой же теряет смысл.
+      if (original.correctsId) {
+        throw new OperatorCommandError(409, 'Это уже поправка. Поправьте исходную запись.');
+      }
+      const corrections = await tx.pileWork.aggregate({
+        _sum: {count: true},
+        where: {tenantId: input.tenantId, correctsId: original.id},
+      });
+      const base = await tx.pileWork.findUnique({where: {id: original.id}, select: {count: true}});
+      const current = (base?.count ?? 0) + (corrections._sum.count ?? 0);
+      const delta = Math.round(input.actual) - current;
+      if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
+      const created = await tx.pileWork.create({
+        data: {
+          reportId: original.reportId,
+          tenantId: input.tenantId,
+          shiftId: input.shiftId,
+          clientCommandId: input.clientCommandId,
+          pileGradeId: original.pileGradeId,
+          count: delta,
+          correctsId: original.id,
+          correctionNote: reason,
+          occurredAt: now,
+        },
+        select: {id: true},
+      });
+      return {correctionId: created.id, was: current, now: Math.round(input.actual)};
+    }
+
+    if (input.kind === 'DRILLING') {
+      const original = await tx.leaderDrilling.findFirst({
+        where: scope,
+        select: {id: true, reportId: true, typeId: true, metersPerUnit: true, count: true, correctsId: true},
+      });
+      if (!original) throw new OperatorCommandError(404, 'Запись не найдена');
+      if (original.correctsId) {
+        throw new OperatorCommandError(409, 'Это уже поправка. Поправьте исходную запись.');
+      }
+      const corrections = await tx.leaderDrilling.aggregate({
+        _sum: {count: true},
+        where: {tenantId: input.tenantId, correctsId: original.id},
+      });
+      const current = original.count + (corrections._sum.count ?? 0);
+      const delta = Math.round(input.actual) - current;
+      if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
+      const created = await tx.leaderDrilling.create({
+        data: {
+          reportId: original.reportId,
+          tenantId: input.tenantId,
+          shiftId: input.shiftId,
+          clientCommandId: input.clientCommandId,
+          typeId: original.typeId,
+          count: delta,
+          metersPerUnit: original.metersPerUnit,
+          // Метры считаются той же глубиной, что и в исходной записи: правят
+          // количество скважин, а не то, насколько глубоко бурили.
+          meters: delta * original.metersPerUnit,
+          correctsId: original.id,
+          correctionNote: reason,
+          occurredAt: now,
+        },
+        select: {id: true},
+      });
+      return {correctionId: created.id, was: current, now: Math.round(input.actual)};
+    }
+
+    const original = await tx.reportDowntime.findFirst({
+      where: scope, select: {id: true, reportId: true, reasonId: true, duration: true, correctsId: true},
+    });
+    if (!original) throw new OperatorCommandError(404, 'Запись не найдена');
+    if (original.correctsId) {
+      throw new OperatorCommandError(409, 'Это уже поправка. Поправьте исходную запись.');
+    }
+    const corrections = await tx.reportDowntime.aggregate({
+      _sum: {duration: true},
+      where: {tenantId: input.tenantId, correctsId: original.id},
+    });
+    const current = original.duration + (corrections._sum.duration ?? 0);
+    const delta = Math.round((input.actual - current) * 100) / 100;
+    if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
+    const created = await tx.reportDowntime.create({
+      data: {
+        reportId: original.reportId,
+        tenantId: input.tenantId,
+        shiftId: input.shiftId,
+        clientCommandId: input.clientCommandId,
+        reasonId: original.reasonId,
+        duration: delta,
+        kind: 'DOWNTIME',
+        status: 'CLOSED',
+        correctsId: original.id,
+        correctionNote: reason,
+        occurredAt: now,
+      },
+      select: {id: true},
+    });
+    return {correctionId: created.id, was: current, now: input.actual};
   });
+}
+
+/** Повтор команды при обрыве сети: поправка уже записана — вернём её. */
+async function findByCommand(
+  tx: Tx, tenantId: string, kind: 'PILES' | 'DRILLING' | 'DOWNTIME', clientCommandId: string,
+): Promise<string | null> {
+  const where = {tenantId_clientCommandId: {tenantId, clientCommandId}};
+  const row = kind === 'PILES'
+    ? await tx.pileWork.findUnique({where, select: {id: true}})
+    : kind === 'DRILLING'
+      ? await tx.leaderDrilling.findUnique({where, select: {id: true}})
+      : await tx.reportDowntime.findUnique({where, select: {id: true}});
+  return row?.id ?? null;
+}
+
+/**
+ * Происшествие на смене.
+ *
+ * ПОЧЕМУ ЗАПИСЬ, А НЕ ЗАПРЕТ. Оценку «критично» ставит правило по названным
+ * признакам, и оно же говорит, что работы надо прекратить. Но прекращает их
+ * человек: приложение не видит площадку и не может знать, чем обернётся
+ * остановка посреди погружения сваи. Поэтому происшествие поднимает красное
+ * предупреждение оператору и диспетчеру и остаётся на виду, пока его не
+ * разберут, — но кнопок не запирает. Единственное, что здесь действительно
+ * запрещает работу, — погода, и она измеряется прибором, а не человеком.
+ *
+ * ПОЧЕМУ ФОТО НЕ ОБЯЗАТЕЛЬНО. У происшествия с человеком первое действие —
+ * помочь, а не снимать. Требовать снимок значит либо задержать помощь, либо
+ * научить людей писать «прочее» вместо правды.
+ */
+export async function reportIncident(input: {
+  tenantId: string;
+  operatorId: string;
+  shiftId: string;
+  category: IncidentCategory;
+  signs: IncidentSign[];
+  injured: boolean;
+  description: string;
+  mediaIds?: string[];
+  clientCommandId: string;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const problems = validateIncident({
+    category: input.category,
+    signs: input.signs,
+    injured: input.injured,
+    description: input.description,
+  });
+  if (problems.length > 0) {
+    throw new OperatorCommandError(400, problems[0], problems);
+  }
+
+  const classification = classifyObservedHazard({
+    observedSigns: input.signs, injured: input.injured,
+  });
+
+  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+
+    const duplicate = await tx.safetyIncident.findUnique({
+      where: {tenantId_clientCommandId: {
+        tenantId: input.tenantId, clientCommandId: input.clientCommandId,
+      }},
+      select: {id: true, severity: true, stopRequired: true},
+    });
+    if (duplicate) {
+      return {
+        incidentId: duplicate.id,
+        severity: duplicate.severity,
+        stopRequired: duplicate.stopRequired,
+      };
+    }
+
+    const mediaIds = await confirmedIncidentImages(
+      tx, input.tenantId, input.operatorId, input.clientCommandId, input.mediaIds ?? [],
+    );
+
+    const incident = await tx.safetyIncident.create({
+      data: {
+        tenantId: input.tenantId,
+        shiftId: input.shiftId,
+        equipmentId: shift.equipmentId,
+        siteId: crew.siteId,
+        category: input.category,
+        // Состояние ведём тем же словарём, что достался от прежнего модуля:
+        // таблица одна, и два набора состояний в ней означали бы, что
+        // администратор видит строки, смысл которых зависит от того, каким
+        // экраном их завели.
+        state: classification.stopRequired ? 'STOP_REQUIRED' : 'REPORTED',
+        severity: classification.severity,
+        description: input.description.trim(),
+        observedSigns: input.signs as unknown as Prisma.InputJsonValue,
+        stopRequired: classification.stopRequired,
+        injured: input.injured,
+        evidenceMediaIds: mediaIds as unknown as Prisma.InputJsonValue,
+        classificationRuleId: classification.ruleId,
+        classificationRuleVersion: classification.ruleVersion,
+        occurredAt: now,
+        reportedById: input.operatorId,
+        clientCommandId: input.clientCommandId,
+      },
+      select: {id: true},
+    });
+
+    // Готовность пересчитываем: происшествие — такой же факт о машине, как
+    // осмотр, и центр готовности должен узнать о нём без ручного обновления.
+    await requestReadinessSnapshot(tx as unknown as Parameters<typeof requestReadinessSnapshot>[0], {
+      tenantId: input.tenantId,
+      equipmentId: shift.equipmentId,
+      aggregateId: incident.id,
+      aggregateType: 'SafetyIncident',
+      triggerType: 'SAFETY_INCIDENT_REPORTED',
+      triggerId: incident.id,
+      occurredAt: now,
+      shiftId: input.shiftId,
+    });
+
+    return {
+      incidentId: incident.id,
+      severity: classification.severity,
+      stopRequired: classification.stopRequired,
+    };
+  });
+}
+
+/**
+ * Снимки происшествия: те же правила, что и у неисправностей в осмотре —
+ * идентификатор без подтверждённой загрузки ничего не доказывает.
+ */
+async function confirmedIncidentImages(
+  tx: Tx, tenantId: string, actorId: string, clientCommandId: string, mediaIds: string[],
+): Promise<string[]> {
+  if (mediaIds.length === 0) return [];
+  const confirmed = await tx.media.findMany({
+    where: {
+      id: {in: mediaIds},
+      tenantId,
+      userId: actorId,
+      entityType: 'safety_incident',
+      entityId: clientCommandId,
+      uploadStatus: 'completed',
+      isDeleted: false,
+    },
+    select: {id: true, contentType: true},
+  });
+  const usable = confirmed
+    .filter((media) => media.contentType?.startsWith('image/'))
+    .map((media) => media.id);
+  if (usable.length !== mediaIds.length) {
+    throw new OperatorCommandError(400, 'Снимок не долетел до хранилища. Повторите отправку фото.');
+  }
+  return usable;
 }
 
 /** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
 export async function finishWork(input: {tenantId: string; operatorId: string; shiftId: string}) {
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    // Единственная команда, где проверки закрепления не было: чужую смену
+    // можно было перевести в «сдаётся» одним идентификатором. Остальные
+    // команды спрашивали бригаду, эта — нет.
+    await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
     await tx.shift.update({
       where: {tenantId_id: {tenantId: input.tenantId, id: input.shiftId}},
       data: {state: 'HANDOVER_PENDING', lastEditedById: input.operatorId},

@@ -26,6 +26,8 @@ export type Ability =
   | 'users.documents.read_all'
   | 'equipment.manage'
   | 'maintenance.manage'
+  | 'incidents.read'
+  | 'incidents.review'
   | 'inspection.perform'
   | 'meter.record'
   | 'crews.read'
@@ -69,6 +71,11 @@ const abilityRoles: Record<Ability, Role[]> = {
   // обслуживания. Мастеру запись сюда не нужна: он смотрит и распределяет.
   // Право охватывает заявки, ремонты и планы ТО — то, что решает офис.
   'maintenance.manage': ['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER'],
+  // Происшествия на смене. Читать их должны все, кто отвечает за ход работ:
+  // мастер видит участок, инженер ОТ — свой прямой предмет. Разбор — решение,
+  // и его подписывают те, кто может что-то изменить.
+  'incidents.read': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
+  'incidents.review': ['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER'],
   // Сменный осмотр — работа оператора, а не офиса: именно он обходит машину
   // перед сменой, и именно его сегодняшний осмотр открывает смену. Раньше
   // осмотры сидели под maintenance.manage, и оператор получал 403 на дело,

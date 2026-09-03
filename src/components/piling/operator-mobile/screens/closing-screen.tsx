@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useState, type ReactNode} from 'react';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
@@ -16,12 +16,14 @@ import {WarningsPanel} from '../warnings-panel';
  * осмотра, утром становится проблемой того, кто на неё сядет: примёрзшие
  * гусеницы, невидимая на горячем ночью течь, трещина, которую никто не искал.
  */
-export function ClosingScreen({state, onOpenService, onClose, busy, error}: {
+export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs}: {
   state: OperatorMobileState;
   onOpenService: () => void;
   onClose: (comment: string) => void;
   busy: boolean;
   error: string | null;
+  /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
+  tabs?: ReactNode;
 }) {
   const [comment, setComment] = useState('');
   const service = state.checklists.find((checklist) => checklist.stage === 'EO_AFTER');
@@ -29,6 +31,7 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error}: {
 
   return (
     <Screen
+      tabs={tabs}
       title="Закрытие смены"
       subtitle={state.assignment?.equipmentName}
       footer={(

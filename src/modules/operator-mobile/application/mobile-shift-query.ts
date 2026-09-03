@@ -3,7 +3,7 @@ import {checkMaintenanceDue} from '@/lib/maintenance-due';
 import {pileLengthMeters} from '@/lib/pile-length';
 import {checkOperatorDocuments} from '../domain/operator-admission';
 import {OPERATOR_CHECKLISTS} from '../domain/checklist-catalog';
-import type {ChecklistStage} from '../domain/checklist-types';
+import type {ChecklistStage, ShiftCondition} from '../domain/checklist-types';
 import {
   BRIEFING_DOCUMENT_TYPE, briefingUpToDate, KNOWLEDGE_DOCUMENT_TYPE, knowledgeValid,
 } from '../domain/operator-credentials';
@@ -15,8 +15,10 @@ import {
   completedPhases, derivePhase, PHASE_LABELS, PHASE_ORDER, type OperatorPhase,
 } from '../domain/shift-phases';
 import {collectWarnings, isWorkAllowed} from '../domain/work-warnings';
+import {isIncidentOpen} from '../domain/incidents';
 import type {
-  ChecklistView, OperatorMobileState, ReadWeather, WeatherView, WorkVolume,
+  ChecklistView, IncidentView, OperatorMobileState, ProductionEntryView, ReadWeather,
+  WeatherView, WorkVolume,
 } from '../domain/view-contracts';
 
 /**
@@ -41,6 +43,93 @@ function todayInTimezone(timezone: string, now: Date): Date {
 
 /** Ненулевой простой без перерывов: перерыв — не потеря времени объекта. */
 const DOWNTIME_ONLY = {OR: [{kind: null}, {kind: {not: 'BREAK'}}]};
+
+type ReportRows = {
+  piles: {id: string; count: number; pileGradeId: string; occurredAt: Date | null; correctsId: string | null; correctionNote: string | null}[];
+  drillings: {id: string; count: number; meters: number; typeId: string; occurredAt: Date | null; correctsId: string | null; correctionNote: string | null}[];
+  downtimes: {id: string; duration: number; kind: string | null; reasonId: string | null; occurredAt: Date | null; correctsId: string | null; correctionNote: string | null}[];
+} | null;
+
+/**
+ * Записи смены с итогом после поправок.
+ *
+ * Исходная строка и поправки к ней — разные строки в базе; экрану нужна одна
+ * строка с итогом и видимым следом правок. Свернуть их молча нельзя: журнал
+ * без следа правок ничем не отличается от журнала, который подчистили.
+ */
+function buildEntries(
+  report: ReportRows,
+  dictionaries: {
+    pileGrades: {id: string; name: string; lengthMm: number | null}[];
+    drillingTypes: {id: string; name: string}[];
+    downtimeReasons: {id: string; name: string}[];
+  },
+  gradeLength: Map<string, number | null>,
+): ProductionEntryView[] {
+  if (!report) return [];
+
+  const gradeName = new Map(dictionaries.pileGrades.map((g) => [g.id, g.name]));
+  const typeName = new Map(dictionaries.drillingTypes.map((t) => [t.id, t.name]));
+  const reasonName = new Map(dictionaries.downtimeReasons.map((r) => [r.id, r.name]));
+  const moment = (value: Date | null) => (value ?? new Date(0)).toISOString();
+
+  const collect = <T extends {id: string; correctsId: string | null; correctionNote: string | null; occurredAt: Date | null}>(
+    rows: T[],
+    kind: ProductionEntryView['kind'],
+    label: (row: T) => string,
+    value: (row: T) => number,
+    meters: (row: T) => number | null,
+  ): ProductionEntryView[] => {
+    const originals = rows.filter((row) => !row.correctsId);
+    const byTarget = new Map<string, T[]>();
+    for (const row of rows) {
+      if (!row.correctsId) continue;
+      byTarget.set(row.correctsId, [...(byTarget.get(row.correctsId) ?? []), row]);
+    }
+    return originals.map((row) => {
+      const patches = byTarget.get(row.id) ?? [];
+      const total = value(row) + patches.reduce((sum, patch) => sum + value(patch), 0);
+      const totalMeters = meters(row) === null ? null
+        : (meters(row) ?? 0) + patches.reduce((sum, patch) => sum + (meters(patch) ?? 0), 0);
+      return {
+        id: row.id,
+        kind,
+        label: label(row),
+        value: Math.round(total * 100) / 100,
+        meters: totalMeters === null ? null : Math.round(totalMeters * 10) / 10,
+        occurredAt: moment(row.occurredAt),
+        corrections: patches
+          .map((patch) => ({
+            delta: Math.round(value(patch) * 100) / 100,
+            note: patch.correctionNote ?? '',
+            at: moment(patch.occurredAt),
+          }))
+          .sort((a, b) => b.at.localeCompare(a.at)),
+      };
+    });
+  };
+
+  return [
+    ...collect(
+      report.piles, 'PILES',
+      (row) => gradeName.get(row.pileGradeId) ?? 'Свая',
+      (row) => row.count,
+      (row) => row.count * pileLengthMeters({gradeLengthMm: gradeLength.get(row.pileGradeId) ?? null}),
+    ),
+    ...collect(
+      report.drillings, 'DRILLING',
+      (row) => typeName.get(row.typeId) ?? 'Бурение',
+      (row) => row.count,
+      (row) => row.meters,
+    ),
+    ...collect(
+      report.downtimes.filter((row) => row.kind === 'DOWNTIME'), 'DOWNTIME',
+      (row) => (row.reasonId ? reasonName.get(row.reasonId) ?? 'Простой' : 'Простой'),
+      (row) => row.duration,
+      () => null,
+    ),
+  ].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+}
 
 export async function queryOperatorMobileState(input: {
   tenantId: string;
@@ -158,12 +247,16 @@ export async function queryOperatorMobileState(input: {
         equipmentActive: true,
         equipmentName: 'Установка',
         openDefects: [],
+        openIncidents: [],
         windMs: null,
         temperatureC: null,
         maintenance: {overdue: false, soon: false, daysLeft: null},
       }),
       workAllowed: true,
       production: {piles: {count: 0, meters: 0}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
+      entries: [],
+      incidents: [],
+      defects: [],
       dictionaries,
     };
   }
@@ -205,7 +298,7 @@ export async function queryOperatorMobileState(input: {
     }),
     db.equipmentDefect.findMany({
       where: {tenantId, equipmentId, status: {in: ['OPEN', 'IN_WORK']}},
-      select: {title: true, severity: true},
+      select: {id: true, title: true, severity: true, status: true, reportedAt: true},
       orderBy: [{severity: 'desc'}, {reportedAt: 'desc'}],
       take: 10,
     }),
@@ -243,7 +336,7 @@ export async function queryOperatorMobileState(input: {
     hasRotator: crew.equipment.isCombined,
   };
 
-  const [executions, report] = shift
+  const [executions, report, startup, incidents] = shift
     ? await Promise.all([
       db.operatorChecklistExecution.findMany({
         where: {tenantId, shiftId: shift.id},
@@ -252,13 +345,75 @@ export async function queryOperatorMobileState(input: {
       db.report.findFirst({
         where: {tenantId, shiftId: shift.id},
         select: {
-          piles: {select: {count: true, pileGradeId: true}},
-          drillings: {select: {count: true, meters: true}},
-          downtimes: {select: {duration: true, kind: true}},
+          piles: {
+            select: {
+              id: true, count: true, pileGradeId: true, occurredAt: true,
+              correctsId: true, correctionNote: true,
+            },
+          },
+          drillings: {
+            select: {
+              id: true, count: true, meters: true, typeId: true, occurredAt: true,
+              correctsId: true, correctionNote: true,
+            },
+          },
+          downtimes: {
+            select: {
+              id: true, duration: true, kind: true, reasonId: true, occurredAt: true,
+              correctsId: true, correctionNote: true,
+            },
+          },
         },
       }),
+      db.operatorShiftEvidence.findFirst({
+        where: {tenantId, shiftId: shift.id, kind: 'STARTUP_READING'},
+        orderBy: {occurredAt: 'asc'},
+        select: {payload: true},
+      }),
+      db.safetyIncident.findMany({
+        where: {tenantId, shiftId: shift.id},
+        orderBy: {occurredAt: 'desc'},
+        select: {
+          id: true, category: true, severity: true, state: true, description: true,
+          observedSigns: true, injured: true, stopRequired: true, occurredAt: true,
+          evidenceMediaIds: true, reviewedAt: true,
+        },
+        take: 20,
+      }),
     ])
-    : [[], null];
+    : [[], null, null, []];
+
+  const incidentViews: IncidentView[] = incidents.map((incident) => ({
+    id: incident.id,
+    category: incident.category as IncidentView['category'],
+    severity: incident.severity as IncidentView['severity'],
+    state: incident.state,
+    description: incident.description,
+    signs: Array.isArray(incident.observedSigns)
+      ? (incident.observedSigns as IncidentView['signs'])
+      : [],
+    injured: incident.injured,
+    stopRequired: incident.stopRequired,
+    occurredAt: incident.occurredAt.toISOString(),
+    photos: Array.isArray(incident.evidenceMediaIds) ? incident.evidenceMediaIds.length : 0,
+    reviewedAt: incident.reviewedAt?.toISOString() ?? null,
+  }));
+
+  // Красное гаснет только после разбора диспетчером, а не после того, как
+  // работу возобновили: это две разные вещи и по времени они расходятся.
+  const openIncidents = incidentViews.filter((incident) => isIncidentOpen(incident.reviewedAt));
+
+
+  // У открытой смены состав осмотра берётся из снимка условий, сделанного при
+  // её открытии, а не из погоды на момент чтения экрана. Иначе список пунктов
+  // менялся бы под руками оператора: утром зимний пункт есть, к обеду
+  // потеплело — и его нет. Сервер при приёме осмотра читает тот же снимок,
+  // поэтому экран и проверка всегда согласны между собой.
+  const storedPayload = startup?.payload as {conditions?: unknown} | null;
+  const shiftConditions: ShiftCondition[] | null = Array.isArray(storedPayload?.conditions)
+    ? storedPayload.conditions.filter((value): value is ShiftCondition => typeof value === 'string')
+    : null;
+  const checklistConditions = shiftConditions ?? conditions;
 
   const completedStages = executions
     .filter((execution) => execution.status === 'COMPLETED')
@@ -285,6 +440,11 @@ export async function queryOperatorMobileState(input: {
     equipmentActive: crew.equipment.isActive,
     equipmentName: crew.equipment.name,
     openDefects,
+    openIncidents: openIncidents.map((incident) => ({
+      description: incident.description,
+      severity: incident.severity,
+      stopRequired: incident.stopRequired,
+    })),
     windMs: weather?.windMs ?? null,
     temperatureC: weather?.temperatureC ?? null,
     maintenance,
@@ -305,10 +465,11 @@ export async function queryOperatorMobileState(input: {
     purpose: definition.purpose,
     version: definition.version,
     done: completedStages.includes(definition.stage),
-    sections: selectChecklistSections(definition, conditions, capabilities),
+    sections: selectChecklistSections(definition, checklistConditions, capabilities),
   }));
 
   const gradeLength = new Map(dictionaries.pileGrades.map((g) => [g.id, g.lengthMm]));
+  const entries = buildEntries(report, dictionaries, gradeLength);
 
   return {
     operator: {id: operatorId, name: input.operatorName},
@@ -336,7 +497,7 @@ export async function queryOperatorMobileState(input: {
       maintenance,
     },
     weather,
-    conditions,
+    conditions: checklistConditions,
     shift: shift
       ? {
         id: shift.id,
@@ -348,6 +509,15 @@ export async function queryOperatorMobileState(input: {
     checklists,
     warnings,
     workAllowed: isWorkAllowed(warnings),
+    entries,
+    incidents: incidentViews,
+    defects: openDefects.map((defect) => ({
+      id: defect.id,
+      title: defect.title,
+      severity: defect.severity,
+      status: defect.status,
+      reportedAt: defect.reportedAt.toISOString(),
+    })),
     production: {
       piles: {
         count: report?.piles.reduce((sum, pile) => sum + pile.count, 0) ?? 0,

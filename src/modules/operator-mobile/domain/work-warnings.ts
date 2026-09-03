@@ -26,6 +26,7 @@ export type WarningCode =
   | 'DOCUMENT_EXPIRING'
   | 'NO_EQUIPMENT_ASSIGNMENT'
   | 'EQUIPMENT_INACTIVE'
+  | 'OPEN_INCIDENT'
   | 'OPEN_ALERT_DEFECT'
   | 'OPEN_DEFECT'
   | 'MAINTENANCE_OVERDUE'
@@ -58,35 +59,56 @@ export interface WarningInput {
   equipmentName: string;
   /** Открытые дефекты установки: заголовок и уровень. */
   openDefects: {title: string; severity: string}[];
+  /** Неразобранные происшествия смены. */
+  openIncidents: {description: string; severity: string; stopRequired: boolean}[];
   windMs: number | null;
   temperatureC: number | null;
   /** Плановое ТО просрочено / подходит. Из общего расчёта продукта. */
   maintenance: {overdue: boolean; soon: boolean; daysLeft: number | null};
 }
 
-export function collectWarnings(input: WarningInput): WorkWarning[] {
-  const warnings: WorkWarning[] = [];
+/**
+ * Погодный запрет — одно правило на весь продукт.
+ *
+ * Вынесено отдельной функцией, потому что запрет проверяется в двух местах:
+ * экран им гасит кнопку «Записать», а команда записи выработки отказывает.
+ * Пока правило жило только внутри сборки предупреждений, серверная проверка
+ * повторяла бы пороги своей копией — и разойтись этим копиям было бы делом
+ * одной правки.
+ *
+ * Нет данных — нет запрета. Молчащий сервис погоды не должен уметь остановить
+ * объект: цена ложной остановки выше цены порыва, о котором оператор и так
+ * знает, стоя на площадке.
+ */
+export function weatherStop(windMs: number | null, temperatureC: number | null): WorkWarning[] {
+  const stops: WorkWarning[] = [];
 
-  // --- погода: единственное, что действительно прекращает работы ---
-  if (input.windMs !== null && input.windMs > WIND_STOP_MS) {
-    warnings.push({
+  if (windMs !== null && windMs > WIND_STOP_MS) {
+    stops.push({
       code: 'WIND_STOP',
       level: 'STOP',
-      title: `Ветер ${Math.round(input.windMs)} м/с`,
+      title: `Ветер ${Math.round(windMs)} м/с`,
       detail: `Порог прекращения работ — ${WIND_STOP_MS} м/с.`,
       resolution: 'Опустите стрелу и дождитесь ослабления ветра.',
     });
   }
 
-  if (input.temperatureC !== null && input.temperatureC < COLD_STOP_C) {
-    warnings.push({
+  if (temperatureC !== null && temperatureC < COLD_STOP_C) {
+    stops.push({
       code: 'COLD_STOP',
       level: 'STOP',
-      title: `Мороз ${Math.round(input.temperatureC)} °C`,
+      title: `Мороз ${Math.round(temperatureC)} °C`,
       detail: `Порог прекращения работ — ${COLD_STOP_C} °C.`,
       resolution: 'Работы прекращают. Сообщите диспетчеру.',
     });
   }
+
+  return stops;
+}
+
+export function collectWarnings(input: WarningInput): WorkWarning[] {
+  // Погода: единственное, что действительно прекращает работы.
+  const warnings: WorkWarning[] = weatherStop(input.windMs, input.temperatureC);
 
   // --- человек ---
   const invalid = input.documents.filter(
@@ -117,6 +139,27 @@ export function collectWarnings(input: WarningInput): WorkWarning[] {
         .map((d) => `${d.name}: ${d.daysLeft} дн.`)
         .join('; '),
       resolution: 'Запишитесь на продление заранее.',
+    });
+  }
+
+  // --- происшествия смены ---
+  //
+  // Стоят выше дефектов машины намеренно: неисправность ждёт механика, а
+  // происшествие ждёт разбора и может касаться человека. Красное здесь видят
+  // оба — и машинист, и диспетчер, — и оно не гаснет само: гаснет, когда
+  // происшествие разберут.
+  if (input.openIncidents.length > 0) {
+    const worst = input.openIncidents.some((incident) => incident.stopRequired);
+    warnings.push({
+      code: 'OPEN_INCIDENT',
+      level: 'ALERT',
+      title: input.openIncidents.length === 1
+        ? 'Происшествие на смене'
+        : `Происшествий на смене: ${input.openIncidents.length}`,
+      detail: input.openIncidents.map((incident) => incident.description).join('; ').slice(0, 300),
+      resolution: worst
+        ? 'Правило требует прекратить работы и привести машину в безопасное состояние. Сообщите диспетчеру.'
+        : 'Сообщите диспетчеру. Запись останется на виду до разбора.',
     });
   }
 

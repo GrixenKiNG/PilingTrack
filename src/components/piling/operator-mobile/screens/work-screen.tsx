@@ -1,11 +1,12 @@
 'use client';
 
-import {useState} from 'react';
+import {useState, type ReactNode} from 'react';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
 import type {ProductionEntryInput} from '../api';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
+import {EntriesList} from './entries-list';
 
 type Tab = 'PILES' | 'DRILLING' | 'DOWNTIME';
 
@@ -26,13 +27,32 @@ const TABS: {value: Tab; label: string}[] = [
  * объём считается умножением. Так это устроено в отчёте за смену; вводить одни
  * и те же данные двумя способами — это два разных числа в аналитике.
  */
-export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: {
+/**
+ * Насколько свежа погода. Сервис отдаёт время измерения, а не время
+ * запроса, и разница до пятнадцати минут — обычное дело из-за кэша.
+ */
+function weatherAge(at: string): string {
+  const minutes = Math.round((Date.now() - new Date(at).getTime()) / 60000);
+  if (!Number.isFinite(minutes) || minutes < 0) return 'по метеосервису';
+  if (minutes < 2) return 'сейчас';
+  if (minutes < 60) return `${minutes} мин назад`;
+  return `${Math.round(minutes / 60)} ч назад`;
+}
+
+export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, tabs, onCorrect}: {
   state: OperatorMobileState;
-  onLog: (entry: ProductionEntryInput) => void;
+  /** Возвращает признак удачи: по нему экран решает, чистить ли форму. */
+  onLog: (entry: ProductionEntryInput) => Promise<boolean>;
   onFinish: () => void;
   onOpenSafety: (stage: 'TB_PILING' | 'TB_DRILLING') => void;
   busy: boolean;
   error: string | null;
+  /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
+  tabs?: ReactNode;
+  /** Поправка к ошибочной записи. Возвращает признак удачи. */
+  onCorrect: (input: {
+    entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
+  }) => Promise<boolean>;
 }) {
   const [tab, setTab] = useState<Tab>('PILES');
   const [reference, setReference] = useState('');
@@ -40,6 +60,11 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: 
   const [metersPerUnit, setMetersPerUnit] = useState('');
   const [hours, setHours] = useState('');
   const [comment, setComment] = useState('');
+  // Завершение работы обратного хода не имеет: смена уходит в сдачу, и
+  // записать сваю после этого уже нельзя. Кнопка стоит вплотную к «Записать»,
+  // и промах по ней в перчатке заканчивал смену досрочно. Второе нажатие
+  // здесь — не бюрократия, а единственная защита от промаха.
+  const [finishing, setFinishing] = useState(false);
 
   // Смена вкладки очищает форму: марка сваи не имеет смысла в простое, а «5»
   // из поля свай, оставшееся в поле часов, — это ошибочный отчёт. Сброс живёт
@@ -75,14 +100,20 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: 
         : Number(hours) > 0
   );
 
-  const submit = () => {
-    if (tab === 'PILES') {
-      onLog({kind: 'PILES', pileGradeId: reference, count: Number(count), comment: comment || undefined});
-    } else if (tab === 'DRILLING') {
-      onLog({kind: 'DRILLING', typeId: reference, count: Number(count), metersPerUnit: Number(metersPerUnit)});
-    } else {
-      onLog({kind: 'DOWNTIME', reasonId: reference, hours: Number(hours), comment: comment || undefined});
-    }
+  // Форма очищается только после того, как сервер подтвердил запись. Раньше
+  // она очищалась сразу: обрыв связи стирал введённое вместе с надеждой
+  // вспомнить, сколько там было свай. Марка сваи и причина простоя остаются
+  // и после удачи — подряд пишут обычно одно и то же.
+  const submit = async () => {
+    const entry: ProductionEntryInput = tab === 'PILES'
+      ? {kind: 'PILES', pileGradeId: reference, count: Number(count), comment: comment || undefined}
+      : tab === 'DRILLING'
+        ? {kind: 'DRILLING', typeId: reference, count: Number(count), metersPerUnit: Number(metersPerUnit)}
+        : {kind: 'DOWNTIME', reasonId: reference, hours: Number(hours), comment: comment || undefined};
+
+    const recorded = await onLog(entry);
+    if (!recorded) return;
+
     setCount('');
     setMetersPerUnit('');
     setHours('');
@@ -91,6 +122,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: 
 
   return (
     <Screen
+      tabs={tabs}
       title="Работа"
       subtitle={[
         state.assignment?.equipmentName,
@@ -99,10 +131,35 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: 
       ].filter(Boolean).join(' · ')}
       footer={(
         <>
-          <BigButton onClick={submit} disabled={!ready || busy || needsSafety}>
+          {/*
+            Погодный запрет гасит запись выработки, но не простоя: простой —
+            это и есть то, чем оператор объясняет остановку по погоде. Сервер
+            отказывает по тому же правилу, кнопка лишь избавляет от отказа
+            после заполнения формы.
+          */}
+          <BigButton
+            onClick={() => void submit()}
+            disabled={!ready || busy || needsSafety || (!state.workAllowed && tab !== 'DOWNTIME')}
+          >
             {busy ? 'Записываем…' : 'Записать'}
           </BigButton>
-          <BigButton tone="ghost" onClick={onFinish}>Работа завершена</BigButton>
+          {finishing ? (
+            <div className="space-y-2 rounded-lg border border-warning bg-warning/10 p-3">
+              <p className="text-sm font-semibold">
+                Завершить работу? Записывать выработку после этого нельзя.
+              </p>
+              <p className="text-2xs text-muted-foreground">
+                За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин,
+                {' '}простой {state.production.downtimeHours.toFixed(1)} ч. Дальше — ЕО после работы.
+              </p>
+              <BigButton tone="danger" onClick={onFinish} disabled={busy}>
+                Да, работа завершена
+              </BigButton>
+              <BigButton tone="ghost" onClick={() => setFinishing(false)}>Продолжить работу</BigButton>
+            </div>
+          ) : (
+            <BigButton tone="ghost" onClick={() => setFinishing(true)}>Работа завершена</BigButton>
+          )}
         </>
       )}
     >
@@ -124,9 +181,21 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: 
             meters={state.production.drilling.meters}
           />
           <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} unit="ч" />
+          {/*
+            Ветер показываем вместе с тем, когда его измерили: работа
+            прекращается при 15 м/с, и цифра без времени не даёт понять,
+            это сейчас или полчаса назад. Сервис погоды держит ответ в кэше
+            до пятнадцати минут, так что разница бывает существенной.
+          */}
           {state.weather && state.weather.windMs !== null ? (
-            <Fact label="Ветер" value={state.weather.windMs} unit="м/с" />
-          ) : null}
+            <Fact
+              label="Ветер"
+              value={state.weather.windMs}
+              unit={`м/с · ${weatherAge(state.weather.at)}`}
+            />
+          ) : (
+            <Fact label="Ветер" value="нет данных" />
+          )}
         </div>
       </Panel>
 
@@ -218,6 +287,8 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error}: 
           ) : null}
         </div>
       )}
+
+      <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
 
       <ErrorNote message={error} />
     </Screen>

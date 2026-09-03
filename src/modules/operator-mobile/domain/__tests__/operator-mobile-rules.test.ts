@@ -5,9 +5,11 @@ import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
 import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
-import {derivePhase} from '../shift-phases';
+import {derivePhase, missingPrerequisites} from '../shift-phases';
+import {classifyObservedHazard, validateIncident} from '../incidents';
+import {buildSlingerAttempt} from '../knowledge-bank';
 import {shiftWindow} from '../shift-window';
-import {collectWarnings, isWorkAllowed} from '../work-warnings';
+import {collectWarnings, isWorkAllowed, weatherStop} from '../work-warnings';
 
 /**
  * Правила, от которых зависит безопасность и учёт. Проверяется только то, чья
@@ -58,6 +60,7 @@ describe('предупреждения смены', () => {
     equipmentActive: true,
     equipmentName: 'Liebherr LRH 100',
     openDefects: [] as {title: string; severity: string}[],
+    openIncidents: [] as {description: string; severity: string; stopRequired: boolean}[],
     windMs: null,
     temperatureC: null,
     maintenance: {overdue: false, soon: false, daysLeft: null},
@@ -308,5 +311,59 @@ describe('плановое окно смены', () => {
     // Красноярск на четыре часа восточнее: его 08:00 наступают раньше.
     expect(moscow.plannedStartAt.getTime() - krasnoyarsk.plannedStartAt.getTime())
       .toBe(4 * 3600 * 1000);
+  });
+});
+
+/**
+ * Серверные запреты. Сюда попадает только то, что раньше держалось на одной
+ * погашенной кнопке: экран легко обойти прямым запросом, а эти два правила —
+ * единственное, что стоит между «работать нельзя» и записью в отчёте.
+ */
+describe('запреты, которые обязан держать сервер', () => {
+  it('ветер выше порога и мороз ниже порога прекращают работы', () => {
+    expect(weatherStop(16, -5).map((stop) => stop.code)).toEqual(['WIND_STOP']);
+    expect(weatherStop(3, -30).map((stop) => stop.code)).toEqual(['COLD_STOP']);
+    expect(weatherStop(20, -30)).toHaveLength(2);
+  });
+
+  it('погода на самом пороге работать не запрещает', () => {
+    expect(weatherStop(15, -25)).toEqual([]);
+  });
+
+  it('молчащий сервис погоды не останавливает объект', () => {
+    expect(weatherStop(null, null)).toEqual([]);
+  });
+
+  it('помощнику достаётся проверка по стропам, а не по кабине', () => {
+    // Если из банка когда-нибудь пропадут вопросы по стропальным работам,
+    // помощник получит короткий набор молча — и проверка станет формальностью.
+    const attempt = buildSlingerAttempt();
+    expect(attempt).toHaveLength(8);
+    expect(attempt.filter((q) => q.topic === 'SLINGING')).toHaveLength(5);
+    expect(attempt.filter((q) => q.topic === 'GENERAL')).toHaveLength(3);
+    // Забивку и бурение помощнику не спрашиваем: в кабине он не сидит.
+    expect(attempt.some((q) => q.topic === 'PILING' || q.topic === 'DRILLING')).toBe(false);
+  });
+
+  it('происшествие без признаков не записывается', () => {
+    // Признаки — единственное, по чему оценивается опасность. Запись без них
+    // попала бы в журнал как «к сведению» независимо от того, что случилось.
+    const problems = validateIncident({
+      category: 'PEOPLE', signs: [], injured: true, description: 'Придавило руку помощнику',
+    });
+    expect(problems).toContain('Отметьте хотя бы один наблюдаемый признак');
+  });
+
+  it('травма делает происшествие критическим', () => {
+    expect(classifyObservedHazard({observedSigns: ['UNUSUAL_NOISE'], injured: true}))
+      .toMatchObject({severity: 'CRITICAL', stopRequired: true});
+  });
+
+  it('этап нельзя сдать раньше предыдущих', () => {
+    expect(missingPrerequisites('EO_AFTER', [])).toEqual([
+      'PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY',
+    ]);
+    expect(missingPrerequisites('SITE_READY', ['PRESHIFT_INSPECTION'])).toEqual(['EO_BEFORE']);
+    expect(missingPrerequisites('PRESHIFT_INSPECTION', [])).toEqual([]);
   });
 });

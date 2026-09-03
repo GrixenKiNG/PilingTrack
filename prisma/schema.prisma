@@ -1023,6 +1023,10 @@ model SafetyIncident {
   stoppedAt             DateTime? @db.Timestamptz(3)
   stoppedById           String?
   resumeSnapshotId      String?
+  /// Разбор происшествия: кто, когда и к чему пришли. Пусто — ещё не разобрано.
+  reviewedAt            DateTime? @db.Timestamptz(3)
+  reviewedById          String?
+  reviewNote            String?  @db.Text
   occurredAt            DateTime @db.Timestamptz(3)
   receivedAt            DateTime @default(now()) @db.Timestamptz(3)
   reportedById          String
@@ -1876,6 +1880,11 @@ model PileWork {
   workEndedAt DateTime? @db.Timestamptz(3)
   result      String?
   comment     String? @db.Text
+  /// Поправка: эта запись исправляет ту, на которую ссылается. Исходную не
+  /// трогаем — она остаётся в журнале как была, а итог даёт сумма.
+  correctsId String?
+  /// Почему пришлось поправить. Обязательно у любой поправки.
+  correctionNote String? @db.Text
   correctionReason String? @db.Text
   occurredAt  DateTime? @db.Timestamptz(3)
   receivedAt  DateTime  @default(now()) @db.Timestamptz(3)
@@ -1911,6 +1920,11 @@ model LeaderDrilling {
   occurredAt    DateTime? @db.Timestamptz(3)
   receivedAt    DateTime  @default(now()) @db.Timestamptz(3)
 
+  /// Поправка: эта запись исправляет ту, на которую ссылается. Исходную не
+  /// трогаем — она остаётся в журнале как была, а итог даёт сумма.
+  correctsId String?
+  /// Почему пришлось поправить. Обязательно у любой поправки.
+  correctionNote String? @db.Text
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   report Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
@@ -1951,6 +1965,11 @@ model ReportDowntime {
   receivedAt DateTime @default(now()) @db.Timestamptz(3)
   version Int @default(1)
 
+  /// Поправка: эта запись исправляет ту, на которую ссылается. Исходную не
+  /// трогаем — она остаётся в журнале как была, а итог даёт сумма.
+  correctsId String?
+  /// Почему пришлось поправить. Обязательно у любой поправки.
+  correctionNote String? @db.Text
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   report Report         @relation(fields: [reportId], references: [id], onDelete: Cascade)

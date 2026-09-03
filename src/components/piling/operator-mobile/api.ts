@@ -57,7 +57,8 @@ type Command =
   | {command: 'accept-equipment'; clientCommandId: string; equipmentId: string; shiftType: 'DAY' | 'NIGHT'}
   | {command: 'submit-checklist'; clientCommandId: string; shiftId: string; equipmentId: string; stage: ChecklistStage; answers: ChecklistAnswer[]}
   | {command: 'log-production'; clientCommandId: string; shiftId: string; entry: ProductionEntryInput}
-  | {command: 'remove-production'; shiftId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; id: string}
+  | {command: 'correct-production'; clientCommandId: string; shiftId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; entryId: string; actual: number; reason: string}
+  | {command: 'report-incident'; clientCommandId: string; shiftId: string; category: string; signs: string[]; injured: boolean; description: string; mediaIds?: string[]}
   | {command: 'finish-work'; shiftId: string}
   | {command: 'close-shift'; shiftId: string; comment: string};
 
@@ -81,8 +82,15 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
 export async function uploadPhoto(input: {
   file: File;
   clientCommandId: string;
-  itemId: string;
+  /** Пункт осмотра. Не задан — снимок относится к команде целиком. */
+  itemId?: string;
+  entityType?: 'equipment_defect' | 'safety_incident';
 }): Promise<string> {
+  // Сервер сверяет вид и идентификатор при подтверждении команды: у пункта
+  // осмотра это «ключ команды и пункт», у происшествия — только ключ
+  // команды, потому что снимок относится к событию, а не к его части.
+  const entityType = input.entityType ?? 'equipment_defect';
+  const entityId = input.itemId ? `${input.clientCommandId}:${input.itemId}` : input.clientCommandId;
   const grant = await fetch('/api/media', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -91,8 +99,8 @@ export async function uploadPhoto(input: {
       fileName: input.file.name || 'photo.jpg',
       contentType: input.file.type || 'image/jpeg',
       fileSize: input.file.size,
-      entityType: 'equipment_defect',
-      entityId: `${input.clientCommandId}:${input.itemId}`,
+      entityType,
+      entityId,
     }),
   });
   // Медиа-маршрут отвечает объектом напрямую, без обёртки `data` — здесь

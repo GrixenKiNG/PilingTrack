@@ -13,11 +13,13 @@ import {cn} from '@/lib/utils';
  * кнопка высотой 36 точек, нормальная для мыши, здесь промахивается.
  */
 
-export function Screen({title, subtitle, children, footer}: {
+export function Screen({title, subtitle, children, footer, tabs}: {
   title: string;
   subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /** Нижние вкладки. Появляются только после начала работы — см. TabBar. */
+  tabs?: ReactNode;
 }) {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
@@ -25,13 +27,69 @@ export function Screen({title, subtitle, children, footer}: {
         <h1 className="text-2xl font-bold leading-tight tracking-tight text-balance">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
       </header>
-      <main className="flex-1 space-y-3 px-4 py-4 pb-40">{children}</main>
-      {footer ? (
-        <div className="sticky bottom-0 space-y-2 border-t bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {footer}
-        </div>
-      ) : null}
+      <main className={cn('flex-1 space-y-3 px-4 py-4', tabs ? 'pb-56' : 'pb-40')}>{children}</main>
+      <div className="sticky bottom-0 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        {footer ? <div className="space-y-2 px-4 py-3">{footer}</div> : null}
+        {tabs}
+      </div>
     </div>
+  );
+}
+
+export interface TabDefinition<T extends string> {
+  id: T;
+  label: string;
+  /** Число на значке: непрочитанное, несделанное, требующее внимания. */
+  badge?: number;
+  /** Значок красный, а не серый: там что-то, что нельзя пропустить. */
+  alarming?: boolean;
+}
+
+/**
+ * Нижние вкладки рабочего места.
+ *
+ * ПОЧЕМУ ТОЛЬКО ПОСЛЕ НАЧАЛА РАБОТЫ. До этого экран ведёт человека по порядку:
+ * допуск, приём, осмотр, пуск, площадка. Порядок здесь — не интерфейсное
+ * удобство, а безопасность: отказы дешевле находить на земле, чем на четвёртой
+ * свае, и давать возможность «сходить в другую вкладку» посреди осмотра значит
+ * дать возможность его не закончить. Когда работа началась, ведение
+ * заканчивается: дальше машинист сам решает, посмотреть ли карточку машины,
+ * записать ли происшествие или проверить свои допуски.
+ */
+export function TabBar<T extends string>({tabs, active, onSelect}: {
+  tabs: TabDefinition<T>[];
+  active: T;
+  onSelect: (id: T) => void;
+}) {
+  return (
+    <nav className="grid grid-cols-4 border-t" aria-label="Разделы смены">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onSelect(tab.id)}
+          aria-current={tab.id === active ? 'page' : undefined}
+          className={cn(
+            'relative min-h-12 px-1 py-2 text-2xs font-semibold transition-colors',
+            tab.id === active
+              ? 'border-t-2 border-signal -mt-px text-signal'
+              : 'text-muted-foreground hover:bg-secondary',
+          )}
+        >
+          {tab.label}
+          {tab.badge ? (
+            <span
+              className={cn(
+                'ml-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-3xs font-bold text-white',
+                tab.alarming ? 'bg-destructive' : 'bg-muted-foreground',
+              )}
+            >
+              {tab.badge}
+            </span>
+          ) : null}
+        </button>
+      ))}
+    </nav>
   );
 }
 

@@ -4,8 +4,10 @@ import {withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
 import {
   acceptEquipment, acknowledgeBriefing, closeShift, finishWork, logProduction,
-  OperatorCommandError, removeProduction, submitChecklist, submitKnowledgeTest,
+  OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
 } from '@/modules/operator-mobile';
+import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/contracts';
+import {getWeatherAt} from '@/services/weather/weather-client';
 
 export const runtime = 'nodejs';
 
@@ -75,10 +77,28 @@ const commandSchema = z.discriminatedUnion('command', [
     ]),
   }),
   z.object({
-    command: z.literal('remove-production'),
+    command: z.literal('correct-production'),
+    clientCommandId: z.string().min(8).max(64),
     shiftId: z.string().min(1),
     kind: z.enum(['PILES', 'DRILLING', 'DOWNTIME']),
-    id: z.string().min(1),
+    entryId: z.string().min(1),
+    // Сколько было на самом деле. Ноль допустим: запись могли завести целиком
+    // по ошибке, и «на самом деле нисколько» — законный ответ.
+    actual: z.number().min(0).max(500),
+    reason: z.string().min(3).max(500),
+  }),
+  z.object({
+    command: z.literal('report-incident'),
+    clientCommandId: z.string().min(8).max(64),
+    shiftId: z.string().min(1),
+    category: z.enum(INCIDENT_CATEGORIES as [string, ...string[]]),
+    // Хотя бы один признак: по ним правило решает, насколько это опасно.
+    // Пустой список означал бы происшествие без оценки — запись, по которой
+    // нельзя понять, надо ли бежать.
+    signs: z.array(z.enum(INCIDENT_SIGNS as unknown as [string, ...string[]])).min(1).max(9),
+    injured: z.boolean(),
+    description: z.string().min(1).max(4000),
+    mediaIds: z.array(z.string()).max(10).optional(),
   }),
   z.object({command: z.literal('finish-work'), shiftId: z.string().min(1)}),
   z.object({
@@ -87,6 +107,20 @@ const commandSchema = z.discriminatedUnion('command', [
     comment: z.string().max(2000).default(''),
   }),
 ]);
+
+/** Диспетчеру в чат: происшествие важнее, чем аккуратность доставки. */
+async function notifyIncident(
+  result: {incidentId: string; severity: string; stopRequired: boolean},
+  description: string,
+) {
+  const {telegramNotifier} = await import('@/core/notifications/telegram');
+  await telegramNotifier.sendAlert({
+    severity: result.severity === 'CRITICAL' ? 'critical' : result.severity === 'HIGH' ? 'high' : 'medium',
+    message: result.stopRequired
+      ? `Происшествие на смене (требуется прекратить работы): ${description}`
+      : `Происшествие на смене: ${description}`,
+  });
+}
 
 /**
  * Единственная точка записи для мобильного места.
@@ -126,13 +160,35 @@ export const POST = withMutation(
         case 'submit-knowledge':
           return NextResponse.json({data: await submitKnowledgeTest({...actor, ...body})});
         case 'accept-equipment':
-          return NextResponse.json({data: await acceptEquipment({...actor, ...body})});
+          return NextResponse.json({
+            data: await acceptEquipment({...actor, ...body, readWeather: getWeatherAt}),
+          });
         case 'submit-checklist':
           return NextResponse.json({data: await submitChecklist({...actor, ...body})});
         case 'log-production':
-          return NextResponse.json({data: await logProduction({...actor, ...body})});
-        case 'remove-production':
-          return NextResponse.json({data: await removeProduction({...actor, ...body})});
+          return NextResponse.json({
+            data: await logProduction({...actor, ...body, readWeather: getWeatherAt}),
+          });
+        case 'correct-production':
+          return NextResponse.json({data: await correctProduction({...actor, ...body})});
+        case 'report-incident': {
+          const result = await reportIncident({
+            ...actor,
+            shiftId: body.shiftId,
+            category: body.category as Parameters<typeof reportIncident>[0]['category'],
+            signs: body.signs as Parameters<typeof reportIncident>[0]['signs'],
+            injured: body.injured,
+            description: body.description,
+            mediaIds: body.mediaIds,
+            clientCommandId: body.clientCommandId,
+          });
+          // Оповещение — после записи и вне транзакции, «как получится».
+          // Происшествие уже в журнале; молчащий Telegram не должен отменять
+          // запись, а упавшая отправка — валить команду. Тем же правилом живут
+          // оповещения о простое (services/reports/event-handlers).
+          void notifyIncident(result, body.description).catch(() => undefined);
+          return NextResponse.json({data: result});
+        }
         case 'finish-work':
           return NextResponse.json({data: await finishWork({...actor, ...body})});
         case 'close-shift':

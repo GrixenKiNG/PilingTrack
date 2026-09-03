@@ -1,4 +1,5 @@
 import type {ChecklistSection, ChecklistStage, ShiftCondition} from './checklist-types';
+import type {IncidentCategory, IncidentSeverity, IncidentSign} from './incidents';
 import type {DocumentCheck} from './operator-admission';
 import type {OperatorPhase} from './shift-phases';
 import type {WorkWarning} from './work-warnings';
@@ -80,6 +81,52 @@ export interface IdentityView {
   };
 }
 
+/** Происшествие смены — то, что уже записано и ещё на виду. */
+export interface IncidentView {
+  id: string;
+  category: IncidentCategory;
+  severity: IncidentSeverity;
+  state: string;
+  description: string;
+  signs: IncidentSign[];
+  injured: boolean;
+  stopRequired: boolean;
+  occurredAt: string;
+  photos: number;
+  /** Когда разобрали. null — ещё на виду у машиниста и диспетчера. */
+  reviewedAt: string | null;
+}
+
+/** Открытая неисправность машины — вкладка «Техника». */
+export interface DefectView {
+  id: string;
+  title: string;
+  severity: string;
+  status: string;
+  reportedAt: string;
+}
+
+/**
+ * Одна запись выработки — то, что машинист может поправить.
+ *
+ * `count` здесь — итог с учётом поправок, а не то, что ввели изначально.
+ * Поправки показываем отдельным списком: скрыть их значило бы сделать журнал
+ * гладким и непроверяемым.
+ */
+export interface ProductionEntryView {
+  id: string;
+  kind: 'PILES' | 'DRILLING' | 'DOWNTIME';
+  /** Марка сваи, тип бурения либо причина простоя. */
+  label: string;
+  /** Итог: свай, скважин либо часов. */
+  value: number;
+  /** Метры погонные — у свай и бурения. */
+  meters: number | null;
+  occurredAt: string;
+  /** Поправки к этой записи, свежие сверху. */
+  corrections: {delta: number; note: string; at: string}[];
+}
+
 export interface OperatorMobileState {
   operator: {id: string; name: string};
   phase: OperatorPhase;
@@ -96,6 +143,12 @@ export interface OperatorMobileState {
   warnings: WorkWarning[];
   workAllowed: boolean;
   production: ProductionView;
+  /** Записи смены поимённо — чтобы ошибочную можно было поправить. */
+  entries: ProductionEntryView[];
+  /** Происшествия этой смены, свежие сверху. */
+  incidents: IncidentView[];
+  /** Открытые неисправности машины: их закрывает механик, не оператор. */
+  defects: DefectView[];
   /** Справочники для учёта выработки — тот же источник, что у отчёта. */
   dictionaries: {
     pileGrades: {id: string; name: string; lengthMm: number | null}[];
@@ -120,3 +173,40 @@ export type ReadWeather = (latitude: number, longitude: number) => Promise<{
   isDay: boolean | null;
   at: string;
 } | null>;
+
+/**
+ * Рабочее место помощника машиниста.
+ *
+ * Смены здесь нет намеренно: её ведёт машинист. Помощнику принадлежит то, что
+ * относится лично к нему, — инструктаж по стропальным работам, проверка знаний
+ * и собственные допуски со сроками.
+ */
+export interface AssistantState {
+  assistant: {id: string; name: string};
+  /** Допуски и корочки: медкомиссия, стропальные работы, электробезопасность. */
+  documents: DocumentCheck[];
+  briefing: {
+    code: string;
+    title: string;
+    version: string;
+    readingMinutes: number;
+    /** С какой версией помощник ознакомлен. null — ни с какой. */
+    acknowledgedVersion: string | null;
+    ok: boolean;
+  };
+  knowledge: {
+    validUntil: string | null;
+    lastResult: string | null;
+    ok: boolean;
+  };
+  /** Бригады, где человек записан помощником: куда идти и с кем работать. */
+  crews: {
+    crewId: string;
+    /** Нужен, чтобы помощник мог завести неисправность именно на эту машину. */
+    equipmentId: string;
+    siteName: string;
+    equipmentName: string;
+    equipmentModel: string;
+    operatorName: string;
+  }[];
+}

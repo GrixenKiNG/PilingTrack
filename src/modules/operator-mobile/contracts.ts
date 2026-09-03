@@ -19,8 +19,8 @@ export type {DocumentCheck, DocumentVerdict} from './domain/operator-admission';
 export type {OperatorPhase} from './domain/shift-phases';
 export type {WarningCode, WarningLevel, WorkWarning} from './domain/work-warnings';
 export type {
-  AssignmentView, ChecklistView, IdentityView, OperatorMobileState,
-  ProductionView, WeatherView, WorkVolume,
+  AssignmentView, AssistantState, ChecklistView, DefectView, IdentityView, IncidentView,
+  OperatorMobileState, ProductionEntryView, ProductionView, WeatherView, WorkVolume,
 } from './domain/view-contracts';
 
 export {OPERATOR_CHECKLISTS, getChecklist} from './domain/checklist-catalog';
@@ -28,8 +28,11 @@ export {CONDITION_LABELS, CONDITION_THRESHOLDS} from './domain/shift-conditions'
 export {PHASE_LABELS, PHASE_ORDER} from './domain/shift-phases';
 export {COLD_STOP_C, WIND_STOP_MS} from './domain/work-warnings';
 export {SAFETY_BRIEFING, briefingRules} from './domain/safety-briefing';
+export {SLINGER_BRIEFING, slingerBriefingRules} from './domain/slinger-briefing';
 export {
   KNOWLEDGE_BANK, KNOWLEDGE_VALID_DAYS, QUESTIONS_PER_ATTEMPT, TOPIC_LABELS,
-  buildAttempt, findQuestion,
+  buildAttempt, buildSlingerAttempt, findQuestion,
 } from './domain/knowledge-bank';
 export type {KnowledgeQuestion, KnowledgeTopic} from './domain/knowledge-bank';
+
+export * from './domain/incidents';
