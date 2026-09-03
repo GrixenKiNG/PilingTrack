@@ -289,12 +289,18 @@ function csvCell(value: string): string {
   return FORMULA_START.has(trimmed.charAt(0)) ? `"'${escaped}"` : `"${escaped}"`;
 }
 
-export async function exportReportsCsv(filters: {
+export interface ReportExportFilters {
   tenantId: string;
   siteId?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
-}) {
+}
+
+/**
+ * \u041E\u0434\u0438\u043D \u0437\u0430\u043F\u0440\u043E\u0441 \u043F\u043E\u0434 \u043E\u0431\u0435 \u0432\u044B\u0433\u0440\u0443\u0437\u043A\u0438 (CSV \u0438 Excel), \u0447\u0442\u043E\u0431\u044B \u0441\u043E\u0441\u0442\u0430\u0432 \u043A\u043E\u043B\u043E\u043D\u043E\u043A \u0438 \u0444\u0438\u043B\u044C\u0442\u0440 \u043D\u0435
+ * \u0440\u0430\u0437\u044A\u0435\u0437\u0436\u0430\u043B\u0438\u0441\u044C \u043C\u0435\u0436\u0434\u0443 \u0444\u043E\u0440\u043C\u0430\u0442\u0430\u043C\u0438. \u0422\u0435\u043D\u0430\u043D\u0442 \u2014 \u0441\u0442\u0440\u043E\u0433\u0438\u043C \u0440\u0430\u0432\u0435\u043D\u0441\u0442\u0432\u043E\u043C (IDOR guard).
+ */
+async function fetchReportsForExport(filters: ReportExportFilters) {
   if (!filters.tenantId) {
     throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
   }
@@ -307,7 +313,7 @@ export async function exportReportsCsv(filters: {
     if (filters.dateTo) (where.date as Record<string, unknown>).lte = filters.dateTo;
   }
 
-  const reports = await db.report.findMany({
+  return db.report.findMany({
     where,
     include: {
       user: { select: { name: true } },
@@ -319,6 +325,10 @@ export async function exportReportsCsv(filters: {
     },
     orderBy: { date: 'desc' },
   });
+}
+
+export async function exportReportsCsv(filters: ReportExportFilters) {
+  const reports = await fetchReportsForExport(filters);
 
   const BOM = '\uFEFF';
   const header =
@@ -338,7 +348,7 @@ export async function exportReportsCsv(filters: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const pileRows = report.piles.map((pile: any) => ({
       ...base,
-      pileGrade: pile.pileGrade.name,
+      pileGrade: pile.pileGrade?.name ?? '',
       pileCount: String(pile.count),
       drillType: '',
       drillMeters: '',
@@ -352,7 +362,7 @@ export async function exportReportsCsv(filters: {
       ...base,
       pileGrade: '',
       pileCount: '',
-      drillType: drilling.type.name,
+      drillType: drilling.type?.name ?? '',
       drillMeters: String(drilling.meters),
       dtReason: '',
       dtHours: '',
@@ -366,7 +376,7 @@ export async function exportReportsCsv(filters: {
       pileCount: '',
       drillType: '',
       drillMeters: '',
-      dtReason: downtime.reason.name,
+      dtReason: downtime.reason?.name ?? '',
       dtHours: String(downtime.duration),
       dtComment: downtime.comment || '',
     }));
@@ -394,6 +404,68 @@ export async function exportReportsCsv(filters: {
   );
 
   return BOM + header + '\n' + csvLines.join('\n');
+}
+
+/**
+ * Та же выгрузка отчётов, но настоящим .xlsx. В отличие от CSV числа лежат
+ * числами (Excel их суммирует без «преобразования текста»), а итоги вынесены
+ * на отдельный лист. Два листа: «Детализация» (строка на каждую сваю / бурение
+ * / простой) и «Итоги» (одна строка на отчёт).
+ */
+export async function exportReportsXlsx(filters: ReportExportFilters): Promise<Buffer> {
+  const { buildXlsx } = await import('@/lib/xlsx-writer');
+  const reports = await fetchReportsForExport(filters);
+
+  const shift = (t: string) => (t === 'NIGHT' ? 'Ночная' : 'Дневная');
+
+  // --- Лист 1: детализация (числа — числами). ---
+  const detail: (string | number | null)[][] = [[
+    'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Экипаж', 'Установка',
+    'Марка сваи', 'Кол-во свай', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
+  ]];
+  for (const r of reports) {
+    const base = [
+      r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name,
+      r.crew?.name || '', r.crew?.equipment?.name || '',
+    ];
+    // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
+    // словарь может не разрешиться (дрейф после переноса базы), и без защиты
+    // весь экспорт падает из-за одной такой строки.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    for (const p of r.piles as any[]) detail.push([...base, p.pileGrade?.name ?? '', p.count, '', null, '', null, '']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    for (const d of r.drillings as any[]) detail.push([...base, '', null, d.type?.name ?? '', d.meters, '', null, '']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', null, d.reason?.name ?? '', d.duration, d.comment || '']);
+    if (!r.piles.length && !r.drillings.length && !r.downtimes.length) {
+      detail.push([...base, '', null, '', null, '', null, '']);
+    }
+  }
+
+  // --- Лист 2: итоги по отчёту. ---
+  const totals: (string | number | null)[][] = [[
+    'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Установка',
+    'Свай, всего', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %',
+  ]];
+  for (const r of reports) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    const piles = (r.piles as any[]).reduce((s, p) => s + p.count, 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    const wells = (r.drillings as any[]).reduce((s, d) => s + d.count, 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    const meters = (r.drillings as any[]).reduce((s, d) => s + d.meters, 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
+    totals.push([
+      r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name, r.crew?.equipment?.name || '',
+      piles, wells, meters, downtime, r.endingFuelPercent ?? null,
+    ]);
+  }
+
+  return buildXlsx([
+    { name: 'Детализация', rows: detail },
+    { name: 'Итоги', rows: totals },
+  ]);
 }
 
 /**

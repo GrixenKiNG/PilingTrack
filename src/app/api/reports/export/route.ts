@@ -55,18 +55,25 @@ export const GET = withApi(
       );
     }
 
-    const { exportReportsCsv } = await getReportsModule();
-    const csv = await exportReportsCsv({
-      tenantId,
-      siteId,
-      dateFrom,
-      dateTo,
-    });
+    const format = request.nextUrl.searchParams.get('format') === 'xlsx' ? 'xlsx' : 'csv';
+    const today = new Date().toISOString().split('T')[0];
+    const mod = await getReportsModule();
 
+    if (format === 'xlsx') {
+      const xlsx = await mod.exportReportsXlsx({ tenantId, siteId, dateFrom, dateTo });
+      return new NextResponse(new Uint8Array(xlsx), {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="pilingtrack-reports-${today}.xlsx"`,
+        },
+      });
+    }
+
+    const csv = await mod.exportReportsCsv({ tenantId, siteId, dateFrom, dateTo });
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="pilingtrack-reports-${new Date().toISOString().split('T')[0]}.csv"`,
+        'Content-Disposition': `attachment; filename="pilingtrack-reports-${today}.csv"`,
       },
     });
   },

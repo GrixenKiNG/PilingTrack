@@ -65,7 +65,7 @@ export function AdminReports() {
   // Скачиваем через blob, а не переходом по ссылке: заголовок «Действую как»
   // ставит authFetch, и при 403 переход увёл бы админа со страницы вместо
   // сообщения.
-  const handleExport = async () => {
+  const handleExport = async (format: 'csv' | 'xlsx' = 'csv') => {
     const dateTo = periodTo || todayYmd();
     const dateFrom = periodFrom || shiftYmd(-30);
     setExporting(true);
@@ -73,6 +73,7 @@ export function AdminReports() {
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+      if (format === 'xlsx') params.set('format', 'xlsx');
 
       const response = await authFetch(`/api/reports/export?${params.toString()}`);
       if (!response.ok) {
@@ -83,7 +84,7 @@ export function AdminReports() {
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.csv`;
+      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
       link.click();
       toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
     } catch (err) {
@@ -202,7 +203,8 @@ export function AdminReports() {
           <ReportsHeader
             reportWord={reportWord}
             onPrint={() => window.print()}
-            onExport={() => { void handleExport(); }}
+            onExport={() => { void handleExport('csv'); }}
+            onExportXlsx={() => { void handleExport('xlsx'); }}
             exporting={exporting}
             onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
           />
@@ -219,7 +221,8 @@ export function AdminReports() {
           <ReportsHeader
             reportWord={reportWord}
             onPrint={() => window.print()}
-            onExport={() => { void handleExport(); }}
+            onExport={() => { void handleExport('csv'); }}
+            onExportXlsx={() => { void handleExport('xlsx'); }}
             exporting={exporting}
             onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
           />

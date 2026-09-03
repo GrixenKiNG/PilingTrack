@@ -41,6 +41,7 @@ export {
   listRecentReportsForDashboard,
   listReportsForUserScope,
   exportReportsCsv,
+  exportReportsXlsx,
   getDashboardStats,
   reportDetailInclude,
 } from './application';

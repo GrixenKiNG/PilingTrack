@@ -36,12 +36,14 @@ export function ReportsHeader({
   reportWord,
   onPrint,
   onExport,
+  onExportXlsx,
   exporting,
   onCreate,
 }: {
   reportWord: string;
   onPrint: () => void;
   onExport: () => void;
+  onExportXlsx: () => void;
   exporting: boolean;
   onCreate: () => void;
 }) {
@@ -76,7 +78,16 @@ export function ReportsHeader({
           className="h-10 border-border bg-card text-foreground"
         >
           <Download className="mr-1.5 h-4 w-4" />
-          {exporting ? 'Готовим…' : 'Выгрузить CSV'}
+          {exporting ? 'Готовим…' : 'CSV'}
+        </Button>
+        <Button
+          onClick={onExportXlsx}
+          disabled={exporting}
+          variant="outline"
+          className="h-10 border-border bg-card text-foreground"
+        >
+          <Download className="mr-1.5 h-4 w-4" />
+          {exporting ? 'Готовим…' : 'Excel'}
         </Button>
         <Button
           onClick={onCreate}

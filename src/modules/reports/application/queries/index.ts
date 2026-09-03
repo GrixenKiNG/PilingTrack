@@ -5,10 +5,11 @@ export {
   listRecentReportsForDashboard,
   listReportsForUserScope,
   exportReportsCsv,
+  exportReportsXlsx,
   getDashboardStats,
   reportDetailInclude,
 } from './report-query.service';
-export type { RecentReportRow } from './report-query.service';
+export type { RecentReportRow, ReportExportFilters } from './report-query.service';
 
 // Здесь до 17.08.2026 стояли двенадцать реэкспортов из cqrs-query.service.ts:
 // getReportStats, getSiteDailyStats, getSiteDashboard, getOperatorPerformance,
