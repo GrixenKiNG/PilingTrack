@@ -247,10 +247,25 @@ export async function completeInspection(
 
   const items = (ins.templateSnapshot as unknown as SnapItem[]) ?? [];
   const answers: AnswerLike[] = ins.answers.map((a) => ({ itemId: a.itemId, result: a.result, photoCount: a.photoCount }));
-  const { missingAnswers, missingPhotos } = findMissing(items, answers);
-  if (missingAnswers.length || missingPhotos.length) {
+  const { missingAnswers, missingPhotos, missingPhotosOnFault } = findMissing(items, answers);
+  // Фото на ежесменном осмотре требуется там, где отмечена неисправность.
+  //
+  // ИСТОРИЯ. Сначала снимок требовался на ЕО везде, где его отметил
+  // администратор, — и осмотры перестали закрываться: связь в поле рвётся,
+  // снимок не уходит, смена встаёт целиком. Тогда (26.08.2026) требование
+  // сняли с ЕО полностью. Это ушло в другую крайность: трещина в мачте
+  // попадала в журнал одной строкой текста, и механик ехал разбираться
+  // вслепую.
+  //
+  // Середина проходит не по уровню осмотра, а по ответу. Снимок исправного
+  // узла не доказывает ничего и стоит минуты в поле. Снимок неисправности —
+  // единственное, по чему потом понятно, что чинить, и восполнить его
+  // назавтра уже нельзя. На ТО и ремонте по-прежнему держат все снимки: там
+  // фото — доказательство выполненных работ, а не описание поломки.
+  const blockingPhotos = ins.level === 'EO' ? missingPhotosOnFault : missingPhotos;
+  if (missingAnswers.length || blockingPhotos.length) {
     throw new ServiceError(
-      `Осмотр не заполнен: пунктов без ответа ${missingAnswers.length}, без обязательного фото ${missingPhotos.length}`,
+      `Осмотр не заполнен: пунктов без ответа ${missingAnswers.length}, без обязательного фото ${blockingPhotos.length}`,
       400,
     );
   }
@@ -263,10 +278,27 @@ export async function completeInspection(
   });
   const now = new Date();
   return db.$transaction(async (tx) => {
-    const inspection = await tx.inspection.update({
-      where: { id },
+    // Переход делаем условным, а не безусловной правкой по `id`.
+    //
+    // ПОЧЕМУ. Состояние осмотра читается ДО транзакции. Два запроса —
+    // повтор при обрыве связи, двойное нажатие, ретрай телефона — успевают
+    // прочитать «черновик» оба, и оба входили сюда. Дефекты защищены
+    // `sourceKey`, наряд ТО — условием `status <> DONE`, а вот показание
+    // моточасов писалось дважды: в журнале наработки появлялась вторая
+    // запись за ту же смену, и от неё считаются сроки ТО.
+    //
+    // `updateMany` с условием на статус делает переход одноразовым: второй
+    // запрос не поменяет ни строки и выйдет отсюда, ничего не записав.
+    const claimed = await tx.inspection.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: { not: 'COMPLETED' } },
       data: { status: 'COMPLETED', healthScore, signedByName: ctx.signedByName, signedAt: now },
     });
+    if (claimed.count === 0) {
+      // Осмотр уже завершён — это не ошибка, а повтор. Возвращаем то, что
+      // есть: телефон получит тот же ответ, что и с первой попытки.
+      return tx.inspection.findUnique({ where: { id }, include: { answers: true } });
+    }
+    const inspection = await tx.inspection.findUniqueOrThrow({ where: { id } });
     // Запись ТО заводится вместе с осмотром и закрывается вместе с ним. Без
     // этого каждый сменный осмотр навсегда оставался «в работе»: журнал
     // обслуживания копил мнимые незакрытые работы, а производная готовность

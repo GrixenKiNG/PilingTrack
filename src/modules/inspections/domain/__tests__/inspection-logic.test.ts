@@ -54,3 +54,29 @@ describe('findMissing', () => {
     expect(res.missingPhotos).toEqual([]);
   });
 });
+
+describe('фото на ежесменном осмотре', () => {
+  const item = {
+    id: 'i1', text: 'Течь гидравлики', answerType: 'YES_NO' as const,
+    required: true, photoRequired: true,
+  };
+
+  it('исправный узел без снимка не считается неисправностью без фото', () => {
+    // Норма — снимать нечего. Именно это позволяло смене закрываться в поле.
+    const missing = findMissing([item], [{itemId: 'i1', result: 'YES', photoCount: 0}]);
+    expect(missing.missingPhotos).toEqual(['i1']);
+    expect(missing.missingPhotosOnFault).toEqual([]);
+  });
+
+  it('неисправность без снимка попадает в отдельный список', () => {
+    // Снимок трещины восполнить назавтра нельзя — механик поедет вслепую.
+    const missing = findMissing([item], [{itemId: 'i1', result: 'NO', photoCount: 0}]);
+    expect(missing.missingPhotosOnFault).toEqual(['i1']);
+  });
+
+  it('неисправность со снимком ничего не требует', () => {
+    const missing = findMissing([item], [{itemId: 'i1', result: 'NO', photoCount: 1}]);
+    expect(missing.missingPhotos).toEqual([]);
+    expect(missing.missingPhotosOnFault).toEqual([]);
+  });
+});

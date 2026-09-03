@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const m = vi.hoisted(() => ({
   tplFindUnique: vi.fn(), tplFindMany: vi.fn(), eqFindUnique: vi.fn(),
   insCreate: vi.fn(), insFindUnique: vi.fn(), insUpdate: vi.fn(),
+  insUpdateMany: vi.fn(), insFindUniqueOrThrow: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
   crewFindFirst: vi.fn(),
@@ -10,7 +11,10 @@ vi.mock('@/lib/db', () => {
   const client = {
     checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },
     equipment: { findUnique: m.eqFindUnique },
-    inspection: { create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate },
+    inspection: {
+      create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate,
+      updateMany: m.insUpdateMany, findUniqueOrThrow: m.insFindUniqueOrThrow,
+    },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
     crew: { findFirst: m.crewFindFirst },
@@ -123,7 +127,7 @@ describe('completeInspection', () => {
     });
     await expect(completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' }))
       .rejects.toThrow(/не заполнен/i);
-    expect(m.insUpdate).not.toHaveBeenCalled();
+    expect(m.insUpdateMany).not.toHaveBeenCalled();
   });
   it('completes and stores health score when all required answered', async () => {
     m.insFindUnique.mockResolvedValue({
@@ -131,13 +135,41 @@ describe('completeInspection', () => {
       templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
       answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
     });
-    m.insUpdate.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', healthScore: 100 });
+    m.insUpdateMany.mockResolvedValue({ count: 1 });
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', healthScore: 100, equipmentId: 'eq1' });
+    m.insFindUnique.mockResolvedValueOnce({
+      id: 'ins1', tenantId: 'orion', status: 'DRAFT',
+      templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
+      answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
+    });
     const res = await completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
-    const data = m.insUpdate.mock.calls[0][0].data;
-    expect(data.status).toBe('COMPLETED');
-    expect(data.healthScore).toBe(100);
-    expect(data.signedByName).toBe('Иванов');
-    expect(res.healthScore).toBe(100);
+    const call = m.insUpdateMany.mock.calls[0][0];
+    expect(call.data.status).toBe('COMPLETED');
+    expect(call.data.healthScore).toBe(100);
+    expect(call.data.signedByName).toBe('Иванов');
+    // Переход одноразовый: условие на статус — это и есть защита от повтора.
+    expect(call.where.status).toEqual({ not: 'COMPLETED' });
+    expect(call.where.tenantId).toBe('orion');
+    expect(res?.healthScore).toBe(100);
+  });
+
+  it('повторное завершение не пишет побочных записей', async () => {
+    // Обрыв связи, двойное нажатие, ретрай телефона. Раньше второй запрос
+    // доходил до конца и заводил вторые моточасы — а от них считаются сроки
+    // планового ТО.
+    m.insFindUnique.mockResolvedValue({
+      id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', engineHours: 1200,
+      templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
+      answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
+    });
+    m.insUpdateMany.mockResolvedValue({ count: 0 });
+
+    const res = await completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+
+    expect(m.insUpdateMany).toHaveBeenCalledTimes(1);
+    expect(m.recUpdateMany).not.toHaveBeenCalled();
+    expect(m.outboxCreate).not.toHaveBeenCalled();
+    expect(res).not.toBeNull();
   });
 });
 
