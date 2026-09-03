@@ -43,7 +43,9 @@ function filled(raw: string | undefined): boolean {
  * возвращаться приходится постоянно — вспомнил про течь, увидев соседний пункт.
  * Секции по узлам дают ориентир: течь была «где-то в гидравлике».
  */
-export function ChecklistScreen({checklist, warnings, onSubmit, busy, error, commandId, onBack}: {
+export function ChecklistScreen({
+  checklist, warnings, onSubmit, busy, error, commandId, onBack, lastMeter,
+}: {
   checklist: ChecklistView;
   warnings: WorkWarning[];
   onSubmit: (answers: ChecklistAnswer[]) => void;
@@ -52,6 +54,12 @@ export function ChecklistScreen({checklist, warnings, onSubmit, busy, error, com
   /** Ключ команды. Нужен уже сейчас: к нему привязываются снимки. */
   commandId: string;
   onBack?: () => void;
+  /**
+   * Последнее показание счётчика моточасов — подсказка под полем ввода.
+   * Счётчик не крутится назад, и человек, видящий прошлое число, замечает
+   * опечатку сам: до отказа сервера, а не после.
+   */
+  lastMeter?: {engineHours: number; recordedAt: string} | null;
 }) {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [showGaps, setShowGaps] = useState(false);
@@ -128,6 +136,7 @@ export function ChecklistScreen({checklist, warnings, onSubmit, busy, error, com
               item={item}
               draft={drafts[item.id] ?? emptyDraft()}
               commandId={commandId}
+              lastMeter={lastMeter}
               onChange={(patch) => update(item.id, patch)}
             />
           ))}
@@ -139,11 +148,12 @@ export function ChecklistScreen({checklist, warnings, onSubmit, busy, error, com
   );
 }
 
-function ItemCard({item, draft, commandId, onChange}: {
+function ItemCard({item, draft, commandId, onChange, lastMeter}: {
   item: ChecklistItem;
   draft: Draft;
   commandId: string;
   onChange: (patch: Partial<Draft>) => void;
+  lastMeter?: {engineHours: number; recordedAt: string} | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -228,6 +238,20 @@ function ItemCard({item, draft, commandId, onChange}: {
             })}
             className="mt-1 h-11 w-full rounded-md border bg-card px-3 text-base font-semibold tabular-nums shadow-xs"
           />
+          {/*
+            Прошлое показание счётчика — только у моточасов: у долива
+            жидкостей «сколько было в прошлый раз» смысла не имеет.
+            Поле не заполняем заранее: подставленное значение отправят не
+            глядя, и в журнале наработки появится вчерашняя цифра под
+            сегодняшней датой.
+          */}
+          {item.measure.key === 'engineHours' && lastMeter ? (
+            <MeterHint
+              last={lastMeter}
+              typed={draft.measures[item.measure.key]}
+              unit={item.measure.unit}
+            />
+          ) : null}
         </label>
       ) : null}
 
@@ -279,6 +303,37 @@ function ItemCard({item, draft, commandId, onChange}: {
 }
 
 /** Чего не хватает, чтобы закрыть список. Те же правила, что и на сервере. */
+/**
+ * Прошлое показание счётчика и предупреждение о движении назад.
+ *
+ * Счётчик моточасов не крутится обратно: меньшее значение — опечатка, и
+ * принять её значит испортить и наработку, и планы ТО, которые от неё
+ * зависят. Сервер такую цифру отклоняет, но узнать об этом после
+ * заполнения всего списка — плохой способ. Здесь то же правило, только
+ * видно сразу.
+ */
+function MeterHint({last, typed, unit}: {
+  last: {engineHours: number; recordedAt: string};
+  typed: string | undefined;
+  unit: string;
+}) {
+  const when = new Date(last.recordedAt).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
+  const value = typed?.trim() ?? '';
+  const goesBack = value !== '' && Number.isFinite(Number(value)) && Number(value) < last.engineHours;
+  return (
+    <span
+      className={cn(
+        'mt-1 block text-2xs',
+        goesBack ? 'font-semibold text-destructive' : 'text-muted-foreground',
+      )}
+    >
+      {goesBack
+        ? `Меньше прошлого показания (${last.engineHours} ${unit} от ${when}). Счётчик не крутится назад — проверьте цифру.`
+        : `Прошлое показание: ${last.engineHours} ${unit} от ${when}`}
+    </span>
+  );
+}
+
 function collectGaps(items: ChecklistItem[], drafts: Record<string, Draft>): string[] {
   const gaps: string[] = [];
   for (const item of items) {

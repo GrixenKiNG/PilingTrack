@@ -316,6 +316,7 @@ export function OperatorMobileApp() {
           busy={busy}
           error={actionError}
           commandId={checklistCommandId}
+          lastMeter={state.assignment?.lastMeter ?? null}
           onBack={detour ? () => setDetour(null) : undefined}
         />
       );

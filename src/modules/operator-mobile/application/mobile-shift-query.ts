@@ -265,7 +265,7 @@ export async function queryOperatorMobileState(input: {
   const siteId = crew.site.id;
   const productionDate = todayInTimezone(profile?.timezone ?? 'Europe/Moscow', now);
 
-  const [sitePiles, siteDrilling, siteDowntime, lastFuel, shift, openDefects] = await Promise.all([
+  const [sitePiles, siteDrilling, siteDowntime, lastFuel, lastMeter, shift, openDefects] = await Promise.all([
     sitePileVolume(tenantId, siteId, dictionaries.pileGrades),
     db.leaderDrilling.aggregate({
       _sum: {count: true, meters: true},
@@ -279,6 +279,14 @@ export async function queryOperatorMobileState(input: {
       where: {tenantId, equipmentId, endingFuelPercent: {not: null}},
       orderBy: {date: 'desc'},
       select: {endingFuelPercent: true},
+    }),
+    // Последнее показание счётчика. Берём из журнала наработки, а не из
+    // поля карточки техники: журнал — источник истины, поле — его кэш, и
+    // расхождение между ними уже случалось.
+    db.meterReading.findFirst({
+      where: {tenantId, equipmentId},
+      orderBy: {recordedAt: 'desc'},
+      select: {engineHours: true, recordedAt: true},
     }),
     // Сначала — открытая смена этой машины на любую дату. База допускает
     // только одну такую (Shift_one_active_per_equipment_key), и если она за
@@ -494,6 +502,9 @@ export async function queryOperatorMobileState(input: {
       },
       siteDowntimeHours: round1(siteDowntime._sum.duration ?? 0),
       fuelPercent: lastFuel?.endingFuelPercent ?? null,
+      lastMeter: lastMeter
+        ? {engineHours: lastMeter.engineHours, recordedAt: lastMeter.recordedAt.toISOString()}
+        : null,
       maintenance,
     },
     weather,
