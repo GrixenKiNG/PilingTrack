@@ -49,19 +49,55 @@ import {
 import {
   deriveEquipmentReadiness,
   type EquipmentReadiness,
+  type ReadinessEvidence,
+  type ReadinessStatus,
 } from './readiness-model';
+import { buildAuthoritativeReadinessPresentation } from './readiness/authoritative-presentation';
 import type { EquipmentOption } from './to-module-bits';
 import type { JournalRecord } from './to-stats';
 
+// Список обязан совпадать с MODULE_TABS: он сторожит ?view= в адресе, и
+// пропущенное здесь значение выглядит как «такой вкладки нет» — переход по
+// закладке молча возвращает на центр готовности.
 const VIEW_IDS = new Set<ReferenceView>([
   'readiness',
   'fleet',
   'shifts',
   'permits',
   'maintenance',
+  'documents',
   'reports',
   'settings',
 ]);
+
+/**
+ * Исход авторитетного расчёта — в статус карточки парка.
+ *
+ * «Готова с замечанием» и «требует решения» сводятся к одному «внимание»:
+ * у карточки парка нет отдельного цвета под каждое, а зелёным их красить
+ * нельзя — замечание тогда некому заметить.
+ */
+const OUTCOME_STATUS: Record<string, ReadinessStatus> = {
+  READY: 'READY',
+  READY_WITH_WARNING: 'ATTENTION',
+  ATTENTION: 'ATTENTION',
+  BLOCKED: 'BLOCKED',
+};
+
+const STAGE_EVIDENCE_KEY: Record<string, ReadinessEvidence['key']> = {
+  INSPECTION: 'inspection',
+  ENGINE_HOURS: 'meter',
+  PERMIT: 'permit',
+  MAINTENANCE: 'maintenance',
+  ACCEPTANCE: 'acceptance',
+};
+
+const STAGE_EVIDENCE_STATE: Record<string, ReadinessEvidence['state']> = {
+  pass: 'pass',
+  warning: 'warning',
+  fail: 'block',
+  unknown: 'missing',
+};
 
 const SETTINGS_IDS = new Set<SettingsSection>([
   'rules',
@@ -421,30 +457,60 @@ export function ToModule() {
   }, [bootstrap?.actor.role, details, equipmentId, journalLoaded]);
 
   const readinessByEquipment = useMemo(() => {
-    // Балл и вердикт берём из авторитетного снимка, а не из производной оценки
-    // по журналу. Журнал грузится только для выбранной установки, поэтому
-    // остальные показывались как «Нет данных · —/100», хотя снимок по ним есть,
-    // и парк выглядел неготовым при готовом парке. Подсказки, доказательства и
-    // следующее действие остаются от производной модели: их снимок не хранит.
+    // Карточка парка собирается из авторитетного снимка целиком.
+    //
+    // ЧТО БЫЛО НЕ ТАК. Балл и вердикт брались из снимка, а причина, следующее
+    // действие и доказательства — из производной оценки по журналу. Журнал
+    // грузится только для выбранной установки, поэтому у остальных эти поля
+    // просто затирались пустыми строками. Получалась карточка, где зелёная
+    // цифра с сервера соседствует с объяснением из другого расчёта или без
+    // объяснения вовсе, — и проверить её было не по чему.
+    //
+    // Вдобавок вердикт схлопывался в «готово»: снимок хранит `status` из двух
+    // значений (READY/BLOCKED), а различие «готова», «готова с замечанием» и
+    // «требует решения» живёт в `outcome`. Читая `status`, экран красил
+    // зелёным и то, что требует решения диспетчера.
+    //
+    // Производная оценка остаётся ровно для одного случая — снимка нет вовсе.
+    // Тогда честный ответ «не подтверждено», а не выдуманная готовность.
     const authoritative = new Map(currentReadiness.map((item) => [item.equipmentId, item]));
     const entries = equipment.map((item) => {
+      const snapshot = authoritative.get(item.id);
       const derived = deriveEquipmentReadiness(
         item,
         journals[item.id] ?? [],
         journalLoaded[item.id] === true,
       );
-      const snapshot = authoritative.get(item.id);
       if (!snapshot) return [item.id, derived] as const;
-      // Подсказку «следующее действие» без загруженного журнала не показываем:
-      // она вывелась бы из пустого списка и предлагала бы начать осмотр там,
-      // где осмотр уже сделан. Карточка подставит нейтральное «Проверить данные».
-      const loaded = journalLoaded[item.id] === true;
+
+      const presentation = buildAuthoritativeReadinessPresentation(snapshot);
+      if (presentation.status === 'UNCONFIRMED') {
+        return [item.id, {
+          ...derived,
+          status: 'NO_DATA',
+          canOperate: false,
+          score: presentation.score,
+          reason: presentation.description,
+          nextAction: presentation.nextAction,
+          nextActionHref: '',
+          evidence: [],
+        } satisfies EquipmentReadiness] as const;
+      }
+
       return [item.id, {
         ...derived,
-        score: snapshot.score,
-        status: snapshot.status === 'BLOCKED' ? 'BLOCKED' : 'READY',
-        canOperate: snapshot.status === 'READY',
-        ...(loaded ? {} : {reason: '', nextAction: '', nextActionHref: '', evidence: []}),
+        score: presentation.score,
+        status: OUTCOME_STATUS[presentation.outcome] ?? 'READY',
+        canOperate: presentation.outcome === 'READY' || presentation.outcome === 'READY_WITH_WARNING',
+        reason: presentation.description,
+        nextAction: presentation.nextAction,
+        nextActionHref: '',
+        evidence: presentation.stages.map((stage): ReadinessEvidence => ({
+          key: STAGE_EVIDENCE_KEY[stage.key],
+          label: stage.label,
+          value: stage.value,
+          state: STAGE_EVIDENCE_STATE[stage.state],
+        })),
       } satisfies EquipmentReadiness] as const;
     });
     return Object.fromEntries(entries) as Record<string, EquipmentReadiness>;

@@ -381,6 +381,17 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   const detail = props.details[selected.id];
   const fleetCard = props.fleetCards.find((item) => item.id === selected.id);
   const handoverJournal = buildHandoverJournal(props.shifts, selected.id, props.bootstrap?.selectors.actors);
+  /**
+   * Установки, чью смену ждут принять.
+   *
+   * Состояние HANDOVER_PENDING — это и есть «сдано, ждём приёмки»; тем же
+   * признаком пользуется экран смен. Порядок — как в списке техники, чтобы
+   * очередь и парк читались одинаково.
+   */
+  const awaitingAcceptance = props.equipment.filter((item) => props.shifts.some(
+    (shift) => shift.equipmentId === item.id && shift.state === 'HANDOVER_PENDING',
+  ));
+
   const inspectionEvidenceId = presentation.evidence.find((item) => item.key === 'inspection')?.reference ?? null;
   /**
    * Куда ведёт шаг чек-листа. Осмотр и моточасы живут в других модулях,
@@ -535,7 +546,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
           </div>
         </div>
         <div className="flex flex-1 flex-col p-4">
-          <h3 className="font-bold">Чек-лист смены (5 шагов)</h3>
+          <h3 className="flex items-center gap-2 font-bold"><ClipboardCheck className="h-4 w-4 text-muted-foreground" />Чек-лист смены (5 шагов)</h3>
           <div className="mt-3 divide-y divide-border">
             {presentation.stages.map((stage, index) => {
               const target = stageTargets[stage.key];
@@ -607,7 +618,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
         <section className={cn(card, 'p-5')}>
           <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
             <div>
-              <h2 className="font-bold">Готовность к работе (доказательная)</h2>
+              <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4 text-muted-foreground" />Готовность к работе (доказательная)</h2>
               <div className="mt-4 flex flex-wrap items-center gap-4 sm:gap-8">
                 <ReadinessRing value={presentation.score} />
                 <div>
@@ -642,7 +653,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
         </section>
         <section className={cn(card, 'flex flex-1 flex-col overflow-hidden')}>
           <div className="p-4">
-            <h2 className="font-bold">Цепочка состояния</h2>
+            <h2 className="flex items-center gap-2 font-bold"><History className="h-4 w-4 text-muted-foreground" />Цепочка состояния</h2>
             {/*
               Пять равных колонок: центры кружков стоят на 10 / 30 / 50 / 70 /
               90 % ширины, поэтому шаги распределены строго равномерно, а линия
@@ -715,7 +726,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             )}
           </div>
           <div className="border-t border-border p-4">
-            <h3 className="font-bold">Критическое замечание</h3>
+            <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4 text-destructive-strong" />Критическое замечание</h3>
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3">
               <AlertTriangle className="h-7 w-7 text-destructive-strong" />
               <div className="flex-1">
@@ -726,7 +737,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             </div>
           </div>
           <div className="flex flex-1 flex-col border-t border-border p-4">
-            <h3 className="font-bold">Доказательства готовности</h3>
+            <h3 className="flex items-center gap-2 font-bold"><FileText className="h-4 w-4 text-muted-foreground" />Доказательства готовности</h3>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-4">
               {metricTiles.map((tile) => {
                 const TileIcon = tile.icon;
@@ -749,7 +760,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                     </dl>
                     {tile.href ? (
                       <Button asChild variant="outline" className="mt-3 h-9 w-full">
-                        <Link href={tile.href}>Открыть</Link>
+                        <Link href={tile.href}><ArrowRight className="h-4 w-4" />Открыть</Link>
                       </Button>
                     ) : (
                       <Button
@@ -758,7 +769,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                         className="mt-3 h-9 w-full"
                         onClick={() => tile.view && props.onViewChange(tile.view)}
                       >
-                        Открыть
+                        <ArrowRight className="h-4 w-4" />Открыть
                       </Button>
                     )}
                   </div>
@@ -800,7 +811,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
 
       <aside className="flex flex-col gap-3 md:col-span-2 xl:col-span-1">
         <section className={cn(card, 'p-4')}>
-          <div className="flex items-center justify-between"><h2 className="font-bold">Передача и приёмка</h2><span className="text-2xs text-muted-foreground">неизменяемый журнал</span></div>
+          <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold"><Send className="h-4 w-4 text-muted-foreground" />Передача и приёмка</h2><span className="text-2xs text-muted-foreground">неизменяемый журнал</span></div>
           {handoverJournal.length === 0 ? (
             <p className="mt-3 rounded-lg border border-border p-3 text-2xs leading-relaxed text-muted-foreground">
               По этой установке ещё не было передач смены. Записи появятся, когда оператор передаст смену диспетчеру.
@@ -841,9 +852,20 @@ export function ReadinessCentre(props: ReferenceUiProps) {
           )}
         </section>
         <section className={cn(card, 'flex flex-1 flex-col p-4')}>
-          <div className="flex items-center justify-between"><h2 className="font-bold">Входящие (диспетчер)</h2><span className="text-xs text-muted-foreground">{props.equipment.length}</span></div>
+          {/*
+            Входящие — это установки, чью смену действительно ждут принять,
+            а не первые три из парка. Панель показывала срез списка техники и
+            подписывала его числом всех машин: диспетчер видел «входящих 12»
+            при пустой очереди и три карточки, которые к передаче отношения не
+            имели. Очередь определяется состоянием смены HANDOVER_PENDING —
+            тем же, по которому её строит экран смен.
+          */}
+          <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold"><AlertCircle className="h-4 w-4 text-muted-foreground" />Входящие (диспетчер)</h2><span className="text-xs text-muted-foreground">{awaitingAcceptance.length}</span></div>
           <div className="mt-3 space-y-3">
-            {props.equipment.slice(0, 3).map((item) => {
+            {awaitingAcceptance.length === 0 && (
+              <p className="text-xs text-muted-foreground">Ничего не ждёт приёмки.</p>
+            )}
+            {awaitingAcceptance.slice(0, 3).map((item) => {
               const itemSnapshot = props.currentReadiness.find((entry) => entry.equipmentId === item.id) ?? null;
               const itemPresentation = props.authoritativeReadinessError
                 ? buildUnavailableReadinessPresentation(itemSnapshot)
@@ -898,7 +920,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                         className="h-9 flex-1 bg-signal text-white hover:bg-signal-strong"
                         onClick={() => props.onViewChange('shifts')}
                       >
-                        Принять и назначить
+                        <CheckCircle2 className="h-4 w-4" />Принять и назначить
                       </Button>
                       <Button
                         type="button"
@@ -906,7 +928,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                         className="h-9 flex-1"
                         onClick={() => props.onViewChange('shifts')}
                       >
-                        Запросить доработки
+                        <AlertCircle className="h-4 w-4" />Запросить доработки
                       </Button>
                     </div>
                   )}
@@ -914,8 +936,8 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               );
             })}
           </div>
-          <button type="button" onClick={() => props.onViewChange('shifts')} className="hit-target mt-auto pt-3 text-left text-xs font-semibold text-signal-strong">
-            Открыть все входящие →
+          <button type="button" onClick={() => props.onViewChange('shifts')} className="hit-target mt-auto flex items-center gap-1 pt-3 text-left text-xs font-semibold text-signal-strong">
+            Открыть все входящие<ChevronRight className="h-4 w-4" />
           </button>
         </section>
         </aside>

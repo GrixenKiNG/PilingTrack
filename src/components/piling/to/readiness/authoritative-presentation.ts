@@ -59,6 +59,11 @@ type Snapshot = CurrentReadinessDto | ReadinessSnapshotDto;
 interface EvidenceRecord {
   equipmentId: string;
   inspectionId: string | null;
+  /**
+   * Из какой таблицы `inspectionId`. Снимки, сделанные до появления поля,
+   * его не имеют — там `undefined`, и ссылку мы не рисуем.
+   */
+  inspectionSource?: 'INSPECTION' | 'OPERATOR_CHECKLIST' | null;
   permitId: string | null;
   maintenanceRecordIds: string[];
   evaluatedAt: string;
@@ -80,6 +85,10 @@ function evidenceRecord(value: unknown): EvidenceRecord | null {
   if (!isRecord(value)
     || typeof value.equipmentId !== 'string'
     || (value.inspectionId !== null && typeof value.inspectionId !== 'string')
+    || (value.inspectionSource !== undefined
+      && value.inspectionSource !== null
+      && value.inspectionSource !== 'INSPECTION'
+      && value.inspectionSource !== 'OPERATOR_CHECKLIST')
     || (value.permitId !== null && typeof value.permitId !== 'string')
     || !Array.isArray(value.maintenanceRecordIds)
     || !value.maintenanceRecordIds.every((item) => typeof item === 'string')
@@ -198,8 +207,20 @@ export function buildAuthoritativeReadinessPresentation(
     {key: 'evaluation', label: 'Расчёт выполнен', reference: evidence.evaluatedAt},
   ];
   if (evidence.inspectionId) {
-    evidenceCards.push({key: 'inspection', label: 'Осмотр', reference: evidence.inspectionId,
-      links: [{text: 'Открыть осмотр', href: `/inspections/${evidence.inspectionId}`}]});
+    // Ссылку даём только журналу ЕО/ТО: у предсменного чек-листа машиниста
+    // отдельной страницы нет, и прежний общий адрес /inspections/{id}
+    // открывал на нём чужую сущность — то есть 404. Снимок без указания
+    // источника сделан до этой правки: там ссылки тоже нет, потому что
+    // проверить, куда она ведёт, нечем.
+    const openable = evidence.inspectionSource === 'INSPECTION';
+    evidenceCards.push({
+      key: 'inspection',
+      label: evidence.inspectionSource === 'OPERATOR_CHECKLIST'
+        ? 'Осмотр машиниста'
+        : 'Осмотр',
+      reference: evidence.inspectionId,
+      links: openable ? [{text: 'Открыть осмотр', href: `/inspections/${evidence.inspectionId}`}] : [],
+    });
   }
   if (evidence.permitId) {
     // Отдельной страницы у наряда нет — ведём на реестр внутри контура.

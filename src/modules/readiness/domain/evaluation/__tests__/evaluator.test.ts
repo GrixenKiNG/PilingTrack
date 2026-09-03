@@ -22,7 +22,7 @@ const facts = {
   maintenanceConfigured: true, maintenanceOverdueHours: 0, maintenanceOverdueDays: 0,
   accepted: true, criticalDefect: false, findings: 0,
 } as const;
-const evidence = {equipmentId: 'eq-1', inspectionId: 'in-1', permitId: null, maintenanceRecordIds: []};
+const evidence = {equipmentId: 'eq-1', inspectionId: 'in-1', inspectionSource: 'INSPECTION' as const, permitId: null, maintenanceRecordIds: []};
 
 describe('authoritative readiness evaluator', () => {
   it('fails closed when published rules are absent', () => {

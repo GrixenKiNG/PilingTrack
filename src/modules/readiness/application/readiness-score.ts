@@ -1,6 +1,7 @@
 import type {Prisma} from '@/generated/postgres-client/client';
 import type {ReadinessTransaction} from '../infrastructure/tenant-transaction';
 import {tenantProductionDate} from '../domain/shifts/tenant-production-date';
+import {chooseInspectionSource} from '../domain/evaluation/inspection-source';
 import {capturedClock, type EvaluationClock} from '../domain/evaluation/clock';
 import {evaluateReadiness} from '../domain/evaluation/evaluator';
 import {immutablePublishedRules} from '../domain/evaluation/rules';
@@ -40,12 +41,19 @@ export async function evaluateAuthoritativeReadiness(input: {
   // расчёт смотрел лишь в `Inspection`, машина с полностью пройденным утренним
   // осмотром висела «Осмотр не завершён» и теряла четверть балла готовности:
   // человек сделал работу, а система её не видела.
+  //
+  // ПРИВЯЗКА К СМЕНЕ. Когда смена известна, осмотр берётся только её —
+  // иначе ночная смена получала готовность по утреннему осмотру дневной:
+  // обе за одни производственные сутки, и фильтра по суткам мало. Когда
+  // смены нет (суточный пересчёт по парку), ограничивать нечем и вопрос
+  // стоит иначе: «смотрели ли машину сегодня вообще».
   const operatorInspection = await input.tx.operatorChecklistExecution.findFirst({
     where: {
       tenantId: input.tenantId,
       equipmentId: input.equipmentId,
       status: 'COMPLETED',
       template: {templateKey: 'PRESHIFT_INSPECTION'},
+      ...(input.shiftId ? {shiftId: input.shiftId} : {}),
     },
     orderBy: {completedAt: 'desc'},
     select: {id: true, completedAt: true, startedAt: true},
@@ -96,6 +104,16 @@ export async function evaluateAuthoritativeReadiness(input: {
   const inspectedToday = inspectionSameTenantDay || operatorSameTenantDay;
   const inspectedEver = Boolean(inspection) || Boolean(operatorInspection);
 
+  // Чей осмотр описывает машину на сейчас — правило живёт в домене
+  // (`inspection-source.ts`) и покрыто тестами: оно решает, по какому
+  // состоянию машине разрешат работу, и на глаз такое не проверяется.
+  const inspectionSource = chooseInspectionSource({
+    operatorAt,
+    operatorSameDay: operatorSameTenantDay,
+    mechanicAt: inspection?.inspectionDate ?? null,
+  });
+  const preferOperatorInspection = inspectionSource === 'OPERATOR_CHECKLIST';
+
   /**
    * Состояние машины по осмотру машиниста: доля пунктов, отвеченных «норма».
    *
@@ -106,7 +124,7 @@ export async function evaluateAuthoritativeReadiness(input: {
    * честно отмеченную мелочь так же, как за трещину в мачте.
    */
   let operatorHealthScore: number | null = null;
-  if (operatorInspection && operatorSameTenantDay) {
+  if (preferOperatorInspection && operatorInspection) {
     const answers = await input.tx.operatorChecklistAnswerRecord.groupBy({
       by: ['result'],
       _count: {_all: true},
@@ -126,10 +144,11 @@ export async function evaluateAuthoritativeReadiness(input: {
     ? Math.max(0, equipment.engineHoursTotal - equipment.nextMaintenanceAtHours) : 0;
   const overdueDays = equipment.nextMaintenanceDate && equipment.nextMaintenanceDate < now
     ? Math.ceil((now.getTime() - equipment.nextMaintenanceDate.getTime()) / 86_400_000) : 0;
-  // Свежий осмотр машиниста важнее вчерашнего журнала ЕО: он описывает
-  // состояние машины на сегодня, а не на позавчера.
-  const healthScore = (operatorSameTenantDay ? operatorHealthScore : null)
-    ?? inspection?.healthScore ?? null;
+  // Балл состояния — из того же осмотра, который признан свежим. Смешивать
+  // нельзя: балл одного осмотра рядом со ссылкой на другой не проверяется.
+  const healthScore = preferOperatorInspection
+    ? operatorHealthScore
+    : inspection?.healthScore ?? operatorHealthScore ?? null;
   const facts = {
     inspectionCompleted: inspectedToday,
     inspectionProgress: inspectedToday ? 1 : inspectedEver ? 0.5 : 0,
@@ -159,11 +178,15 @@ export async function evaluateAuthoritativeReadiness(input: {
     facts, rules,
     evidence: {
       equipmentId: equipment.id,
-      // Ссылаемся на тот осмотр, который дал сегодняшний вывод: иначе в
-      // доказательствах стоял бы вчерашний журнал ЕО при свежем осмотре
-      // машиниста, и проверить вывод было бы не по чему.
-      inspectionId: (operatorSameTenantDay ? operatorInspection?.id : null)
+      // Ссылаемся на тот осмотр, который дал вывод, и говорим, откуда он.
+      //
+      // ПОЧЕМУ ТИП ОБЯЗАТЕЛЕН. Идентификаторы журнала ЕО и чек-листа
+      // машиниста лежат в разных таблицах и внешне неразличимы. Экран вёл
+      // «Открыть осмотр» на /inspections/{id} для обоих — и на осмотре
+      // машиниста открывалась страница чужой сущности, то есть 404.
+      inspectionId: (preferOperatorInspection ? operatorInspection?.id : null)
         ?? inspection?.id ?? null,
+      inspectionSource,
       permitId: permit?.id ?? null,
       maintenanceRecordIds: openRecords.map((row) => row.id),
     },

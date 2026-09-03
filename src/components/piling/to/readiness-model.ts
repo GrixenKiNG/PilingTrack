@@ -28,7 +28,7 @@ export interface ReadinessEquipment {
 }
 
 export interface ReadinessEvidence {
-  key: 'inspection' | 'meter' | 'crew' | 'maintenance' | 'repair';
+  key: 'inspection' | 'meter' | 'crew' | 'maintenance' | 'repair' | 'permit' | 'acceptance';
   label: string;
   value: string;
   state: EvidenceState;
