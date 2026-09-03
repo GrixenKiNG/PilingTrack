@@ -52,6 +52,16 @@ export async function assertCanAccessMediaEntity(
     return;
   }
 
+  // Фото к опасному событию или дефекту снимается до отправки самой команды.
+  // entityId здесь равен commandId: после подтверждения загрузки команда
+  // проверит владельца, организацию, тип, этот идентификатор и image/*.
+  if (entityType === 'safety_incident' || entityType === 'equipment_defect') {
+    if (!/^[A-Za-z0-9._:-]{8,128}$/.test(entityId)) {
+      throw new ServiceError('Некорректный идентификатор события для фотографии', 400);
+    }
+    return;
+  }
+
   // Фото к пункту осмотра. entityId — составной `${inspectionId}__${itemId}`.
   //
   // Оператор проводит сменный осмотр (право `inspection.perform`), а часть

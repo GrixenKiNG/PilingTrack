@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  FileText,
   HardHat,
   Link2Off,
   Plus,
@@ -215,7 +216,7 @@ export function AdminUsers() {
               там перечни свайных работ (марки свай, типы бурения, причины
               простоя), а это перечень про людей и он нужен рядом с ними. */}
           <Button variant="outline" className="h-10" onClick={() => setShowTypes(true)}>
-            Виды документов
+            <FileText className="h-4 w-4" />Виды документов
           </Button>
           <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
             <Plus className="h-4 w-4" />Новый пользователь

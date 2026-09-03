@@ -268,7 +268,7 @@ function CrewDetail({ crew, onEdit, onDelete, onToggle }: { crew: Crew; onEdit: 
 
       {crew.assistants.length > 0 && (
         <div className="rounded-md border border-border p-2.5">
-          <h3 className="mb-1 text-xs font-semibold text-foreground">Состав</h3>
+          <h3 className="mb-1 flex items-center gap-2 text-xs font-semibold text-foreground"><Users className="h-4 w-4 text-muted-foreground" />Состав</h3>
           <p className="text-2xs text-muted-foreground">{crew.assistants.map((a) => a.name).join(', ')}</p>
         </div>
       )}

@@ -15,7 +15,7 @@
  * законодательством и заказчиком и меняется без релиза.
  */
 
-import { documentExpiry } from '@/lib/document-expiry';
+import { documentExpiry, type DocumentExpiryStatus } from '@/lib/document-expiry';
 
 export interface RequiredDocumentType {
   id: string;
@@ -42,11 +42,31 @@ export interface ClearanceIssue {
   daysLeft: number | null;
 }
 
+/**
+ * Строка карточки «Личный допуск»: вид документа и его состояние — включая
+ * благополучное.
+ *
+ * Препятствия и предупреждения говорят только о плохом, а оператору перед
+ * сменой надо показать, что допуск ЕСТЬ: «✓ удостоверение действительно,
+ * ✓ медсправка действительна». Иначе экран допуска либо пуст, либо ругается —
+ * третьего состояния у него не было.
+ */
+export interface ClearanceDocument {
+  typeId: string;
+  typeName: string;
+  status: DocumentExpiryStatus | 'missing';
+  /** Срок действия, ISO. null — бессрочный или документа нет вовсе. */
+  expiresAt: string | null;
+  daysLeft: number | null;
+}
+
 export interface OperatorClearance {
   /** Допущен: ни одного препятствия. Предупреждения допуску не мешают. */
   cleared: boolean;
   blockers: ClearanceIssue[];
   warnings: ClearanceIssue[];
+  /** Все обязательные виды документов с их состоянием — для карточки допуска. */
+  documents: ClearanceDocument[];
 }
 
 const dayWord = (days: number) => {
@@ -87,6 +107,7 @@ export function evaluateOperatorClearance(
 ): OperatorClearance {
   const blockers: ClearanceIssue[] = [];
   const warnings: ClearanceIssue[] = [];
+  const documents: ClearanceDocument[] = [];
 
   for (const type of required) {
     const own = held.filter((document) => document.typeId === type.id);
@@ -95,6 +116,10 @@ export function evaluateOperatorClearance(
     // Документа нет вовсе. Это препятствие, а не предупреждение: обязательным
     // его назвал администратор, и работать без него нельзя.
     if (!document) {
+      documents.push({
+        typeId: type.id, typeName: type.name, status: 'missing',
+        expiresAt: null, daysLeft: null,
+      });
       blockers.push({
         typeId: type.id, typeName: type.name, reason: 'missing', daysLeft: null,
         label: `Нет документа: ${type.name}`,
@@ -103,6 +128,15 @@ export function evaluateOperatorClearance(
     }
 
     const expiry = documentExpiry(document.expiresAt, type.leadTimeDays, now);
+    documents.push({
+      typeId: type.id,
+      typeName: type.name,
+      status: expiry.status,
+      expiresAt: document.expiresAt == null || document.expiresAt === ''
+        ? null
+        : new Date(document.expiresAt).toISOString(),
+      daysLeft: expiry.daysLeft,
+    });
     if (expiry.status === 'expired') {
       const days = Math.abs(expiry.daysLeft ?? 0);
       blockers.push({
@@ -118,5 +152,5 @@ export function evaluateOperatorClearance(
     }
   }
 
-  return { cleared: blockers.length === 0, blockers, warnings };
+  return { cleared: blockers.length === 0, blockers, warnings, documents };
 }

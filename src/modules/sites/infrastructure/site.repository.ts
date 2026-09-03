@@ -22,6 +22,7 @@ export class PrismaSiteRepository implements SiteRepository {
         where: { id: state.id }, create: persistenceData,
         update: { name: persistenceData.name, status: persistenceData.status,
           plannedPiles: persistenceData.plannedPiles, plannedDrilling: persistenceData.plannedDrilling,
+          latitude: persistenceData.latitude, longitude: persistenceData.longitude,
           completionDate: persistenceData.completionDate, isActive: persistenceData.isActive },
       });
       if (pendingEvents.length > 0) {

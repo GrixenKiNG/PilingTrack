@@ -13,6 +13,8 @@ export function toPrismaData(aggregate: SiteAggregate) {
     status: state.status,
     plannedPiles: state.plannedPiles,
     plannedDrilling: state.plannedDrilling,
+    latitude: state.latitude ?? null,
+    longitude: state.longitude ?? null,
     completionDate: state.completionDate,
     isActive: state.isActive,
   };
@@ -27,6 +29,8 @@ export function fromPrismaToState(prismaSite: any): SiteInfo {
     status: prismaSite.status,
     plannedPiles: prismaSite.plannedPiles,
     plannedDrilling: prismaSite.plannedDrilling,
+    latitude: prismaSite.latitude ?? null,
+    longitude: prismaSite.longitude ?? null,
     completionDate: prismaSite.completionDate,
     isActive: prismaSite.isActive,
     createdAt: prismaSite.createdAt.toISOString(),

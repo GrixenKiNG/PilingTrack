@@ -143,6 +143,16 @@ export async function updateSiteWithPlans(siteId: string, input: {
   name?: string;
   plannedPiles?: number;
   plannedDrilling?: number;
+  /**
+   * Координаты площадки: `null` — стереть, `undefined` — не трогать.
+   *
+   * Проводить их надо и здесь, а не только в `updateSite`: форма объекта
+   * всегда шлёт массивы планов, а пустой массив в JS истинный — значит
+   * маршрут всегда выбирает эту ветку, и правка одних координат из формы
+   * иначе не сохранялась бы вовсе.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
   completionDate?: Date | string;
   pilePlans?: IncomingPilePlan[];
   drillingPlans?: IncomingDrillingPlan[];
@@ -171,6 +181,8 @@ export async function updateSiteWithPlans(siteId: string, input: {
         name: input.name !== undefined ? input.name.trim() : undefined,
         plannedPiles: hasPilePlans ? normalized.plannedPiles : input.plannedPiles,
         plannedDrilling: hasDrillingPlans ? normalized.plannedDrilling : input.plannedDrilling,
+        latitude: input.latitude,
+        longitude: input.longitude,
         ...(completionDate && { completionDate }),
       },
     });

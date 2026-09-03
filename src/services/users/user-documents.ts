@@ -305,7 +305,7 @@ export async function getOperatorClearance(
     where: { tenantId, isActive: true, requiredForOperator: true },
     select: { id: true, name: true, leadTimeDays: true },
   });
-  if (required.length === 0) return { cleared: true, blockers: [], warnings: [] };
+  if (required.length === 0) return { cleared: true, blockers: [], warnings: [], documents: [] };
 
   const held = await client.userDocument.findMany({
     where: { tenantId, userId, typeId: { in: required.map((type) => type.id) } },

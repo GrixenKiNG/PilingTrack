@@ -40,7 +40,8 @@ interface EditSiteDialogProps {
     name: string,
     isActive: boolean,
     pilePlans: PilePlanRow[],
-    drillingPlans: DrillingPlanRow[]
+    drillingPlans: DrillingPlanRow[],
+    coordinates: { latitude: number | null; longitude: number | null }
   ) => Promise<void>;
 }
 
@@ -54,6 +55,10 @@ export function EditSiteDialog({
 }: EditSiteDialogProps) {
   const [name, setName] = useState('');
   const [active, setActive] = useState(true);
+  // Координаты держим строками, а не числами: пустое поле должно означать
+  // «координат нет», а `Number('')` — это 0, то есть точка в Гвинейском заливе.
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
   const [pilePlans, setPilePlans] = useState<PilePlanRow[]>([]);
   const [drillingPlans, setDrillingPlans] = useState<DrillingPlanRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -83,7 +88,11 @@ export function EditSiteDialog({
         const fullSite = data.site as {
           pilePlans?: SitePilePlanDTO[];
           drillingPlans?: SiteDrillingPlanDTO[];
+          latitude?: number | null;
+          longitude?: number | null;
         };
+        setLatitude(fullSite.latitude == null ? '' : String(fullSite.latitude));
+        setLongitude(fullSite.longitude == null ? '' : String(fullSite.longitude));
         setPilePlans(
           (fullSite.pilePlans ?? []).map((p) => ({
               tempId: p.id,
@@ -107,9 +116,40 @@ export function EditSiteDialog({
       .catch(() => setDetailState('error'));
   }, [open, site, retryKey]);
 
+  /**
+   * Разбор координаты из поля.
+   *
+   * `null` — поле пустое, координату надо стереть. `undefined` — введено
+   * что-то, что числом не является: сохранять нельзя, иначе объект уедет
+   * непонятно куда. Запятую принимаем: на русской раскладке её набирают чаще
+   * точки, и отказывать из-за этого было бы придиркой.
+   */
+  const parseCoordinate = (raw: string, limit: number): number | null | undefined => {
+    const text = raw.trim().replace(',', '.');
+    if (text === '') return null;
+    const value = Number(text);
+    if (!Number.isFinite(value) || Math.abs(value) > limit) return undefined;
+    return value;
+  };
+
+  const parsedLatitude = parseCoordinate(latitude, 90);
+  const parsedLongitude = parseCoordinate(longitude, 180);
+  const coordinatesError = parsedLatitude === undefined
+    ? 'Широта должна быть числом от −90 до 90'
+    : parsedLongitude === undefined
+      ? 'Долгота должна быть числом от −180 до 180'
+      // Одна координата без второй бесполезна: точки из этого не получится.
+      : (parsedLatitude === null) !== (parsedLongitude === null)
+        ? 'Укажите обе координаты или оставьте оба поля пустыми'
+        : null;
+
   const submit = async () => {
     if (!site || !name.trim()) {
       toast.error('Введите название');
+      return;
+    }
+    if (coordinatesError) {
+      toast.error(coordinatesError);
       return;
     }
     if (planWipeRequiresConfirm(initialPileRows, initialDrillingRows, pilePlans, drillingPlans)) {
@@ -120,7 +160,10 @@ export function EditSiteDialog({
     }
     setSaving(true);
     try {
-      await onSave(site.id, name.trim(), active, pilePlans, drillingPlans);
+      await onSave(site.id, name.trim(), active, pilePlans, drillingPlans, {
+        latitude: parsedLatitude ?? null,
+        longitude: parsedLongitude ?? null,
+      });
     } finally {
       setSaving(false);
     }
@@ -155,6 +198,41 @@ export function EditSiteDialog({
                   className="h-11"
                   autoFocus
                 />
+              </div>
+
+              {/*
+                Координаты площадки. Нужны погоде на экране оператора: когда
+                телефон не отдал геопозицию, взять ветер и температуру больше
+                неоткуда. Оба поля необязательные — объект без координат это
+                нормально, просто у него не будет погоды.
+              */}
+              <div className="space-y-1.5">
+                <Label>Координаты площадки</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    inputMode="decimal"
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="Широта, напр. 57.5833"
+                    aria-label="Широта"
+                    className="h-11"
+                  />
+                  <Input
+                    inputMode="decimal"
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="Долгота, напр. 34.5667"
+                    aria-label="Долгота"
+                    className="h-11"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Нужны для погоды на экране оператора, когда телефон не даёт геопозицию.
+                  Можно оставить пустыми.
+                </p>
+                {coordinatesError && (
+                  <p className="text-xs text-destructive-strong">{coordinatesError}</p>
+                )}
               </div>
 
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">

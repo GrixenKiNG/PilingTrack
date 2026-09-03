@@ -45,6 +45,8 @@ export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandCon
     name: command.name,
     plannedPiles: command.plannedPiles,
     plannedDrilling: command.plannedDrilling,
+    latitude: command.latitude,
+    longitude: command.longitude,
     completionDate: command.completionDate,
   }, ctx.actorId);
 

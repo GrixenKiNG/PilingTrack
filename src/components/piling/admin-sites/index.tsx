@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus, CheckCircle2 } from '@/components/piling/icons/unified-icons';
+import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus, CheckCircle2, TrendingUp, Network, Power, PowerOff } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -305,8 +305,13 @@ export function AdminSites() {
         onOpenChange={(open) => { if (!open) setEditSite(null); }}
         loadingPileGrades={loadingPileGrades}
         pileGrades={pileGrades}
-        onSave={async (siteId, name, isActive, pilePlans, drillingPlans) => {
-          const ok = await mutations.handleSaveEdit(siteId, name, isActive, pilePlans, drillingPlans);
+        onSave={async (siteId, name, isActive, pilePlans, drillingPlans, coordinates) => {
+          // `coordinates` пробрасывать обязательно. Эта обёртка принимала пять
+          // аргументов и молча теряла шестой: TypeScript такое пропускает
+          // (функция с меньшим числом параметров совместима), а координаты из
+          // формы уходили в никуда — форма их принимала, сервер их умел, но
+          // между ними была дыра.
+          const ok = await mutations.handleSaveEdit(siteId, name, isActive, pilePlans, drillingPlans, coordinates);
           if (ok) { setEditSite(null); reload(); }
         }}
       />
@@ -374,7 +379,7 @@ function SiteDetail({
         <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
         <Button size="sm" variant="outline" onClick={onAssign} className="h-8 text-xs"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
         <Button size="sm" variant="outline" onClick={onToggleCompleted} className="h-8 text-xs"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
-        <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-8 text-xs">{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
+        <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-8 text-xs">{row.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
         <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
       </div>
 
@@ -389,13 +394,13 @@ function SiteDetail({
       </div>
 
       <div className="rounded-md border border-border p-2.5">
-        <h3 className="mb-1.5 text-xs font-semibold text-foreground">Прогресс</h3>
+        <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><TrendingUp className="h-4 w-4 text-muted-foreground" />Прогресс</h3>
         <LabeledProgress label="Сваи" pct={row.pileProgress} planned={row.plannedPiles} tone="orange" />
         <LabeledProgress label="Бурение" pct={row.drillingProgress} planned={row.plannedDrilling} tone="blue" />
       </div>
 
       <div className="rounded-md border border-border p-2.5">
-        <h3 className="mb-1.5 text-xs font-semibold text-foreground">Иерархия</h3>
+        <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Network className="h-4 w-4 text-muted-foreground" />Иерархия</h3>
         {tree
           ? <HierarchyTree siteId={row.siteId} tree={tree} onAdd={onAddHierarchy} onDelete={onDeleteHierarchy} />
           : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}

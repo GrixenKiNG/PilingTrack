@@ -105,6 +105,17 @@ describe('assertCanAccessMediaEntity — отчёты и осмотры', () => 
     await expect(assertCanAccessMediaEntity(operator, 'report', 'draft-id')).resolves.toBeUndefined();
   });
 
+  it.each(['safety_incident', 'equipment_defect'])(
+    'оператор загружает доказательство к своему будущему событию типа %s по commandId',
+    async (entityType) => {
+      await expect(assertCanAccessMediaEntity(
+        operator,
+        entityType,
+        'operator-command-0001',
+      )).resolves.toBeUndefined();
+    },
+  );
+
   it('оператор ведёт фото своего осмотра', async () => {
     inspectionFindUniqueMock.mockResolvedValue({ performedById: 'op-1' });
     await expect(assertCanAccessMediaEntity(operator, 'inspection', 'insp-1__item-3')).resolves.toBeUndefined();

@@ -16,6 +16,15 @@ export interface SiteInfo {
   status: SiteStatus;
   plannedPiles: number;
   plannedDrilling: number;
+  /**
+   * Координаты площадки. `null` — не заданы, и это нормальное состояние: у
+   * объекта их может не быть, пока никто не открыл карту.
+   *
+   * Нужны погоде на экране оператора, когда телефон не отдал геопозицию.
+   * Инвариантов у них нет — только диапазон, и его сторожит схема запроса.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
   completionDate?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -82,6 +91,8 @@ export class SiteAggregate {
     name?: string;
     plannedPiles?: number;
     plannedDrilling?: number;
+    latitude?: number | null;
+    longitude?: number | null;
     completionDate?: string | null;
   }, userId?: string): void {
     if (data.name !== undefined) {
@@ -92,6 +103,10 @@ export class SiteAggregate {
     }
     if (data.plannedPiles !== undefined) this.state.plannedPiles = data.plannedPiles;
     if (data.plannedDrilling !== undefined) this.state.plannedDrilling = data.plannedDrilling;
+    // `null` — это «стереть координаты», `undefined` — «не трогать». Разница
+    // существенная: без неё очистить однажды заданную точку было бы нельзя.
+    if (data.latitude !== undefined) this.state.latitude = data.latitude;
+    if (data.longitude !== undefined) this.state.longitude = data.longitude;
     if (data.completionDate !== undefined) this.state.completionDate = data.completionDate;
 
     this.state.updatedAt = new Date().toISOString();
@@ -154,6 +169,8 @@ export class SiteAggregate {
       status: this.state.status,
       plannedPiles: this.state.plannedPiles,
       plannedDrilling: this.state.plannedDrilling,
+      latitude: this.state.latitude,
+      longitude: this.state.longitude,
       completionDate: this.state.completionDate,
       isActive: this.state.isActive,
       createdAt: this.state.createdAt,

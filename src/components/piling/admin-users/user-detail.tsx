@@ -1,6 +1,9 @@
 'use client';
 
-import { Pencil, Power, PowerOff, Trash2 } from '@/components/piling/icons/unified-icons';
+import {
+  Activity, CircleUserRound, FileText, History, KeyRound, MapPin,
+  Pencil, Power, PowerOff, Trash2,
+} from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ROLE_LABELS, type OperationalUserDTO } from '@/lib/types';
@@ -13,6 +16,15 @@ import {
   useEntityHistory,
 } from '@/components/piling/ops-shell';
 import { UserDocuments } from './user-documents';
+
+const USER_TABS = [
+  { value: 'overview', label: 'Обзор', icon: CircleUserRound },
+  { value: 'documents', label: 'Документы', icon: FileText },
+  { value: 'assignment', label: 'Закрепление', icon: MapPin },
+  { value: 'activity', label: 'Активность', icon: Activity },
+  { value: 'access', label: 'Доступ', icon: KeyRound },
+  { value: 'history', label: 'История', icon: History },
+] as const;
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -52,13 +64,20 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
       status={<OpsRiskBadge level={risk.level} label={risk.label} />}
     >
       <Tabs defaultValue="overview" className="gap-3">
+        {/* Иконка над подписью, а не рядом с ней: шесть вкладок делят ширину
+            панели (от 320 px), и в строку «Закрепление» со значком уже не
+            помещается — значок вытеснил бы слово многоточием. */}
         <TabsList className="grid h-auto w-full grid-cols-6 rounded-md bg-muted p-1">
-          <TabsTrigger value="overview" className="min-w-0 px-1 text-xs">Обзор</TabsTrigger>
-          <TabsTrigger value="documents" className="min-w-0 px-1 text-xs">Документы</TabsTrigger>
-          <TabsTrigger value="assignment" className="min-w-0 px-1 text-xs">Закрепление</TabsTrigger>
-          <TabsTrigger value="activity" className="min-w-0 px-1 text-xs">Активность</TabsTrigger>
-          <TabsTrigger value="access" className="min-w-0 px-1 text-xs">Доступ</TabsTrigger>
-          <TabsTrigger value="history" className="min-w-0 px-1 text-xs">История</TabsTrigger>
+          {USER_TABS.map(({ value, label, icon: Icon }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="min-w-0 flex-col gap-0.5 px-1 py-1.5 text-3xs leading-tight"
+            >
+              <Icon className="h-4 w-4" />
+              <span className="min-w-0 truncate">{label}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="documents">

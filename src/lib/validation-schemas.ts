@@ -74,6 +74,13 @@ export const createSiteSchema = z.object({
   name: z.string().min(1, 'Site name is required').max(200),
   plannedPiles: z.number().int().min(0).max(999999).optional(),
   plannedDrilling: z.number().int().min(0).max(999999).optional(),
+  // Координаты площадки. Нужны погоде на экране оператора, когда телефон не
+  // отдал геопозицию: без них показать ветер и температуру неоткуда.
+  //
+  // `nullable` обязателен: очистить ранее заданные координаты должно быть
+  // можно, а `undefined` в PATCH-семантике означает «не трогать».
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
   description: z.string().max(2000).optional(),
   status: z.enum(['active', 'paused', 'completed']).default('active'),
   pilePlans: z.array(z.object({

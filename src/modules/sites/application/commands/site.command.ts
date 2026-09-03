@@ -16,6 +16,9 @@ export interface UpdateSiteCommand {
   name?: string;
   plannedPiles?: number;
   plannedDrilling?: number;
+  /** Координаты площадки: `null` — стереть, `undefined` — не трогать. */
+  latitude?: number | null;
+  longitude?: number | null;
   completionDate?: string | null;
   userId?: string;
 }

@@ -85,10 +85,18 @@ export function useSiteMutations({
     name: string,
     isActive: boolean,
     pilePlans: PilePlanRow[],
-    drillingPlans: DrillingPlanRow[]
+    drillingPlans: DrillingPlanRow[],
+    coordinates?: { latitude: number | null; longitude: number | null }
   ) => {
     try {
       const payload: Record<string, unknown> = { name, isActive };
+      // Координаты шлём всегда, когда форма их посчитала: `null` означает
+      // «стереть», и пропустить его нельзя — иначе снять однажды заданную
+      // точку было бы невозможно.
+      if (coordinates) {
+        payload.latitude = coordinates.latitude;
+        payload.longitude = coordinates.longitude;
+      }
 
       const validPilePlans = pilePlans.filter((p) => p.pileGradeId && p.count > 0);
       const validDrillingPlans = drillingPlans.filter((p) => p.count > 0);
