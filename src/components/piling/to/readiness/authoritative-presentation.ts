@@ -56,17 +56,46 @@ export interface AuthoritativeReadinessPresentation {
 
 type Snapshot = CurrentReadinessDto | ReadinessSnapshotDto;
 
+const REFERENCE_TYPES = ['EQUIPMENT', 'INSPECTION', 'OPERATOR_CHECKLIST', 'PERMIT', 'MAINTENANCE'] as const;
+type EvidenceReferenceType = (typeof REFERENCE_TYPES)[number];
+interface EvidenceReference {
+  type: EvidenceReferenceType;
+  id: string;
+}
+
 interface EvidenceRecord {
+  /**
+   * Типизированные ссылки — источник истины о том, что за запись и куда её
+   * открыть. Необязательны: снимки готовности неизменяемы, и сделанные до
+   * появления поля навсегда остаются с плоскими полями ниже.
+   */
+  references?: EvidenceReference[];
   equipmentId: string;
   inspectionId: string | null;
   /**
-   * Из какой таблицы `inspectionId`. Снимки, сделанные до появления поля,
-   * его не имеют — там `undefined`, и ссылку мы не рисуем.
+   * Из какой таблицы `inspectionId` — совместимость для снимков без
+   * `references`. Снимки, сделанные до появления и этого поля, его не имеют:
+   * там `undefined`, и ссылку мы не рисуем.
    */
   inspectionSource?: 'INSPECTION' | 'OPERATOR_CHECKLIST' | null;
   permitId: string | null;
   maintenanceRecordIds: string[];
   evaluatedAt: string;
+}
+
+/**
+ * Тип и id осмотра из доказательства: сначала из типизированных ссылок, иначе
+ * из плоских полей старого снимка. `type: null` — тип неизвестен, ссылку не
+ * строим (проверить, куда она ведёт, нечем).
+ */
+function inspectionEvidence(evidence: EvidenceRecord): {
+  type: 'INSPECTION' | 'OPERATOR_CHECKLIST' | null;
+  id: string | null;
+} {
+  const typed = evidence.references?.find(
+    (item) => item.type === 'INSPECTION' || item.type === 'OPERATOR_CHECKLIST');
+  if (typed) return {type: typed.type as 'INSPECTION' | 'OPERATOR_CHECKLIST', id: typed.id};
+  return {type: evidence.inspectionSource ?? null, id: evidence.inspectionId};
 }
 
 const UNKNOWN_STAGES: AuthoritativeReadinessPresentation['stages'] = [
@@ -81,8 +110,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isReferenceList(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => isRecord(item)
+    && typeof item.id === 'string'
+    && REFERENCE_TYPES.includes(item.type as EvidenceReferenceType));
+}
+
 function evidenceRecord(value: unknown): EvidenceRecord | null {
   if (!isRecord(value)
+    || (value.references !== undefined && !isReferenceList(value.references))
     || typeof value.equipmentId !== 'string'
     || (value.inspectionId !== null && typeof value.inspectionId !== 'string')
     || (value.inspectionSource !== undefined
@@ -206,20 +242,19 @@ export function buildAuthoritativeReadinessPresentation(
       links: [{text: 'Открыть карточку установки', href: `/admin/equipment/${evidence.equipmentId}`}]},
     {key: 'evaluation', label: 'Расчёт выполнен', reference: evidence.evaluatedAt},
   ];
-  if (evidence.inspectionId) {
+  const inspection = inspectionEvidence(evidence);
+  if (inspection.id) {
     // Ссылку даём только журналу ЕО/ТО: у предсменного чек-листа машиниста
     // отдельной страницы нет, и прежний общий адрес /inspections/{id}
-    // открывал на нём чужую сущность — то есть 404. Снимок без указания
-    // источника сделан до этой правки: там ссылки тоже нет, потому что
-    // проверить, куда она ведёт, нечем.
-    const openable = evidence.inspectionSource === 'INSPECTION';
+    // открывал на нём чужую сущность — то есть 404. Тип берётся из
+    // типизированной ссылки, а у старых снимков — из плоского поля; если и
+    // его нет, ссылки не будет: проверить, куда она ведёт, нечем.
+    const openable = inspection.type === 'INSPECTION';
     evidenceCards.push({
       key: 'inspection',
-      label: evidence.inspectionSource === 'OPERATOR_CHECKLIST'
-        ? 'Осмотр машиниста'
-        : 'Осмотр',
-      reference: evidence.inspectionId,
-      links: openable ? [{text: 'Открыть осмотр', href: `/inspections/${evidence.inspectionId}`}] : [],
+      label: inspection.type === 'OPERATOR_CHECKLIST' ? 'Осмотр машиниста' : 'Осмотр',
+      reference: inspection.id,
+      links: openable ? [{text: 'Открыть осмотр', href: `/inspections/${inspection.id}`}] : [],
     });
   }
   if (evidence.permitId) {

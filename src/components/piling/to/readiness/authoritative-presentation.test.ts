@@ -87,6 +87,49 @@ describe('buildAuthoritativeReadinessPresentation', () => {
     expect(legacy?.links ?? []).toEqual([]);
   });
 
+  it('takes the inspection type from typed references, ignoring the flat field', () => {
+    // Типизированные ссылки — источник истины. Если плоское поле осталось от
+    // прежней записи и спорит со ссылкой, верить надо ссылке: только у неё тип
+    // неотделим от идентификатора.
+    const withRefs = (references: unknown, flat: Record<string, unknown> = {}) =>
+      buildAuthoritativeReadinessPresentation(snapshot({
+        evidence: {
+          references,
+          equipmentId: 'equipment-1',
+          inspectionId: 'inspection-1',
+          permitId: null,
+          maintenanceRecordIds: [],
+          evaluatedAt: '2026-08-08T12:00:00.000Z',
+          ...flat,
+        },
+      })).evidence.find((item) => item.key === 'inspection');
+
+    // Ссылка говорит «чек-лист машиниста», плоское поле врёт «осмотр механика».
+    const operator = withRefs(
+      [{type: 'EQUIPMENT', id: 'equipment-1'}, {type: 'OPERATOR_CHECKLIST', id: 'exec-9'}],
+      {inspectionSource: 'INSPECTION'},
+    );
+    expect(operator?.label).toBe('Осмотр машиниста');
+    expect(operator?.reference).toBe('exec-9');
+    expect(operator?.links ?? []).toEqual([]);
+
+    // Обратный случай: ссылка на журнал ЕО/ТО — открывается по своему id.
+    const mechanic = withRefs(
+      [{type: 'EQUIPMENT', id: 'equipment-1'}, {type: 'INSPECTION', id: 'insp-7'}],
+      {inspectionSource: 'OPERATOR_CHECKLIST'},
+    );
+    expect(mechanic?.links).toEqual([{text: 'Открыть осмотр', href: '/inspections/insp-7'}]);
+
+    // Испорченные ссылки не принимаем: снимок считается некорректным целиком.
+    expect(buildAuthoritativeReadinessPresentation(snapshot({
+      evidence: {
+        references: [{type: 'NOT_A_TYPE', id: 'x'}],
+        equipmentId: 'equipment-1', inspectionId: null, permitId: null,
+        maintenanceRecordIds: [], evaluatedAt: '2026-08-08T12:00:00.000Z',
+      },
+    }))).toMatchObject({mode: 'malformed'});
+  });
+
   it('builds BLOCKED notices and next action from persisted blockers', () => {
     const result = buildAuthoritativeReadinessPresentation(snapshot({
       status: 'BLOCKED', score: 42,

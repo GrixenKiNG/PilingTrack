@@ -4,6 +4,7 @@ import {tenantProductionDate} from '../domain/shifts/tenant-production-date';
 import {chooseInspectionSource} from '../domain/evaluation/inspection-source';
 import {capturedClock, type EvaluationClock} from '../domain/evaluation/clock';
 import {evaluateReadiness} from '../domain/evaluation/evaluator';
+import {buildEvidence} from '../domain/evaluation/evidence';
 import {immutablePublishedRules} from '../domain/evaluation/rules';
 
 /**
@@ -176,7 +177,7 @@ export async function evaluateAuthoritativeReadiness(input: {
   }) : null;
   const evaluation = evaluateReadiness({
     facts, rules,
-    evidence: {
+    evidence: buildEvidence({
       equipmentId: equipment.id,
       // Ссылаемся на тот осмотр, который дал вывод, и говорим, откуда он.
       //
@@ -189,7 +190,7 @@ export async function evaluateAuthoritativeReadiness(input: {
       inspectionSource,
       permitId: permit?.id ?? null,
       maintenanceRecordIds: openRecords.map((row) => row.id),
-    },
+    }),
     clock: capturedClock(now),
   });
   return {

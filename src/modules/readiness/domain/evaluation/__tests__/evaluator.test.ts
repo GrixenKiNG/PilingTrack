@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {capturedClock} from '../clock';
 import {evaluateReadiness} from '../evaluator';
+import {buildEvidence} from '../evidence';
 import {immutablePublishedRules} from '../rules';
 import {DEFAULT_READINESS_RULES} from '../../readiness-rules';
 
@@ -22,7 +23,12 @@ const facts = {
   maintenanceConfigured: true, maintenanceOverdueHours: 0, maintenanceOverdueDays: 0,
   accepted: true, criticalDefect: false, findings: 0,
 } as const;
-const evidence = {equipmentId: 'eq-1', inspectionId: 'in-1', inspectionSource: 'INSPECTION' as const, permitId: null, maintenanceRecordIds: []};
+// Через настоящий сборщик: фикстура заодно держит плоские поля и
+// типизированные ссылки согласованными, как их пишет расчёт.
+const evidence = buildEvidence({
+  equipmentId: 'eq-1', inspectionId: 'in-1', inspectionSource: 'INSPECTION',
+  permitId: null, maintenanceRecordIds: [],
+});
 
 describe('authoritative readiness evaluator', () => {
   it('fails closed when published rules are absent', () => {
