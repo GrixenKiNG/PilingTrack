@@ -233,7 +233,7 @@ function buildReadinessMetricTiles(
   equipmentId: string,
   engineHoursTotal: number | null | undefined,
   detail: EquipmentDetailSnapshot | undefined,
-  inspectionId: string | null,
+  inspectionHref: string | null,
 ): ReadinessMetricTile[] {
   const inspectionStage = presentation.stages.find((stage) => stage.key === 'INSPECTION');
   const maintenanceStage = presentation.stages.find((stage) => stage.key === 'MAINTENANCE');
@@ -261,9 +261,12 @@ function buildReadinessMetricTiles(
       icon: FileText,
       pill: STAGE_PILL[inspectionStage?.state ?? 'unknown'],
       rows: [{ caption: 'Выполнено пунктов', value: inspectionItems }],
-      href: inspectionId
-        ? `/inspections/${inspectionId}`
-        : lastInspection ? `/inspections/${lastInspection.id}` : '/inspections',
+      // Source-aware ссылка из доказательства (журнал ЕО/ТО открывается,
+      // чек-лист машиниста — без ссылки). Иначе последний реальный осмотр
+      // (валидная сущность /inspections), иначе список. Никогда не сырой
+      // inspectionId: он может быть id чек-листа машиниста и вести в 404.
+      href: inspectionHref
+        ?? (lastInspection ? `/inspections/${lastInspection.id}` : '/inspections'),
     },
     {
       key: 'meter',
@@ -392,14 +395,19 @@ export function ReadinessCentre(props: ReferenceUiProps) {
     (shift) => shift.equipmentId === item.id && shift.state === 'HANDOVER_PENDING',
   ));
 
-  const inspectionEvidenceId = presentation.evidence.find((item) => item.key === 'inspection')?.reference ?? null;
+  // Ссылку на осмотр берём готовой из доказательства: presentation уже сделал
+  // её зависимой от источника — журнал ЕО/ТО открывается, а у предсменного
+  // чек-листа машиниста своей страницы нет, поэтому ссылки нет. Раньше здесь
+  // бралась сырая `reference` (inspectionId) и подставлялась в /inspections/{id};
+  // для чек-листа машиниста это чужой тип сущности — открывался 404.
+  const inspectionHref = presentation.evidence.find((item) => item.key === 'inspection')?.links?.[0]?.href ?? null;
   /**
    * Куда ведёт шаг чек-листа. Осмотр и моточасы живут в других модулях,
    * остальные шаги — вкладки этого же контура. Раньше строки показывали
    * шеврон, но не открывали ничего.
    */
   const stageTargets: Record<PresentationStage['key'], {href?: string; view?: ReferenceView}> = {
-    INSPECTION: {href: inspectionEvidenceId ? `/inspections/${inspectionEvidenceId}` : '/inspections'},
+    INSPECTION: {href: inspectionHref ?? '/inspections'},
     ENGINE_HOURS: {href: `/admin/equipment/${selected.id}`},
     PERMIT: {view: 'permits'},
     MAINTENANCE: {view: 'maintenance'},
@@ -419,7 +427,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   const nextTarget = nextStage ? stageTargets[nextStage.key] : null;
   const stageOwner = nextStage ? STAGE_OWNER[nextStage.key] : null;
   const metricTiles = buildReadinessMetricTiles(
-    facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionEvidenceId,
+    facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionHref,
   );
   // Смена и открытые заявки по выбранной установке — вход для счётчиков ролей.
   const currentShift = props.shifts.find((item) => item.equipmentId === selected.id) ?? null;

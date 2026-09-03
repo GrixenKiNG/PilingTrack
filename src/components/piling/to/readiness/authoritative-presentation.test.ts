@@ -57,6 +57,36 @@ describe('buildAuthoritativeReadinessPresentation', () => {
     ]));
   });
 
+  it('links the inspection evidence only for a mechanic inspection, never for an operator checklist', () => {
+    // Регресс: `inspectionId` может быть id осмотра механика ИЛИ id чек-листа
+    // машиниста. Ссылка /inspections/{id} валидна только для первого; для
+    // второго это чужой тип сущности — 404. Источник различает `inspectionSource`.
+    const base = {
+      equipmentId: 'equipment-1',
+      inspectionId: 'inspection-1',
+      permitId: null,
+      maintenanceRecordIds: [] as string[],
+      evaluatedAt: '2026-08-08T12:00:00.000Z',
+    };
+
+    const mechanic = buildAuthoritativeReadinessPresentation(
+      snapshot({evidence: {...base, inspectionSource: 'INSPECTION'}}),
+    ).evidence.find((item) => item.key === 'inspection');
+    expect(mechanic?.links).toEqual([{text: 'Открыть осмотр', href: '/inspections/inspection-1'}]);
+
+    const operator = buildAuthoritativeReadinessPresentation(
+      snapshot({evidence: {...base, inspectionSource: 'OPERATOR_CHECKLIST'}}),
+    ).evidence.find((item) => item.key === 'inspection');
+    expect(operator?.label).toBe('Осмотр машиниста');
+    expect(operator?.links ?? []).toEqual([]);
+
+    // Старый снимок без источника: проверить ссылку нечем — не даём её.
+    const legacy = buildAuthoritativeReadinessPresentation(
+      snapshot({evidence: base}),
+    ).evidence.find((item) => item.key === 'inspection');
+    expect(legacy?.links ?? []).toEqual([]);
+  });
+
   it('builds BLOCKED notices and next action from persisted blockers', () => {
     const result = buildAuthoritativeReadinessPresentation(snapshot({
       status: 'BLOCKED', score: 42,
