@@ -25,6 +25,11 @@ const migrationPaths = [
   // То же и про новые таблицы, а не только колонки: без этой строки решение о
   // пуске падает на запросе разрешения, которого в одноразовой базе нет.
   resolve(process.cwd(), 'prisma/migrations/20260820120000_shift_start_waiver/migration.sql'),
+  // Расчёт готовности читает предсменный осмотр машиниста (readiness-score.ts):
+  // одна и та же проверка обслуживает и центр готовности, и мобильное место.
+  // Без этой миграции в одноразовой базе нет таблицы осмотров, и решение о
+  // пуске падает ещё до того, как дойдёт до проверяемого правила.
+  resolve(process.cwd(), 'prisma/migrations/20260829170000_operator_v3_mobile_new_spec/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
@@ -131,6 +136,11 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     for (const migrationPath of migrationPaths) {
       await sql.query(await readFile(migrationPath, 'utf8'));
     }
+    // Миграция 20260826140000 целиком сюда не годится: она же трогает Report,
+    // которого в этой урезанной базе нет. Берём из неё только колонку смены —
+    // без неё клиент Prisma выбирает поле, которого в базе нет, и падают все
+    // тесты смен.
+    await sql.query('ALTER TABLE "Shift" ADD COLUMN IF NOT EXISTS "closeExceptionReason" TEXT');
     await sql.query(`INSERT INTO "ReadinessRuleSet" ("id","tenantId","status","version","criteria","blockers","publishedAt")
       VALUES ('rules-default',$1,'PUBLISHED',$2,$3,$4,NOW())`, [tenantId, DEFAULT_READINESS_RULES.version,
       JSON.stringify(DEFAULT_READINESS_RULES.criteria), JSON.stringify(DEFAULT_READINESS_RULES.blockers)]);

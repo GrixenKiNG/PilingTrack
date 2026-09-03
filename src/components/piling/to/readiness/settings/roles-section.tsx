@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { roleIcon } from '@/components/piling/icons';
 import { AlertTriangle, CheckCircle2, ChevronRight } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
@@ -236,7 +237,15 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
           <div className="overflow-x-auto">
             <div className="grid min-w-[820px] grid-cols-[minmax(0,1fr)_repeat(7,90px)] items-end gap-1 border-b border-border px-4 py-2 text-3xs font-semibold text-muted-foreground">
               <span>Полномочие</span>
-              {MATRIX_ROLES.map((role) => <span key={role} className="text-center">{handoverRoleLabel(role)}</span>)}
+              {MATRIX_ROLES.map((role) => {
+                const RoleIcon = roleIcon(role);
+                return (
+                  <span key={role} className="flex flex-col items-center gap-0.5 text-center">
+                    <RoleIcon className="h-4 w-4 text-muted-foreground" />
+                    <span className="leading-tight">{handoverRoleLabel(role)}</span>
+                  </span>
+                );
+              })}
             </div>
             {READINESS_ABILITIES.map((ability) => (
               <div key={ability} className="grid min-w-[820px] grid-cols-[minmax(0,1fr)_repeat(7,90px)] items-center gap-1 border-b border-border px-4 py-2 text-2xs last:border-b-0 hover:bg-signal/5">
@@ -289,7 +298,9 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
           <section className={cn(card, 'overflow-hidden')}>
             <div className="border-b border-border p-4"><h2 className="font-bold">Роли</h2></div>
             <div className="divide-y divide-border">
-              {roleRows.map(({ role, users }) => (
+              {roleRows.map(({ role, users }) => {
+                const RoleIcon = roleIcon(role);
+                return (
                 <button
                   key={role}
                   type="button"
@@ -300,11 +311,13 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
                     role === selectedRole ? 'border-signal bg-signal/10 font-semibold text-signal-strong' : 'border-transparent hover:bg-muted',
                   )}
                 >
+                  <RoleIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate">{handoverRoleLabel(role)}</span>
                   <span className="font-mono">{users.length}</span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
-              ))}
+                );
+              })}
             </div>
           </section>
           <section className={cn(card, 'overflow-hidden')}>

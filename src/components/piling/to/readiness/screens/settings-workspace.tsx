@@ -317,12 +317,12 @@ function RulesSettings(props: ReferenceUiProps) {
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className={cn(card, 'overflow-hidden')}>
           <div className="border-b border-border p-3">
-            <h2 className="text-lg font-bold">Вес критериев и критические блокеры</h2>
+            <h2 className="flex items-center gap-2 text-lg font-bold"><Gauge className="h-5 w-5 text-muted-foreground" />Вес критериев и критические блокеры</h2>
           </div>
           <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <div className="rounded-xl border border-border p-3">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="font-bold">Вес критериев</h3>
+                <h3 className="flex items-center gap-2 font-bold"><Gauge className="h-4 w-4 text-muted-foreground" />Вес критериев</h3>
                 <span className="text-xs text-muted-foreground">Итого <b className={cn('ml-1 rounded px-2 py-1 font-mono', total === 100 ? 'bg-success/10 text-success-strong' : 'bg-destructive/10 text-destructive-strong')}>{total}%</b></span>
               </div>
               <div className="mt-2 divide-y divide-border">
@@ -383,7 +383,7 @@ function RulesSettings(props: ReferenceUiProps) {
             <div className="space-y-3">
               <div className="rounded-xl border border-border p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-bold">Блокеры и предупреждения</h3>
+                  <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4 text-muted-foreground" />Блокеры и предупреждения</h3>
                   <span className="text-xs text-muted-foreground">{draft.blockers.filter((item) => item.isActive).length} из {draft.blockers.length} активны</span>
                 </div>
                 <div className="mt-2 grid grid-cols-[minmax(0,1fr)_128px_44px] items-end gap-2 border-b border-border pb-1.5 text-3xs uppercase text-muted-foreground">
@@ -434,7 +434,7 @@ function RulesSettings(props: ReferenceUiProps) {
                 })}
               </div>
               <div className="overflow-x-auto rounded-xl border border-border p-3">
-                <h3 className="font-bold">Роли и доступы</h3>
+                <h3 className="flex items-center gap-2 font-bold"><Users className="h-4 w-4 text-muted-foreground" />Роли и доступы</h3>
                 <div className="mt-2 grid min-w-[286px] grid-cols-[104px_repeat(4,minmax(0,1fr))] text-3xs font-semibold text-muted-foreground">
                   <span />{ROLE_COLUMNS.map(({ role, label }) => <span key={role} className="truncate text-center">{label}</span>)}
                 </div>
@@ -478,7 +478,7 @@ function RulesSettings(props: ReferenceUiProps) {
               <div className="flex justify-between gap-2"><dt>Автор</dt><dd className="text-right font-semibold text-foreground">{publishedAuthor}</dd></div>
               <div className="flex justify-between gap-2"><dt>Установок затронуто</dt><dd className="text-right font-mono font-semibold text-foreground">{props.equipment.length}</dd></div>
             </dl>
-            <h3 className="mt-3 text-xs font-bold">Что сейчас действует</h3>
+            <h3 className="mt-3 flex items-center gap-2 text-xs font-bold"><CheckCircle2 className="h-4 w-4 text-muted-foreground" />Что сейчас действует</h3>
             <ul className="mt-1.5 space-y-1.5">
               {activeRules.length === 0
                 ? <li className="text-2xs text-muted-foreground">Ни одно правило не включено — запуск ничем не ограничен.</li>
@@ -522,7 +522,7 @@ function RulesSettings(props: ReferenceUiProps) {
         </aside>
       </div>
       <section className={cn(card, 'mt-2 p-3')}>
-        <h2 className="font-bold">Предпросмотр расчёта готовности</h2>
+        <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4 text-muted-foreground" />Предпросмотр расчёта готовности</h2>
         <div className="mt-3 grid grid-cols-1 items-start gap-4 xl:grid-cols-[270px_minmax(0,1.5fr)_minmax(0,1fr)_200px]">
           <div className="flex items-center gap-3">
             <EquipmentPhoto cardData={previewFleet} name={previewEquipment?.name ?? ''} className="h-[74px] w-[68px] shrink-0" />

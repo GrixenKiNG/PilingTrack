@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Link2, Radio, Send } from '@/components/piling/icons/unified-icons';
+import { AlertTriangle, Clock, Link2, Radio, Send } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { authFetch } from '@/lib/api';
@@ -91,7 +91,7 @@ export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSetting
       ]} />
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'p-4')}>
-          <h2 className="font-bold">Подключённые системы</h2>
+          <h2 className="flex items-center gap-2 font-bold"><Link2 className="h-4 w-4 text-muted-foreground" />Подключённые системы</h2>
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
             {systems.map((system) => {
               const Icon = system.icon;
@@ -124,7 +124,7 @@ export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSetting
         <aside className="space-y-3">
           <section className={cn(card, 'overflow-hidden')}>
             <div className="flex items-center justify-between gap-2 border-b border-border p-4">
-              <h2 className="font-bold">Устройства телематики</h2>
+              <h2 className="flex items-center gap-2 font-bold"><Radio className="h-4 w-4 text-muted-foreground" />Устройства телематики</h2>
               <StatusPill tone={online.length > 0 ? 'success' : 'neutral'}>{online.length > 0 ? 'Онлайн' : 'Нет данных'}</StatusPill>
             </div>
             <div className="divide-y divide-border">
@@ -147,7 +147,7 @@ export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSetting
             </div>
           </section>
           <section className={cn(card, 'p-4')}>
-            <h2 className="font-bold">Часовой пояс контура</h2>
+            <h2 className="flex items-center gap-2 font-bold"><Clock className="h-4 w-4 text-muted-foreground" />Часовой пояс контура</h2>
             <p className="mt-2 font-mono text-sm font-bold">{bootstrap?.tenant.timezone ?? 'Europe/Moscow'}</p>
             <p className="mt-2 text-2xs leading-relaxed text-muted-foreground">В этом поясе считаются производственные сутки, сроки нарядов и графики смен.</p>
           </section>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { AlertTriangle, CheckCircle2, ChevronRight, Search } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,15 @@ const CATEGORY_LABEL = {
 } as const;
 
 type CategoryKey = keyof typeof CATEGORY_LABEL;
+
+/** Значок категории — из утверждённого набора PilingTrack. */
+const CATEGORY_ICON: Record<CategoryKey, PilingIconName> = {
+  equipment: 'equipment-rig',
+  sites: 'site',
+  pileGrades: 'pile-group',
+  drillingTypes: 'drilling-auger',
+  downtimeReasons: 'downtime-reason',
+};
 
 const CATEGORY_HREF: Record<CategoryKey, string> = {
   equipment: '/admin/equipment',
@@ -180,6 +190,7 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
                   key === 'equipment' ? 'border-signal bg-signal/10 font-semibold text-signal-strong' : 'border-transparent',
                 )}
               >
+                <PilingIcon name={CATEGORY_ICON[key]} size={14} decorative />
                 <span className="min-w-0 flex-1 truncate">{CATEGORY_LABEL[key]}</span>
                 <span className="font-mono">{counts[key] ?? '…'}</span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

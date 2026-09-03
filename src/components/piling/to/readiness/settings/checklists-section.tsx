@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   Camera,
+  CalendarCheck,
   ChevronRight,
   ClipboardCheck,
   Search,
+  Wrench,
 } from '@/components/piling/icons/unified-icons';
 import {
   DoneControl,
@@ -52,6 +54,19 @@ interface TemplateDetail {
 }
 
 /** Подписи типов ответа — в интерфейсе оператора они на русском. */
+/**
+ * Значок уровня обслуживания. ЕО оператор делает каждую смену сам, ТО —
+ * плановая работа механика: в списке из трёх десятков шаблонов это первое,
+ * что человек хочет различить, и подпись «ЕО · База» тонет в третьей строке.
+ */
+const LEVEL_ICON: Record<string, typeof ClipboardCheck> = {
+  EO: ClipboardCheck,
+  TO1: Wrench,
+  TO2: Wrench,
+  TO3: Wrench,
+  SEASONAL: CalendarCheck,
+};
+
 const ANSWER_TYPE_LABEL: Record<string, string> = {
   YES_NO: 'Да / Нет',
   STATUS4: 'Четыре состояния',
@@ -203,7 +218,9 @@ export function ChecklistsSettings() {
             {loading && <div className="p-6 text-center text-xs text-muted-foreground">Загружаем шаблоны…</div>}
             {error && <div role="alert" className="p-6 text-xs text-destructive-strong">{error}</div>}
             {!loading && !error && filtered.length === 0 && <div className="p-6 text-center text-xs text-muted-foreground">Шаблоны не найдены.</div>}
-            {filtered.map((template) => (
+            {filtered.map((template) => {
+              const LevelIcon = LEVEL_ICON[template.level] ?? ClipboardCheck;
+              return (
               <button
                 key={template.id}
                 type="button"
@@ -214,6 +231,7 @@ export function ChecklistsSettings() {
                   template.id === selectedId ? 'border-signal bg-signal/10' : 'border-transparent hover:bg-muted',
                 )}
               >
+                <LevelIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-bold">{template.name}</span>
                   <span className="mt-0.5 block text-3xs text-muted-foreground">
@@ -222,7 +240,8 @@ export function ChecklistsSettings() {
                 </span>
                 <StatusPill tone={template.isActive === false ? 'neutral' : 'success'}>{template.isActive === false ? 'Архив' : 'Действует'}</StatusPill>
               </button>
-            ))}
+              );
+            })}
           </div>
           <div className="border-t border-border p-3">
             <Button asChild variant="outline" className="w-full"><Link href="/admin/checklists">Управление шаблонами</Link></Button>

@@ -7,18 +7,25 @@ import {
   useRef,
 } from 'react';
 import { cn } from '@/lib/utils';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import type { ReferenceView } from '../readiness-reference-ui';
 
+/**
+ * Иконки здесь не украшение. Восемь одинаковых слов в одну строку читаются
+ * подряд, и человек каждый раз ищет нужное перечитыванием. Внутренняя
+ * навигация модуля (`readiness-reference-ui`, VIEW_ITEMS) иконки уже носит —
+ * эта полоса просто не получила их при выносе в администраторскую оболочку.
+ */
 export const MODULE_TABS = [
-  { id: 'readiness', label: 'Центр готовности' },
-  { id: 'fleet', label: 'Техника' },
-  { id: 'shifts', label: 'Смены' },
-  { id: 'permits', label: 'Наряд-допуски' },
-  { id: 'maintenance', label: 'Обслуживание' },
-  { id: 'documents', label: 'Документы' },
-  { id: 'reports', label: 'Отчёты' },
-  { id: 'settings', label: 'Настройки' },
-] as const satisfies ReadonlyArray<{ id: ReferenceView; label: string }>;
+  { id: 'readiness', label: 'Центр готовности', icon: 'technical-readiness' },
+  { id: 'fleet', label: 'Техника', icon: 'equipment-rig' },
+  { id: 'shifts', label: 'Смены', icon: 'shift-start' },
+  { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
+  { id: 'maintenance', label: 'Обслуживание', icon: 'repair' },
+  { id: 'documents', label: 'Документы', icon: 'documents' },
+  { id: 'reports', label: 'Отчёты', icon: 'reports' },
+  { id: 'settings', label: 'Настройки', icon: 'settings' },
+] as const satisfies ReadonlyArray<{ id: ReferenceView; label: string; icon: PilingIconName }>;
 
 interface ModuleTabListProps {
   activeView: ReferenceView;
@@ -109,12 +116,18 @@ export function ModuleTabList({
               onClick={() => onViewChange(tab.id)}
               onKeyDown={(event) => handleKeyDown(event, index)}
               className={cn(
-                'relative flex h-12 min-h-9 flex-none items-center whitespace-nowrap px-3 text-sm outline-none transition-colors focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-4 max-sm:min-h-11',
+                'relative flex h-12 min-h-9 flex-none items-center gap-1.5 whitespace-nowrap px-3 text-sm outline-none transition-colors focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-4 max-sm:min-h-11',
                 selected
                   ? 'font-semibold text-foreground'
                   : 'font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
             >
+              <PilingIcon
+                name={tab.icon}
+                size={14}
+                tone={selected ? 'primary' : 'neutral'}
+                decorative
+              />
               {tab.label}
               {selected && (
                 <span

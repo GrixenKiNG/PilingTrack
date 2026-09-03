@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { getOperatorClearance } from '@/modules/users';
+import { getOperatorClearance, type ClearanceDocument } from '@/modules/users';
 import { hasPostShiftSection } from '@/modules/inspections';
 
 /**
@@ -61,6 +61,17 @@ export interface OperatorShiftFacts {
    * («на старт») и в работе — из него же видно наработку за смену.
    */
   meterCurrent: number | null;
+  /**
+   * Откуда взята цифра моточасов и когда.
+   *
+   * Без этого экран показывал голое число, и первый же вопрос был «а это
+   * откуда?». `reading` — снятое кем-то показание счётчика (есть дата),
+   * `equipment` — наработка из карточки установки, то есть цифра, которую
+   * последним правил администратор, а не то, что сейчас на приборе.
+   */
+  meterSource: 'reading' | 'equipment' | null;
+  /** Когда снято показание. Только для `meterSource: 'reading'`. */
+  meterRecordedAt: string | null;
   /** Свай зачтено в сегодняшнем отчёте — счётчик на экране работы. */
   pilesToday: number;
   /**
@@ -72,6 +83,12 @@ export interface OperatorShiftFacts {
   incomingHandover: {
     id: string; shiftId: string; summary: string;
     submittedById: string; submittedByName: string | null;
+    /**
+     * Версия записи. Обязательна: приёмка — команда контура, и без
+     * `expectedVersion`/`if-match` сервер отвечает 428. Экран оператора её не
+     * получал и отправлял пустое тело — принять передачу было нельзя вовсе.
+     */
+    version: number;
   } | null;
   /** Разрешение диспетчера на пуск, выданное этой смене. */
   startWaiver: { id: string; reason: string } | null;
@@ -80,7 +97,19 @@ export interface OperatorShiftFacts {
    * предупреждения только показываются: истекающее удостоверение — повод
    * заняться продлением, а не повод не выйти на работу.
    */
-  clearance: { blockers: string[]; warnings: string[] };
+  clearance: {
+    blockers: string[];
+    warnings: string[];
+    /**
+     * Обязательные виды документов с их состоянием — включая благополучное.
+     *
+     * Экран допуска показывает карточку «✓ удостоверение действительно,
+     * ✓ медсправка действительна» одним взглядом. Из одних препятствий такую
+     * карточку не собрать: у допущенного оператора список пуст, и экран не мог
+     * сказать ему ничего, кроме молчания.
+     */
+    documents: ClearanceDocument[];
+  };
   /**
    * У чек-листа этой машины есть раздел на конец смены.
    *
@@ -116,12 +145,14 @@ export async function getOperatorShiftFacts(
   const clearance = {
     blockers: clearanceResult.blockers.map((issue) => issue.label),
     warnings: clearanceResult.warnings.map((issue) => issue.label),
+    documents: clearanceResult.documents,
   };
 
   const empty: OperatorShiftFacts = {
     assignments: [], equipment: null, shift: null, readiness: null,
     inspection: { preShift: null, postShift: null },
-    report: null, meterKnownToday: false, meterCurrent: null, pilesToday: 0,
+    report: null, meterKnownToday: false, meterCurrent: null,
+    meterSource: null, meterRecordedAt: null, pilesToday: 0,
     incomingHandover: null, startWaiver: null,
     clearance, postShiftAvailable: false,
   };
@@ -187,16 +218,24 @@ export async function getOperatorShiftFacts(
     // Передача предыдущей смены, ожидающая решения. Свою собственную оператор
     // принять не сможет — это проверит команда, — но видеть её он должен.
     db.shiftHandover.findFirst({
-      where: { tenantId, state: 'SUBMITTED', shift: { equipmentId: equipment.id } },
+      // Состояние смены в условии обязательно, а не для красоты: приёмка
+      // передачи закрывает смену и требует от неё HANDOVER_PENDING. Передача
+      // на уже закрытой смене принята быть не может — предлагать её экрану
+      // значит запереть оператора на первом шаге с ответом 409.
+      where: {
+        tenantId,
+        state: 'SUBMITTED',
+        shift: { equipmentId: equipment.id, state: 'HANDOVER_PENDING' },
+      },
       orderBy: { submittedAt: 'desc' },
-      select: { id: true, shiftId: true, summary: true, submittedById: true },
+      select: { id: true, shiftId: true, summary: true, submittedById: true, version: true },
     }),
     // Последнее показание счётчика — не только за сегодня: на карточке приёмки
     // машины показание вчерашней смены честнее прочерка.
     db.meterReading.findFirst({
       where: { tenantId, equipmentId: equipment.id },
       orderBy: { recordedAt: 'desc' },
-      select: { engineHours: true },
+      select: { engineHours: true, recordedAt: true },
     }),
   ]);
 
@@ -213,9 +252,14 @@ export async function getOperatorShiftFacts(
         id: incoming.id, shiftId: incoming.shiftId, summary: incoming.summary,
         submittedById: incoming.submittedById,
         submittedByName: submitter?.name ?? null,
+        version: incoming.version,
       }
     : null;
   const meterCurrent = lastMeter?.engineHours ?? equipment.engineHoursTotal ?? null;
+  const meterSource: 'reading' | 'equipment' | null = lastMeter
+    ? 'reading'
+    : equipment.engineHoursTotal != null ? 'equipment' : null;
+  const meterRecordedAt = lastMeter?.recordedAt?.toISOString() ?? null;
   const equipmentDto = {
     id: equipment.id, name: equipment.name, model: equipment.model,
     engineHoursTotal: equipment.engineHoursTotal,
@@ -243,6 +287,8 @@ export async function getOperatorShiftFacts(
         : null,
       meterKnownToday: meterToday > 0,
       meterCurrent,
+      meterSource,
+      meterRecordedAt,
       incomingHandover: handover,
     };
   }
@@ -291,6 +337,8 @@ export async function getOperatorShiftFacts(
     report: report ? { id: report.id, status: report.status } : null,
     meterKnownToday: meterToday > 0,
     meterCurrent,
+    meterSource,
+    meterRecordedAt,
     pilesToday: report?.piles.reduce((sum, row) => sum + row.count, 0) ?? 0,
     incomingHandover: handover,
     startWaiver: waiver,

@@ -78,9 +78,12 @@ describe('суточный сброс техготовности', () => {
     expect(result.shiftsAutoClosed).toBe(1);
   });
 
-  it('несостоявшиеся смены (запланирована, ждёт приёмки) не трогает', async () => {
+  // Закрывать автоматически можно только идущую смену. Смена, ждущая приёмки,
+  // держит непринятую передачу: закрыв её, мы делаем передачу непринимаемой
+  // навсегда — приёмка требует от смены состояния HANDOVER_PENDING.
+  it('трогает только идущие смены — ни план, ни ждущую приёмки', async () => {
     await runReadinessScheduler('orion', NOW);
-    expect(shiftFindMany.mock.calls[0][0].where.state).toEqual({in: ['STARTED', 'HANDOVER_PENDING']});
+    expect(shiftFindMany.mock.calls[0][0].where.state).toEqual({in: ['STARTED']});
   });
 });
 

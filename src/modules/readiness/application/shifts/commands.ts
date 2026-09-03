@@ -6,7 +6,7 @@ import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from 
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
 import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag';
 import {ReadinessCommandError} from '../command-pipeline/errors';
-import {assertHandoverAcceptedByAnotherPerson, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
+import {isSelfAcceptedHandover, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
 import {blockerFingerprint, requireWaiverReason} from '../../domain/shifts/waiver';
 import {diffInspectionStates, type StateAnswer} from '@/modules/inspections/domain/state-diff';
 import {requireCancellationReason, validateShiftWindow} from '../../domain/shifts/shift';
@@ -398,9 +398,11 @@ async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCo
     aggregateId: input.id, key: input.key, body: commandBody, expectedVersion: expected,
     execute: async (key) => { const handovers = new HandoverRepository(input.tx); const shifts = new ShiftRepository(input.tx);
       const before = await handovers.get(input.context.tenantId, input.id);
-      if (input.action === 'accept') {
-        assertHandoverAcceptedByAnotherPerson(before.submittedById, input.context.actorId);
-      }
+      // Самоприёмка разрешена, но записывается отдельным признаком: при работе
+      // в одну смену принять передачу больше некому, а «кто проверил» остаётся
+      // вопросом для разбора. См. `isSelfAcceptedHandover`.
+      const selfAccepted = input.action === 'accept'
+        && isSelfAcceptedHandover(before.submittedById, input.context.actorId);
       if (before.version !== expected || before.state !== 'SUBMITTED') {
         throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Передача изменилась. Обновите страницу и повторите действие',
           {current: serializeHandover(before)});
@@ -419,7 +421,8 @@ async function decideHandover(input: {tx: ReadinessTransaction; context: ShiftCo
         action: input.action === 'accept' ? 'accepted' : 'rework-requested', entityType: 'ShiftHandover',
         entityId: handover.id, entityVersion: handover.version, equipmentId: shift.equipmentId,
         shiftId: shift.id, triggerOccurredAt: handover.acceptedAt ?? handover.reworkedAt ?? now,
-        before: serializeHandover(before), after});
+        before: serializeHandover(before),
+        after: selfAccepted ? {...after, selfAccepted: true} : after});
       return {status: 200, body: {data: after, shift: serializeShift(shift)},
         headers: {ETag: formatStrongEtag('handover', handover.id, handover.version)}};}});
 }

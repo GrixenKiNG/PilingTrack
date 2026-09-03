@@ -1,15 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Search } from '@/components/piling/icons/unified-icons';
+import { ChevronRight, Search } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import type { ReadinessAuditEnvelope, ReadinessAuditEventDto, ReadinessBootstrap } from '../api/contracts';
 import { handoverRoleLabel } from '../handover-journal';
-import { auditActionLabel, auditEntityLabel, isCriticalAuditAction } from './audit-labels';
+import { auditActionLabel, auditActionMark, auditEntityLabel, isCriticalAuditAction } from './audit-labels';
 import { InfoRow, ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
+
+const AUDIT_TONE: Record<string, string> = {
+  success: 'text-success-strong',
+  danger: 'text-destructive-strong',
+  warning: 'text-signal-strong',
+  info: 'text-info-strong',
+  neutral: 'text-muted-foreground',
+};
 
 interface AuditSettingsProps {
   audit: ReadinessAuditEnvelope | null;
@@ -80,6 +88,8 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
             <div className="hidden max-h-[520px] min-w-[820px] divide-y divide-border overflow-y-auto md:block">
               {visible.map((event) => {
                 const critical = isCriticalAuditAction(event.action);
+                const mark = auditActionMark(event.action);
+                const ActionIcon = mark.icon;
                 return (
                   <button
                     key={event.id}
@@ -97,9 +107,7 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
                       <small className="block text-muted-foreground">{handoverRoleLabel(event.actor.actingAs || event.actor.role) ?? 'PilingTrack'}</small>
                     </span>
                     <span className="flex min-w-0 items-center gap-2">
-                      {critical
-                        ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive-strong" />
-                        : <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success-strong" />}
+                      <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', AUDIT_TONE[mark.tone])} />
                       <span className="min-w-0 leading-snug">{auditActionLabel(event.action)}</span>
                     </span>
                     <span className="min-w-0">
@@ -114,10 +122,13 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
             </div>
           </div>
           <div className="space-y-2 p-3 md:hidden">
-            {visible.map((event) => (
+            {visible.map((event) => {
+              const mark = auditActionMark(event.action);
+              const ActionIcon = mark.icon;
+              return (
               <article key={event.id} className="rounded-lg border border-border p-3 text-xs">
                 <div className="flex items-start justify-between gap-2">
-                  <b className="min-w-0">{auditActionLabel(event.action)}</b>
+                  <b className="flex min-w-0 items-center gap-2"><ActionIcon className={cn('h-4 w-4 shrink-0', AUDIT_TONE[mark.tone])} />{auditActionLabel(event.action)}</b>
                   {isCriticalAuditAction(event.action) ? <StatusPill tone="danger">Критично</StatusPill> : <StatusPill tone="success">Успешно</StatusPill>}
                 </div>
                 <div className="mt-2 text-muted-foreground">{event.actor.name || 'Система'} · {handoverRoleLabel(event.actor.actingAs || event.actor.role) ?? 'PilingTrack'}</div>
@@ -126,7 +137,8 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
                   <span>{auditEntityLabel(event.entity.type)}</span>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
           {visible.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground">{events.length === 0 ? 'События аудита недоступны в текущем источнике.' : 'По запросу ничего не найдено.'}</div>}
           <div className="border-t border-border p-3 text-xs text-muted-foreground">

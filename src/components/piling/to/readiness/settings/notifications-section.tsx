@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Bell, ChevronRight, Clock, Wrench } from '@/components/piling/icons/unified-icons';
+import { AlertTriangle, Bell, ChevronRight, Clock, Mail, MessageCircle, Send, Wrench } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -113,10 +113,10 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
   // Каналы перечисляем по факту подключения, а не по макету: почта и SMS
   // в контуре не настроены, и обещать доставку по ним нельзя.
   const channels = [
-    { name: 'Telegram', detail: telegramCount == null ? 'проверяем' : telegramReady ? `конфигураций: ${telegramCount}` : 'бот не настроен', ready: telegramReady, href: '/admin/telegram' },
-    { name: 'Электронная почта', detail: 'SMTP не подключён', ready: false, href: '/admin/settings' },
-    { name: 'Push в браузере', detail: 'не подключено', ready: false, href: '/admin/settings' },
-    { name: 'SMS', detail: 'не подключено', ready: false, href: '/admin/settings' },
+    { name: 'Telegram', icon: Send, detail: telegramCount == null ? 'проверяем' : telegramReady ? `конфигураций: ${telegramCount}` : 'бот не настроен', ready: telegramReady, href: '/admin/telegram' },
+    { name: 'Электронная почта', icon: Mail, detail: 'SMTP не подключён', ready: false, href: '/admin/settings' },
+    { name: 'Push в браузере', icon: Bell, detail: 'не подключено', ready: false, href: '/admin/settings' },
+    { name: 'SMS', icon: MessageCircle, detail: 'не подключено', ready: false, href: '/admin/settings' },
   ];
 
   return (
@@ -203,16 +203,20 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
           <section className={cn(card, 'overflow-hidden')}>
             <div className="border-b border-border p-4"><h2 className="font-bold">Каналы доставки</h2></div>
             <div className="divide-y divide-border">
-              {channels.map((channel) => (
+              {channels.map((channel) => {
+                const ChannelIcon = channel.icon;
+                return (
                 <Link key={channel.name} href={channel.href} className="flex min-h-14 items-center gap-3 px-4 py-2 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal">
                   <span aria-hidden="true" className={cn('h-2 w-2 shrink-0 rounded-full', channel.ready ? 'bg-success-strong' : 'bg-border')} />
+                  <ChannelIcon className={cn('h-4 w-4 shrink-0', channel.ready ? 'text-success-strong' : 'text-muted-foreground')} />
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold">{channel.name}</span>
                     <span className="block text-3xs text-muted-foreground">{channel.detail}</span>
                   </span>
                   <StatusPill tone={channel.ready ? 'success' : 'neutral'}>{channel.ready ? 'Включён' : 'Не настроен'}</StatusPill>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </section>
           <section className={cn(card, 'p-4')}>

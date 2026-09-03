@@ -1,7 +1,6 @@
 'use client';
 
-import { ForemanIcon, SafetyEngineerIcon } from '@/components/piling/icons';
-import { Headset, Joystick, Wrench } from '@/components/piling/icons/unified-icons';
+import { ROLE_ICONS } from '@/components/piling/icons';
 import { ACTING_ROLES, ROLE_LABELS, type ActingRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -24,22 +23,13 @@ interface ActingRoleSwitchProps {
   disabled?: boolean;
 }
 
-/** Контурные иконки одной грамматики, чтобы ряд читался как ряд. */
-const ROLE_ICON: Record<ActingRole, (props: { className?: string }) => React.ReactElement> = {
-  MECHANIC: (props) => <Wrench {...props} />,
-  FOREMAN: (props) => <ForemanIcon {...props} />,
-  SAFETY_ENGINEER: (props) => <SafetyEngineerIcon {...props} />,
-  DISPATCHER: (props) => <Headset {...props} />,
-  OPERATOR: (props) => <Joystick {...props} />,
-};
-
 export function ActingRoleSwitch({ actorRole, value, onChange, disabled = false }: ActingRoleSwitchProps) {
   // Исполнять чужую роль может только администратор — то же правило, что и на
   // сервере (`canActAs`). Остальным контрол не показываем совсем, чтобы не
   // предлагать действие, которое закончится отказом.
   if (actorRole !== 'ADMIN') return null;
 
-  const Icon = value ? ROLE_ICON[value] : null;
+  const Icon = value ? ROLE_ICONS[value] : null;
 
   return (
     <label className="flex shrink-0 items-center gap-2 pl-3 pr-1 text-xs">
