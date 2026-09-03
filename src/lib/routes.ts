@@ -14,6 +14,9 @@ import type { AppPage } from '@/lib/types';
  */
 export const OPERATOR_HOME_ROUTE = '/operator';
 
+/** Рабочее место помощника машиниста: инструктаж, проверка знаний, допуски. */
+export const ASSISTANT_HOME_ROUTE = '/assistant';
+
 const PAGE_TO_ROUTE: Record<AppPage, string> = {
   login: '/login',
   'operator-dashboard': '/operator',

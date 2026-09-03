@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ASSISTANT_HOME_ROUTE, OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import { ROLE_NAVIGATION } from '../role-navigation';
 
 const emojiPattern = /[\p{Extended_Pictographic}]/u;
@@ -15,10 +16,15 @@ describe('ROLE_NAVIGATION', () => {
 
   it('covers the operator workflow routes', () => {
     expect(ROLE_NAVIGATION.OPERATOR.map(({ href, icon }) => [href, icon])).toEqual([
-      ['/operator', 'home'],
+      [OPERATOR_HOME_ROUTE, 'home'],
       ['/history', 'history'],
     ]);
-    expect(ROLE_NAVIGATION.ASSISTANT).toEqual(ROLE_NAVIGATION.OPERATOR);
+    // У помощника своё место, а не урезанное место машиниста: рабочее место
+    // машиниста отвечает ему отказом, и пункт меню, ведущий в отказ, — это
+    // тупик. Его экран — собственный допуск.
+    expect(ROLE_NAVIGATION.ASSISTANT.map(({ href }) => href))
+      .toEqual([ASSISTANT_HOME_ROUTE, '/history']);
+    expect(ROLE_NAVIGATION.ASSISTANT.map(({ href }) => href)).not.toContain(OPERATOR_HOME_ROUTE);
   });
 
   /**

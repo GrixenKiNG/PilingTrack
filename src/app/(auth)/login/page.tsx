@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginPage } from '@/components/piling/login-page';
+import { ASSISTANT_HOME_ROUTE, OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import { usePilingStore } from '@/lib/store';
 
 export default function LoginPageRoute() {
@@ -16,8 +17,13 @@ export default function LoginPageRoute() {
         router.replace('/admin');
       } else if (role === 'MECHANIC' || role === 'SAFETY_ENGINEER') {
         router.replace('/admin/to');
+      } else if (role === 'ASSISTANT') {
+        // Помощник смену не ведёт — рабочее место машиниста отвечает ему
+        // отказом. Его место — свой допуск: инструктаж, проверка знаний и
+        // документы со сроками.
+        router.replace(ASSISTANT_HOME_ROUTE);
       } else {
-        router.replace('/operator');
+        router.replace(OPERATOR_HOME_ROUTE);
       }
     }
   }, [currentUser, router]);

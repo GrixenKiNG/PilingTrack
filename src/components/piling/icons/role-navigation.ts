@@ -1,3 +1,4 @@
+import { ASSISTANT_HOME_ROUTE, OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import type { UserRole } from '@/lib/types';
 import type { PilingIconName, PilingIconTone } from './piling-icon';
 
@@ -23,7 +24,23 @@ export interface NavigationItem {
  * нечего. «Мониторинг» — сводка по парку, тоже не его инструмент.
  */
 const operatorNavigation: NavigationItem[] = [
-  { label: 'Смена', href: '/operator', icon: 'home', tone: 'primary' },
+  { label: 'Смена', href: OPERATOR_HOME_ROUTE, icon: 'home', tone: 'primary' },
+  { label: 'История', href: '/history', icon: 'history' },
+];
+
+/**
+ * У помощника машиниста своё место, а не урезанное место машиниста.
+ *
+ * Смену он не ведёт: её открывает, осматривает машину и записывает выработку
+ * тот, за кем закреплена установка, — так устроен requireCrew в модуле смены.
+ * Пока меню было общим, единственный заметный пункт «Смена» вёл в отказ
+ * «Экран доступен только машинисту»: гарантированный тупик.
+ *
+ * Что относится лично к нему — инструктаж по стропальным работам, проверка
+ * знаний и свои допуски со сроками — живёт на `/assistant`.
+ */
+const assistantNavigation: NavigationItem[] = [
+  { label: 'Допуск', href: ASSISTANT_HOME_ROUTE, icon: 'home', tone: 'primary' },
   { label: 'История', href: '/history', icon: 'history' },
 ];
 
@@ -35,6 +52,7 @@ const dispatcherNavigation: NavigationItem[] = [
   { label: 'Объекты', href: '/admin/sites', icon: 'site' },
   { label: 'Установки', href: '/admin/equipment', icon: 'equipment-rig' },
   { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
+  { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
   { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
   { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
   { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
@@ -44,7 +62,7 @@ const settingsNav: NavigationItem = { label: 'Настройки', href: '/admin
 
 export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   OPERATOR: operatorNavigation,
-  ASSISTANT: operatorNavigation,
+  ASSISTANT: assistantNavigation,
   MECHANIC: [
     { label: 'Готовность техники', href: '/admin/to', icon: 'technical-readiness' },
   ],
