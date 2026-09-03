@@ -1,0 +1,512 @@
+/*
+ * Стили экранов из макета `docs/product/operator-v1-screens.html`,
+ * перенесённые без изменений по значениям. Каждый селектор ограничен `.v5`:
+ * короткие имена классов макета (`.b`, `.h`, `.card`, `.note`) иначе
+ * встретились бы с классами приложения из globals.css.
+ *
+ * Обвязка каталога (`.wrap`, `.toc`, `.rail`, рамка `.ph`) не перенесена:
+ * в приложении экран занимает телефон целиком. Оболочка — в
+ * `operator-v5-app.css`.
+ *
+ * Семейства шрифтов заменены на переменные next/font: файлы раздаются со
+ * своего домена, обращения к fonts.googleapis.com нет — его срезал бы CSP
+ * из `src/proxy.ts`.
+ */
+.v5 {
+  --ground: #f3f4f6;
+  --surface: #ffffff;
+  --surface-2: #e9ebee;
+  --ink: #16181a;
+  --ink-muted: #5e6469;
+  --ink-faint: #8c9196;
+  --line: #d5d9dd;
+  --line-strong: #b6bcc2;
+  --signal: #c04300;
+  --signal-fill: #e2650f;
+  --signal-wash: #fbeade;
+  --keep: #1c6b4f;
+  --keep-wash: #e3f0eb;
+  --stop: #a3261f;
+  --stop-wash: #f8e6e4;
+  --shadow: 0 1px 2px color-mix(in oklab, var(--ink) 10%, transparent), 0 8px 24px color-mix(in oklab, var(--ink) 6%, transparent);
+  --f-display: var(--font-oswald), "Arial Narrow", system-ui, sans-serif;
+  --f-body: var(--font-pt-sans), "Segoe UI", system-ui, sans-serif;
+  --f-mono: var(--font-jetbrains), "Consolas", ui-monospace, monospace;
+  --measure: 62ch;
+  --pad: clamp(1.25rem, 4vw, 3rem);
+}
+@media (prefers-color-scheme: dark) {
+  .v5:not([data-theme="light"]) {
+    --ground: #0f1113;
+    --surface: #171a1d;
+    --surface-2: #22262a;
+    --ink: #e7eaec;
+    --ink-muted: #9aa0a5;
+    --ink-faint: #6f757a;
+    --line: #2c3135;
+    --line-strong: #3d4348;
+    --signal: #f5893c;
+    --signal-fill: #e2650f;
+    --signal-wash: #2c1a0f;
+    --keep: #58c398;
+    --keep-wash: #14261f;
+    --stop: #ef7b6e;
+    --stop-wash: #2a1614;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+.v5[data-theme="dark"] {
+  --ground: #0f1113;
+  --surface: #171a1d;
+  --surface-2: #22262a;
+  --ink: #e7eaec;
+  --ink-muted: #9aa0a5;
+  --ink-faint: #6f757a;
+  --line: #2c3135;
+  --line-strong: #3d4348;
+  --signal: #f5893c;
+  --signal-fill: #e2650f;
+  --signal-wash: #2c1a0f;
+  --keep: #58c398;
+  --keep-wash: #14261f;
+  --stop: #ef7b6e;
+  --stop-wash: #2a1614;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+.v5 * {
+  box-sizing: border-box;
+}
+/* Правила `body` макета. Здесь они лежат на div внутри чужого body, поэтому
+   к ним добавлена высота: без неё на коротком экране снизу проступал фон
+   приложения, которого в макете нет. */
+.v5 {
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.v5 h1, .v5 h2, .v5 h3, .v5 h4 {
+  font-family: var(--f-display);
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.14;
+  text-wrap: balance;
+}
+.v5 .bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .5rem .85rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--f-mono);
+  font-size: .64rem;
+  color: var(--ink-muted);
+}
+.v5 .dot {
+  display: inline-block;
+  width: .45rem;
+  height: .45rem;
+  border-radius: 50%;
+  background: var(--keep);
+  margin-right: .3rem;
+  vertical-align: middle;
+}
+.v5 .dot.off {
+  background: var(--signal-fill);
+}
+.v5 .nav {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .7rem .85rem;
+  border-bottom: 1px solid var(--line);
+}
+.v5 .nav .back {
+  font-family: var(--f-mono);
+  color: var(--signal);
+  font-size: .8rem;
+}
+.v5 .nav .ttl {
+  font-family: var(--f-display);
+  text-transform: uppercase;
+  font-size: .92rem;
+  letter-spacing: .01em;
+}
+.v5 .top {
+  padding: .8rem .85rem;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: .15rem;
+}
+.v5 .top .mach {
+  font-family: var(--f-display);
+  text-transform: uppercase;
+  font-size: .95rem;
+}
+.v5 .top .where {
+  font-size: .76rem;
+  color: var(--ink-muted);
+}
+.v5 .scr {
+  padding: .85rem;
+  display: grid;
+  gap: .7rem;
+}
+.v5 .kicker {
+  font-family: var(--f-mono);
+  font-size: .65rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+.v5 .h {
+  font-family: var(--f-display);
+  font-size: 1.35rem;
+  line-height: 1.14;
+  text-transform: uppercase;
+  margin: 0;
+}
+.v5 .m {
+  font-family: var(--f-mono);
+  font-size: .76rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+.v5 .p {
+  margin: 0;
+  font-size: .86rem;
+}
+.v5 .b {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: .85rem;
+  background: var(--signal-fill);
+  color: #fff;
+  font-family: var(--f-display);
+  font-size: .98rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 4px;
+}
+.v5 .b.gh {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+.v5 .b.dn {
+  background: var(--stop);
+}
+.v5 .b.ok {
+  background: var(--keep);
+}
+.v5 .b.dis {
+  background: var(--surface-2);
+  color: var(--ink-faint);
+}
+.v5 .note {
+  margin: 0;
+  font-size: .78rem;
+  color: var(--ink-muted);
+  border-left: 3px solid var(--line-strong);
+  padding-left: .6rem;
+  line-height: 1.45;
+}
+.v5 .note.warn {
+  border-left-color: var(--signal-fill);
+  color: var(--ink);
+}
+.v5 .note.bad {
+  border-left-color: var(--stop);
+  color: var(--ink);
+}
+.v5 .note.good {
+  border-left-color: var(--keep);
+}
+.v5 .card {
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: .6rem .7rem;
+  display: grid;
+  gap: .2rem;
+}
+.v5 .card .lbl {
+  font-family: var(--f-display);
+  font-size: .62rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.v5 .card p {
+  margin: 0;
+  font-size: .82rem;
+}
+.v5 .rowline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .6rem;
+  padding: .6rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: .85rem;
+}
+.v5 .rowline:last-child {
+  border-bottom: none;
+}
+.v5 .rowline .r {
+  font-family: var(--f-mono);
+  font-size: .74rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.v5 .badge {
+  font-family: var(--f-mono);
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: .2rem .4rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.v5 .badge.ok {
+  background: var(--keep-wash);
+  color: var(--keep);
+}
+.v5 .badge.warn {
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+.v5 .badge.bad {
+  background: var(--stop-wash);
+  color: var(--stop);
+}
+.v5 .ans {
+  display: flex;
+  gap: .25rem;
+}
+.v5 .ans span {
+  font-family: var(--f-mono);
+  font-size: .64rem;
+  padding: .38rem .45rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-muted);
+  border-radius: 3px;
+}
+.v5 .ans span.on {
+  background: var(--keep);
+  border-color: var(--keep);
+  color: #fff;
+}
+.v5 .ans span.bad {
+  background: var(--stop);
+  border-color: var(--stop);
+  color: #fff;
+}
+.v5 .crit {
+  color: var(--stop);
+  font-weight: 700;
+}
+.v5 .pbar {
+  height: 3px;
+  background: var(--surface-2);
+}
+.v5 .pbar i {
+  display: block;
+  height: 100%;
+  background: var(--signal-fill);
+}
+.v5 .stop-head {
+  background: var(--stop);
+  color: #fff;
+  padding: .85rem;
+  display: grid;
+  gap: .2rem;
+}
+.v5 .stop-head .t {
+  font-family: var(--f-display);
+  font-size: 1.3rem;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.v5 .stop-head .s {
+  font-size: .8rem;
+  opacity: .93;
+}
+.v5 .ok-head {
+  background: var(--keep);
+  color: #fff;
+  padding: .85rem;
+  display: grid;
+  gap: .2rem;
+}
+.v5 .ok-head .t {
+  font-family: var(--f-display);
+  font-size: 1.3rem;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.v5 .ok-head .s {
+  font-size: .8rem;
+  opacity: .93;
+}
+.v5 .chain {
+  border: 1px solid var(--line);
+}
+.v5 .chain div {
+  display: grid;
+  grid-template-columns: 5.6rem minmax(0,1fr);
+  gap: .5rem;
+  padding: .5rem .6rem;
+  border-bottom: 1px solid var(--line);
+  font-size: .78rem;
+}
+.v5 .chain div:last-child {
+  border-bottom: none;
+}
+.v5 .chain .k {
+  font-family: var(--f-display);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding-top: .12rem;
+}
+.v5 .keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .3rem;
+}
+.v5 .keys span {
+  text-align: center;
+  padding: .7rem 0;
+  background: var(--surface-2);
+  border-radius: 4px;
+  font-family: var(--f-mono);
+  font-size: 1rem;
+}
+.v5 .bignum {
+  font-family: var(--f-mono);
+  font-size: 2.1rem;
+  font-weight: 700;
+  text-align: center;
+  padding: .5rem 0;
+  border-bottom: 2px solid var(--signal-fill);
+  font-variant-numeric: tabular-nums;
+}
+.v5 .doc {
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: .7rem;
+  font-size: .78rem;
+  color: var(--ink-muted);
+  line-height: 1.5;
+  max-height: 8.5rem;
+  overflow: hidden;
+  position: relative;
+}
+.v5 .doc::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2.5rem;
+  background: linear-gradient(to bottom, transparent, var(--surface-2));
+}
+.v5 .doc b {
+  color: var(--ink);
+}
+.v5 .qz {
+  display: grid;
+  gap: .4rem;
+}
+.v5 .qz .opt {
+  padding: .65rem .7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-size: .85rem;
+}
+.v5 .qz .opt.sel {
+  border-color: var(--signal-fill);
+  background: var(--signal-wash);
+}
+.v5 .tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .5rem;
+}
+.v5 .tile {
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: .65rem;
+  display: grid;
+  gap: .15rem;
+}
+.v5 .tile .v {
+  font-family: var(--f-mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.v5 .tile .k {
+  font-size: .7rem;
+  color: var(--ink-muted);
+}
+.v5 .dock {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.v5 .dock span {
+  padding: .6rem .2rem;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  color: var(--ink-muted);
+  border-right: 1px solid var(--line);
+  letter-spacing: .02em;
+}
+.v5 .dock span:last-child {
+  border-right: none;
+}
+.v5 .dock span.on {
+  color: var(--signal);
+  background: var(--surface);
+}
+.v5 .seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .3rem;
+}
+.v5 .seg span {
+  text-align: center;
+  padding: .55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-size: .8rem;
+}
+.v5 .seg span.on {
+  background: var(--ink);
+  color: var(--ground);
+  border-color: var(--ink);
+}
+.v5 a {
+  color: var(--signal);
+}
+.v5 :focus-visible {
+  outline: 2px solid var(--signal-fill);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v5 * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
