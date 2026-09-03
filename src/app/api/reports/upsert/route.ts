@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
@@ -62,7 +63,7 @@ export const POST = withMutation(
     // hide those reports (operator sees "no history", admin period
     // filter shows zeros). Resolve it once here.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || null;
+    const tenantId = requireTenantId(user!);
 
     const result = await upsertReport(
       {

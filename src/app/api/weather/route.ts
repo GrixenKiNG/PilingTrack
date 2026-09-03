@@ -1,31 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { withApi } from '@/core/api-wrapper';
-import { getSiteWind, WIND_BOOM_TRANSPORT_MS, WIND_STOP_WORK_MS } from '@/services/weather/weather-client';
+import {
+  WIND_BOOM_TRANSPORT_MS, WIND_STOP_WORK_MS, getWeatherAt,
+} from '@/services/weather/weather-client';
 
 export const runtime = 'nodejs';
 
 /**
- * Ветер на объекте плюс пороги из руководства.
+ * Погода на точке работ — ветер и температура по координатам.
  *
- * Пороги отдаём вместе с показанием, чтобы экран не хранил их копию: разойтись
- * они не должны, а живут они в клиенте погоды рядом с чтением.
+ * ПОЧЕМУ НЕ GISMETEO. Сначала здесь был он, и это оказалось лишним: в продукте
+ * уже был `services/weather/weather-client` на Open-Meteo — без ключа, с кэшем
+ * в Redis на 15 минут, предохранителем на отказы и порогами ветра, выписанными
+ * из руководств машин (Liebherr LB 20 / LRH 100): 20 м/с — работы прекращают,
+ * 36 м/с — стрелу в транспортное положение. Отдельный клиент рядом означал бы
+ * второй ответ на тот же вопрос: свой кэш, свои пороги, ещё один секрет в
+ * окружении. Маршрут стал тонкой обёрткой над общим клиентом.
+ *
+ * ПОЧЕМУ ЧЕРЕЗ СЕРВЕР, А НЕ ИЗ БРАУЗЕРА. Кэш и предохранитель живут на сервере:
+ * из клиента каждый телефон ходил бы наружу сам, и при недоступности сервиса
+ * каждый ждал бы таймаут в одиночку. Заодно это снимает вопрос с CSP — строгая
+ * политика продукта не пускает страницу на чужие хосты.
+ *
+ * Координаты приходят от телефона оператора (`navigator.geolocation`) либо из
+ * карточки объекта — то есть погода привязана к месту, где стоит машина.
  */
+
+/** То, что нужно экрану оператора. */
+export interface OperatorWeather {
+  temperature: number | null;
+  windSpeed: number | null;
+  /** Ветер достиг порога прекращения работ. */
+  windWarning: boolean;
+  /** Ветер достиг порога перевода стрелы в транспортное положение. */
+  windCritical: boolean;
+}
+
 export const GET = withApi(
   async (request: NextRequest) => {
-    const { user, error } = await requireAuth(request);
+    const { error } = await requireAuth(request);
     if (error) return error;
-    const siteId = request.nextUrl.searchParams.get('siteId');
-    if (!siteId) return NextResponse.json({ error: 'Не указан объект' }, { status: 400 });
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
-    if (!tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
 
-    const wind = await getSiteWind(tenantId, siteId);
-    return NextResponse.json({
-      wind,
-      thresholds: { stopWorkMs: WIND_STOP_WORK_MS, boomTransportMs: WIND_BOOM_TRANSPORT_MS },
-    });
+    const latitude = Number(request.nextUrl.searchParams.get('lat'));
+    const longitude = Number(request.nextUrl.searchParams.get('lon'));
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+      || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+      return NextResponse.json({ error: 'Некорректные координаты' }, { status: 400 });
+    }
+
+    const conditions = await getWeatherAt(latitude, longitude);
+    if (!conditions) {
+      // Клиент никогда не бросает: `null` — это «сервис не ответил». Погодный
+      // сервис не должен уметь остановить работу на площадке, поэтому здесь не
+      // ошибка приложения, а честное «сейчас неизвестно».
+      return NextResponse.json({ error: 'Погода сейчас недоступна' }, { status: 503 });
+    }
+
+    const result: OperatorWeather = {
+      temperature: conditions.temperatureC,
+      windSpeed: conditions.windMs,
+      windWarning: conditions.windMs >= WIND_STOP_WORK_MS,
+      windCritical: conditions.windMs >= WIND_BOOM_TRANSPORT_MS,
+    };
+    return NextResponse.json(result);
   },
-  { domain: 'weather' }
+  { domain: 'operator.weather' },
 );

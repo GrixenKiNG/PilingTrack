@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
@@ -121,7 +122,7 @@ export const POST = withApi(async (request: NextRequest) => {
     // against another tenant's equipment. Telemetry has no tenantId column;
     // the tenant anchor is the equipment's.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }

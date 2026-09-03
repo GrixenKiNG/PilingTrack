@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -45,10 +46,12 @@ async function requireTenantEquipment(
   equipmentId: string,
   tenantId: string | null | undefined
 ): Promise<NextResponse | { tenantId: string; db: Awaited<ReturnType<typeof getDbClient>> }> {
-  const resolvedTenantId = tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
-  if (!resolvedTenantId) {
-    return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+  // Организация берётся только из сессии: подстановка из окружения давала
+  // пользователю без организации доступ к данным организации по умолчанию.
+  if (!tenantId) {
+    return NextResponse.json({ error: 'Организация пользователя не определена' }, { status: 403 });
   }
+  const resolvedTenantId = tenantId;
   const db = await getDbClient();
   const equipment = await db.equipment.findUnique({
     where: { id: equipmentId, tenantId: resolvedTenantId },
@@ -78,7 +81,7 @@ export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => 
   }
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+  const tenantId = requireTenantId(user!);
   if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
   const provisioned = await provisionDeviceKey({

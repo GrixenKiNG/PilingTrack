@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import crypto from 'node:crypto';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -39,7 +40,7 @@ export const POST = withMutation(
     // edits were also writing NULL tenantId, hiding the edited report
     // from the tenant-scoped history view.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || undefined;
+    const tenantId = requireTenantId(user!);
     const result = await upsertReport(
       {
         // Тот же порядок, что и в операторском маршруте: свой идентификатор,

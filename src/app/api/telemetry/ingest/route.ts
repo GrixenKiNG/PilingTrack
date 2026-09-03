@@ -280,7 +280,12 @@ function validateTelemetry(data: unknown): ValidationResult {
 async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown[]) {
   // Fail closed: every persisted record needs a tenant. Legacy device keys
   // provisioned before tenant scoping may still have a null tenantId.
-  const tenantId = identity.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  //
+  // Организация берётся из ключа устройства и ниоткуда больше: подстановка
+  // из окружения писала бы телеметрию неизвестного контроллера в организацию
+  // по умолчанию. Здесь нет сессии, поэтому и общего помощника нет — отказ
+  // выражен броском, который ловит обвязка маршрута.
+  const tenantId = identity.tenantId;
   if (!tenantId) {
     throw new Error('ingestTelemetry (device): tenant context missing for this device key');
   }

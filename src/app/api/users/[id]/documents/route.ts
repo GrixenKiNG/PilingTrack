@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { listUserDocuments, createUserDocument } from '@/modules/users';
@@ -26,7 +27,7 @@ const createSchema = z.object({
  * разъезжается по маршрутам через assertCan.
  */
 function actorContext(user: { id: string; role: string; tenantId?: string | null }) {
-  const tenantId = user.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  const tenantId = requireTenantId(user);
   if (!tenantId) return null;
   return { tenantId, actor: { id: user.id, role: user.role } };
 }

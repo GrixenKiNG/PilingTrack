@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi } from '@/core/api-wrapper';
@@ -28,7 +29,7 @@ export const GET = withApi(
 
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const details = await getEquipmentDetails(id, tenantId);
     return NextResponse.json(details);
   },

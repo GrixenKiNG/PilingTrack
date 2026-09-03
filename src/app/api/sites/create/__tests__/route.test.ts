@@ -78,7 +78,7 @@ describe('POST /api/sites/create', () => {
   it('fails closed when tenant context is missing', async () => {
     requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: null }, error: null });
     const res = await POST(req({ name: 'Site A' }));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(createSiteMock).not.toHaveBeenCalled();
   });
 });

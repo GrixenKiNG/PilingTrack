@@ -166,15 +166,17 @@ const AUTH_GATES = [
   'requireAuth',                     // сессия приложения
   'resolveReadinessRequestContext',  // тот же requireAuth + тенант + матрица доступов
   'withReadinessCommand',            // обёртка вокруг него же
+  'resolveOperatorV3RequestContext', // тот же requireAuth + роль OPERATOR + тенант
+  'withOperatorV3Command',           // обёртка вокруг него же
   'authenticateDevice',              // ключ устройства в заголовке X-Device-Key
   'ALERTMANAGER_WEBHOOK_TOKEN',      // общий секрет, сверяется constantTimeEquals
 ];
 
 /** Всё, что закрывает межсайтовый вызов с чужой страницы. */
-const CSRF_GATES = ['withMutation', 'withReadinessCommand', 'withCsrf'];
+const CSRF_GATES = ['withMutation', 'withReadinessCommand', 'withCsrf', 'withOperatorV3Command'];
 
 /** Всё, что ловит исключение до того, как оно уйдёт наружу стеком. */
-const WRAPPERS = ['withApi', 'withMutation', 'withReadinessCommand'];
+const WRAPPERS = ['withApi', 'withMutation', 'withReadinessCommand', 'withOperatorV3Command'];
 
 /**
  * Маршруты без проверки личности — и почему это правильно.

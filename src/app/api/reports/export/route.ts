@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi } from '@/core/api-wrapper';
@@ -21,7 +22,7 @@ export const GET = withApi(
     assertCan(user!, 'reports.export');
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || null;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) {
       return NextResponse.json({ error: 'tenantId is required' }, { status: 400 });
     }

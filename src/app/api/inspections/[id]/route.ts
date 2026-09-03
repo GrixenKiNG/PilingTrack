@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -27,7 +28,7 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const { id } = await params;
     try {
       // Оператор работает только со своим осмотром; офис — со всеми.
@@ -49,7 +50,7 @@ export const PUT = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const { id } = await params;
     const parsed = answersSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {

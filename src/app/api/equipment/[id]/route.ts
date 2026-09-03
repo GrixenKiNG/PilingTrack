@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { canDecreaseMeter, getEquipmentByIdOrThrow, updateEquipment, updateEquipmentMetadata, deleteEquipment } from '@/modules/equipment';
@@ -14,7 +15,7 @@ export const GET = withApi(
 
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const equipment = await getEquipmentByIdOrThrow(id, tenantId);
     return NextResponse.json({ equipment });
   },
@@ -30,7 +31,7 @@ export const PUT = withMutation(
     assertCan(user!, 'equipment.manage');
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const body = await readJsonBody(request);
 
     const validation = equipmentManageSchema.partial().safeParse(body);
@@ -76,7 +77,7 @@ export const DELETE = withMutation(
     assertCan(user!, 'equipment.manage');
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const result = await deleteEquipment(id, tenantId);
     return NextResponse.json(result);
   },

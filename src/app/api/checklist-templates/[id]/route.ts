@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -46,7 +47,7 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const { id } = await params;
     try {
       const template = await getTemplate(id, tenantId);
@@ -66,7 +67,7 @@ export const PUT = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const { id } = await params;
     const parsed = createSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
@@ -94,7 +95,7 @@ export const DELETE = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const { id } = await params;
     try {
       await deleteTemplate(id, tenantId);

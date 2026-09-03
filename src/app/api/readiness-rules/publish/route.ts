@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { withMutation } from '@/core/api-wrapper';
 import { requireAuth } from '@/lib/auth';
 import { publishReadinessRules } from '@/modules/readiness/application/readiness-rules-service';
@@ -11,7 +12,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (error) return error;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   assertRole(user, 'ADMIN');
-  const tenantId = user.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  const tenantId = requireTenantId(user);
   if (!tenantId) {
     return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
   }

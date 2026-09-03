@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { getLayout, getLayoutSet, saveLayout, deleteLayout, BASE_ENTITY, UnknownSurfaceError } from '@/modules/layout';
@@ -24,7 +25,7 @@ export const runtime = 'nodejs';
 type Ctx = { params: Promise<{ surfaceId: string }> };
 
 function tenantOf(user: { tenantId?: string | null }): string | null {
-  return user.tenantId ?? process.env.DEFAULT_TENANT_ID ?? null;
+  return requireTenantId(user);
 }
 
 export const GET = withApi(async (request: NextRequest, ctx: Ctx) => {

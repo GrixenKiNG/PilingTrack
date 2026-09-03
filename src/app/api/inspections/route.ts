@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -36,7 +37,7 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const equipmentId = request.nextUrl.searchParams.get('equipmentId') ?? undefined;
     const level = request.nextUrl.searchParams.get('level') ?? undefined;
     // Оператор видит только свои осмотры: право проводить осмотр не даёт
@@ -56,7 +57,7 @@ export const POST = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const body = await readJsonBody(request);
     const isBlockStart = body && typeof body === 'object' && 'level' in body && !('templateId' in body);

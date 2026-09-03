@@ -67,7 +67,7 @@ describe('DELETE /api/reports/delete — tenant scoping', () => {
 
     const res = await DELETE(deleteReq('report-1'));
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(findFirstMock).not.toHaveBeenCalled();
   });
 

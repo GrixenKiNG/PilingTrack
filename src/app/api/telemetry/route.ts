@@ -6,6 +6,7 @@
  * For dedicated batch endpoint: POST /api/telemetry/batch
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
@@ -108,7 +109,7 @@ export const POST = withApi(async (request: NextRequest) => {
     if (roleCheck) return roleCheck;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
@@ -242,7 +243,7 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }
@@ -279,7 +280,7 @@ export const GET = withApi(async (request: NextRequest) => {
       // Page through accessible equipment — typically small for an operator.
       const owned = await listAllEquipment(
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-        user!.tenantId ?? process.env.DEFAULT_TENANT_ID,
+        requireTenantId(user!),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
         { limit: 200, getNextCursor: () => null } as any,
         null,

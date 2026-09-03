@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -31,7 +32,7 @@ export const GET = withApi(
     assertCan(user!, 'maintenance.manage');
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID ?? '';
+    const tenantId = requireTenantId(user!);
     const equipmentId = request.nextUrl.searchParams.get('equipmentId') ?? undefined;
     const plans = await listMaintenancePlans(tenantId, equipmentId);
 
@@ -64,7 +65,7 @@ export const POST = withMutation(
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
     try {

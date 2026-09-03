@@ -63,7 +63,7 @@ describe('PUT /api/crews/[id] — tenant scoping', () => {
     requireAuthMock.mockResolvedValue({ user: NO_TENANT, error: null });
     const res = await PUT(putReq({ name: 'Renamed' }), params());
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(updateCrewMock).not.toHaveBeenCalled();
   });
 
@@ -92,7 +92,7 @@ describe('DELETE /api/crews/[id] — tenant scoping', () => {
     requireAuthMock.mockResolvedValue({ user: NO_TENANT, error: null });
     const res = await DELETE(deleteReq(), params());
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(deleteCrewMock).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { createUserDocumentType, listUserDocumentTypes, listUserDocumentTypesForAdmin } from '@/modules/users';
@@ -28,7 +29,7 @@ export const GET = withApi(
     if (error) return error;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
     // ?scope=all — экран управления справочником: отдаёт и отключённые виды
@@ -54,7 +55,7 @@ export const POST = withMutation(
     const { user, error } = await requireAuth(request);
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
     const parsed = documentTypeSchema.safeParse(await readJsonBody(request));

@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withApi } from '@/core/api-wrapper';
 import { getFleetSnapshot } from '@/modules/monitoring';
@@ -27,7 +28,7 @@ export const GET = withApi(
       user!.role === 'OPERATOR' || user!.role === 'ASSISTANT' ? user!.id : null;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = user!.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(user!);
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     }

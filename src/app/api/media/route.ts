@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { getMediaService } from '@/core/media/media-service';
 import { assertCanAccessMediaEntity } from '@/core/media/media-auth';
@@ -44,7 +45,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
+  const tenantId = requireTenantId(user!);
   const result = await getMediaService().getPresignedUrl({
     fileName: body.fileName,
     contentType: body.contentType,
@@ -81,7 +82,7 @@ export const GET = withApi(async (request: NextRequest) => {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  const tenantId = user!.tenantId || process.env.DEFAULT_TENANT_ID || 'default';
+  const tenantId = requireTenantId(user!);
   const media = await getMediaService().listByEntity(entityType, entityId, tenantId);
 
   return NextResponse.json({ data: media }, { headers: { 'X-Request-Id': requestId || '' } });

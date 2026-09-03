@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { listDocumentsNeedingAttention } from '@/modules/users';
 import { withApi } from '@/core/api-wrapper';
@@ -18,7 +19,7 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const actor = user!;
-    const tenantId = actor.tenantId ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = requireTenantId(actor);
     if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
 
     try {
