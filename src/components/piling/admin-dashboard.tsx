@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  AlertTriangle, CameraOff, Clock, FileWarning,
+  AlertTriangle, CameraOff, Clock, FileWarning, LayoutGrid,
   PauseCircle, TrendingDown, Truck, Building2, Wrench,
   RefreshCw,
 } from '@/components/piling/icons/unified-icons';
@@ -303,7 +303,7 @@ export function AdminDashboard() {
     <div className="space-y-4 p-4 lg:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Дашборд</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-foreground"><LayoutGrid className="h-5 w-5 text-signal-strong" />Дашборд</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Оперативная сводка производства</p>
         </div>
 

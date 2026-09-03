@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { BellRing, Building2, Database, LayoutGrid, LayoutTemplate, Save, Send, Settings2, ShieldCheck, UsersRound } from '@/components/piling/icons/unified-icons';
+import { BellRing, Building2, Database, LayoutGrid, LayoutTemplate, Pencil, Save, Send, Settings2, ShieldCheck, UsersRound } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -137,16 +137,21 @@ export function WorkspaceSettings() {
       </header>
 
       <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-border text-sm font-medium">
+        {/* Иконки те же, что у заголовков карточек ниже: вкладка и раздел, в
+            который она ведёт, должны опознаваться одним и тем же знаком. */}
         {([
-          { id: 'workspace', label: 'Рабочее пространство' },
-          { id: 'roles', label: 'Пользователи и роли' },
-          { id: 'notifications', label: 'Уведомления' },
-          { id: 'template', label: 'Шаблоны плиток' },
+          { id: 'workspace', label: 'Рабочее пространство', icon: Building2 },
+          { id: 'roles', label: 'Пользователи и роли', icon: UsersRound },
+          { id: 'notifications', label: 'Уведомления', icon: BellRing },
+          { id: 'template', label: 'Шаблоны плиток', icon: LayoutTemplate },
           // Telegram и DLQ — операционное обслуживание, только администратор.
-          ...(isAdmin ? [{ id: 'telegram', label: 'Telegram' }, { id: 'dlq', label: 'Очередь (DLQ)' }] as const : []),
-        ] as const).map((tab) => (
-          <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`shrink-0 ${activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-foreground' : 'pb-3 text-muted-foreground'}`}>{tab.label}</button>
-        ))}
+          ...(isAdmin ? [{ id: 'telegram', label: 'Telegram', icon: Send }, { id: 'dlq', label: 'Очередь (DLQ)', icon: Database }] as const : []),
+        ] as const).map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center gap-1.5 ${activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-foreground' : 'pb-3 text-muted-foreground'}`}><Icon className="h-4 w-4" />{tab.label}</button>
+          );
+        })}
       </nav>
 
       {activeTab === 'workspace' && (
@@ -156,7 +161,7 @@ export function WorkspaceSettings() {
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-signal-strong" />Рабочее пространство</CardTitle>
               {isAdmin && !editing && (
-                <Button variant="outline" size="sm" onClick={() => { setSnapshot(settings); setEditing(true); }}>Редактировать</Button>
+                <Button variant="outline" size="sm" onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
               )}
             </CardHeader>
             <CardContent>
@@ -237,7 +242,7 @@ export function WorkspaceSettings() {
                 <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-signal-strong" />Шаблоны плиток</CardTitle>
                 <CardDescription>Состав, порядок и размер плиток на дашбордах, мониторинге и в оборудовании.</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setActiveTab('template')}>Открыть редактор</Button>
+              <Button variant="outline" size="sm" onClick={() => setActiveTab('template')}><LayoutTemplate className="h-4 w-4" />Открыть редактор</Button>
             </CardHeader>
           </Card>
         </div>

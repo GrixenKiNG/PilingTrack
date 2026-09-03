@@ -1,4 +1,5 @@
-import type { ComponentPropsWithoutRef } from 'react';
+import type { ComponentPropsWithoutRef, ReactElement } from 'react';
+import { Headset, Joystick, ShieldCheck, UserPlus, UserRound, Wrench } from 'lucide-react';
 
 /**
  * Иконки производственных ролей, которых нет в наборе Lucide.
@@ -65,4 +66,30 @@ export function SafetyEngineerIcon(props: IconProps) {
       <path d="M8.4 13.2h7.2" />
     </IconBase>
   );
+}
+
+/**
+ * Одна карта «роль → иконка» на всё приложение.
+ *
+ * Раньше такая карта жила внутри переключателя исполняемой роли и знала
+ * только пять ролей, которые может замещать администратор. Матрице полномочий
+ * нужны все семь, и заводить вторую карту значило бы допустить, что одна и та
+ * же роль в двух местах помечена по-разному.
+ *
+ * Ключ — строка, а не `ReadinessRole`: сюда приходят и роли из справочника
+ * пользователей, которых в контуре готовности может не быть.
+ */
+export const ROLE_ICONS: Record<string, (props: IconProps) => ReactElement> = {
+  OPERATOR: (props) => <Joystick {...props} />,
+  ASSISTANT: (props) => <UserPlus {...props} />,
+  DISPATCHER: (props) => <Headset {...props} />,
+  MECHANIC: (props) => <Wrench {...props} />,
+  FOREMAN: (props) => <ForemanIcon {...props} />,
+  SAFETY_ENGINEER: (props) => <SafetyEngineerIcon {...props} />,
+  ADMIN: (props) => <ShieldCheck {...props} />,
+};
+
+/** Запасной значок: неизвестная роль всё равно должна получить пометку. */
+export function roleIcon(role: string | null | undefined) {
+  return ROLE_ICONS[role ?? ''] ?? ((props: IconProps) => <UserRound {...props} />);
 }

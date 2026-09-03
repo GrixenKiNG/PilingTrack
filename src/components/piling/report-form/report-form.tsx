@@ -14,6 +14,7 @@ import { SubmitBar } from './submit-bar';
 import { ReportSentScreen } from './report-sent-screen';
 import { PhotoSection } from './photo-section';
 import { filterPileGradesBySitePlan } from './filter-pile-grades';
+import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
 
 // Temp state for form inputs (kept local to avoid re-renders on every keystroke)
 function useTempState() {
@@ -237,7 +238,7 @@ export function ReportForm({ anchor, onExit }: ReportFormProps) {
         totalPiles={totalPiles} totalPileMeters={totalPileMeters}
         totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
         totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
-        onDone={() => (onExit ? onExit() : router.push('/operator'))}
+        onDone={() => (onExit ? onExit() : router.push(OPERATOR_HOME_ROUTE))}
       />
     );
   }
@@ -246,7 +247,7 @@ export function ReportForm({ anchor, onExit }: ReportFormProps) {
     <div className="flex flex-col min-h-screen bg-muted">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card border-b px-4 py-3 pt-safe flex items-center gap-3">
-        <button onClick={() => (onExit ? onExit() : router.push('/operator'))}
+        <button onClick={() => (onExit ? onExit() : router.push(OPERATOR_HOME_ROUTE))}
           aria-label="Вернуться к операторской смене"
           className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
           <ArrowLeft className="w-5 h-5 text-muted-foreground" />

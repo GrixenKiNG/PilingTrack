@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import { readPageSessionUser } from '@/lib/page-session';
 
 export default async function AdminSectionLayout({ children }: { children: React.ReactNode }) {
@@ -9,7 +10,7 @@ export default async function AdminSectionLayout({ children }: { children: React
   if (!user) redirect('/login');
 
   if (user.role !== 'ADMIN' && user.role !== 'DISPATCHER') {
-    redirect('/operator');
+    redirect(OPERATOR_HOME_ROUTE);
   }
 
   return <>{children}</>;

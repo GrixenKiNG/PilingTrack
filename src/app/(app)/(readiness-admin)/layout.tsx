@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import { readPageSessionUser } from '@/lib/page-session';
 
 const ALLOWED = new Set([
@@ -11,7 +12,7 @@ export default async function ReadinessAdminLayout({ children }: { children: Rea
   if (!user) redirect('/login');
 
   if (!ALLOWED.has(user.role)) {
-    redirect('/operator');
+    redirect(OPERATOR_HOME_ROUTE);
   }
 
   return <>{children}</>;

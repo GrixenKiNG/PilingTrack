@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Activity, Gauge, Info, Wrench } from '@/components/piling/icons/unified-icons';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { EquipmentToTab } from './equipment-to-tab';
@@ -110,10 +111,10 @@ export function EquipmentForm({ state, onChange, compact = false, equipmentId }:
   return (
     <Tabs defaultValue="basic" className="w-full">
       <TabsList className={cn('grid w-full', showTo ? 'grid-cols-4' : 'grid-cols-3')}>
-        <TabsTrigger value="basic">Основное</TabsTrigger>
-        <TabsTrigger value="tech" disabled={compact}>Тех. характеристики</TabsTrigger>
-        {showTo && <TabsTrigger value="to">ТО</TabsTrigger>}
-        <TabsTrigger value="ops" disabled={compact}>Эксплуатация</TabsTrigger>
+        <TabsTrigger value="basic" className="gap-1.5"><Info className="h-4 w-4" />Основное</TabsTrigger>
+        <TabsTrigger value="tech" disabled={compact} className="gap-1.5"><Gauge className="h-4 w-4" />Тех. характеристики</TabsTrigger>
+        {showTo && <TabsTrigger value="to" className="gap-1.5"><Wrench className="h-4 w-4" />ТО</TabsTrigger>}
+        <TabsTrigger value="ops" disabled={compact} className="gap-1.5"><Activity className="h-4 w-4" />Эксплуатация</TabsTrigger>
       </TabsList>
 
       {showTo && equipmentId && (

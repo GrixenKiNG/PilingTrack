@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/services/auth/session-service';
 
 /**
@@ -27,5 +28,5 @@ export default async function Home() {
     redirect('/admin/to');
   }
 
-  redirect('/operator');
+  redirect(OPERATOR_HOME_ROUTE);
 }

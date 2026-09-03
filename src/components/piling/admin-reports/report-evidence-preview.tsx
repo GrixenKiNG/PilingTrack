@@ -162,7 +162,7 @@ export function ReportEvidencePreview({
         <div className="grid gap-2 md:grid-cols-2">
           {report.downtimes.length > 0 && (
             <div className="rounded-md border border-border p-2.5">
-              <h3 className="mb-1.5 text-xs font-semibold text-foreground">Простои по причинам</h3>
+              <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Clock className="h-4 w-4 text-muted-foreground" />Простои по причинам</h3>
               <div className="space-y-1">
                 {report.downtimes.slice(0, 3).map((downtime) => (
                   <ProgressLine
@@ -178,7 +178,7 @@ export function ReportEvidencePreview({
           )}
 
           <div className="rounded-md border border-border p-2.5">
-            <h3 className="mb-1.5 text-xs font-semibold text-foreground">Типы работ</h3>
+            <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Drill className="h-4 w-4 text-muted-foreground" />Типы работ</h3>
             <div className="space-y-1">
               <ProgressLine label="Сваи" value={`${formatNumber(totals.pileMeters)} м.п.`} pct={(totals.pileMeters / workTotal) * 100} tone="orange" />
               <ProgressLine label="Бурение" value={`${formatNumber(totals.drillingMeters)} м`} pct={(totals.drillingMeters / workTotal) * 100} tone="blue" />

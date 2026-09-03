@@ -139,7 +139,7 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
   return (
     <div className="bg-card rounded-2xl border border-border p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-bold text-foreground">Фото отчёта</h3>
+        <h3 className="flex items-center gap-2 text-base font-bold text-foreground"><Camera className="h-5 w-5 text-muted-foreground" />Фото отчёта</h3>
         {photo && canEdit && (
           <button
             type="button"

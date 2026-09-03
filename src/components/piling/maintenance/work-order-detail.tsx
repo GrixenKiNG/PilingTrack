@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2 } from '@/components/piling/icons/unified-icons';
+import { ArrowLeft, Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
@@ -323,7 +323,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         рядом с именем того, кто должен это сделать.
       */}
       <div className="mt-4 rounded-xl border bg-card p-4">
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Кто и когда</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground"><UserCog className="h-4 w-4 text-muted-foreground" />Кто и когда</h2>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <PersonRow label="Заявку открыл" name={person(record.createdById)} at={record.createdAt}
             fallback="создано по регламенту, без автора" />
@@ -344,7 +344,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       </div>
 
       <div className="mt-4 rounded-xl border bg-card p-4">
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Исполнение</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground"><Wrench className="h-4 w-4 text-muted-foreground" />Исполнение</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="col-span-2 sm:col-span-1">
             <Label htmlFor="q-assignee">Исполнитель</Label>
@@ -400,18 +400,18 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-4">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Фото — диагностика</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground"><Camera className="h-4 w-4 text-muted-foreground" />Фото — диагностика</h2>
           <WorkOrderPhotos recordId={recordId} entityId={recordId} />
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Фото — выполненные работы</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground"><Camera className="h-4 w-4 text-muted-foreground" />Фото — выполненные работы</h2>
           <WorkOrderPhotos recordId={recordId} entityId={`${recordId}__work`} />
         </div>
       </div>
 
       {/* Приёмка работ администратором */}
       <div className="mt-4 rounded-xl border bg-card p-4">
-        <h2 className="mb-2 text-sm font-semibold text-foreground">Приёмка</h2>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><ClipboardCheck className="h-4 w-4 text-muted-foreground" />Приёмка</h2>
         {record.acceptedAt ? (
           <p className="text-sm text-success-strong">
             ✓ Принято {formatRuDate(record.acceptedAt)}

@@ -1,5 +1,5 @@
 export { IconTile } from './icon-tile';
-export { ForemanIcon, SafetyEngineerIcon } from './role-icons';
+export { ForemanIcon, ROLE_ICONS, SafetyEngineerIcon, roleIcon } from './role-icons';
 export { ROLE_NAVIGATION, type NavigationItem } from './role-navigation';
 export {
   DOMAIN_ICON_NAMES,

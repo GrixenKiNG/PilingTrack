@@ -358,7 +358,7 @@ function DowntimePareto({ rows }: { rows: AnalyticsResult['downtimePareto'] }) {
   if (rows.length === 0) {
     return (
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-foreground">Простои по причинам</h2>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><Clock className="h-4 w-4 text-muted-foreground" />Простои по причинам</h2>
         <p className="rounded-lg bg-muted px-3 py-3 text-sm text-muted-foreground">Простоев за период нет.</p>
       </div>
     );
@@ -366,7 +366,7 @@ function DowntimePareto({ rows }: { rows: AnalyticsResult['downtimePareto'] }) {
   const max = Math.max(...rows.map((r) => r.hours), 1);
   return (
     <div>
-      <h2 className="mb-2 text-sm font-semibold text-foreground">Простои по причинам</h2>
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><Clock className="h-4 w-4 text-muted-foreground" />Простои по причинам</h2>
       <div className="space-y-2 rounded-lg border p-3">
         {rows.map((r) => (
           <div key={r.reasonId}>
