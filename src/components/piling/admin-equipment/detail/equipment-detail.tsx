@@ -25,6 +25,7 @@ import { EquipmentPhotos } from './equipment-photos';
 import { EquipmentDocuments } from './equipment-documents';
 import { EquipmentMonitoring } from './equipment-monitoring';
 import { EquipmentMaintenance } from './equipment-maintenance';
+import { FuelPanel } from '@/components/piling/to/fuel-panel';
 import { EquipmentInspections } from './equipment-inspections';
 import { EquipmentReportExport } from './equipment-report-export';
 import { EquipmentPlaceholder } from '../equipment-placeholder';
@@ -306,6 +307,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
             <div className="space-y-4">
               <MaintenanceBlock eq={eq} />
               <EquipmentMaintenance equipmentId={equipmentId} />
+              <FuelPanel equipmentId={equipmentId} />
             </div>
           )}
 
@@ -410,6 +412,11 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       <Section icon={Timer} title="Обслуживание">
         <MaintenanceBlock eq={eq} />
         <EquipmentMaintenance equipmentId={equipmentId} />
+      </Section>
+
+      {/* Топливо */}
+      <Section icon={Gauge} title="Топливо" collapsible defaultOpen={false}>
+        <FuelPanel equipmentId={equipmentId} />
       </Section>
 
       {/* Осмотры */}

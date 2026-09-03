@@ -246,6 +246,7 @@ model Equipment {
   purchaseDate           DateTime? @db.Timestamptz(3)
   purchasePrice          Decimal?  @db.Decimal(14, 2)
   engineHoursTotal       Int? // суммарная наработка
+  fuelTankLiters         Int? // объём топливного бака, л — для расчёта расхода из остатка %
   nextMaintenanceAtHours Int?
   nextMaintenanceDate    DateTime? @db.Timestamptz(3)
   homeBaseLocation       String?
@@ -263,6 +264,7 @@ model Equipment {
   inspections           Inspection[]
   defects               EquipmentDefect[]
   meterReadings         MeterReading[]
+  fuelLogs              FuelLog[]
   maintenancePlans      MaintenancePlan[]
   operatorChecklistExecutions OperatorChecklistExecution[]
   operatorShiftEvidence OperatorShiftEvidence[]
@@ -502,6 +504,33 @@ model MeterReading {
 enum MeterSource {
   MANUAL
   TELEMETRY
+}
+
+// ============================================================
+// FUEL LOG — журнал топлива (долив и остаток по указателю)
+// Тот же приём, что у MeterReading: источник истины — история записей,
+// а не одно поле. Расход НЕ храним отдельным числом — он выводится из
+// долива, остатка и объёма бака (Equipment.fuelTankLiters), а моточасы для
+// «л/моточас» берём из MeterReading, чтобы не заводить вторую копию факта.
+// Фаза телеметрии пишет сюда с source=TELEMETRY без изменения модели: бокс
+// на баке становится ещё одним источником и вытесняет ручной ввод.
+// ============================================================
+model FuelLog {
+  id           String      @id @default(cuid())
+  tenantId     String
+  equipmentId  String
+  recordedAt   DateTime    @db.Timestamptz(3) // когда сделана запись
+  litersAdded  Int? // сколько залито в бак за эту запись, л (у долива)
+  tankPercent  Int? // остаток по указателю на момент записи, % (0–100)
+  source       MeterSource @default(MANUAL)
+  recordedById String? // кто внёс (User.id), без relation — как createdById
+  note         String      @default("")
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([equipmentId, recordedAt])
 }
 
 // ============================================================

@@ -162,6 +162,7 @@ const equipmentMetadataSchema = z.object({
   purchaseDate:           optDate,
   purchasePrice:          optNum(z.number().nonnegative().max(1_000_000_000)),
   engineHoursTotal:       optNum(z.number().int().min(0).max(1_000_000)),
+  fuelTankLiters:         optNum(z.number().int().min(0).max(100_000)),
   nextMaintenanceAtHours: optNum(z.number().int().min(0).max(1_000_000)),
   nextMaintenanceDate:    optDate,
   homeBaseLocation:       optStr(200),

@@ -11,11 +11,13 @@ export { createMaintenance, updateMaintenance, deleteMaintenance, acceptMaintena
 export type { MaintenanceInput, MaintenanceType, MaintenanceStatus, MaintenancePriority } from './application/commands/equipment-maintenance';
 export { addMeterReading, deleteMeterReading, recordMeterReadingInTx, checkMeterReading, canDecreaseMeter, METER_JUMP_WARN_HOURS } from './application/commands/meter-reading';
 export type { MeterReadingInput, MeterSource, AddMeterReadingResult, MeterReadingContext } from './application/commands/meter-reading';
+export { addFuelEntry, deleteFuelEntry, computeFuelConsumption } from './application/commands/fuel-log';
+export type { FuelLogInput, FuelLogContext, FuelConsumption, FuelConsumptionInput } from './application/commands/fuel-log';
 export { createMaintenancePlan, updateMaintenancePlan, deleteMaintenancePlan } from './application/commands/maintenance-plan';
 export type { MaintenancePlanInput } from './application/commands/maintenance-plan';
 export { runPmScheduler, evaluatePlanDue } from './application/commands/pm-scheduler';
 export type { PmTriggerType, PmDueStatus, PlanForEval, PlanDueResult, PmSchedulerResult } from './application/commands/pm-scheduler';
 export type { CreateEquipmentCommand, UpdateEquipmentCommand } from './application/commands/equipment.command';
-export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, getMaintenanceById, listAllEquipment, listAllMaintenance, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance, listMeterReadings, listMaintenancePlans, getFleetKpiData } from './application/queries/equipment-query.service';
+export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, getMaintenanceById, listAllEquipment, listAllMaintenance, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance, listMeterReadings, listFuelLog, getFuelSummary, listMaintenancePlans, getFleetKpiData } from './application/queries/equipment-query.service';
 export type { MaintenanceListFilter } from './application/queries/equipment-query.service';
 export { getEquipmentRepository } from './infrastructure/equipment.repository';

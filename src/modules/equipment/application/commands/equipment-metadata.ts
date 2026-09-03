@@ -52,6 +52,7 @@ const METADATA_KEYS = [
   'purchaseDate',
   'purchasePrice',
   'engineHoursTotal',
+  'fuelTankLiters',
   'nextMaintenanceAtHours',
   'nextMaintenanceDate',
   'homeBaseLocation',

@@ -62,6 +62,7 @@ export interface EquipmentFormState {
   purchaseDate: string;        // YYYY-MM-DD
   purchasePrice: string;
   engineHoursTotal: string;
+  fuelTankLiters: string;
   nextMaintenanceAtHours: string;
   nextMaintenanceDate: string; // YYYY-MM-DD
   homeBaseLocation: string;
@@ -78,7 +79,7 @@ export const EMPTY_EQUIPMENT_FORM: EquipmentFormState = {
   hammerType: '', hammerSerialNumber: '', hammerEnergyKj: '',
   hammerKind: 'NONE', isCombined: false,
   purchaseDate: '', purchasePrice: '',
-  engineHoursTotal: '', nextMaintenanceAtHours: '', nextMaintenanceDate: '',
+  engineHoursTotal: '', fuelTankLiters: '', nextMaintenanceAtHours: '', nextMaintenanceDate: '',
   homeBaseLocation: '',
 };
 
@@ -247,6 +248,7 @@ export function EquipmentForm({ state, onChange, compact = false, equipmentId }:
           </Field>
           <NumberField label="Стоимость покупки (₽)" value={state.purchasePrice} onChange={(v) => onChange({ purchasePrice: v })} step="0.01" />
           <NumberField label="Наработка моточасов" value={state.engineHoursTotal} onChange={(v) => onChange({ engineHoursTotal: v })} step="1" />
+          <NumberField label="Объём бака (л)" value={state.fuelTankLiters} onChange={(v) => onChange({ fuelTankLiters: v })} step="1" />
           <NumberField label="След. ТО по моточасам" value={state.nextMaintenanceAtHours} onChange={(v) => onChange({ nextMaintenanceAtHours: v })} step="1" />
           <Field label="След. ТО по дате">
             <Input type="date" value={state.nextMaintenanceDate} onChange={(e) => onChange({ nextMaintenanceDate: e.target.value })} className="h-11" />
@@ -357,6 +359,7 @@ export function formStateToPayload(state: EquipmentFormState): Record<string, un
     purchaseDate: str(state.purchaseDate),
     purchasePrice: num(state.purchasePrice),
     engineHoursTotal: num(state.engineHoursTotal),
+    fuelTankLiters: num(state.fuelTankLiters),
     nextMaintenanceAtHours: num(state.nextMaintenanceAtHours),
     nextMaintenanceDate: str(state.nextMaintenanceDate),
     homeBaseLocation: str(state.homeBaseLocation),
@@ -406,6 +409,7 @@ export function equipmentToFormState(item: Record<string, unknown> | null): Equi
     purchaseDate: dateOnly('purchaseDate'),
     purchasePrice: s('purchasePrice'),
     engineHoursTotal: s('engineHoursTotal'),
+    fuelTankLiters: s('fuelTankLiters'),
     nextMaintenanceAtHours: s('nextMaintenanceAtHours'),
     nextMaintenanceDate: dateOnly('nextMaintenanceDate'),
     homeBaseLocation: s('homeBaseLocation'),
