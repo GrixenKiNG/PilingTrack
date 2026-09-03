@@ -35,4 +35,4 @@ export type { UserDocumentInput, UserDocumentContext, UserDocumentTypeInput } fr
 // eslint-disable-next-line no-restricted-imports -- intentional public re-export facade during the services-to-modules migration
 export { evaluateOperatorClearance } from '@/services/users/operator-clearance';
 // eslint-disable-next-line no-restricted-imports -- intentional public re-export facade during the services-to-modules migration
-export type { OperatorClearance, ClearanceIssue } from '@/services/users/operator-clearance';
+export type { OperatorClearance, ClearanceIssue, ClearanceDocument } from '@/services/users/operator-clearance';
