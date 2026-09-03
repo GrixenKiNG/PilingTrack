@@ -341,14 +341,24 @@ function HandoverEvent({ event, latest, timezone }: {
       </span>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 text-xs font-semibold">{event.label}</div>
-        <span className={cn('shrink-0 rounded border px-1.5 py-0.5 text-3xs font-semibold', pill.cls)}>
-          {pill.label}
-        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Самоприёмку показываем видимой меткой: разрешена, но «кто
+              проверил» — вопрос для разбора, и в аудите он лежал незаметно. */}
+          {event.selfAccepted && (
+            <span className="rounded border border-warning bg-warning/10 px-1.5 py-0.5 text-3xs font-semibold text-warning-strong">
+              Самоприёмка
+            </span>
+          )}
+          <span className={cn('rounded border px-1.5 py-0.5 text-3xs font-semibold', pill.cls)}>
+            {pill.label}
+          </span>
+        </div>
       </div>
       <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">
         {formatDateTimeInTimezone(event.occurredAt, timezone)}
         {event.actorName ? ` · ${event.actorName}` : ''}
         {handoverRoleLabel(event.actorRole) ? ` (${handoverRoleLabel(event.actorRole)})` : ''}
+        {event.selfAccepted ? ' · принято тем же, кто сдал' : ''}
         {` · пакет v${event.packageVersion}`}
       </div>
       {event.comment && (

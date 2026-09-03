@@ -21,6 +21,13 @@ export interface HandoverJournalEvent {
   actorRole: string | null;
   comment: string | null;
   packageVersion: number;
+  /**
+   * Передачу принял тот же человек, что её сдал. Самоприёмка разрешена (в смену
+   * из одного человека принять больше некому), но «кто проверил» остаётся
+   * вопросом для разбора — поэтому помечаем её видимо, а не только в аудите.
+   * Только у события ACCEPTED.
+   */
+  selfAccepted: boolean;
 }
 
 const EVENT_LABEL: Record<HandoverEventKind, string> = {
@@ -59,7 +66,10 @@ export function buildHandoverJournal(
   for (const shift of shifts) {
     if (shift.equipmentId !== equipmentId) continue;
     for (const handover of shift.handovers) {
-      const add = (kind: HandoverEventKind, at: string | null, actorId: string | null, comment: string | null) => {
+      const add = (
+        kind: HandoverEventKind, at: string | null, actorId: string | null,
+        comment: string | null, selfAccepted = false,
+      ) => {
         if (!at) return;
         events.push({
           id: `${handover.id}:${kind}`,
@@ -68,12 +78,14 @@ export function buildHandoverJournal(
           occurredAt: at,
           comment,
           packageVersion: handover.version,
+          selfAccepted,
           ...resolve(actorId),
         });
       };
       add('SUBMITTED', handover.submittedAt, handover.submittedById, handover.summary);
       add('REWORKED', handover.reworkedAt, handover.reworkedById, handover.reworkReason);
-      add('ACCEPTED', handover.acceptedAt, handover.acceptedById, null);
+      add('ACCEPTED', handover.acceptedAt, handover.acceptedById, null,
+        handover.submittedById != null && handover.acceptedById === handover.submittedById);
     }
   }
 
