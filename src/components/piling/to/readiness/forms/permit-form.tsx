@@ -208,11 +208,10 @@ export function PermitForm({
     if (!ready) { setError('Заполните обязательные поля, отмеченные звёздочкой.'); return; }
     setPending(true);
     setError(null);
-    const actingHeader: Record<string, string> = bootstrap?.actor.actingAs
-      ? { 'x-readiness-acting-as': bootstrap.actor.actingAs } : {};
+
     const created = await authFetch('/api/readiness/work-permits', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID(), ...actingHeader },
+      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
       body: JSON.stringify({
         equipmentId, shiftId: null, workTypeId, risk,
         title: title.trim(), scope: scope.trim(),
@@ -246,7 +245,6 @@ export function PermitForm({
         'content-type': 'application/json',
         'idempotency-key': crypto.randomUUID(),
         'if-match': `"work-permit-${permit.id}-v${permit.version}"`,
-        ...actingHeader,
       },
       body: JSON.stringify({ expectedVersion: permit.version }),
     });

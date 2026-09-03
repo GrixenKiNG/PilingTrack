@@ -1,7 +1,6 @@
 import type {NextRequest, NextResponse} from 'next/server';
 import {requireAuth} from '@/lib/auth';
 import {getRequestId} from '@/lib/request-context';
-import {canActAs} from '@/lib/types';
 import {resolveCorrelationId} from '@/modules/readiness/application/command-pipeline/correlation';
 import {getPublishedAccessMatrix} from '@/modules/readiness/application/access-matrix-service';
 import {effectiveReadinessCapabilities, type ReadinessAbility} from '@/modules/readiness/application/capabilities';
@@ -46,9 +45,26 @@ export type ReadinessRequestResolution =
   | {context: ReadinessRequestContext; response?: undefined}
   | {context?: undefined; response: NextResponse};
 
+/**
+ * Разбор запроса к контуру готовности.
+ *
+ * ПОЧЕМУ ИСПОЛНЯЕМАЯ РОЛЬ БЕРЁТСЯ ИЗ `requireAuth`, А НЕ ИЗ ЗАГОЛОВКА.
+ * Раньше здесь читался собственный заголовок `x-readiness-acting-as`, а
+ * проверенный `user.actingAs` игнорировался. Клиент же шлёт `x-acting-as` —
+ * один раз и на каждом запросе (`lib/api.ts`). Совпадали они ровно в трёх
+ * местах, которые дописывали особый заголовок руками: форма наряда, панель
+ * дефектов и экран нарядов. Всё остальное уходило без замещения, и
+ * администратор в режиме механика выполнял команды с полными правами
+ * администратора, а в журнал попадало «замещения не было». Режим «Действую
+ * как» существует, чтобы увидеть продукт чужими глазами; полномочия,
+ * молча остающиеся своими, делают его бесполезным и вдобавок портят аудит.
+ *
+ * Источник теперь один. Проверку `canActAs` здесь не повторяем: `requireAuth`
+ * уже применил её и обнулил недопустимое замещение — повторная проверка
+ * никогда бы не сработала, а её наличие внушало бы, что источников два.
+ */
 export async function resolveReadinessRequestContext(
   request: NextRequest,
-  actingAs: string | null = request.headers.get('x-readiness-acting-as'),
 ): Promise<ReadinessRequestResolution> {
   const requestId = getRequestId(request);
   const {user, error} = await requireAuth(request);
@@ -57,10 +73,9 @@ export async function resolveReadinessRequestContext(
     const {NextResponse} = await import('next/server');
     return {response: NextResponse.json({error: {code: 'FORBIDDEN', message: 'Tenant context is required'}}, {status: 403})};
   }
-  if (!canActAs(user.role, actingAs)) {
-    const {NextResponse} = await import('next/server');
-    return {response: NextResponse.json({error: {code: 'FORBIDDEN', message: 'Acting role is not allowed'}}, {status: 403})};
-  }
+  //  — не украшение: тип контекста обещает , а
+  // отсутствующее поле дало бы  и утекло бы в журнал как таковое.
+  const actingAs = user.actingAs ?? null;
   const accessMatrix = await getPublishedAccessMatrix(user.tenantId);
   return {
     context: {

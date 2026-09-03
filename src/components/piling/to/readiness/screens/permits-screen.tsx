@@ -118,10 +118,10 @@ export function PermitsScreen(props: ReferenceUiProps) {
         'content-type': 'application/json',
         'idempotency-key': crypto.randomUUID(),
         'if-match': `"work-permit-${permit.id}-v${permit.version}"`,
-        // Замещение передаём и при согласовании: администратор подписывает
-        // наряд обычного риска именно как диспетчер. Правило «автор не
-        // согласует свой наряд» остаётся на сервере.
-        ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
+        // Замещение сюда не дописываем: `authFetch` шлёт `x-acting-as` на
+        // каждом запросе, и сервер берёт роль оттуда. Администратор
+        // подписывает наряд обычного риска именно как диспетчер, а правило
+        // «автор не согласует свой наряд» остаётся на сервере.
       },
       body: JSON.stringify(action === 'revoke'
         ? { expectedVersion: permit.version, reason: commandText.trim() }

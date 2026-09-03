@@ -88,7 +88,6 @@ export function DefectsPanel(props: ReferenceUiProps) {
   const headers = (extra: Record<string, string> = {}) => ({
     'content-type': 'application/json',
     'idempotency-key': crypto.randomUUID(),
-    ...(props.bootstrap?.actor.actingAs ? { 'x-readiness-acting-as': props.bootstrap.actor.actingAs } : {}),
     ...extra,
   });
 
