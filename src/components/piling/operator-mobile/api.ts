@@ -3,13 +3,18 @@
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
+import {commandLabel, enqueue, isQueueable, markAttempt, resolve} from './offline-queue';
 
 /**
- * Клиент мобильного места. Только онлайн: очереди и хранилища на телефоне нет.
+ * Клиент мобильного места.
  *
- * ПОЧЕМУ БЕЗ ОЧЕРЕДИ. Автономная работа — это отдельный продукт со своими
- * правилами разрешения конфликтов. Пока её нет, честнее показать «нет сети»,
- * чем принять осмотр, который неизвестно когда доедет до сервера и доедет ли.
+ * Добавляющие записи (выработка, осмотр, происшествие, поправка) переживают
+ * обрыв сети: они ложатся в очередь на устройстве и уходят при связи. Повтор
+ * безопасен — сервер узнаёт команду по `clientCommandId` и второй записи не
+ * делает.
+ *
+ * Переходы состояния смены остаются строго онлайн: откладывать их значило бы
+ * решать судьбу смены, не зная её состояния. Подробнее — в `offline-queue.ts`.
  */
 
 export class ApiError extends Error {
@@ -62,7 +67,26 @@ type Command =
   | {command: 'finish-work'; shiftId: string}
   | {command: 'close-shift'; shiftId: string; comment: string};
 
-export async function sendCommand<T = unknown>(command: Command): Promise<T> {
+/**
+ * Запись принята устройством, но ещё не сервером: лежит в очереди и уйдёт,
+ * когда вернётся сеть. Не ошибка — форму можно закрывать, данные не потеряны.
+ */
+export class QueuedOffline extends Error {
+  constructor(readonly label: string) {
+    super(`${label}: сохранено на устройстве, отправим при связи`);
+    this.name = 'QueuedOffline';
+  }
+}
+
+/**
+ * Отправка уже стоящей в очереди команды: без повторной постановки в очередь,
+ * иначе дозапись сама себя бы туда и клала.
+ */
+export function sendQueuedCommand(command: unknown): Promise<unknown> {
+  return postCommand<unknown>(command);
+}
+
+async function postCommand<T>(command: unknown): Promise<T> {
   const response = await fetch('/api/operator/mobile/command', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -70,6 +94,32 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
     body: JSON.stringify(command),
   });
   return parse<T>(response);
+}
+
+export async function sendCommand<T = unknown>(command: Command): Promise<T> {
+  // Команды перехода состояния смены отправляем как есть: откладывать их
+  // нельзя (см. offline-queue.ts).
+  if (!isQueueable(command)) return postCommand<T>(command);
+
+  // Сначала в очередь, потом в сеть: обрыв посреди запроса не должен терять
+  // введённое. Успех снимает запись из очереди, отказ по существу — тоже
+  // (повтор не поможет), а обрыв оставляет её ждать связи.
+  enqueue(command);
+  try {
+    const result = await postCommand<T>(command);
+    resolve(command.clientCommandId);
+    return result;
+  } catch (error) {
+    const status = error instanceof ApiError ? error.status : null;
+    const permanent = status !== null && status >= 400 && status < 500;
+    if (permanent) {
+      resolve(command.clientCommandId);
+      throw error;
+    }
+    markAttempt(command.clientCommandId,
+      error instanceof Error ? error.message : 'Не отправлено', false);
+    throw new QueuedOffline(commandLabel(command));
+  }
 }
 
 /**
