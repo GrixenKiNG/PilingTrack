@@ -798,6 +798,21 @@ export async function logProduction(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    // Повтор уже принятой команды отсекаем ДО всех остальных правил.
+    //
+    // Ниже стоит перехват P2002 — он спасает мгновенный повтор при обрыве. Но
+    // между первой отправкой и повтором проходит время, а правила ниже от
+    // времени зависят: смена успевает закрыться, ветер — подняться. Тогда
+    // повтор отвергается ещё до `create`, и машинист получает отказ по записи,
+    // которая давно принята. Для отложенной отправки с телефона это обычный
+    // случай, а не редкость.
+    //
+    // Запись уже есть — значит команда выполнена, и время её больше не судит.
+    const duplicate = await findByCommand(
+      tx, input.tenantId, input.entry.kind, input.clientCommandId,
+    );
+    if (duplicate) return {reportId: ''};
+
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
