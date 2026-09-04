@@ -10,7 +10,9 @@ import {
 */
 
 const piles = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES'}};
-const inspection = {command: 'submit-checklist', clientCommandId: 'c2'};
+const inspection = {command: 'submit-checklist', clientCommandId: 'cX'};
+// Вторая очередная запись — происшествие: осмотр в очередь больше не идёт.
+const incident = {command: 'report-incident', clientCommandId: 'c2'};
 
 // Своё хранилище, а не окружения: тест не должен зависеть от того, даёт ли
 // среда localStorage, — иначе он молча проверял бы пустую очередь и проходил.
@@ -28,11 +30,15 @@ beforeEach(() => {
 });
 
 describe('очередь команд на устройстве', () => {
-  it('откладывает только добавляющие записи, переходы смены — никогда', () => {
+  it('откладывает только то, что ничего не решает о состоянии смены', () => {
     expect(isQueueable(piles)).toBe(true);
-    expect(isQueueable(inspection)).toBe(true);
-    // У этих нет ключа идемпотентности и есть порядок: отложить — значит
-    // решать судьбу смены, не зная её состояния.
+    expect(isQueueable({command: 'report-incident', clientCommandId: 'i1'})).toBe(true);
+
+    // Осмотр двигает фазу смены, а фаза живёт на сервере. Отложенный осмотр
+    // оставлял машиниста на том же экране: он жал «Завершить» снова, и каждое
+    // нажатие заводило новый ключ — второй осмотр той же смены.
+    expect(isQueueable(inspection)).toBe(false);
+    // Эти к тому же зависят от порядка.
     expect(isQueueable({command: 'close-shift', shiftId: 's1'})).toBe(false);
     expect(isQueueable({command: 'accept-equipment', clientCommandId: 'x'})).toBe(false);
   });
@@ -45,7 +51,7 @@ describe('очередь команд на устройстве', () => {
 
   it('обрыв сети оставляет записи в очереди и не долбит остальные', async () => {
     enqueue(piles);
-    enqueue(inspection);
+    enqueue(incident);
     let calls = 0;
     const result = await flushQueue(async () => {
       calls += 1;
@@ -58,7 +64,7 @@ describe('очередь команд на устройстве', () => {
 
   it('отказ сервера по существу помечает запись и не мешает остальным', async () => {
     enqueue(piles);
-    enqueue(inspection);
+    enqueue(incident);
     await flushQueue(async (command) => {
       if ((command as {clientCommandId: string}).clientCommandId === 'c1') {
         throw Object.assign(new Error('Количество должно быть больше нуля'), {status: 400});
