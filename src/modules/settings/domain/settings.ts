@@ -29,10 +29,16 @@ export interface WorkspaceSettings {
 /**
  * Правила уведомлений, которые тенант может включать и выключать.
  *
- * `implemented` — есть ли у правила настоящий отправитель. Отправителей ровно
- * два (`services/reports/event-handlers.ts`): предупреждение о простое и PDF
- * сменного отчёта. Оба теперь проверяют признак; раньше признак сохранялся, но
- * никем не читался, и включённое правило вело себя ровно как выключенное.
+ * `implemented` — есть ли у правила настоящий отправитель. Признак сохранялся и
+ * раньше, но его никто не читал, и включённое правило вело себя ровно как
+ * выключенное; сейчас каждый отправитель спрашивает его перед отправкой:
+ *
+ * - `downtime30`, `newReports` — `services/reports/event-handlers.ts`
+ * - `maintenanceOverdue` — `workers/unified-worker/pm-scheduler.ts`
+ * - `criticalDefect` — `modules/readiness/application/defects/notify-critical.ts`
+ *
+ * Без отправителя остаётся только `planDeviation`, и экран настроек об этом
+ * говорит прямо.
  *
  * Подпись первого правила обещала простой «более 30 минут», хотя отправитель
  * молчит до 2 часов, — приведена к фактическому порогу.
@@ -40,7 +46,8 @@ export interface WorkspaceSettings {
 export const NOTIFICATION_KEYS = [
   { key: 'downtime30', label: 'Простой в сменном отчёте дольше 2 часов', implemented: true },
   { key: 'planDeviation', label: 'Отклонения по плану (±10%)', implemented: false },
-  { key: 'maintenanceOverdue', label: 'Просроченные ТО', implemented: false },
+  { key: 'maintenanceOverdue', label: 'Просроченные ТО', implemented: true },
+  { key: 'criticalDefect', label: 'Опасный дефект установки (срочный или запрет работы)', implemented: true },
   { key: 'newReports', label: 'Новые отчёты и сводки', implemented: true },
 ] as const;
 
@@ -50,6 +57,9 @@ export const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
   downtime30: true,
   planDeviation: true,
   maintenanceOverdue: true,
+  // Дефект, из-за которого нельзя или опасно работать, — то немногое, о чём
+  // молчать дороже, чем лишний раз написать. Умолчание «включено».
+  criticalDefect: true,
   newReports: false,
 };
 

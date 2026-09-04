@@ -6,7 +6,7 @@ vi.mock('@/lib/db', () => ({
 
 import { db } from '@/lib/db';
 import { getSettings, saveSettings } from '@/modules/settings';
-import { sanitizeSettings, DEFAULT_WORKSPACE_SETTINGS } from '@/modules/settings/domain/settings';
+import { sanitizeSettings, DEFAULT_WORKSPACE_SETTINGS, NOTIFICATION_KEYS } from '@/modules/settings/domain/settings';
 
 const anyDb = db.tenantSettings as unknown as { findUnique: ReturnType<typeof vi.fn>; upsert: ReturnType<typeof vi.fn> };
 
@@ -15,7 +15,11 @@ describe('settings sanitizer', () => {
     const s = sanitizeSettings({ notifications: { downtime30: false, bogus: true } });
     expect(s.notifications.downtime30).toBe(false);
     expect('bogus' in s.notifications).toBe(false);
-    expect(Object.keys(s.notifications).sort()).toEqual(['downtime30', 'maintenanceOverdue', 'newReports', 'planDeviation']);
+    // Список берётся из каталога, а не переписывается здесь: проверяем
+    // «ровно известные ключи», а не «ровно эти четыре». Иначе новое правило
+    // роняет тест, ничего не сломав, и его чинят вписыванием строки.
+    expect(Object.keys(s.notifications).sort())
+      .toEqual(NOTIFICATION_KEYS.map(({ key }) => key as string).sort());
   });
 
   it('rejects an unknown units value and over-long strings', () => {

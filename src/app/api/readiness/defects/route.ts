@@ -1,6 +1,7 @@
 import type {NextRequest} from 'next/server';
 import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
 import {createDefectCommand} from '@/modules/readiness/application/defects/commands';
+import {notifyCriticalDefects} from '@/modules/readiness/application/defects/notify-critical';
 import {queryDefects} from '@/modules/readiness/application/defects/queries';
 import {createDefectSchema, listDefectsQuerySchema} from '@/modules/readiness/application/defects/schemas';
 import {
@@ -76,6 +77,17 @@ export const POST = withReadinessCommand(async (request: NextRequest, context) =
   const result = await withReadinessSerializableTransaction(context.tenantId,
     (tx) => createDefectCommand({tx, context,
       key: request.headers.get('idempotency-key'), payload: parsed.data}));
+  // Оповещение — после фиксации и вне транзакции: дефект уже в журнале, и
+  // упавшая отправка не должна валить запись. Повтор по тому же ключу
+  // возвращает тот же 201 — второй раз не пишем.
+  if (!result.replayed && result.status === 201) {
+    void notifyCriticalDefects({
+      tenantId: context.tenantId,
+      equipmentId: parsed.data.equipmentId,
+      reportedBy: context.actorName,
+      defects: [{severity: parsed.data.severity, title: parsed.data.title}],
+    }).catch(() => undefined);
+  }
   return readinessResponse({body: result.body, status: result.status, headers: result.headers,
     correlationId: context.correlationId, requestId: context.requestId});
 }, {domain: 'readiness-defects', rateLimit: {maxAttempts: 30, windowMs: 60_000, blockDurationMs: 60_000}});

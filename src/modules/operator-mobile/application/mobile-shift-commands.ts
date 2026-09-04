@@ -572,7 +572,7 @@ export async function submitChecklist(input: {
       where: {tenantId_clientCommandId: {tenantId: input.tenantId, clientCommandId: input.clientCommandId}},
       select: {id: true},
     });
-    if (duplicate) return {executionId: duplicate.id, alerts: 0, defects: 0};
+    if (duplicate) return {executionId: duplicate.id, alerts: 0, defects: 0, createdDefects: []};
 
     const {id: templateId, definition} = await ensureTemplate(tx, input.tenantId, input.stage, input.operatorId);
 
@@ -636,8 +636,12 @@ export async function submitChecklist(input: {
       });
     }
 
-    const defects = collectDefectDrafts(input.stage, input.equipmentId, items, input.answers);
-    for (const draft of defects) {
+    const drafts = collectDefectDrafts(input.stage, input.equipmentId, items, input.answers);
+    // Заведённые здесь и сейчас, без тех, что уже висят по этому же пункту:
+    // о повторно отмеченной той же течи оповещать некого — дефект по ней
+    // открыт, и разбирается он в журнале, а не вторым сигналом в чат.
+    const created: {severity: string; title: string}[] = [];
+    for (const draft of drafts) {
       const open = await tx.equipmentDefect.findFirst({
         where: {
           tenantId: input.tenantId,
@@ -647,6 +651,7 @@ export async function submitChecklist(input: {
         select: {id: true},
       });
       if (open) continue;
+      created.push({severity: draft.severity, title: draft.title});
       await tx.equipmentDefect.create({
         data: {
           tenantId: input.tenantId,
@@ -726,7 +731,11 @@ export async function submitChecklist(input: {
     return {
       executionId: execution.id,
       alerts: alertingFaults(items, input.answers).length,
-      defects: defects.length,
+      defects: created.length,
+      // Опасные из заведённых — маршруту, чтобы оповестить после фиксации и
+      // вне транзакции. Отправлять отсюда нельзя: откат сериализации отменил
+      // бы запись, а сигнал в чат уже ушёл бы.
+      createdDefects: created,
     };
   });
 }

@@ -7,6 +7,10 @@ import {
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
 } from '@/modules/operator-mobile';
 import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/contracts';
+// Напрямую из `application`, а не через `@/modules/readiness`: тот барьер
+// импортируют клиентские компоненты, и серверный модуль в нём тянет `lib/db`
+// в браузерный бандл.
+import {notifyCriticalDefects} from '@/modules/readiness/application/defects/notify-critical';
 import {getWeatherAt} from '@/services/weather/weather-client';
 
 export const runtime = 'nodejs';
@@ -163,8 +167,19 @@ export const POST = withMutation(
           return NextResponse.json({
             data: await acceptEquipment({...actor, ...body, readWeather: getWeatherAt}),
           });
-        case 'submit-checklist':
-          return NextResponse.json({data: await submitChecklist({...actor, ...body})});
+        case 'submit-checklist': {
+          const result = await submitChecklist({...actor, ...body});
+          // Оповещение — после фиксации и вне транзакции, тем же правилом, что
+          // и происшествие ниже: осмотр уже записан, и молчащий Telegram не
+          // повод его отменить. Отбор опасных и признак организации — внутри.
+          void notifyCriticalDefects({
+            tenantId: user.tenantId,
+            equipmentId: body.equipmentId,
+            reportedBy: user.name,
+            defects: result.createdDefects,
+          }).catch(() => undefined);
+          return NextResponse.json({data: result});
+        }
         case 'log-production':
           return NextResponse.json({
             data: await logProduction({...actor, ...body, readWeather: getWeatherAt}),

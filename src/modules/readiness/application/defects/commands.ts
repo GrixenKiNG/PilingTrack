@@ -94,7 +94,10 @@ async function runCommand(input: {
   tx: ReadinessTransaction; context: DefectCommandContext; method: 'POST';
   routeTemplate: string; aggregateId?: string; key: string | null; body: unknown;
   expectedVersion?: number; execute: (key: string) => Promise<CommandHttpResult>;
-}): Promise<CommandHttpResult> {
+  // `replayed` пробрасывается наружу: повтор по тому же ключу возвращает тот же
+  // 201, и без этого признака вызывающий не отличит «завели дефект» от «уже
+  // заводили» — а оповещать во второй раз незачем.
+}): Promise<CommandHttpResult & {replayed: boolean}> {
   const key = requireIdempotencyKey(input.key);
   const scope = createIdempotencyScope({method: input.method,
     routeTemplate: input.routeTemplate, aggregateId: input.aggregateId,
@@ -114,7 +117,7 @@ async function runCommand(input: {
 export async function createDefectCommand(input: {
   tx: ReadinessTransaction; context: DefectCommandContext; key: string | null;
   payload: CreateDefectPayload;
-}): Promise<CommandHttpResult> {
+}): Promise<CommandHttpResult & {replayed: boolean}> {
   assertCanReport(input.context);
   return runCommand({tx: input.tx, context: input.context, method: 'POST',
     routeTemplate: '/api/readiness/defects', key: input.key, body: input.payload,
