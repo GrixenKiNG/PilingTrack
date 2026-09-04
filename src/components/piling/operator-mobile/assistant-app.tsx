@@ -298,8 +298,15 @@ export function AssistantApp() {
                         {' · с '}
                         {new Date(defect.reportedAt).toLocaleDateString('ru-RU')}
                       </p>
-                      {defect.reportedByMe && (
+                      {/* Своё выделяем, чужое подписываем именем: до этого
+                          запись машиниста висела здесь без автора, и спросить
+                          «где именно» было не у кого. */}
+                      {defect.reportedByMe ? (
                         <p className="text-2xs font-semibold text-signal">Это записали вы</p>
+                      ) : (
+                        <p className="text-2xs text-muted-foreground">
+                          Записал: {defect.reportedByName}
+                        </p>
                       )}
                     </div>
                   </li>

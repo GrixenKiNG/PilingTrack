@@ -1,4 +1,5 @@
 import {db} from '@/lib/db';
+import {toDefectViews} from './defect-views';
 import {checkOperatorDocuments} from '../domain/operator-admission';
 import {
   briefingUpToDate, knowledgeValid,
@@ -101,6 +102,13 @@ export async function queryAssistantState(input: {
     take: 20,
   });
 
+  // Машину подписываем поверх общего вида: она есть только у помощника —
+  // он стоит у нескольких, машинист всегда у одной. Сопоставляем по
+  // идентификатору, а не по месту в списке: порядок — не обещание сериализатора.
+  const equipmentNames = new Map(defects.map((defect) => [defect.id, defect.equipment?.name ?? '—']));
+  const defectViews = (await toDefectViews({tenantId, viewerId: assistantId, defects}))
+    .map((view) => ({...view, equipmentName: equipmentNames.get(view.id) ?? '—'}));
+
   const checks = checkOperatorDocuments(documentTypes, documents, now);
 
   const briefingDocument = documents.find(
@@ -135,15 +143,7 @@ export async function queryAssistantState(input: {
       lastResult: knowledgeDocument?.number ?? null,
       ok: knowledgeValid(knowledgeUntil, now),
     },
-    defects: defects.map((defect) => ({
-      id: defect.id,
-      title: defect.title,
-      severity: defect.severity,
-      status: defect.status,
-      reportedAt: defect.reportedAt.toISOString(),
-      equipmentName: defect.equipment?.name ?? '—',
-      reportedByMe: defect.reportedById === assistantId,
-    })),
+    defects: defectViews,
     crews: crews
       // Бригада без машины к заведению неисправности непригодна и на
       // экране бесполезна: показывать «Установка: —» нечего.

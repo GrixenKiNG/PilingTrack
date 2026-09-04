@@ -113,6 +113,14 @@ export interface DefectView {
   severity: string;
   status: string;
   reportedAt: string;
+  /**
+   * Кто заметил. Машинисту это половина ответа: у помощника можно спросить,
+   * где именно он видел обрыв, а «дефект завёлся сам» спрашивать не у кого.
+   * Автор потерялся вместе с учёткой — «неизвестно кто».
+   */
+  reportedByName: string;
+  /** Смотрящий сам это и записал: подписывается «вы», а не своим именем. */
+  reportedByMe: boolean;
 }
 
 /**
@@ -193,8 +201,6 @@ export type ReadWeather = (latitude: number, longitude: number) => Promise<{
 /** Неисправность, как её видит помощник: чья машина и его ли это запись. */
 export interface AssistantDefectView extends DefectView {
   equipmentName: string;
-  /** Записал ли это сам помощник — чтобы найти своё среди чужого. */
-  reportedByMe: boolean;
 }
 
 export interface AssistantState {

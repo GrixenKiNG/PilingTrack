@@ -14,6 +14,7 @@ import {
 import {
   completedPhases, derivePhase, PHASE_LABELS, PHASE_ORDER, type OperatorPhase,
 } from '../domain/shift-phases';
+import {toDefectViews} from './defect-views';
 import {collectWarnings, isWorkAllowed} from '../domain/work-warnings';
 import {isIncidentOpen} from '../domain/incidents';
 import type {
@@ -306,7 +307,10 @@ export async function queryOperatorMobileState(input: {
     }),
     db.equipmentDefect.findMany({
       where: {tenantId, equipmentId, status: {in: ['OPEN', 'IN_WORK']}},
-      select: {id: true, title: true, severity: true, status: true, reportedAt: true},
+      select: {
+        id: true, title: true, severity: true, status: true,
+        reportedAt: true, reportedById: true,
+      },
       orderBy: [{severity: 'desc'}, {reportedAt: 'desc'}],
       take: 10,
     }),
@@ -442,6 +446,10 @@ export async function queryOperatorMobileState(input: {
     daysLeft: maintenanceDaysLeft,
   };
 
+  const defectViews = await toDefectViews({
+    tenantId, viewerId: operatorId, defects: openDefects,
+  });
+
   const warnings = collectWarnings({
     documents: checks,
     hasEquipmentAssignment: true,
@@ -522,13 +530,7 @@ export async function queryOperatorMobileState(input: {
     workAllowed: isWorkAllowed(warnings),
     entries,
     incidents: incidentViews,
-    defects: openDefects.map((defect) => ({
-      id: defect.id,
-      title: defect.title,
-      severity: defect.severity,
-      status: defect.status,
-      reportedAt: defect.reportedAt.toISOString(),
-    })),
+    defects: defectViews,
     production: {
       piles: {
         count: report?.piles.reduce((sum, pile) => sum + pile.count, 0) ?? 0,

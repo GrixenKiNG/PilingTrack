@@ -79,6 +79,11 @@ export function EquipmentTab({state}: {state: OperatorMobileState}) {
                     {' · с '}
                     {new Date(defect.reportedAt).toLocaleDateString('ru-RU')}
                   </p>
+                  {/* Кто заметил. У помощника можно уточнить, где именно он
+                      видел обрыв; про запись без автора спросить некого. */}
+                  <p className="text-2xs text-muted-foreground">
+                    {defect.reportedByMe ? 'Записали вы' : `Записал: ${defect.reportedByName}`}
+                  </p>
                 </div>
               </li>
             ))}
