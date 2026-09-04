@@ -8,6 +8,9 @@ import {ApiError} from './api';
 import {AssistantDefectForm} from './screens/assistant-defect-form';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen} from './screens/knowledge-screen';
+import {
+  DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
+} from '@/modules/operator-mobile/domain/defect-labels';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, Sign} from './ui';
 
 /**
@@ -270,6 +273,47 @@ export function AssistantApp() {
             продление занимает недели.
           </p>
         </Panel>
+
+        {state.crews.length > 0 && (
+          <Panel tone={state.defects.length > 0 ? 'warning' : 'ok'}>
+            <PanelTitle tone={state.defects.length > 0 ? 'warning' : 'ok'}>
+              {state.defects.length > 0
+                ? `Открытых неисправностей: ${state.defects.length}`
+                : 'Открытых неисправностей нет'}
+            </PanelTitle>
+            {state.defects.length > 0 ? (
+              <ul className="mt-2 space-y-2">
+                {state.defects.map((defect) => (
+                  <li key={defect.id} className="flex gap-2 border-t pt-2 first:border-t-0 first:pt-0">
+                    <Sign tone={isAlarmingSeverity(defect.severity) ? 'danger' : 'warning'} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{defect.title}</p>
+                      <p className="text-2xs text-muted-foreground">
+                        {/* Машину подписываем, только если их несколько: при одной
+                            это повтор строки «Где я работаю» под каждой записью. */}
+                        {state.crews.length > 1 ? `${defect.equipmentName} · ` : ''}
+                        {DEFECT_SEVERITY_FIELD_LABELS[defect.severity] ?? defect.severity}
+                        {' · '}
+                        {DEFECT_STATUS_FIELD_LABELS[defect.status] ?? defect.status}
+                        {' · с '}
+                        {new Date(defect.reportedAt).toLocaleDateString('ru-RU')}
+                      </p>
+                      {defect.reportedByMe && (
+                        <p className="text-2xs font-semibold text-signal">Это записали вы</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              /* Пустой список — тоже ответ. Без него отсутствие панели читается
+                 как «экран не умеет», и человек записывает поломку повторно. */
+              <p className="mt-1 text-sm text-muted-foreground">
+                По вашим машинам ничего не открыто. Закрывает неисправности механик.
+              </p>
+            )}
+          </Panel>
+        )}
 
         <AssistantDefectForm crews={state.crews} onReported={reload} />
 

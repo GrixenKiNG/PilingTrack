@@ -1,21 +1,10 @@
 'use client';
 
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import {
+  DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
+} from '@/modules/operator-mobile/domain/defect-labels';
 import {Fact, Panel, PanelTitle, Sign} from '../ui';
-
-// Значения DefectSeverity из схемы. Пропущенный уровень выводится кодом —
-// заметно, что перевода нет, и это лучше, чем показать не тот уровень.
-const SEVERITY_LABELS: Record<string, string> = {
-  CRITICAL: 'Эксплуатация запрещена',
-  HIGH: 'Устранить срочно',
-  NORMAL: 'Плановое устранение',
-  LOW: 'Наблюдение',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  OPEN: 'Не начат',
-  IN_WORK: 'В работе',
-};
 
 /**
  * Карточка машины и её открытые неисправности.
@@ -80,13 +69,13 @@ export function EquipmentTab({state}: {state: OperatorMobileState}) {
           <ul className="mt-2 space-y-2">
             {state.defects.map((defect) => (
               <li key={defect.id} className="flex gap-2 border-t pt-2 first:border-t-0 first:pt-0">
-                <Sign tone={defect.severity === 'CRITICAL' || defect.severity === 'HIGH' ? 'danger' : 'warning'} />
+                <Sign tone={isAlarmingSeverity(defect.severity) ? 'danger' : 'warning'} />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{defect.title}</p>
                   <p className="text-2xs text-muted-foreground">
-                    {SEVERITY_LABELS[defect.severity] ?? defect.severity}
+                    {DEFECT_SEVERITY_FIELD_LABELS[defect.severity] ?? defect.severity}
                     {' · '}
-                    {STATUS_LABELS[defect.status] ?? defect.status}
+                    {DEFECT_STATUS_FIELD_LABELS[defect.status] ?? defect.status}
                     {' · с '}
                     {new Date(defect.reportedAt).toLocaleDateString('ru-RU')}
                   </p>

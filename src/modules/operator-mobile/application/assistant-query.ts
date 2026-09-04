@@ -23,8 +23,14 @@ import type {AssistantState} from '../domain/view-contracts';
  * осматривает её и записывает выработку. Помощник в бригаде числится, но
  * команд смены не подаёт — так устроена проверка закрепления в модуле смены.
  * Поэтому его место — не урезанная смена, а то, что относится лично к нему:
- * инструктаж по стропальным работам, проверка знаний и собственные документы
- * со сроками.
+ * инструктаж по стропальным работам, проверка знаний, собственные документы
+ * со сроками и открытые неисправности машин, у которых он стоит.
+ *
+ * ПОЧЕМУ НЕИСПРАВНОСТИ ТОЖЕ ЗДЕСЬ. Право их заводить у помощника было, а
+ * возможности перечитать записанное — нет: форма отвечала «Записано» и
+ * забывала. Человек не мог проверить ни своё замечание, ни то, что машинист
+ * уже завёл ту же поломку в осмотре, и вторая запись о том же тросе доходила
+ * до диспетчера как отдельная неисправность.
  *
  * ПОЧЕМУ ЭКРАН ВООБЩЕ НУЖЕН. До него помощник видел в меню «Смену», открывал
  * её и получал отказ. Единственный заметный пункт вёл в тупик, а свои сроки —
@@ -75,6 +81,26 @@ export async function queryAssistantState(input: {
     }),
   ]);
 
+  // Неисправности берём вторым запросом: их круг задают машины бригад, а те
+  // известны только после первого. Ни одной бригады — ни одного запроса.
+  const equipmentIds = crews
+    .map((row) => row.crew.equipment?.id)
+    .filter((id): id is string => Boolean(id));
+  const defects = equipmentIds.length === 0 ? [] : await db.equipmentDefect.findMany({
+    // Строгое равенство по тенанту, как и везде: машина из другой организации
+    // в этот список попасть не может.
+    where: {tenantId, equipmentId: {in: equipmentIds}, status: {in: ['OPEN', 'IN_WORK']}},
+    select: {
+      id: true, title: true, severity: true, status: true,
+      reportedAt: true, reportedById: true,
+      equipment: {select: {name: true}},
+    },
+    // Порядок значений DefectSeverity в схеме идёт от LOW к CRITICAL, поэтому
+    // 'desc' поднимает наверх запрет эксплуатации.
+    orderBy: [{severity: 'desc'}, {reportedAt: 'desc'}],
+    take: 20,
+  });
+
   const checks = checkOperatorDocuments(documentTypes, documents, now);
 
   const briefingDocument = documents.find(
@@ -109,6 +135,15 @@ export async function queryAssistantState(input: {
       lastResult: knowledgeDocument?.number ?? null,
       ok: knowledgeValid(knowledgeUntil, now),
     },
+    defects: defects.map((defect) => ({
+      id: defect.id,
+      title: defect.title,
+      severity: defect.severity,
+      status: defect.status,
+      reportedAt: defect.reportedAt.toISOString(),
+      equipmentName: defect.equipment?.name ?? '—',
+      reportedByMe: defect.reportedById === assistantId,
+    })),
     crews: crews
       // Бригада без машины к заведению неисправности непригодна и на
       // экране бесполезна: показывать «Установка: —» нечего.
