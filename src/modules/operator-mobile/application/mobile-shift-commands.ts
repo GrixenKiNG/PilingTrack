@@ -5,7 +5,7 @@ import {requestReadinessSnapshot} from '@/modules/readiness/application/projecti
 import {getChecklist} from '../domain/checklist-catalog';
 import type {ChecklistStage, ShiftCondition} from '../domain/checklist-types';
 import {
-  alertingFaults, collectDefectDrafts, validateChecklistRun, type ChecklistAnswer,
+  collectDefectDrafts, validateChecklistRun, type ChecklistAnswer,
 } from '../domain/checklist-run';
 import {
   BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE,
@@ -572,7 +572,7 @@ export async function submitChecklist(input: {
       where: {tenantId_clientCommandId: {tenantId: input.tenantId, clientCommandId: input.clientCommandId}},
       select: {id: true},
     });
-    if (duplicate) return {executionId: duplicate.id, alerts: 0, defects: 0, createdDefects: []};
+    if (duplicate) return {executionId: duplicate.id, defects: 0, createdDefects: []};
 
     const {id: templateId, definition} = await ensureTemplate(tx, input.tenantId, input.stage, input.operatorId);
 
@@ -730,7 +730,6 @@ export async function submitChecklist(input: {
 
     return {
       executionId: execution.id,
-      alerts: alertingFaults(items, input.answers).length,
       defects: created.length,
       // Опасные из заведённых — маршруту, чтобы оповестить после фиксации и
       // вне транзакции. Отправлять отсюда нельзя: откат сериализации отменил

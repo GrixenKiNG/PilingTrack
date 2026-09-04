@@ -63,19 +63,6 @@ export function validateChecklistRun(
   return problems;
 }
 
-/**
- * Пункты, по которым оператор отметил неисправность в узле, где она означает
- * опасность. Это НЕ запрет работы — телеметрии нет, и программа не может
- * проверить состояние машины. Это красное предупреждение оператору и
- * диспетчеру, которое висит, пока дефект не закрыт.
- */
-export function alertingFaults(items: ChecklistItem[], answers: ChecklistAnswer[]): ChecklistItem[] {
-  const faulted = new Set(
-    answers.filter((answer) => answer.answer === 'FAULT').map((answer) => answer.itemId),
-  );
-  return items.filter((item) => item.severity === 'ALERT' && faulted.has(item.id));
-}
-
 export interface DefectDraft {
   sourceKey: string;
   title: string;

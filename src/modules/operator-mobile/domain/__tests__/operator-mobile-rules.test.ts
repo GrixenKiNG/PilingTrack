@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {getChecklist} from '../checklist-catalog';
-import {alertingFaults, collectDefectDrafts, validateChecklistRun} from '../checklist-run';
+import {collectDefectDrafts, validateChecklistRun} from '../checklist-run';
 import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
 import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
@@ -194,16 +194,6 @@ describe('заполнение чек-листа', () => {
     );
   });
 
-  it('неисправность критичного пункта даёт красное предупреждение', () => {
-    const answers = allOk.map((answer) => (
-      answer.itemId === 'mast'
-        ? {...answer, answer: 'FAULT' as const, note: 'Трещина', mediaIds: ['m1']}
-        : answer
-    ));
-    expect(validateChecklistRun(items, answers)).toEqual([]);
-    expect(alertingFaults(items, answers).map((item) => item.id)).toEqual(['mast']);
-  });
-
   it('замечание заводит дефект с устойчивым ключом источника', () => {
     const answers = allOk.map((answer) => (
       answer.itemId === 'leaks-ground'
@@ -222,6 +212,9 @@ describe('заполнение чек-листа', () => {
         ? {...answer, answer: 'FAULT' as const, note: 'Трещина', mediaIds: ['m1']}
         : answer
     ));
+    // Заполненная неисправность — описание и снимок есть — проходит проверку:
+    // строгость к незаполненным не должна мешать сообщить о настоящей поломке.
+    expect(validateChecklistRun(items, answers)).toEqual([]);
     const drafts = collectDefectDrafts('PRESHIFT_INSPECTION', 'eq-1', items, answers);
     expect(drafts[0].severity).toBe('HIGH');
   });
