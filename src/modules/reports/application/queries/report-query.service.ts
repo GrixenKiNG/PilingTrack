@@ -161,7 +161,11 @@ export async function listRecentReportsForDashboard(
   sessionUser: { tenantId?: string | null },
   limit = 8,
 ): Promise<RecentReportRow[]> {
-  const tenantId = sessionUser.tenantId ?? process.env.DEFAULT_TENANT_ID;
+  // Организация — только из сессии. Подстановка DEFAULT_TENANT_ID означала бы,
+  // что пользователь без организации видит отчёты организации по умолчанию:
+  // ровно тот шаблон, которым в этом продукте уже случался IDOR (31.05.2026).
+  // Пустая организация — это отказ, а не повод подставить чужую.
+  const tenantId = sessionUser.tenantId;
   if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
 
   const reports = await db.report.findMany({
