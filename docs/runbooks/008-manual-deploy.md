@@ -60,6 +60,29 @@ docker compose up -d app workers
 Add `ws` to both lines only if the WebSocket server changed (rare —
 look for `src/core/realtime/server/` in the diff).
 
+## Post-deploy check (mandatory — the deploy is not done until this passes)
+
+Run from the workstation (read-only GETs, no secrets, safe to repeat):
+
+```bash
+node scripts/prod-smoke.mjs --url https://orionpiling.ru --sha $(git rev-parse --short HEAD)
+```
+
+The decisive assertion is the **version**: `/api/health` reports the
+`APP_VERSION` baked into the image at build time, so a mismatch means the
+image did not rebuild and every other green check describes the *previous*
+release. Exit code is 1 on any failure, so this works as the final deploy
+step in a script or CI job.
+
+It also asserts that dependencies are up and that protected APIs still answer
+401/403 without a cookie — a deploy that accidentally opens data is caught
+here rather than by a user.
+
+`websocket: down` is a known, tolerated state on this stand and does not fail
+the run (it does make `/api/health/deep` answer 503 — see the note in that
+route). Everything else failing means: treat the deploy as unsuccessful and
+investigate before walking away.
+
 ## Migrations (if the diff adds a `prisma/migrations/*` folder)
 
 **The `migrate` service bakes `prisma/migrations` into its image at build
