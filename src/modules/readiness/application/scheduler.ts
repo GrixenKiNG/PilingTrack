@@ -22,10 +22,21 @@
  * день ничего не находит и ничего не делает.
  */
 
+import {randomUUID} from 'node:crypto';
 import type {db} from '@/lib/db';
 import {withReadinessTenantTransaction} from '../infrastructure/tenant-transaction';
 import {tenantProductionDate} from '../domain/shifts/tenant-production-date';
 import {requestReadinessSnapshot} from './projection/request-snapshot';
+import {recordChainedReadinessAudit} from '../infrastructure/audit/record-audit';
+
+/**
+ * Кто именно поменял состояние, когда это сделал не человек.
+ *
+ * Без явного актора событие выглядело бы как действие с пустым автором, и при
+ * разборе «кто закрыл смену» ответа не было бы вовсе. `id` пустой намеренно:
+ * пользователя за этим нет, и придумывать его нельзя.
+ */
+const SCHEDULER_ACTOR = {id: null, name: 'Планировщик техготовности', role: 'SYSTEM'} as const;
 
 export interface ReadinessSchedulerResult {
   permitsExpired: number;
@@ -56,29 +67,82 @@ export async function runReadinessScheduler(
   tenantId: string,
   now: Date = new Date(),
 ): Promise<ReadinessSchedulerResult> {
+  // Один идентификатор на весь прогон. У команд человека он приходит из
+  // HTTP-запроса, у планировщика запроса нет — но связать между собой все
+  // переходы одного ночного прогона нужно так же (и этого требует ограничение
+  // `AuditLog_native_chain_complete`: звено цепочки без корреляции не примут).
+  const runId = randomUUID();
+
   return withReadinessTenantTransaction(tenantId, async (tx) => {
     // 1. Наряды с истёкшим сроком. Только APPROVED: черновик и наряд на
     //    согласовании срока не имеют, отозванный уже закрыт человеком.
-    const expired = await tx.workPermit.updateMany({
+    //
+    // Сначала выбираем строки, потом обновляем по их идентификаторам: слепой
+    // `updateMany` не оставлял следа, кто и что поменял, а модуль стоит на
+    // доказательности. Внутри одной транзакции выбранный набор и есть
+    // обновлённый.
+    const expiring = await tx.workPermit.findMany({
       where: {tenantId, state: 'APPROVED', validTo: {lte: now}},
+      select: {id: true, version: true, state: true, validTo: true},
+    });
+    const expired = expiring.length === 0 ? {count: 0} : await tx.workPermit.updateMany({
+      where: {tenantId, id: {in: expiring.map((permit) => permit.id)}, state: 'APPROVED'},
       data: {state: 'EXPIRED', expiredAt: now, version: {increment: 1}},
     });
+    for (const permit of expiring) {
+      await recordChainedReadinessAudit(tx, {
+        tenantId,
+        action: 'work-permit.expired',
+        entityType: 'WorkPermit',
+        entityId: permit.id,
+        entityVersion: permit.version + 1,
+        actor: SCHEDULER_ACTOR,
+        requestId: runId,
+        correlationId: runId,
+        occurredAt: now,
+        before: {state: permit.state, version: permit.version,
+          validTo: permit.validTo ? permit.validTo.toISOString() : null},
+        after: {state: 'EXPIRED', version: permit.version + 1, expiredAt: now.toISOString()},
+        metadata: {trigger: 'SCHEDULER', reason: 'VALIDITY_ELAPSED'},
+      });
+    }
 
     // 2. Незакрытые смены прошедших производственных суток. Сравнение идёт по
     //    поясу самой смены, а не сервера: в 03:00 по Москве вчерашняя смена
     //    другого пояса может ещё продолжаться.
     const unfinished = await tx.shift.findMany({
       where: {tenantId, state: {in: [...UNFINISHED_SHIFT_STATES]}},
-      select: {id: true, productionDate: true, timezone: true},
+      select: {id: true, productionDate: true, timezone: true, version: true, state: true},
     });
-    const staleIds = unfinished
-      .filter((shift) => shift.productionDate < tenantProductionDate(now, shift.timezone))
-      .map((shift) => shift.id);
+    const stale = unfinished
+      .filter((shift) => shift.productionDate < tenantProductionDate(now, shift.timezone));
+    const staleIds = stale.map((shift) => shift.id);
 
     const closed = staleIds.length === 0 ? {count: 0} : await tx.shift.updateMany({
       where: {tenantId, id: {in: staleIds}, state: {in: [...UNFINISHED_SHIFT_STATES]}},
       data: {state: 'CLOSED', closedAt: now, autoClosedAt: now, version: {increment: 1}},
     });
+    // Автозакрытие — единственный способ закрыть смену без отчёта, послесменного
+    // осмотра и передачи. Именно поэтому оно обязано быть видно при разборе:
+    // `autoClosedAt` в строке отличает такую смену, а событие говорит когда и
+    // на каком основании она закрыта.
+    for (const shift of stale) {
+      await recordChainedReadinessAudit(tx, {
+        tenantId,
+        action: 'shift.auto-closed',
+        entityType: 'Shift',
+        entityId: shift.id,
+        entityVersion: shift.version + 1,
+        actor: SCHEDULER_ACTOR,
+        requestId: runId,
+        correlationId: runId,
+        occurredAt: now,
+        before: {state: shift.state, version: shift.version,
+          productionDate: shift.productionDate.toISOString().slice(0, 10)},
+        after: {state: 'CLOSED', version: shift.version + 1, autoClosedAt: now.toISOString()},
+        metadata: {trigger: 'SCHEDULER', reason: 'PRODUCTION_DAY_ELAPSED', timezone: shift.timezone},
+      });
+    }
 
     // 3. Пересчёт готовности на новые сутки.
     //
