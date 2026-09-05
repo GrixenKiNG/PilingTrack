@@ -54,8 +54,8 @@ export function DowntimeSection({
                 <SelectContent>{downtimeReasons.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex gap-2">
-                <Input type="number" aria-label="Продолжительность простоя, ч" step="0.5" placeholder="Часы" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
-                  min="0.5" className="h-11 font-mono flex-1" />
+                <Input type="number" aria-label="Продолжительность простоя, ч" step="1" placeholder="Полных часов" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
+                  min="1" className="h-11 font-mono flex-1" />
                 <Button onClick={onAdd} aria-label="Добавить простой в отчёт" className="h-11 min-h-[44px] bg-warning-strong hover:bg-warning-strong text-white px-4"><PilingIcon name="add" size={16} decorative className="!text-white" /></Button>
               </div>
               <Input aria-label="Комментарий к простою" placeholder="Комментарий (необязательно)" value={tempComment} onChange={(e) => onTempCommentChange(e.target.value)} className="h-11" />

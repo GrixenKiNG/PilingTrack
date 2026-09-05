@@ -180,7 +180,9 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             count={state.production.drilling.count}
             meters={state.production.drilling.meters}
           />
-          <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} unit="ч" />
+          {/* Без .toFixed(1): часы целые, и «0,0 ч» подсказывало бы, что
+              бывает 0,3. Ранее записанные дробные показываем как есть. */}
+          <Fact label="Простой" value={String(state.production.downtimeHours)} unit="ч" />
           {/*
             Ветер показываем вместе с тем, когда его измерили: работа
             прекращается при 15 м/с, и цифра без времени не даёт понять,
@@ -260,7 +262,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
           ) : null}
 
           {tab === 'DOWNTIME' ? (
-            <NumberField label="Длительность, часов" value={hours} onChange={setHours} decimal />
+            <NumberField label="Длительность, полных часов" value={hours} onChange={setHours} />
           ) : null}
 
           {tab === 'PILES' && grade?.lengthMm && Number(count) > 0 ? (

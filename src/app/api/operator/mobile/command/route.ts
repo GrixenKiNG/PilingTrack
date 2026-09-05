@@ -11,6 +11,7 @@ import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/con
 // импортируют клиентские компоненты, и серверный модуль в нём тянет `lib/db`
 // в браузерный бандл.
 import {notifyCriticalDefects} from '@/modules/readiness/application/defects/notify-critical';
+import {DOWNTIME_MAX_HOURS, roundDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import {getWeatherAt} from '@/services/weather/weather-client';
 
 export const runtime = 'nodejs';
@@ -73,9 +74,11 @@ const commandSchema = z.discriminatedUnion('command', [
       z.object({
         kind: z.literal('DOWNTIME'),
         reasonId: z.string().min(1),
-        // Простой измеряется в часах во всём приложении. Максимум в 24
-        // отсекает опечатку «ввёл минуты».
-        hours: z.number().min(0.1).max(24),
+        // Простой измеряется полными часами: неполный округляется вверх
+        // (правило и причина — reports/domain/downtime-hours). Округляем, а не
+        // отвергаем: старый телефон в кармане не обязан знать о правиле.
+        // Максимум в 24 отсекает опечатку «ввёл минуты».
+        hours: z.number().min(0.1).max(DOWNTIME_MAX_HOURS).transform(roundDowntimeHours),
         comment: z.string().max(500).optional(),
       }),
     ]),

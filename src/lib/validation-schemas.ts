@@ -4,6 +4,9 @@
  */
 
 import { z } from 'zod';
+// Чистый доменный модуль без зависимостей — безопасен и на клиенте, куда эти
+// схемы тоже попадают.
+import { DOWNTIME_MAX_HOURS, roundDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 // ============================================================
 // Common schemas
@@ -250,10 +253,11 @@ export const reportUpsertSchema = z.object({
   })).max(100).default([]),
   downtimes: z.array(z.object({
     reasonId: internalIdSchema,
-    // Downtime is measured in HOURS (the server compares the total to the shift
-    // length in hours). Fractional allowed (UI uses a 0.5h step); the column is
-    // Float. Cap at 24h — a single downtime can't exceed a day.
-    duration: z.number().min(0).max(24),
+    // Простой измеряется полными часами: неполный округляется вверх (правило
+    // и причина — reports/domain/downtime-hours). Колонка осталась Float ради
+    // ранее записанных дробных значений — переписывать историю не стали.
+    // Ноль допустим: «простоя не было» — законный ответ при правке.
+    duration: z.number().min(0).max(DOWNTIME_MAX_HOURS).transform(roundDowntimeHours),
     comment: z.string().max(1000).optional(),
   })).max(50).default([]),
   comment: z.string().max(2000).optional(),

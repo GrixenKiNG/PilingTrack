@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
 import {requestReadinessSnapshot} from '@/modules/readiness/application/projection/request-snapshot';
+import {roundDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import {getChecklist} from '../domain/checklist-catalog';
 import type {ChecklistStage, ShiftCondition} from '../domain/checklist-types';
 import {
@@ -1084,7 +1085,12 @@ export async function correctProduction(input: {
       where: {tenantId: input.tenantId, correctsId: original.id},
     });
     const current = original.duration + (corrections._sum.duration ?? 0);
-    const delta = Math.round((input.actual - current) * 100) / 100;
+    // Правка простоя подчиняется тому же правилу, что и запись: полные часы,
+    // неполный вверх. Схема команды округлить это не может — `actual` там один
+    // на сваи, бурение и простой, а часы из них только у простого. Ноль
+    // остаётся нулём: «простоя не было» — законный ответ.
+    const actual = roundDowntimeHours(input.actual);
+    const delta = Math.round((actual - current) * 100) / 100;
     if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
     const created = await tx.reportDowntime.create({
       data: {
@@ -1102,7 +1108,7 @@ export async function correctProduction(input: {
       },
       select: {id: true},
     });
-    return {correctionId: created.id, was: current, now: input.actual};
+    return {correctionId: created.id, was: current, now: actual};
   });
 }
 
