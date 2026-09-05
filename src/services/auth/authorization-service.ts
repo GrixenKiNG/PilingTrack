@@ -18,6 +18,7 @@ export type Ability =
   | 'reports.read_cross_user'
   | 'reports.export'
   | 'reports.manage_all'
+  | 'piles.manage'
   | 'sites.read_all'
   | 'sites.manage'
   | 'sites.assign_users'
@@ -54,6 +55,10 @@ const abilityRoles: Record<Ability, Role[]> = {
   'reports.read_cross_user': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'reports.export': ['ADMIN'],
   'reports.manage_all': ['ADMIN', 'DISPATCHER'],
+  // Журнал забивки и решение по свае. Принимает сваю мастер: он отвечает за
+  // участок. Диспетчер и администратор — тем же правом, чтобы разбор не
+  // вставал, пока роль мастера исполняет администратор.
+  'piles.manage': ['ADMIN', 'DISPATCHER', 'FOREMAN'],
   'sites.read_all': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'sites.manage': ['ADMIN', 'DISPATCHER'],
   'sites.assign_users': ['ADMIN', 'DISPATCHER'],

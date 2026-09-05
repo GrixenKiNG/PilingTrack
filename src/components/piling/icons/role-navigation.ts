@@ -55,6 +55,7 @@ const dispatcherNavigation: NavigationItem[] = [
   { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
   { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
   { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
+  { label: 'Журнал забивки', href: '/admin/piles', icon: 'pile-group' },
   { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
 ];
 
@@ -71,6 +72,7 @@ export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   // и без управления бригадами: их права уже сужены в authorization-service.
   FOREMAN: [
     { label: 'Дашборд', href: '/admin', icon: 'dashboard' },
+    { label: 'Журнал забивки', href: '/admin/piles', icon: 'pile-group' },
     { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring' },
     { label: 'Объекты', href: '/admin/sites', icon: 'site' },
     { label: 'Бригады', href: '/admin/crews', icon: 'crew' },

@@ -56,6 +56,46 @@ export function refusalExceedsDesign(input: {
   return input.actual > input.design;
 }
 
+/** Что мастер постановил по свае. Значения совпадают с `PileAcceptance`. */
+export type PileAcceptanceValue = 'PENDING' | 'ACCEPTED' | 'NEEDS_REDRIVE';
+
+export const PILE_ACCEPTANCE_LABELS: Record<PileAcceptanceValue, string> = {
+  PENDING: 'Не разобрана',
+  ACCEPTED: 'Принята',
+  NEEDS_REDRIVE: 'На добивку',
+};
+
+/**
+ * Что подсказать мастеру по свае.
+ *
+ * ПОЧЕМУ ПОДСКАЗКА, А НЕ РЕШЕНИЕ. Отказ больше проектного — сильный довод не
+ * принимать сваю, но не приговор: грунт «отдыхает», и добивка через сутки часто
+ * даёт нужный отказ; бывает и ошибка замера. Решает человек, который отвечает
+ * за участок. Программа обязана показать довод, а не подменять собой мастера —
+ * ровно так же, как она не запрещает работу по осмотру.
+ *
+ * `null` — сказать нечего: без проектного отказа сравнивать не с чем.
+ */
+export function suggestAcceptance(input: {
+  actualRefusalMm: number | null;
+  designRefusalMm: number | null;
+}): {value: PileAcceptanceValue; reason: string} | null {
+  const exceeds = refusalExceedsDesign({
+    actual: input.actualRefusalMm,
+    design: input.designRefusalMm,
+  });
+  if (exceeds === null) return null;
+  return exceeds
+    ? {
+      value: 'NEEDS_REDRIVE',
+      reason: `Отказ ${input.actualRefusalMm} мм/удар больше проектного ${input.designRefusalMm}`,
+    }
+    : {
+      value: 'ACCEPTED',
+      reason: `Отказ ${input.actualRefusalMm} мм/удар в пределах проектного ${input.designRefusalMm}`,
+    };
+}
+
 export interface PassportProblem {
   field: string;
   message: string;
