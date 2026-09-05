@@ -25,7 +25,12 @@ export const GET = withApi(
     const { listReportsForReview } = await getReportsModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const paginated = await listReportsForReview(user!, siteId, { cursor, limit }, userId);
-    return NextResponse.json({ reports: paginated.data, hasMore: paginated.hasMore, nextCursor: paginated.nextCursor });
+    return NextResponse.json({
+      reports: paginated.data,
+      hasMore: paginated.hasMore,
+      nextCursor: paginated.nextCursor,
+      total: paginated.total,
+    });
   },
   { domain: 'reports', cache: true, cacheTTL: 10_000 }
 );

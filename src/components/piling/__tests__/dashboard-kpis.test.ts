@@ -19,7 +19,9 @@ function row(over: Partial<DashboardAnalyticsRow>): DashboardAnalyticsRow {
   };
 }
 
-const fleet: DashboardFleetTotals = { activeToday: 3, expected: 2, totalEquipment: 10, crewsOnShiftToday: 4 };
+const fleet: DashboardFleetTotals = {
+  activeToday: 3, workingNow: 2, expected: 2, totalEquipment: 10, crewsOnShiftToday: 4,
+};
 
 describe('computeDashboardKpis', () => {
   it('sums analytics rows and derives site counts', () => {
@@ -47,8 +49,10 @@ describe('computeDashboardKpis', () => {
 
   it('reads shift/rig/crew counts from fleet totals', () => {
     const k = computeDashboardKpis([], fleet, new Map(), []);
-    expect(k.shiftsDone).toBe(3);
-    expect(k.rigsWorking).toBe(3);
+    expect(k.shiftsDone).toBe(3); // сдали отчёт за сегодня
+    // «В работе» — открытая смена, а не сданный отчёт. Раньше сюда шло
+    // activeToday, и плитка показывала ноль, пока смена шла без отчёта.
+    expect(k.rigsWorking).toBe(2);
     expect(k.reportsExpected).toBe(5); // activeToday + expected
     expect(k.rigsTotal).toBe(10);
     expect(k.crews).toBe(4);

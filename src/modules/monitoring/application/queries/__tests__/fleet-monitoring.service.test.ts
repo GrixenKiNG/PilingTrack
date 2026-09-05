@@ -8,11 +8,20 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { equipmentFindMany, reportFindMany, analyticsFindMany, mediaFindMany } = vi.hoisted(() => ({
+// Смены и наряды читает общее правило состояния установки
+// (@/modules/equipment): «работает» — это открытая смена, «в ремонте» —
+// открытая неисправность. Раньше состояние выводилось из наличия отчёта за
+// сегодня, и работающая с утра машина числилась стоящей до сдачи отчёта.
+const {
+  equipmentFindMany, reportFindMany, analyticsFindMany, mediaFindMany,
+  shiftFindMany, maintenanceFindMany,
+} = vi.hoisted(() => ({
   equipmentFindMany: vi.fn(),
   reportFindMany: vi.fn(),
   analyticsFindMany: vi.fn(),
   mediaFindMany: vi.fn(),
+  shiftFindMany: vi.fn(() => Promise.resolve([])),
+  maintenanceFindMany: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -21,6 +30,8 @@ vi.mock('@/lib/db', () => ({
     report: { findMany: reportFindMany },
     reportAnalytics: { findMany: analyticsFindMany },
     media: { findMany: mediaFindMany },
+    shift: { findMany: shiftFindMany },
+    maintenanceRecord: { findMany: maintenanceFindMany },
   },
 }));
 
@@ -31,9 +42,12 @@ describe('getFleetSnapshot — tenant isolation', () => {
     equipmentFindMany.mockReset();
     reportFindMany.mockReset();
     analyticsFindMany.mockReset();
+    shiftFindMany.mockReset().mockResolvedValue([]);
+    maintenanceFindMany.mockReset().mockResolvedValue([]);
     // Empty equipment → early return; we only assert the query's where clause.
     equipmentFindMany.mockResolvedValue([]);
     reportFindMany.mockResolvedValue([]);
+    shiftFindMany.mockResolvedValue([{ equipmentId: 'eq-1' }]);
     analyticsFindMany.mockResolvedValue([]);
   });
 
@@ -176,6 +190,8 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
     expect(card.assignedCrewName).toBe('Бригада Андреева');
     expect(card.assignedOperatorName).toBe('Иван Петров');
     expect(card.reportStatus).toBe('has_report');
+    // «Работает» теперь означает открытую смену, а не сданный отчёт: смену
+    // задаёт shiftFindMany ниже по фикстуре.
     expect(card.equipmentStatus).toBe('working');
     expect(card.todayTotals).toEqual({
       piles: 18,
@@ -201,10 +217,10 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
         nextMaintenanceDate: null,
         nextMaintenanceAtHours: null,
         crews: [],
-        maintenanceRecords: [{ id: 'mr-1' }],
       },
     ]);
     reportFindMany.mockResolvedValue([]);
+    maintenanceFindMany.mockResolvedValue([{ equipmentId: 'eq-1' }]);
 
     const snap = await getFleetSnapshot({ tenantId: 'orion' });
 

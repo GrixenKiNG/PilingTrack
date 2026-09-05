@@ -30,3 +30,21 @@ export const DOWNTIME_STEP_HOURS = 1;
 export function roundDowntimeHours(hours: number): number {
   return hours > 0 ? Math.ceil(hours) : 0;
 }
+
+/**
+ * Простой для показа: всегда полные часы.
+ *
+ * ПОЧЕМУ НЕ ОБЩИЙ `formatHours`. Тот же помощник рисует и отработанное время
+ * смены, где «11 ч 30 мин» — правда. У простоя минут не бывает по правилу
+ * учёта, и общий формат выводил «115 ч 36 мин» ровно там, где минут быть не
+ * должно.
+ *
+ * ПОЧЕМУ ВВЕРХ. Тем же правилом, что и ввод. Записанные до правила дробные
+ * значения (18 строк на 05.09.2026) поднимаются до полного часа, а не
+ * показываются с минутами: две единицы измерения простоя на одном экране хуже
+ * округления на известную величину.
+ */
+export function formatDowntimeHours(hours: number | null | undefined): string {
+  if (hours == null || !Number.isFinite(hours) || hours <= 0) return '0 ч';
+  return `${roundDowntimeHours(hours)} ч`;
+}

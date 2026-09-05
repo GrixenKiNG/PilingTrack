@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
 import { computeOperatorRotation } from './operator-rotation';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 // --------------------------------------------------------------------------
 // Generic layout pieces
@@ -177,7 +178,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
                   {row.drillingMeters != null ? formatFixed(row.drillingMeters, 1) : '—'}
                 </td>
                 <td className="px-3 py-2 text-right font-mono">
-                  {row.downtimeHours != null ? formatHours(row.downtimeHours) : '—'}
+                  {row.downtimeHours != null ? formatDowntimeHours(row.downtimeHours) : '—'}
                 </td>
               </tr>
             ))}

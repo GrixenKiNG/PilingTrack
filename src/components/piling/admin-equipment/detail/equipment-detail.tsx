@@ -32,7 +32,7 @@ import { EquipmentPlaceholder } from '../equipment-placeholder';
 import {
   Section, KV, Metric, EmptyState, BackLink, TelematicsStatusBadge,
   HistoryTable, OperatorRotationCard, MaintenanceBlock, PassportGrid,
-  formatHours, formatRelative,
+  formatRelative,
 } from './equipment-detail-parts';
 import { formatFixed } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
@@ -45,6 +45,7 @@ import {
   type DetailsResponse,
   type TabKey,
 } from './equipment-detail-overview';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 interface Props {
   equipmentId: string;
@@ -250,7 +251,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                 <Metric label="Отчётов (30д)" value={details.stats30d.reportCount} />
                 <Metric label="Сваи шт./м.п." value={`${formatFixed(details.stats30d.piles, 0)} / ${formatFixed(details.stats30d.pileMeters, 1)}`} />
                 <Metric label="Бурение шт./м" value={`${formatFixed(details.stats30d.drillingCount, 0)} / ${formatFixed(details.stats30d.drillingMeters, 1)}`} />
-                <Metric label="Простой" value={formatHours(details.stats30d.downtimeHours)} />
+                <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
               </div>
             </div>
           )}
@@ -376,7 +377,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           <Metric label="Отчётов" value={details.stats30d.reportCount} />
           <Metric label="Свай" value={details.stats30d.piles} />
           <Metric label="Бурение, м" value={formatFixed(details.stats30d.drillingMeters, 1)} />
-          <Metric label="Простой" value={formatHours(details.stats30d.downtimeHours)} />
+          <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
         </div>
       </Section>
 

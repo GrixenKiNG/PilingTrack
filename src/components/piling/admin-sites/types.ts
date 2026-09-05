@@ -25,7 +25,7 @@ export interface SiteCrew {
   operator: { id: string; name: string } | null;
   assistants: { id: string; name: string }[];
   equipment: { id: string; name: string; model: string | null; isActive: boolean } | null;
-  equipmentState: 'WORKING' | 'REPAIR' | 'IDLE' | null;
+  equipmentState: 'working' | 'repair' | 'idle' | null;
 }
 
 export interface SiteFullData extends SiteWithTreeDTO {

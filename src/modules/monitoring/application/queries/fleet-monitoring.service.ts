@@ -20,6 +20,7 @@
 
 import { db } from '@/lib/db';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { resolveEquipmentOperationalStates } from '@/modules/equipment';
 import type { EquipmentKind } from '@/generated/postgres-client';
 
 const RECENT_WINDOW_DAYS = 7;
@@ -75,6 +76,7 @@ export interface FleetSnapshot {
   today: string;
   totals: {
     totalEquipment: number;
+    workingNow: number;
     activeToday: number;
     expected: number;
     idle: number;
@@ -149,19 +151,6 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
           site: { select: { id: true, name: true } },
         },
       },
-      maintenanceRecords: {
-        // Any OPEN repair/fault marks the rig — not just IN_PROGRESS. A logged
-        // but not-yet-started fault (PLANNED/ASSIGNED/ON_HOLD) still means the
-        // rig needs repair; filtering to IN_PROGRESS hid a CRITICAL fault from
-        // the fleet card while analytics counted it as a failure (mismatch).
-        where: {
-          status: { notIn: ['DONE', 'CANCELLED'] },
-          type: { in: ['REPAIR', 'FAULT'] },
-        },
-        take: 1,
-        orderBy: { updatedAt: 'desc' },
-        select: { id: true },
-      },
     },
   });
 
@@ -169,7 +158,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     return {
       asOf: now.toISOString(),
       today,
-      totals: { totalEquipment: 0, activeToday: 0, expected: 0, idle: 0, pilesToday: 0, pileMetersToday: 0, drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0 },
+      totals: { totalEquipment: 0, activeToday: 0, workingNow: 0, expected: 0, idle: 0, pilesToday: 0, pileMetersToday: 0, drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0 },
       equipment: [],
     };
   }
@@ -254,6 +243,12 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     arr.push(r);
   }
 
+  // Состояние машин — одним запросом на весь парк, по общему правилу продукта.
+  const operationalStates = await resolveEquipmentOperationalStates(
+    opts.tenantId,
+    equipment.map((eq) => eq.id),
+  );
+
   // Build cards.
   const cards: FleetCard[] = equipment.map((eq) => {
     const eqReports = reportsByEquipment.get(eq.id) ?? [];
@@ -305,12 +300,11 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
 
     const latest = eqReports[0] ?? null;
     const activeCrew = eq.crews[0] ?? null;
-    const hasActiveRepair = (eq.maintenanceRecords ?? []).length > 0;
-    const equipmentStatus: EquipmentOperationalStatus = hasActiveRepair
-      ? 'repair'
-      : status === 'active'
-        ? 'working'
-        : 'idle';
+    // «Работает» — это открытая смена, а не сданный отчёт: отчёт сдают в конце
+    // смены, и до вечера работающая машина выглядела бы стоящей. Правило одно
+    // на продукт (`@/modules/equipment`), иначе дашборд, парк и карточка
+    // объекта отвечают об одной машине по-разному.
+    const equipmentStatus: EquipmentOperationalStatus = operationalStates[eq.id] ?? 'idle';
     return {
       id: eq.id,
       name: eq.name,
@@ -357,7 +351,10 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
 
   const totals = {
     totalEquipment: cards.length,
+    /** Сдан отчёт за сегодня. НЕ «работает сейчас» — см. workingNow. */
     activeToday: cards.filter((c) => c.status === 'active').length,
+    /** Машин с открытой сменой прямо сейчас. */
+    workingNow: cards.filter((c) => c.equipmentStatus === 'working').length,
     expected: cards.filter((c) => c.status === 'expected').length,
     idle: cards.filter((c) => c.status === 'idle').length,
     pilesToday: cards.reduce((s, c) => s + (c.todayTotals?.piles ?? 0), 0),

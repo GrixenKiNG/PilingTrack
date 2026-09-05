@@ -34,6 +34,7 @@ import {
   shiftLabel,
   shortDate,
 } from './report-list-format';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 export function ReportEvidencePreview({
   report,
@@ -148,7 +149,7 @@ export function ReportEvidencePreview({
         <div className="grid grid-cols-4 divide-x rounded-md border border-border">
           <PreviewMetric icon={HardHat} label="Сваи" value={`${formatNumber(totals.piles)} шт.`} sub={`${formatNumber(totals.pileMeters)} м.п.`} />
           <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м`} />
-          <PreviewMetric icon={Clock} label="Простой" value={formatHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} />
+          <PreviewMetric icon={Clock} label="Простой" value={formatDowntimeHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} />
           <PreviewMetric icon={CheckCircle2} label="Эффективность" value={efficiency == null ? '-' : formatPercentValue(efficiency)} sub="без простоев" />
         </div>
 
@@ -168,7 +169,7 @@ export function ReportEvidencePreview({
                   <ProgressLine
                     key={downtime.id}
                     label={downtime.reason?.name || 'Причина не указана'}
-                    value={formatHours(downtime.duration)}
+                    value={formatDowntimeHours(downtime.duration)}
                     pct={(downtime.duration / downtimeMax) * 100}
                     tone="amber"
                   />

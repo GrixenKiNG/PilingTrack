@@ -101,6 +101,13 @@ export async function listReportsForReview(
     where.userId = userId;
   }
 
+  // Сколько всего отчётов под этим отбором — тем же условием, что и страница.
+  // Экран считает итоги по загруженным строкам, и без этого числа он выдавал
+  // сумму первой сотни за сумму всего среза: 821 свая вместо 2320. Считаем
+  // тут, а не вторым условием на экране: расхождение условий дало бы «100 из
+  // 90» и веру пользователя в цифру, которой нет.
+  const total = await db.report.count({ where });
+
   const page = await paginateQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     (args) => db.report.findMany(args as any),
@@ -132,6 +139,7 @@ export async function listReportsForReview(
 
   return {
     ...page,
+    total,
     data: page.data.map((r) => {
       const row = r as { reportId?: string; journalPhotoMediaId?: string | null };
       const thumbnailMediaId = (row.reportId ? thumbByReport.get(row.reportId) : undefined) ?? row.journalPhotoMediaId ?? null;

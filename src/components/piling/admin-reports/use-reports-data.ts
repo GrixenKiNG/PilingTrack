@@ -35,6 +35,8 @@ export interface UseReportsDataReturn {
   loadingReferenceData: boolean;
   loadingMore: boolean;
   hasMore: boolean;
+  /** Сколько отчётов под отбором всего — не сколько подгружено. */
+  totalReports: number;
   handleApplyPeriod: () => void;
   handleResetPeriod: () => void;
   loadMoreReports: () => Promise<void>;
@@ -63,6 +65,7 @@ export function useReportsData(): UseReportsDataReturn {
   const [loadingReferenceData, setLoadingReferenceData] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [totalReports, setTotalReports] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -177,6 +180,11 @@ export function useReportsData(): UseReportsDataReturn {
           const data = await res.json();
           const reportsArray = Array.isArray(data.reports) ? data.reports : [];
           setReports(reportsArray);
+          // В режиме периода сервер отдаёт срез целиком — всё загруженное и
+          // есть весь отбор.
+          setTotalReports(
+            typeof data.total === 'number' ? data.total : reportsArray.length,
+          );
           setHasMore(!periodActive && Boolean(data.hasMore));
           setNextCursor(!periodActive ? data.nextCursor ?? null : null);
         } else {
@@ -266,7 +274,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

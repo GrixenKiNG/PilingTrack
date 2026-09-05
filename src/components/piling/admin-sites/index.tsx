@@ -414,10 +414,11 @@ function SiteDetail({
   );
 }
 
+// Подписи к общему состоянию установки (@/modules/equipment).
 const EQUIPMENT_STATE: Record<string, { label: string; className: string }> = {
-  WORKING: { label: 'В работе', className: 'bg-success/15 text-success-strong' },
-  REPAIR: { label: 'В ремонте', className: 'bg-destructive/15 text-destructive-strong' },
-  IDLE: { label: 'Простой', className: 'bg-warning/15 text-warning-strong' },
+  working: { label: 'В работе', className: 'bg-success/15 text-success-strong' },
+  repair: { label: 'В ремонте', className: 'bg-destructive/15 text-destructive-strong' },
+  idle: { label: 'Простой', className: 'bg-warning/15 text-warning-strong' },
 };
 
 /**

@@ -18,7 +18,10 @@ export interface DashboardAnalyticsRow {
 }
 
 export interface DashboardFleetTotals {
+  /** Сдан отчёт за сегодня. Это НЕ «работает сейчас». */
   activeToday: number;
+  /** Машин с открытой сменой прямо сейчас. */
+  workingNow?: number;
   expected: number;
   totalEquipment: number;
   crewsOnShiftToday: number;
@@ -65,6 +68,7 @@ export interface DashboardKpis {
   downtime: number;
   sitesActive: number;
   sitesTotal: number;
+  /** Машин с открытой сменой прямо сейчас — не «сдали отчёт». */
   rigsWorking: number;
   rigsTotal: number;
   toRisk: number;
@@ -107,7 +111,9 @@ export function computeDashboardKpis(
     downtime: sumBy(analytics, (a) => a.totalDowntime || 0),
     sitesActive: analytics.filter((a) => a.totalReports > 0).length,
     sitesTotal: analytics.length,
-    rigsWorking: activeToday,
+    // Раньше сюда шло activeToday («сдан отчёт за сегодня»), и плитка
+    // «N в работе» показывала ноль, пока смена шла, но отчёт ещё не сдан.
+    rigsWorking: fleetTotals?.workingNow ?? 0,
     rigsTotal: fleetTotals?.totalEquipment ?? 0,
     toRisk,
     crews: fleetTotals?.crewsOnShiftToday ?? 0,

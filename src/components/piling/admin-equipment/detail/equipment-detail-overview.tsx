@@ -7,9 +7,10 @@
 
 import { type ReactNode } from 'react';
 import { KIND_LABELS } from '../equipment-form';
-import { formatHours, type TimelineRow } from './equipment-detail-parts';
+import { type TimelineRow } from './equipment-detail-parts';
 import { formatFixed } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 export interface DetailsResponse {
   equipment: EquipmentDTO & Record<string, unknown>;
@@ -162,7 +163,7 @@ export function OverviewTiles({
         rows={[
           ['Сваи', `${formatFixed(stats.piles, 0)} шт. / ${formatFixed(stats.pileMeters, 1)} м.п.`],
           ['Бурение', `${formatFixed(stats.drillingCount, 0)} шт. / ${formatFixed(stats.drillingMeters, 1)} м`],
-          ['Простой', formatHours(stats.downtimeHours)],
+          ['Простой', formatDowntimeHours(stats.downtimeHours)],
           ['Отчёты', `${stats.reportCount}`],
         ]}
       />

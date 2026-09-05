@@ -12,6 +12,8 @@ export type { MaintenanceInput, MaintenanceType, MaintenanceStatus, MaintenanceP
 export { addMeterReading, deleteMeterReading, recordMeterReadingInTx, checkMeterReading, canDecreaseMeter, METER_JUMP_WARN_HOURS } from './application/commands/meter-reading';
 export type { MeterReadingInput, MeterSource, AddMeterReadingResult, MeterReadingContext } from './application/commands/meter-reading';
 export { addFuelEntry, deleteFuelEntry, computeFuelConsumption } from './application/commands/fuel-log';
+export { resolveEquipmentOperationalStates } from './application/queries/operational-state';
+export type { EquipmentOperationalState } from './application/queries/operational-state';
 export type { FuelLogInput, FuelLogContext, FuelConsumption, FuelConsumptionInput } from './application/commands/fuel-log';
 export { createMaintenancePlan, updateMaintenancePlan, deleteMaintenancePlan } from './application/commands/maintenance-plan';
 export type { MaintenancePlanInput } from './application/commands/maintenance-plan';

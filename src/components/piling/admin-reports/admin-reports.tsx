@@ -41,7 +41,7 @@ export function AdminReports() {
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
     periodActive, loading, loadingReferenceData, loadingMore, hasMore, error,
-    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
+    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports,
   } = useReportsData();
 
   const [detailReport, setDetailReport] = useState<ReportDTO | null>(null);
@@ -227,7 +227,14 @@ export function AdminReports() {
             onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
           />
 
-          <EvidenceSummary reportCount={filteredReports.length} totals={totals} photoCount={photoCount} />
+          <EvidenceSummary
+            reportCount={filteredReports.length}
+            totals={totals}
+            photoCount={photoCount}
+            totalReports={totalReports}
+            // Суммы описывают весь отбор, только когда догружать больше нечего.
+            complete={!hasMore}
+          />
 
           <div
             style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
