@@ -29,7 +29,10 @@ describe('tenant-scoped site queries', () => {
   });
 
   it('scopes site detail to tenant even for privileged roles', async () => {
-    findFirst.mockResolvedValue({ id: 's1' });
+    // `crews` приходит из include всегда — заглушка повторяет настоящую форму.
+    // Пустой список к тому же коротко замыкает добор состояний машин, и
+    // мокать ради проверки изоляции ещё две таблицы не нужно.
+    findFirst.mockResolvedValue({ id: 's1', crews: [] });
     await getSiteWithHierarchy({ id: 'a', role: 'ADMIN' }, 'tenant-a', 's1');
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 's1', tenantId: 'tenant-a' } }));
   });

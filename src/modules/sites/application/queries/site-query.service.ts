@@ -31,6 +31,20 @@ const siteDetailInclude = {
   drillingPlans: {
     orderBy: { createdAt: 'asc' },
   },
+  // Бригады и закреплённые за ними установки — доказательная часть карточки
+  // объекта: кто и на чём здесь работает. Только действующие: расформированная
+  // бригада остаётся в базе историей отчётов, но на объекте её уже нет.
+  crews: {
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      operator: { select: { id: true, name: true } },
+      assistants: { select: { id: true, name: true } },
+      equipment: { select: { id: true, name: true, model: true, isActive: true } },
+    },
+    orderBy: { name: 'asc' },
+  },
 } as const;
 
 export async function getAccessibleSites(
@@ -67,6 +81,53 @@ export async function getAccessibleSites(
   });
 }
 
+/**
+ * Состояние установки на объекте: работает, стоит или в ремонте.
+ *
+ * ПОЧЕМУ НЕ ПОЛЕ В ТАБЛИЦЕ. Колонки `Equipment.status` в продукте нет намеренно
+ * — состояние выводится из фактов: идёт ли по машине смена и висит ли на ней
+ * открытая поломка. Заведи её полем, и первое же расхождение с фактами дало бы
+ * «в работе» у машины, которую вчера увезли в ремонт.
+ *
+ * ПОРЯДОК ВАЖЕН. Ремонт перекрывает смену: если на машине открыта неисправность,
+ * она в ремонте, даже когда смену на ней формально не закрыли. Тем же правилом
+ * живут карточки парка (`fleet-monitoring`), и два разных ответа об одной
+ * машине на двух экранах хуже, чем один огрублённый.
+ */
+export type SiteEquipmentState = 'WORKING' | 'REPAIR' | 'IDLE';
+
+async function resolveEquipmentStates(
+  tenantId: string,
+  equipmentIds: string[],
+): Promise<Record<string, SiteEquipmentState>> {
+  if (equipmentIds.length === 0) return {};
+
+  const [running, repairs] = await Promise.all([
+    db.shift.findMany({
+      where: {
+        tenantId,
+        equipmentId: { in: equipmentIds },
+        state: { in: ['STARTED', 'HANDOVER_PENDING'] },
+      },
+      select: { equipmentId: true },
+    }),
+    db.maintenanceRecord.findMany({
+      where: {
+        equipmentId: { in: equipmentIds },
+        type: { in: ['REPAIR', 'FAULT'] },
+        status: { notIn: ['DONE', 'CANCELLED'] },
+      },
+      select: { equipmentId: true },
+    }),
+  ]);
+
+  const states: Record<string, SiteEquipmentState> = {};
+  for (const id of equipmentIds) states[id] = 'IDLE';
+  for (const row of running) states[row.equipmentId] = 'WORKING';
+  for (const row of repairs) states[row.equipmentId] = 'REPAIR';
+  return states;
+}
+
 export async function getSiteWithHierarchy(
   sessionUser: { id: string; role: string },
   tenantId: string,
@@ -75,10 +136,26 @@ export async function getSiteWithHierarchy(
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   await assertCanAccessSite(sessionUser, siteId, 'sites.read_all');
 
-  return db.site.findFirst({
+  const site = await db.site.findFirst({
     where: { id: siteId, tenantId },
     include: siteDetailInclude,
   });
+  if (!site) return site;
+
+  // Состояние машин добираем отдельным запросом: оно выводится из смен и
+  // нарядов, а не хранится, и связью в `include` его не достать.
+  const equipmentIds = site.crews
+    .map((crew) => crew.equipment?.id)
+    .filter((id): id is string => Boolean(id));
+  const states = await resolveEquipmentStates(tenantId, equipmentIds);
+
+  return {
+    ...site,
+    crews: site.crews.map((crew) => ({
+      ...crew,
+      equipmentState: crew.equipment ? states[crew.equipment.id] ?? 'IDLE' : null,
+    })),
+  };
 }
 
 export async function listAllSitesForAdmin(tenantId: string, includeInactive = true) {

@@ -37,7 +37,8 @@ import { UserAssignmentDialog } from './user-assignment';
 import { useSiteMutations } from './use-site-mutations';
 import { useSitesData } from './use-sites-data';
 import { useSitesOverview, type SiteOverviewRow } from './use-sites-overview';
-import type { SiteFullData, SiteListItem } from './types';
+import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
+import type { SiteCrew, SiteFullData, SiteListItem } from './types';
 
 type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 
@@ -399,6 +400,8 @@ function SiteDetail({
         <LabeledProgress label="Бурение" pct={row.drillingProgress} planned={row.plannedDrilling} tone="blue" />
       </div>
 
+      <SiteCrewBoard crews={tree?.crews} />
+
       <div className="rounded-md border border-border p-2.5">
         <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Network className="h-4 w-4 text-muted-foreground" />Иерархия</h3>
         {tree
@@ -408,6 +411,86 @@ function SiteDetail({
 
       <OpsHistoryList entries={history.entries} loading={history.loading} error={history.error} title="История изменений" />
     </OpsDetailPanel>
+  );
+}
+
+const EQUIPMENT_STATE: Record<string, { label: string; className: string }> = {
+  WORKING: { label: 'В работе', className: 'bg-success/15 text-success-strong' },
+  REPAIR: { label: 'В ремонте', className: 'bg-destructive/15 text-destructive-strong' },
+  IDLE: { label: 'Простой', className: 'bg-warning/15 text-warning-strong' },
+};
+
+/**
+ * Кто и на чём работает на объекте.
+ *
+ * ЗАЧЕМ В КАРТОЧКЕ ОБЪЕКТА. План и факт отвечают «сколько сделано», но не
+ * «чем и кем». Закрепление жило в модуле бригад, и чтобы узнать, какие машины
+ * стоят на объекте, приходилось уходить с экрана и искать по обратной связи.
+ *
+ * ПОЧЕМУ ФОТО. Установки различают глазами, а не по строке «КБУРГ-16.02 №1»:
+ * снимок модели узнаётся быстрее названия. Снимка на модель нет — показываем
+ * название, а не пустую рамку.
+ */
+function SiteCrewBoard({ crews }: { crews?: SiteCrew[] }) {
+  return (
+    <div className="rounded-md border border-border p-2.5">
+      <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
+        <HardHat className="h-4 w-4 text-muted-foreground" />
+        Установки и бригады
+        {crews?.length ? <span className="font-mono text-2xs text-muted-foreground">{crews.length}</span> : null}
+      </h3>
+
+      {crews === undefined ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
+      {crews?.length === 0 ? (
+        <p className="text-2xs text-muted-foreground">
+          За объектом не закреплено ни одной бригады. Закрепление — в модуле «Бригады».
+        </p>
+      ) : null}
+
+      <ul className="space-y-2">
+        {(crews ?? []).map((crew) => {
+          const photo = getEquipmentPhoto(crew.equipment?.model);
+          const state = crew.equipmentState ? EQUIPMENT_STATE[crew.equipmentState] : null;
+          return (
+            <li key={crew.id} className="flex gap-2.5 border-t pt-2 first:border-t-0 first:pt-0">
+              <div className="h-14 w-20 shrink-0 overflow-hidden rounded border border-border bg-muted">
+                {photo ? (
+                   
+                  <img src={photo} alt={crew.equipment?.name ?? 'Установка'} className="h-full w-full object-cover" />
+                ) : (
+                  // Снимка на эту модель нет. Название не повторяем — оно уже
+                  // стоит заголовком справа, и дубль читается как ошибка.
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    <HardHat className="h-6 w-6" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-xs font-semibold text-foreground">
+                    {crew.equipment?.name ?? 'Установка не закреплена'}
+                  </p>
+                  {state ? (
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-3xs font-semibold ${state.className}`}>
+                      {state.label}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="truncate text-2xs text-muted-foreground">
+                  {crew.name || 'Бригада без названия'}
+                  {crew.operator ? ` · ${crew.operator.name}` : ''}
+                </p>
+                {crew.assistants.length > 0 ? (
+                  <p className="truncate text-2xs text-muted-foreground">
+                    Помощники: {crew.assistants.map((assistant) => assistant.name).join(', ')}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

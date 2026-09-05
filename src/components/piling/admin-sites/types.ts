@@ -13,10 +13,26 @@ export interface SiteListItem extends SiteDTO {
   };
 }
 
+/**
+ * Бригада на объекте вместе с закреплённой установкой.
+ *
+ * `equipmentState` считает сервер по фактам — идёт ли смена и открыта ли
+ * поломка, — а не хранит полем: см. `resolveEquipmentStates`.
+ */
+export interface SiteCrew {
+  id: string;
+  name: string;
+  operator: { id: string; name: string } | null;
+  assistants: { id: string; name: string }[];
+  equipment: { id: string; name: string; model: string | null; isActive: boolean } | null;
+  equipmentState: 'WORKING' | 'REPAIR' | 'IDLE' | null;
+}
+
 export interface SiteFullData extends SiteWithTreeDTO {
   users?: AssignedUser[];
   pilePlans?: SitePilePlanDTO[];
   drillingPlans?: SiteDrillingPlanDTO[];
+  crews?: SiteCrew[];
 }
 
 export interface PilePlanRow {
