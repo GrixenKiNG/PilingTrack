@@ -29,6 +29,7 @@
  * памяти вкладки и помечены на экране.
  */
 
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
@@ -702,7 +703,7 @@ export function OperatorShiftV2() {
                 </li>
                 <li><ValueRow label="Сваи сегодня" value={`${report.totalPiles} шт`} /></li>
                 {report.totalDowntime > 0 && (
-                  <li><ValueRow label="Простой" value={`${report.totalDowntime} ч`} tone="warn" /></li>
+                  <li><ValueRow label="Простой" value={formatDowntimeHours(report.totalDowntime)} tone="warn" /></li>
                 )}
               </RowList>
 
@@ -838,7 +839,7 @@ export function OperatorShiftV2() {
             </li>
             <li><ValueRow label="Сваи выполнено" value={`${report.totalPiles} шт`} /></li>
             <li>
-              <ValueRow label="Простой" value={`${report.totalDowntime} ч`}
+              <ValueRow label="Простой" value={formatDowntimeHours(report.totalDowntime)}
                 tone={report.totalDowntime > 0 ? 'warn' : undefined} />
             </li>
             <li>
@@ -912,7 +913,7 @@ export function OperatorShiftV2() {
       <RowList>
         <li><ValueRow label="Время работы" value={elapsed ?? '—'} /></li>
         <li><ValueRow label="Сваи выполнено" value={`${report.totalPiles} шт`} /></li>
-        <li><ValueRow label="Простой" value={`${report.totalDowntime} ч`} /></li>
+        <li><ValueRow label="Простой" value={formatDowntimeHours(report.totalDowntime)} /></li>
         {facts.meterCurrent != null && (
           <li><ValueRow label="Моточасы" value={`${formatNumber(facts.meterCurrent)} м/ч`} /></li>
         )}

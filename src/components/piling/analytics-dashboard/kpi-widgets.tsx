@@ -23,6 +23,7 @@ import {
   ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from './kpi-catalog';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 export interface AnalyticsKpiData {
   totalEquipment: number;
@@ -92,7 +93,7 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
       p ? `${fmtRu(p.drilling.value)} м` : `${Math.round(d.drillingToday)} м`,
       p ? 'за период' : 'за сегодня', pctDelta(p?.drilling.deltaPct)),
     'kpi-downtime': tile('kpi-downtime', 'Простой',
-      p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : `${d.downtimeHoursToday} ч`,
+      p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : formatDowntimeHours(d.downtimeHoursToday),
       p ? 'доля времени смен' : 'за сегодня',
       // For downtime a NEGATIVE delta (less idle time) is the good direction.
       p && p.downtime.deltaPp != null ? { text: `${signed(p.downtime.deltaPp, ' п.п.')} ${p.label}`, good: p.downtime.deltaPp <= 0 } : null),

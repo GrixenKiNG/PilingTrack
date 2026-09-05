@@ -39,6 +39,7 @@ import { useSitesData } from './use-sites-data';
 import { useSitesOverview, type SiteOverviewRow } from './use-sites-overview';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import type { SiteCrew, SiteFullData, SiteListItem } from './types';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 
@@ -208,7 +209,7 @@ export function AdminSites() {
     },
     { key: 'progress', header: 'Прогресс', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{r.plannedPiles > 0 ? pct(r.pileProgress) : '—'}</span> },
     { key: 'reports', header: 'Отчёты', width: '80px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-foreground">{r.totalReports}</span> },
-    { key: 'downtime', header: 'Простой', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-foreground">{r.totalDowntime > 0 ? `${formatNumber(r.totalDowntime)} ч` : '—'}</span> },
+    { key: 'downtime', header: 'Простой', width: '88px', align: 'right', cell: (r) => <span className="font-mono text-sm tabular-nums text-foreground">{r.totalDowntime > 0 ? formatDowntimeHours(r.totalDowntime) : '—'}</span> },
     {
       key: 'status',
       header: 'Статус',
@@ -391,7 +392,7 @@ function SiteDetail({
       <div className="grid grid-cols-3 divide-x rounded-md border border-border">
         <OpsFact label="Бурение план" value={formatNumber(row.plannedDrilling)} sub="м" />
         <OpsFact label="Бурение факт" value={formatNumber(row.actualDrilling)} sub="м" />
-        <OpsFact label="Простой" value={row.totalDowntime > 0 ? `${formatNumber(row.totalDowntime)} ч` : '—'} />
+        <OpsFact label="Простой" value={row.totalDowntime > 0 ? formatDowntimeHours(row.totalDowntime) : '—'} />
       </div>
 
       <div className="rounded-md border border-border p-2.5">

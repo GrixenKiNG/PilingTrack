@@ -2,6 +2,7 @@
 
 import { formatNumber } from '@/lib/format';
 import { IconTile } from '@/components/piling/icons';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 interface ReportSentScreenProps {
   siteName: string;
@@ -39,7 +40,7 @@ export function ReportSentScreen({
           <Row label="Дата" value={formatDate(date)} />
           <Row label="Сваи" value={`${totalPiles} шт. / ${formatNumber(totalPileMeters)} м.п.`} />
           <Row label="Бурение" value={`${totalDrillingCount} шт. / ${formatNumber(totalMeters)} м.п.`} />
-          {hasDowntime && <Row label="Простой" value={`${formatNumber(totalDowntime)} ч`} />}
+          {hasDowntime && <Row label="Простой" value={formatDowntimeHours(totalDowntime)} />}
         </div>
       </div>
 

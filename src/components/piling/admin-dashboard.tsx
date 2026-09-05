@@ -34,6 +34,7 @@ import { getTodayInTimezone } from '@/lib/timezone';
 import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 import { useMainDashboardLayout } from '@/components/piling/main-dashboard/dashboard-layout';
 import { PageLayoutRenderer, type RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
 import type { SiteAnalyticsDTO } from '@/lib/types';
@@ -230,7 +231,7 @@ export function AdminDashboard() {
         text: `${c.name} — отчёт за смену ожидается`, hint: c.assignedSiteName || c.model, href: `/admin/equipment/${c.id}`, rig: c.id, site });
       const dt = c.todayTotals?.downtimeHours ?? 0;
       if (dt >= 1) out.push({ id: `dt-${c.id}`, tone: 'warning', icon: PauseCircle,
-        text: `${c.name} — простой ${formatNumber(dt)} ч`, hint: c.assignedSiteName || c.model, href: `/admin/equipment/${c.id}`, rig: c.id, site });
+        text: `${c.name} — простой ${formatDowntimeHours(dt)}`, hint: c.assignedSiteName || c.model, href: `/admin/equipment/${c.id}`, rig: c.id, site });
     }
     const today = getTodayInTimezone();
     for (const r of recent) {
@@ -294,7 +295,7 @@ export function AdminDashboard() {
     'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="смен сдано сегодня" /> },
     'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={`${formatNumber(kpis.actualPiles)} шт / ${formatNumber(kpis.actualPileMeters)} м.п.`} sub={`план ${formatNumber(kpis.plannedPiles)} шт / ${formatNumber(kpis.plannedPileMeters)} м.п.`} progress={pileProgress} /> },
     'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`} sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`} progress={drillingProgress} /> },
-    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={`${formatNumber(kpis.downtime)} ч`} sub="за период" /> },
+    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={formatDowntimeHours(kpis.downtime)} sub="за период" /> },
     'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={`${kpis.rigsWorking} в работе`} sub={`из ${kpis.rigsTotal}`} progress={fleetProgress} /> },
     'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={`${formatNumber(kpis.toRisk)} риска`} sub={`из ${kpis.rigsTotal} установок`} /> },
   };

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import type { DowntimeReasonDTO } from '@/lib/types';
 import { PilingIcon } from '@/components/piling/icons';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 interface DowntimeSectionProps {
   downtimes: { id: string; reasonId: string; duration: number; comment: string }[];
@@ -70,7 +71,7 @@ export function DowntimeSection({
                       {dt.comment && <p className="text-xs font-medium text-muted-foreground truncate">{dt.comment}</p>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-mono font-bold text-warning-strong">{dt.duration} ч</span>
+                      <span className="text-base font-mono font-bold text-warning-strong">{formatDowntimeHours(dt.duration)}</span>
                       <button onClick={() => onRemove(dt.id)}
                         aria-label={`Удалить простой «${getDowntimeReasonName(dt.reasonId)}» из отчёта`}
                         className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong">
@@ -83,7 +84,7 @@ export function DowntimeSection({
             )}
 
             {totalDowntime > 0 && (
-              <div className="text-sm font-medium text-foreground text-right">Итого: <span className="font-mono font-bold">{totalDowntime} ч</span></div>
+              <div className="text-sm font-medium text-foreground text-right">Итого: <span className="font-mono font-bold">{formatDowntimeHours(totalDowntime)}</span></div>
             )}
           </CardContent>
         )}

@@ -10,6 +10,7 @@ import type { FleetCard } from './fleet-types';
 import { STATUS_META, KIND_LABEL } from './equipment-status';
 import { getMaintenanceFlag } from './equipment-maintenance-flag';
 import { getEquipmentBrand } from './equipment-brand-logo';
+import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
 
 const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('ru'));
 const formatNum = (n: number | null | undefined, digits = 0) =>
@@ -112,7 +113,7 @@ export function EquipmentTile({
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Metric label="сваи шт./м.п." value={t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'} />
           <Metric label="бурение шт./м" value={t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'} />
-          <Metric label="простой, ч" value={t ? formatNum(t.downtimeHours, 1) : '—'} />
+          <Metric label="простой" value={t ? formatDowntimeHours(t.downtimeHours) : '—'} />
         </div>
 
         {flag ? (
