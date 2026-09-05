@@ -60,11 +60,16 @@ function isOriginAllowed(origin: string, allowed: string[]): boolean {
 // ============================================================
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
-  // Already set in next.config.ts, but reinforce here for Proxy runtime
+  // На бою эти заголовки ставит Caddy (deploy/Caddyfile.prod), здесь они нужны
+  // для развёртываний без него. Значения обязаны совпадать: разойдясь, они
+  // дадут двойной заголовок с разными правилами.
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  // geolocation=(self): координаты телефона нужны мобильному месту машиниста
+  // для погоды на площадке. Причина и почему камера остаётся закрытой —
+  // в Caddyfile.prod рядом с тем же заголовком.
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()');
 
   return response;
 }

@@ -10,6 +10,8 @@ import { getResponseCache } from '@/core/cache';
 import { recordHttpRequest } from '@/core/observability/http-metrics';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { readSessionToken } from '@/services/auth/session-service';
+ 
+import { requireAuth } from '@/lib/auth';
 import { runWithTenantContext } from '@/core/security/tenant-context';
 
 export interface ApiWrapperOptions {
@@ -26,11 +28,25 @@ const PRISMA_STATUS: Record<string, number> = {
   P2002: 409, // Unique constraint violation
 };
 
+/**
+ * Область кеша одного посетителя.
+ *
+ * ПОЧЕМУ В КЛЮЧ ВХОДИТ ИСПОЛНЯЕМАЯ РОЛЬ. Администратор переключается в режим
+ * «действую как» тем же токеном, и без этого заголовка ответ, снятый в полных
+ * правах, отдавался бы ему же в урезанной роли — экран показывал бы объём,
+ * которого эта роль видеть не должна. Значению заголовка доверять не нужно:
+ * подставить чужую роль не даёт requireAuth, здесь он лишь разводит ячейки.
+ *
+ * ПОЧЕМУ ЭТО ЖЕ МЕСТО СЧИТАЕТ КЛЮЧ ДЛЯ СБРОСА. Маршрут обратной связи гасит
+ * запись того же посетителя (invalidateFeedbackCache). Считай он ключ сам,
+ * первое расхождение оставило бы висеть ячейку, которую некому убрать.
+ */
 export function getSessionCacheScope(request: NextRequest): string | undefined {
   const sessionToken = readSessionToken(request);
   if (!sessionToken) return undefined;
 
-  return createHash('sha256').update(sessionToken).digest('hex').slice(0, 24);
+  const actingAs = request.headers.get('x-acting-as') ?? '';
+  return createHash('sha256').update(`${sessionToken}:${actingAs}`).digest('hex').slice(0, 24);
 }
 
 function isPrismaKnownError(err: unknown): err is { code: string; message: string } {
@@ -56,11 +72,23 @@ export function withApi<T extends any[]>(
     let response: NextResponse;
 
     try {
-      if (
-        _opts?.cache &&
-        request.method === 'GET' &&
-        !request.nextUrl.searchParams.has('_ts')
-      ) {
+      // Сессию проверяем ДО обращения к кешу.
+      //
+      // Проверки прав живут внутри обработчиков (requireAuth, assertCan), а
+      // попадание в кеш обработчик не запускает вовсе. Отозванный или истёкший
+      // токен продолжал получать снятый прежде ответ всё время жизни записи,
+      // включая окно подачи устаревшего. Наличие строки токена сессией не
+      // является, и хеш от неё этого не проверяет.
+      //
+      // Невалидная сессия — идём мимо кеша: обработчик ответит отказом сам, в
+      // своей форме. Токена нет вовсе — поведение прежнее: обработчик всё
+      // равно ответит 401, и такая ячейка общая для всех неопознанных.
+      const cacheable = Boolean(_opts?.cache)
+        && request.method === 'GET'
+        && !request.nextUrl.searchParams.has('_ts')
+        && (readSessionToken(request) === null || (await requireAuth(request)).user !== null);
+
+      if (cacheable) {
         const responseCache = getResponseCache(domain);
         const userScope = getSessionCacheScope(request);
 
@@ -71,7 +99,7 @@ export function withApi<T extends any[]>(
             userId: userScope,
           },
           () => handler(request, ...args),
-          { ttl: _opts.cacheTTL }
+          { ttl: _opts?.cacheTTL }
         );
       } else {
         response = await handler(request, ...args);

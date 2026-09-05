@@ -31,7 +31,13 @@ orionpiling.ru, www.orionpiling.ru {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		# geolocation=(self): мобильное место машиниста берёт координаты телефона
+		# (navigator.geolocation) для погоды на площадке — по ней запрещают работы
+		# при ветре выше 15 м/с. С geolocation=() браузер молча отдавал отказ, и
+		# погода тихо съезжала на координаты объекта из справочника.
+		# Камера закрыта намеренно: getUserMedia в приложении не используется, а
+		# съёмка фото идёт через <input capture>, которую эта политика не трогает.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self), payment=(), usb=()"
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Resource-Policy "same-origin"
 	}

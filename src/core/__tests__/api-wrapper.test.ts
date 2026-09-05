@@ -46,6 +46,21 @@ vi.mock('@/lib/rate-limiter', () => ({
   getRateLimitIdentifier: vi.fn(() => 'test-ip'),
 }));
 
+// Сессия: по умолчанию токена нет — так ведут себя остальные тесты файла.
+type FakeAuth = { user: { id: string } | null; error: null };
+const mockReadSessionToken = vi.fn<(request: NextRequest) => string | null>(() => null);
+const mockRequireAuth = vi.fn<(request: NextRequest) => Promise<FakeAuth>>(
+  async () => ({ user: { id: 'u1' }, error: null }),
+);
+
+vi.mock('@/services/auth/session-service', () => ({
+  readSessionToken: (request: NextRequest) => mockReadSessionToken(request),
+}));
+
+vi.mock('@/lib/auth', () => ({
+  requireAuth: (request: NextRequest) => mockRequireAuth(request),
+}));
+
 import { ServiceError } from '@/lib/service-error';
 import { CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withCsrf } from '@/lib/csrf-protection';
@@ -134,6 +149,52 @@ describe('withApi', () => {
     expect(body1.ok).toBe(true);
     expect(body2.ok).toBe(true);
     expect(body2.nonce).toBe(body1.nonce);
+  });
+
+  /*
+    Кеш не должен отвечать раньше, чем проверена сессия.
+
+    Проверки прав живут внутри обработчиков; попадание в кеш обработчик не
+    запускает вовсе. Ключ строился из строки токена, а наличие строки сессией
+    не является — отозванный токен продолжал получать снятый ранее ответ всё
+    время жизни записи.
+  */
+  it('не отдаёт из кеша, когда сессия перестала быть действительной', async () => {
+    mockReadSessionToken.mockReturnValue('session-token');
+    mockRequireAuth.mockResolvedValue({ user: { id: 'u1' }, error: null });
+
+    const calls = vi.fn(async () => NextResponse.json({ ok: true }));
+    const handler = withApi(calls, { domain: 'cache-revoked-test', cache: true, cacheTTL: 60_000 });
+
+    await handler(mockRequest());
+    expect(calls).toHaveBeenCalledTimes(1);
+
+    // Доступ отозвали: запись в кеше ещё свежая, но отвечать по ней нельзя.
+    mockRequireAuth.mockResolvedValue({ user: null, error: null });
+    await handler(mockRequest());
+
+    expect(calls).toHaveBeenCalledTimes(2);
+    mockReadSessionToken.mockReturnValue(null);
+  });
+
+  /*
+    Режим «действую как» — тот же токен, другие права. Без роли в ключе
+    администратор получал в урезанной роли ответ, снятый в полных правах.
+  */
+  it('разводит по кешу полные права и режим «действую как»', async () => {
+    mockReadSessionToken.mockReturnValue('session-token');
+    mockRequireAuth.mockResolvedValue({ user: { id: 'admin' }, error: null });
+
+    const calls = vi.fn(async () => NextResponse.json({ ok: true }));
+    const handler = withApi(calls, { domain: 'cache-acting-test', cache: true, cacheTTL: 60_000 });
+
+    await handler(mockRequest());
+    await handler(new NextRequest('http://localhost/api/test', {
+      method: 'GET', headers: { 'x-acting-as': 'OPERATOR' },
+    }));
+
+    expect(calls).toHaveBeenCalledTimes(2);
+    mockReadSessionToken.mockReturnValue(null);
   });
 
   it('should catch ServiceError and return its status', async () => {

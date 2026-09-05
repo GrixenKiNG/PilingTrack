@@ -313,6 +313,59 @@ describe('Report Command Service', () => {
       const sessionUser = { id: 'admin-1', role: 'ADMIN' };
       expect(() => assertCanActForUser(sessionUser, 'user-2')).not.toThrow();
     });
+
+    /*
+      Правка чужого отчёта по его идентификатору.
+
+      Маршрут проверяет право действовать за ПРИСЛАННОГО пользователя, а
+      команда грузила запись по одному reportId. Оператор, приславший свой
+      собственный userId и чужой reportId, проходил проверку прав и переписывал
+      выработку в чужом отчёте: владелец в записи оставался прежним, а сваи
+      становились его. Изоляция по организации здесь не помогает — оба внутри
+      одной.
+    */
+    it('отказывает в правке отчёта, принадлежащего другому пользователю', async () => {
+      const victimsReport = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'victim',
+        siteId: 'site-1',
+        date: '2026-04-05',
+      });
+      victimsReport.addPileWork({ pileGradeId: 'grade-1', count: 5 }, 'victim');
+      mockRepoFindById.mockResolvedValue(victimsReport);
+
+      await expect(upsertReport({
+        reportId: 'report-1',
+        // Нападающий действует от себя — право действовать за себя есть у всех.
+        userId: 'attacker',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 99 }],
+      })).rejects.toThrow(/другому пользователю/);
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    it('правку своего отчёта не трогает', async () => {
+      const own = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+      });
+      own.addPileWork({ pileGradeId: 'grade-1', count: 5 }, 'user-1');
+      mockRepoFindById.mockResolvedValue(own);
+
+      await upsertReport({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 7 }],
+      });
+
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('tenant + concurrency wiring', () => {
