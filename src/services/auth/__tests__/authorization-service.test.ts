@@ -116,9 +116,12 @@ describe('authorization-service', () => {
     // Раньше карточку закрывало system.read (диагностика системы), взятое как
     // синоним «админ или диспетчер»; механику она из-за этого не открывалась.
     it('separates reading an equipment card from managing the fleet', () => {
-      for (const role of ['ADMIN', 'DISPATCHER', 'MECHANIC'] as const) {
+      for (const role of ['ADMIN', 'DISPATCHER', 'MECHANIC', 'SAFETY_ENGINEER'] as const) {
         expect(can({ role }, 'equipment.read')).toBe(true);
       }
+      // Право на чтение карточки не даёт распоряжаться парком ни одной из них.
+      expect(can({ role: 'MECHANIC' }, 'equipment.manage')).toBe(false);
+      expect(can({ role: 'SAFETY_ENGINEER' }, 'equipment.manage')).toBe(false);
       expect(can({ role: 'DISPATCHER' }, 'equipment.manage')).toBe(false);
       expect(can({ role: 'OPERATOR' }, 'equipment.read')).toBe(false);
     });
