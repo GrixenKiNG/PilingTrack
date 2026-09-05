@@ -65,6 +65,33 @@ const commandSchema = z.discriminatedUnion('command', [
         comment: z.string().max(500).optional(),
       }),
       z.object({
+        kind: z.literal('PILE_PASSPORT'),
+        pileGradeId: z.string().min(1),
+        // Обязателен только номер сваи: остальное машинист дописывает по ходу,
+        // и половина замеров появляется уже после забивки. Границы широкие и
+        // отсекают опечатку, а не оценивают качество работы — это дело приёмки.
+        passport: z.object({
+          pileNumber: z.string().trim().min(1).max(50),
+          picketId: z.string().min(1).optional(),
+          // Отметка головы бывает отрицательной: отсчёт от нуля здания.
+          designHeadLevelM: z.number().min(-200).max(200).nullish(),
+          actualHeadLevelM: z.number().min(-200).max(200).nullish(),
+          drivenDepthM: z.number().min(0).max(200).nullish(),
+          refusalSetPenetrationMm: z.number().min(0).max(10_000).nullish(),
+          refusalSetBlows: z.number().int().min(1).max(1000).nullish(),
+          designRefusalMm: z.number().min(0).max(1000).nullish(),
+          totalBlows: z.number().int().min(0).max(100_000).nullish(),
+          blowsLastMeter: z.number().int().min(0).max(100_000).nullish(),
+          redriven: z.boolean().optional(),
+          headCutOff: z.boolean().optional(),
+          planDeviationMm: z.number().min(0).max(10_000).nullish(),
+          tiltPercent: z.number().min(0).max(100).nullish(),
+          dropHeightM: z.number().min(0).max(20).nullish(),
+          mediaIds: z.array(z.string()).max(10).optional(),
+          note: z.string().max(2000).optional(),
+        }),
+      }),
+      z.object({
         kind: z.literal('DRILLING'),
         typeId: z.string().min(1),
         count: z.number().int().min(1).max(500),

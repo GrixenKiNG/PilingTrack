@@ -7,6 +7,7 @@ import type {ProductionEntryInput} from '../api';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 import {EntriesList} from './entries-list';
+import {PilePassportForm} from './pile-passport-form';
 
 type Tab = 'PILES' | 'DRILLING' | 'DOWNTIME';
 
@@ -55,6 +56,14 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
   }) => Promise<boolean>;
 }) {
   const [tab, setTab] = useState<Tab>('PILES');
+  /**
+   * Как записывают сваи.
+   *
+   * Паспорт стоит первым и включён по умолчанию: он и есть исполнительный
+   * документ, а пачка — способ добрать задним числом то, что записать сразу не
+   * вышло. Порядок кнопок здесь и есть указание, как правильно.
+   */
+  const [pileMode, setPileMode] = useState<'PASSPORT' | 'BATCH'>('PASSPORT');
   const [reference, setReference] = useState('');
   const [count, setCount] = useState('');
   const [metersPerUnit, setMetersPerUnit] = useState('');
@@ -80,6 +89,9 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
 
   const safetyDone = (stage: 'TB_PILING' | 'TB_DRILLING') =>
     state.checklists.find((checklist) => checklist.stage === stage)?.done ?? false;
+
+  // Паспорт заполняется своей формой: у неё своя кнопка и свои поля.
+  const passportMode = tab === 'PILES' && pileMode === 'PASSPORT';
 
   const needsSafety = (tab === 'PILES' && !safetyDone('TB_PILING'))
     || (tab === 'DRILLING' && !safetyDone('TB_DRILLING'));
@@ -137,12 +149,14 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             отказывает по тому же правилу, кнопка лишь избавляет от отказа
             после заполнения формы.
           */}
-          <BigButton
-            onClick={() => void submit()}
-            disabled={!ready || busy || needsSafety || (!state.workAllowed && tab !== 'DOWNTIME')}
-          >
-            {busy ? 'Записываем…' : 'Записать'}
-          </BigButton>
+          {!passportMode ? (
+            <BigButton
+              onClick={() => void submit()}
+              disabled={!ready || busy || needsSafety || (!state.workAllowed && tab !== 'DOWNTIME')}
+            >
+              {busy ? 'Записываем…' : 'Записать'}
+            </BigButton>
+          ) : null}
           {finishing ? (
             <div className="space-y-2 rounded-lg border border-warning bg-warning/10 p-3">
               <p className="text-sm font-semibold">
@@ -150,7 +164,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
               </p>
               <p className="text-2xs text-muted-foreground">
                 За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин,
-                {' '}простой {state.production.downtimeHours.toFixed(1)} ч. Дальше — ЕО после работы.
+                {' '}простой {state.production.downtimeHours} ч. Дальше — ЕО после работы.
               </p>
               <BigButton tone="danger" onClick={onFinish} disabled={busy}>
                 Да, работа завершена
@@ -231,8 +245,20 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             </BigButton>
           </div>
         </Panel>
+      ) : passportMode ? (
+        <div className="space-y-3">
+          <PileModeSwitch mode={pileMode} onChange={setPileMode} />
+          <PilePassportForm
+            grades={state.dictionaries.pileGrades}
+            busy={busy || !state.workAllowed}
+            onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
+          />
+          {error ? <ErrorNote message={error} /> : null}
+          <EntriesList entries={state.entries} onCorrect={onCorrect} busy={busy} />
+        </div>
       ) : (
         <div className="space-y-3">
+          {tab === 'PILES' ? <PileModeSwitch mode={pileMode} onChange={setPileMode} /> : null}
           <label className="block">
             <span className="text-2xs font-medium text-muted-foreground">
               {tab === 'PILES' ? 'Марка сваи' : tab === 'DRILLING' ? 'Тип бурения' : 'Причина простоя'}
@@ -294,6 +320,38 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
 
       <ErrorNote message={error} />
     </Screen>
+  );
+}
+
+/**
+ * Паспорт или пачка.
+ *
+ * Пачка не спрятана: бывает, что сваю забили, а замеры взять не успели, и
+ * запретить записать её вовсе значит получить смену, которой нет в отчёте.
+ */
+function PileModeSwitch({mode, onChange}: {
+  mode: 'PASSPORT' | 'BATCH';
+  onChange: (mode: 'PASSPORT' | 'BATCH') => void;
+}) {
+  return (
+    <div className="flex gap-1.5 rounded-lg bg-secondary p-1">
+      {([
+        {value: 'PASSPORT' as const, label: 'Паспорт сваи'},
+        {value: 'BATCH' as const, label: 'Пачкой'},
+      ]).map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={cn(
+            'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
+            mode === option.value ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

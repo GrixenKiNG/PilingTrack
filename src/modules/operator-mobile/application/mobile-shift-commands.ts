@@ -16,6 +16,7 @@ import {
 import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../domain/knowledge-bank';
 import {SAFETY_BRIEFING} from '../domain/safety-briefing';
 import {SLINGER_BRIEFING} from '../domain/slinger-briefing';
+import {validatePassport} from '../domain/pile-passport';
 import {resolveShiftConditions, selectChecklistItems} from '../domain/shift-conditions';
 import type {ReadWeather} from '../domain/view-contracts';
 import {weatherStop} from '../domain/work-warnings';
@@ -778,8 +779,40 @@ async function ensureReport(tx: Tx, input: {
   return created.id;
 }
 
+/** Замеры и отметки журнала забивки. Обязателен только номер сваи. */
+export interface PilePassportEntry {
+  pileNumber: string;
+  picketId?: string;
+  designHeadLevelM?: number | null;
+  actualHeadLevelM?: number | null;
+  drivenDepthM?: number | null;
+  refusalSetPenetrationMm?: number | null;
+  refusalSetBlows?: number | null;
+  designRefusalMm?: number | null;
+  totalBlows?: number | null;
+  blowsLastMeter?: number | null;
+  redriven?: boolean;
+  headCutOff?: boolean;
+  planDeviationMm?: number | null;
+  tiltPercent?: number | null;
+  dropHeightM?: number | null;
+  mediaIds?: string[];
+  note?: string;
+}
+
 export type ProductionEntry =
   | {kind: 'PILES'; pileGradeId: string; count: number; comment?: string}
+  /**
+   * Одна свая с паспортом.
+   *
+   * ПОЧЕМУ ЭТО РАЗНОВИДНОСТЬ ВЫРАБОТКИ, А НЕ ОТДЕЛЬНАЯ КОМАНДА. Забитая свая
+   * есть забитая свая: она подчиняется тем же правилам, что и пачка, — ветер
+   * выше 15 м/с запрещает, чек-лист ТБ по забивке обязателен, ключ команды
+   * защищает от двойной записи при обрыве, очередь на устройстве откладывает
+   * до связи. Отдельная команда означала бы второй набор тех же правил, и
+   * первое же расхождение дало бы сваю, записанную в грозу.
+   */
+  | {kind: 'PILE_PASSPORT'; pileGradeId: string; passport: PilePassportEntry}
   | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
   | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
 
@@ -860,7 +893,7 @@ export async function logProduction(input: {
     // Чек-лист ТБ — пропуск к работе этого вида, а не бумажка «на потом».
     // Он спрашивается один раз за смену перед первой записью: забивка и
     // бурение опасны по-разному, и общий инструктаж эти различия стирает.
-    const requiredSafety = input.entry.kind === 'PILES'
+    const requiredSafety = input.entry.kind === 'PILES' || input.entry.kind === 'PILE_PASSPORT'
       ? 'TB_PILING'
       : input.entry.kind === 'DRILLING' ? 'TB_DRILLING' : null;
     if (requiredSafety) {
@@ -907,6 +940,67 @@ export async function logProduction(input: {
           count: entry.count,
           comment: entry.comment ?? null,
           occurredAt: now,
+        },
+      });
+    } else if (entry.kind === 'PILE_PASSPORT') {
+      const problems = validatePassport({
+        pileNumber: entry.passport.pileNumber,
+        refusalSetPenetrationMm: entry.passport.refusalSetPenetrationMm ?? null,
+        refusalSetBlows: entry.passport.refusalSetBlows ?? null,
+      });
+      if (problems.length > 0) {
+        throw new OperatorCommandError(400, 'Паспорт заполнен не полностью', problems);
+      }
+
+      // Молот снимаем с карточки установки: позднейшая замена молота не должна
+      // переписывать журнал уже забитых свай.
+      const equipment = await tx.equipment.findFirst({
+        where: {tenantId: input.tenantId, id: shift.equipmentId},
+        select: {hammerType: true, hammerEnergyKj: true},
+      });
+
+      const work = await tx.pileWork.create({
+        data: {
+          reportId,
+          tenantId: input.tenantId,
+          shiftId: input.shiftId,
+          clientCommandId: input.clientCommandId,
+          pileGradeId: entry.pileGradeId,
+          // Одна свая — одна запись. Учёт, планы и погонные метры считают по
+          // этой строке ровно как по пачке и о паспорте ничего не знают.
+          count: 1,
+          picketId: entry.passport.picketId ?? null,
+          depth: entry.passport.drivenDepthM ?? null,
+          occurredAt: now,
+        },
+        select: {id: true},
+      });
+
+      await tx.pilePassport.create({
+        data: {
+          tenantId: input.tenantId,
+          pileWorkId: work.id,
+          clientCommandId: input.clientCommandId,
+          pileNumber: entry.passport.pileNumber.trim(),
+          designHeadLevelM: entry.passport.designHeadLevelM ?? null,
+          actualHeadLevelM: entry.passport.actualHeadLevelM ?? null,
+          drivenDepthM: entry.passport.drivenDepthM ?? null,
+          refusalSetPenetrationMm: entry.passport.refusalSetPenetrationMm ?? null,
+          refusalSetBlows: entry.passport.refusalSetBlows ?? null,
+          designRefusalMm: entry.passport.designRefusalMm ?? null,
+          totalBlows: entry.passport.totalBlows ?? null,
+          blowsLastMeter: entry.passport.blowsLastMeter ?? null,
+          redriven: entry.passport.redriven ?? false,
+          headCutOff: entry.passport.headCutOff ?? false,
+          planDeviationMm: entry.passport.planDeviationMm ?? null,
+          tiltPercent: entry.passport.tiltPercent ?? null,
+          hammerType: equipment?.hammerType ?? null,
+          hammerEnergyKj: equipment?.hammerEnergyKj ?? null,
+          dropHeightM: entry.passport.dropHeightM ?? null,
+          mediaIds: (entry.passport.mediaIds ?? []) as Prisma.InputJsonValue,
+          note: entry.passport.note?.trim() || null,
+          drivenAt: now,
+          recordedById: input.operatorId,
         },
       });
     } else if (entry.kind === 'DRILLING') {
@@ -1114,10 +1208,12 @@ export async function correctProduction(input: {
 
 /** Повтор команды при обрыве сети: поправка уже записана — вернём её. */
 async function findByCommand(
-  tx: Tx, tenantId: string, kind: 'PILES' | 'DRILLING' | 'DOWNTIME', clientCommandId: string,
+  tx: Tx, tenantId: string, kind: ProductionEntry['kind'], clientCommandId: string,
 ): Promise<string | null> {
   const where = {tenantId_clientCommandId: {tenantId, clientCommandId}};
-  const row = kind === 'PILES'
+  // Паспорт лежит в PileWork той же строкой, что и пачка: свая с паспортом —
+  // это запись выработки на одну сваю.
+  const row = kind === 'PILES' || kind === 'PILE_PASSPORT'
     ? await tx.pileWork.findUnique({where, select: {id: true}})
     : kind === 'DRILLING'
       ? await tx.leaderDrilling.findUnique({where, select: {id: true}})

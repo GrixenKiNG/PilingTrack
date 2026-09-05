@@ -1923,12 +1923,95 @@ model PileWork {
   report    Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
   picket    Picket?   @relation(fields: [picketId], references: [id])
   pileGrade PileGrade @relation(fields: [pileGradeId], references: [id], onDelete: Restrict)
+  passport  PilePassport?
 
   @@index([reportId])
   @@index([picketId])
   @@index([pileGradeId])
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, shiftId, occurredAt])
+}
+
+// ============================================================
+// PILE PASSPORT — паспорт сваи (журнал забивки)
+// ============================================================
+
+/// Паспорт забитой сваи: то, чем доказывают несущую способность.
+///
+/// ПОЧЕМУ ОТДЕЛЬНАЯ ТАБЛИЦА, А НЕ ПОЛЯ В PileWork. PileWork — учётная запись:
+/// «столько-то свай такой-то марки». По ней считают планы, погонные метры,
+/// проекции и КПИ. Паспорт — исполнительный документ на ОДНУ сваю. Связь
+/// один-к-одному с записью на одну сваю (count = 1) оставляет весь учёт
+/// нетронутым и не заставляет заполнять паспорт там, где выработку добирают
+/// пачкой задним числом.
+///
+/// ЧЕГО ЗДЕСЬ НЕТ И ПОЧЕМУ. Марка сваи, пикет, смена и отчёт лежат в PileWork,
+/// к которой паспорт привязан. Копировать их сюда значило бы завести второй
+/// источник правды об одной и той же свае. Бетон и армирование не пишем вовсе:
+/// сваи забивные, заводские, и то и другое — свойство марки, а не работы.
+///
+/// ОТКАЗ НЕ ХРАНИТСЯ. Его меряют залогом — погружением за серию ударов, — и
+/// хранятся именно замеры. Отказ считает домен делением одного на другое: два
+/// хранимых числа и одно выведенное не могут разойтись, а три хранимых могут.
+model PilePassport {
+  id       String @id @default(cuid())
+  tenantId String
+  /// Запись выработки на эту сваю. Одна свая — одна запись с count = 1.
+  pileWorkId String @unique
+  /// Ключ команды с телефона: повтор при обрыве не заводит второй паспорт.
+  clientCommandId String
+
+  /// Номер сваи по проекту: «С-130». Уникальность не навязываем в базе —
+  /// добивку той же сваи пишут отдельной записью, а совпадения номеров между
+  /// полями объекта законны. Дубль показываем машинисту, решает человек.
+  pileNumber String
+
+  // --- Отметки и глубина, метры. Отметка головы бывает отрицательной. ---
+  designHeadLevelM Float?
+  actualHeadLevelM Float?
+  drivenDepthM     Float?
+
+  // --- Отказ: замеры залога ---
+  /// Погружение за залог, мм.
+  refusalSetPenetrationMm Float?
+  /// Сколько ударов в залоге (обычно 10).
+  refusalSetBlows Int?
+  /// Проектный (расчётный) отказ, мм/удар — с ним сравнивают фактический.
+  designRefusalMm Float?
+
+  // --- Ударная работа ---
+  totalBlows     Int?
+  blowsLastMeter Int?
+  /// Добивка: сваю добивали после перерыва («отдыха» грунта).
+  redriven Boolean @default(false)
+  /// Голова сваи срублена под проектную отметку.
+  headCutOff Boolean @default(false)
+
+  // --- Отклонения от проекта ---
+  planDeviationMm Float?
+  tiltPercent     Float?
+
+  // --- Снимок молота на момент забивки ---
+  /// Копия из карточки установки: позднейшая замена молота не должна
+  /// переписывать журнал уже забитых свай.
+  hammerType     String?
+  hammerEnergyKj Float?
+  /// Высота падения, м — её машинист меняет по ходу, поэтому спрашиваем.
+  dropHeightM Float?
+
+  mediaIds Json    @default("[]")
+  note     String? @db.Text
+
+  drivenAt     DateTime @db.Timestamptz(3)
+  recordedById String
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  pileWork PileWork @relation(fields: [pileWorkId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, clientCommandId])
+  @@index([tenantId, pileNumber])
+  @@index([tenantId, drivenAt])
 }
 
 // ============================================================

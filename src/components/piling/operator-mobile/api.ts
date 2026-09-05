@@ -51,8 +51,29 @@ export async function fetchState(input: {
   return parse<OperatorMobileState>(response);
 }
 
+export interface PilePassportInput {
+  pileNumber: string;
+  picketId?: string;
+  designHeadLevelM?: number | null;
+  actualHeadLevelM?: number | null;
+  drivenDepthM?: number | null;
+  refusalSetPenetrationMm?: number | null;
+  refusalSetBlows?: number | null;
+  designRefusalMm?: number | null;
+  totalBlows?: number | null;
+  blowsLastMeter?: number | null;
+  redriven?: boolean;
+  headCutOff?: boolean;
+  planDeviationMm?: number | null;
+  tiltPercent?: number | null;
+  dropHeightM?: number | null;
+  mediaIds?: string[];
+  note?: string;
+}
+
 export type ProductionEntryInput =
   | {kind: 'PILES'; pileGradeId: string; count: number; comment?: string}
+  | {kind: 'PILE_PASSPORT'; pileGradeId: string; passport: PilePassportInput}
   | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
   | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
 
