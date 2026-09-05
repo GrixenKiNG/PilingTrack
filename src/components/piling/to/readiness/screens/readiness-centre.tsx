@@ -453,12 +453,40 @@ export function ReadinessCentre(props: ReferenceUiProps) {
     openMaintenanceCount,
     props.rulesState.publishedInDb,
   );
+  /*
+    ДОПУСК И ХОД ПРОЦЕДУРЫ — РАЗНЫЕ УТВЕРЖДЕНИЯ.
+
+    «Готова к работе» — это вердикт по действующим правилам: ничто из
+    включённых условий пуск не запретило. Это НЕ значит, что процедура
+    пройдена. Рядом на экране стояли «Осмотр не завершён · 50%», «Приёмка не
+    подтверждена» и «Процесс остановился на шаге Осмотр» — и зелёная плашка
+    читалась как опровержение этих строк. На деле они верны все сразу:
+    правило «осмотр ниже 80%» в опубликованном наборе выключено, а условия
+    на неподтверждённую приёмку нет вовсе, поэтому незакрытые шаги вердикт
+    не ухудшают.
+
+    Считаем незакрытые шаги из того же снимка, что и вердикт, — цепочка и
+    плашка приходят из одних фактов, расхождения во времени между ними нет.
+  */
+  const startAllowed = presentation.outcome === 'READY' || presentation.outcome === 'READY_WITH_WARNING';
+  /*
+    ОДНО СЛЕДУЮЩЕЕ ДЕЙСТВИЕ, А НЕ ДВА РАЗНЫХ.
+    В блоке «Следующее действие» стояло «Авторитетная оценка подтверждает
+    готовность к работе» — это вообще не действие, — а кнопка под ним вела
+    на осмотр. Пока критических замечаний нет, но в цепочке есть незакрытый
+    шаг, действие ровно одно: закрыть этот шаг. Есть блокер — он и есть
+    действие, его подпись перебивает всё остальное.
+  */
+  const pendingStages = presentation.stages.filter((stage) => stage.state !== 'pass');
+  const pendingSummary = pendingStages.map((stage) => `${stage.label} — ${stage.value.toLowerCase()}`).join('; ');
   const recommendation = blockers > 0
     ? 'Рекомендация: устранить критические замечания для допуска к работе.'
     : warnings > 0
       ? 'Рекомендация: закрыть замечания до начала смены.'
       : presentation.status === 'READY'
-        ? 'Рекомендация: установка допущена к работе.'
+        ? pendingStages.length > 0
+          ? `Рекомендация: пуск правилами не запрещён, но процедура не завершена — ${pendingSummary}.`
+          : 'Рекомендация: установка допущена к работе.'
         : 'Рекомендация: выполнить авторитетную оценку готовности.';
 
   return (
@@ -527,18 +555,40 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             <div className="min-w-0">
               <div className="text-sm font-bold">{presentation.title}</div>
               <div className="mt-0.5 text-2xs text-muted-foreground">
+                {/*
+                  «Готовность подтверждена на 66%» звучало как достоверность
+                  вывода. Это взвешенный балл по пяти критериям, и назвать
+                  его надо тем, что он есть.
+                */}
                 {presentation.score != null
-                  ? `Готовность подтверждена на ${presentation.score}%`
+                  ? `Балл готовности ${presentation.score} из 100`
                   : 'Авторитетной оценки ещё нет'}
               </div>
             </div>
           </div>
+          {/*
+            Оговорка стоит вплотную к вердикту, а не в цепочке ниже: именно
+            рядом зелёная плашка и читалась как «всё сделано».
+          */}
+          {startAllowed && pendingStages.length > 0 && (
+            <p className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-2xs leading-relaxed text-foreground">
+              <span className="font-semibold">Процедура не завершена:</span> {pendingSummary}.{' '}
+              <span className="text-muted-foreground">Действующие правила пуск этим не ограничивают — вердикт выше относится к запрету, а не к полноте процедуры.</span>
+            </p>
+          )}
           <div className="mt-3 rounded-lg border border-signal bg-signal/10 p-3">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="text-2xs text-muted-foreground">Следующее действие</div>
-                <div className="mt-2 font-bold">{presentation.nextAction}</div>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{props.authoritativeReadinessError ?? presentation.description}</p>
+                <div className="mt-2 font-bold">
+                  {blockers === 0 && nextStage ? `Завершить шаг «${nextStage.label}»` : presentation.nextAction}
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {props.authoritativeReadinessError
+                    ?? (blockers === 0 && nextStage
+                      ? `${nextStage.value}. Ход за: ${stageOwner ?? 'не назначен'}.`
+                      : presentation.description)}
+                </p>
               </div>
               <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-signal text-white">
                 <ClipboardCheck className="h-7 w-7" />
