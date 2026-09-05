@@ -66,6 +66,11 @@ function buildFleetMetricRows(
   detail: EquipmentDetailSnapshot | undefined,
 ): Array<{ key: string; icon: typeof FileText; label: string; value: string; tone?: 'danger'; href: string }> {
   const inspection = detail?.latestInspection ?? null;
+  // Карточка машины могла не загрузиться — отказом по правам или сбоем сети.
+  // Тогда мы не знаем о технике ничего, и говорить «осмотр не проводился»
+  // или «регламент не задан» нельзя: это утверждения об установке, а не о
+  // нашей осведомлённости. Пустой словарь деталей значит «нет данных».
+  const detailLoaded = detail != null;
   const nextAtHours = detail?.equipment?.nextMaintenanceAtHours;
   const hoursLeft = nextAtHours != null && equipment.engineHoursTotal != null
     ? Math.round(nextAtHours - equipment.engineHoursTotal)
@@ -77,9 +82,11 @@ function buildFleetMetricRows(
       key: 'inspection',
       icon: FileText,
       label: 'Осмотр',
-      value: !inspection
-        ? 'не проводился'
-        : inspection.itemsTotal === 0 ? 'пункты не заданы' : `${inspection.itemsAnswered} из ${inspection.itemsTotal}`,
+      value: !detailLoaded
+        ? 'нет данных'
+        : !inspection
+          ? 'не проводился'
+          : inspection.itemsTotal === 0 ? 'пункты не заданы' : `${inspection.itemsAnswered} из ${inspection.itemsTotal}`,
       href: inspection ? `/inspections/${inspection.id}` : '/inspections',
     },
     {
@@ -105,7 +112,7 @@ function buildFleetMetricRows(
       label: 'ТО через',
       value: hoursLeft != null
         ? hoursLeft > 0 ? `${hoursLeft.toLocaleString('ru-RU')} м/ч` : `перепробег ${Math.abs(hoursLeft).toLocaleString('ru-RU')} м/ч`
-        : 'регламент не задан',
+        : detailLoaded ? 'регламент не задан' : 'нет данных',
       href: `/admin/equipment/${equipment.id}`,
     },
   ];

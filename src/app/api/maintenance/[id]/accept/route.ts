@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
-import { assertCan } from '@/services/auth/authorization-service';
+import { assertCan, assertRole } from '@/services/auth/authorization-service';
 import { acceptMaintenance } from '@/modules/equipment';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
@@ -15,10 +15,11 @@ export const POST = withMutation(
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'maintenance.manage');
+    // Через assertRole, а не по user.role: проверка настоящей роли пропускала
+    // администратора в режиме «Действую как механик» — то есть ровно того, от
+    // кого приёмка и отделяет исполнителя работ.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    if (user!.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Принять может только администратор' }, { status: 403 });
-    }
+    assertRole(user!, 'ADMIN');
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);

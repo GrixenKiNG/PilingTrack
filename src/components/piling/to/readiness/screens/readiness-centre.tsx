@@ -240,11 +240,15 @@ function buildReadinessMetricTiles(
   const lastInspection = detail?.latestInspection ?? null;
   // Пункты, а не процент: доля из facts — это флаг «завершён / начат / нет»,
   // по ней нельзя сказать, сколько строк чек-листа реально заполнено.
-  const inspectionItems = !lastInspection
-    ? 'осмотра ещё не было'
-    : lastInspection.itemsTotal === 0
-      ? 'пункты не заданы'
-      : `${lastInspection.itemsAnswered} из ${lastInspection.itemsTotal}`;
+  // Пустая карточка машины — это незнание, а не факт о технике: деталь могла
+  // не загрузиться отказом по правам или сбоем сети.
+  const inspectionItems = !detail
+    ? 'нет данных'
+    : !lastInspection
+      ? 'осмотра ещё не было'
+      : lastInspection.itemsTotal === 0
+        ? 'пункты не заданы'
+        : `${lastInspection.itemsAnswered} из ${lastInspection.itemsTotal}`;
   const nextAtHours = detail?.equipment?.nextMaintenanceAtHours;
   const hoursLeft = nextAtHours != null && engineHoursTotal != null
     ? Math.round(nextAtHours - engineHoursTotal)
@@ -308,7 +312,7 @@ function buildReadinessMetricTiles(
           caption: 'Ближайшее ТО',
           value: hoursLeft != null
             ? hoursLeft > 0 ? `через ${hoursLeft.toLocaleString('ru-RU')} м/ч` : `перепробег ${Math.abs(hoursLeft).toLocaleString('ru-RU')} м/ч`
-            : 'регламент не задан',
+            : detail ? 'регламент не задан' : 'нет данных',
         },
         {
           caption: 'Плановое ТО',

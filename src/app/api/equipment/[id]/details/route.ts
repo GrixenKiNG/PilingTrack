@@ -22,10 +22,12 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
-    // The detail page is read-only admin/dispatcher tooling. Mutations stay
-    // protected by equipment.manage in their dedicated routes.
+    // Чтение карточки машины, а не диагностика системы: раньше здесь стояло
+    // system.read, взятое как синоним «админ или диспетчер», и механик не
+    // мог открыть установку, которую сам обслуживает. Изменения по-прежнему
+    // закрыты equipment.manage в своих маршрутах.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'system.read');
+    assertCan(user!, 'equipment.read');
 
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

@@ -84,6 +84,44 @@ describe('authorization-service', () => {
         expect(can({ role }, 'users.read')).toBe(true);
       }
     });
+
+    // Механик. Роль живёт сразу в двух системах: матрица готовности
+    // (`readiness/domain/capability-defaults.ts`) говорит, что он ведёт
+    // осмотры, наряды ТО, моточасы и дефекты, — а здесь у него не было ни
+    // одного права, и центр готовности отвечал ему 403 по бригадам,
+    // обслуживанию, шаблонам осмотра и карточке установки. Экран показывал
+    // отказ как «осмотра ещё не было»: недоступность первоисточника
+    // превращалась в утверждение о технике. Права ниже — не расширение, а
+    // приведение второй системы к тому, что первая уже разрешила.
+    it('gives MECHANIC the abilities its readiness capabilities already imply', () => {
+      expect(can({ role: 'MECHANIC' }, 'maintenance.manage')).toBe(true);
+      expect(can({ role: 'MECHANIC' }, 'inspection.perform')).toBe(true);
+      expect(can({ role: 'MECHANIC' }, 'meter.record')).toBe(true);
+      expect(can({ role: 'MECHANIC' }, 'crews.read')).toBe(true);
+      expect(can({ role: 'MECHANIC' }, 'equipment.read')).toBe(true);
+    });
+
+    // Граница роли: механик обслуживает технику, а не распоряжается
+    // предприятием. Всё, что заводит, удаляет и назначает, остаётся закрытым.
+    it('keeps MECHANIC out of everything that manages the business', () => {
+      for (const ability of [
+        'equipment.manage', 'crews.manage', 'users.read', 'users.manage',
+        'sites.manage', 'sites.assign_users', 'reports.export', 'system.read',
+      ] as const) {
+        expect(can({ role: 'MECHANIC' }, ability)).toBe(false);
+      }
+    });
+
+    // Читать карточку установки и распоряжаться парком — разные права.
+    // Раньше карточку закрывало system.read (диагностика системы), взятое как
+    // синоним «админ или диспетчер»; механику она из-за этого не открывалась.
+    it('separates reading an equipment card from managing the fleet', () => {
+      for (const role of ['ADMIN', 'DISPATCHER', 'MECHANIC'] as const) {
+        expect(can({ role }, 'equipment.read')).toBe(true);
+      }
+      expect(can({ role: 'DISPATCHER' }, 'equipment.manage')).toBe(false);
+      expect(can({ role: 'OPERATOR' }, 'equipment.read')).toBe(false);
+    });
   });
 
   describe('assertCan', () => {
