@@ -63,6 +63,7 @@ export interface PilePassportInput {
   totalBlows?: number | null;
   blowsLastMeter?: number | null;
   redriven?: boolean;
+  followerUsed?: boolean;
   headCutOff?: boolean;
   planDeviationMm?: number | null;
   tiltPercent?: number | null;

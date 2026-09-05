@@ -792,6 +792,7 @@ export interface PilePassportEntry {
   totalBlows?: number | null;
   blowsLastMeter?: number | null;
   redriven?: boolean;
+  followerUsed?: boolean;
   headCutOff?: boolean;
   planDeviationMm?: number | null;
   tiltPercent?: number | null;
@@ -943,10 +944,21 @@ export async function logProduction(input: {
         },
       });
     } else if (entry.kind === 'PILE_PASSPORT') {
+      // Длину сваи берём из её марки — единственного источника длины в
+      // продукте (см. lib/pile-length). Она нужна правилу глубины: свая не
+      // уходит глубже собственной длины, кроме погружения добойником.
+      const grade = await tx.pileGrade.findFirst({
+        where: {id: entry.pileGradeId},
+        select: {lengthMm: true},
+      });
+
       const problems = validatePassport({
         pileNumber: entry.passport.pileNumber,
         refusalSetPenetrationMm: entry.passport.refusalSetPenetrationMm ?? null,
         refusalSetBlows: entry.passport.refusalSetBlows ?? null,
+        drivenDepthM: entry.passport.drivenDepthM ?? null,
+        pileLengthM: grade?.lengthMm != null ? grade.lengthMm / 1000 : null,
+        followerUsed: entry.passport.followerUsed ?? false,
       });
       if (problems.length > 0) {
         throw new OperatorCommandError(400, 'Паспорт заполнен не полностью', problems);
@@ -991,6 +1003,7 @@ export async function logProduction(input: {
           totalBlows: entry.passport.totalBlows ?? null,
           blowsLastMeter: entry.passport.blowsLastMeter ?? null,
           redriven: entry.passport.redriven ?? false,
+          followerUsed: entry.passport.followerUsed ?? false,
           headCutOff: entry.passport.headCutOff ?? false,
           planDeviationMm: entry.passport.planDeviationMm ?? null,
           tiltPercent: entry.passport.tiltPercent ?? null,

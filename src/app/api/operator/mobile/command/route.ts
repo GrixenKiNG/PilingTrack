@@ -83,6 +83,7 @@ const commandSchema = z.discriminatedUnion('command', [
           totalBlows: z.number().int().min(0).max(100_000).nullish(),
           blowsLastMeter: z.number().int().min(0).max(100_000).nullish(),
           redriven: z.boolean().optional(),
+          followerUsed: z.boolean().optional(),
           headCutOff: z.boolean().optional(),
           planDeviationMm: z.number().min(0).max(10_000).nullish(),
           tiltPercent: z.number().min(0).max(100).nullish(),

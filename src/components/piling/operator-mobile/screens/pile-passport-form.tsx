@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {
-  actualRefusalMm, DEFAULT_SET_BLOWS, refusalExceedsDesign,
+  actualRefusalMm, DEFAULT_SET_BLOWS, refusalExceedsDesign, validatePassport,
 } from '@/modules/operator-mobile/domain/pile-passport';
 import type {PilePassportInput} from '../api';
 import {BigButton, Panel, PanelTitle} from '../ui';
@@ -95,6 +95,7 @@ export function PilePassportForm({grades, busy, onSubmit}: {
   const [tilt, setTilt] = useState('');
   const [dropHeight, setDropHeight] = useState('');
   const [redriven, setRedriven] = useState(false);
+  const [followerUsed, setFollowerUsed] = useState(false);
   const [headCutOff, setHeadCutOff] = useState(false);
   const [note, setNote] = useState('');
 
@@ -103,7 +104,19 @@ export function PilePassportForm({grades, busy, onSubmit}: {
   const refusal = actualRefusalMm({penetrationMm: num(penetration), blows: num(blows)});
   const exceeds = refusalExceedsDesign({actual: refusal, design: num(designRefusal)});
 
-  const ready = Boolean(pileGradeId) && pileNumber.trim().length > 0;
+  // Глубину сверяем с длиной сваи из марки — тем же правилом, что и сервер:
+  // экран должен предупредить до отправки, а не показать отказ после.
+  const pileLengthM = grades.find((grade) => grade.id === pileGradeId)?.lengthMm;
+  const depthProblem = validatePassport({
+    pileNumber: pileNumber || 'x',
+    refusalSetPenetrationMm: null,
+    refusalSetBlows: null,
+    drivenDepthM: num(depth),
+    pileLengthM: pileLengthM != null ? pileLengthM / 1000 : null,
+    followerUsed,
+  }).find((problem) => problem.field === 'drivenDepthM');
+
+  const ready = Boolean(pileGradeId) && pileNumber.trim().length > 0 && !depthProblem;
 
   const submit = async () => {
     if (!ready) return;
@@ -121,6 +134,7 @@ export function PilePassportForm({grades, busy, onSubmit}: {
       tiltPercent: num(tilt),
       dropHeightM: num(dropHeight),
       redriven,
+      followerUsed,
       headCutOff,
       note: note.trim() || undefined,
     });
@@ -138,6 +152,7 @@ export function PilePassportForm({grades, busy, onSubmit}: {
     setPlanDeviation('');
     setTilt('');
     setRedriven(false);
+    setFollowerUsed(false);
     setHeadCutOff(false);
     setNote('');
   };
@@ -177,6 +192,11 @@ export function PilePassportForm({grades, busy, onSubmit}: {
         <div className="mt-3">
           <Num label="Глубина погружения" unit="м" value={depth} onChange={setDepth} step="0.01" />
         </div>
+        {depthProblem ? (
+          <p className="mt-2 rounded-md bg-warning/15 px-3 py-2 text-sm font-semibold text-warning-strong">
+            {depthProblem.message}
+          </p>
+        ) : null}
       </Panel>
 
       <Panel tone={exceeds === true ? 'warning' : 'plain'}>
@@ -231,6 +251,11 @@ export function PilePassportForm({grades, busy, onSubmit}: {
 
       <div className="grid grid-cols-1 gap-2">
         <Check label="Добивка после отдыха грунта" checked={redriven} onChange={setRedriven} />
+        <Check
+          label="Погружение добойником (голова ниже грунта)"
+          checked={followerUsed}
+          onChange={setFollowerUsed}
+        />
         <Check label="Голова срублена под проектную отметку" checked={headCutOff} onChange={setHeadCutOff} />
       </div>
 

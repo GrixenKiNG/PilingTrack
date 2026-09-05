@@ -3,6 +3,7 @@ import {getChecklist} from '../checklist-catalog';
 import {collectDefectDrafts, validateChecklistRun} from '../checklist-run';
 import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
 import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
+import {actualRefusalMm, validatePassport} from '../pile-passport';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
 import {derivePhase, missingPrerequisites} from '../shift-phases';
@@ -358,5 +359,29 @@ describe('запреты, которые обязан держать серве�
     ]);
     expect(missingPrerequisites('SITE_READY', ['PRESHIFT_INSPECTION'])).toEqual(['EO_BEFORE']);
     expect(missingPrerequisites('PRESHIFT_INSPECTION', [])).toEqual([]);
+  });
+
+  /*
+    Свая не уходит глубже собственной длины — ей нечем. Исключение одно:
+    добойник уводит голову ниже уровня грунта, и тогда остриё оказывается
+    глубже. Без него такая глубина — описка в замере.
+  */
+  it('глубже длины сваи можно только добойником', () => {
+    const base = {pileNumber: 'С-130', refusalSetPenetrationMm: null, refusalSetBlows: null};
+    const tooDeep = {...base, drivenDepthM: 11.5, pileLengthM: 10};
+
+    expect(validatePassport(tooDeep).map((problem) => problem.field)).toContain('drivenDepthM');
+    expect(validatePassport({...tooDeep, followerUsed: true})).toEqual([]);
+    expect(validatePassport({...base, drivenDepthM: 9.8, pileLengthM: 10})).toEqual([]);
+    // Длина марки не заведена — сверять не с чем, выдуманный отказ хуже молчания.
+    expect(validatePassport({...base, drivenDepthM: 99, pileLengthM: null})).toEqual([]);
+  });
+
+  it('отказ считается по залогу, а половина замера отвергается', () => {
+    expect(actualRefusalMm({penetrationMm: 18, blows: 10})).toBe(1.8);
+    expect(actualRefusalMm({penetrationMm: 18, blows: null})).toBeNull();
+    expect(validatePassport({
+      pileNumber: 'С-130', refusalSetPenetrationMm: 18, refusalSetBlows: null,
+    }).map((problem) => problem.field)).toContain('refusalSetBlows');
   });
 });

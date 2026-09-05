@@ -77,6 +77,11 @@ export function validatePassport(input: {
   pileNumber: string;
   refusalSetPenetrationMm: number | null;
   refusalSetBlows: number | null;
+  drivenDepthM?: number | null;
+  /** Длина сваи из её марки, м. Неизвестна — глубину не с чем сверять. */
+  pileLengthM?: number | null;
+  /** Погружали добойником: голова ушла ниже уровня грунта. */
+  followerUsed?: boolean;
 }): PassportProblem[] {
   const problems: PassportProblem[] = [];
 
@@ -90,6 +95,30 @@ export function validatePassport(input: {
     problems.push({
       field: hasPenetration ? 'refusalSetBlows' : 'refusalSetPenetrationMm',
       message: 'Отказ считается по залогу: нужны и погружение, и число ударов',
+    });
+  }
+
+  // Свая не уходит глубже собственной длины — ей нечем.
+  //
+  // Исключение одно: погружение добойником. Инструмент уводит голову ниже
+  // уровня грунта, и тогда остриё оказывается глубже, чем длина сваи от
+  // поверхности. Без добойника такая глубина — описка в замере, и поймать её
+  // здесь дешевле, чем объяснять на приёмке.
+  //
+  // Длина берётся из марки (`PileGrade.lengthMm`) — единственного источника
+  // длины в продукте. Не задана — сверять не с чем, и молчим: выдуманный
+  // отказ хуже пропущенной описки.
+  if (
+    !input.followerUsed
+    && input.drivenDepthM != null
+    && input.pileLengthM != null
+    && input.pileLengthM > 0
+    && input.drivenDepthM > input.pileLengthM
+  ) {
+    problems.push({
+      field: 'drivenDepthM',
+      message: `Глубина ${input.drivenDepthM} м больше длины сваи ${input.pileLengthM} м. `
+        + 'Так бывает только при погружении добойником — отметьте его или поправьте замер',
     });
   }
 

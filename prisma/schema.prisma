@@ -1984,6 +1984,9 @@ model PilePassport {
   blowsLastMeter Int?
   /// Добивка: сваю добивали после перерыва («отдыха» грунта).
   redriven Boolean @default(false)
+  /// Погружение добойником — голову увели ниже уровня грунта инструментом.
+  /// Единственный случай, когда глубина погружения законно больше длины сваи.
+  followerUsed Boolean @default(false)
   /// Голова сваи срублена под проектную отметку.
   headCutOff Boolean @default(false)
 

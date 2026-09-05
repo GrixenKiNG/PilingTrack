@@ -3,6 +3,7 @@
 import {useState} from 'react';
 import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
+import {SELECTABLE_SHIFT_TYPES} from '@/modules/reports/domain/shift-types';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 
@@ -156,24 +157,31 @@ export function AdmissionScreen({state, onAccept, onSelectEquipment, busy, error
         )}
       </Panel>
 
-      <div className="space-y-2">
-        <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Смена</h2>
-        <div className="flex gap-2 rounded-lg bg-secondary p-1">
-          {(['DAY', 'NIGHT'] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setShiftType(type)}
-              className={cn(
-                'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
-                shiftType === type ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
-              )}
-            >
-              {type === 'DAY' ? 'Дневная' : 'Ночная'}
-            </button>
-          ))}
+      {/*
+        Выбор смены показываем, только когда их больше одной. Кнопка с
+        единственным вариантом ничего не решает, а место на телефоне занимает.
+        Вернуть ночную — в SELECTABLE_SHIFT_TYPES.
+      */}
+      {SELECTABLE_SHIFT_TYPES.length > 1 ? (
+        <div className="space-y-2">
+          <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Смена</h2>
+          <div className="flex gap-2 rounded-lg bg-secondary p-1">
+            {SELECTABLE_SHIFT_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setShiftType(type)}
+                className={cn(
+                  'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
+                  shiftType === type ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
+                )}
+              >
+                {type === 'DAY' ? 'Дневная' : 'Ночная'}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <ErrorNote message={error} />
     </Screen>
