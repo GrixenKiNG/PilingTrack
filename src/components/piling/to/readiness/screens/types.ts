@@ -81,6 +81,13 @@ export interface ReferenceUiProps {
   loading: boolean;
   workspaceError: string | null;
   workspaceIssues: Array<{ source: string; message: string }>;
+  /**
+   * Разделы, закрытые ролью, а не сбоем. Отдельно от workspaceIssues: там
+   * «временно недоступно, повторите», здесь повтор бессмысленен — роли это
+   * просто не положено. Пустой раздел без такой подписи читался бы как
+   * утверждение, что данных нет.
+   */
+  outOfRoleSources: string[];
   rulesAvailable: boolean;
   bootstrap: ReadinessBootstrap | null;
   shifts: ReadinessShiftDto[];

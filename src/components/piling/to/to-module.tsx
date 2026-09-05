@@ -55,6 +55,10 @@ import {
 import { buildAuthoritativeReadinessPresentation } from './readiness/authoritative-presentation';
 import type { EquipmentOption } from './to-module-bits';
 import type { JournalRecord } from './to-stats';
+// Та же матрица прав, по которой откажет сервер. Модуль чистый — ни базы,
+// ни серверных зависимостей, — поэтому безопасен в клиентской сборке.
+import { can } from '@/services/auth/authorization-service';
+import { resolveEffectiveRole } from '@/lib/types';
 
 // Список обязан совпадать с MODULE_TABS: он сторожит ?view= в адресе, и
 // пропущенное здесь значение выглядит как «такой вкладки нет» — переход по
@@ -232,6 +236,9 @@ export function ToModule() {
   const [loading, setLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [workspaceIssues, setWorkspaceIssues] = useState<WorkspaceIssue[]>([]);
+  // Источники, закрытые ролью, а не сбоем: показывать их ни пустотой, ни
+  // строкой «временно недоступно» с кнопкой повтора нельзя — повтор не поможет.
+  const [outOfRoleSources, setOutOfRoleSources] = useState<string[]>([]);
   const [rulesAvailable, setRulesAvailable] = useState(false);
   const [shifts, setShifts] = useState<ReadinessShiftDto[]>([]);
   const [permits, setPermits] = useState<WorkPermitDto[]>([]);
@@ -265,6 +272,7 @@ export function ToModule() {
     setBootstrapError(null);
     setWorkspaceError(null);
     setWorkspaceIssues([]);
+    setOutOfRoleSources([]);
     setAuthoritativeReadinessError(null);
     setRulesAvailable(false);
     try {
@@ -274,7 +282,27 @@ export function ToModule() {
       }
       if (controller.signal.aborted) return;
       setBootstrap(readinessBootstrap);
-      const canReadLegacyAdminData = readinessBootstrap.actor.role !== 'OPERATOR';
+      // Спрашиваем только то, что роли положено. Раньше здесь стоял один
+      // признак «не оператор», и мастер, которому наряды ТО не положены по
+      // матрице готовности, всё равно запрашивал обслуживание, журнал и
+      // карточку установки — получал три 403 на ровном месте, а экран выдавал
+      // этот отказ за отсутствие данных о технике. Матрица здесь та же, по
+      // которой откажет сервер, поэтому спрашивать «а вдруг пустят» не нужно.
+      const actor = readinessBootstrap.actor;
+      const canReadCrews = can(actor, 'crews.read');
+      const canReadMaintenance = can(actor, 'maintenance.manage');
+      const canReadEquipmentCard = can(actor, 'equipment.read');
+      // Данные по всему парку: рабочее место машиниста их не показывает и
+      // берёт свою установку из самого контура. Это выбор экрана, не запрет.
+      // По ИСПОЛНЯЕМОЙ роли, как и права рядом: администратор в режиме
+      // «Действую как машинист» должен видеть экран машиниста — иначе режим
+      // показывает не то, что увидит человек, ради которого его включили.
+      const usesParkWideData = resolveEffectiveRole(actor.role, actor.actingAs) !== 'OPERATOR';
+      setOutOfRoleSources(usesParkWideData ? [
+        ...(canReadCrews ? [] : ['Бригады']),
+        ...(canReadMaintenance ? [] : ['Обслуживание и журнал ТО']),
+        ...(canReadEquipmentCard ? [] : ['Карточка установки']),
+      ] : []);
       const [
         equipmentResponse,
         crewResult,
@@ -288,18 +316,18 @@ export function ToModule() {
         historyResult,
         auditResult,
       ] = await Promise.all([
-        canReadLegacyAdminData ? authFetch('/api/equipment?limit=100') : Promise.resolve(null),
-        canReadLegacyAdminData ? readOptionalCollectionWithIssue<CrewSummary>(
+        usesParkWideData ? authFetch('/api/equipment?limit=100') : Promise.resolve(null),
+        usesParkWideData && canReadCrews ? readOptionalCollectionWithIssue<CrewSummary>(
           '/api/crews?limit=100',
           'data',
           'Бригады',
         ) : Promise.resolve({ data: [] as CrewSummary[], issue: null }),
-        canReadLegacyAdminData ? readOptionalCollectionWithIssue<MaintenanceSummary>(
+        usesParkWideData && canReadMaintenance ? readOptionalCollectionWithIssue<MaintenanceSummary>(
           '/api/maintenance',
           'records',
           'Обслуживание',
         ) : Promise.resolve({ data: [] as MaintenanceSummary[], issue: null }),
-        canReadLegacyAdminData ? readOptionalJsonWithIssue<FleetSnapshot>(
+        usesParkWideData ? readOptionalJsonWithIssue<FleetSnapshot>(
           '/api/monitoring/fleet',
           'Мониторинг парка',
         ) : Promise.resolve({ data: null, issue: null }),
@@ -378,19 +406,20 @@ export function ToModule() {
         return;
       }
 
-      const [primaryJournal, primaryDetail] = canReadLegacyAdminData ? await Promise.all([
-        readOptionalJsonWithIssue<{ records?: JournalRecord[] }>(
-          `/api/to/journal?equipmentId=${encodeURIComponent(primaryEquipment.id)}`,
-          `Журнал «${primaryEquipment.name}»`,
-        ),
-        readOptionalJsonWithIssue<EquipmentDetailSnapshot>(
-          `/api/equipment/${encodeURIComponent(primaryEquipment.id)}/details`,
-          `Карточка «${primaryEquipment.name}»`,
-        ),
-      ]) : [
-        { data: null, issue: null },
-        { data: null, issue: null },
-      ];
+      const [primaryJournal, primaryDetail] = await Promise.all([
+        usesParkWideData && canReadMaintenance
+          ? readOptionalJsonWithIssue<{ records?: JournalRecord[] }>(
+              `/api/to/journal?equipmentId=${encodeURIComponent(primaryEquipment.id)}`,
+              `Журнал «${primaryEquipment.name}»`,
+            )
+          : Promise.resolve({ data: null, issue: null }),
+        usesParkWideData && canReadEquipmentCard
+          ? readOptionalJsonWithIssue<EquipmentDetailSnapshot>(
+              `/api/equipment/${encodeURIComponent(primaryEquipment.id)}/details`,
+              `Карточка «${primaryEquipment.name}»`,
+            )
+          : Promise.resolve({ data: null, issue: null }),
+      ]);
       const primaryIssues = [primaryJournal.issue, primaryDetail.issue]
         .filter((issue): issue is WorkspaceIssue => issue !== null);
       if (primaryIssues.length > 0) {
@@ -441,12 +470,24 @@ export function ToModule() {
     return () => workspaceRequest.current?.abort();
   }, [loadWorkspace]);
 
+  // Догрузка журнала и карточки при выборе установки. Права те же, что и при
+  // первой загрузке: без них экран снова спрашивал бы у мастера то, что ему
+  // не положено, и получал 403 — а пустой журнал читался бы как «записей нет».
   useEffect(() => {
-    if (!equipmentId || bootstrap?.actor.role === 'OPERATOR' || journalLoaded[equipmentId] || details[equipmentId]) return;
+    const actor = bootstrap?.actor;
+    if (!equipmentId || !actor || journalLoaded[equipmentId] || details[equipmentId]) return;
+    if (resolveEffectiveRole(actor.role, actor.actingAs) === 'OPERATOR') return;
+    const mayReadJournal = can(actor, 'maintenance.manage');
+    const mayReadCard = can(actor, 'equipment.read');
+    if (!mayReadJournal && !mayReadCard) return;
     let active = true;
     void Promise.all([
-      readOptionalJson<{ records?: JournalRecord[] }>(`/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`),
-      readOptionalJson<EquipmentDetailSnapshot>(`/api/equipment/${encodeURIComponent(equipmentId)}/details`),
+      mayReadJournal
+        ? readOptionalJson<{ records?: JournalRecord[] }>(`/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`)
+        : Promise.resolve(null),
+      mayReadCard
+        ? readOptionalJson<EquipmentDetailSnapshot>(`/api/equipment/${encodeURIComponent(equipmentId)}/details`)
+        : Promise.resolve(null),
     ]).then(([journal, detail]) => {
       if (!active) return;
       setJournals((previous) => ({ ...previous, [equipmentId]: journal?.records ?? [] }));
@@ -454,7 +495,7 @@ export function ToModule() {
       if (detail) setDetails((previous) => ({ ...previous, [equipmentId]: detail }));
     });
     return () => { active = false; };
-  }, [bootstrap?.actor.role, details, equipmentId, journalLoaded]);
+  }, [bootstrap?.actor, details, equipmentId, journalLoaded]);
 
   const readinessByEquipment = useMemo(() => {
     // Карточка парка собирается из авторитетного снимка целиком.
@@ -602,6 +643,7 @@ export function ToModule() {
       loading={loading}
       workspaceError={workspaceError}
       workspaceIssues={workspaceIssues}
+      outOfRoleSources={outOfRoleSources}
       rulesAvailable={rulesAvailable}
       bootstrap={bootstrap}
       shifts={shifts}

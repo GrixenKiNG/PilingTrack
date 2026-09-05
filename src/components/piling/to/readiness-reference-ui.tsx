@@ -94,6 +94,16 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
             );
           })}
         </header>}
+        {props.outOfRoleSources.length > 0 && !fatalError && (
+          <p
+            role="note"
+            className="mx-2 mt-3 rounded-xl border border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground sm:mx-4"
+          >
+            Не входит в вашу роль:{' '}
+            <span className="font-medium text-foreground">{props.outOfRoleSources.join(', ')}</span>.
+            {' '}Эти разделы ведут другие сотрудники — здесь они не показаны.
+          </p>
+        )}
         {props.workspaceIssues.length > 0 && !fatalError && (
           <div
             role="status"
