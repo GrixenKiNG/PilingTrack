@@ -17,8 +17,12 @@ export const GET = withApi(
     const { user, error } = await requireAuth(request);
     if (error) return error;
 
+    // Чтение списка, а не распоряжение им: диспетчер, мастер и инженер ОТ
+    // обязаны видеть работников, чтобы закреплять их за объектом, допускать к
+    // работе и фильтровать отчёты по машинисту. Заводить и удалять — ниже, по
+    // users.manage, и только админ.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'users.manage');
+    assertCan(user!, 'users.read');
     const tenantId = user?.tenantId;
     if (!tenantId) {
       return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });

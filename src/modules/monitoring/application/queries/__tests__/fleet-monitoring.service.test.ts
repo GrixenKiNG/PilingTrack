@@ -20,8 +20,11 @@ const {
   reportFindMany: vi.fn(),
   analyticsFindMany: vi.fn(),
   mediaFindMany: vi.fn(),
-  shiftFindMany: vi.fn(() => Promise.resolve([])),
-  maintenanceFindMany: vi.fn(() => Promise.resolve([])),
+  // Форма задана явно: без неё реализация по умолчанию сужает тип до
+  // Promise<never[]>, и тест, подставляющий строку смены или наряда, не
+  // компилируется.
+  shiftFindMany: vi.fn((): Promise<Array<{ equipmentId: string }>> => Promise.resolve([])),
+  maintenanceFindMany: vi.fn((): Promise<Array<{ equipmentId: string }>> => Promise.resolve([])),
 }));
 
 vi.mock('@/lib/db', () => ({

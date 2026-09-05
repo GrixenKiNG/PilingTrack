@@ -71,6 +71,10 @@ export function WorkspaceSettings() {
   const [activeTab, setActiveTab] = useState<Tab>('workspace');
   const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
+  // Отказ доступа — не факт об организации. Раньше 403 на списке работников
+  // молча оставлял счётчики пустыми, и диспетчер видел «0 пользователей» во
+  // всех ролях: экран утверждал то, чего не проверял.
+  const [rosterState, setRosterState] = useState<'loading' | 'ready' | 'forbidden' | 'error'>('loading');
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [snapshot, setSnapshot] = useState<WorkspaceSettingsData | null>(null);
@@ -89,16 +93,25 @@ export function WorkspaceSettings() {
       for (let i = 0; i < 50; i++) {
         const url: string = `/api/users?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
         const res: Response | null = await authFetch(url).catch(() => null);
-        if (!res || !res.ok) break;
+        if (!res || !res.ok) {
+          if (active) setRosterState(res?.status === 403 ? 'forbidden' : 'error');
+          return;
+        }
         const body: { users?: Array<{ role: string }>; nextCursor?: string | null } = await res.json();
         for (const u of (body.users ?? [])) counts[u.role] = (counts[u.role] ?? 0) + 1;
         cursor = body.nextCursor ?? null;
         if (!cursor) break;
       }
-      if (active) setRoleCounts(counts);
+      if (active) { setRoleCounts(counts); setRosterState('ready'); }
     })();
     return () => { active = false; };
   }, []);
+
+  const roleCountLabel = (role: string): string => {
+    if (rosterState === 'ready') return String(roleCounts[role] ?? 0);
+    if (rosterState === 'loading') return '…';
+    return rosterState === 'forbidden' ? 'нет доступа' : 'не загрузилось';
+  };
 
   const save = useCallback(async (next: WorkspaceSettingsData) => {
     if (!isAdmin) return;
@@ -200,7 +213,7 @@ export function WorkspaceSettings() {
               {ROLE_ORDER.map((role) => (
                 <div key={role} className="flex items-center justify-between border-b border-border py-2.5 text-sm">
                   <span className="text-foreground">{ROLE_LABELS[role] ?? role}</span>
-                  <span className="font-medium text-foreground">{roleCounts[role] ?? 0}</span>
+                  <span className="font-medium text-foreground">{roleCountLabel(role)}</span>
                 </div>
               ))}
               <a href="/admin/users" className="mt-3 inline-block text-sm font-medium text-info-strong hover:underline">Все роли и права доступа →</a>
@@ -255,7 +268,7 @@ export function WorkspaceSettings() {
             {ROLE_ORDER.map((role) => (
               <div key={role} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
                 <span className="font-medium text-foreground">{ROLE_LABELS[role] ?? role}</span>
-                <span className="text-muted-foreground">{roleCounts[role] ?? 0}</span>
+                <span className="text-muted-foreground">{roleCountLabel(role)}</span>
               </div>
             ))}
             <Button variant="outline" className="w-full justify-start" asChild><a href="/admin/users"><ShieldCheck className="mr-2 h-4 w-4" />Управление ролями</a></Button>

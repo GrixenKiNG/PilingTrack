@@ -57,6 +57,33 @@ describe('authorization-service', () => {
       expect(can({ role: 'DISPATCHER' }, 'crews.manage')).toBe(true);
       expect(can({ role: 'OPERATOR' }, 'crews.manage')).toBe(false);
     });
+
+    // Читать список работников и распоряжаться им — разные права. Диспетчер
+    // закрепляет людей за объектом (`sites.assign_users`) и смотрит чужие
+    // отчёты; исполнить это, не видя списка людей, невозможно. Раньше список
+    // требовал `users.manage`, и диспетчеру приходил 403, а экран рисовал его
+    // как «0 пользователей». Заводить и удалять работников по-прежнему может
+    // только администратор — это и проверяет вторая половина теста.
+    it('separates reading the staff roster from managing it', () => {
+      expect(can({ role: 'ADMIN' }, 'users.read')).toBe(true);
+      expect(can({ role: 'DISPATCHER' }, 'users.read')).toBe(true);
+      expect(can({ role: 'FOREMAN' }, 'users.read')).toBe(true);
+      expect(can({ role: 'SAFETY_ENGINEER' }, 'users.read')).toBe(true);
+      expect(can({ role: 'OPERATOR' }, 'users.read')).toBe(false);
+      expect(can({ role: 'ASSISTANT' }, 'users.read')).toBe(false);
+
+      expect(can({ role: 'DISPATCHER' }, 'users.manage')).toBe(false);
+      expect(can({ role: 'FOREMAN' }, 'users.manage')).toBe(false);
+      expect(can({ role: 'SAFETY_ENGINEER' }, 'users.manage')).toBe(false);
+    });
+
+    // Кто закрепляет людей за объектом — обязан видеть список людей.
+    it('gives the roster to every role that can assign users to a site', () => {
+      for (const role of ['ADMIN', 'DISPATCHER'] as const) {
+        expect(can({ role }, 'sites.assign_users')).toBe(true);
+        expect(can({ role }, 'users.read')).toBe(true);
+      }
+    });
   });
 
   describe('assertCan', () => {

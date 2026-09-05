@@ -23,6 +23,7 @@ export type Ability =
   | 'sites.manage'
   | 'sites.assign_users'
   | 'sites.manage_hierarchy'
+  | 'users.read'
   | 'users.manage'
   | 'users.documents.read_all'
   | 'equipment.manage'
@@ -63,6 +64,13 @@ const abilityRoles: Record<Ability, Role[]> = {
   'sites.manage': ['ADMIN', 'DISPATCHER'],
   'sites.assign_users': ['ADMIN', 'DISPATCHER'],
   'sites.manage_hierarchy': ['ADMIN', 'DISPATCHER'],
+  // Список работников: читать и распоряжаться — разные права. Диспетчер
+  // закрепляет людей за объектом, мастер и инженер ОТ решают, кого допустить,
+  // и фильтруют отчёты по машинисту — всем троим нужен сам список. Пока чтение
+  // требовало users.manage, они получали 403, а экран показывал его как
+  // «0 пользователей»: отказ доступа выглядел как факт об организации.
+  // Заводить, менять и удалять работников по-прежнему может только админ.
+  'users.read': ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'],
   'users.manage': ['ADMIN'],
   // Документы работника (права на управление установкой, медосмотр, охрана
   // труда) видит не только кадровик: диспетчер обязан контролировать просрочку
