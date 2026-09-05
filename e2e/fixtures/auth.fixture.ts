@@ -1,6 +1,5 @@
 import { test as base } from '@playwright/test';
 import { LoginPage } from '../page-objects/login.page';
-import { DashboardPage } from '../page-objects/dashboard.page';
 
 /**
  * Test Users — predefined accounts for E2E testing.
@@ -33,14 +32,17 @@ export const TEST_USERS = {
  * Authenticated Test Context
  *
  * Provides pre-authenticated page instances with storage state.
+ *
+ * ВНИМАНИЕ. Здесь нет page object дашборда: он никогда не существовал в
+ * репозитории, но импортировался — и один такой импорт обнуляет сбор ВСЕХ
+ * тестов Playwright, а не только своего файла. Новые фикстуры добавлять
+ * только на существующие модули.
  */
 
 interface TestFixtures {
   loginPage: LoginPage;
-  dashboardPage: DashboardPage;
   authenticatedPage: {
     page: ReturnType<typeof base.page>;
-    dashboard: DashboardPage;
   };
 }
 
@@ -54,11 +56,6 @@ export const test = base.extend<TestFixtures>({
     await applyFixture(loginPage);
   },
 
-  dashboardPage: async ({ page }, applyFixture) => {
-    const dashboardPage = new DashboardPage(page);
-    await applyFixture(dashboardPage);
-  },
-
   authenticatedPage: async ({ page }, applyFixture) => {
     // Login before each test
     const user = TEST_USERS.operator;
@@ -68,8 +65,7 @@ export const test = base.extend<TestFixtures>({
     await page.getByRole('button', { name: /войти|login/i }).click();
     await page.waitForURL(/dashboard/, { timeout: 10000 });
 
-    const dashboard = new DashboardPage(page);
-    await applyFixture({ page, dashboard });
+    await applyFixture({ page });
   },
 });
 
