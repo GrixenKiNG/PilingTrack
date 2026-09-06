@@ -331,6 +331,8 @@ export async function createUserDocument(
   if (type.requiresExpiry && expiresAt == null) {
     throw new ServiceError(`Для документа «${type.name}» нужно указать срок действия`, 400);
   }
+  const issuedAt = toDate(input.issuedAt);
+  assertDocumentDatesOrdered(issuedAt, expiresAt);
 
   const created = await db.userDocument.create({
     data: {
@@ -338,7 +340,7 @@ export async function createUserDocument(
       userId: user.id,
       typeId: type.id,
       number: input.number?.trim() ?? '',
-      issuedAt: toDate(input.issuedAt),
+      issuedAt,
       expiresAt,
       notes: input.notes?.trim() ?? '',
       mediaId: input.mediaId || null,
@@ -380,10 +382,31 @@ function auditDocumentChange(
   });
 }
 
+/**
+ * Срок действия не может кончиться раньше, чем документ выдан.
+ *
+ * Проверки не было ни на одном из двух путей записи, и в базе оказывались
+ * документы с выдачей 06.09 и окончанием 01.09. Контроль просрочки считает
+ * такой документ давно недействительным, а человек видит свежую дату выдачи
+ * и не понимает, почему его не допускают.
+ *
+ * Равные даты допускаются: разрешение на один день — не ошибка.
+ */
+function assertDocumentDatesOrdered(issuedAt: Date | null, expiresAt: Date | null) {
+  if (issuedAt && expiresAt && expiresAt.getTime() < issuedAt.getTime()) {
+    throw new ServiceError(
+      'Дата окончания раньше даты выдачи — проверьте документ',
+      400,
+    );
+  }
+}
+
 async function requireOwnDocument(userId: string, documentId: string, tenantId: string) {
   const document = await db.userDocument.findFirst({
     where: { id: documentId, userId, tenantId },
-    select: { id: true, typeId: true },
+    // Даты нужны целиком: правка одной из них проверяется против второй,
+    // которая осталась в записи.
+    select: { id: true, typeId: true, issuedAt: true, expiresAt: true },
   });
   if (!document) throw new ServiceError('Документ не найден', 404);
   return document;
@@ -416,6 +439,12 @@ export async function updateUserDocument(
       throw new ServiceError(`Для документа «${type.name}» нужно указать срок действия`, 400);
     }
   }
+
+  // Сверяем итоговую пару, а не присланную: меняться может одна дата.
+  assertDocumentDatesOrdered(
+    input.issuedAt !== undefined ? (data.issuedAt as Date | null) : existing.issuedAt,
+    input.expiresAt !== undefined ? (data.expiresAt as Date | null) : existing.expiresAt,
+  );
 
   const updated = await db.userDocument.update({ where: { id: documentId }, data });
   await auditDocumentChange('updated', ctx, updated, userId);

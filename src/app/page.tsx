@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
+import { roleHomeRoute } from '@/lib/routes';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/services/auth/session-service';
 
 /**
@@ -20,13 +20,5 @@ export default async function Home() {
     redirect('/login');
   }
 
-  const role = payload.role;
-  if (role === 'ADMIN' || role === 'DISPATCHER' || role === 'FOREMAN') {
-    redirect('/admin');
-  }
-  if (role === 'MECHANIC' || role === 'SAFETY_ENGINEER') {
-    redirect('/admin/to');
-  }
-
-  redirect(OPERATOR_HOME_ROUTE);
+  redirect(roleHomeRoute(payload.role));
 }
