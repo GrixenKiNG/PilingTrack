@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals } from '@/components/piling/admin-reports/report-totals';
-import { computePeriodSummary } from '@/app/api/reports/period/route';
+import { computePeriodSummary } from '@/modules/reports/domain/period-summary';
 import { pileLengthMeters } from '@/lib/pile-length';
 
 // One logical report: 4 piles of a 30 m grade + 6 piles of a 12 m grade, no plan.

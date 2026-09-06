@@ -209,6 +209,45 @@ export async function startInspection(
 
 export interface AnswerInput { itemId: string; result: string; value?: string | null; note?: string | null; photoCount?: number }
 
+/**
+ * Сколько снимков реально приложено к пунктам осмотра.
+ *
+ * ПОЧЕМУ НЕ ВЕРИМ КЛИЕНТУ. `photoCount` приходил в теле запроса и
+ * записывался как есть, а завершение осмотра по нему решало, есть ли
+ * обязательное фото. Прямой запрос с `photoCount: 999` закрывал пункт с
+ * неисправностью, не приложив ни одного файла: доказательство существовало
+ * только как число, которое прислал тот, кого оно проверяет.
+ *
+ * Снимки лежат в Media с составным `entityId` вида `${inspectionId}__${itemId}`
+ * (см. `inspection-item-photos.tsx`), поэтому принадлежность пункту и осмотру
+ * проверяется самим ключом, а организация — строгим равенством.
+ * Незавершённые и удалённые загрузки не считаются: файла за ними нет.
+ */
+async function countInspectionPhotos(
+  tenantId: string,
+  inspectionId: string,
+  itemIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (itemIds.length === 0) return counts;
+  const rows = await db.media.groupBy({
+    by: ['entityId'],
+    where: {
+      tenantId,
+      entityType: 'inspection',
+      entityId: { in: itemIds.map((itemId) => `${inspectionId}__${itemId}`) },
+      isDeleted: false,
+      uploadStatus: 'completed',
+    },
+    _count: { _all: true },
+  });
+  for (const row of rows) {
+    const itemId = (row.entityId ?? '').slice(inspectionId.length + 2);
+    if (itemId) counts.set(itemId, row._count._all);
+  }
+  return counts;
+}
+
 export async function saveAnswers(
   id: string,
   answers: AnswerInput[],
@@ -225,10 +264,14 @@ export async function saveAnswers(
   if (ins.status === 'COMPLETED') throw new ServiceError('Осмотр уже завершён', 409);
   await db.inspectionAnswer.deleteMany({ where: { inspectionId: id } });
   if (answers.length) {
+    // Присланный photoCount игнорируем: в базу идёт число реально
+    // приложенных файлов.
+    const photos = await countInspectionPhotos(ctx.tenantId, id, answers.map((a) => a.itemId));
     await db.inspectionAnswer.createMany({
       data: answers.map((a) => ({
         tenantId: ctx.tenantId, inspectionId: id, itemId: a.itemId,
-        result: a.result, value: a.value ?? null, note: a.note ?? null, photoCount: a.photoCount ?? 0,
+        result: a.result, value: a.value ?? null, note: a.note ?? null,
+        photoCount: photos.get(a.itemId) ?? 0,
       })),
     });
   }
@@ -246,7 +289,13 @@ export async function completeInspection(
   if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Inspection not found', 404);
 
   const items = (ins.templateSnapshot as unknown as SnapItem[]) ?? [];
-  const answers: AnswerLike[] = ins.answers.map((a) => ({ itemId: a.itemId, result: a.result, photoCount: a.photoCount }));
+  // Пересчёт на завершении, а не доверие сохранённому: снимок могли
+  // приложить уже после сохранения ответов — и наоборот, удалить.
+  // Решение о допуске принимается по тому, что лежит в хранилище сейчас.
+  const photos = await countInspectionPhotos(ctx.tenantId, id, ins.answers.map((a) => a.itemId));
+  const answers: AnswerLike[] = ins.answers.map((a) => ({
+    itemId: a.itemId, result: a.result, photoCount: photos.get(a.itemId) ?? 0,
+  }));
   const { missingAnswers, missingPhotos, missingPhotosOnFault } = findMissing(items, answers);
   // Фото на ежесменном осмотре требуется там, где отмечена неисправность.
   //

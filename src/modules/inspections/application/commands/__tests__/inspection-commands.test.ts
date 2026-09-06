@@ -6,6 +6,8 @@ const m = vi.hoisted(() => ({
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
   crewFindFirst: vi.fn(),
+  // Снимки к пунктам осмотра считаются по Media, а не по числу из запроса.
+  mediaGroupBy: vi.fn(),
 }));
 vi.mock('@/lib/db', () => {
   const client = {
@@ -19,13 +21,18 @@ vi.mock('@/lib/db', () => {
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
     crew: { findFirst: m.crewFindFirst },
     outboxEvent: { createMany: m.outboxCreate },
+    media: { groupBy: m.mediaGroupBy },
     $transaction: (run: (tx: unknown) => unknown) => run(client),
   };
   return { db: client };
 });
 import { startInspection, startToInspection, saveAnswers, completeInspection } from '../inspection-commands';
 
-beforeEach(() => Object.values(m).forEach((fn) => fn.mockReset()));
+beforeEach(() => {
+  Object.values(m).forEach((fn) => fn.mockReset());
+  // По умолчанию снимков нет — их наличие тест задаёт явно там, где проверяет.
+  m.mediaGroupBy.mockResolvedValue([]);
+});
 
 describe('startInspection', () => {
   it('snapshots template items and writes tenant-scoped inspection', async () => {
@@ -111,10 +118,34 @@ describe('saveAnswers', () => {
     m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT' });
     m.ansDeleteMany.mockResolvedValue({ count: 0 });
     m.ansCreateMany.mockResolvedValue({ count: 1 });
-    await saveAnswers('ins1', [{ itemId: 'i1', result: 'OK', note: 'ok', photoCount: 2 }], { tenantId: 'orion' });
+    m.mediaGroupBy.mockResolvedValue([{ entityId: 'ins1__i1', _count: { _all: 2 } }]);
+    await saveAnswers('ins1', [{ itemId: 'i1', result: 'OK', note: 'ok' }], { tenantId: 'orion' });
     expect(m.ansDeleteMany.mock.calls[0][0]).toEqual({ where: { inspectionId: 'ins1' } });
     const rows = m.ansCreateMany.mock.calls[0][0].data;
     expect(rows[0]).toMatchObject({ tenantId: 'orion', inspectionId: 'ins1', itemId: 'i1', result: 'OK', photoCount: 2 });
+  });
+
+  /**
+   * Раньше `photoCount` приходил в теле запроса и записывался как есть, а
+   * завершение осмотра по нему решало, приложено ли обязательное фото.
+   * Запрос с `photoCount: 999` закрывал пункт с неисправностью, не приложив
+   * ни одного файла.
+   */
+  it('игнорирует присланное число снимков и пишет фактическое', async () => {
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT' });
+    m.ansDeleteMany.mockResolvedValue({ count: 0 });
+    m.ansCreateMany.mockResolvedValue({ count: 1 });
+    m.mediaGroupBy.mockResolvedValue([]); // файлов в хранилище нет
+    await saveAnswers('ins1', [{ itemId: 'i1', result: 'FAULT', photoCount: 999 }], { tenantId: 'orion' });
+    expect(m.ansCreateMany.mock.calls[0][0].data[0]).toMatchObject({ itemId: 'i1', photoCount: 0 });
+    // Считаем строго по своей организации, своему осмотру и своему пункту.
+    expect(m.mediaGroupBy.mock.calls[0][0].where).toMatchObject({
+      tenantId: 'orion',
+      entityType: 'inspection',
+      entityId: { in: ['ins1__i1'] },
+      isDeleted: false,
+      uploadStatus: 'completed',
+    });
   });
 });
 

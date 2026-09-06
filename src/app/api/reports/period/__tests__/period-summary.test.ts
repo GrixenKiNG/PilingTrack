@@ -7,7 +7,7 @@
  * pile.metersPerUnit, then briefly the site plan — both gone.
  */
 import { describe, it, expect } from 'vitest';
-import { computePeriodSummary } from '../route';
+import { computePeriodSummary } from '@/modules/reports/domain/period-summary';
 
 describe('computePeriodSummary', () => {
   it('sums pile metres from the grade length', () => {
