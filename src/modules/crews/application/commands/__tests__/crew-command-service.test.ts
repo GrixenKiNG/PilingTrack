@@ -136,6 +136,40 @@ describe('Crew Command Service', () => {
       );
     });
 
+    /**
+     * Ответ на создание бригады отдавал оператора целиком.
+     *
+     * `include: { operator: true }` тянет ВСЕ скалярные поля User — вместе с
+     * `password`, `pin` и `pinLookup`. Хеши пароля и ПИН-кода машиниста
+     * уходили в браузер каждому, кто может завести бригаду. Запросы на чтение
+     * (`crew-query.service`) всегда перечисляли поля явно; расходились именно
+     * команды.
+     *
+     * Тест проверяет ФОРМУ запроса, а не ответ: подделать мок ответа легко,
+     * а `include: true` — это и есть дефект.
+     */
+    it('never selects operator secrets into the crew response', async () => {
+      await createCrew({
+        name: 'Alpha Crew',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+        userId: 'user-1',
+      });
+
+      const include = mockDb.crew.findUnique.mock.calls.at(-1)?.[0]?.include as
+        | { operator?: unknown }
+        | undefined;
+      expect(include?.operator).not.toBe(true);
+      const selected = Object.keys(
+        (include?.operator as { select?: Record<string, unknown> } | undefined)?.select ?? {},
+      );
+      expect(selected.length).toBeGreaterThan(0);
+      for (const secret of ['password', 'pin', 'pinLookup']) {
+        expect(selected).not.toContain(secret);
+      }
+    });
+
     it('should reject crew with missing operatorId', async () => {
       await expect(createCrew({
         name: 'Alpha',

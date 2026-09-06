@@ -104,6 +104,28 @@ async function buildAssistantRows(
     .map((name) => ({ userId: null, name }));
 }
 
+/**
+ * Что бригада возвращает ПОСЛЕ записи.
+ *
+ * Оператор перечислен по полям намеренно. Раньше стояло
+ * `include: { operator: true }`, а это тянет все скалярные поля User —
+ * вместе с `password`, `pin` и `pinLookup`. Хеши пароля и ПИН-кода
+ * машиниста уходили в браузер каждому, кто может завести или изменить
+ * бригаду. Читающая сторона (`crew-query.service`) всегда перечисляла поля
+ * явно — расходились именно команды, и расхождение никто не замечал,
+ * потому что экран берёт из ответа только имя оператора.
+ *
+ * Установка и объект остаются целиком: секретных колонок у них нет
+ * (проверено по схеме), а сужение здесь ломало бы потребителей ответа без
+ * выигрыша в безопасности.
+ */
+const crewWriteResponseInclude = {
+  operator: { select: { id: true, name: true, email: true, role: true, isActive: true } },
+  equipment: true,
+  site: true,
+  assistants: true,
+} as const;
+
 export async function createCrew(command: CreateCrewCommand) {
   // Validate required fields before creating aggregate
   if (!command.operatorId || !command.equipmentId || !command.siteId) {
@@ -171,7 +193,7 @@ export async function createCrew(command: CreateCrewCommand) {
 
   const created = await db.crew.findUnique({
     where: { id: aggregate.getState().id },
-    include: { operator: true, equipment: true, site: true, assistants: true },
+    include: crewWriteResponseInclude,
   });
 
   await recordAuditEvent({
@@ -294,7 +316,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
 
   const updated = await db.crew.findUnique({
     where: { id: command.crewId },
-    include: { operator: true, equipment: true, site: true, assistants: true },
+    include: crewWriteResponseInclude,
   });
 
   await recordAuditEvent({
