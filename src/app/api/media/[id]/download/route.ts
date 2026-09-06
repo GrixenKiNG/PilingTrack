@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getMediaService } from '@/core/media/media-service';
-import { assertCanAccessMedia } from '@/core/media/media-auth';
+import { assertCanAccessMedia, ownsUserDocumentMedia } from '@/core/media/media-auth';
 import { withApi } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -28,8 +28,15 @@ export const GET = withApi(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       assertCanAccessMedia(user!, media, 'read');
     } catch (err) {
-      if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
-      throw err;
+      // Общее правило даёт доступ загрузившему. Документы работника грузит за
+      // него администратор, поэтому перед отказом спрашиваем: не его ли это
+      // собственный документ. Запрос к базе идёт только на пути отказа.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      const ownDocument = await ownsUserDocumentMedia(user!, id);
+      if (!ownDocument) {
+        if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
+        throw err;
+      }
     }
 
     const s3 = new S3Client({

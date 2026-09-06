@@ -2,18 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // assertCanAccessMediaEntity уходит в базу за владельцем отчёта и осмотра
 // (динамическим import), поэтому мок нужен и здесь.
-const { reportFindFirstMock, inspectionFindUniqueMock } = vi.hoisted(() => ({
+const { reportFindFirstMock, inspectionFindUniqueMock, userDocumentFindFirstMock } = vi.hoisted(() => ({
   reportFindFirstMock: vi.fn(),
   inspectionFindUniqueMock: vi.fn(),
+  userDocumentFindFirstMock: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
   db: {
     report: { findFirst: reportFindFirstMock },
     inspection: { findUnique: inspectionFindUniqueMock },
+    userDocument: { findFirst: userDocumentFindFirstMock },
   },
 }));
 
-import { assertCanAccessMedia, assertCanAccessMediaEntity } from '../media-auth';
+import { assertCanAccessMedia, assertCanAccessMediaEntity, ownsUserDocumentMedia } from '../media-auth';
 
 describe('assertCanAccessMediaEntity — equipment', () => {
   it('allows ADMIN to manage equipment media and rejects DISPATCHER', async () => {
@@ -142,5 +144,37 @@ describe('assertCanAccessMediaEntity — отчёты и осмотры', () => 
 
   it('незнакомый тип сущности закрыт по умолчанию', async () => {
     await expect(assertCanAccessMediaEntity(operator, 'invoice', 'x1')).rejects.toThrow(/недоступна/);
+  });
+});
+
+/**
+ * Удостоверение, медосмотр и допуск по охране труда загружает за работника
+ * администратор, поэтому общее правило «файл читает загрузивший» оставляло
+ * человека с 403 на собственный документ.
+ */
+describe('ownsUserDocumentMedia — свой документ работника', () => {
+  beforeEach(() => userDocumentFindFirstMock.mockReset());
+
+  it('признаёт файл своим, когда документ принадлежит работнику', async () => {
+    userDocumentFindFirstMock.mockResolvedValue({ id: 'doc-1' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
+    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' } as any, 'm1')).resolves.toBe(true);
+    expect(userDocumentFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { mediaId: 'm1', userId: 'u1', tenantId: 'orion' } }),
+    );
+  });
+
+  it('не признаёт чужой документ', async () => {
+    userDocumentFindFirstMock.mockResolvedValue(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
+    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' } as any, 'm1')).resolves.toBe(false);
+  });
+
+  // Организация без значения доступа не даёт и в базу не ходит: правило
+  // проекта — закрываться, а не подбирать строки без владельца.
+  it('закрывается, когда у работника нет организации', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
+    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: null } as any, 'm1')).resolves.toBe(false);
+    expect(userDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 });

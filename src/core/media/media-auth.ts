@@ -133,6 +133,32 @@ export function filterReadableMedia(
   });
 }
 
+/**
+ * Файл, приложенный к документу работника, читает и сам работник.
+ *
+ * Общее правило ниже даёт доступ ЗАГРУЗИВШЕМУ (`media.userId === actor.id`),
+ * а удостоверения, медосмотры и допуски по охране труда загружает за
+ * работника администратор. Из-за этого человек получал 403 на собственный
+ * документ: файл его, а запись о загрузке — чужая.
+ *
+ * Отдельного `entityType` у таких вложений нет — связь идёт через
+ * `UserDocument.mediaId`, поэтому спрашиваем базу. Организация сверяется
+ * строгим равенством и закрывается при отсутствии: тенант без значения
+ * доступа не даёт (правило проекта против IDOR).
+ */
+export async function ownsUserDocumentMedia(
+  actor: ActorLike,
+  mediaId: string,
+): Promise<boolean> {
+  if (!actor.tenantId) return false;
+  const { db } = await import('@/lib/db');
+  const document = await db.userDocument.findFirst({
+    where: { mediaId, userId: actor.id, tenantId: actor.tenantId },
+    select: { id: true },
+  });
+  return document !== null;
+}
+
 export function assertCanAccessMedia(
   actor: ActorLike,
   media: MediaContext,
