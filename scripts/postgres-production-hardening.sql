@@ -15,8 +15,13 @@
 -- ============================================================
 
 -- Role constraint
+-- Список ролей ДОЛЖЕН совпадать с UserRole в src/lib/types.ts. Здесь он
+-- когда-то остановился на четырёх ролях, а приложение ушло вперёд — завести
+-- механика, мастера и инженера ОТ стало нельзя: строка не проходила проверку.
+-- Расширяя роли в приложении, правьте и эту строку (миграция
+-- 20260906090000_user_role_check_all_roles).
 ALTER TABLE "User" ADD CONSTRAINT chk_user_role_valid
-  CHECK ("role" IN ('ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'));
+  CHECK ("role" IN ('ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT', 'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER'));
 
 -- Report status constraint
 ALTER TABLE "Report" ADD CONSTRAINT chk_report_status_valid
