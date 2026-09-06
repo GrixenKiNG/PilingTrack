@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { canDecreaseMeter, createEquipment, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
+import { canDecreaseMeter, createEquipment, getEquipmentByIdOrThrow, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
 import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
@@ -71,7 +71,14 @@ export const POST = withMutation(
       });
     }
 
-    return NextResponse.json({ equipment }, { status: 201 });
+    // Перечитываем: `createEquipment` возвращает строку ДО записи
+    // характеристик, и ответ показывал `kind: OTHER` с пустыми полями, хотя
+    // в базе уже лежал верный тип. Экран, рисующий новую установку прямо из
+    // ответа, показывал не то, что сохранил.
+    const saved = equipment
+      ? await getEquipmentByIdOrThrow(equipment.id, tenantId)
+      : equipment;
+    return NextResponse.json({ equipment: saved }, { status: 201 });
   },
   { domain: 'equipment' }
 );
