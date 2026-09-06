@@ -15,6 +15,7 @@
  */
 
 import { cacheAside, cacheAsideInvalidate } from '@/lib/cache-strategies';
+import { getResponseCache } from '@/core/cache/response-cache';
 import { recordDeletion } from '@/lib/cache-metrics';
 import { db } from '@/lib/db';
 
@@ -79,8 +80,24 @@ export async function getCachedAllDictionaries(tenantId: string) {
 // Cache Invalidation — Call after mutations
 // ============================================================
 
+/**
+ * Объект изменился — устарели ОБА слоя кэша.
+ *
+ * Слоя два: данные (`cacheAside`, ключ `sites:{tenant}:all`) и готовые
+ * ответы маршрутов (`withApi({cache: true})`, домен `sites`, TTL 30 с).
+ * Сбрасывался только первый, поэтому сразу после сохранения объекта
+ * обычный GET ещё полминуты отдавал прежнюю запись — в проверке
+ * сохранённые координаты приходили пустыми, а тот же запрос с обходом
+ * кэша возвращал верные.
+ *
+ * Оба слоя чистит одна функция: пока их было два владельца, вызов
+ * «сбросить кэш объектов» означал «сбросить половину».
+ */
 export async function invalidateSites(tenantId: string): Promise<void> {
   await cacheAsideInvalidate(`sites:${tenantId}:all`);
+  // Префикс — начало ключа ответа (`${method}:${pathname}`), поэтому одним
+  // вызовом снимаются и список, и карточка объекта, и /api/sites/all.
+  getResponseCache('sites').invalidate('GET:/api/sites');
   recordDeletion();
 }
 

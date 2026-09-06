@@ -253,8 +253,12 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             busy={busy || !state.workAllowed}
             onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
           />
-          {error ? <ErrorNote message={error} /> : null}
-          <EntriesList entries={state.entries} onCorrect={onCorrect} busy={busy} />
+          {/*
+            Список записанного и строка ошибки стоят ОДИН раз — ниже, общими
+            для всех режимов. Здесь они дублировались: в режиме паспорта
+            машинист видел свои две сваи и поправку к ним дважды и не мог
+            понять, записалось ли вдвое больше.
+          */}
         </div>
       ) : (
         <div className="space-y-3">

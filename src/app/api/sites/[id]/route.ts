@@ -50,8 +50,13 @@ export const PUT = withMutation(
       );
     }
 
-    // Check if plans are included
-    const hasPlans = validated.data.pilePlans || validated.data.drillingPlans;
+    // Планы пришли — значит их прислали, а не «оказались непустыми».
+    // Пустой массив в JavaScript истинный, поэтому прежняя проверка на
+    // истинность уводила в эту ветку каждое сохранение объекта и стирала
+    // план вместе со строками. Явный пустой массив по-прежнему означает
+    // «очистить план» — это осознанное действие, а не побочный эффект.
+    const hasPlans = validated.data.pilePlans !== undefined
+      || validated.data.drillingPlans !== undefined;
     
     let site;
     if (hasPlans) {

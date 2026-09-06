@@ -98,9 +98,30 @@ export const createSiteSchema = z.object({
   })).max(100).default([]).optional(),
 });
 
+/**
+ * Правка объекта. Планы здесь БЕЗ `.default([])` — и это главное отличие от
+ * создания.
+ *
+ * Значение по умолчанию подставляло пустой массив всякий раз, когда планы в
+ * запросе не присылали. Маршрут проверял их на истинность, а пустой массив в
+ * JavaScript истинный — поэтому ЛЮБОЕ сохранение объекта (даже переименование)
+ * уходило в ветку «пришли новые планы»: план обнулялся, а его строки
+ * удалялись. Пропущенное поле должно означать «не трогать», и только явный
+ * пустой массив — «очистить».
+ */
 export const updateSiteSchema = createSiteSchema.partial().extend({
   isActive: z.boolean().optional(),
   completed: z.boolean().optional(),
+  pilePlans: z.array(z.object({
+    pileGradeId: z.string().min(1).max(64),
+    count: z.number().int().min(1),
+    metersPerUnit: z.number().min(0).optional(),
+  })).max(100).optional(),
+  drillingPlans: z.array(z.object({
+    diameter: z.number().min(0).max(999),
+    count: z.number().int().min(1),
+    metersPerUnit: z.number().min(0).optional(),
+  })).max(100).optional(),
 });
 
 export const siteHierarchySchema = z.object({
@@ -173,8 +194,12 @@ const equipmentMetadataSchema = z.object({
 
 export const createEquipmentSchema = z.object({
   name: z.string().min(1, 'Equipment name is required').max(200),
-  model: z.string().max(200).optional(),
-  description: z.string().max(2000).optional(),
+  // Через optStr, как и остальные 26 полей установки: пустое поле формы
+  // приходит как null, и голый z.string().optional() отвечал на него
+  // «expected string, received null» — установку нельзя было завести, не
+  // заполнив модель и описание, хотя оба необязательны.
+  model: optStr(200),
+  description: optStr(2000),
   qty: z.number().int().min(0).max(100).default(1),
   isActive: z.boolean().default(true),
 }).extend(equipmentMetadataSchema.shape);
