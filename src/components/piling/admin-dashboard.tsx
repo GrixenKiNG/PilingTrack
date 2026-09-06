@@ -369,7 +369,14 @@ export function AdminDashboard() {
       <PageLayoutRenderer template={layout.template} widgets={dashKpiWidgets} />
 
       {/* Две колонки: слева план-факт + установки, справа риски */}
-      <div className="grid gap-3 lg:grid-cols-3">
+      {/*
+        [&>*]:min-w-0 — не украшение, а условие переносимости на телефон.
+        У элемента сетки min-width по умолчанию равен auto, то есть он не
+        может стать уже своего содержимого. Колонка держала 399 px при
+        контейнере 343, страница переставала сжиматься ниже 415 px, и на
+        экране 375 дашборд ездил вбок.
+      */}
+      <div className="grid gap-3 lg:grid-cols-3 [&>*]:min-w-0">
         <div className="space-y-3 lg:col-span-2">
           <Section icon={Building2} title="План-факт по объектам" footerLabel="Все объекты" onFooter={() => router.push('/admin/sites')}>
             {planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (

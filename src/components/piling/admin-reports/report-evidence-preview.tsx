@@ -146,14 +146,20 @@ export function ReportEvidencePreview({
           <PhotoSection reportId={report.reportId} canEdit={false} />
         </div>
 
-        <div className="grid grid-cols-4 divide-x rounded-md border border-border">
+        {/*
+          Две колонки на телефоне, четыре от sm. При четырёх на 375 px
+          колонка выходила 79 px, а «Эффективность» со значком требует 118 —
+          подпись вылезала за край, и страница переставала сжиматься ниже
+          393 px.
+        */}
+        <div className="grid grid-cols-2 divide-x sm:grid-cols-4 rounded-md border border-border">
           <PreviewMetric icon={HardHat} label="Сваи" value={`${formatNumber(totals.piles)} шт.`} sub={`${formatNumber(totals.pileMeters)} м.п.`} />
           <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м`} />
           <PreviewMetric icon={Clock} label="Простой" value={formatDowntimeHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} />
           <PreviewMetric icon={CheckCircle2} label="Эффективность" value={efficiency == null ? '-' : formatPercentValue(efficiency)} sub="без простоев" />
         </div>
 
-        <div className="grid grid-cols-4 divide-x rounded-md border border-border">
+        <div className="grid grid-cols-2 divide-x sm:grid-cols-4 rounded-md border border-border">
           <PlainFact label="Начало смены" value={report.shiftStart || '-'} />
           <PlainFact label="Окончание" value={report.shiftEnd || '-'} />
           <PlainFact label="Отработано" value={duration == null ? '-' : formatHours(duration)} />
