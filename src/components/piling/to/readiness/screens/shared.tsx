@@ -234,6 +234,7 @@ export function RefKpi({
   alert,
   tone,
   onClick,
+  pressed,
 }: {
   icon: PilingIconName;
   label: string;
@@ -242,8 +243,10 @@ export function RefKpi({
   alert?: boolean;
   tone?: KpiTone;
   onClick?: () => void;
+  /** Плитка-фильтр: показывает, что этот срез парка сейчас выбран. */
+  pressed?: boolean;
 }) {
-  return <KpiTile icon={icon} label={label} value={value} detail={detail} alert={alert} tone={tone} onClick={onClick} />;
+  return <KpiTile icon={icon} label={label} value={value} detail={detail} alert={alert} tone={tone} onClick={onClick} pressed={pressed} />;
 }
 
 /** Подпись кнопки «следующее действие» — по конкретному незакрытому шагу. */

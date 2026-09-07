@@ -18,7 +18,7 @@ import type { ReferenceView } from '../readiness-reference-ui';
  */
 export const MODULE_TABS = [
   { id: 'readiness', label: 'Центр готовности', icon: 'technical-readiness' },
-  { id: 'fleet', label: 'Техника', icon: 'equipment-rig' },
+  { id: 'fleet', label: 'Готовность парка', icon: 'equipment-rig' },
   { id: 'shifts', label: 'Смены', icon: 'shift-start' },
   { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
   { id: 'maintenance', label: 'Обслуживание', icon: 'repair' },

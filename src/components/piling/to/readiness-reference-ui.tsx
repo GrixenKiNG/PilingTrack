@@ -46,7 +46,7 @@ const VIEW_ITEMS: Array<{
   icon: typeof ShieldCheck;
 }> = [
   { id: 'readiness', label: 'Центр готовности', icon: ShieldCheck },
-  { id: 'fleet', label: 'Техника', icon: HardHat },
+  { id: 'fleet', label: 'Готовность парка', icon: HardHat },
   { id: 'shifts', label: 'Смены', icon: CalendarClock },
   { id: 'permits', label: 'Наряд-допуски', icon: FileText },
   { id: 'maintenance', label: 'Обслуживание', icon: Wrench },

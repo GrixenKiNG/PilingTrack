@@ -67,6 +67,15 @@ export interface KpiTileProps {
   children?: ReactNode;
   className?: string;
   onClick?: () => void;
+  /**
+   * Плитка-переключатель: нажата или нет. Только вместе с `onClick`.
+   *
+   * Плитка, которая фильтрует список, обязана показывать своё состояние —
+   * иначе после нажатия «Заблокировано» человек видит короткий список и не
+   * знает, это весь парк или его срез. `undefined` (обычная плитка) не
+   * добавляет ни рамки, ни aria-pressed.
+   */
+  pressed?: boolean;
 }
 
 /**
@@ -90,7 +99,7 @@ function renderIcon(Icon: IconComponent, tone: KpiTone) {
 }
 
 export function KpiTile({
-  icon, label, value, detail, alert, tone, children, className, onClick,
+  icon, label, value, detail, alert, tone, children, className, onClick, pressed,
 }: KpiTileProps) {
   const Wrapper = onClick ? 'button' : 'div';
   const iconTone: KpiTone = tone ?? (alert ? 'warning' : 'neutral');
@@ -102,9 +111,11 @@ export function KpiTile({
     <Wrapper
       type={onClick ? 'button' : undefined}
       onClick={onClick}
+      aria-pressed={onClick && pressed !== undefined ? pressed : undefined}
       className={cn(
         'flex h-full min-h-28 min-w-0 flex-col rounded-xl border border-border bg-card p-4 text-left shadow-sm transition',
-        onClick && 'hover:border-signal/30 hover:shadow-md',
+        onClick && 'hover:border-signal/30 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
+        pressed && 'border-signal ring-1 ring-signal/20',
         className,
       )}
     >
