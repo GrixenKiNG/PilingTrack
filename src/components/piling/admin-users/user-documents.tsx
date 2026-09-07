@@ -64,7 +64,23 @@ const EMPTY_FORM = { typeId: '', number: '', issuedAt: '', expiresAt: '', notes:
 const toInputDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '');
 
 export function UserDocuments({ userId }: { userId: string }) {
-  const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  /**
+   * Документы хранятся ВМЕСТЕ с владельцем, а не сами по себе.
+   *
+   * Компонент не пересоздаётся при выборе другого сотрудника — родитель держит
+   * тот же экземпляр и меняет только `userId`. Пока состояние было просто
+   * массивом строк, любой сбой загрузки оставлял на экране документы
+   * предыдущего человека: заголовок карточки менялся, а номера удостоверения и
+   * медосмотра под ним оставались чужими. То же давала гонка двух успешных
+   * ответов — медленный ответ по первому сотруднику приходил после быстрого по
+   * второму и затирал его.
+   *
+   * Пара `{owner, rows}` делает подмену невозможной: строки рисуются, только
+   * когда `owner` совпадает с текущим `userId`. Это ответ на вопрос «чьи это
+   * данные», а не на вопрос «загрузилось ли что-нибудь».
+   */
+  const [loaded, setLoaded] = useState<{ owner: string; rows: DocumentRow[] } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [types, setTypes] = useState<DocumentType[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -96,27 +112,36 @@ export function UserDocuments({ userId }: { userId: string }) {
     setDialogOpen(true);
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
+    setFailed(null);
     try {
       const [docsRes, typesRes] = await Promise.all([
-        authFetch(`/api/users/${userId}/documents`),
-        authFetch('/api/user-document-types'),
+        authFetch(`/api/users/${userId}/documents`, { signal }),
+        authFetch('/api/user-document-types', { signal }),
       ]);
       if (!docsRes.ok) throw new Error('Не удалось загрузить документы');
       const docsBody = await docsRes.json();
-      setDocuments(docsBody.documents ?? []);
+      if (signal?.aborted) return;
+      setLoaded({ owner: userId, rows: docsBody.documents ?? [] });
       if (typesRes.ok) setTypes((await typesRes.json()).types ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
+      // Сообщение остаётся на экране, а не улетает всплывающим уведомлением:
+      // пустая вкладка с исчезнувшим тостом читается как «документов нет».
+      setFailed(err instanceof Error ? err.message : 'Ошибка загрузки');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
-    void load();
+    void load(controller.signal);
+    // Уход с сотрудника отменяет его запрос: ответ, пришедший после
+    // переключения, не должен попасть в карточку следующего человека.
+    return () => controller.abort();
   }, [load]);
 
   /**
@@ -178,6 +203,28 @@ export function UserDocuments({ userId }: { userId: string }) {
   };
 
   if (loading) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border p-4 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Загрузка документов…
+      </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <div role="alert" className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm">
+        <p className="font-medium text-destructive-strong">{failed}</p>
+        {/* Ни одной строки: чужие документы под чужим именем хуже пустоты. */}
+        <p className="text-muted-foreground">Документы этого сотрудника не показаны. Это не значит, что их нет.</p>
+        <Button size="sm" variant="outline" onClick={() => void load()}>Повторить</Button>
+      </div>
+    );
+  }
+
+  // Ответ ещё не подтверждён для ЭТОГО сотрудника — показываем ожидание, а не
+  // строки, оставшиеся от предыдущего.
+  const documents = loaded?.owner === userId ? loaded.rows : null;
+  if (documents === null) {
     return (
       <div className="flex items-center gap-2 rounded-md border border-border p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Загрузка документов…
