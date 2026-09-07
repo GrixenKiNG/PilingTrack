@@ -122,12 +122,28 @@ export interface ReadinessRuleSet {
 export const DEFAULT_READINESS_RULES: ReadinessRuleSet = {
   version: 'v1.0',
   status: 'PUBLISHED',
+  /*
+    Наряд-допуск выведен из расчёта — решение владельца от 07.09.2026.
+
+    В ОРИОН наряды не выписывают ни в программе, ни на бумаге, и заказчик их
+    не запрашивает. Четверть балла готовности при этом зависела от документа,
+    которого не существует: у семи машин из восьми «замечание» было ровно про
+    просроченный наряд, заведённый разработчиком при отладке.
+
+    Вес 0 — это «в нашей организации критерий не применяется», а не «неважно».
+    Остальные веса пересчитаны пропорционально прежним (30/15/20/10 из 75),
+    чтобы не переоценивать заодно и их: решение было про наряд, а не про то,
+    что осмотр стал важнее ТО.
+
+    Реестр нарядов остаётся: вкладка, документы и подписи никуда не делись.
+    Из балла и замечаний убран только вклад.
+  */
   criteria: [
-    { key: 'INSPECTION', weight: 30, locked: false },
-    { key: 'ENGINE_HOURS', weight: 15, locked: false },
-    { key: 'PERMIT', weight: 25, locked: false },
-    { key: 'MAINTENANCE', weight: 20, locked: false },
-    { key: 'ACCEPTANCE', weight: 10, locked: false },
+    { key: 'INSPECTION', weight: 40, locked: false },
+    { key: 'ENGINE_HOURS', weight: 20, locked: false },
+    { key: 'PERMIT', weight: 0, locked: false },
+    { key: 'MAINTENANCE', weight: 27, locked: false },
+    { key: 'ACCEPTANCE', weight: 13, locked: false },
   ],
   blockers: [
     { condition: 'CRITICAL_DEFECT', action: 'DENY_START', isActive: true },
@@ -140,9 +156,12 @@ export const DEFAULT_READINESS_RULES: ReadinessRuleSet = {
     // WARN_ONLY нельзя — интерфейс тогда пишет «наряд обязателен» и при этом
     // ничего не запрещает, то есть противоречит сам себе.
     { condition: 'VALID_WORK_PERMIT_REQUIRED', action: 'DENY_START', isActive: false },
-    // Просроченный наряд — замечание, а не остановка смены. Тенант может
-    // ужесточить оба правила в «Настройки → Правила готовности», не трогая код.
-    { condition: 'PERMIT_EXPIRED', action: 'WARN_ONLY', isActive: true },
+    // Просроченный наряд перестал быть даже замечанием — 07.09.2026, вместе с
+    // выводом наряда из расчёта. Замечание о просрочке документа, который в
+    // организации не выписывают, — это шум на каждой машине каждый день.
+    // Тенант, который наряды ведёт, включает правило в «Настройки → Правила
+    // готовности», не трогая код.
+    { condition: 'PERMIT_EXPIRED', action: 'WARN_ONLY', isActive: false },
     // Просроченное ТО снижает балл и показывает замечание, но установку не
     // останавливает — решение владельца от 2026-08-08. Тенант может ужесточить
     // правило в «Настройки → Правила готовности», не трогая код.

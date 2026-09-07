@@ -44,8 +44,25 @@ describe('authoritative readiness evaluator', () => {
     }));
   });
 
-  it('warns but allows a missing optional permit', () => {
+  /*
+    Наряды выведены из расчёта (решение владельца 07.09.2026, вес критерия 0).
+    Замечание «наряд не оформлен» тогда выписывалось бы каждой машине каждый
+    день — про документ, которого в организации не существует.
+  */
+  it('says nothing about permits when the tenant does not use them', () => {
     const rules = publishedRules(DEFAULT_READINESS_RULES);
+    const result = evaluateReadiness({facts, rules, evidence,
+      clock: capturedClock(new Date('2026-03-29T00:30:00.000Z'))});
+    expect(result.allowed).toBe(true);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  // Обратный случай: у тенанта, который наряды ведёт (вес критерия больше
+  // нуля), замечание об неоформленном наряде возвращается целиком.
+  it('warns but allows a missing optional permit when permits carry weight', () => {
+    const rules = publishedRules({...DEFAULT_READINESS_RULES,
+      criteria: DEFAULT_READINESS_RULES.criteria.map((item) => item.key === 'PERMIT'
+        ? {...item, weight: 25} : item)});
     const result = evaluateReadiness({facts, rules, evidence,
       clock: capturedClock(new Date('2026-03-29T00:30:00.000Z'))});
     expect(result.allowed).toBe(true);
@@ -74,14 +91,33 @@ describe('authoritative readiness evaluator', () => {
     expect(result.blockers).toContainEqual(expect.objectContaining({condition: 'VALID_WORK_PERMIT_REQUIRED'}));
   });
 
-  // Наряд-допуск информационный (решение владельца от 15.08.2026): просроченный
-  // наряд остаётся замечанием и смену не останавливает.
-  it('просроченный наряд по умолчанию предупреждает, но не блокирует', () => {
+  /*
+    Решение владельца 07.09.2026 заменило решение 15.08.2026.
+
+    Тогда наряд был признан информационным, и просроченный давал замечание.
+    Теперь наряды не ведут вовсе — правило PERMIT_EXPIRED выключено, и
+    просроченный наряд не даёт ни блокировки, ни замечания. Семь машин из
+    восьми были помечены замечанием именно из-за нарядов, заведённых при
+    отладке.
+  */
+  it('просроченный наряд по умолчанию молчит: наряды выведены из расчёта', () => {
     const result = evaluateReadiness({facts: {...facts, permitExpired: true},
       rules: publishedRules(DEFAULT_READINESS_RULES), evidence,
       clock: capturedClock(new Date('2026-07-01T09:00:00.000Z'))});
     expect(result.allowed).toBe(true);
     expect(result.blockers).toHaveLength(0);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  // Тенант, который наряды ведёт, включает правило обратно — и просроченный
+  // наряд снова становится замечанием, без правок кода.
+  it('возвращает замечание о просрочке, когда тенант включил правило', () => {
+    const rules = publishedRules({...DEFAULT_READINESS_RULES,
+      blockers: DEFAULT_READINESS_RULES.blockers.map((item) => item.condition === 'PERMIT_EXPIRED'
+        ? {...item, isActive: true} : item)});
+    const result = evaluateReadiness({facts: {...facts, permitExpired: true}, rules, evidence,
+      clock: capturedClock(new Date('2026-07-01T09:00:00.000Z'))});
+    expect(result.allowed).toBe(true);
     expect(result.warnings).toContainEqual(expect.objectContaining({code: 'PERMIT_EXPIRED'}));
   });
 
@@ -91,7 +127,7 @@ describe('authoritative readiness evaluator', () => {
   it('блокирует просроченный наряд, если тенант ужесточил правило', () => {
     const strict = publishedRules({...DEFAULT_READINESS_RULES,
       blockers: DEFAULT_READINESS_RULES.blockers.map((item) => item.condition === 'PERMIT_EXPIRED'
-        ? {...item, action: 'DENY_START' as const} : item)});
+        ? {...item, action: 'DENY_START' as const, isActive: true} : item)});
     const result = evaluateReadiness({facts: {...facts, permitExpired: true},
       rules: strict, evidence,
       clock: capturedClock(new Date('2026-07-01T09:00:00.000Z'))});

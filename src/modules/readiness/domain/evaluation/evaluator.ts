@@ -62,11 +62,23 @@ export function evaluateReadiness(input: {
   const result = computeReadinessScore(input.facts, input.rules as ReadinessRuleSet);
   const permitRequired = input.rules.blockers.some((item) =>
     item.condition === 'VALID_WORK_PERMIT_REQUIRED' && item.isActive);
+  /*
+    Нулевой вес критерия означает «в этой организации наряды не ведутся».
+
+    Без этой проверки вывод наряда из расчёта дал бы обратный эффект: правило
+    «наряд обязателен» выключено, значит замечание «наряд не оформлен»
+    выписывалось бы КАЖДОЙ машине КАЖДЫЙ день — и статус «Готова» превратился
+    бы в «Готова с замечанием» у всего парка из-за документа, которого здесь
+    не существует. Замечание имеет смысл там, где наряды выписывают, но
+    конкретный ещё не оформлен.
+  */
+  const permitConsidered = (input.rules.criteria.find((item) => item.key === 'PERMIT')?.weight ?? 0) > 0;
   // Замечание видит оператор на экране готовности, поэтому текст по-русски и
   // про дело: «правила не требуют» — это ответ разработчику, а не машинисту.
   // Если наряд просрочен, об этом уже сказало правило PERMIT_EXPIRED, и второе
   // сообщение «наряд не оформлен» рядом с ним противоречило бы первому.
-  const permitWarnings = input.facts.permitValid !== true && !input.facts.permitExpired && !permitRequired
+  const permitWarnings = permitConsidered
+    && input.facts.permitValid !== true && !input.facts.permitExpired && !permitRequired
     ? [{code: 'WORK_PERMIT_MISSING_OPTIONAL', message: 'Наряд-допуск не оформлен (по правилам не обязателен)'}]
     : [];
   // Сработавшее правило с действием WARN_ONLY — это замечание, а не блокировка.
