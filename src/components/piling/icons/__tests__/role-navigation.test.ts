@@ -53,6 +53,23 @@ describe('ROLE_NAVIGATION', () => {
     expect(dispatcherRoutes).toContain('/admin/to');
   });
 
+  /**
+   * Право без дороги — это тот же тупик, что дорога без права.
+   *
+   * `incidents.read` разрешён администратору, диспетчеру, мастеру и инженеру
+   * ОТ, но в меню «Происшествия» стояли только у первых двух. Инженер ОТ —
+   * один из трёх, кому разрешено закрывать происшествие разбором, — попадал
+   * на экран только по прямому адресу.
+   */
+  it('gives every role that may read incidents a way to reach them', () => {
+    for (const role of ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'] as const) {
+      expect(ROLE_NAVIGATION[role].map((item) => item.href)).toContain('/admin/incidents');
+    }
+    for (const role of ['OPERATOR', 'ASSISTANT', 'MECHANIC'] as const) {
+      expect(ROLE_NAVIGATION[role].map((item) => item.href)).not.toContain('/admin/incidents');
+    }
+  });
+
   it('gives mechanics only the readiness destination', () => {
     expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href)).toEqual(['/admin/to']);
   });

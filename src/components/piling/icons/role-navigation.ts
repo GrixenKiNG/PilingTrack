@@ -46,16 +46,33 @@ const assistantNavigation: NavigationItem[] = [
 
 // Telegram и DLQ теперь живут вкладками внутри «Настроек» (см. workspace-settings),
 // а «Настройки» стоят в самом конце списка модулей.
+/**
+ * Порядок — единственный способ показать, что с чем связано.
+ *
+ * Список плоский: групп и разделителей у NavigationItem нет. Пока пунктов
+ * было пять, порядок ничего не значил; на десяти он стал смыслом. Здесь идут
+ * четыре смысловые связки подряд, а не десять равнозначных строк:
+ *
+ *   обзор       — дашборд, мониторинг
+ *   работа      — объекты, журнал забивки, отчёты
+ *   техника     — установки, техготовность
+ *   люди        — бригады, происшествия
+ *   итоги       — аналитика
+ *
+ * Раньше «Происшествия» стояли между техникой и людьми, а «Журнал забивки» —
+ * после «Отчётов», хотя паспорт сваи и приходит из отчёта смены: мастер
+ * открывает их подряд.
+ */
 const dispatcherNavigation: NavigationItem[] = [
   { label: 'Дашборд', href: '/admin', icon: 'dashboard' },
   { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring', tone: 'info' },
   { label: 'Объекты', href: '/admin/sites', icon: 'site' },
+  { label: 'Журнал забивки', href: '/admin/piles', icon: 'pile-group' },
+  { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
   { label: 'Установки', href: '/admin/equipment', icon: 'equipment-rig' },
   { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
-  { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
   { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
-  { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
-  { label: 'Журнал забивки', href: '/admin/piles', icon: 'pile-group' },
+  { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
   { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
 ];
 
@@ -76,10 +93,21 @@ export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
     { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring' },
     { label: 'Объекты', href: '/admin/sites', icon: 'site' },
     { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
+    // Читать происшествия на своём участке мастеру разрешено
+    // (`incidents.read`), а пункта в меню не было: экран открывался только по
+    // прямому адресу. Разбор ему недоступен — кнопку прячет сам экран.
+    { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
     { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
     { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
   ],
   SAFETY_ENGINEER: [
+    /*
+      Разбор происшествий — то, что закрывает лично инженер ОТ: он один из
+      трёх, кому разрешён `incidents.review`. Пункта в меню при этом не было
+      вовсе — право есть, дороги нет. Стоит первым: экран открывают, чтобы
+      увидеть, что требует решения сегодня.
+    */
+    { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
     { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
     { label: 'Объекты', href: '/admin/sites', icon: 'site' },
     { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
