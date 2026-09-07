@@ -202,9 +202,20 @@ export function buildAuthoritativeReadinessPresentation(
   const stages: AuthoritativeReadinessPresentation['stages'] = [
     {
       key: 'INSPECTION', label: 'Осмотр',
+      /*
+        Здесь стоял процент — и он врал.
+
+        `inspectionProgress` не доля заполненных пунктов, а трёхзначный
+        признак: 1 — машину смотрели сегодня, 0.5 — смотрели когда-то,
+        0 — не смотрели ни разу (см. readiness-score.ts). Строка «Не
+        завершён · 50%» читалась как «заполнена половина чек-листа», хотя
+        осмотр мог быть пройден полностью — просто вчера. Рядом на том же
+        экране стоит настоящий счёт пунктов («10 из 10»), и два разных
+        «процента» противоречили друг другу. Слова этого спутать не дают.
+      */
       value: facts.inspectionCompleted
-        ? `Завершён · ${Math.round(facts.inspectionProgress * 100)}%`
-        : `Не завершён · ${Math.round(facts.inspectionProgress * 100)}%`,
+        ? 'Пройден сегодня'
+        : facts.inspectionProgress > 0 ? 'Последний осмотр не за сегодня' : 'Осмотров нет',
       state: facts.inspectionCompleted ? 'pass' : facts.inspectionProgress > 0 ? 'warning' : 'fail',
     },
     {
