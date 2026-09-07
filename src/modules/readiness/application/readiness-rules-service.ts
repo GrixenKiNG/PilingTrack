@@ -7,6 +7,7 @@ import {
   sanitizeRuleSet,
   type ReadinessRuleSet,
 } from '../domain/readiness-rules';
+import { requestReadinessSnapshot } from './projection/request-snapshot';
 
 export interface ReadinessRulesState {
   published: ReadinessRuleSet;
@@ -141,8 +142,45 @@ async function publishBaseline(
         tenantId,
       },
     });
+    await requestFleetRecalc(tx, tenantId, published.version);
   });
   return getReadinessRules(tenantId);
+}
+
+/**
+ * Новые правила без пересчёта — правила, которых никто не видит.
+ *
+ * Снимок готовности неизменяем: он хранит вердикт, посчитанный по правилам,
+ * действовавшим в тот момент. Публикация сама по себе ни одного снимка не
+ * трогает, поэтому владелец включал правило, открывал парк — и не видел
+ * никакой разницы до суточного прогона планировщика или до случайного события
+ * по конкретной машине. Выглядело как «настройка не работает».
+ *
+ * Заказ идёт той же очередью, что и суточный пересчёт: ключ дедупликации —
+ * версия набора, так что повторная публикация той же версии второй раз ничего
+ * не закажет, а каждая новая — закажет по одному пересчёту на машину.
+ */
+async function requestFleetRecalc(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  ruleSetVersion: string,
+): Promise<void> {
+  const now = new Date();
+  const fleet = await tx.equipment.findMany({
+    where: { tenantId, isActive: true },
+    select: { id: true },
+  });
+  for (const equipment of fleet) {
+    await requestReadinessSnapshot(tx as unknown as typeof db, {
+      tenantId,
+      equipmentId: equipment.id,
+      aggregateId: equipment.id,
+      aggregateType: 'Equipment',
+      triggerType: 'RULES_PUBLISHED',
+      triggerId: ruleSetVersion,
+      occurredAt: now,
+    });
+  }
 }
 
 export async function publishReadinessRules(
@@ -199,6 +237,7 @@ export async function publishReadinessRules(
         tenantId,
       },
     });
+    await requestFleetRecalc(tx, tenantId, published.version);
   });
   return getReadinessRules(tenantId);
 }

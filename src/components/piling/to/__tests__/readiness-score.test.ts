@@ -92,19 +92,57 @@ describe('readiness score', () => {
     expect(result.score).toBeLessThan(100);
   });
 
-  // Решение владельца 2026-08-08: если утром не было связи, смена начинается,
-  // а осмотр и моточасы досдаются позже. Отсутствие данных бьёт по баллу, но не
-  // запрещает работу — иначе бригада начнёт работать в обход системы.
-  it('allows the shift to start when morning evidence has not arrived yet', () => {
+  /*
+    Решение владельца 2026-09-07 заменило решение 2026-08-08.
+
+    Раньше: если утром не было связи, смена начинается, а осмотр и моточасы
+    досдаются позже — «иначе бригада начнёт работать в обход системы».
+    Проверка на живых данных показала цену этого допущения: у семи машин из
+    восьми осмотра за сегодня не было, приёмки не было ни у одной, и все
+    восемь стояли «Готова к работе». Допуск держался на одном условии —
+    незакрытом критическом дефекте.
+
+    Теперь отсутствие сегодняшнего осмотра возвращает машину оператору. Это
+    по-прежнему не запрет: вердикт RETURN_TO_OPERATOR даёт на экране «Требует
+    решения», работа продолжается сразу после осмотра. Моточасы и приёмка
+    по-прежнему только снижают балл — их обязательность не вводилась.
+  */
+  it('returns the rig to the operator when today has no inspection', () => {
     const result = computeReadinessScore(facts({
       inspectionCompleted: false,
       inspectionProgress: 0,
       meterKnown: false,
       accepted: false,
     }));
+    expect(result.verdict).toBe('RETURN_TO_OPERATOR');
+    expect(result.canStart).toBe(false);
+    expect(result.blockers.map((item) => item.condition)).toContain('INSPECTION_BELOW_80');
+    // Текст блокировки сохраняется внутрь снимка и попадает на экран как
+    // причина. Он обязан называть то, что правило проверяет: «менее 80%»
+    // обещало долю заполненных пунктов, которой в этом правиле нет.
+    expect(result.blockers.map((item) => item.label)).toContain('Нет осмотра за сегодня');
+    expect(result.score).toBeLessThan(50);
+  });
+
+  // Вчерашний осмотр — тоже не сегодняшний: признак 0.5 ниже порога 0.8, и
+  // правило срабатывает на полностью пройденном, но вчерашнем осмотре. Это и
+  // есть смысл правила, а не проверка заполненности чек-листа.
+  it('treats a complete but not-today inspection as missing', () => {
+    const result = computeReadinessScore(facts({
+      inspectionCompleted: false,
+      inspectionProgress: 0.5,
+    }));
+    expect(result.verdict).toBe('RETURN_TO_OPERATOR');
+  });
+
+  // Приёмка и моточасы обязательными не стали: без них машина остаётся
+  // допущенной, теряя только балл. Сторож на случай, если правило осмотра
+  // когда-нибудь захотят «заодно» распространить и на них.
+  it('keeps acceptance and meter readings out of the admission decision', () => {
+    const result = computeReadinessScore(facts({ accepted: false, meterKnown: false }));
     expect(result.verdict).toBe('ALLOWED');
     expect(result.canStart).toBe(true);
-    expect(result.score).toBeLessThan(50);
+    expect(result.score).toBeLessThan(100);
   });
 
   it('uses configured criterion weights', () => {

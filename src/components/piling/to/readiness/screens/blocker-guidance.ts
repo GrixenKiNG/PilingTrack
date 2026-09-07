@@ -31,7 +31,10 @@ const GUIDANCE: Record<string, BlockerGuidance> = {
   },
   INSPECTION_BELOW_80: {
     who: 'оператор',
-    where: 'вкладка «Смены» → дозаполнить осмотр',
+    // Не «дозаполнить»: правило срабатывает и на полностью пройденном
+    // вчерашнем осмотре — оно требует осмотра за сегодня, а не недостающих
+    // пунктов (см. BLOCKER_LABELS в readiness-rules.ts).
+    where: 'вкладка «Смены» → провести осмотр за сегодня',
     view: 'shifts',
   },
   MAINTENANCE_OVERDUE_50H: {
