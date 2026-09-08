@@ -44,9 +44,11 @@ const CATEGORY_ICON: Record<CategoryKey, PilingIconName> = {
 const CATEGORY_HREF: Record<CategoryKey, string> = {
   equipment: '/admin/equipment',
   sites: '/admin/sites',
-  pileGrades: '/admin/dictionaries',
-  drillingTypes: '/admin/dictionaries',
-  downtimeReasons: '/admin/dictionaries',
+  // Категория передаётся в адресе: без неё ссылка из «Причин простоев»
+  // открывала «Сваи», и нужный перечень приходилось искать заново.
+  pileGrades: '/admin/dictionaries?kind=pileGrade',
+  drillingTypes: '/admin/dictionaries?kind=drillingType',
+  downtimeReasons: '/admin/dictionaries?kind=downtimeReason',
 };
 
 export function DictionariesSettings({ equipment, bootstrap, onExport }: DictionariesSettingsProps) {

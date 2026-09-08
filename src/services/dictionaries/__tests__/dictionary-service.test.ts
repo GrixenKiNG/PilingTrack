@@ -19,7 +19,7 @@ vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }
 import {
   deleteDictionaryItem,
   archiveDictionaryItem, restoreDictionaryItem, renameDictionaryItem,
-  createDictionaryItem, getDictionaryUsage, listDictionaries,
+  createDictionaryItem, getDictionaryUsage, listDictionaries, setPileGradeLength,
 } from '../dictionary-service';
 
 const tenantId = 'tenant-a';
@@ -144,6 +144,28 @@ describe('archive/restore/rename', () => {
     await expect(renameDictionaryItem(mutation, 'drillingType', 't1', 'new'))
       .rejects.toMatchObject({ status: 409 });
     expect(dbMock.drillingType.update).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  Длина марки не хранится в отчёте: её берут живьём аналитика объекта и техники,
+  журнал забивки и печатные формы за прошлые периоды. Ноль обнулил бы погонные
+  метры везде и задним числом, поэтому отказ обязан быть на сервере, а не только
+  в форме.
+*/
+describe('setPileGradeLength', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('rejects a zero length before touching the database', async () => {
+    await expect(setPileGradeLength(mutation, 'g1', 0)).rejects.toMatchObject({ status: 400 });
+    expect(dbMock.pileGrade.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps null as an unset length', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', lengthMm: 12000 });
+    dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', lengthMm: null });
+    await setPileGradeLength(mutation, 'g1', null);
+    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { lengthMm: null } });
   });
 });
 

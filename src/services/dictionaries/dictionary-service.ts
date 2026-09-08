@@ -48,9 +48,20 @@ function assertTenantId(tenantId: string): void {
   if (!tenantId) throw new ServiceError('Организация не определена', 403);
 }
 
+/**
+ * Ноль запрещён, `null` — нет.
+ *
+ * Свай нулевой длины не бывает, а последствия у нуля тяжёлые: длина марки
+ * не хранится в отчёте, её берут живьём все потребители — аналитика объекта и
+ * техники, журнал забивки, печатные формы за прошлые периоды. Ноль обнулил бы
+ * погонные метры везде и задним числом. Форма положительное число и требовала,
+ * а схема маршрута допускала `min(0)` — то есть защита стояла только на экране.
+ *
+ * `null` остаётся законным: это «длина не задана» у марок, где её не завели.
+ */
 function assertLengthMm(lengthMm: number | null | undefined): void {
-  if (lengthMm !== undefined && lengthMm !== null && (!Number.isInteger(lengthMm) || lengthMm < 0)) {
-    throw new ServiceError('Длина должна быть неотрицательным целым числом (мм)', 400);
+  if (lengthMm !== undefined && lengthMm !== null && (!Number.isInteger(lengthMm) || lengthMm <= 0)) {
+    throw new ServiceError('Длина сваи должна быть целым числом больше нуля (мм)', 400);
   }
 }
 

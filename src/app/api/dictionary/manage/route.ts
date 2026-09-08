@@ -18,7 +18,7 @@ const createSchema = z.object({
   type: typeEnum,
   name: z.string().min(1).max(100),
   code: z.string().max(100).optional(),
-  lengthMm: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  lengthMm: z.number().int().min(1).max(1_000_000).nullable().optional(),
   sectionOrDiameter: z.string().max(100).nullable().optional(),
   notes: z.string().max(500).optional(),
 }).superRefine((value, context) => {
@@ -35,8 +35,16 @@ const patchSchema = z.object({
   type: typeEnum, id: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
   isActive: z.boolean().optional(),
-  // Pile length in millimetres; null clears it. Only valid for pileGrade.
-  lengthMm: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  /*
+    Длина в миллиметрах; null очищает её. Только для марки сваи.
+
+    Ноль запрещён: свай нулевой длины не бывает, а длина не хранится в отчёте —
+    её берут живьём аналитика, журнал забивки и печатные формы, в том числе за
+    прошлые периоды. Ноль обнулил бы погонные метры везде и задним числом.
+    Форма положительное число и требовала, но схема допускала min(0): защита
+    стояла только на экране.
+  */
+  lengthMm: z.number().int().min(1).max(1_000_000).nullable().optional(),
   // Section/diameter label; null clears it. Only valid for pileGrade.
   sectionOrDiameter: z.string().max(100).nullable().optional(),
 }).refine(

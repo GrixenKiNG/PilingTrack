@@ -84,7 +84,22 @@ export function AdminDictionaries() {
   const [panelDraft, setPanelDraft] = useState<{ name: string; section: string; length: string } | null>(null);
   const [inspectorTab, setInspectorTab] = useState<'general' | 'history'>('general');
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
-  const [activeKind, setActiveKind] = useState<DictionaryKind>('pileGrade');
+  const [historyFailed, setHistoryFailed] = useState(false);
+  /** Счётчик попыток: его изменение перезапускает загрузку журнала. */
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  /**
+   * Категория берётся из адреса и туда же возвращается.
+   *
+   * Ссылки «Марки свай», «Типы бурения» и «Причины простоев» в настройках
+   * техготовности вели на /admin/dictionaries без категории — человек из
+   * «Причин простоев» неизменно попадал в «Сваи» и искал их заново. По той же
+   * причине перезагрузка теряла выбранную вкладку.
+   */
+  const [activeKind, setActiveKind] = useState<DictionaryKind>(() => {
+    if (typeof window === 'undefined') return 'pileGrade';
+    const requested = new URLSearchParams(window.location.search).get('kind');
+    return KINDS.some(({ kind }) => kind === requested) ? (requested as DictionaryKind) : 'pileGrade';
+  });
   const [panelWidth, setPanelWidth] = useState(380);
   const compactInspector = useCompactInspector();
   const InspectorShell: React.ElementType = compactInspector ? SheetContent : 'aside';
@@ -119,6 +134,28 @@ export function AdminDictionaries() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- async registry load on mount/filter change
   useEffect(() => { void loadData(); }, [loadData]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (activeKind === 'pileGrade') url.searchParams.delete('kind');
+    else url.searchParams.set('kind', activeKind);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search);
+  }, [activeKind]);
+
+  /**
+   * Смена категории закрывает карточку прежней.
+   *
+   * Иначе слева «Бурение», а справа — марка сваи с её историей: два разных
+   * предмета на одном экране, и непонятно, к чему относятся кнопки.
+   */
+  const selectKind = (kind: DictionaryKind) => {
+    setActiveKind(kind);
+    setSelectedItem(null);
+    setPanelDraft(null);
+    setHistory(null);
+    setHistoryFailed(false);
+  };
+
   // Real change history from the audit log, loaded when the tab is opened.
   const selectedId = selectedItem?.id;
   useEffect(() => {
@@ -130,13 +167,19 @@ export function AdminDictionaries() {
         if (!response.ok) throw new Error('audit');
         const payload = await response.json() as { entries?: HistoryEntry[] };
          
-        if (active) setHistory(payload.entries ?? []);
+        if (active) { setHistory(payload.entries ?? []); setHistoryFailed(false); }
       } catch {
-        if (active) setHistory([]);
+        /*
+          Пустой список тут был враньём: сбой загрузки журнала выглядел как
+          «изменений не было». У значения с реальной историей правок экран
+          сообщал, что её нет, — и это ровно тот ответ, ради которого сюда
+          заходят («кто менял длину?»).
+        */
+        if (active) { setHistory(null); setHistoryFailed(true); }
       }
     })();
     return () => { active = false; };
-  }, [inspectorTab, selectedId]);
+  }, [inspectorTab, selectedId, historyAttempt]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ru');
@@ -359,7 +402,7 @@ export function AdminDictionaries() {
           </AlertDescription>
         </Alert>
       ) : (
-        <Tabs value={activeKind} onValueChange={(value) => setActiveKind(value as DictionaryKind)}>
+        <Tabs value={activeKind} onValueChange={(value) => selectKind(value as DictionaryKind)}>
           {/* overflow-x-auto: панель вкладок шире 390px и на мобильном распирала
               страницу горизонтально — теперь прокручивается внутри себя. */}
           <div className="overflow-x-auto border-b border-border">
@@ -372,7 +415,7 @@ export function AdminDictionaries() {
 
           <section aria-label="Сводка справочников" className="mt-4 grid gap-3 md:grid-cols-3">
             {dictionarySummary.map(({ kind, summaryTitle, pilingIcon, active, archived, objects }) => (
-              <button key={kind} type="button" className="rounded-xl border border-border bg-card p-4 text-left transition hover:border-signal/30 hover:shadow-sm" onClick={() => { setActiveKind(kind); setSearch(''); }}>
+              <button key={kind} type="button" className="rounded-xl border border-border bg-card p-4 text-left transition hover:border-signal/30 hover:shadow-sm" onClick={() => { selectKind(kind); setSearch(''); }}>
                 {/* Иконка во всю высоту плитки + описание — как в дашборде. */}
                 <div className="flex items-stretch gap-4"><span className="relative w-20 shrink-0 self-stretch"><PilingIcon name={pilingIcon} fill decorative className="absolute inset-0" /></span><div><p className="text-sm font-semibold text-foreground">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-info-strong">{active}</p><p className="text-xs text-info-strong">активных</p></div><div className="border-l border-border pl-4"><p className="text-lg font-semibold text-muted-foreground">{archived}</p><p className="text-xs text-muted-foreground">архивных</p></div></div></div></div>
                 <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">Используются в {objects} объектах</p>
@@ -470,7 +513,12 @@ export function AdminDictionaries() {
           </div>
           <div className="mt-5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-strong">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Использование: отчётов — {selectedItem.reportCount}, планов — {selectedItem.planCount}.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-foreground">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Планы</span><b>{selectedItem.planCount}</b></p></section>
           <div className="mt-auto border-t border-border pt-5"><div className="grid grid-cols-2 gap-2"><Button className="min-h-11 bg-signal text-white hover:bg-signal-strong" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="min-h-11 border-signal/30 text-signal-strong hover:bg-signal/10" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-muted-foreground">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-muted-foreground">
-            {history === null ? <p className="py-6 text-center text-muted-foreground">Загрузка истории…</p>
+            {historyFailed ? <div role="alert" className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <p className="font-medium text-destructive-strong">Журнал изменений не загрузился</p>
+              <p className="text-muted-foreground">История этого значения не показана. Это не значит, что изменений не было.</p>
+              <Button variant="outline" className="min-h-11" onClick={() => setHistoryAttempt((n) => n + 1)}>Повторить</Button>
+            </div>
+              : history === null ? <p className="py-6 text-center text-muted-foreground">Загрузка истории…</p>
               : history.length === 0 ? <p className="py-6 text-center text-muted-foreground">Записей аудита по элементу нет.</p>
               : <ul className="space-y-3">
                   {history.map((entry) => (
