@@ -51,16 +51,18 @@ const users = [
   user('u2', { name: 'Иван Петров', isActive: false }),
   user('u3', { role: 'ADMIN', activeCrew: null }),
   user('u4', { role: 'DISPATCHER' }),
+  // Машинист без объекта и бригады — единственный, кому закрепление положено.
+  user('u5', { name: 'Пётр Новиков', assignedSites: [], activeCrew: null }),
 ];
 
 describe('filterOperationalUsers', () => {
   it.each([
     ['assistants', ['u1']],
     ['blocked', ['u2']],
-    ['no-site', ['u1']],
-    ['no-crew', ['u1', 'u3']],
+    ['no-site', ['u5']],
+    ['no-crew', ['u5']],
     ['inactive-30-days', ['u1']],
-    ['operators', ['u2']],
+    ['operators', ['u2', 'u5']],
     ['dispatchers', ['u4']],
     ['admins', ['u3']],
   ] as const)('applies the %s quick filter', (quick, expectedIds) => {
@@ -71,6 +73,33 @@ describe('filterOperationalUsers', () => {
 
   it.each(['анна', 'ASSISTANT@EXAMPLE.TEST', '9991234567'])(
     'searches case-insensitively by name, email or phone: %s',
+    (search) => {
+      const result = filterOperationalUsers(users, { quick: 'all', search, now: NOW });
+
+      expect(result.map((item) => item.id)).toEqual(['u1']);
+    }
+  );
+
+  /*
+    Правка карточки администратором — не активность сотрудника. Уволенный
+    оператор, которому поправили телефон, переставал попадать в фильтр
+    неиспользуемых записей: отметку о его «активности» ставил другой человек.
+  */
+  it('does not treat an administrator edit as the employee own activity', () => {
+    const edited = user('edited', {
+      lastLoginAt: '2026-01-10T00:00:00.000Z',
+      lastReportAt: null,
+      lastActivityAt: NOW.toISOString(),
+      lastActivitySource: 'profile',
+    });
+
+    expect(filterOperationalUsers([edited], {
+      quick: 'inactive-30-days', search: '', now: NOW,
+    }).map((item) => item.id)).toEqual(['edited']);
+  });
+
+  it.each(['+79991234567', '89991234567', '9991234567', '999 123 45 67'])(
+    'finds a phone typed in any shape: %s',
     (search) => {
       const result = filterOperationalUsers(users, { quick: 'all', search, now: NOW });
 
@@ -96,10 +125,10 @@ describe('filterOperationalUsers', () => {
 describe('computeUserKpis', () => {
   it('returns operational counts', () => {
     expect(computeUserKpis(users)).toEqual([
-      expect.objectContaining({ label: 'Всего', value: '4' }),
-      expect.objectContaining({ label: 'Активные', value: '3' }),
-      expect.objectContaining({ label: 'Операторы', value: '1' }),
-      expect.objectContaining({ label: 'Без закрепления', value: '2' }),
+      expect.objectContaining({ label: 'Всего', value: '5' }),
+      expect.objectContaining({ label: 'Доступ включён', value: '4' }),
+      expect.objectContaining({ label: 'Операторы', value: '2' }),
+      expect.objectContaining({ label: 'Требуют закрепления', value: '1' }),
       expect.objectContaining({ label: 'Заблокированы', value: '1', tone: 'red' }),
     ]);
   });

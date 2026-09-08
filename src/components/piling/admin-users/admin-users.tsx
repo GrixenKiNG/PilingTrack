@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   FileText,
@@ -56,9 +56,9 @@ const QUICK_FILTERS: OpsQuickFilter<UserQuickFilter>[] = [
 
 const KPI_ICONS = {
   'Всего': Users,
-  'Активные': UserCheck,
+  'Доступ включён': UserCheck,
   'Операторы': HardHat,
-  'Без закрепления': Link2Off,
+  'Требуют закрепления': Link2Off,
   'Заблокированы': AlertTriangle,
 } as const;
 
@@ -71,7 +71,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
 });
 
 function userRisk(user: OperationalUserDTO) {
-  return resolveRisk([[!user.isActive, 'critical', 'Заблокирован']], 'Активен');
+  return resolveRisk([[!user.isActive, 'critical', 'Заблокирован']], 'Доступ включён');
 }
 
 function formatActivity(user: OperationalUserDTO) {
@@ -84,12 +84,51 @@ function formatActivity(user: OperationalUserDTO) {
   return { value: dateTimeFormatter.format(new Date(user.lastActivityAt)), source };
 }
 
+/**
+ * Фильтр, поиск и выбранный сотрудник живут в адресе страницы.
+ *
+ * Без этого перезагрузка (или переход по ссылке коллеге) возвращала пустой
+ * список «Все» с начала: администратор, разбиравший операторов без бригады,
+ * каждый раз набирал фильтр заново.
+ */
+const QUICK_KEYS: UserQuickFilter[] = [
+  'all', 'operators', 'dispatchers', 'admins', 'assistants',
+  'blocked', 'no-site', 'no-crew', 'inactive-30-days',
+];
+
+function readUrlState(search: string) {
+  const params = new URLSearchParams(search);
+  const quick = params.get('filter');
+  return {
+    quick: QUICK_KEYS.includes(quick as UserQuickFilter) ? (quick as UserQuickFilter) : 'all',
+    search: params.get('q') ?? '',
+    userId: params.get('userId'),
+  };
+}
+
+function writeUrlState(state: { quick: UserQuickFilter; search: string; userId: string | null }) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  const pairs: Record<string, string> = {
+    filter: state.quick === 'all' ? '' : state.quick,
+    q: state.search,
+    userId: state.userId ?? '',
+  };
+  Object.entries(pairs).forEach(([key, value]) =>
+    value ? url.searchParams.set(key, value) : url.searchParams.delete(key));
+  window.history.replaceState(window.history.state, '', url.pathname + url.search);
+}
+
 export function AdminUsers() {
   const currentUser = usePilingStore((state) => state.currentUser);
   const { users, loading, error, retry, create, update, remove, toggleActive } = useUsersList();
-  const [quick, setQuick] = useState<UserQuickFilter>('all');
-  const [search, setSearch] = useState('');
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const initial = useMemo(
+    () => readUrlState(typeof window === 'undefined' ? '' : window.location.search),
+    [],
+  );
+  const [quick, setQuick] = useState<UserQuickFilter>(initial.quick);
+  const [search, setSearch] = useState(initial.search);
+  const [activeId, setActiveId] = useState<string | null>(initial.userId);
   const [showCreate, setShowCreate] = useState(false);
   const [showTypes, setShowTypes] = useState(false);
   const [editUser, setEditUser] = useState<OperationalUserDTO | null>(null);
@@ -105,6 +144,23 @@ export function AdminUsers() {
     () => filtered.find((user) => user.id === activeId) ?? filtered[0] ?? null,
     [filtered, activeId]
   );
+
+  useEffect(() => {
+    writeUrlState({ quick, search, userId: active?.id ?? null });
+  }, [quick, search, active?.id]);
+
+  /**
+   * На телефоне карточка стоит под всем списком: после выбора сотрудника она
+   * оказывалась почти на три тысячи точек ниже экрана, и человек не понимал,
+   * что вообще что-то произошло. На широком экране панель и так рядом.
+   */
+  const selectUser = (id: string) => {
+    setActiveId(id);
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1279px)').matches) {
+      requestAnimationFrame(() =>
+        document.getElementById('user-detail-panel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    }
+  };
 
   const kpis = useMemo(() => computeUserKpis(users).map((item) => ({
     ...item,
@@ -232,6 +288,7 @@ export function AdminUsers() {
         header={header}
         kpi={<OpsKpiBar items={kpis} />}
         aside={active ? (
+          <div id="user-detail-panel" className="scroll-mt-24">
           <UserDetail
             user={active}
             isSelf={currentUser?.id === active.id}
@@ -239,6 +296,7 @@ export function AdminUsers() {
             onDelete={() => setDeleteUser(active)}
             onToggle={() => toggleActive(active)}
           />
+          </div>
         ) : <OpsDetailEmpty message="Выберите пользователя, чтобы увидеть доступы и историю." />}
       >
         <OpsFilterBar
@@ -264,7 +322,7 @@ export function AdminUsers() {
           rows={filtered}
           getRowId={(user) => user.id}
           activeId={active?.id ?? null}
-          onRowSelect={(user) => setActiveId(user.id)}
+          onRowSelect={(user) => selectUser(user.id)}
           empty={<OpsTableEmpty icon={Users} title="Пользователи не найдены" hint="Измените фильтр или строку поиска." />}
         />
       </OpsPage>

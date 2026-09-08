@@ -54,7 +54,7 @@ interface UserDetailProps {
 }
 
 export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDetailProps) {
-  const risk = resolveRisk([[!user.isActive, 'critical', 'Заблокирован']], 'Активен');
+  const risk = resolveRisk([[!user.isActive, 'critical', 'Заблокирован']], 'Доступ включён');
   const history = useEntityHistory('users', user.id);
 
   return (
