@@ -7,6 +7,7 @@ const {
   findManyUserMock,
   findManyFeedbackEventMock,
   updateUserMock,
+  countUserMock,
 } = vi.hoisted(() => ({
   createUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   findManyUserMock: vi.fn(),
   findManyFeedbackEventMock: vi.fn(),
   updateUserMock: vi.fn(),
+  countUserMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -27,6 +29,7 @@ vi.mock('@/lib/db', () => ({
       findFirst: findFirstUserMock,
       findMany: findManyUserMock,
       update: updateUserMock,
+      count: countUserMock,
     },
   },
 }));
@@ -205,6 +208,7 @@ describe('updateUser', () => {
   beforeEach(() => {
     findFirstUserMock.mockReset();
     updateUserMock.mockReset();
+    countUserMock.mockReset();
     findFirstUserMock.mockResolvedValue(null);
     updateUserMock.mockResolvedValue({ ...existingUser, name: 'X' });
   });
@@ -226,6 +230,39 @@ describe('updateUser', () => {
 
     expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'user-b', tenantId: 'tenant-a' },
+    }));
+  });
+
+  /*
+    Организация без администратора неуправляема: завести или повысить
+    пользователя может только он. Снятие роли и блокировка шли без проверок —
+    администратор мог разжаловать или заблокировать сам себя.
+  */
+  const adminUser = { ...existingUser, id: 'admin-a', role: 'ADMIN' };
+
+  it('refuses to demote or block the last active administrator', async () => {
+    findFirstUserMock.mockResolvedValue(adminUser);
+    countUserMock.mockResolvedValue(0);
+
+    await expect(updateUser('tenant-a', { id: 'admin-a', role: 'OPERATOR' }, 'admin-a'))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(updateUser('tenant-a', { id: 'admin-a', isActive: false }, 'admin-a'))
+      .rejects.toMatchObject({ status: 409 });
+    expect(updateUserMock).not.toHaveBeenCalled();
+    // Заблокированный администратор не считается заменой действующему.
+    expect(countUserMock).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-a', role: 'ADMIN', isActive: true, id: { not: 'admin-a' } },
+    });
+  });
+
+  it('allows demoting an administrator while another one remains', async () => {
+    findFirstUserMock.mockResolvedValue(adminUser);
+    countUserMock.mockResolvedValue(1);
+
+    await updateUser('tenant-a', { id: 'admin-a', role: 'OPERATOR' }, 'admin-b');
+
+    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: 'OPERATOR' }),
     }));
   });
 

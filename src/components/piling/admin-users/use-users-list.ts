@@ -149,11 +149,17 @@ export function useUsersList() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: user.id, isActive: !user.isActive }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        // Причина отказа приходит от сервера и бывает единственным объяснением:
+        // «это последний администратор организации». Пустой `throw` заменял её
+        // на «Ошибка изменения статуса», и человек не понимал, что делать.
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Ошибка изменения статуса');
+      }
       await load();
       toast.success(user.isActive ? 'Пользователь деактивирован' : 'Пользователь активирован');
-    } catch {
-      toast.error('Ошибка изменения статуса');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Ошибка изменения статуса');
     }
   };
 

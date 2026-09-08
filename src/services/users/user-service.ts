@@ -237,6 +237,39 @@ export async function updateUser(
       data.sessionVersion = { increment: 1 };
     }
 
+    /*
+      Организация не должна остаться без администратора.
+
+      Снятие роли и блокировка проходили без единой проверки: администратор мог
+      сменить себе роль на оператора или заблокировать сам себя — и управление
+      организацией терялось. Вернуть его изнутри некому: заводить и повышать
+      пользователей может только администратор. Удаление такой дыры не имело:
+      там стоит запрет на действие над собой.
+
+      Считаем ДРУГИХ действующих администраторов. Если их нет — отказ, независимо
+      от того, себя правит человек или последнего коллегу-администратора.
+    */
+    const losesAdmin = previousUser.role === 'ADMIN'
+      && ((input.role !== undefined && input.role !== 'ADMIN') || input.isActive === false);
+    if (losesAdmin) {
+      const otherAdmins = await client.user.count({
+        where: {
+          tenantId: scopedTenantId,
+          role: 'ADMIN',
+          isActive: true,
+          id: { not: previousUser.id },
+        },
+      });
+      if (otherAdmins === 0) {
+        throw new ServiceError(
+          input.isActive === false
+            ? 'Это последний администратор организации — его нельзя заблокировать. Сначала назначьте другого администратора'
+            : 'Это последний администратор организации — у него нельзя снять роль. Сначала назначьте другого администратора',
+          409,
+        );
+      }
+    }
+
     const updatedUser = await client.user.update({
       where: { id: input.id, tenantId: scopedTenantId },
       data,
