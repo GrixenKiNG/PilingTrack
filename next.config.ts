@@ -21,6 +21,29 @@ const nextConfig: NextConfig = {
   env: {
     APP_VERSION: process.env.APP_VERSION ?? process.env.npm_package_version ?? "unknown",
   },
+  /*
+    Turbopack остаётся для `next dev`, но прод собирается webpack
+    (`next build --webpack`, см. package.json) — решение 12.09.2026.
+
+    ПОЧЕМУ. Под strict-dynamic браузер доверяет только скриптам с nonce и тем,
+    что подгружены уже доверенным скриптом. Turbopack отдавал один общий
+    вендорный чанк (next/image + базовый lucide) тегом `<script src async>`
+    БЕЗ nonce: из 17 тегов 16 с nonce, один без. Браузер его запрещал —
+    ошибка в консоли у каждого пользователя на каждой странице, а на экране
+    входа из-за этого не завершалась гидратация.
+
+    Правку искали с 08.07.2026 (кампания csp-monitoring): обновление Next не
+    помогло, `optimizePackageImports` под Turbopack игнорируется, хеш чанка
+    меняется каждую сборку, а ослаблять политику нельзя. Webpack штампует
+    nonce на все теги: проверено — 17 из 17. Прежде сборка webpack падала на
+    ошибке типов сгенерированного валидатора маршрутов; на Next 16.2.12 это
+    прошло.
+
+    Цена: прод-сборка примерно вдвое медленнее. Когда Turbopack научится
+    протягивать nonce в этот тег, флаг можно убрать — проверять так:
+    `curl -s http://localhost:3000/login | grep -o '<script src="[^"]*"[^>]*>' | grep -vc nonce`
+    должно давать 0.
+  */
   turbopack: {
     root: path.resolve(import.meta.dirname),
   },
