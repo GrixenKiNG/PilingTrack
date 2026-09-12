@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { usePilingStore } from '@/lib/store';
+import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { pluralizeRu } from '@/lib/format';
@@ -35,6 +37,11 @@ const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
 ];
 
 export function AdminReports() {
+  const currentUser = usePilingStore(s => s.currentUser);
+  const actingAs = usePilingStore(s => s.actingAs);
+  const actor = { role: currentUser?.role ?? '', actingAs };
+  const mayManage = can(actor, 'reports.manage_all');
+  const mayExport = can(actor, 'reports.export');
   const {
     reports, sites, operators, pileGrades, drillingTypes, downtimeReasons, equipment,
     filterSiteId, setFilterSiteId,
@@ -57,22 +64,30 @@ export function AdminReports() {
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   const [exporting, setExporting] = useState(false);
 
-  // Выгрузка CSV. Диапазон дат у /api/reports/export обязателен и ограничен
-  // 92 днями, поэтому без выбранного периода берём последние 30 дней: молча
-  // отдать всю историю эндпоинт всё равно не может, а внятный период понятнее
-  // ошибки «dateFrom and dateTo are required».
-  //
-  // Скачиваем через blob, а не переходом по ссылке: заголовок «Действую как»
-  // ставит authFetch, и при 403 переход увёл бы админа со страницы вместо
-  // сообщения.
+  // Export the same filters as the visible list. An unbounded history needs
+  // an explicit period because the export endpoint is limited to 92 days.
   const handleExport = async (format: 'csv' | 'xlsx' = 'csv') => {
-    const dateTo = periodTo || todayYmd();
-    const dateFrom = periodFrom || shiftYmd(-30);
+    const quickFrom = quickFilter === 'today' ? todayYmd()
+      : quickFilter === 'yesterday' ? shiftYmd(-1)
+      : quickFilter === 'week' ? shiftYmd(-6) : null;
+    const quickTo = quickFilter === 'yesterday' ? shiftYmd(-1) : todayYmd();
+    if (!quickFrom && (!periodActive || !periodFrom || !periodTo)) {
+      toast.error('Для выгрузки выберите и примените период до 92 дней либо фильтр Сегодня, Вчера или 7 дней.');
+      return;
+    }
+    const dateFrom = quickFrom && periodActive && periodFrom ? (quickFrom > periodFrom ? quickFrom : periodFrom)
+      : quickFrom || periodFrom;
+    const dateTo = quickFrom && periodActive && periodTo ? [quickTo, periodTo].sort()[0]
+      : quickFrom ? quickTo : periodTo;
+    if (dateFrom > dateTo) { toast.error('В выбранном пересечении дат нет отчётов.'); return; }
     setExporting(true);
     let objectUrl: string | null = null;
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
+      if (filterUserId !== 'all') params.set('userId', filterUserId);
+      if (filterEquipmentId !== 'all') params.set('equipmentId', filterEquipmentId);
+      if (['downtime', 'withPhotos', 'edited'].includes(quickFilter)) params.set('filter', quickFilter);
       if (format === 'xlsx') params.set('format', 'xlsx');
 
       const response = await authFetch(`/api/reports/export?${params.toString()}`);
@@ -142,7 +157,7 @@ export function AdminReports() {
       const totals = getReportTotals(report);
       if (quickFilter === 'today' && report.date !== today) return false;
       if (quickFilter === 'yesterday' && report.date !== yesterday) return false;
-      if (quickFilter === 'week' && report.date < weekStart) return false;
+      if (quickFilter === 'week' && (report.date < weekStart || report.date > today)) return false;
       if (quickFilter === 'downtime' && totals.downtimeHours <= 0) return false;
       if (quickFilter === 'withPhotos' && report.hasPhotos !== true) return false;
       if (quickFilter === 'edited' && !report.lastEditedByName) return false;
@@ -203,10 +218,10 @@ export function AdminReports() {
           <ReportsHeader
             reportWord={reportWord}
             onPrint={() => window.print()}
-            onExport={() => { void handleExport('csv'); }}
-            onExportXlsx={() => { void handleExport('xlsx'); }}
+            onExport={mayExport ? () => { void handleExport('csv'); } : undefined}
+            onExportXlsx={mayExport ? () => { void handleExport('xlsx'); } : undefined}
             exporting={exporting}
-            onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
+            onCreate={mayManage ? () => { setEditReport(null); setShowCreateDialog(true); } : undefined}
           />
           <QueryErrorBanner
             title="Не удалось загрузить отчёты"
@@ -221,10 +236,10 @@ export function AdminReports() {
           <ReportsHeader
             reportWord={reportWord}
             onPrint={() => window.print()}
-            onExport={() => { void handleExport('csv'); }}
-            onExportXlsx={() => { void handleExport('xlsx'); }}
+            onExport={mayExport ? () => { void handleExport('csv'); } : undefined}
+            onExportXlsx={mayExport ? () => { void handleExport('xlsx'); } : undefined}
             exporting={exporting}
-            onCreate={() => { setEditReport(null); setShowCreateDialog(true); }}
+            onCreate={mayManage ? () => { setEditReport(null); setShowCreateDialog(true); } : undefined}
           />
 
           <EvidenceSummary
@@ -327,9 +342,9 @@ export function AdminReports() {
                         formatLastEditor={formatLastEditor}
                         onSelect={setPreviewReport}
                         onOpenDetails={setDetailReport}
-                        onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
+                        onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
                         onPreviewPdf={handlePreviewPdf}
-                        onDelete={setPendingDeleteReport}
+                        onDelete={mayManage ? setPendingDeleteReport : undefined}
                       />
                     ))}
                   </div>
@@ -388,7 +403,7 @@ export function AdminReports() {
               history={reportHistory}
               formatDate={formatDate}
               onClose={() => setPreviewReport(null)}
-              onEdit={(r) => { setEditReport(r); setShowCreateDialog(true); }}
+              onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
               onPreviewPdf={handlePreviewPdf}
               onPrint={() => window.print()}
             />

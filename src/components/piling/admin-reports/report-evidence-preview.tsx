@@ -49,7 +49,7 @@ export function ReportEvidencePreview({
   history: { data: ReportHistory | null; loading: boolean; error: boolean };
   formatDate: (d: string) => string;
   onClose: () => void;
-  onEdit: (r: ReportDTO) => void;
+  onEdit?: (r: ReportDTO) => void;
   onPreviewPdf: (r: ReportDTO) => void;
   onPrint: () => void;
 }) {
@@ -198,18 +198,20 @@ export function ReportEvidencePreview({
             <FileDown className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Открыть PDF</span>
           </Button>
-          <Button onClick={() => onPreviewPdf(report)} variant="outline" className="h-9 min-w-0 px-2 text-xs">
+          <Button asChild variant="outline" className="h-9 min-w-0 px-2 text-xs">
+            <a href={`/api/reports/single-pdf?reportId=${encodeURIComponent(report.reportId)}`} download>
             <Download className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Скачать</span>
+            </a>
           </Button>
           <Button onClick={onPrint} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Printer className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Печать</span>
           </Button>
-          <Button onClick={() => onEdit(report)} variant="outline" className="h-9 min-w-0 px-2 text-xs">
+          {onEdit && <Button onClick={() => onEdit(report)} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Pencil className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Редактировать</span>
-          </Button>
+          </Button>}
         </div>
       </div>
     </aside>

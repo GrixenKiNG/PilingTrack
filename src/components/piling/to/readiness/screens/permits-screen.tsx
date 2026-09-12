@@ -8,6 +8,7 @@ import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
 import { formatDateInTimezone, formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
@@ -57,8 +58,12 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
   // Сроки документов экипажей: те же данные, что во вкладке «Документы».
-  const [documents, setDocuments] = useState<{expired: number; expiring: number} | null>(null);
+  const canReadDocuments = !!props.bootstrap && can(props.bootstrap.actor, 'users.documents.read_all');
+  const documentActorKey = props.bootstrap ? [props.bootstrap.actor.id, props.bootstrap.actor.role, props.bootstrap.actor.actingAs].join(':') : '';
+  const [documentResult, setDocuments] = useState<{actorKey: string; expired: number; expiring: number} | null>(null);
+  const documents = canReadDocuments && documentResult?.actorKey === documentActorKey ? documentResult : null;
   useEffect(() => {
+    if (!canReadDocuments) return;
     let cancelled = false;
     void authFetch('/api/user-documents/control')
       .then(async (response) => {
@@ -66,11 +71,11 @@ export function PermitsScreen(props: ReferenceUiProps) {
         const body = await response.json() as {expired?: number; expiring?: number};
         // Право на этот список есть не у всех, кому открыт экран нарядов —
         // отказ оставляет плитку в состоянии «не загружено», а не врёт «в порядке».
-        if (!cancelled) setDocuments({expired: body.expired ?? 0, expiring: body.expiring ?? 0});
+        if (!cancelled) setDocuments({actorKey: documentActorKey, expired: body.expired ?? 0, expiring: body.expiring ?? 0});
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, []);
+  }, [canReadDocuments, documentActorKey]);
 
   const active = props.permits.filter((item) => item.state === 'APPROVED').length;
   const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
@@ -201,7 +206,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
                   : documents.expiring > 0 ? 'warning' : 'pass',
               lines: [
                 `Экипажей: ${props.crews.filter((crew) => crew.isActive).length}`,
-                documents === null ? 'Сроки документов не загружены'
+                !canReadDocuments ? 'Сроки документов проверяет администратор или инженер ОТ' : documents === null ? 'Сроки документов не загружены'
                   : documents.expired > 0 ? `Просрочены документы: ${documents.expired}`
                     : documents.expiring > 0 ? `Истекают: ${documents.expiring}`
                       : 'Документы действуют',

@@ -9,19 +9,20 @@ import {
 import type { SiteFullData } from './types';
 
 interface HierarchyTreeProps {
+  readOnly?: boolean;
   siteId: string;
   tree: SiteFullData;
   onAdd: (type: 'field' | 'cluster' | 'picket', siteId: string, parentId: string) => void;
   onDelete: (siteId: string, type: string, itemId: string) => void;
 }
 
-export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreeProps) {
+export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete }: HierarchyTreeProps) {
   return (
     <div className="pl-4 border-l-2 border-signal/30 space-y-2">
       {/* Fields */}
       {tree.fields.length === 0 ? (
         <p className="text-xs text-muted-foreground py-2">
-          Нет свайных полей. Нажмите + чтобы добавить.
+          {readOnly ? 'Нет свайных полей.' : 'Нет свайных полей. Нажмите + чтобы добавить.'}
         </p>
       ) : (
         tree.fields.map((field) => (
@@ -34,20 +35,20 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <button
+                {!readOnly && <button
                   onClick={() => onAdd('cluster', siteId, field.id)}
                   className="w-6 h-6 rounded flex items-center justify-center hover:bg-signal/10 text-muted-foreground hover:text-signal-strong"
                   title="Добавить куст"
                 >
                   <Plus className="w-3 h-3" />
-                </button>
-                <button
+                </button>}
+                {!readOnly && <button
                   onClick={() => onDelete(siteId, 'field', field.id)}
                   className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
                   title="Удалить поле"
                 >
                   <Trash2 className="w-3 h-3" />
-                </button>
+                </button>}
               </div>
             </div>
             {/* Clusters */}
@@ -60,18 +61,18 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
                     <div className="flex items-center justify-between py-0.5">
                       <span className="text-xs text-foreground">{cluster.name}</span>
                       <div className="flex items-center gap-1">
-                        <button
+                        {!readOnly && <button
                           onClick={() => onAdd('picket', siteId, cluster.id)}
                           className="w-5 h-5 rounded flex items-center justify-center hover:bg-signal/10 text-muted-foreground hover:text-signal-strong"
                         >
                           <Plus className="w-2.5 h-2.5" />
-                        </button>
-                        <button
+                        </button>}
+                        {!readOnly && <button
                           onClick={() => onDelete(siteId, 'cluster', cluster.id)}
                           className="w-5 h-5 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
                         >
                           <Trash2 className="w-2.5 h-2.5" />
-                        </button>
+                        </button>}
                       </div>
                     </div>
                     {/* Pickets */}
@@ -87,12 +88,12 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
                             <span className="text-2xs text-muted-foreground">
                               {'\ud83d\udccd'} {picket.name}
                             </span>
-                            <button
+                            {!readOnly && <button
                               onClick={() => onDelete(siteId, 'picket', picket.id)}
                               className="w-5 h-5 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
                             >
                               <Trash2 className="w-2.5 h-2.5" />
-                            </button>
+                            </button>}
                           </div>
                         ))
                       )}
@@ -104,13 +105,13 @@ export function HierarchyTree({ siteId, tree, onAdd, onDelete }: HierarchyTreePr
           </div>
         ))
       )}
-      <button
+      {!readOnly && <button
         onClick={() => onAdd('field', siteId, siteId)}
         className="flex items-center gap-1.5 text-xs text-signal-strong hover:text-signal-strong font-medium py-1"
       >
         <Plus className="w-3 h-3" />
         Добавить свайное поле
-      </button>
+      </button>}
     </div>
   );
 }

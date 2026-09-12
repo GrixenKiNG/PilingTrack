@@ -1,5 +1,7 @@
 'use client';
 
+import { PermittedEntityHistory } from '@/components/piling/ops-shell/permitted-entity-history';
+import { useAbility } from '@/lib/use-ability';
 import { useEffect, useMemo, useState } from 'react';
 import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, UserPlus, CheckCircle2, TrendingUp, Network, Power, PowerOff } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
@@ -18,10 +20,8 @@ import {
   OpsDetailPanel,
   OpsDetailEmpty,
   OpsFact,
-  OpsHistoryList,
   OpsRiskBadge,
   resolveRisk,
-  useEntityHistory,
   type OpsColumn,
   type OpsQuickFilter,
   type OpsKpiItem,
@@ -75,6 +75,7 @@ function toListItem(row: SiteOverviewRow): SiteListItem {
 }
 
 export function AdminSites() {
+  const canManage = useAbility('sites.manage');
   const { rows, loading, error, reload } = useSitesOverview();
   const { sites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
 
@@ -237,7 +238,7 @@ export function AdminSites() {
       title="Объекты"
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['объект', 'объекта', 'объектов'])}`}
       subtitle="План/факт стройки: прогресс, бригады, простои, отчёты"
-      actions={
+      actions={canManage &&
         <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
           <Plus className="mr-1.5 h-4 w-4" />
           Новый объект
@@ -265,6 +266,7 @@ export function AdminSites() {
           ? (
             <SiteDetail
               row={active}
+              canManage={canManage}
               togglingId={mutations.togglingId}
               onEdit={() => setEditSite(toListItem(active))}
               onDelete={() => setDeleteSite(toListItem(active))}
@@ -359,9 +361,10 @@ export function AdminSites() {
 }
 
 function SiteDetail({
-  row, togglingId, tree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
+  row, canManage, togglingId, tree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
 }: {
   row: SiteOverviewRow;
+  canManage: boolean;
   togglingId: string | null;
   tree?: SiteFullData;
   onEdit: () => void;
@@ -373,17 +376,16 @@ function SiteDetail({
   onDeleteHierarchy: (siteId: string, type: string, itemId: string) => void;
 }) {
   const risk = siteRisk(row);
-  const history = useEntityHistory('sites', row.siteId);
   const completed = Boolean(row.completionDate);
   return (
     <OpsDetailPanel title={row.siteName} subtitle={`Объект · ${row.totalReports} ${pluralizeRu(row.totalReports, ['отчёт', 'отчёта', 'отчётов'])}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
-      <div className="flex flex-wrap gap-2">
+      {canManage && <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
         <Button size="sm" variant="outline" onClick={onAssign} className="h-8 text-xs"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
         <Button size="sm" variant="outline" onClick={onToggleCompleted} className="h-8 text-xs"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
         <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-8 text-xs">{row.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
         <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
-      </div>
+      </div>}
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
         <OpsFact label="Сваи план" value={`${formatNumber(row.plannedPiles)} шт.`} sub={`${formatNumber(row.plannedPileMeters)} м.п.`} />
@@ -406,11 +408,11 @@ function SiteDetail({
       <div className="rounded-md border border-border p-2.5">
         <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Network className="h-4 w-4 text-muted-foreground" />Иерархия</h3>
         {tree
-          ? <HierarchyTree siteId={row.siteId} tree={tree} onAdd={onAddHierarchy} onDelete={onDeleteHierarchy} />
+          ? <HierarchyTree readOnly={!canManage} siteId={row.siteId} tree={tree} onAdd={onAddHierarchy} onDelete={onDeleteHierarchy} />
           : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}
       </div>
 
-      <OpsHistoryList entries={history.entries} loading={history.loading} error={history.error} title="История изменений" />
+      <PermittedEntityHistory scope="sites" targetId={row.siteId} title="История изменений" />
     </OpsDetailPanel>
   );
 }

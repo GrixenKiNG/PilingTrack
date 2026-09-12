@@ -1,5 +1,7 @@
 'use client';
 
+import { PermittedEntityHistory } from '@/components/piling/ops-shell/permitted-entity-history';
+import { useAbility } from '@/lib/use-ability';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Trash2, Power, PowerOff } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
@@ -16,10 +18,8 @@ import {
   OpsDetailPanel,
   OpsDetailEmpty,
   OpsFact,
-  OpsHistoryList,
   OpsRiskBadge,
   resolveRisk,
-  useEntityHistory,
   type OpsColumn,
   type OpsQuickFilter,
   type OpsKpiItem,
@@ -49,6 +49,7 @@ function crewRisk(crew: Crew) {
 }
 
 export function AdminCrews() {
+  const canManage = useAbility('crews.manage');
   const {
     crews, setCrews, equipmentList, sites,
     loading, loadingReferenceData, loadReferenceData,
@@ -192,7 +193,7 @@ export function AdminCrews() {
       title="Бригады"
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['бригада', 'бригады', 'бригад'])}`}
       subtitle="Сменные назначения: оператор, помощники, установка, объект"
-      actions={
+      actions={canManage &&
         <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
           <Plus className="mr-1.5 h-4 w-4" />Добавить
         </Button>
@@ -208,6 +209,7 @@ export function AdminCrews() {
           ? (
             <CrewDetail
               crew={active}
+              canManage={canManage}
               onEdit={() => setEditItem(active)}
               onDelete={() => setDeleteItem(active)}
               onToggle={() => toggleActive(active)}
@@ -243,19 +245,18 @@ export function AdminCrews() {
   );
 }
 
-function CrewDetail({ crew, onEdit, onDelete, onToggle }: { crew: Crew; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
+function CrewDetail({ crew, canManage, onEdit, onDelete, onToggle }: { crew: Crew; canManage: boolean; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
   const risk = crewRisk(crew);
-  const history = useEntityHistory('crews', crew.id);
   return (
     <OpsDetailPanel title={crew.name || 'Без названия'} subtitle={`Бригада · ${crew.site?.name ?? '—'}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
-      <div className="flex flex-wrap gap-2">
+      {canManage && <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
         <Button size="sm" variant="outline" onClick={onToggle} className="h-8 text-xs">
           {crew.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}
           {crew.isActive ? 'Деактивировать' : 'Активировать'}
         </Button>
         <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
-      </div>
+      </div>}
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
         <OpsFact label="Оператор" value={crew.operator?.name ?? '—'} />
@@ -273,7 +274,7 @@ function CrewDetail({ crew, onEdit, onDelete, onToggle }: { crew: Crew; onEdit: 
         </div>
       )}
 
-      <OpsHistoryList entries={history.entries} loading={history.loading} error={history.error} title="История назначений" />
+      <PermittedEntityHistory scope="crews" targetId={crew.id} title="История назначений" />
     </OpsDetailPanel>
   );
 }

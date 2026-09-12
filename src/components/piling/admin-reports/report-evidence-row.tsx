@@ -43,10 +43,10 @@ export function ReportsHeader({
 }: {
   reportWord: string;
   onPrint: () => void;
-  onExport: () => void;
-  onExportXlsx: () => void;
+  onExport?: () => void;
+  onExportXlsx?: () => void;
   exporting: boolean;
-  onCreate: () => void;
+  onCreate?: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -72,7 +72,7 @@ export function ReportsHeader({
           <Printer className="mr-1.5 h-4 w-4" />
           Печать
         </Button>
-        <Button
+        {onExport && <Button
           onClick={onExport}
           disabled={exporting}
           variant="outline"
@@ -80,8 +80,8 @@ export function ReportsHeader({
         >
           <Download className="mr-1.5 h-4 w-4" />
           {exporting ? 'Готовим…' : 'CSV'}
-        </Button>
-        <Button
+        </Button>}
+        {onExportXlsx && <Button
           onClick={onExportXlsx}
           disabled={exporting}
           variant="outline"
@@ -89,14 +89,14 @@ export function ReportsHeader({
         >
           <Download className="mr-1.5 h-4 w-4" />
           {exporting ? 'Готовим…' : 'Excel'}
-        </Button>
-        <Button
+        </Button>}
+        {onCreate && <Button
           onClick={onCreate}
           className="h-10 bg-signal text-white hover:bg-signal-strong"
         >
           <Plus className="mr-1.5 h-4 w-4" />
           Новый отчёт
-        </Button>
+        </Button>}
       </div>
     </div>
   );
@@ -175,9 +175,9 @@ export function EvidenceReportRow({
   formatLastEditor: (r: ReportDTO) => string;
   onSelect: (r: ReportDTO) => void;
   onOpenDetails: (r: ReportDTO) => void;
-  onEdit: (r: ReportDTO) => void;
+  onEdit?: (r: ReportDTO) => void;
   onPreviewPdf: (r: ReportDTO) => void;
-  onDelete: (r: ReportDTO) => void;
+  onDelete?: (r: ReportDTO) => void;
 }) {
   const totals = getReportTotals(report);
 
@@ -224,8 +224,8 @@ export function EvidenceReportRow({
         <IconButton label="Показать в правой панели" onClick={() => onSelect(report)} icon={FileText} />
         <IconButton label="Предпросмотр PDF" onClick={() => onPreviewPdf(report)} icon={Eye} />
         <IconButton label="Подробнее" onClick={() => onOpenDetails(report)} icon={ShieldCheck} />
-        <IconButton label="Редактировать" onClick={() => onEdit(report)} icon={Pencil} />
-        <IconButton label="Удалить" onClick={() => onDelete(report)} icon={Trash2} danger disabled={deleting} />
+        {onEdit && <IconButton label="Редактировать" onClick={() => onEdit(report)} icon={Pencil} />}
+        {onDelete && <IconButton label="Удалить" onClick={() => onDelete(report)} icon={Trash2} danger disabled={deleting} />}
       </div>
     </div>
   );

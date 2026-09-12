@@ -20,6 +20,7 @@
  * первого отчёта выглядит как «ничего не сделано».
  */
 
+import { useAbility } from '@/lib/use-ability';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -69,6 +70,7 @@ function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; t
 }
 
 export function AdminDashboard() {
+  const canReadMaintenance = useAbility('maintenance.manage');
   const router = useRouter();
   const layout = useMainDashboardLayout();
   const [analytics, setAnalytics] = useState<SiteAnalyticsDTO[]>([]);
@@ -113,17 +115,17 @@ export function AdminDashboard() {
     try {
       const [fRes, mRes, rRes] = await Promise.all([
         authFetch('/api/monitoring/fleet'),
-        authFetch('/api/maintenance'),
+        canReadMaintenance ? authFetch('/api/maintenance') : Promise.resolve(null),
         authFetch('/api/reports/recent'),
       ]);
-      setStale((prev) => ({ ...prev, fleet: !fRes.ok, maint: !mRes.ok, recent: !rRes.ok }));
+      setStale((prev) => ({ ...prev, fleet: !fRes.ok, maint: canReadMaintenance && !mRes?.ok, recent: !rRes.ok }));
       if (fRes.ok) setFleet((await fRes.json()) as FleetSnapshot);
-      if (mRes.ok) setMaint(((await mRes.json()).records ?? []) as MaintRow[]);
+      if (mRes?.ok) setMaint(((await mRes.json()).records ?? []) as MaintRow[]);
       if (rRes.ok) setRecent(((await rRes.json()).reports ?? []) as RecentReport[]);
     } catch {
-      setStale((prev) => ({ ...prev, fleet: true, maint: true, recent: true }));
+      setStale((prev) => ({ ...prev, fleet: true, maint: canReadMaintenance, recent: true }));
     }
-  }, []);
+  }, [canReadMaintenance]);
 
   const refreshAll = useCallback(() => { void loadAnalytics(); void loadOps(); }, [loadAnalytics, loadOps]);
 
@@ -162,6 +164,7 @@ export function AdminDashboard() {
   // ── Derived: maintenance state per equipment ────────────────────────────────
   const maintByRig = useMemo(() => {
     const m = new Map<string, { overdue: boolean; repair: boolean; requires: boolean }>();
+    if (!canReadMaintenance) return m;
     for (const r of maint) {
       if (!r.equipmentId || !OPEN_STATUSES.has(r.status)) continue;
       const cur = m.get(r.equipmentId) ?? { overdue: false, repair: false, requires: false };
@@ -172,7 +175,7 @@ export function AdminDashboard() {
       m.set(r.equipmentId, cur);
     }
     return m;
-  }, [maint]);
+  }, [maint, canReadMaintenance]);
 
   // Production numbers come from analytics (period-aware). Operational numbers
   // come from fleet/maintenance and are always "now".
@@ -297,7 +300,7 @@ export function AdminDashboard() {
     'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`} sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`} progress={drillingProgress} /> },
     'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={formatDowntimeHours(kpis.downtime)} sub="за период" /> },
     'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={`${kpis.rigsWorking} в работе`} sub={`из ${kpis.rigsTotal}`} progress={fleetProgress} /> },
-    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={`${formatNumber(kpis.toRisk)} риска`} sub={`из ${kpis.rigsTotal} установок`} /> },
+    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={canReadMaintenance ? `${formatNumber(kpis.toRisk)} риска` : '—'} sub={canReadMaintenance ? `из ${kpis.rigsTotal} установок` : 'Недоступно вашей роли'} /> },
   };
 
   return (
@@ -403,7 +406,7 @@ export function AdminDashboard() {
 
         <Section icon={AlertTriangle} title="Риски дня" count={visibleRisks.length} dominant>
           {visibleRisks.length === 0 ? (
-            (stale.fleet || stale.maint || stale.recent) ? <Empty text="Часть данных не загрузилась" tone="warning" /> : <Empty text="Рисков нет" tone="success" />
+            (stale.fleet || stale.maint || stale.recent) ? <Empty text="Часть данных не загрузилась" tone="warning" /> : <Empty text={canReadMaintenance ? "Рисков нет" : "Рисков в доступных данных нет"} tone="success" />
           ) : (
             <div className="divide-y divide-border">
               <RiskGroup title="Критично" risks={groupedRisks.critical} onOpen={(href) => router.push(href)} />
