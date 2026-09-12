@@ -80,6 +80,24 @@ export function missingPrerequisites(
   return STAGE_PREREQUISITES[stage].filter((required) => !completed.includes(required));
 }
 
+/**
+ * Принята ли установка — по состоянию смены, а не по её существованию.
+ *
+ * Запланированная диспетчером смена существует задолго до того, как машинист к
+ * ней подошёл. Считать её принятой нельзя: приём установки — это действие
+ * человека (`acceptEquipment`), которое и переводит смену в STARTED. Пока это
+ * правило жило как `Boolean(shift)` в запросе состояния, найденная
+ * запланированная смена проскакивала фазу приёма, смена оставалась
+ * PENDING_ACCEPTANCE, и выработка отвергалась сервером всю смену (бой,
+ * 12.09.2026). Поэтому правило стоит здесь, рядом с порядком фаз, а не в
+ * выборке.
+ *
+ * HANDOVER_PENDING — тоже принятая: смену в этом состоянии уже сдают.
+ */
+export function admissionAccepted(shiftState: string | null | undefined): boolean {
+  return shiftState === 'STARTED' || shiftState === 'HANDOVER_PENDING';
+}
+
 export interface ShiftFacts {
   /** Оператор ознакомился с действующей версией инструкции. */
   briefingAcknowledged: boolean;

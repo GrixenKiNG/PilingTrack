@@ -12,7 +12,8 @@ import {
   resolveShiftConditions, selectChecklistSections, type EquipmentCapabilities,
 } from '../domain/shift-conditions';
 import {
-  completedPhases, derivePhase, PHASE_LABELS, PHASE_ORDER, type OperatorPhase,
+  admissionAccepted, completedPhases, derivePhase, PHASE_LABELS, PHASE_ORDER,
+  type OperatorPhase,
 } from '../domain/shift-phases';
 import {toDefectViews} from './defect-views';
 import {collectWarnings, isWorkAllowed} from '../domain/work-warnings';
@@ -469,7 +470,10 @@ export async function queryOperatorMobileState(input: {
   const phase = derivePhase({
     briefingAcknowledged: briefingOk,
     knowledgeValid: knowledgeOk,
-    admissionAccepted: Boolean(shift),
+    // Выборка выше берёт сегодняшнюю смену в любом состоянии, кроме отменённой,
+    // — запланированную диспетчером надо показать тому, кто на неё выходит. Но
+    // «найдена» не значит «принята»: правило и его цена — в `admissionAccepted`.
+    admissionAccepted: admissionAccepted(shift?.state),
     completedStages,
     workFinished: shift?.state === 'HANDOVER_PENDING',
     shiftClosed: shift?.state === 'CLOSED',
