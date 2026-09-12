@@ -303,6 +303,9 @@ function csvCell(value: string): string {
 
 export interface ReportExportFilters {
   tenantId: string;
+  userId?: string | null;
+  equipmentId?: string | null;
+  filter?: 'downtime' | 'withPhotos' | 'edited' | null;
   siteId?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
@@ -319,16 +322,19 @@ async function fetchReportsForExport(filters: ReportExportFilters) {
 
   const where: Record<string, unknown> = { tenantId: filters.tenantId };
   if (filters.siteId) where.siteId = filters.siteId;
+  if (filters.userId) where.userId = filters.userId;
+  if (filters.equipmentId) where.equipmentId = filters.equipmentId;
   if (filters.dateFrom || filters.dateTo) {
     where.date = {};
     if (filters.dateFrom) (where.date as Record<string, unknown>).gte = filters.dateFrom;
     if (filters.dateTo) (where.date as Record<string, unknown>).lte = filters.dateTo;
   }
 
-  return db.report.findMany({
+  const reports = await db.report.findMany({
     where,
     include: {
       user: { select: { name: true } },
+      equipment: { select: { name: true } },
       crew: { select: { name: true, equipment: { select: { name: true } } } },
       site: { select: { name: true } },
       piles: { include: { pileGrade: true } },
@@ -337,6 +343,18 @@ async function fetchReportsForExport(filters: ReportExportFilters) {
     },
     orderBy: { date: 'desc' },
   });
+  if (filters.filter === 'downtime') return reports.filter((report) => report.downtimes.reduce((sum, row) => sum + row.duration, 0) > 0);
+  if (filters.filter === 'edited') return reports.filter((report) => Boolean(report.lastEditedByName));
+  if (filters.filter === 'withPhotos') {
+    const media = await db.media.findMany({
+      where: { tenantId: filters.tenantId, entityType: 'report', entityId: { in: reports.map(row => row.reportId) }, isDeleted: false, uploadStatus: 'completed' },
+      select: { entityId: true },
+    });
+    const withPhotos = new Set(media.map(row => row.entityId));
+    return reports.filter(report => withPhotos.has(report.reportId));
+  }
+  return reports;
+
 }
 
 export async function exportReportsCsv(filters: ReportExportFilters) {
@@ -354,7 +372,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       site: report.site.name,
       operator: report.user.name,
       crew: report.crew?.name || '',
-      equipment: report.crew?.equipment?.name || '',
+      equipment: report.equipment?.name || report.crew?.equipment?.name || '',
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
@@ -438,7 +456,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   for (const r of reports) {
     const base = [
       r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name,
-      r.crew?.name || '', r.crew?.equipment?.name || '',
+      r.crew?.name || '', r.equipment?.name || r.crew?.equipment?.name || '',
     ];
     // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
     // словарь может не разрешиться (дрейф после переноса базы), и без защиты
@@ -469,7 +487,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
     totals.push([
-      r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name, r.crew?.equipment?.name || '',
+      r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, wells, meters, downtime, r.endingFuelPercent ?? null,
     ]);
   }

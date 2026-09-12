@@ -30,6 +30,13 @@ export const GET = withApi(
     const dateFrom = request.nextUrl.searchParams.get('dateFrom');
     const dateTo = request.nextUrl.searchParams.get('dateTo');
     const siteId = request.nextUrl.searchParams.get('siteId');
+    const userId = request.nextUrl.searchParams.get('userId');
+    const equipmentId = request.nextUrl.searchParams.get('equipmentId');
+    const filterParam = request.nextUrl.searchParams.get('filter');
+    if (filterParam && !['downtime', 'withPhotos', 'edited'].includes(filterParam)) {
+      return NextResponse.json({ error: 'Неизвестный фильтр выгрузки' }, { status: 400 });
+    }
+    const filter = filterParam as 'downtime' | 'withPhotos' | 'edited' | null;
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
@@ -40,7 +47,7 @@ export const GET = withApi(
 
     const fromTs = Date.parse(dateFrom);
     const toTs = Date.parse(dateTo);
-    if (Number.isNaN(fromTs) || Number.isNaN(toTs) || toTs < fromTs) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo) || Number.isNaN(fromTs) || Number.isNaN(toTs) || new Date(fromTs).toISOString().slice(0, 10) !== dateFrom || new Date(toTs).toISOString().slice(0, 10) !== dateTo || toTs < fromTs) {
       return NextResponse.json(
         { error: 'Invalid dateFrom/dateTo' },
         { status: 400 },
@@ -60,7 +67,7 @@ export const GET = withApi(
     const mod = await getReportsModule();
 
     if (format === 'xlsx') {
-      const xlsx = await mod.exportReportsXlsx({ tenantId, siteId, dateFrom, dateTo });
+      const xlsx = await mod.exportReportsXlsx({ tenantId, siteId, userId, equipmentId, filter, dateFrom, dateTo });
       return new NextResponse(new Uint8Array(xlsx), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -69,7 +76,7 @@ export const GET = withApi(
       });
     }
 
-    const csv = await mod.exportReportsCsv({ tenantId, siteId, dateFrom, dateTo });
+    const csv = await mod.exportReportsCsv({ tenantId, siteId, userId, equipmentId, filter, dateFrom, dateTo });
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
