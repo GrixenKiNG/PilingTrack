@@ -3,7 +3,7 @@ import {capturedClock} from '../clock';
 import {evaluateReadiness} from '../evaluator';
 import {buildEvidence} from '../evidence';
 import {immutablePublishedRules} from '../rules';
-import {DEFAULT_READINESS_RULES} from '../../readiness-rules';
+import {DEFAULT_READINESS_RULES, usesWorkPermits} from '../../readiness-rules';
 
 /*
   immutablePublishedRules возвращает null, если набор правил не опубликован.
@@ -55,6 +55,22 @@ describe('authoritative readiness evaluator', () => {
       clock: capturedClock(new Date('2026-03-29T00:30:00.000Z'))});
     expect(result.allowed).toBe(true);
     expect(result.warnings).toHaveLength(0);
+    /*
+      Тот же ответ обязан получить и сборщик фактов. Пока он решал сам, снимок
+      писал «наряд не подтверждён» там, где оценщик наряд не спрашивал: балл
+      не страдал (вес 0), но «Центр готовности» вечно показывал шаг «Допуск»
+      невыполненным, а лента администратора — «2 из 3».
+    */
+    expect(usesWorkPermits(rules)).toBe(false);
+  });
+
+  // Оставленное правило о просрочке — тоже признак, что наряды ведут: иначе
+  // организация следила бы за сроком документа, которого не выписывает.
+  it('считает наряды ведущимися, если тенант оставил правило о просрочке', () => {
+    const rules = publishedRules({...DEFAULT_READINESS_RULES,
+      blockers: DEFAULT_READINESS_RULES.blockers.map((item) => item.condition === 'PERMIT_EXPIRED'
+        ? {...item, isActive: true} : item)});
+    expect(usesWorkPermits(rules)).toBe(true);
   });
 
   // Обратный случай: у тенанта, который наряды ведёт (вес критерия больше

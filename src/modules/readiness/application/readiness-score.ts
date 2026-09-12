@@ -6,6 +6,7 @@ import {capturedClock, type EvaluationClock} from '../domain/evaluation/clock';
 import {evaluateReadiness} from '../domain/evaluation/evaluator';
 import {buildEvidence} from '../domain/evaluation/evidence';
 import {immutablePublishedRules} from '../domain/evaluation/rules';
+import {usesWorkPermits} from '../domain/readiness-rules';
 
 /**
  * Статусы наряда ТО, которые авторитетный расчёт считает «работа не закрыта».
@@ -150,22 +151,6 @@ export async function evaluateAuthoritativeReadiness(input: {
   const healthScore = preferOperatorInspection
     ? operatorHealthScore
     : inspection?.healthScore ?? operatorHealthScore ?? null;
-  const facts = {
-    inspectionCompleted: inspectedToday,
-    inspectionProgress: inspectedToday ? 1 : inspectedEver ? 0.5 : 0,
-    healthScore,
-    meterKnown: equipment.engineHoursTotal != null,
-    permitValid: Boolean(permit && permit.state === 'APPROVED' && permit.validFrom <= now && permit.validTo > now),
-    permitExpired: Boolean(permit && (permit.state === 'EXPIRED' || permit.validTo <= now)),
-    maintenanceConfigured: equipment.nextMaintenanceAtHours != null || equipment.nextMaintenanceDate != null,
-    maintenanceOverdueHours: overdueHours,
-    maintenanceOverdueDays: overdueDays,
-    accepted: Boolean(startApproval),
-    criticalDefect: blockingDefect != null || openRecords.some((row) =>
-      (row.type === 'FAULT' || row.type === 'REPAIR') && row.priority === 'CRITICAL'),
-    findings: healthScore == null ? 0 : Math.max(0, Math.ceil((100 - healthScore) / 10)),
-  } as const;
-
   const rules = publishedRow ? immutablePublishedRules({
     version: publishedRow.version,
     status: publishedRow.status,
@@ -175,6 +160,40 @@ export async function evaluateAuthoritativeReadiness(input: {
     updatedBy: publishedRow.updatedBy ?? undefined,
     publishedAt: publishedRow.publishedAt?.toISOString() ?? null,
   }) : null;
+  /*
+    «Наряда нет» и «наряд не нужен» — разные ответы, и снимок обязан их
+    различать. `null` означает «правила наряд не требуют», и так его читают
+    все потребители: балл начисляет полностью, экран пишет «не требуется».
+
+    Пока здесь стоял `Boolean(permit && ...)`, организация без нарядов
+    получала `false` — «не подтверждён». Балл от этого не страдал (вес 0), но
+    «Центр готовности» показывал шаг «Допуск» невыполненным, а лента
+    администратора навсегда застывала на «2 из 3»: ждала документ, который в
+    этой организации не выписывают. Расчёт наряд не спрашивал, а интерфейс
+    продолжал требовать.
+
+    Без опубликованных правил считаем, что наряды ведут: предполагать
+    «не требуется» там, где требования ещё неизвестны, нельзя.
+  */
+  const permitsInUse = rules ? usesWorkPermits(rules) : true;
+  const facts = {
+    inspectionCompleted: inspectedToday,
+    inspectionProgress: inspectedToday ? 1 : inspectedEver ? 0.5 : 0,
+    healthScore,
+    meterKnown: equipment.engineHoursTotal != null,
+    permitValid: permitsInUse
+      ? Boolean(permit && permit.state === 'APPROVED' && permit.validFrom <= now && permit.validTo > now)
+      : null,
+    permitExpired: permitsInUse
+      && Boolean(permit && (permit.state === 'EXPIRED' || permit.validTo <= now)),
+    maintenanceConfigured: equipment.nextMaintenanceAtHours != null || equipment.nextMaintenanceDate != null,
+    maintenanceOverdueHours: overdueHours,
+    maintenanceOverdueDays: overdueDays,
+    accepted: Boolean(startApproval),
+    criticalDefect: blockingDefect != null || openRecords.some((row) =>
+      (row.type === 'FAULT' || row.type === 'REPAIR') && row.priority === 'CRITICAL'),
+    findings: healthScore == null ? 0 : Math.max(0, Math.ceil((100 - healthScore) / 10)),
+  } as const;
   const evaluation = evaluateReadiness({
     facts, rules,
     evidence: buildEvidence({

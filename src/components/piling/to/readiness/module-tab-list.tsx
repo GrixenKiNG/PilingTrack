@@ -20,10 +20,15 @@ export const MODULE_TABS = [
   { id: 'readiness', label: 'Центр готовности', icon: 'technical-readiness' },
   { id: 'fleet', label: 'Готовность парка', icon: 'equipment-rig' },
   { id: 'shifts', label: 'Смены', icon: 'shift-start' },
-  { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
   { id: 'maintenance', label: 'Обслуживание', icon: 'repair' },
   { id: 'documents', label: 'Документы', icon: 'documents' },
   { id: 'reports', label: 'Отчёты', icon: 'reports' },
+  // Наряды в ОРИОН не выписывают и в расчёт допуска они не входят
+  // (`readiness-rules.ts`, 07.09.2026). Реестр оставлен — организация, которая
+  // наряды ведёт, включает их правилами, — но между «Сменами» и
+  // «Обслуживанием» он стоял как обязательный шаг смены. Место по частоте
+  // обращения: рядом с настройками, а не в начале полосы.
+  { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
   { id: 'settings', label: 'Настройки', icon: 'settings' },
 ] as const satisfies ReadonlyArray<{ id: ReferenceView; label: string; icon: PilingIconName }>;
 

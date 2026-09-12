@@ -48,9 +48,11 @@ const VIEW_ITEMS: Array<{
   { id: 'readiness', label: 'Центр готовности', icon: ShieldCheck },
   { id: 'fleet', label: 'Готовность парка', icon: HardHat },
   { id: 'shifts', label: 'Смены', icon: CalendarClock },
-  { id: 'permits', label: 'Наряд-допуски', icon: FileText },
   { id: 'maintenance', label: 'Обслуживание', icon: Wrench },
   { id: 'reports', label: 'Отчёты', icon: BarChart3 },
+  // Порядок тот же, что в полосе вкладок модуля (`module-tab-list.tsx`):
+  // наряды — редкий реестр, а не шаг смены.
+  { id: 'permits', label: 'Наряд-допуски', icon: FileText },
   { id: 'settings', label: 'Настройки', icon: Settings2 },
 ];
 

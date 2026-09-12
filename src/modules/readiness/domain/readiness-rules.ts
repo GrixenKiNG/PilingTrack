@@ -119,6 +119,30 @@ export interface ReadinessRuleSet {
   publishedAt?: string | null;
 }
 
+/**
+ * Ведёт ли организация наряды-допуски вообще.
+ *
+ * Наряд участвует в допуске двумя способами: даёт вес в балле или включён
+ * правилом. Ни того, ни другого — значит наряды здесь не выписывают, и все
+ * ответы про наряд должны звучать «не требуется», а не «не подтверждён».
+ *
+ * Один ответ на два вопроса намеренно: и расчёт, и факты обязаны считать
+ * одинаково. Разъехавшись, они дали бы снимок, где наряд не нужен для балла,
+ * но не выполнен на экране — это ровно то, что мы сейчас и исправляем.
+ *
+ * Оставленное включённым правило о просрочке тоже считается признаком, что
+ * наряды ведут: следить за сроком документа, которого не существует, незачем.
+ */
+export function usesWorkPermits(rules: {
+  criteria: readonly ReadinessCriterion[];
+  blockers: readonly Pick<ReadinessBlockerRule, 'condition' | 'isActive'>[];
+}): boolean {
+  const weighted = (rules.criteria.find((item) => item.key === 'PERMIT')?.weight ?? 0) > 0;
+  const enforced = rules.blockers.some((item) => item.isActive
+    && (item.condition === 'VALID_WORK_PERMIT_REQUIRED' || item.condition === 'PERMIT_EXPIRED'));
+  return weighted || enforced;
+}
+
 export const DEFAULT_READINESS_RULES: ReadinessRuleSet = {
   version: 'v1.0',
   status: 'PUBLISHED',

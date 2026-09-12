@@ -5,7 +5,7 @@ import {
   type ReadinessVerdict,
   type TriggeredBlocker,
 } from '../readiness-score';
-import {BLOCKER_ACTION_LABELS, type ReadinessRuleSet} from '../readiness-rules';
+import {BLOCKER_ACTION_LABELS, usesWorkPermits, type ReadinessRuleSet} from '../readiness-rules';
 import type {EvaluationClock} from './clock';
 import type {ReadinessEvidence} from './evidence';
 import type {AuthoritativeReadinessFacts} from './facts';
@@ -72,7 +72,7 @@ export function evaluateReadiness(input: {
     не существует. Замечание имеет смысл там, где наряды выписывают, но
     конкретный ещё не оформлен.
   */
-  const permitConsidered = (input.rules.criteria.find((item) => item.key === 'PERMIT')?.weight ?? 0) > 0;
+  const permitConsidered = usesWorkPermits(input.rules);
   // Замечание видит оператор на экране готовности, поэтому текст по-русски и
   // про дело: «правила не требуют» — это ответ разработчику, а не машинисту.
   // Если наряд просрочен, об этом уже сказало правило PERMIT_EXPIRED, и второе

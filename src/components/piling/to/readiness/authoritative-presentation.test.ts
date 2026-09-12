@@ -145,6 +145,21 @@ describe('buildAuthoritativeReadinessPresentation', () => {
     expect(result.stages.find((stage) => stage.key === 'PERMIT')?.state).toBe('fail');
   });
 
+  /*
+    Организация, которая наряды не ведёт, присылает permitValid = null. Шаг
+    «Допуск» тогда не «не подтверждён», а выполненный и с объяснением: иначе
+    лента роли администратора («Центр готовности») ждёт документ, которого в
+    этой организации не выписывают, и навсегда стоит на «2 из 3».
+  */
+  it('показывает шаг «Допуск» выполненным, когда наряды не требуются', () => {
+    const result = buildAuthoritativeReadinessPresentation(snapshot({
+      facts: {...facts, permitValid: null},
+    }));
+    expect(result.stages.find((stage) => stage.key === 'PERMIT')).toMatchObject({
+      state: 'pass', value: 'Не требуется правилами',
+    });
+  });
+
   it('marks a legacy snapshot without facts as incomplete history', () => {
     expect(buildAuthoritativeReadinessPresentation(snapshot({facts: null}))).toMatchObject({
       mode: 'historical-incomplete',

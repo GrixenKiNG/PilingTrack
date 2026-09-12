@@ -69,7 +69,9 @@ async function main() {
     console.log(`    модуль прочитал: осмотр сегодня ${f.inspectionCompleted ? 'да' : 'нет'}`
       + ` (готовность ${Math.round(f.inspectionProgress * 100)}%, оценка ${f.healthScore ?? '—'})`
       + `, моточасы ${f.meterKnown ? 'известны' : 'неизвестны'}`
-      + `, наряд ${f.permitValid ? 'действует' : f.permitExpired ? 'просрочен' : 'нет'}`
+      // null — «правила наряд не требуют»; печатать это «нет» значит повторять
+      // в отчёте ту же путаницу, из-за которой экран ждал ненужный документ.
+      + `, наряд ${f.permitValid == null ? 'не требуется' : f.permitValid ? 'действует' : f.permitExpired ? 'просрочен' : 'нет'}`
       + `, ТО ${f.maintenanceConfigured ? `перепробег ${f.maintenanceOverdueHours} м/ч / ${f.maintenanceOverdueDays} дн.` : 'регламент не настроен'}`
       + `, критический дефект ${f.criticalDefect ? 'есть' : 'нет'}`
       + `, приёмка ${f.accepted ? 'есть' : 'нет'}`);
