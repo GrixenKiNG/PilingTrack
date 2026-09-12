@@ -1,18 +1,22 @@
-'use client';
+import type {Metadata} from 'next';
+import {OperatorMobileApp} from '@/components/piling/operator-mobile/operator-mobile-app';
 
-import { OperatorDashboard } from '@/components/piling/operator-dashboard';
+export const metadata: Metadata = {title: 'Смена машиниста'};
 
 /**
- * Рабочее место машиниста — действующее исполнение.
+ * Рабочее место машиниста сваебойной установки.
  *
- * Новый контур смены (`operator-mobile`) в коде есть и покрыт тестами, но на
- * бой не выпущен: решение владельца от 12.09.2026 — сначала доработать, потом
- * включать. Пока машинист работает на прежнем экране, к которому привык.
+ * Смена от допуска до отправки отчёта: инструктаж, проверка знаний, приём
+ * установки, осмотр, пуск, площадка, учёт выработки, послесменное обслуживание.
+ * Данные берутся из общей базы и уходят в отчёт смены — тот же `Report`, что
+ * заполняет администратор, поэтому выработка сразу видна в аналитике.
  *
- * Чтобы включить новый контур, здесь возвращается `OperatorMobileApp` из
- * `@/components/piling/operator-mobile/operator-mobile-app` — и вместе с ним
- * нужно вернуть пункт «История» в нижнее меню (`icons/role-navigation.ts`).
+ * Включено на бой 12.09.2026 решением владельца. Прежний экран
+ * (`operator-dashboard.tsx` и его шаги в `components/piling/operator/`)
+ * оставлен в коде как путь отхода: если новый контур подведёт, здесь
+ * возвращается `OperatorDashboard`, а в нижнее меню — «Мониторинг» вместо
+ * «Истории» (`icons/role-navigation.ts`).
  */
 export default function OperatorPage() {
-  return <OperatorDashboard />;
+  return <OperatorMobileApp />;
 }

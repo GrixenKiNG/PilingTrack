@@ -19,9 +19,14 @@ export interface NavigationItem {
 // препятствия к пуску и так показаны на экране смены. Маршрут по-прежнему
 // открыт оператору (см. `(readiness-admin)/layout.tsx`) — убран пункт меню, а
 // не доступ: по ссылке из уведомления человек попадёт куда звали.
+//
+// «Мониторинг» убран 12.09.2026 вместе с включением нового контура смены:
+// сводка по всему парку — инструмент диспетчера и механика. Вместо него
+// «История»: свои прошлые смены машинист открывает регулярно, а из нового
+// экрана смены туда хода нет.
 const operatorNavigation: NavigationItem[] = [
-  { label: 'Смена', href: OPERATOR_HOME_ROUTE, icon: 'home' },
-  { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring', tone: 'info' },
+  { label: 'Смена', href: OPERATOR_HOME_ROUTE, icon: 'home', tone: 'primary' },
+  { label: 'История', href: '/history', icon: 'history' },
 ];
 
 /**

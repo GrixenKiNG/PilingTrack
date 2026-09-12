@@ -19,7 +19,7 @@ describe('ROLE_NAVIGATION', () => {
   it('covers the operator workflow routes', () => {
     expect(ROLE_NAVIGATION.OPERATOR.map(({ href, icon }) => [href, icon])).toEqual([
       [OPERATOR_HOME_ROUTE, 'home'],
-      ['/monitoring', 'monitoring'],
+      ['/history', 'history'],
     ]);
     // У помощника своё место, а не урезанное место машиниста: рабочее место
     // машиниста отвечает ему отказом, и пункт меню, ведущий в отказ, — это
@@ -39,10 +39,7 @@ describe('ROLE_NAVIGATION', () => {
    */
   it('keeps the operator out of routes that bypass the shift step', () => {
     const routes = ROLE_NAVIGATION.OPERATOR.map((item) => item.href);
-    // «Мониторинг» из этого списка убран 12.09.2026 вместе с решением оставить
-    // машиниста на действующем экране смены: его меню — из того же исполнения.
-    // Сводка по парку шага смены не обходит, отчёт и центр готовности — обходят.
-    for (const bypass of ['/report', '/admin/to']) {
+    for (const bypass of ['/report', '/admin/to', '/monitoring']) {
       expect(routes).not.toContain(bypass);
     }
   });
