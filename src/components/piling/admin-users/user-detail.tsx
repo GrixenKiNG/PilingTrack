@@ -101,7 +101,9 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
             <div className="border-b border-border px-2.5 py-2 text-2xs font-semibold text-foreground">Объекты</div>
             {user.assignedSites.length > 0 ? user.assignedSites.map((site) => (
               <div key={site.id} className="border-b border-border px-2.5 py-2 text-xs last:border-b-0">{site.name}</div>
-            )) : <div className="px-2.5 py-3 text-2xs text-warning-strong">Объект не назначен</div>}
+            )) : user.role === 'ASSISTANT' && user.activeCrew?.siteName ? (
+              <div className="px-2.5 py-2 text-xs">{user.activeCrew.siteName}<span className="ml-2 text-muted-foreground">Через экипаж</span></div>
+            ) : <div className="px-2.5 py-3 text-2xs text-warning-strong">Объект не назначен</div>}
           </div>
           <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
             <OpsFact label="Бригада" value={user.activeCrew?.name || 'Не назначена'} />

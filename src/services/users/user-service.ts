@@ -60,6 +60,15 @@ export async function listUsers(
         },
         orderBy: { createdAt: 'asc' },
       },
+      crewAssistantOf: {
+        where: { crew: { isActive: true, site: { tenantId } } },
+        select: { crew: { select: {
+          id: true, name: true,
+          equipment: { select: { name: true } },
+          site: { select: { name: true } },
+        } } },
+        orderBy: { id: 'asc' },
+      },
       _count: { select: { reports: true, sites: true } },
       reports: {
         orderBy: { updatedAt: 'desc' },
@@ -103,7 +112,7 @@ export async function listUsers(
       activity.at !== null
     );
     const latestActivity = activities.sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null;
-    const activeCrew = user.crews[0] ?? null;
+    const activeCrew = user.crews[0] ?? user.crewAssistantOf?.[0]?.crew ?? null;
 
     return {
       id: user.id,
@@ -123,7 +132,7 @@ export async function listUsers(
           }
         : null,
       reportCount: user._count.reports,
-      canHardDelete: user._count.reports === 0 && user._count.sites === 0 && user.crews.length === 0,
+      canHardDelete: user._count.reports === 0 && user._count.sites === 0 && user.crews.length === 0 && !user.crewAssistantOf?.length,
       lastReportAt: lastReport?.toISOString() ?? null,
       lastLoginAt: lastLogin?.toISOString() ?? null,
       lastActivityAt: latestActivity?.at.toISOString() ?? null,

@@ -197,6 +197,11 @@ export function AdminUsers() {
             <div className="text-3xs text-muted-foreground">+ ещё {user.assignedSites.length - 1}</div>
           )}
         </div>
+      ) : user.role === 'ASSISTANT' && user.activeCrew?.siteName ? (
+        <div className="min-w-0">
+          <div className="truncate text-xs font-medium text-foreground">{user.activeCrew.siteName}</div>
+          <div className="text-3xs text-muted-foreground">Через экипаж</div>
+        </div>
       ) : <span className="text-2xs text-warning-strong">Не назначен</span>,
     },
     {
