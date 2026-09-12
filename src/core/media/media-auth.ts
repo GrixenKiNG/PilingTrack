@@ -1,11 +1,13 @@
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { isPrivilegedRole } from '@/services/auth/authorization-service';
+import { can, isPrivilegedRole } from '@/services/auth/authorization-service';
+import { resolveEffectiveRole } from '@/lib/types';
 import { ServiceError } from '@/lib/service-error';
 
 interface ActorLike {
   id: string;
   role: string;
   tenantId?: string | null;
+  actingAs?: string | null;
 }
 
 interface MediaContext {
@@ -29,13 +31,15 @@ export async function assertCanAccessMediaEntity(
   actor: ActorLike,
   entityType: string | null | undefined,
   entityId: string | null | undefined,
+  action: 'read' | 'mutate' = 'mutate',
 ): Promise<void> {
   if (entityType === 'equipment') {
-    if (actor.role !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
+    if (action === 'read' && actor.tenantId && can(actor, 'equipment.read')) return;
+    if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
     return;
   }
 
-  if (isPrivilegedRole(actor.role)) return;
+  if (isPrivilegedRole(resolveEffectiveRole(actor.role, actor.actingAs))) return;
 
   if (!entityType || !entityId) {
     throw new ServiceError('entityType and entityId are required for non-admin users', 400);
@@ -45,9 +49,10 @@ export async function assertCanAccessMediaEntity(
     const { db } = await import('@/lib/db');
     const report = await db.report.findFirst({
       where: { OR: [{ id: entityId }, { reportId: entityId }] },
-      select: { userId: true },
+      select: { userId: true, tenantId: true },
     });
     if (!report) return; // draft id — operator hasn't submitted yet
+    if (action === 'read' && actor.tenantId && report.tenantId === actor.tenantId && can(actor, 'reports.read_cross_user')) return;
     if (report.userId !== actor.id) throw new ServiceError('Forbidden', 403);
     return;
   }
@@ -69,15 +74,25 @@ export async function assertCanAccessMediaEntity(
   // упирался в тупик: ответы сохранялись, а завершение отвечало «без
   // обязательного фото». Доступ сужен до своего осмотра — тем же правилом,
   // что и сам осмотр.
+  if (entityType === 'maintenance') {
+    const { db } = await import('@/lib/db');
+    const record = await db.maintenanceRecord.findUnique({ where: { id: entityId }, select: { tenantId: true } });
+    if (!actor.tenantId || record?.tenantId !== actor.tenantId || !can(actor, 'maintenance.manage')) {
+      throw new ServiceError('Forbidden', 403);
+    }
+    return;
+  }
+
   if (entityType === 'inspection') {
     const inspectionId = entityId.split('__')[0];
     if (!inspectionId) throw new ServiceError('Forbidden', 403);
     const { db } = await import('@/lib/db');
     const inspection = await db.inspection.findUnique({
       where: { id: inspectionId },
-      select: { performedById: true },
+      select: { performedById: true, tenantId: true },
     });
     if (!inspection) throw new ServiceError('Forbidden', 403);
+    if (action === 'read' && actor.tenantId && inspection.tenantId === actor.tenantId && can(actor, 'maintenance.manage')) return;
     if (inspection.performedById !== actor.id) throw new ServiceError('Forbidden', 403);
     return;
   }
@@ -171,11 +186,15 @@ export function assertCanAccessMedia(
       }
       return;
     }
-    if (actor.role !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
+    if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
     return;
   }
 
-  if (isPrivilegedRole(actor.role)) return;
+  if (isPrivilegedRole(resolveEffectiveRole(actor.role, actor.actingAs))) return;
   if (media.userId === actor.id) return;
+  if (action === 'read' && actor.tenantId && media.tenantId === actor.tenantId) {
+    if ((media.entityType === 'inspection' || media.entityType === 'maintenance') && can(actor, 'maintenance.manage')) return;
+    if (media.entityType === 'report' && can(actor, 'reports.read_cross_user')) return;
+  }
   throw new ServiceError('Forbidden', 403);
 }

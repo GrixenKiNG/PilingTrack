@@ -75,7 +75,7 @@ export const GET = withApi(async (request: NextRequest) => {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    await assertCanAccessMediaEntity(user!, entityType, entityId);
+    await assertCanAccessMediaEntity(user!, entityType, entityId, 'read');
   } catch (err) {
     if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;

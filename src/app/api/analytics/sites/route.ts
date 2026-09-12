@@ -15,7 +15,7 @@ export const GET = withApi(
     if (error) return error;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    assertCan(user!, 'analytics.read');
+    assertCan(user!, 'sites.read_all');
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);

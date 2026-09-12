@@ -31,18 +31,26 @@ describe('GET /api/crews/all', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 403 for a DISPATCHER (crews.legacy_manage is ADMIN-only)', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'd', role: 'DISPATCHER' }, error: null });
+  it('returns 403 for an OPERATOR', async () => {
+    requireAuthMock.mockResolvedValue({ user: { id: 'd', role: 'OPERATOR' }, error: null });
     const res = await GET(req());
     expect(res.status).toBe(403);
     expect(cachedCrewsMock).not.toHaveBeenCalled();
   });
 
   it('returns the cached crews for an ADMIN', async () => {
-    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN' }, error: null });
-    cachedCrewsMock.mockResolvedValue([{ id: 'c1', name: 'Crew A' }]);
+    requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'orion' }, error: null });
+    cachedCrewsMock.mockResolvedValue([{ id: 'c1', name: 'Crew A', site: { tenantId: 'orion' } }]);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect((await res.json()).crews).toEqual([{ id: 'c1', name: 'Crew A' }]);
+    expect((await res.json()).crews).toEqual([{ id: 'c1', name: 'Crew A', site: { tenantId: 'orion' } }]);
   });
+});
+
+it('dispatcher reads only crews of their organization', async () => {
+  requireAuthMock.mockResolvedValue({user: {id: 'd', role: 'DISPATCHER', tenantId: 'orion'}, error: null});
+  cachedCrewsMock.mockResolvedValue([{id: 'own', site: {tenantId: 'orion'}}, {id: 'foreign', site: {tenantId: 'other'}}]);
+  const response = await GET(req());
+  expect(response.status).toBe(200);
+  expect((await response.json()).crews.map((crew: {id: string}) => crew.id)).toEqual(['own']);
 });
