@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HardHat, Mail, Lock, Eye, EyeOff, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
@@ -11,7 +11,12 @@ import { Label } from '@/components/ui/label';
 
 const BACKGROUNDS = ['/login-bg/bg-1.png', '/login-bg/bg-2.png', '/login-bg/bg-3.png'];
 
+const subscribeHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
+
 export function LoginPage() {
+  const hydrated = useSyncExternalStore(subscribeHydration, clientReady, serverReady);
   const login = usePilingStore((s) => s.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -103,6 +108,7 @@ export function LoginPage() {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                 <Input
                   id="email"
+                  disabled={!hydrated}
                   type="email"
                   placeholder="operator@piling.ru"
                   value={email}
@@ -120,6 +126,7 @@ export function LoginPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                 <Input
                   id="password"
+                  disabled={!hydrated}
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
@@ -143,7 +150,7 @@ export function LoginPage() {
             <Button
               type="submit"
               className="w-full h-12 md:h-13 bg-info-strong hover:bg-info-strong text-white font-medium text-base shadow-lg shadow-info/30"
-              disabled={loading}
+              disabled={loading || !hydrated}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Войти'}
             </Button>
