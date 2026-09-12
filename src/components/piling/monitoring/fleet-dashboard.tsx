@@ -63,20 +63,25 @@ export function FleetDashboard() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempt = useRef(0);
+  const snapshotRequest = useRef(0);
   const fetchSnapshot = useCallback(async (opts?: { bust?: boolean }) => {
+    const request = ++snapshotRequest.current;
     try {
       const url = opts?.bust
         ? `/api/monitoring/fleet?_ts=${Date.now()}`
         : '/api/monitoring/fleet';
-      const res = await authFetch(url);
+      const res = await authFetch(url, {signal: AbortSignal.timeout(15_000)});
+      if (request !== snapshotRequest.current) return;
       if (!res.ok) {
         setError('Сервис мониторинга временно недоступен.');
         return;
       }
       const data: FleetSnapshot = await res.json();
+      if (request !== snapshotRequest.current) return;
       setSnap(data);
       setError(null);
     } catch {
+      if (request !== snapshotRequest.current) return;
       setError('Нет соединения с сервисом мониторинга.');
     }
   }, []);
@@ -135,6 +140,7 @@ export function FleetDashboard() {
       ws.addEventListener('open', () => {
         reconnectAttempt.current = 0;
         setConn('live');
+        void fetchSnapshot({ bust: true });
       });
       ws.addEventListener('close', () => {
         setConn('offline');
@@ -167,7 +173,15 @@ export function FleetDashboard() {
       if (refetchTimer.current) clearTimeout(refetchTimer.current);
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
     };
-  }, [scheduleRefetch]);
+  }, [scheduleRefetch, fetchSnapshot]);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchSnapshot({bust: true}); };
+    const timer = setInterval(refresh, 30_000);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [fetchSnapshot]);
 
   const siteOptions = useMemo(() => {
     if (!snap) return [];
@@ -227,7 +241,11 @@ export function FleetDashboard() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      <StatusBar snap={snap} conn={conn} />
+      {error && <div role="alert" className="rounded-lg border border-destructive p-3 text-destructive-strong">
+        {error} Показан предыдущий снимок.
+        <button type="button" className="ml-3 underline" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
+      </div>}
+      <StatusBar snap={snap} conn={error ? 'offline' : conn} />
 
       {snap.equipment.length > 1 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -315,7 +333,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
             conn === 'connecting' && 'border-warning/30 bg-warning/10 text-warning-strong',
             conn === 'offline' && 'border-destructive/30 bg-destructive/10 text-destructive-strong',
           )}>
-            {conn === 'live' ? 'Данные онлайн' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
+            {conn === 'live' ? 'Соединение активно' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
           </div>
           <div className="text-3xs text-muted-foreground">Данные обновлены {formatRelative(snap.asOf)}</div>
         </div>

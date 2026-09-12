@@ -12,7 +12,7 @@
  *   - print / save via the browser
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Gauge, HardHat, Drill, Clock, Fuel, Wrench, Printer, ArrowUpDown,
@@ -86,21 +86,26 @@ export function EquipmentAnalytics() {
   const [sortKey, setSortKey] = useState<SortKey>('piles');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const invalid = from > to;
+  const requestId = useRef(0);
 
   const load = useCallback(async () => {
-    if (from > to) return;
+    const id = ++requestId.current;
+    if (from > to) { setData(null); setLoading(false); return; }
+    setData(null);
     setLoading(true);
     setError(null);
     try {
       const qs = new URLSearchParams({ dateFrom: from, dateTo: to });
       const { authFetch } = await import('@/lib/api');
       const res = await authFetch(`/api/admin/equipment-analytics?${qs.toString()}`);
+      if (id !== requestId.current) return;
       if (!res.ok) { setError(`Сервер вернул ${res.status}`); return; }
-      setData(await res.json());
+      const next = await res.json();
+      if (id === requestId.current) setData(next);
     } catch (err) {
-      setError((err as Error).message);
+      if (id === requestId.current) setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, [from, to]);
 
@@ -163,7 +168,7 @@ export function EquipmentAnalytics() {
 
       {invalid && <p className="text-xs text-destructive-strong">Дата «С» позже даты «По».</p>}
 
-      {error && !data ? (
+      {error ? (
         <QueryErrorBanner message={error} onRetry={() => void load()} retrying={loading} />
       ) : loading && !data ? (
         <Skeleton className="h-40 w-full" />
