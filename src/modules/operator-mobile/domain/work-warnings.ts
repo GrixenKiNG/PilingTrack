@@ -193,7 +193,9 @@ export function collectWarnings(input: WarningInput): WorkWarning[] {
       level: 'ALERT',
       title: alerting.length === 1 ? 'Неисправность не устранена' : `Неисправностей не устранено: ${alerting.length}`,
       detail: alerting.map((defect) => defect.title).join('; '),
-      resolution: 'Работать с осторожностью. Предупреждение снимется, когда механик закроет дефект.',
+      resolution: alerting.some(defect => defect.severity === 'CRITICAL')
+        ? 'Эксплуатация запрещена до устранения критического дефекта. Сообщите механику и диспетчеру.'
+        : 'Согласуйте дальнейшие действия с механиком и диспетчером. Дефект требует срочного устранения.',
     });
   }
 

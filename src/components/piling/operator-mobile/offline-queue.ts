@@ -78,24 +78,36 @@ export function commandLabel(command: unknown): string {
 
 // --- Хранилище ---
 
-function read(): QueuedCommand[] {
+export class QueueStorageError extends Error {
+  constructor() {
+    super('Не удалось сохранить запись на устройстве. Не закрывайте форму: освободите место или восстановите связь и повторите.');
+    this.name = 'QueueStorageError';
+  }
+}
+
+function read(strict = false): QueuedCommand[] {
   try {
     const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed as QueuedCommand[] : [];
+    if (!Array.isArray(parsed)) throw new QueueStorageError();
+    return parsed as QueuedCommand[];
   } catch {
-    // Испорченное хранилище не должно ронять смену: считаем очередь пустой.
+    if (strict) throw new QueueStorageError();
+    // Reading the badge must not crash the screen; enqueue uses strict reads.
     return [];
   }
 }
 
 function write(queue: QueuedCommand[]): void {
   try {
-    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(queue));
+    const storage = globalThis.localStorage;
+    if (!storage) throw new QueueStorageError();
+    const value = JSON.stringify(queue);
+    storage.setItem(STORAGE_KEY, value);
+    if (storage.getItem(STORAGE_KEY) !== value) throw new QueueStorageError();
   } catch {
-    // Переполнение или приватный режим. Записать не смогли — молчим: сообщать
-    // об этом машинисту нечем, а работу останавливать нельзя.
+    throw new QueueStorageError();
   }
   notify();
 }
@@ -125,7 +137,7 @@ export function pendingCount(): number {
 
 /** Кладём до отправки: обрыв на середине запроса не должен терять запись. */
 export function enqueue(command: {clientCommandId: string}): void {
-  const queue = read();
+  const queue = read(true);
   if (queue.some((item) => item.clientCommandId === command.clientCommandId)) return;
   queue.push({
     clientCommandId: command.clientCommandId,

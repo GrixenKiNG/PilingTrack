@@ -179,9 +179,9 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
     >
       <WarningsPanel warnings={state.warnings} />
 
-      <Panel tone={state.workAllowed ? 'ok' : 'danger'}>
-        <PanelTitle tone={state.workAllowed ? 'ok' : 'danger'}>
-          {state.workAllowed ? 'Работа разрешена' : 'Работы прекращают'}
+      <Panel tone={state.workAllowed ? 'plain' : 'danger'}>
+        <PanelTitle tone={state.workAllowed ? 'plain' : 'danger'}>
+          {state.workAllowed ? 'Учёт выполненных работ' : 'Работы прекращают'}
         </PanelTitle>
         <div className="mt-2">
           <VolumeFact
