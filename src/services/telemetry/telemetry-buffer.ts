@@ -12,7 +12,7 @@
  *   maxBatchSize:    Max records per single INSERT (default 200)
  */
 
-import { CircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
+import { CircuitBreaker } from '@/core/infrastructure/circuit-breakers';
 import type { Prisma } from '@/generated/postgres-client';
 import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
@@ -61,6 +61,7 @@ export class TelemetryBuffer {
   private maxBatchSize: number;
 
   // Stats
+  private flushPromise: Promise<void> | null = null;
   private totalBuffered = 0;
   private totalFlushed = 0;
   private totalDropped = 0;
@@ -121,76 +122,42 @@ export class TelemetryBuffer {
    * Processes in batches respecting maxBatchSize.
    */
   async flush(): Promise<void> {
+    if (this.flushPromise) return this.flushPromise;
+    this.flushPromise = this.flushPending().finally(() => { this.flushPromise = null; });
+    return this.flushPromise;
+  }
+
+  private async flushPending(): Promise<void> {
     if (this.buffer.length === 0) return;
-
-    const recordsToFlush = [...this.buffer];
-    this.buffer = [];
+    // Resolve the client before taking ownership of the buffered records.
     const db = await getDbClient();
-
-    let flushedCount = 0;
-    let droppedCount = 0;
-
-    for (let i = 0; i < recordsToFlush.length; i += this.maxBatchSize) {
-      const batch = recordsToFlush.slice(i, i + this.maxBatchSize);
-
+    const pending = [...groupByTenant(this.buffer).values()]
+      .flatMap((records) => Array.from(
+        {length: Math.ceil(records.length / this.maxBatchSize)},
+        (_, i) => records.slice(i * this.maxBatchSize, (i + 1) * this.maxBatchSize),
+      ));
+    this.buffer = [];
+    for (let i = 0; i < pending.length; i++) {
+      const batch = pending[i];
       try {
-        await this.circuitBreaker.execute(async () => {
-          // Сброс буфера идёт по таймеру, а не внутри запроса, — контекста
-          // организации здесь нет, и под строгими политиками RLS вставка была
-          // бы отклонена. Пачка режется по организациям: в буфер попадают
-          // записи от разных устройств, и одна транзакция на всех означала бы
-          // либо отказ, либо запись под чужой организацией.
-          for (const [tenantId, records] of groupByTenant(batch)) {
-            await runWithTenantContext(async () => {
-              setRequestTenantId(tenantId);
-              await db.$transaction(
-                records.map((record) =>
-                  db.telemetryRecord.create({
-                    data: {
-                      type: record.type,
-                      tenantId: record.tenantId,
-                      equipmentId: record.equipmentId,
-                      siteId: record.siteId || null,
-                      value: record.value,
-                      unit: record.unit || null,
-                      latitude: record.latitude || null,
-                      longitude: record.longitude || null,
-                      ...(record.metadata !== undefined
-                        ? { metadata: toJsonMetadata(record.metadata) }
-                        : {}),
-                      timestamp: record.timestamp || new Date(),
-                    },
-                  })
-                )
-              );
-            });
-          }
-        });
-        flushedCount += batch.length;
+        await this.circuitBreaker.execute(() => runWithTenantContext(async () => {
+          setRequestTenantId(batch[0].tenantId);
+          await db.$transaction(batch.map((record) => db.telemetryRecord.create({data: {
+            type: record.type, tenantId: record.tenantId, equipmentId: record.equipmentId,
+            siteId: record.siteId ?? null, value: record.value, unit: record.unit ?? null,
+            latitude: record.latitude ?? null, longitude: record.longitude ?? null,
+            ...(record.metadata !== undefined ? {metadata: toJsonMetadata(record.metadata)} : {}),
+            timestamp: record.timestamp ?? new Date(),
+          }})));
+        }));
+        this.totalFlushed += batch.length;
       } catch (error) {
-        // Circuit is OPEN or DB failed — re-queue remaining batches
-        if (error instanceof CircuitOpenError) {
-          // Put remaining records back into buffer
-          const remaining = recordsToFlush.slice(i + this.maxBatchSize);
-          this.buffer = [...remaining, ...this.buffer];
-          droppedCount += batch.length;
-          this.totalDropped += batch.length;
-          logger.warn('TelemetryBuffer: circuit breaker OPEN, dropping batch', { batchSize: batch.length });
-          break;
-        }
-
-        // Other DB error — re-queue and log
-        const remaining = recordsToFlush.slice(i + this.maxBatchSize);
-        this.buffer = [...remaining, ...this.buffer];
-        logger.error('TelemetryBuffer: flush error', error);
-        break;
+        // Successful tenant batches stay committed; retry only the failed and
+        // unattempted batches, including the current batch (not i + 1).
+        this.buffer = [...pending.slice(i).flat().map(record => ({...record, _ingestedAt: Date.now()})), ...this.buffer];
+        logger.error('TelemetryBuffer: flush failed; records retained for retry', error);
+        return;
       }
-    }
-
-    this.totalFlushed += flushedCount;
-
-    if (flushedCount > 0) {
-      logger.debug('TelemetryBuffer: flushed records', { flushedCount, droppedCount });
     }
   }
 

@@ -237,6 +237,8 @@ function validateTelemetry(data: unknown): ValidationResult {
     'vibration',
     'temperature',
     'fuel_level',
+    'fuel_total',
+    'machine_state',
     'engine_hours',
     'impact_force',
     // Aftermarket box / J1939 / engine ECU
@@ -310,8 +312,8 @@ async function ingestTelemetry(identity: DeviceIdentity, data: unknown | unknown
       siteId: identity.siteId,
       value: Number(r.value),
       unit: (r.unit as string) || null,
-      latitude: r.latitude ? Number(r.latitude) : null,
-      longitude: r.longitude ? Number(r.longitude) : null,
+      latitude: r.latitude == null ? null : Number(r.latitude),
+      longitude: r.longitude == null ? null : Number(r.longitude),
       metadata: r.metadata ?? null,
       timestamp: r.timestamp ? new Date(r.timestamp as string) : undefined,
     };
