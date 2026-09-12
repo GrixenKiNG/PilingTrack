@@ -216,5 +216,5 @@ export type DatabaseClient = PostgresPrismaClient;
 export async function runInTransaction<T>(
   fn: (tx: PostgresPrisma.TransactionClient) => Promise<T>
 ): Promise<T> {
-  return getPrismaClient().$transaction(fn, DEFAULT_TX_OPTIONS);
+  return db.$transaction(fn, DEFAULT_TX_OPTIONS);
 }

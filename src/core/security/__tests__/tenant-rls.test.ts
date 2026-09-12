@@ -208,3 +208,22 @@ describe('обёртка сырого SQL', () => {
     }
   });
 });
+
+// Prisma model calls are lazy thenables: their work starts when awaited.
+it('keeps tenant GUC context while assimilating a lazy transaction result', async () => {
+  const tx = { $executeRaw: vi.fn().mockResolvedValue(1) };
+  let appliedWhenExecuted = false;
+  const original = async (work: unknown) => (work as (tx: unknown) => Promise<unknown>)(tx);
+  await runWithTenantContext(async () => {
+    setRequestTenantId('tenant-lazy');
+    const result = await wrapTransaction({} as never, original as never, [() => ({
+      then(resolve: (value: string) => void) {
+        appliedWhenExecuted = isGucApplied();
+        resolve('lazy result');
+      },
+    })]);
+    expect(result).toBe('lazy result');
+    expect(appliedWhenExecuted).toBe(true);
+    expect(isGucApplied()).toBe(false);
+  });
+});

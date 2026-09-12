@@ -144,7 +144,8 @@ export function wrapTransaction(
         $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
       };
       await scopedTx.$executeRaw`SELECT set_config('app.current_tenant', ${tenantId}, true)`;
-      return runWithGucApplied(() => work(tx));
+      // PrismaPromise starts on await; assimilate it before leaving the GUC scope.
+      return runWithGucApplied(async () => await work(tx));
     },
     ...rest,
   ]);
