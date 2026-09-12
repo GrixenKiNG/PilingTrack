@@ -264,11 +264,13 @@ export const reportUpsertSchema = z.object({
   // legacy clients keep last-write-wins, no false conflicts).
   version: z.number().int().nonnegative().optional(),
   piles: z.array(z.object({
+    id: internalIdSchema.optional(),
     pileGradeId: internalIdSchema,
     count: z.number().int().min(1, 'Count must be at least 1'),
     picketId: internalIdSchema.optional(),
   })).max(100).default([]),
   drillings: z.array(z.object({
+    id: internalIdSchema.optional(),
     typeId: internalIdSchema,
     count: z.number().int().min(1).max(9999).optional(),
     metersPerUnit: z.number().min(0).max(9999).optional(),
@@ -277,6 +279,7 @@ export const reportUpsertSchema = z.object({
     picketId: internalIdSchema.optional(),
   })).max(100).default([]),
   downtimes: z.array(z.object({
+    id: internalIdSchema.optional(),
     reasonId: internalIdSchema,
     // Простой измеряется полными часами: неполный округляется вверх (правило
     // и причина — reports/domain/downtime-hours). Колонка осталась Float ради
@@ -289,6 +292,7 @@ export const reportUpsertSchema = z.object({
   assistantReport: z.object({
     name: z.string().max(200),
     piles: z.array(z.object({
+    id: internalIdSchema.optional(),
       pileGradeId: internalIdSchema,
       count: z.number().int().min(0).max(9999),
     })).max(100).default([]),

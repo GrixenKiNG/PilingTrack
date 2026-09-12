@@ -13,11 +13,13 @@ import { ReportAggregate } from '../../domain';
 const tx = {
   report: {
     findUnique: vi.fn(),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    create: vi.fn().mockResolvedValue({}),
     update: vi.fn().mockResolvedValue({}),
   },
-  reportDowntime: { deleteMany: vi.fn().mockResolvedValue({}), createMany: vi.fn().mockResolvedValue({}) },
-  pileWork: { deleteMany: vi.fn().mockResolvedValue({}), createMany: vi.fn().mockResolvedValue({}) },
-  leaderDrilling: { deleteMany: vi.fn().mockResolvedValue({}), createMany: vi.fn().mockResolvedValue({}) },
+  reportDowntime: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({}), update: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}), createMany: vi.fn().mockResolvedValue({}) },
+  pileWork: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({}), update: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}), createMany: vi.fn().mockResolvedValue({}) },
+  leaderDrilling: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({}), update: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}), createMany: vi.fn().mockResolvedValue({}) },
   outboxEvent: { createMany: vi.fn().mockResolvedValue({}) },
   reportVersion: { create: vi.fn().mockResolvedValue({}) },
 };
@@ -78,5 +80,29 @@ describe('PrismaReportRepository optimistic concurrency', () => {
     ).resolves.toBeUndefined();
 
     expect(tx.reportVersion.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('report save regression', () => {
+  const repo = new PrismaReportRepository();
+  beforeEach(() => { vi.clearAllMocks(); tx.report.findUnique.mockResolvedValue({id:'rep-internal', version:5, tenantId:'orion', shiftId:'shift-1'}); });
+  it('rejects a concurrent version claim before changing any work', async () => {
+    tx.report.updateMany.mockResolvedValueOnce({count: 0});
+    await expect(repo.save(makeUpdateAggregate(), {expectedVersion: 5})).rejects.toMatchObject({status:409});
+    expect(tx.pileWork.deleteMany).not.toHaveBeenCalled();
+    expect(tx.reportVersion.create).not.toHaveBeenCalled();
+  });
+  it('preserves work identity and server-derived tenant/shift', async () => {
+    tx.pileWork.findMany.mockResolvedValueOnce([{id:'work-1', pileGradeId:'grade-1', count:1, picketId:null}]);
+    await repo.save(makeUpdateAggregate(), {expectedVersion:5});
+    expect(tx.pileWork.deleteMany).not.toHaveBeenCalled();
+    expect(tx.pileWork.create).not.toHaveBeenCalled();
+    expect(tx.pileWork.update).toHaveBeenCalledWith({where:{id:'work-1'},data:{pileGradeId:'grade-1',count:2,picketId:null,tenantId:'orion',shiftId:'shift-1'}});
+  });
+  it('creates without querying a removed natural unique key', async () => {
+    tx.report.findUnique.mockResolvedValue(null);
+    await repo.save(makeUpdateAggregate());
+    expect(tx.report.findUnique).toHaveBeenCalledTimes(1);
+    expect(tx.report.create).toHaveBeenCalledTimes(1);
   });
 });

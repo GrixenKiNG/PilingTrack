@@ -18,12 +18,14 @@ import { createReportEvent, ReportDomainEvent } from './report.events';
 // ============================================================
 
 export interface PileWorkEntry {
+  id?: string;
   pileGradeId: string;
   count: number;
   picketId?: string;
 }
 
 export interface DrillingEntry {
+  id?: string;
   typeId: string;
   count: number;
   metersPerUnit: number;
@@ -32,6 +34,7 @@ export interface DrillingEntry {
 }
 
 export interface DowntimeEntry {
+  id?: string;
   reasonId: string;
   duration: number;
   comment?: string;

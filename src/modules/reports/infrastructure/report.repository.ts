@@ -8,6 +8,7 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import { reconcileReportEntries } from './reconcile-report-entries';
 import { ServiceError } from '@/lib/service-error';
 import { ReportAggregate } from '../domain';
 import { fromPrismaToState } from './report.prisma.mapper';
@@ -87,28 +88,10 @@ export class PrismaReportRepository implements ReportRepository {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
-      // Check if report exists by reportId first, then by the natural unique
-      // (userId, siteId, date) tuple. Offline clients can generate a fresh
-      // reportId on retry, which previously caused a P2002 race on
-      // Report_userId_siteId_date_key. Looking up by both keys lets us route
-      // a retry to the UPDATE path instead of crashing.
-      let existing = await tx.report.findUnique({
+      const existing = await tx.report.findUnique({
         where: { reportId: state.reportId },
-        select: { id: true, version: true },
+        select: { id: true, version: true, tenantId: true, shiftId: true },
       });
-
-      if (!existing) {
-        existing = await tx.report.findUnique({
-          where: {
-            unique_user_site_date: {
-              userId: state.userId,
-              siteId: state.siteId,
-              date: state.date,
-            },
-          },
-          select: { id: true, version: true },
-        });
-      }
 
       // Optimistic-concurrency guard (race-free: the version is read in the
       // same tx that writes). If the caller passed the version it edited and
@@ -128,15 +111,12 @@ export class PrismaReportRepository implements ReportRepository {
       if (existing) {
         // === UPDATE PATH ===
 
-        // Delete old child records
-        await tx.reportDowntime.deleteMany({ where: { reportId: existing.id } });
-        await tx.pileWork.deleteMany({ where: { reportId: existing.id } });
-        await tx.leaderDrilling.deleteMany({ where: { reportId: existing.id } });
-
-        // Update parent
-        await tx.report.update({
-          where: { reportId: state.reportId },
+        // Claim the version atomically before reading children. Concurrent saves
+        // cannot both pass a read-then-write check at READ COMMITTED.
+        const claimed = await tx.report.updateMany({
+          where: { id: existing.id, version: existing.version },
           data: {
+            version: { increment: 1 },
             status: state.status,
             shiftType: state.shiftType,
             shiftStart: state.shiftStart,
@@ -147,41 +127,32 @@ export class PrismaReportRepository implements ReportRepository {
             lastEditedByRole: state.lastEditedByRole,
           },
         });
-
-        // Batch insert children
-        if (state.piles.length > 0) {
-          await tx.pileWork.createMany({
-            data: state.piles.map((p) => ({
-              reportId: existing.id,
-              pileGradeId: p.pileGradeId,
-              count: p.count,
-              picketId: p.picketId || null,
-            })),
-          });
+        if (claimed.count !== 1) {
+          throw new ServiceError('Отчёт был изменён другим пользователем. Обновите страницу.', 409);
         }
-
-        if (state.drillings.length > 0) {
-          await tx.leaderDrilling.createMany({
-            data: state.drillings.map((d) => ({
-              reportId: existing.id,
-              typeId: d.typeId,
-              count: d.count,
-              metersPerUnit: d.metersPerUnit,
-              meters: d.meters,
-              picketId: d.picketId || null,
-            })),
+        const provenance = { tenantId: existing.tenantId, shiftId: existing.shiftId };
+        const groups = [
+          { model: tx.pileWork, entries: state.piles, fields: ['pileGradeId', 'count', 'picketId'], group: ['pileGradeId', 'picketId'], include: { passport: true } },
+          { model: tx.leaderDrilling, entries: state.drillings, fields: ['typeId', 'count', 'metersPerUnit', 'meters', 'picketId'], group: ['typeId', 'picketId'] },
+          { model: tx.reportDowntime, entries: state.downtimes, fields: ['reasonId', 'duration', 'comment'], group: ['reasonId'] },
+        ];
+        for (const group of groups) {
+          const stored = await group.model.findMany({
+            where: { reportId: existing.id },
+            ...(group.include ? { include: group.include } : {}),
+            orderBy: { id: 'asc' },
           });
-        }
-
-        if (state.downtimes.length > 0) {
-          await tx.reportDowntime.createMany({
-            data: state.downtimes.map((d) => ({
-              reportId: existing.id,
-              reasonId: d.reasonId,
-              duration: d.duration,
-              comment: d.comment || null,
-            })),
-          });
+          const plan = reconcileReportEntries(stored, group.entries, group.fields, group.group);
+          if (plan.removeIds.length) {
+            await group.model.deleteMany({ where: { reportId: existing.id, id: { in: plan.removeIds } } });
+          }
+          for (const row of plan.rows) {
+            if (row.id) {
+              await group.model.update({ where: { id: row.id }, data: { ...row.data, ...provenance } });
+            } else {
+              await group.model.create({ data: { ...row.data, ...provenance, reportId: existing.id } });
+            }
+          }
         }
       } else {
         // === CREATE PATH ===
@@ -204,6 +175,8 @@ export class PrismaReportRepository implements ReportRepository {
             lastEditedByRole: state.lastEditedByRole,
             piles: {
               create: state.piles.map((pile) => ({
+                tenantId: state.tenantId,
+                shiftId: state.shiftId,
                 picketId: pile.picketId || null,
                 pileGradeId: pile.pileGradeId,
                 count: pile.count,
@@ -211,6 +184,8 @@ export class PrismaReportRepository implements ReportRepository {
             },
             drillings: {
               create: state.drillings.map((drilling) => ({
+                tenantId: state.tenantId,
+                shiftId: state.shiftId,
                 picketId: drilling.picketId || null,
                 typeId: drilling.typeId,
                 count: drilling.count,
@@ -220,6 +195,8 @@ export class PrismaReportRepository implements ReportRepository {
             },
             downtimes: {
               create: state.downtimes.map((downtime) => ({
+                tenantId: state.tenantId,
+                shiftId: state.shiftId,
                 reasonId: downtime.reasonId,
                 duration: downtime.duration,
                 comment: downtime.comment || null,
@@ -245,20 +222,13 @@ export class PrismaReportRepository implements ReportRepository {
       // Reuse the version already read above (same tx) — no extra round-trip.
       const newVersion = (existing?.version || 0) + 1;
 
-      // Update report version (if existing)
-      if (existing) {
-        await tx.report.update({
-          where: { reportId: state.reportId },
-          data: { version: newVersion },
-        });
-      }
-
       await tx.reportVersion.create({
         data: {
           reportId: state.reportId,
           version: newVersion,
           data: {
             ...state,
+            version: newVersion,
             piles: state.piles,
             drillings: state.drillings,
             downtimes: state.downtimes,
@@ -310,7 +280,8 @@ export class PrismaReportRepository implements ReportRepository {
     date: string
   ): Promise<ReportAggregate | null> {
     const prismaReport = await db.report.findFirst({
-      where: { userId, siteId, date },
+      where: { userId, siteId, date, shiftId: null },
+      orderBy: { createdAt: 'desc' },
       include: {
         piles: true,
         drillings: true,

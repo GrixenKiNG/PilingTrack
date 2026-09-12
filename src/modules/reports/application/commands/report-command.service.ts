@@ -107,14 +107,8 @@ export async function upsertReport(
 
   // Phase 2: Load existing or create new aggregate.
   //
-  // The Report table has @@unique([userId, siteId, date]) — one report per
-  // operator per site per day. The client supplies its own reportId (used
-  // as the idempotency token), so when a client retries with a different
-  // reportId for the same natural key (mobile form regenerates UUID on
-  // resubmit, offline outbox replays after server-side save, etc.) the
-  // CREATE path would hit a P2002 unique-constraint and surface as 409.
-  // Fall back to the natural key to honour the "one report per day" rule
-  // and let the user edit the existing row instead of failing.
+  // Shift reports are identified by reportId. The legacy fallback is
+  // restricted to reports without a shift; it must never overwrite mobile work.
   let existing = await repo.findById(input.reportId);
   if (!existing) {
     existing = await repo.findByUserIdAndDate(input.userId, input.siteId, input.date);
@@ -199,6 +193,8 @@ export async function upsertReport(
             tenantId: input.tenantId ?? undefined,
             equipmentId: { in: operatorCrews.map((crew) => crew.equipmentId) },
             state: { in: ['STARTED', 'HANDOVER_PENDING'] },
+            productionDate: new Date(input.date + 'T00:00:00.000Z'),
+            ...(input.equipmentId ? { equipmentId: input.equipmentId } : {}),
           },
           orderBy: { startedAt: 'desc' },
           select: { id: true, equipmentId: true },
@@ -272,7 +268,7 @@ export async function upsertReport(
     onBeforeCommit: async (tx) => {
       await writeReportAuditRow(auditRecord, tx);
     },
-    expectedVersion: input.expectedVersion,
+    expectedVersion: input.expectedVersion ?? existing?.getState().version,
   });
 
   // Phase 5.5: Post-commit audit side effects (structured logger + feedback
@@ -325,6 +321,7 @@ function applyEntriesToAggregate(
   for (const drilling of input.drillings || []) {
     aggregate.addDrilling(
       {
+        id: drilling.id,
         typeId: drilling.typeId,
         count: drilling.count || 1,
         metersPerUnit: drilling.metersPerUnit || 0,

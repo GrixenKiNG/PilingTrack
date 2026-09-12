@@ -18,9 +18,9 @@ export interface UpsertReportCommand {
   shiftStart?: string | null;
   shiftEnd?: string | null;
   equipmentId?: string | null;
-  piles?: Array<{ picketId?: string; pileGradeId: string; count: number }>;
-  drillings?: Array<{ picketId?: string; typeId: string; count?: number; metersPerUnit?: number; meters: number }>;
-  downtimes?: Array<{ reasonId: string; duration: number; comment?: string }>;
+  piles?: Array<{ id?: string; picketId?: string; pileGradeId: string; count: number }>;
+  drillings?: Array<{ id?: string; picketId?: string; typeId: string; count?: number; metersPerUnit?: number; meters: number }>;
+  downtimes?: Array<{ id?: string; reasonId: string; duration: number; comment?: string }>;
 }
 
 export interface UpsertReportResult {

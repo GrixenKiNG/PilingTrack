@@ -28,8 +28,8 @@ import { pileLengthMeters } from '@/lib/pile-length';
 
 interface OperatorUser { id: string; name: string; }
 
-interface PileEntry { id: string; pileGradeId: string; count: number; }
-interface DrillingEntry { id: string; typeId: string; count: number; metersPerUnit: number; meters: number; }
+interface PileEntry { id: string; picketId?: string | null; pileGradeId: string; count: number; }
+interface DrillingEntry { id: string; picketId?: string | null; typeId: string; count: number; metersPerUnit: number; meters: number; }
 interface DowntimeEntry { id: string; reasonId: string; duration: number; comment: string; }
 
 interface ReportFormDialogProps {
@@ -60,11 +60,12 @@ export function ReportFormDialog({
   const [formEquipmentId, setFormEquipmentId] = useState(editReport?.equipment?.id || '');
 
   const [formPiles, setFormPiles] = useState<PileEntry[]>(
-    (editReport?.piles || []).map((p) => ({ id: p.id, pileGradeId: p.pileGradeId, count: p.count }))
+    (editReport?.piles || []).map((p) => ({ id: p.id, picketId: p.picketId, pileGradeId: p.pileGradeId, count: p.count }))
   );
   const [formDrillings, setFormDrillings] = useState<DrillingEntry[]>(
     (editReport?.drillings || []).map((d) => ({
       id: d.id,
+      picketId: d.picketId,
       typeId: d.typeId,
       count: d.count || 1,
       metersPerUnit: d.metersPerUnit || d.meters || 0,
@@ -172,14 +173,16 @@ export function ReportFormDialog({
           version: editReport?.version,
           shiftStart: formShiftStart, shiftEnd: formShiftEnd,
           equipmentId: formEquipmentId || undefined,
-          piles: formPiles.map((p) => ({ pileGradeId: p.pileGradeId, count: p.count })),
+          piles: formPiles.map((p) => ({ id: editReport?.piles.some(row => row.id === p.id) ? p.id : undefined, picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
           drillings: formDrillings.map((d) => ({
+            id: editReport?.drillings.some(row => row.id === d.id) ? d.id : undefined,
+            picketId: d.picketId || undefined,
             typeId: d.typeId,
             count: d.count,
             metersPerUnit: d.metersPerUnit,
             meters: d.meters,
           })),
-          downtimes: formDowntimes.map((d) => ({ reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
+          downtimes: formDowntimes.map((d) => ({ id: editReport?.downtimes.some(row => row.id === d.id) ? d.id : undefined, reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
         }),
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Ошибка сохранения'); }
