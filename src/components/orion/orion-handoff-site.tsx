@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { FormEvent, KeyboardEvent, useEffect, useState } from 'react';
-import { orionEquipment, orionGeneralEquipment, orionProcessSteps, orionRequisites } from './orion-content';
+import { orionEquipment, orionFaqs, orionGeneralEquipment, orionProcessSteps, orionRequisites } from './orion-content';
 import { OrionCinematicGallery } from './orion-cinematic-gallery';
 import { orionEquipmentProfiles } from './orion-equipment-profiles';
 import styles from './orion-handoff-site.module.css';
@@ -34,14 +34,6 @@ const proof = [
   ['ППР', 'работа по проекту'],
   ['Экипаж', 'аренда с оператором'],
   ['PDF', 'русскоязычные карточки техники'],
-] as const;
-
-const faq = [
-  ['Как получить предварительный расчёт?', 'Пришлите фрагмент проекта или ведомость свай, адрес площадки и желаемые сроки. Инженер уточнит недостающие данные.'],
-  ['В каких регионах работает ОРИОН?', 'База компании находится в Чебоксарах. Возможность мобилизации по России подтверждается после оценки техники, маршрута и графика.'],
-  ['Работаете ли вы зимой и в сложных грунтах?', 'Технология и состав техники определяются после изучения проекта, инженерно-геологических данных и условий площадки.'],
-  ['Можно арендовать установку с оператором?', 'Да. Запрос оценивается по типу работ, срокам, комплектации и условиям мобилизации.'],
-  ['Какие документы получает заказчик?', 'Состав документов фиксируется договором и ППР. Для технической оценки доступны карточки и источники характеристик техники.'],
 ] as const;
 
 const engineeringStories = [
@@ -332,7 +324,7 @@ export function OrionHandoffSite() {
 
         <section className={styles.faq} id="faq">
           <div className={styles.sectionHeading}><p className={styles.sectionLabel}>09 / ВОПРОСЫ И ОТВЕТЫ</p><h2>До расчёта — только честные вводные.</h2></div>
-          <div>{faq.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
+          <div>{orionFaqs.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
         </section>
 
         <section className={styles.contact} id="contact">
@@ -346,7 +338,7 @@ export function OrionHandoffSite() {
               <div className={styles.formProgress}><div><b>ШАГ {step + 1} / 4</b><span>{['Задача', 'Город и сроки', 'Проект', 'Контакты'][step]}</span></div><i><span style={{ transform: `scaleX(${(step + 1) / 4})` }} /></i></div>
               {step === 0 && <fieldset><legend>Какая задача стоит на объекте?</legend><div className={styles.serviceChips}>{services.map(([, title]) => <button type="button" key={title} aria-pressed={lead.service === title} onClick={() => setField('service', title)}>{title}</button>)}</div><label>Кратко опишите задачу<textarea value={lead.task} onChange={(e) => setField('task', e.target.value)} maxLength={800} /></label></fieldset>}
               {step === 1 && <fieldset><legend>Где и когда планируются работы?</legend><label>Город или регион<input value={lead.city} onChange={(e) => setField('city', e.target.value)} /></label><label>Желаемые сроки<input value={lead.timeline} onChange={(e) => setField('timeline', e.target.value)} placeholder="Например: август — сентябрь" /></label></fieldset>}
-              {step === 2 && <fieldset><legend>Есть проект или ведомость?</legend><label className={styles.fileZone}>↑<span>{lead.file || 'Выберите файл — его название попадёт в заявку'}</span><small>Сам файл инженер запросит безопасным каналом после контакта.</small><input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(e) => setField('file', e.target.files?.[0]?.name || '')} /></label></fieldset>}
+              {step === 2 && <fieldset><legend>Есть проект или ведомость?</legend><label className={styles.fileZone}>↑<span>{lead.file || 'Файл не прикрепляется — пришлите его на orion02@bk.ru после отправки заявки'}</span><small>Загрузка файла недоступна — с заявкой передаётся только его название.</small><input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(e) => setField('file', e.target.files?.[0]?.name || '')} /></label></fieldset>}
               {step === 3 && <fieldset><legend>Куда ответить?</legend><label>Имя<input required value={lead.name} onChange={(e) => setField('name', e.target.value)} autoComplete="name" /></label><label>Телефон<input value={lead.phone} onChange={(e) => setField('phone', e.target.value)} autoComplete="tel" inputMode="tel" /></label><label>Email<input type="email" value={lead.email} onChange={(e) => setField('email', e.target.value)} autoComplete="email" /></label><label className={styles.consent}><input type="checkbox" checked={lead.consent} onChange={(e) => setField('consent', e.target.checked)} />Согласен на обработку данных для ответа на заявку</label><input className={styles.honeypot} tabIndex={-1} aria-hidden="true" value={lead.website} onChange={(e) => setField('website', e.target.value)} /></fieldset>}
               {submitState === 'error' && <p className={styles.formError} role="alert">Проверьте имя, контакт и согласие или свяжитесь с нами напрямую.</p>}
               <div className={styles.formNav}>{step > 0 && <button type="button" onClick={() => { setStep((value) => value - 1); setSubmitState('idle'); }}>Назад</button>}<button className={styles.nextButton} type={step === 3 ? 'submit' : 'button'} disabled={submitState === 'sending'} onClick={step < 3 ? () => setStep((value) => value + 1) : undefined}>{submitState === 'sending' ? 'Отправляем…' : step === 3 ? 'Отправить' : 'Далее'}</button></div>
