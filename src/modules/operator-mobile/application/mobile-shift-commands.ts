@@ -1,3 +1,5 @@
+import {enqueueAlert, enqueueCriticalDefects} from '@/core/notifications/durable-alert';
+import {verifyKnowledgeAttempt} from './knowledge-attempt';
 import {randomUUID} from 'node:crypto';
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
@@ -197,11 +199,14 @@ export async function acknowledgeBriefing(input: {
 export async function submitKnowledgeTest(input: {
   tenantId: string;
   operatorId: string;
+  attemptToken: string;
   picks: {questionId: string; picked: number}[];
   audience?: BriefingAudience;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
+  try { await verifyKnowledgeAttempt(input, input.attemptToken, input.picks); }
+  catch { throw new OperatorCommandError(400, 'Набор вопросов неполный или попытка истекла. Начните проверку заново.'); }
   const result = scoreAttempt(input.picks);
   if (result.total === 0) {
     throw new OperatorCommandError(400, 'Проверка знаний не заполнена');
@@ -730,6 +735,8 @@ export async function submitChecklist(input: {
       shiftId: input.shiftId,
     });
 
+    await enqueueCriticalDefects(tx, {tenantId: input.tenantId, aggregateId: execution.id,
+      equipmentId: input.equipmentId, reportedBy: input.operatorId, defects: created});
     return {
       executionId: execution.id,
       defects: created.length,
@@ -1364,6 +1371,10 @@ export async function reportIncident(input: {
       shiftId: input.shiftId,
     });
 
+    await enqueueAlert(tx, {tenantId: input.tenantId, aggregateId: incident.id, alert: {
+      severity: classification.severity === 'CRITICAL' ? 'critical' : classification.severity === 'HIGH' ? 'high' : 'medium',
+      message: (classification.stopRequired ? 'Происшествие: требуется прекратить работы. ' : 'Происшествие: ') + input.description,
+    }});
     return {
       incidentId: incident.id,
       severity: classification.severity,

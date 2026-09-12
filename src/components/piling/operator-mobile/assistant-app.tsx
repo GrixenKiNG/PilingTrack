@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useState} from 'react';
 import {
-  buildSlingerAttempt, SLINGER_BRIEFING, type AssistantState,
+  SLINGER_BRIEFING, type AssistantState,
 } from '@/modules/operator-mobile/contracts';
 import {ApiError} from './api';
 import {AssistantDefectForm} from './screens/assistant-defect-form';
@@ -151,10 +151,9 @@ export function AssistantApp() {
   if (detour === 'KNOWLEDGE') {
     return (
       <KnowledgeScreen
-        build={buildSlingerAttempt}
         busy={busy}
         error={actionError}
-        onDone={(picks) => void run(() => sendCommand({command: 'submit-knowledge', picks}))}
+        onDone={(picks, attemptToken) => void run(() => sendCommand({command: 'submit-knowledge', picks, attemptToken}))}
         onBack={() => setDetour(null)}
       />
     );

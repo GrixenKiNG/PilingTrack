@@ -1,7 +1,7 @@
 'use client';
 
-import {useMemo, useState} from 'react';
-import {buildAttempt, TOPIC_LABELS, type KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
+import {useEffect, useState} from 'react';
+import {TOPIC_LABELS, type KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
 
@@ -17,19 +17,37 @@ import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
  * палке сети. Итог всё равно считает сервер по своему банку — в журнал уходит
  * то, что человек действительно нажал.
  */
-export function KnowledgeScreen({busy, error, onDone, onBack, build = buildAttempt}: {
+interface KnowledgeScreenProps {
   busy: boolean;
   error: string | null;
-  onDone: (picks: {questionId: string; picked: number}[]) => void;
+  onDone: (picks: {questionId: string; picked: number}[], attemptToken: string) => void;
   onBack: () => void;
-  /**
-   * Чем собирается набор вопросов. По умолчанию — набор машиниста
-   * (забивка, бурение, охрана труда). Помощнику собирают другой: стропы
-   * и охрана труда, потому что в кабине он не сидит.
-   */
-  build?: () => KnowledgeQuestion[];
+}
+export function KnowledgeScreen(props: KnowledgeScreenProps) {
+  const [attempt, setAttempt] = useState<{questions: KnowledgeQuestion[]; attemptToken: string} | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const abort = new AbortController();
+    void fetch('/api/operator/knowledge-attempt', {cache: 'no-store', signal: abort.signal})
+      .then(async response => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? 'Не удалось получить вопросы');
+        if (!abort.signal.aborted) setAttempt(body.data);
+      }).catch(error => { if (!abort.signal.aborted) setLoadError(error.message); });
+    return () => abort.abort();
+  }, [retry]);
+  if (!attempt) return <Screen title="Проверка знаний">
+    <ErrorNote message={loadError} />
+    {loadError ? <BigButton onClick={() => { setLoadError(null); setRetry(n => n + 1); }}>Повторить</BigButton> : <p>Получаем вопросы…</p>}
+    <BigButton tone="ghost" onClick={props.onBack}>Назад</BigButton>
+  </Screen>;
+  return <KnowledgeAttempt {...props} attempt={attempt.questions} attemptToken={attempt.attemptToken} />;
+}
+
+function KnowledgeAttempt({busy, error, onDone, onBack, attempt, attemptToken}: KnowledgeScreenProps & {
+  attempt: KnowledgeQuestion[]; attemptToken: string;
 }) {
-  const attempt = useMemo(() => build(), [build]);
   const [queue, setQueue] = useState<KnowledgeQuestion[]>(attempt);
   const [picked, setPicked] = useState<number | null>(null);
   /**
@@ -53,7 +71,7 @@ export function KnowledgeScreen({busy, error, onDone, onBack, build = buildAttem
         title="Проверка пройдена"
         subtitle={`${attempt.length} из ${attempt.length}${mistakes > 0 ? ` · ошибок по ходу: ${mistakes}` : ''}`}
         footer={(
-          <BigButton onClick={() => onDone(Object.entries(picks).map(([questionId, value]) => ({questionId, picked: value})))} disabled={busy}>
+          <BigButton onClick={() => onDone(Object.entries(picks).map(([questionId, value]) => ({questionId, picked: value})), attemptToken)} disabled={busy}>
             {busy ? 'Записываем…' : 'Записать результат'}
           </BigButton>
         )}

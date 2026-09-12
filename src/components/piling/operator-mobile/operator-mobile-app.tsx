@@ -353,7 +353,7 @@ export function OperatorMobileApp() {
         <KnowledgeScreen
           busy={busy}
           error={actionError}
-          onDone={(picks) => void run(() => sendCommand({command: 'submit-knowledge', picks}))}
+          onDone={(picks, attemptToken) => void run(() => sendCommand({command: 'submit-knowledge', picks, attemptToken}))}
           onBack={() => setDetour(null)}
         />
       );

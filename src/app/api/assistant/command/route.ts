@@ -11,10 +11,11 @@ const commandSchema = z.discriminatedUnion('command', [
   z.object({command: z.literal('acknowledge-briefing')}),
   z.object({
     command: z.literal('submit-knowledge'),
+    attemptToken: z.string().min(1).max(4096),
     picks: z.array(z.object({
       questionId: z.string().min(1),
       picked: z.number().int().min(0).max(9),
-    })).min(1).max(20),
+    })).length(8),
   }),
 ]);
 
@@ -58,7 +59,7 @@ export const POST = withMutation(
       if (body.command === 'acknowledge-briefing') {
         return NextResponse.json({data: await acknowledgeBriefing(actor)});
       }
-      return NextResponse.json({data: await submitKnowledgeTest({...actor, picks: body.picks})});
+      return NextResponse.json({data: await submitKnowledgeTest({...actor, picks: body.picks, attemptToken: body.attemptToken})});
     } catch (commandError) {
       if (commandError instanceof OperatorCommandError) {
         return NextResponse.json(

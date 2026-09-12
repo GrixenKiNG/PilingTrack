@@ -10,7 +10,6 @@ import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/con
 // Напрямую из `application`, а не через `@/modules/readiness`: тот барьер
 // импортируют клиентские компоненты, и серверный модуль в нём тянет `lib/db`
 // в браузерный бандл.
-import {notifyCriticalDefects} from '@/modules/readiness/application/defects/notify-critical';
 import {DOWNTIME_MAX_HOURS, roundDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import {getWeatherAt} from '@/services/weather/weather-client';
 
@@ -32,10 +31,11 @@ const commandSchema = z.discriminatedUnion('command', [
   z.object({command: z.literal('acknowledge-briefing')}),
   z.object({
     command: z.literal('submit-knowledge'),
+    attemptToken: z.string().min(1).max(4096),
     picks: z.array(z.object({
       questionId: z.string().min(1),
       picked: z.number().int().min(0).max(9),
-    })).min(1).max(20),
+    })).length(8),
   }),
   z.object({
     command: z.literal('accept-equipment'),
@@ -143,20 +143,6 @@ const commandSchema = z.discriminatedUnion('command', [
   }),
 ]);
 
-/** Диспетчеру в чат: происшествие важнее, чем аккуратность доставки. */
-async function notifyIncident(
-  result: {incidentId: string; severity: string; stopRequired: boolean},
-  description: string,
-) {
-  const {telegramNotifier} = await import('@/core/notifications/telegram');
-  await telegramNotifier.sendAlert({
-    severity: result.severity === 'CRITICAL' ? 'critical' : result.severity === 'HIGH' ? 'high' : 'medium',
-    message: result.stopRequired
-      ? `Происшествие на смене (требуется прекратить работы): ${description}`
-      : `Происшествие на смене: ${description}`,
-  });
-}
-
 /**
  * Единственная точка записи для мобильного места.
  *
@@ -200,15 +186,6 @@ export const POST = withMutation(
           });
         case 'submit-checklist': {
           const result = await submitChecklist({...actor, ...body});
-          // Оповещение — после фиксации и вне транзакции, тем же правилом, что
-          // и происшествие ниже: осмотр уже записан, и молчащий Telegram не
-          // повод его отменить. Отбор опасных и признак организации — внутри.
-          void notifyCriticalDefects({
-            tenantId: user.tenantId,
-            equipmentId: body.equipmentId,
-            reportedBy: user.name,
-            defects: result.createdDefects,
-          }).catch(() => undefined);
           return NextResponse.json({data: result});
         }
         case 'log-production':
@@ -228,11 +205,6 @@ export const POST = withMutation(
             mediaIds: body.mediaIds,
             clientCommandId: body.clientCommandId,
           });
-          // Оповещение — после записи и вне транзакции, «как получится».
-          // Происшествие уже в журнале; молчащий Telegram не должен отменять
-          // запись, а упавшая отправка — валить команду. Тем же правилом живут
-          // оповещения о простое (services/reports/event-handlers).
-          void notifyIncident(result, body.description).catch(() => undefined);
           return NextResponse.json({data: result});
         }
         case 'finish-work':
