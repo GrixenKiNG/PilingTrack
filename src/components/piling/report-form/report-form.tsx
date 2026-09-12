@@ -14,7 +14,6 @@ import { SubmitBar } from './submit-bar';
 import { ReportSentScreen } from './report-sent-screen';
 import { PhotoSection } from './photo-section';
 import { filterPileGradesBySitePlan } from './filter-pile-grades';
-import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
 
 // Temp state for form inputs (kept local to avoid re-renders on every keystroke)
 function useTempState() {
@@ -56,24 +55,13 @@ function useTempState() {
   };
 }
 
-interface ReportFormProps {
-  /**
-   * Раздел, к которому проскроллить при открытии: `inspection`, `defect`,
-   * `photo` или `submit`.
-   *
-   * На своём маршруте эту роль играет хеш адреса (`/report#photo`), но экран
-   * смены показывает отчёт внутри себя, без своего адреса, — и передаёт раздел
-   * пропом. Не задан — работает прежний разбор хеша.
-   */
-  anchor?: string;
-  /**
-   * Куда уходить по «Готово» и по кнопке назад, когда отчёт вложен в чужой
-   * экран. Без него — на `/operator`, как с отдельного маршрута.
-   */
-  onExit?: () => void;
-}
-
-export function ReportForm({ anchor, onExit }: ReportFormProps) {
+/**
+ * @param onExit куда возвращаться по «назад» и после отправки. Задан — форма
+ *   открыта внутри экрана смены: закрываем слой, а не уходим маршрутом.
+ * @param anchor к какому разделу прокрутить. Внутри экрана смены адресной
+ *   строки нет, и `#photo` из плитки передавать больше нечем.
+ */
+export function ReportForm({ onExit, anchor }: { onExit?: () => void; anchor?: string } = {}) {
   const {
     reportId,
     date, setDate, shiftStart, setShiftStart, shiftEnd, setShiftEnd,
@@ -155,9 +143,7 @@ export function ReportForm({ anchor, onExit }: ReportFormProps) {
   ]);
 
   useEffect(() => {
-    // Проп важнее хеша: вложенный отчёт своего адреса не имеет, а чужой хеш,
-    // оставшийся в строке от предыдущего экрана, увёл бы не туда.
-    const targetId = anchor ?? (window.location.hash ? window.location.hash.slice(1) : '');
+    const targetId = anchor || window.location.hash.slice(1);
     if (loading || !targetId) return;
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -238,7 +224,7 @@ export function ReportForm({ anchor, onExit }: ReportFormProps) {
         totalPiles={totalPiles} totalPileMeters={totalPileMeters}
         totalDrillingCount={totalDrillingCount} totalMeters={totalMeters}
         totalDowntime={totalDowntime} hasDowntime={downtimes.length > 0}
-        onDone={() => (onExit ? onExit() : router.push(OPERATOR_HOME_ROUTE))}
+        onDone={() => (onExit ? onExit() : router.push('/operator'))}
       />
     );
   }
@@ -247,7 +233,7 @@ export function ReportForm({ anchor, onExit }: ReportFormProps) {
     <div className="flex flex-col min-h-screen bg-muted">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card border-b px-4 py-3 pt-safe flex items-center gap-3">
-        <button onClick={() => (onExit ? onExit() : router.push(OPERATOR_HOME_ROUTE))}
+        <button onClick={() => (onExit ? onExit() : router.push('/operator'))}
           aria-label="Вернуться к операторской смене"
           className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
           <ArrowLeft className="w-5 h-5 text-muted-foreground" />

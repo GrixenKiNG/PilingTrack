@@ -42,9 +42,13 @@ describe('ORION production site', () => {
     expect(screen.getByRole('heading', {
       name: /только реальные объекты и подтверждённые результаты/i,
     })).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { name: 'Исходные данные' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('heading', { name: 'Производство' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('heading', { name: 'Подтверждённый результат' })).toBeInTheDocument();
+    // Заголовки раздела объектов переименованы 23.08.2026: они дословно
+    // совпадали с этапами раздела «Как мы работаем», и в оглавлении страницы
+    // (а для скринридера — в списке заголовков) это были неразличимые пункты.
+    // Проверяем именно уникальность, иначе дубли вернутся незамеченными.
+    for (const name of ['Что было на входе', 'Как выполняли', 'Что получилось']) {
+      expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+    }
   });
 
   it('exposes the cinematic gallery, eight keyboard tabs and an Escape-safe menu', () => {

@@ -75,20 +75,13 @@ const emptyAnswer = (): ItemAnswer => ({ result: '', value: '', note: '' });
 
 // ---------- main component ----------
 
-interface RunInspectionProps {
-  inspectionId: string;
-  /**
-   * Куда уходить по завершении осмотра, когда компонент вложен в чужой экран.
-   *
-   * Без него осмотр уводит на `/inspections` — так он и работает на своём
-   * маршруте у диспетчера и механика. Экран смены оператора показывает осмотр
-   * внутри себя, и уход на список там разорвал бы цикл смены: человек оказался
-   * бы в чужом разделе вместо следующего шага.
-   */
-  onExit?: () => void;
-}
-
-export function RunInspection({ inspectionId, onExit }: RunInspectionProps) {
+/**
+ * @param onExit куда возвращаться по «назад» и после подписи. Задан — осмотр
+ *   открыт внутри экрана смены и никуда не уводит: закрываем слой и отдаём
+ *   управление обратно. Не задан — это отдельная страница `/inspections/[id]`,
+ *   и возврат идёт в список осмотров, как раньше.
+ */
+export function RunInspection({ inspectionId, onExit }: { inspectionId: string; onExit?: () => void }) {
   const router = useRouter();
   const currentUser = usePilingStore((s) => s.currentUser);
 
@@ -230,8 +223,7 @@ export function RunInspection({ inspectionId, onExit }: RunInspectionProps) {
         throw new Error(err.error || 'Ошибка завершения');
       }
       toast.success('Осмотр завершён');
-      if (onExit) onExit();
-      else router.push('/inspections');
+      if (onExit) onExit(); else router.push('/inspections');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Ошибка');
     } finally {
@@ -305,7 +297,9 @@ export function RunInspection({ inspectionId, onExit }: RunInspectionProps) {
     return (
       <div className="mx-auto max-w-xl px-4 py-8 text-center text-sm text-muted-foreground">
         Осмотр не найден.{' '}
-        <Link href="/inspections" className="text-signal-strong underline">К списку</Link>
+        {onExit
+          ? <button type="button" onClick={onExit} className="text-signal-strong underline">К смене</button>
+          : <Link href="/inspections" className="text-signal-strong underline">К списку</Link>}
       </div>
     );
   }
@@ -314,12 +308,22 @@ export function RunInspection({ inspectionId, onExit }: RunInspectionProps) {
     <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-28">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        <Link
-          href="/inspections"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
-        </Link>
+        {onExit ? (
+          <button
+            type="button"
+            onClick={onExit}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> К смене
+          </button>
+        ) : (
+          <Link
+            href="/inspections"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
+          </Link>
+        )}
       </div>
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
