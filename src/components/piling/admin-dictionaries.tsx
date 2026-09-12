@@ -33,6 +33,23 @@ interface HistoryEntry {
 }
 interface FormState { mode: 'create' | 'rename'; kind: DictionaryKind; item?: RegistryItem }
 interface LengthState { item: RegistryItem; value: string }
+/** Откуда пришло изменение длины, чтобы после подтверждения довести именно его. */
+interface LengthConfirmState { item: RegistryItem; lengthMm: number; source: 'dialog' | 'panel' }
+
+/*
+  Длина марки у свай одна и истории не имеет — так решено сознательно.
+
+  Погонные метры нигде не хранятся: отчёт держит только марку и количество свай,
+  а метры считаются от текущей длины марки каждый раз, когда открывают отчёт,
+  аналитику, сводку за период или печатают PDF. Значит правка длины у уже
+  используемой марки — это не правка справочника, а пересчёт сданных документов
+  за прошлые периоды.
+
+  Версионировать длину не стали: у марки она одна (решение владельца 12.09.2026).
+  Поэтому единственная защита — показать, что именно изменится, и спросить.
+*/
+const lengthChangesHistory = (item: RegistryItem, lengthMm: number) =>
+  (item.reportCount > 0 || item.planCount > 0) && item.lengthMm !== lengthMm;
 
 function useCompactInspector() {
   const [compact, setCompact] = useState(false);
@@ -78,6 +95,7 @@ export function AdminDictionaries() {
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
   const [lengthState, setLengthState] = useState<LengthState | null>(null);
+  const [lengthConfirm, setLengthConfirm] = useState<LengthConfirmState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: DictionaryKind; item: RegistryItem } | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RegistryItem | null>(null);
@@ -228,7 +246,7 @@ export function AdminDictionaries() {
     ))
   ));
 
-  const savePanel = async () => {
+  const savePanel = async (confirmed = false) => {
     if (!selectedItem || !panelDraft) return;
     const payload: Record<string, unknown> = { type: selectedKind, id: selectedItem.id };
     const nextName = panelDraft.name.trim();
@@ -251,6 +269,10 @@ export function AdminDictionaries() {
         if (!Number.isFinite(metres) || metres <= 0) { toast.error('Введите положительную длину в метрах'); return; }
         const lengthMm = Math.round(metres * 1000);
         if (lengthMm !== selectedItem.lengthMm) payload.lengthMm = lengthMm;
+        if (!confirmed && lengthChangesHistory(selectedItem, lengthMm)) {
+          setLengthConfirm({ item: selectedItem, lengthMm, source: 'panel' });
+          return;
+        }
       }
     }
     if (!Object.keys(payload).some((key) => key !== 'type' && key !== 'id')) return;
@@ -334,18 +356,23 @@ export function AdminDictionaries() {
     }
   };
 
-  const saveLength = async () => {
+  const saveLength = async (confirmed = false) => {
     if (!lengthState) return;
     const metres = Number(lengthState.value.replace(',', '.'));
     if (!Number.isFinite(metres) || metres <= 0) {
       toast.error('Введите положительную длину в метрах');
       return;
     }
+    const lengthMm = Math.round(metres * 1000);
+    if (!confirmed && lengthChangesHistory(lengthState.item, lengthMm)) {
+      setLengthConfirm({ item: lengthState.item, lengthMm, source: 'dialog' });
+      return;
+    }
     setSaving(true);
     try {
       const response = await authFetch('/api/dictionary/manage', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'pileGrade', id: lengthState.item.id, lengthMm: Math.round(metres * 1000) }),
+        body: JSON.stringify({ type: 'pileGrade', id: lengthState.item.id, lengthMm }),
       });
       if (!response.ok) throw new Error(await responseError(response, 'Не удалось сохранить длину'));
       toast.success('Длина сохранена');
@@ -508,6 +535,12 @@ export function AdminDictionaries() {
           <label className="block"><span className="text-muted-foreground">Длина, м</span>
             <Input aria-label="Длина, м" value={panelDraft?.length ?? ''} inputMode="decimal" placeholder="35,00" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, length: event.target.value }))} className="mt-1 h-11" />
             <p className="mt-1 text-xs text-muted-foreground">Указываются по проектной длине.</p>
+            {selectedUsed && (
+              <p className="mt-1.5 flex gap-1.5 rounded-md border border-warning/30 bg-warning/10 p-2 text-xs text-warning-strong">
+                <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+                <span>Погонные метры считаются от этой длины. Если её изменить, цифры в уже сданных отчётах ({selectedItem.reportCount}) и в аналитике за прошлые периоды станут другими.</span>
+              </p>
+            )}
           </label>
           </> : (selectedItem.code ? <div><span className="text-muted-foreground">Код</span><div className="mt-1 rounded-md border border-border bg-muted p-2 font-medium text-foreground">{selectedItem.code}</div></div> : null)}
           </div>
@@ -564,9 +597,46 @@ export function AdminDictionaries() {
             Длина, м
             <Input aria-label="Длина сваи, м" value={lengthState?.value || ''} onChange={(event) => setLengthState((state) => state && ({ ...state, value: event.target.value }))} inputMode="decimal" />
           </label>
+          {lengthState && (lengthState.item.reportCount > 0 || lengthState.item.planCount > 0) && (
+            <p className="flex gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-strong">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Марка уже используется: отчётов — {lengthState.item.reportCount}, планов — {lengthState.item.planCount}. Погонные метры нигде не хранятся, их считают от длины марки — новая длина изменит цифры и за прошлые периоды.</span>
+            </p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setLengthState(null)}>Отмена</Button>
             <Button onClick={() => void saveLength()} disabled={saving} className="bg-signal text-white hover:bg-signal-strong">Сохранить</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={lengthConfirm !== null} onOpenChange={(open) => !open && setLengthConfirm(null)}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>Пересчитать прошлые отчёты?</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p className="text-foreground">
+              «{lengthConfirm?.item.name}»: длина {formatMetres(lengthConfirm?.item.lengthMm) || '—'} м → <b>{formatMetres(lengthConfirm?.lengthMm)} м</b>.
+            </p>
+            <p>
+              Погонные метры нигде не хранятся: их считают от длины марки при каждом открытии отчёта,
+              аналитики, сводки за период и при печати PDF. Новая длина изменит эти цифры и за прошлые
+              периоды: отчётов — {lengthConfirm?.item.reportCount}, планов — {lengthConfirm?.item.planCount}.
+            </p>
+            <p>У марки одна длина: прежнее значение не сохранится, старые отчёты не останутся с прежними метрами.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLengthConfirm(null)}>Отмена</Button>
+            <Button
+              disabled={saving}
+              className="bg-warning-strong text-white hover:bg-warning-strong"
+              onClick={() => {
+                const source = lengthConfirm?.source;
+                setLengthConfirm(null);
+                if (source === 'panel') void savePanel(true); else void saveLength(true);
+              }}
+            >
+              Изменить длину
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
