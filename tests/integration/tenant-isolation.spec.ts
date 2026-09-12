@@ -11,16 +11,24 @@
  * surface where needed.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   requireTenant,
   tenantWhere,
   runWithTenantContext,
 } from '@/core/security/tenant-enforcement';
 
+const originalTenantEnv = { MULTI_TENANT_MODE: process.env.MULTI_TENANT_MODE, DEFAULT_TENANT_ID: process.env.DEFAULT_TENANT_ID };
+afterEach(() => {
+  for (const [key, value] of Object.entries(originalTenantEnv)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  }
+});
+
 describe('tenant isolation — requireTenant', () => {
   beforeEach(() => {
     delete process.env.MULTI_TENANT_MODE;
+    delete process.env.DEFAULT_TENANT_ID;
   });
 
   it('returns user.tenantId when set in multi-tenant mode', () => {

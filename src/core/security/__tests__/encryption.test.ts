@@ -48,7 +48,7 @@ describe('encryption — versioned keys', () => {
     const m = await freshModule({ ENCRYPTION_KEY: KEY_A });
     const ct = m.encrypt('telegram-bot-token-secret');
     expect(ct.startsWith('enc:')).toBe(true);
-    expect(ct.startsWith('enc:v')).toBe(false); // legacy keeps the historic shape
+    expect(ct).not.toMatch(/^enc:v\d+:/); // legacy keeps the historic shape
     expect(m.decrypt(ct)).toBe('telegram-bot-token-secret');
     expect(m.activeKeyVersion()).toBe('legacy');
   });
@@ -65,7 +65,7 @@ describe('encryption — versioned keys', () => {
     // Phase 1: encrypt under legacy key.
     let m = await freshModule({ ENCRYPTION_KEY: KEY_A });
     const oldCt = m.encrypt('legacy-payload');
-    expect(oldCt.startsWith('enc:v')).toBe(false);
+    expect(oldCt).not.toMatch(/^enc:v\d+:/);
 
     // Phase 2: rotate. Legacy key kept (so old data still readable),
     // V2 introduced and made active.

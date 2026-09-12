@@ -151,6 +151,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); });
 
   it('allows exactly one of 20 parallel starts and commits one atomic evidence set', async () => {
+    await sql.query('INSERT INTO "Inspection" ("id","tenantId","equipmentId","inspectionDate","healthScore","status") VALUES ($1,$2,$3,NOW(),100,$4)', ['valid-start-inspection',tenantId,equipmentId,'COMPLETED']);
     const ids = Array.from({length: 20}, (_, index) => `parallel-shift-${index}`);
     // Запуск смены — решение диспетчера о допуске, а не действие оператора,
     // поэтому смена ждёт в PENDING_ACCEPTANCE и команду шлёт DISPATCHER.
@@ -161,6 +162,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     const successes = outcomes.filter((result) => result.status === 'fulfilled');
     const failures = outcomes.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     expect(successes).toHaveLength(1);
+    expect(successes[0]).toMatchObject({status: 'fulfilled', value: {status: 200, body: {decision: {allowed: true}}}});
     expect(failures.map((result) => code(result.reason))).toEqual(
       Array.from({length: failures.length}, () => 'VERSION_CONFLICT'),
     );

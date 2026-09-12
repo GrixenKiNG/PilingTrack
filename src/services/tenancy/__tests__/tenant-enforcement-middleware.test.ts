@@ -26,6 +26,7 @@ describe('tenant-enforcement-middleware', () => {
 
   beforeEach(() => {
     saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
+    for (const key of ENV_KEYS) delete process.env[key];
   });
 
   afterEach(() => {

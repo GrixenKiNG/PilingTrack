@@ -78,17 +78,15 @@ jobs:
         run: npm run db:check-migrations
 
       - name: Unit tests
-        # Only the in-src unit tests. Integration / contract suites need a
-        # real Postgres + Redis — see the `integration` job below.
-        run: npx vitest run src/
+        # Unit and contract checks; database-backed suites run below.
+        run: npx vitest run src/ tests/contract --coverage --maxWorkers=2
 
   # Validates that Prisma migrations apply cleanly on a real Postgres.
   # This catches a class of bugs that pure-mock unit tests miss:
   # syntax that Prisma's parser accepts but Postgres rejects,
   # ordering issues, and RLS policies that need DB state to compile.
   #
-  # The tests under `tests/integration/` currently mock Prisma, so they
-  # are not run here. A real-DB integration suite is a follow-up.
+  # Integration suites create disposable databases on this Postgres service.
   schema-validation:
     name: Schema + migrations (Postgres)
     runs-on: ubuntu-latest
@@ -157,6 +155,9 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d pilingtrack_ci \
             -tAc "select count(*) from information_schema.tables where table_schema='public'" \
             | awk '{ if ($1 < 30) { print "FAIL: only " $1 " tables, expected >= 30"; exit 1 } else { print "OK: " $1 " tables" } }'
+
+      - name: Database integration tests
+        run: npx vitest run tests/integration
 
   # Golden-path browser tests so the operator/admin core flows don't
   # silently break between releases. We don't run the full Playwright
@@ -286,6 +287,9 @@ jobs:
             e2e/admin-dictionaries.spec.ts \
             e2e/operator-report-smoke.spec.ts \
             e2e/report-creation-flow.spec.ts
+
+      - name: Seven real role accounts
+        run: npx playwright test e2e/role-audit.spec.js --project=chromium --workers=1
         env:
           BASE_URL: 'http://localhost:3000'
 

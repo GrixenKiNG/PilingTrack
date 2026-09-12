@@ -21,39 +21,23 @@ import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant
  * которому нужна настоящая база, и он не должен ронять прогон на машине, где
  * она не поднята. Как завести роль — docs/runbooks/011-app-db-role.md.
  */
-const APP_ROLE_URL = process.env.DATABASE_URL_APP_ROLE
-  ?? 'postgresql://pilingtrack_app:localtest@localhost:5435/pilingtrack_test?schema=public';
-
+const APP_ROLE_URL = process.env.DATABASE_URL_APP_ROLE;
+// An explicitly configured database must work; missing configuration is SKIP,
+// never a successful test that ran no assertions.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let db: any;
-let available = false;
 
-beforeAll(async () => {
-  try {
+describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-настоящему', () => {
+  beforeAll(async () => {
     const clientPath = path.join(process.cwd(), 'src', 'generated', 'postgres-client', 'client.js');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PrismaClient } = require(clientPath);
-    const raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: APP_ROLE_URL }) });
-    await raw.$queryRaw`SELECT 1`;
+    const raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: APP_ROLE_URL! }) });
     db = applyTenantGuc(raw);
-    // Набору нужны строки тенанта orion: без них «свой тенант видит объекты»
-    // упало бы не из-за поломки RLS, а из-за пустой базы.
-    const [{ count }] = await raw.$queryRaw<Array<{ count: bigint }>>`
-      SELECT count(*) FROM "Site" WHERE "tenantId" = 'orion'
-    `;
-    available = Number(count) > 0;
-  } catch {
-    available = false;
-  }
-});
-
-afterAll(async () => {
-  await db?.$disconnect?.();
-});
-
-describe('RLS отделяет тенантов по-настоящему', () => {
+    await raw.$queryRaw`SELECT 1`;
+  });
+  afterAll(async () => { await db?.$disconnect?.(); });
   it('подключение непривилегированной ролью действительно без обхода RLS', async () => {
-    if (!available) return expect(available).toBe(false);
 
     const [role] = await db.$queryRaw<Array<{ rolsuper: boolean; rolbypassrls: boolean }>>`
       SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user
@@ -64,7 +48,6 @@ describe('RLS отделяет тенантов по-настоящему', () =
   });
 
   it('под своим тенантом объекты видны', async () => {
-    if (!available) return;
 
     const sites = await runWithTenantContext(async () => {
       setRequestTenantId('orion');
@@ -81,7 +64,6 @@ describe('RLS отделяет тенантов по-настоящему', () =
    * оговоркой `tenantId IS NULL`, или если приложение вернут на суперроль.
    */
   it('под чужим тенантом не видно ни одной строки', async () => {
-    if (!available) return;
 
     const sites = await runWithTenantContext(async () => {
       setRequestTenantId('чужой-тенант');
@@ -92,7 +74,6 @@ describe('RLS отделяет тенантов по-настоящему', () =
   });
 
   it('разделение держится и внутри транзакции', async () => {
-    if (!available) return;
 
     const own = await runWithTenantContext(async () => {
       setRequestTenantId('orion');
@@ -114,17 +95,9 @@ describe('RLS отделяет тенантов по-настоящему', () =
     expect(stranger).toEqual([]);
   });
 
-  /**
-   * Текущее поведение без контекста — режим аудита: политика пропускает всё,
-   * когда `app.current_tenant` не выставлен. Это ЗАФИКСИРОВАНО намеренно, а не
-   * одобрено: шаг 6 плана убирает эту оговорку, и тогда ожидание здесь
-   * поменяется на пустой список. Пока же тест стережёт обратное — что
-   * включение механизма не сломало пути, где тенанта нет (воркеры, миграции).
-   */
-  it('без тенанта пока действует режим аудита — строки видны', async () => {
-    if (!available) return;
+  it('без тенанта данные закрыты', async () => {
 
     const sites = await db.site.findMany({ select: { id: true } });
-    expect(sites.length).toBeGreaterThan(0);
+    expect(sites).toEqual([]);
   });
 });
