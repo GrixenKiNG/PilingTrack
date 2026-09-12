@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { recordMeterReadingInTx } from '@/modules/equipment';
-import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
+import { requestReadinessSnapshot } from '@/modules/readiness/server';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } from '../../domain/defect-rules';
 import {

@@ -16,7 +16,7 @@ import {
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { projectOutboxEvents } from '@/services/reports/outbox-publisher';
 import { projectWeeklyTrend } from './projection-handlers';
-import {consumeReadinessProjectionEvent} from '@/modules/readiness/application/projection/consumer';
+import {consumeReadinessProjectionEvent} from '@/modules/readiness/server';
 import { forEachTenant } from '@/lib/tenant-iteration';
 
 function shouldLogProjectionLifecycle(): boolean {

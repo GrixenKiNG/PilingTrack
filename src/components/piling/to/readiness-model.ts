@@ -16,16 +16,8 @@ export type ReadinessStatus =
 
 export type EvidenceState = 'pass' | 'warning' | 'missing' | 'block';
 
-export interface ReadinessEquipment {
-  id: string;
-  name: string;
-  model: string | null;
-  isActive: boolean;
-  crewCount: number;
-  engineHoursTotal?: number | null;
-  nextMaintenanceAtHours?: number | null;
-  nextMaintenanceDate?: string | null;
-}
+import type {ReadinessEquipment} from '@/lib/maintenance-read-model';
+export type {ReadinessEquipment} from '@/lib/maintenance-read-model';
 
 export interface ReadinessEvidence {
   key: 'inspection' | 'meter' | 'crew' | 'maintenance' | 'repair' | 'permit' | 'acceptance';

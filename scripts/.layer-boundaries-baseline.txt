@@ -6,4 +6,3 @@ src/core/observability/health-tracker/checkers/outbox.ts|@/services/reports/outb
 src/core/realtime/server/auth.ts|@/services/auth/session-service|core/ may not import from services/
 src/core/security/refresh-tokens.ts|@/services/auth/session-service|core/ may not import from services/
 src/modules/monitoring/application/template-service.ts|@/components/piling/monitoring/equipment-tile-template|modules/ may not import from components/
-src/modules/monitoring/application/template-service.ts|@/modules/layout|modules/monitoring may not import from modules/layout (cross-module)

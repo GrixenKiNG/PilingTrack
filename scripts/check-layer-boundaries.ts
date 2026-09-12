@@ -5,7 +5,8 @@
  *   - core/       — infrastructure; must not depend on modules/, services/,
  *                   app/, or components/.
  *   - modules/X/  — DDD domain; may depend on core/ and on its own module
- *                   subtree, but NOT on app/, components/, or another module.
+ *                   subtree and another module public API, but NOT on app/, components/,
+ *                   or another module internals.
  *   - services/   — cross-cutting glue; may depend on core/ and modules/,
  *                   but NOT on app/ or components/.
  *
@@ -17,6 +18,7 @@
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import {isPublicModuleEntry, isModuleServerEntry} from './lib/module-boundaries';
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.resolve(ROOT, 'src');
@@ -84,9 +86,13 @@ function checkImport(fromInfo: { layer: Layer; module?: string }, importPath: st
   if (FORBIDDEN[fromInfo.layer]?.includes(toInfo.layer)) {
     return `${fromInfo.layer}/ may not import from ${toInfo.layer}/`;
   }
-  // Cross-module isolation: modules/A may not reach into modules/B.
+  if (fromInfo.layer === 'components' && isModuleServerEntry(importPath)) {
+    return 'components/ may not import module server entry points';
+  }
+  // CLAUDE.md allows public module APIs; internal implementation paths stay private.
   if (fromInfo.layer === 'modules' && toInfo.layer === 'modules'
-      && fromInfo.module && toInfo.module && fromInfo.module !== toInfo.module) {
+      && fromInfo.module && toInfo.module && fromInfo.module !== toInfo.module
+      && !isPublicModuleEntry(importPath)) {
     return `modules/${fromInfo.module} may not import from modules/${toInfo.module} (cross-module)`;
   }
   return null;

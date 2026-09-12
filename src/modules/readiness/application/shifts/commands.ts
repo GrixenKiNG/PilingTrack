@@ -8,7 +8,7 @@ import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag
 import {ReadinessCommandError} from '../command-pipeline/errors';
 import {isSelfAcceptedHandover, assertShiftReportSubmitted, requireReworkReason, validateHandoverSummary} from '../../domain/shifts/handover';
 import {blockerFingerprint, requireWaiverReason} from '../../domain/shifts/waiver';
-import {diffInspectionStates, type StateAnswer} from '@/modules/inspections/domain/state-diff';
+import {diffInspectionStates, type StateAnswer} from '@/modules/inspections';
 import {requireCancellationReason, validateShiftWindow} from '../../domain/shifts/shift';
 import {normalizeTenantTimezone, tenantProductionDate} from '../../domain/shifts/tenant-production-date';
 import {assertHandoverTransition, assertShiftTransition} from '../../domain/shifts/transitions';

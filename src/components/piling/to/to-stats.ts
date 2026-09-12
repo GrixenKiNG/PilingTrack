@@ -7,23 +7,8 @@
 
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
 
-export interface JournalRecord {
-  id: string;
-  type: string;
-  status: string;
-  title: string;
-  scheduledAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  engineHoursAtService: number | null;
-  inspection: { id: string; healthScore: number | null; status: string; level: string } | null;
-}
-
-const INSPECTION_TYPES = new Set(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'INSPECTION']);
-const OPEN_STATUSES = new Set(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']);
-
-export const isInspectionRecord = (record: JournalRecord) => INSPECTION_TYPES.has(record.type);
-export const isOpenRecord = (record: JournalRecord) => OPEN_STATUSES.has(record.status);
+import {isInspectionRecord, isOpenRecord, type JournalRecord} from '@/lib/maintenance-read-model';
+export {isInspectionRecord, isOpenRecord, type JournalRecord} from '@/lib/maintenance-read-model';
 
 export interface ToStats {
   inspections: number;

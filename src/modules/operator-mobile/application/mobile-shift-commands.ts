@@ -2,9 +2,9 @@ import {enqueueAlert, enqueueCriticalDefects} from '@/core/notifications/durable
 import {verifyKnowledgeAttempt} from './knowledge-attempt';
 import {randomUUID} from 'node:crypto';
 import type {Prisma} from '@/generated/postgres-client/client';
-import {withReadinessTenantTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
-import {requestReadinessSnapshot} from '@/modules/readiness/application/projection/request-snapshot';
-import {roundDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {withReadinessTenantTransaction} from '@/modules/readiness/server';
+import {requestReadinessSnapshot} from '@/modules/readiness/server';
+import {roundDowntimeHours} from '@/modules/reports';
 import {getChecklist} from '../domain/checklist-catalog';
 import type {ChecklistStage, ShiftCondition} from '../domain/checklist-types';
 import {

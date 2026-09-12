@@ -7,8 +7,8 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
-import { OPEN_MAINTENANCE } from '@/modules/readiness/application/readiness-score';
+import { requestReadinessSnapshot } from '@/modules/readiness/server';
+import { OPEN_MAINTENANCE } from '@/modules/readiness/server';
 import { advanceMaintenanceRegulation } from './maintenance-regulation';
 import { recordMeterReadingInTx } from './meter-reading';
 

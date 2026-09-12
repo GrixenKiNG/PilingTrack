@@ -11,7 +11,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { evaluatePlanDue } from '@/lib/pm-due';
-import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
+import { requestReadinessSnapshot } from '@/modules/readiness/server';
 import {
   runWithTenantContext,
   setRequestTenantId,

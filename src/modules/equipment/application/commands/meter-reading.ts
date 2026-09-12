@@ -17,7 +17,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { requestReadinessSnapshot } from '@/modules/readiness/application/projection/request-snapshot';
+import { requestReadinessSnapshot } from '@/modules/readiness/server';
 
 export type MeterSource = 'MANUAL' | 'TELEMETRY';
 

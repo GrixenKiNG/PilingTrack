@@ -1,10 +1,10 @@
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
-import type { ReadinessEquipment } from '@/components/piling/to/readiness-model';
 import {
   isInspectionRecord,
   isOpenRecord,
   type JournalRecord,
-} from '@/components/piling/to/to-stats';
+  type ReadinessEquipment,
+} from '@/lib/maintenance-read-model';
 import type { ReadinessFacts } from '../domain/readiness-score';
 import { summarizeDefects } from '../domain/defects/defect';
 import type { DefectRecord } from '../domain/defects/types';
