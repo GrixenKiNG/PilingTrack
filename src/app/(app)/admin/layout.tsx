@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
+import { roleHomeRoute } from '@/lib/routes';
 import { readPageSessionUser } from '@/lib/page-session';
 
 export default async function AdminSectionLayout({ children }: { children: React.ReactNode }) {
@@ -9,8 +9,8 @@ export default async function AdminSectionLayout({ children }: { children: React
   const user = await readPageSessionUser();
   if (!user) redirect('/login');
 
-  if (user.role !== 'ADMIN' && user.role !== 'DISPATCHER') {
-    redirect(OPERATOR_HOME_ROUTE);
+  if (!['ADMIN', 'DISPATCHER', 'FOREMAN', 'MECHANIC', 'SAFETY_ENGINEER'].includes(user.role)) {
+    redirect(roleHomeRoute(user.role));
   }
 
   return <>{children}</>;

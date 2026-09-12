@@ -79,13 +79,13 @@ describe('AdminSectionLayout — sessionVersion check', () => {
     expect(result).toBeTruthy();
   });
 
-  it('keeps mechanics out of the shared admin route tree', async () => {
+  it('allows mechanics into the shell; section layouts enforce permissions', async () => {
     withCookie('mechanic-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'mechanic-1', role: 'MECHANIC', sv: 2 });
     findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'MECHANIC', isActive: true, sessionVersion: 2 });
 
     await expect(
       AdminSectionLayout({ children: 'ADMIN' as unknown as React.ReactNode })
-    ).rejects.toThrow('REDIRECT:/operator');
+    ).resolves.toBeTruthy();
   });
 });
