@@ -1,3 +1,4 @@
+import {enqueueCriticalDefects} from '@/core/notifications/durable-alert';
 import type {ReadinessAccessMatrix} from '../../domain/access-matrix';
 import type {Prisma} from '@/generated/postgres-client/client';
 import {recordChainedReadinessAudit} from '../../infrastructure/audit/record-audit';
@@ -137,6 +138,9 @@ export async function createDefectCommand(input: {
         actorId: input.context.actorId,
       });
       await emitEffects({tx: input.tx, context: input.context, action: 'reported', row, key});
+      await enqueueCriticalDefects(input.tx, {tenantId: input.context.tenantId, aggregateId: row.id,
+        equipmentId: row.equipmentId, reportedBy: input.context.actorName,
+        defects: [{severity: row.severity, title: row.title}]});
       return {status: 201, body: {data: serializeDefect(row)},
         headers: {ETag: formatStrongEtag('defect', row.id, row.version),
           Location: `/api/readiness/defects/${row.id}`}};

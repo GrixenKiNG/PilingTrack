@@ -68,7 +68,12 @@ export function on(eventType: string, handler: EventHandler) {
  * notifications, audit logging) MUST swallow their own errors internally.
  * Critical handlers (analytics projections, daily summary) MUST propagate.
  */
-export async function emitDomainEvent(event: DomainEvent): Promise<void> {
+export async function emitDomainEvent(event: DomainEvent | (Omit<DomainEvent, 'type'> & {type: 'NotificationDeliveryRequested'})): Promise<void> {
+  if (event.type === 'NotificationDeliveryRequested') {
+    const {deliverQueuedAlert} = await import('@/services/notifications/durable-alert-delivery');
+    await deliverQueuedAlert(event);
+    return;
+  }
   const normalizedType = normalizeReportDomainEventType(event.type) || event.type;
   const normalizedEvent =
     normalizedType === event.type ? event : { ...event, type: normalizedType };
