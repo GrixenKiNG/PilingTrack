@@ -30,8 +30,6 @@ export const GET = withApi(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-
     // ?scope=all — экран управления справочником: отдаёт и отключённые виды
     // со счётчиком использования. Право проверяет сервис (users.manage).
     if (new URL(request.url).searchParams.get('scope') === 'all') {
@@ -56,8 +54,6 @@ export const POST = withMutation(
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-
     const parsed = documentTypeSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Validation failed', details: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })) }, { status: 400 });

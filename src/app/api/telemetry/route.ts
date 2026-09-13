@@ -110,10 +110,6 @@ export const POST = withApi(async (request: NextRequest) => {
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
-
     // Check circuit breaker before accepting data
     const circuitResponse = checkCircuitBreaker();
     if (circuitResponse) return circuitResponse;
@@ -244,10 +240,6 @@ export const GET = withApi(async (request: NextRequest) => {
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
-
     const { searchParams } = request.nextUrl;
     const action = searchParams.get('action');
 

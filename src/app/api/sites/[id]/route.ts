@@ -37,7 +37,6 @@ export const PUT = withMutation(
     assertCan(user!, 'sites.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const commandContext = { tenantId, actorId: user!.id };
     const { id } = await params;
@@ -115,7 +114,6 @@ export const DELETE = withMutation(
     assertCan(user!, 'sites.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     // Permanent delete — only succeeds for erroneously created sites (0 crews,
     // 0 reports). Worked sites must be deactivated via PUT { isActive: false }.

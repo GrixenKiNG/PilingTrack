@@ -13,9 +13,6 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   assertRole(user, 'ADMIN');
   const tenantId = requireTenantId(user);
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-  }
   return NextResponse.json(await publishReadinessRules(tenantId, {
     id: user.id,
     name: user.name,

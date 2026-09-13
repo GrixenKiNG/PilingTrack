@@ -17,8 +17,6 @@ export const PATCH = withMutation(
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-
     const parsed = patchSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
@@ -42,8 +40,6 @@ export const DELETE = withMutation(
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-
     const { id } = await params;
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

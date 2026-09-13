@@ -28,7 +28,6 @@ const createSchema = z.object({
  */
 function actorContext(user: { id: string; role: string; tenantId?: string | null }) {
   const tenantId = requireTenantId(user);
-  if (!tenantId) return null;
   return { tenantId, actor: { id: user.id, role: user.role } };
 }
 
