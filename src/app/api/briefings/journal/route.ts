@@ -30,8 +30,6 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const actor = user!;
     const tenantId = requireTenantId(actor);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-
     const params = request.nextUrl.searchParams;
     const rawKind = params.get('kind');
     const kind = rawKind === 'INSTRUCTION' || rawKind === 'KNOWLEDGE' ? rawKind : null;
