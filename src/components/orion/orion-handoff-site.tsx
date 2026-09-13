@@ -121,6 +121,105 @@ export function OrionHandoffSite() {
     };
   }, [menuOpen]);
 
+  // Визуальные эффекты: scroll-reveal, 3D-tilt карточек и курсор-прожектор.
+  // Все три отключаются при prefers-reduced-motion; reveal дополнительно
+  // отпадает без IntersectionObserver, а tilt/прожектор — без мыши с тонким
+  // курсором (hover-устройства вроде тачскрина их не получают). Это держит
+  // доступность и тесты нетронутыми: без JS/поддержки разметка стоит как есть.
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof IntersectionObserver === 'undefined' || reduceMotion) return;
+
+    // Включает CSS-скрытие только когда reveal реально работает (имеется
+    // IntersectionObserver): без JS или при reduced-motion карточки стоят
+    // видимыми, и страница не остаётся пустой ни для кого.
+    const root = document.querySelector('main');
+    if (root) root.dataset.revealActive = 'true';
+
+    const reveal = (root: HTMLElement) => {
+      const cards = Array.from(root.querySelectorAll<HTMLElement>(':scope > *')) as HTMLElement[];
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            (entry.target as HTMLElement).dataset.revealed = 'true';
+            observer.unobserve(entry.target);
+          }
+        },
+        { rootMargin: '-8% 0px' },
+      );
+      for (const card of cards) {
+        card.style.setProperty('--reveal-index', String(cards.indexOf(card)));
+        observer.observe(card);
+      }
+      return observer;
+    };
+
+    const observers = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'), reveal);
+    return () => observers.forEach((observer) => observer.disconnect());
+  }, []);
+
+  // 3D-tilt: карточка наклоняется к курсору в пределе ±7°, сдвиг сглаживается.
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return;
+    if (!window.matchMedia('(hover: hover)').matches) return;
+
+    const tilts = Array.from(document.querySelectorAll<HTMLElement>('[data-tilt]'));
+    if (tilts.length === 0) return;
+
+    const onMove = (event: MouseEvent) => {
+      for (const root of tilts) {
+        const cards = root.querySelectorAll<HTMLElement>(':scope > *');
+        for (const card of cards) {
+          const rect = card.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) continue;
+          const px = (event.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+          const py = (event.clientY - rect.top - rect.height / 2) / (rect.height / 2);
+          card.style.setProperty('--tilt-x', `${(py * -7).toFixed(2)}deg`);
+          card.style.setProperty('--tilt-y', `${(px * 7).toFixed(2)}deg`);
+        }
+      }
+    };
+    const onLeave = () => {
+      for (const root of tilts) {
+        for (const card of root.querySelectorAll<HTMLElement>(':scope > *')) {
+          card.style.setProperty('--tilt-x', '0deg');
+          card.style.setProperty('--tilt-y', '0deg');
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('mouseleave', onLeave);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseleave', onLeave);
+    };
+  }, []);
+
+  // Прожектор-свечение за курсором на акцентных секциях (statement и process).
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return;
+    if (!window.matchMedia('(hover: hover)').matches) return;
+
+    const spots = Array.from(document.querySelectorAll<HTMLElement>('[data-spotlight]'));
+    if (spots.length === 0) return;
+
+    const onMove = (event: MouseEvent) => {
+      for (const spot of spots) {
+        const rect = spot.getBoundingClientRect();
+        if (rect.height === 0) continue;
+        const x = ((event.clientX - rect.left) / rect.width) * 100;
+        const y = ((event.clientY - rect.top) / rect.height) * 100;
+        spot.style.setProperty('--spot-x', `${x.toFixed(1)}%`);
+        spot.style.setProperty('--spot-y', `${y.toFixed(1)}%`);
+      }
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
   function selectFleet(index: number) {
     setActiveFleet((index + orionEquipment.length) % orionEquipment.length);
   }
@@ -208,7 +307,7 @@ export function OrionHandoffSite() {
           {proof.map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}
         </section>
 
-        <section className={styles.statement}>
+        <section className={styles.statement} data-spotlight>
           {/* Слэши — часть оформления подписи, а не комментарий: в фигурных
               скобках, иначе JSX читает их как начало комментария (линт-ошибка
               react/jsx-no-comment-textnodes роняла npm run verify). */}
@@ -220,14 +319,14 @@ export function OrionHandoffSite() {
 
         <section className={styles.section} id="services">
           <div className={styles.sectionHeading}><p className={styles.sectionLabel}>01 / УСЛУГИ</p><h2>Технология под задачу, а не наоборот.</h2></div>
-          <div className={styles.serviceGrid}>
+          <div className={styles.serviceGrid} data-reveal data-tilt>
             {services.map(([number, title, copy]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{copy}</p></div></article>)}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeading}><p className={styles.sectionLabel}>02 / СФЕРЫ ПРИМЕНЕНИЯ</p><h2>Работаем там, где основание определяет весь график.</h2></div>
-          <div className={styles.sectorGrid}>
+          <div className={styles.sectorGrid} data-reveal data-tilt>
             {sectors.map(([number, title, copy]) => <article key={number}><strong>{number}</strong><div><h3>{title}</h3><p>{copy}</p></div></article>)}
           </div>
         </section>
@@ -272,7 +371,7 @@ export function OrionHandoffSite() {
             <h2>Только реальные объекты и подтверждённые результаты.</h2>
             <p>Раздел подготовлен к публикации. Названия заказчиков, фотографии, объёмы и сроки появятся после проверки и согласования материалов компанией ОРИОН.</p>
           </div>
-          <div className={styles.storyBlueprint}>
+          <div className={styles.storyBlueprint} data-reveal>
             <article><span>01</span><h3>Что было на входе</h3><p>Тип объекта, город, проектная задача и условия площадки.</p></article>
             <article><span>02</span><h3>Как выполняли</h3><p>Состав техники, технология, этапы работ и реальные фотографии.</p></article>
             <article><span>03</span><h3>Что получилось</h3><p>Фактический объём, сроки и исполнительные материалы — без рекламных допущений.</p></article>
@@ -281,7 +380,7 @@ export function OrionHandoffSite() {
 
         <section className={styles.section} id="process">
           <div className={styles.sectionHeading}><p className={styles.sectionLabel}>05 / КАК МЫ РАБОТАЕМ</p><h2>Предсказуемость начинается до выхода на площадку.</h2></div>
-          <ol className={styles.processGrid}>{orionProcessSteps.map((item) => <li key={item.number}><span>{item.number}</span><h3>{item.title}</h3><p>{item.copy}</p></li>)}</ol>
+          <ol className={styles.processGrid} data-reveal>{orionProcessSteps.map((item) => <li key={item.number}><span>{item.number}</span><h3>{item.title}</h3><p>{item.copy}</p></li>)}</ol>
         </section>
 
 
@@ -319,7 +418,7 @@ export function OrionHandoffSite() {
 
         <section className={styles.evidence}>
           <div className={styles.sectionHeading}><p className={styles.sectionLabel}>08 / ДОКАЗАТЕЛЬНАЯ БАЗА</p><h2>Не отзывы вместо фактов, а проверяемые материалы.</h2></div>
-          <div>{[['01', 'Паспорта техники', 'Русскоязычные карточки и ссылки на документы производителей.'], ['02', 'ППР и контроль', 'Состав работ и контрольные точки фиксируются до мобилизации.'], ['03', 'PilingTrack', 'Смены, объёмы, фото и состояние техники собираются в цифровом контуре.']].map(([n,t,c]) => <article key={n}><span>{n}</span><h3>{t}</h3><p>{c}</p></article>)}</div>
+          <div data-reveal data-tilt>{[['01', 'Паспорта техники', 'Русскоязычные карточки и ссылки на документы производителей.'], ['02', 'ППР и контроль', 'Состав работ и контрольные точки фиксируются до мобилизации.'], ['03', 'PilingTrack', 'Смены, объёмы, фото и состояние техники собираются в цифровом контуре.']].map(([n,t,c]) => <article key={n}><span>{n}</span><h3>{t}</h3><p>{c}</p></article>)}</div>
         </section>
 
         <section className={styles.faq} id="faq">
