@@ -12,6 +12,32 @@ description: >-
 
 # PilingTrack CSP / Monitoring Campaign
 
+**Статус: ЗАКРЫТО 12.09.2026, коммит `a3ff7c58`, раскатано на прод (`b9dde8e`).**
+
+Починено ровно тем, что стояло в меню решений первым: **прод собирается
+webpack** (`next build --webpack` в `package.json`; Turbopack остался для
+`next dev`). Webpack штампует nonce на все теги. Числовой критерий выполнен:
+на прод-сборке `<script src>` без nonce — **0 из 17** (было 1 из 17), в
+консоли на `/admin`, `/login`, `/operator` ошибок CSP нет.
+
+Что изменилось с 09.07.2026 и позволило закрыть: **ошибка типов, из-за которой
+сборка webpack падала, на Next 16.2.12 исчезла** (тогда был 16.2.6). Больше
+ничего делать не пришлось — политику не трогали, `buildNonceCsp` не трогали.
+
+Цена: прод-сборка около 4 минут вместо двух. Как проверить, что Turbopack
+научился протягивать nonce (тогда флаг можно снять):
+`curl -s http://localhost:3000/login | grep -o '<script src="[^"]*"[^>]*>' | grep -vc nonce`
+— должно быть 0 и на сборке без `--webpack`.
+
+Уточнение к прежней оценке «косметика»: на `/login` заблокированный чанк
+(общий вендорный — next/image + базовый lucide) **мешал гидратации**, а не
+только шумел в консоли. Это выяснилось 12.09.2026, когда правка «кнопки входа
+неактивны до готовности» оставила форму входа мёртвой на бою: гидратация не
+завершалась, замок не открывался. Правку откатили (`56bf170`), причину
+устранили здесь.
+
+Ниже — история расследования, она больше не требует действий.
+
 **Status as of 2026-07-09: OPEN — ROOT-CAUSED, no clean in-place fix yet.**
 Reproduced end-to-end locally and the injection point is localized (Phase 2
 complete). No fix shipped — the fix is now a build-pipeline *decision*, see
@@ -41,7 +67,8 @@ when you learn something that changes the picture.
   `/login`, `/operator`, `/report`, `/history`, `/inspections` too. The
   "/monitoring" framing was just where it was first noticed. The Sentry
   `tunnelRoute:"/monitoring"` lead (Experiment 4) is a **dead end** for this
-  bug — refuted.
+  bug — refuted. (It was nonetheless a **real, separate bug**: the tunnel
+  never worked at all. Closed 2026-09-13 — see Experiment 4 below.)
 - **Bundler confirmed = Turbopack** (build banner `Next.js 16.2.6
   (Turbopack)`). Resolves Experiment 5's open question; the `~` in chunk names
   is Turbopack naming, not webpack split-chunks.
@@ -478,7 +505,51 @@ export const config = {
   disproof of a documented assumption, which is exactly the kind of finding
   this file exists to capture.
 
-### Experiment 4 — the Sentry `tunnelRoute` collision (MEDIUM confidence, verified oddity)
+### Experiment 4 — the Sentry `tunnelRoute` collision — **CONFIRMED & FIXED 2026-09-13**
+
+**Outcome: real bug, unrelated to this campaign's CSP symptom. Fixed by
+`tunnelRoute: "/monitoring"` → `"/_relay"` in `next.config.ts`. Nothing below
+needs re-running; kept for the reasoning.**
+
+The open question this experiment left ("rewrite vs. injected route handler —
+not verified") is now answered from the installed SDK's own source:
+
+- `@sentry/nextjs/build/cjs/config/withSentryConfig/tunnel.js` registers the
+  tunnel as a `rewrites()` entry and returns it as a **bare array**.
+- `next/dist/lib/load-custom-routes.js:418` assigns a bare array to
+  **`afterFiles`** — rewrites checked *after* pages and route handlers.
+- So the real page `src/app/(app)/monitoring/page.tsx` won every time and the
+  rewrite never fired. Confirmed in the built artifact: `routes-manifest.json`
+  showed `beforeFiles: 0`, `afterFiles: [/monitoring(/?) -> ...sentry.io]`.
+
+**Consequence (verified locally, standalone prod build, Next 16.2.12 +
+`@sentry/*` 10.62.0 — byte-identical to prod commit `b9dde8e`):**
+`POST /monitoring?o=..&p=..&r=de` with a real envelope returned **200 + the
+page's HTML**. The browser SDK reads 200 as "delivered" and never retries, so
+**every browser error was silently dropped**. After the fix the same envelope
+to `/_relay` returns `{"id":"<event_id>"}` from Sentry ingest.
+
+**Refuted sub-claim — do not repeat it:** the prod log line
+`The Server Reference ID did not match the expected format. Received "x"` is
+**NOT** caused by this collision. Reproduced locally: it needs a
+`next-action` header whose value isn't 42 chars (`mightBeServerReferenceId`
+is literally `id.length === 42`), thrown by the server-module-map proxy at
+`next/dist/esm/server/app-render/manifests-singleton.js:157`. The Sentry
+browser transport sets **no headers at all**
+(`@sentry/browser/.../transports/fetch.js`: `headers: options.headers`, unset)
+and posts `text/plain;charset=UTF-8`, which fails every gate in
+`server-action-request-meta.js` — verified: that exact request shape returns
+200 HTML and logs nothing. Whatever sends `next-action: x` is a separate,
+still-unidentified client (a scanner probing for exposed server actions is the
+leading guess). **Do not "fix" it by changing the tunnel again.**
+
+**Why `/_relay`:** a leading underscore is an App Router *private folder*, so
+no page can ever claim that URL again — the collision is impossible by
+construction rather than by comment. The name avoids the word "sentry" on
+purpose: ad-blocker lists match it, which is what `tunnelRoute` exists to dodge.
+
+<details>
+<summary>Original (2026-07-08) experiment text, superseded</summary>
 
 `next.config.ts:111-114` (verified 2026-07-08):
 
@@ -521,6 +592,8 @@ normal App Router render pipeline (rather than only the Sentry `POST`
 envelope), that would explain a page-specific nonce-injection failure and
 deserves its own follow-up — but do not assume this without the network
 evidence above.
+
+</details>
 
 ### Experiment 5 — Turbopack vs webpack chunk-naming (LOW confidence, flagged not resolved)
 
@@ -740,7 +813,8 @@ grep -rn "force-dynamic\|force-static" src/app
 grep -n "PWA cache headers" next.config.ts
 find public -iname "sw.js" -o -iname "manifest.json"   # expect: nothing
 
-# 4. The Sentry tunnelRoute collision still exists as described
+# 4. The Sentry tunnelRoute collision — FIXED 2026-09-13, expect "/_relay"
+#    (if this prints "/monitoring" again, the fix was reverted — re-read Exp. 4)
 grep -n "tunnelRoute" next.config.ts
 
 # 5. This campaign hasn't already been closed elsewhere
