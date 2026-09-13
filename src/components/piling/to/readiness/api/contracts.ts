@@ -58,6 +58,7 @@ export interface ReadinessBootstrap {
       permits: boolean;
       maintenance: boolean;
       documents: boolean;
+      briefings: boolean;
       reports: boolean;
       settings: boolean;
     };
@@ -390,7 +391,8 @@ export function isReadinessBootstrapEnvelope(
     return false;
   }
   if (!booleanRecord(capabilities.screens, [
-    'readiness', 'fleet', 'shifts', 'permits', 'maintenance', 'documents', 'reports', 'settings',
+    'readiness', 'fleet', 'shifts', 'permits', 'maintenance', 'documents', 'briefings',
+    'reports', 'settings',
   ])) return false;
   if (typeof capabilities.canActAsMechanic !== 'boolean' || !record(capabilities.entities)) {
     return false;

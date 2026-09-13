@@ -1,0 +1,135 @@
+/*
+ * Лист журнала инструктажей.
+ *
+ * Стили свои, а не утилитами Tailwind: документ должен выглядеть одинаково на
+ * экране и на бумаге, а часть утилит (тени, скругления, цвета фона) принтер либо
+ * не печатает, либо печатает серым. Здесь только то, что переживает печать, —
+ * линии, размеры и отступы.
+ */
+
+@page {
+  /* Девять граф в портретной ориентации не помещаются: правые столбцы
+     наползают друг на друга. */
+  size: A4 landscape;
+  margin: 12mm 10mm;
+}
+
+.journal-sheet {
+  box-sizing: border-box;
+  max-width: 277mm;
+  margin: 0 auto;
+  padding: 8mm;
+  background: #fff;
+  color: #000;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 10pt;
+  line-height: 1.35;
+}
+
+.journal-head h1 {
+  margin: 0 0 4mm;
+  font-size: 13pt;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.journal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm 8mm;
+  margin: 0 0 4mm;
+}
+
+.journal-meta div {
+  display: flex;
+  gap: 2mm;
+}
+
+.journal-meta dt {
+  font-weight: 600;
+}
+
+.journal-meta dt::after {
+  content: ':';
+}
+
+.journal-meta dd {
+  margin: 0;
+}
+
+.journal-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.journal-table th,
+.journal-table td {
+  padding: 1.5mm 2mm;
+  border: 0.3mm solid #000;
+  text-align: left;
+  vertical-align: top;
+}
+
+.journal-table th {
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+/* Номер и даты не переносим — иначе строка журнала читается в два приёма. */
+.journal-table td:first-child,
+.journal-table td:nth-child(2),
+.journal-table td:nth-child(8) {
+  white-space: nowrap;
+}
+
+/* Графа под живую подпись: ширина под росчерк, пустая осознанно. */
+.journal-sign {
+  min-width: 28mm;
+}
+
+.journal-code {
+  white-space: nowrap;
+}
+
+.journal-foot {
+  margin-top: 5mm;
+  font-size: 9pt;
+}
+
+.journal-foot p {
+  margin: 0 0 4mm;
+}
+
+.journal-signatures {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4mm;
+}
+
+.journal-warning,
+.journal-error,
+.journal-empty {
+  margin: 0 0 4mm;
+  padding: 2mm 3mm;
+  border: 0.3mm solid #000;
+  font-size: 9pt;
+}
+
+/* Заголовок таблицы повторяется на каждом листе: журнал за месяц в одну
+   страницу не укладывается, а безголовая вторая страница нечитаема. */
+@media print {
+  .journal-table thead {
+    display: table-header-group;
+  }
+
+  .journal-table tr {
+    break-inside: avoid;
+  }
+
+  .journal-sheet {
+    max-width: none;
+    padding: 0;
+  }
+}

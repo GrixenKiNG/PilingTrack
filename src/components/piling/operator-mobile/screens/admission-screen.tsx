@@ -172,7 +172,7 @@ export function AdmissionScreen({state, onAccept, onSelectEquipment, busy, error
                 type="button"
                 onClick={() => setShiftType(type)}
                 className={cn(
-                  'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
+                  'min-h-11 flex-1 rounded-md text-sm font-medium transition-colors',
                   shiftType === type ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
                 )}
               >

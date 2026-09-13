@@ -156,8 +156,9 @@ export interface OperatorMobileState {
   conditions: ShiftCondition[];
   shift: {id: string; productionDate: string; startedAt: string | null; state: string} | null;
   checklists: ChecklistView[];
-  /** Предупреждения смены. Запрещает работу только погода. */
+  /** Предупреждения смены. Даже красные не блокируют учёт программно. */
   warnings: WorkWarning[];
+  /** Совместимость со старым клиентом; при политике предупреждений всегда true. */
   workAllowed: boolean;
   production: ProductionView;
   /** Записи смены поимённо — чтобы ошибочную можно было поправить. */

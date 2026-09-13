@@ -1,4 +1,6 @@
 import {describe, expect, it} from 'vitest';
+import {listBriefingJournal} from '../../application/briefing-journal-query';
+import {dayRangeToInstants} from '../briefing-journal-view';
 import {getChecklist} from '../checklist-catalog';
 import {collectDefectDrafts, validateChecklistRun} from '../checklist-run';
 import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
@@ -6,7 +8,7 @@ import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
 import {actualRefusalMm, validatePassport} from '../pile-passport';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
-import {derivePhase, missingPrerequisites} from '../shift-phases';
+import {admissionAccepted, derivePhase, missingPrerequisites} from '../shift-phases';
 import {classifyObservedHazard, validateIncident} from '../incidents';
 import {buildSlingerAttempt} from '../knowledge-bank';
 import {shiftWindow} from '../shift-window';
@@ -87,13 +89,17 @@ describe('предупреждения смены', () => {
     expect(isWorkAllowed(warnings)).toBe(true);
   });
 
-  it('ветер выше 15 м/с прекращает работы', () => {
-    expect(isWorkAllowed(collectWarnings({...base, windMs: 17}))).toBe(false);
+  it('ветер выше 15 м/с даёт красное предупреждение, но не блокирует учёт', () => {
+    const warnings = collectWarnings({...base, windMs: 17});
+    expect(warnings.find((warning) => warning.code === 'WIND_STOP')?.level).toBe('STOP');
+    expect(isWorkAllowed(warnings)).toBe(true);
     expect(isWorkAllowed(collectWarnings({...base, windMs: 14}))).toBe(true);
   });
 
-  it('мороз ниже −25 °C прекращает работы', () => {
-    expect(isWorkAllowed(collectWarnings({...base, temperatureC: -27}))).toBe(false);
+  it('мороз ниже −25 °C даёт красное предупреждение, но не блокирует учёт', () => {
+    const warnings = collectWarnings({...base, temperatureC: -27});
+    expect(warnings.find((warning) => warning.code === 'COLD_STOP')?.level).toBe('STOP');
+    expect(isWorkAllowed(warnings)).toBe(true);
     expect(isWorkAllowed(collectWarnings({...base, temperatureC: -24}))).toBe(true);
   });
 
@@ -132,6 +138,21 @@ describe('фазы смены', () => {
   it('«работа завершена» ведёт к сдаче, закрытая смена — в конец', () => {
     expect(derivePhase({...facts, workFinished: true})).toBe('CLOSING');
     expect(derivePhase({...facts, shiftClosed: true})).toBe('CLOSED');
+  });
+
+  /*
+    Бой 12.09.2026: запланированная диспетчером смена считалась принятой, экран
+    проскакивал приём установки, смена оставалась PENDING_ACCEPTANCE — и сервер
+    отвергал КАЖДУЮ запись выработки, пока осмотры проходили нормально.
+    Машинист отработал смену и не записал ни сваи.
+  */
+  it('запланированная смена не считается принятой', () => {
+    expect(admissionAccepted('PLANNED')).toBe(false);
+    expect(admissionAccepted('PENDING_ACCEPTANCE')).toBe(false);
+    expect(admissionAccepted(null)).toBe(false);
+    expect(admissionAccepted('STARTED')).toBe(true);
+    // Смену уже сдают — возвращать человека к приёму установки нельзя.
+    expect(admissionAccepted('HANDOVER_PENDING')).toBe(true);
   });
 });
 
@@ -383,5 +404,37 @@ describe('запреты, которые обязан держать серве�
     expect(validatePassport({
       pileNumber: 'С-130', refusalSetPenetrationMm: 18, refusalSetBlows: null,
     }).map((problem) => problem.field)).toContain('refusalSetBlows');
+  });
+});
+
+describe('период журнала инструктажей', () => {
+  /*
+    Последний день периода обязан попасть в выборку целиком. Если бы границу
+    брали как `new Date('2026-09-12')`, это была бы полночь UTC — три часа ночи
+    по Москве, и инструктажи последнего дня выпали бы из журнала, который с ними
+    распечатан и подписан.
+  */
+  it('конец периода — последнее мгновение дня, а не его начало', () => {
+    const range = dayRangeToInstants('2026-09-01', '2026-09-12');
+    const end = new Date(range.to);
+    expect(end.getHours()).toBe(23);
+    expect(end.getMinutes()).toBe(59);
+    expect(end.getDate()).toBe(12);
+    expect(new Date(range.from).getHours()).toBe(0);
+    expect(new Date(range.from).getDate()).toBe(1);
+  });
+
+  it('перевёрнутый период разворачивается, а не отдаёт пустой журнал', () => {
+    const reversed = dayRangeToInstants('2026-09-12', '2026-09-01');
+    expect(reversed).toEqual(dayRangeToInstants('2026-09-01', '2026-09-12'));
+  });
+
+  it('журнал не открывается без права видеть документы всех работников', async () => {
+    // Журнал — персональные данные всех работников сразу. Отказ обязан случиться
+    // до обращения к базе: без него выборка ушла бы в запрос, а право проверял
+    // бы только экран, который легко обойти прямым запросом к API.
+    await expect(listBriefingJournal({
+      tenantId: 'orion', mayReadAllDocuments: false,
+    })).rejects.toMatchObject({status: 403});
   });
 });

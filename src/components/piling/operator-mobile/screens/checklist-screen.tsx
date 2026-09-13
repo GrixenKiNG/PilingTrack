@@ -104,10 +104,16 @@ export function ChecklistScreen({
       subtitle={checklist.purpose}
       footer={(
         <>
-          <p className="text-center text-2xs font-medium text-muted-foreground">
-            Отмечено {answered} из {items.length}
-          </p>
-          <BigButton onClick={submit} disabled={busy || gaps.length > 0}>
+          {showGaps && gaps.length > 0 ? (
+            <p role="alert" className="rounded-lg bg-warning/10 px-3 py-2 text-2xs font-semibold text-warning-strong">
+              Первый незаполненный пункт: {gaps[0]}
+            </p>
+          ) : (
+            <p className="text-center text-2xs font-medium text-muted-foreground">
+              Отмечено {answered} из {items.length}
+            </p>
+          )}
+          <BigButton onClick={submit} disabled={busy}>
             {busy ? 'Отправляем…' : gaps.length > 0 ? `Осталось заполнить: ${gaps.length}` : 'Завершить'}
           </BigButton>
           {onBack ? <BigButton tone="ghost" onClick={onBack}>Назад</BigButton> : null}

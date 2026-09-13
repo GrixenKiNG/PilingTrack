@@ -19,6 +19,7 @@ import { ShiftsScreen } from './readiness/screens/shifts-screen';
 import { PermitsScreen } from './readiness/screens/permits-screen';
 import { MaintenanceScreen } from './readiness/screens/maintenance-screen';
 import { DocumentsScreen } from './readiness/screens/documents-screen';
+import { BriefingsScreen } from './readiness/screens/briefings-screen';
 import { ReportsScreen } from './readiness/screens/reports-screen';
 import { SettingsWorkspace } from './readiness/screens/settings-workspace';
 import type { ReferenceUiProps, ReferenceView } from './readiness/screens/types';
@@ -179,6 +180,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
             {props.view === 'permits' && <PermitsScreen {...props} />}
             {props.view === 'maintenance' && <MaintenanceScreen {...props} />}
             {props.view === 'documents' && <DocumentsScreen {...props} />}
+            {props.view === 'briefings' && <BriefingsScreen {...props} />}
             {props.view === 'reports' && <ReportsScreen {...props} />}
           </div>
         )}

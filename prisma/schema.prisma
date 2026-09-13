@@ -118,6 +118,7 @@ model User {
   crewAssistantOf CrewAssistant[]      @relation("CrewAssistantUser")
   feedbackReads   FeedbackEventRead[]
   documents       UserDocument[]
+  briefings       BriefingRecord[]
   placePresets    UserPlacePreset[]
   operatorChecklistTemplatesCreated OperatorChecklistTemplate[] @relation("OperatorChecklistTemplateCreatedBy")
   operatorChecklistExecutionsStarted OperatorChecklistExecution[] @relation("OperatorChecklistExecutionStartedBy")
@@ -208,6 +209,65 @@ model UserDocument {
   @@index([tenantId, userId])
   @@index([tenantId, expiresAt])
   @@index([tenantId, typeId])
+}
+
+/// Что записано в журнале: ознакомление с инструкцией или проверка знаний.
+/// Два значения, заданные кодом, — это перечисление, а не справочник:
+/// появление третьего вида означает новый код, который его записывает.
+enum BriefingRecordKind {
+  INSTRUCTION
+  KNOWLEDGE
+}
+
+/// Журнал инструктажей: каждое ознакомление с инструкцией и каждая проверка
+/// знаний — отдельной строкой, навсегда.
+///
+/// ПОЧЕМУ ОТДЕЛЬНО ОТ UserDocument. Документ работника отвечает на вопрос «есть
+/// ли у человека действующее подтверждение сейчас»: одна строка на вид, она
+/// обновляется на месте. Журнал отвечает на другой вопрос — «кто и когда
+/// проходил», и ответ на него накапливается. Свести их в одну таблицу нельзя ни
+/// в одну сторону: хранить историю в документах значит засыпать карточку
+/// работника и список просрочки сотней строк «ознакомлен» за год, а обновлять
+/// на месте — стирать историю. Поэтому команда пишет в обе таблицы: состояние
+/// туда, факт сюда.
+///
+/// СНИМОК ФИО И ДОЛЖНОСТИ. Журнал — документ: он показывает, кем человек был в
+/// день инструктажа. Переименование учётной записи или перевод на другую
+/// должность не должны задним числом переписывать подписанный лист — то же
+/// правило и по той же причине, что у WorkPermit.
+model BriefingRecord {
+  id       String             @id @default(cuid())
+  tenantId String
+  userId   String
+  kind     BriefingRecordKind
+
+  /// Снимок на момент записи — см. примечание к модели.
+  userName String
+  userRole String
+
+  /// Инструкция, к которой относится запись. Текст инструкций живёт в коде, и
+  /// версия — единственное, чем запись привязана к той редакции, которую
+  /// человек действительно читал.
+  documentCode    String
+  documentTitle   String
+  documentVersion String
+
+  /// Итог проверки знаний: верных ответов из общего числа. У ознакомления
+  /// результата нет — там null.
+  correct Int?
+  total   Int?
+
+  /// До какой даты действует проверка знаний. Ознакомление бессрочно.
+  validUntil DateTime? @db.Timestamptz(3)
+
+  recordedAt DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Restrict)
+
+  /// Журнал читают периодом и по работнику — этими двумя способами и только ими.
+  @@index([tenantId, recordedAt])
+  @@index([tenantId, userId, recordedAt])
 }
 
 // ============================================================

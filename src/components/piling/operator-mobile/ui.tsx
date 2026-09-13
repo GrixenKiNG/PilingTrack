@@ -22,13 +22,13 @@ export function Screen({title, subtitle, children, footer, tabs}: {
   tabs?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="border-b px-4 pb-3 pt-3">
-        <h1 className="text-2xl font-bold leading-tight tracking-tight text-balance">{title}</h1>
+    <div className="operator-screen flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="operator-screen-header border-b px-4 pb-3 pt-4">
+        <h1 className="text-[1.65rem] font-black leading-tight tracking-[-0.025em] text-balance">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
       </header>
-      <main className={cn('flex-1 space-y-3 px-4 py-4', tabs ? 'pb-56' : 'pb-40')}>{children}</main>
-      <div className="sticky bottom-0 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <main className={cn('operator-screen-main flex-1 space-y-3 px-4 py-4', tabs ? 'pb-56' : 'pb-40')}>{children}</main>
+      <div className="operator-screen-footer sticky bottom-0 z-20 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
         {footer ? <div className="space-y-2 px-4 py-3">{footer}</div> : null}
         {tabs}
       </div>
@@ -39,6 +39,7 @@ export function Screen({title, subtitle, children, footer, tabs}: {
 export interface TabDefinition<T extends string> {
   id: T;
   label: string;
+  icon?: ReactNode;
   /** Число на значке: непрочитанное, несделанное, требующее внимания. */
   badge?: number;
   /** Значок красный, а не серый: там что-то, что нельзя пропустить. */
@@ -62,7 +63,7 @@ export function TabBar<T extends string>({tabs, active, onSelect}: {
   onSelect: (id: T) => void;
 }) {
   return (
-    <nav className="grid grid-cols-4 border-t" aria-label="Разделы смены">
+    <nav className="operator-tab-bar grid grid-cols-4 border-t" aria-label="Разделы смены">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -70,13 +71,14 @@ export function TabBar<T extends string>({tabs, active, onSelect}: {
           onClick={() => onSelect(tab.id)}
           aria-current={tab.id === active ? 'page' : undefined}
           className={cn(
-            'relative min-h-12 px-1 py-2 text-2xs font-semibold transition-colors',
+            'relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-1.5 text-3xs font-bold transition-colors',
             tab.id === active
               ? 'border-t-2 border-signal -mt-px text-signal'
               : 'text-muted-foreground hover:bg-secondary',
           )}
         >
-          {tab.label}
+          {tab.icon ? <span className="[&>svg]:size-[18px]" aria-hidden>{tab.icon}</span> : null}
+          <span>{tab.label}</span>
           {tab.badge ? (
             <span
               className={cn(
@@ -106,7 +108,7 @@ export function BigButton({children, onClick, disabled, tone = 'primary', type =
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'min-h-12 w-full rounded-lg border px-4 text-base font-semibold shadow-xs transition-colors',
+        'operator-big-button min-h-12 w-full rounded-xl border px-4 text-base font-bold shadow-sm transition-all active:translate-y-px',
         'disabled:cursor-not-allowed disabled:opacity-50',
         tone === 'primary' && 'border-signal bg-signal text-white hover:bg-signal-strong',
         tone === 'ghost' && 'bg-card text-foreground hover:bg-secondary',
@@ -128,7 +130,7 @@ export function Panel({children, tone = 'plain', className}: {
   return (
     <section
       className={cn(
-        'rounded-lg border bg-card p-4 shadow-xs',
+        'operator-panel rounded-xl border bg-card p-4 shadow-xs',
         tone === 'ok' && 'border-success/45 bg-success/8',
         tone === 'warning' && 'border-warning/50 bg-warning/10',
         tone === 'danger' && 'border-destructive/45 bg-destructive/8',
@@ -158,7 +160,7 @@ export function PanelTitle({children, tone = 'plain'}: {children: ReactNode; ton
 /** Строка «показатель — значение». Значение крупнее подписи и моноширинное. */
 export function Fact({label, value, unit}: {label: string; value: ReactNode; unit?: string}) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 last:pb-0">
+    <div className="operator-fact flex items-baseline justify-between gap-3 border-b py-2.5 last:border-b-0 last:pb-0">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-right">
         <span className="text-base font-semibold tabular-nums">{value}</span>
@@ -171,7 +173,7 @@ export function Fact({label, value, unit}: {label: string; value: ReactNode; uni
 /** Объём работ в двух единицах сразу: штуки и метры погонные. */
 export function VolumeFact({label, count, meters}: {label: string; count: number; meters: number}) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 last:pb-0">
+    <div className="operator-fact flex items-baseline justify-between gap-3 border-b py-2.5 last:border-b-0 last:pb-0">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-right tabular-nums">
         <span className="text-base font-semibold">{count}</span>
@@ -188,24 +190,44 @@ export function PhaseBar({progress}: {
   progress: {phase: string; label: string; done: boolean; current: boolean}[];
 }) {
   const current = progress.find((step) => step.current);
+  const currentIndex = Math.max(0, progress.findIndex((step) => step.current));
   return (
-    <div className="bg-background px-4 pt-3">
-      <ol className="flex gap-1" aria-label="Ход смены">
-        {progress.map((step) => (
+    <div className="operator-phase-bar border-b border-white/10 bg-[#121a22] px-4 pb-3 pt-3 text-white">
+      <div className="mb-2.5 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-3xs font-bold uppercase tracking-[0.18em] text-white/55">
+            Шаг {currentIndex + 1} из {progress.length}
+          </p>
+          <p className="mt-0.5 text-sm font-bold">{current?.label ?? 'Смена завершена'}</p>
+        </div>
+        <p className="text-right text-3xs font-medium text-white/55">Контроль смены</p>
+      </div>
+      <ol
+        className="grid"
+        style={{gridTemplateColumns: `repeat(${progress.length}, minmax(0, 1fr))`}}
+        aria-label="Ход смены"
+      >
+        {progress.map((step, index) => (
           <li
             key={step.phase}
+            aria-label={`${step.label} — ${step.done ? 'выполнено' : step.current ? 'текущий этап' : 'впереди'}`}
             className={cn(
-              'h-1 flex-1 rounded-full',
-              step.done && 'bg-success',
-              step.current && 'bg-signal',
-              !step.done && !step.current && 'bg-border',
+              'relative flex min-w-0 flex-col items-center',
+              index > 0 && 'before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-white/20',
+              index > 0 && (step.done || step.current) && 'before:bg-success/80',
             )}
-          />
+          >
+            <span className={cn(
+              'relative z-10 flex size-6 items-center justify-center rounded-full border text-[10px] font-black tabular-nums',
+              step.done && 'border-success bg-success text-white',
+              step.current && 'border-signal bg-signal text-white ring-4 ring-signal/20',
+              !step.done && !step.current && 'border-white/30 bg-[#121a22] text-white/45',
+            )}>
+              {step.done ? '✓' : index + 1}
+            </span>
+          </li>
         ))}
       </ol>
-      <p className="mt-2 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {current?.label ?? ''}
-      </p>
     </div>
   );
 }
