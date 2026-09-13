@@ -45,6 +45,7 @@
     "worker:outbox": "npx tsx src/workers/outbox-worker.ts",
     "worker:projection": "npx tsx src/workers/projection-worker.ts",
     "worker:pdf": "npx tsx src/workers/pdf-worker.ts",
+    "preworker:all": "node scripts/kill-port.js 3002",
     "worker:all": "npx tsx src/workers/unified-worker.ts",
     "postinstall": "npm run db:generate",
     "db:push": "prisma db push",
