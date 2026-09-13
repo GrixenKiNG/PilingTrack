@@ -3,7 +3,7 @@
   "version": "2.8.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/kill-port.js 3000",
+    "predev": "node scripts/kill-port.js 3000 && node scripts/free-dev-lock.js",
     "dev": "npx tsx scripts/validate-env.ts && next dev -p 3000",
     "build": "npx tsx scripts/validate-env.ts && npm run db:generate && next build --webpack && node scripts/copy-standalone-assets.js",
     "prestart": "node scripts/kill-port.js 3000",

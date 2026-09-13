@@ -6,9 +6,11 @@ rem                             This is the recommended workflow for development
 rem With "docker":              full Docker stack (app + workers + ws + DB).
 rem With "prod":                local `npm run build` + `npm run start` against Docker DB.
 rem
-rem Port 3000 is freed automatically by the predev/prestart npm hooks
-rem (scripts/kill-port.js), so a hung node process from a previous run
-rem no longer blocks startup.
+rem Before dev starts, the predev npm hook frees port 3000 (scripts/kill-port.js)
+rem AND clears a leftover Next dev lock (scripts/free-dev-lock.js). The lock
+rem matters on its own: Next refuses a second dev server for the same directory,
+rem whatever port the old one sits on, and the new one dies right after printing
+rem "Ready" - which looks like this script simply cutting out.
 rem
 rem For first-time setup on a fresh machine, run setup.bat instead.
 
