@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { deleteUserDocumentType, updateUserDocumentType } from '@/modules/users';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
-import { documentTypeSchema } from '../route';
+import { documentTypeSchema } from '../schema';
 
 export const runtime = 'nodejs';
 

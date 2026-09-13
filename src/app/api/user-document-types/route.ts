@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
-import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
+import { documentTypeSchema } from './schema';
 import { createUserDocumentType, listUserDocumentTypes, listUserDocumentTypesForAdmin } from '@/modules/users';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
 
 export const runtime = 'nodejs';
-
-export const documentTypeSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  requiresExpiry: z.boolean().optional(),
-  defaultValidMonths: z.number().int().min(1).max(600).nullable().optional(),
-  leadTimeDays: z.number().int().min(0).max(365).optional(),
-  requiredForOperator: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-  notes: z.string().max(2000).optional(),
-});
 
 /**
  * Справочник видов документов работника — нужен формам заведения.
