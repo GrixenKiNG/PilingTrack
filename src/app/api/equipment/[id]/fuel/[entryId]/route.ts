@@ -18,10 +18,6 @@ export const DELETE = withMutation(
     const { id, entryId } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
-
     try {
       await deleteFuelEntry(id, entryId, { tenantId });
       return NextResponse.json({ success: true });

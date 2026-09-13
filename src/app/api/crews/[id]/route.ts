@@ -40,7 +40,6 @@ export const PUT = withMutation(
     assertCan(user!, 'crews.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const body = await readJsonBody(request);
     const validated = updateCrewSchema.safeParse(body);
@@ -81,7 +80,6 @@ export const DELETE = withMutation(
     assertCan(user!, 'crews.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const { id } = await params;
     const { deleteCrew } = await getCrewsModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

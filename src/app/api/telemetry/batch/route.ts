@@ -123,9 +123,6 @@ export const POST = withApi(async (request: NextRequest) => {
     // the tenant anchor is the equipment's.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
     const requestedIds = [...new Set(validated.data.map((r) => r.equipmentId))];
     const foreign = await findForeignEquipmentIds(tenantId, requestedIds);
     if (foreign.length > 0) {

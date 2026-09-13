@@ -28,9 +28,6 @@ export const GET = withApi(
     assertCan(user!, 'telegram.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
     const configs = await listTelegramConfigs(tenantId);
     return NextResponse.json({ configs });
   },
@@ -46,9 +43,6 @@ export const POST = withMutation(
     assertCan(user!, 'telegram.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
     const body = await readJsonBody(request);
 
     const validation = telegramConfigSchema.safeParse(body);
@@ -75,9 +69,6 @@ export const PUT = withMutation(
     assertCan(user!, 'telegram.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
     const body = await readJsonBody(request);
 
     const validation = telegramConfigIdSchema.safeParse(body);
@@ -105,9 +96,6 @@ export const DELETE = withMutation(
     assertCan(user!, 'telegram.manage');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-    }
     const body = await readJsonBody(request);
 
     const validation = deleteIdSchema.safeParse(body);

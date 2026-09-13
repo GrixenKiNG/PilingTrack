@@ -58,7 +58,6 @@ export const POST = withMutation(
     assertCan(user!, 'inspection.perform');
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
-    if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
     const body = await readJsonBody(request);
     const isBlockStart = body && typeof body === 'object' && 'level' in body && !('templateId' in body);
 

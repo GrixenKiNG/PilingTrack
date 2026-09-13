@@ -15,9 +15,6 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const tenantId = requireTenantId(user);
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-  }
   return NextResponse.json(await getReadinessRules(tenantId));
 }, { domain: 'readiness' });
 
@@ -27,9 +24,6 @@ export const PUT = withMutation(async (request: NextRequest) => {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   assertRole(user, 'ADMIN');
   const tenantId = requireTenantId(user);
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
-  }
   let body: unknown;
   try {
     body = await request.json();
