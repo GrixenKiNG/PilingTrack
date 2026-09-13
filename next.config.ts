@@ -131,10 +131,23 @@ export default withSentryConfig(nextConfig, {
   // Capture a wider set of source-map files for readable stack traces.
   widenClientFileUpload: true,
 
-  // Route Sentry browser requests through our own /monitoring path to dodge
-  // ad-blockers. Keep an eye on src/proxy.ts — if any middleware starts
-  // matching /monitoring, client errors stop reaching Sentry.
-  tunnelRoute: "/monitoring",
+  // Route Sentry browser requests through our own path to dodge ad-blockers.
+  //
+  // The path MUST NOT collide with an app route. Sentry registers the tunnel as
+  // a plain `rewrites()` array, which Next treats as `afterFiles`: pages and
+  // route handlers match FIRST, so a real route on the same path wins and every
+  // envelope POST lands on it. That is what "/monitoring" did — it is a real
+  // page (src/app/(app)/monitoring). The POST was answered by that page with
+  // 200 and Content-Type: text/html; the SDK reads any 2xx as delivered, so it
+  // never retried and no browser error reached Sentry (measured 2026-09-13).
+  //
+  // The leading underscore makes a repeat impossible: the App Router treats
+  // "_"-prefixed segments as private folders, so src/app/_relay/** can never
+  // claim this URL. The name deliberately avoids the word "sentry" — ad-blocker
+  // lists match it, which is exactly what tunnelRoute exists to avoid.
+  // Keep an eye on src/proxy.ts — if it ever short-circuits this path, client
+  // errors stop reaching Sentry.
+  tunnelRoute: "/_relay",
 
   sourcemaps: {
     // Skip upload entirely when no auth token is present (local builds).
