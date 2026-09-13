@@ -13,8 +13,11 @@ export type ReferenceView =
   | 'shifts'
   | 'permits'
   | 'maintenance'
+  | 'my-clearance'
+  | 'safety'
   | 'documents'
   | 'briefings'
+  | 'incidents'
   | 'reports'
   | 'settings';
 

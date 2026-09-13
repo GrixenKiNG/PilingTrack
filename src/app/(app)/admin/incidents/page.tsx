@@ -1,7 +1,13 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { AdminIncidents } from '@/components/piling/admin-incidents';
-
+/**
+ * Разбор происшествий переехал в модуль «ТБ и допуски» (13.09.2026).
+ *
+ * Маршрут оставлен редиректом, а не удалён: `/admin/incidents` два месяца был
+ * пунктом меню у четырёх ролей и ссылкой в уведомлениях — такие адреса лежат
+ * в закладках и переписке. Молчаливый 404 на месте рабочего экрана выглядит
+ * как пропавший раздел.
+ */
 export default function AdminIncidentsPage() {
-  return <AdminIncidents />;
+  redirect('/admin/safety?view=incidents');
 }

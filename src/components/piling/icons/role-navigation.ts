@@ -2,6 +2,12 @@ import { ASSISTANT_HOME_ROUTE, OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import type { UserRole } from '@/lib/types';
 import type { PilingIconName, PilingIconTone } from './piling-icon';
 
+/**
+ * Модуль охраны труда. Один адрес на все роли: он открыт каждому, и
+ * повторять строку в семи списках — способ однажды разойтись.
+ */
+const SAFETY_MODULE_ROUTE = '/admin/safety';
+
 export interface NavigationItem {
   label: string;
   href: string;
@@ -26,6 +32,11 @@ export interface NavigationItem {
 // экрана смены туда хода нет.
 const operatorNavigation: NavigationItem[] = [
   { label: 'Смена', href: OPERATOR_HOME_ROUTE, icon: 'home', tone: 'primary' },
+  // Инструктаж проходит каждый — значит и дорога к своим инструктажам нужна
+  // каждому (решение владельца 13.09.2026). Машинист откроет «Мой допуск»:
+  // свои документы, свои инструктажи, своя проверка знаний. Чужие допуски
+  // ему закрыты сервером, а не отсутствием пункта меню.
+  { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted' },
   { label: 'История', href: '/history', icon: 'history' },
 ];
 
@@ -42,6 +53,7 @@ const operatorNavigation: NavigationItem[] = [
  */
 const assistantNavigation: NavigationItem[] = [
   { label: 'Допуск', href: ASSISTANT_HOME_ROUTE, icon: 'home', tone: 'primary' },
+  { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted' },
   { label: 'История', href: '/history', icon: 'history' },
 ];
 
@@ -73,7 +85,10 @@ const dispatcherNavigation: NavigationItem[] = [
   { label: 'Установки', href: '/admin/equipment', icon: 'equipment-rig' },
   { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
   { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
-  { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
+  // «Происшествия» больше не отдельный пункт: разбор переехал вкладкой в «ТБ
+  // и допуски» вместе с документами работников, журналом инструктажей и
+  // нарядами (решение владельца 13.09.2026 — развести технику и людей).
+  { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted', tone: 'danger' },
   { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
 ];
 
@@ -84,6 +99,7 @@ export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   ASSISTANT: assistantNavigation,
   MECHANIC: [
     { label: 'Готовность техники', href: '/admin/to', icon: 'technical-readiness' },
+    { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted' },
   ],
   // Мастер смотрит за ходом работ на участке, инженер ОТ — за допусками и
   // осмотрами. Оба заходят в те же разделы, что и диспетчер, но без настроек
@@ -97,18 +113,19 @@ export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
     // Читать происшествия на своём участке мастеру разрешено
     // (`incidents.read`), а пункта в меню не было: экран открывался только по
     // прямому адресу. Разбор ему недоступен — кнопку прячет сам экран.
-    { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
+    // Ведёт в модуль «ТБ и допуски»: чужие допуски мастеру закрыты, и модуль
+    // сам откроется на первой разрешённой ему вкладке — происшествиях.
+    { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted', tone: 'danger' },
     { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
     { label: 'Аналитика', href: '/admin/analytics', icon: 'analytics', tone: 'info' },
   ],
   SAFETY_ENGINEER: [
     /*
-      Разбор происшествий — то, что закрывает лично инженер ОТ: он один из
-      трёх, кому разрешён `incidents.review`. Пункта в меню при этом не было
-      вовсе — право есть, дороги нет. Стоит первым: экран открывают, чтобы
-      увидеть, что требует решения сегодня.
+      Свой модуль инженера ОТ стоит первым: допуски работников, документы,
+      журнал инструктажей и разбор происшествий — всё, что он закрывает лично
+      (`incidents.review` есть у трёх ролей, и он одна из них).
     */
-    { label: 'Происшествия', href: '/admin/incidents', icon: 'risk', tone: 'danger' },
+    { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted', tone: 'danger' },
     { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
     { label: 'Объекты', href: '/admin/sites', icon: 'site' },
     { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },

@@ -6,7 +6,7 @@ import { ActiveViewErrorBoundary } from './boundaries/active-view-error-boundary
 import { BootstrapBoundary } from './boundaries/bootstrap-boundary';
 import { READY_QUERY_STATE, type QueryState } from './boundaries/query-state';
 import { LiveRegion } from './live-region';
-import { MODULE_TABS, ModuleTabList } from './module-tab-list';
+import { MODULE_TABS, ModuleTabList, type ModuleTab } from './module-tab-list';
 import type { ReadinessBootstrap } from './api/contracts';
 
 interface TechReadinessModuleProps {
@@ -19,6 +19,10 @@ interface TechReadinessModuleProps {
   bootstrap?: ReadinessBootstrap | null;
   /** Контрол в правом конце полосы вкладок. */
   tabStripTrailing?: ReactNode;
+  /** Вкладки модуля. По умолчанию — «Техготовность». */
+  tabs?: ReadonlyArray<ModuleTab>;
+  /** Как модуль называется: подпись области и полосы вкладок. */
+  moduleLabel?: string;
 }
 
 function activeViewState(
@@ -49,13 +53,15 @@ export function TechReadinessModule({
   onRetry,
   bootstrap,
   tabStripTrailing,
+  tabs = MODULE_TABS,
+  moduleLabel = 'Центр технической готовности',
 }: TechReadinessModuleProps) {
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const resolvedQueryState = activeViewState(activeView, queryState, bootstrap);
 
   return (
     <section
-      aria-label="Центр технической готовности"
+      aria-label={moduleLabel}
       data-testid="tech-readiness-module"
       className="w-full min-w-0 overflow-x-hidden bg-background"
     >
@@ -65,8 +71,10 @@ export function TechReadinessModule({
         activeTabRef={activeTabRef}
         screens={bootstrap?.capabilities.screens ?? null}
         trailing={tabStripTrailing}
+        tabs={tabs}
+        ariaLabel={moduleLabel}
       />
-      {MODULE_TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = tab.id === activeView;
         return (
           <div

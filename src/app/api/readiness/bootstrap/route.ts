@@ -49,6 +49,7 @@ async function handleGet(request: NextRequest) {
         // Право из прикладной матрицы: контур готовности его не знает, см.
         // ReadinessExternalGrants.
         documentsControl: can(user, 'users.documents.read_all'),
+        incidentsRead: can(user, 'incidents.read'),
       })
     );
     return response({ data, meta: { requestId } }, 200, requestId);

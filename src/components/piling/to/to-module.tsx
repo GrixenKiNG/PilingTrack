@@ -16,6 +16,7 @@ import {
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import type { ActingRole } from '@/lib/types';
 import { TechReadinessModule } from './readiness/tech-readiness-module';
+import { MODULE_TABS, SAFETY_TABS, type ModuleTab } from './readiness/module-tab-list';
 import type { QueryState } from './readiness/boundaries/query-state';
 import {
   fetchCurrentReadiness,
@@ -60,17 +61,20 @@ import type { JournalRecord } from './to-stats';
 import { can } from '@/services/auth/authorization-service';
 import { resolveEffectiveRole } from '@/lib/types';
 
-// Список обязан совпадать с MODULE_TABS: он сторожит ?view= в адресе, и
-// пропущенное здесь значение выглядит как «такой вкладки нет» — переход по
-// закладке молча возвращает на центр готовности.
+// Список обязан покрывать ОБА набора вкладок — MODULE_TABS и SAFETY_TABS: он
+// сторожит ?view= в адресе, и пропущенное здесь значение выглядит как «такой
+// вкладки нет» — переход по закладке молча возвращает на домашний раздел.
 const VIEW_IDS = new Set<ReferenceView>([
+  'my-clearance',
   'readiness',
   'fleet',
   'shifts',
   'permits',
   'maintenance',
+  'safety',
   'documents',
   'briefings',
+  'incidents',
   'reports',
   'settings',
 ]);
@@ -117,9 +121,46 @@ const SETTINGS_IDS = new Set<SettingsSection>([
 export const TECH_READINESS_PRODUCTION_SHELL_ENABLED =
   process.env.NEXT_PUBLIC_TECH_READINESS_PRODUCTION_SHELL !== 'false';
 
-const parseView = (value: string | null): ReferenceView => {
+/**
+ * Какой модуль показывает оболочка. Данные и экраны у них общие, разные —
+ * набор вкладок, адрес и то, куда попадаешь без `?view=`.
+ */
+export type ModuleSurface = 'readiness' | 'safety';
+
+const SURFACE_TABS: Record<ModuleSurface, ReadonlyArray<ModuleTab>> = {
+  readiness: MODULE_TABS,
+  safety: SAFETY_TABS,
+};
+
+const SURFACE_ROUTE: Record<ModuleSurface, string> = {
+  readiness: '/admin/to',
+  safety: '/admin/safety',
+};
+
+const SURFACE_LABEL: Record<ModuleSurface, string> = {
+  readiness: 'Центр технической готовности',
+  safety: 'ТБ и допуски',
+};
+
+/** Раздел, который открывается без `?view=` в адресе. */
+const SURFACE_HOME: Record<ModuleSurface, ReferenceView> = {
+  readiness: 'readiness',
+  // Домашний раздел «ТБ и допусков» — сводка инженера ОТ. Роли без его прав
+  // туда не попадут: подстановка первой разрешённой вкладки уведёт их на
+  // «Мой допуск», открытый каждому.
+  safety: 'safety',
+};
+
+/** Какому модулю принадлежит раздел. Раздел живёт ровно в одном. */
+function surfaceOfView(view: ReferenceView): ModuleSurface {
+  return SAFETY_TABS.some((tab) => tab.id === view) ? 'safety' : 'readiness';
+}
+
+const parseView = (value: string | null, surface: ModuleSurface): ReferenceView => {
   if (value === 'journal' || value === 'meters' || value === 'plans') return 'maintenance';
-  return value && VIEW_IDS.has(value as ReferenceView) ? value as ReferenceView : 'readiness';
+  return value && VIEW_IDS.has(value as ReferenceView)
+    ? value as ReferenceView
+    : SURFACE_HOME[surface];
 };
 
 const parseSettingsSection = (value: string | null): SettingsSection =>
@@ -206,8 +247,10 @@ async function readAuthoritativeCollection<T>(
   }
 }
 
-export function ToModule() {
+export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } = {}) {
   const workspaceRequest = useRef<AbortController | null>(null);
+  // Раздел назван в адресе — значит выбран человеком, и подменять его нельзя.
+  const viewPinnedByUrl = useRef(false);
   const [bootstrap, setBootstrap] = useState<ReadinessBootstrap | null>(null);
   // Роль, которую администратор исполняет. null — работает как администратор.
   // MECHANIC по умолчанию сохраняет прежнее поведение: раньше модуль включал
@@ -226,7 +269,7 @@ export function ToModule() {
   const [maintenance, setMaintenance] = useState<MaintenanceSummary[]>([]);
   const [fleetCards, setFleetCards] = useState<FleetCard[]>([]);
   const [details, setDetails] = useState<Record<string, EquipmentDetailSnapshot>>({});
-  const [view, setView] = useState<ReferenceView>('readiness');
+  const [view, setView] = useState<ReferenceView>(SURFACE_HOME[surface]);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('rules');
   const [rulesState, setRulesState] = useState<ReadinessRulesState>({
     published: DEFAULT_READINESS_RULES,
@@ -252,8 +295,23 @@ export function ToModule() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    viewPinnedByUrl.current = params.get('view') !== null;
+    const requestedView = parseView(params.get('view'), surface);
+    // Раздел чужого модуля в адресе — не ошибка, а старая ссылка: наряды и
+    // журнал инструктажей годами открывались как `/admin/to?view=...`, и такие
+    // адреса лежат в закладках, письмах и уведомлениях. Уводим туда, где
+    // раздел теперь живёт, вместо молчаливой подмены на домашнюю вкладку.
+    if (surfaceOfView(requestedView) !== surface) {
+      // Именно `location.replace`, а не переход роутером: старый адрес не
+      // должен оставаться в истории — кнопка «назад» возвращала бы на него и
+      // тут же переводила обратно, зациклив шаг назад.
+      window.location.replace(
+        `${SURFACE_ROUTE[surfaceOfView(requestedView)]}?view=${requestedView}`,
+      );
+      return;
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- URL deep-link is the source of initial tab state
-    setView(parseView(params.get('view')));
+    setView(requestedView);
     setSettingsSection(parseSettingsSection(params.get('section')));
     const requestedEquipment = params.get('equipmentId');
     if (requestedEquipment) setEquipmentId(requestedEquipment);
@@ -263,7 +321,25 @@ export function ToModule() {
       if (value) (nextFilters as Record<string, string>)[key] = value;
     }
     setReadinessFilters(nextFilters);
-  }, []);
+  }, [surface]);
+
+  /**
+   * Домашний раздел модуля может быть закрыт ролью.
+   *
+   * Мастер читает происшествия, но чужих допусков не видит: открыв «ТБ и
+   * допуски», он попадал бы на «Недостаточно прав» при том, что соседняя
+   * вкладка ему открыта. Это ровно то «право есть, дороги нет», от которого
+   * модуль уже лечили. Подменяем ТОЛЬКО когда раздел не назван в адресе: по
+   * явной ссылке человек должен увидеть честный отказ, а не другой экран.
+   */
+  useEffect(() => {
+    if (!bootstrap || viewPinnedByUrl.current) return;
+    if (bootstrap.capabilities.screens[view] !== false) return;
+    const fallback = SURFACE_TABS[surface]
+      .find((tab) => bootstrap.capabilities.screens[tab.id] !== false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- permissions arrive with the bootstrap, after the initial view is chosen
+    if (fallback) setView(fallback.id);
+  }, [bootstrap, surface, view]);
 
   const loadWorkspace = useCallback(async () => {
     workspaceRequest.current?.abort();
@@ -588,7 +664,7 @@ export function ToModule() {
     nextEquipmentId = equipmentId,
   ) => {
     const url = new URL(window.location.href);
-    if (nextView === 'readiness') url.searchParams.delete('view');
+    if (nextView === SURFACE_HOME[surface]) url.searchParams.delete('view');
     else url.searchParams.set('view', nextView);
     if (nextView === 'settings') url.searchParams.set('section', nextSection);
     else url.searchParams.delete('section');
@@ -679,11 +755,13 @@ export function ToModule() {
       onViewChange={changeView}
       queryState={queryState}
       bootstrap={bootstrap}
+      tabs={SURFACE_TABS[surface]}
+      moduleLabel={SURFACE_LABEL[surface]}
       announcement={
         workspaceError
           ? `Ошибка загрузки: ${workspaceError}`
           : loading
-            ? 'Загрузка центра технической готовности'
+            ? `Загрузка модуля: ${SURFACE_LABEL[surface]}`
             : `Открыт раздел ${view}`
       }
       onRetry={bootstrapError?.retryable === false ? undefined : loadWorkspace}

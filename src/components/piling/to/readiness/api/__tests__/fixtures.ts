@@ -27,12 +27,15 @@ export function bootstrapEnvelope(
       capabilities: {
         abilities: ['readiness.read', 'readiness.handover.decide'],
         screens: {
+          'my-clearance': true,
           readiness: true,
           fleet: true,
           shifts: true,
           permits: true,
           maintenance: true,
+          safety: true,
           documents: true,
+          incidents: true,
           briefings: true,
           reports: true,
           settings: true,

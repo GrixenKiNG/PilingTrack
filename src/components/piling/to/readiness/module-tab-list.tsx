@@ -16,25 +16,44 @@ import type { ReferenceView } from '../readiness-reference-ui';
  * навигация модуля (`readiness-reference-ui`, VIEW_ITEMS) иконки уже носит —
  * эта полоса просто не получила их при выносе в администраторскую оболочку.
  */
+export type ModuleTab = { id: ReferenceView; label: string; icon: PilingIconName };
+
+/**
+ * Вкладки «Техготовности» — модуль про ТЕХНИКУ.
+ *
+ * Раньше здесь же жили вкладки про людей: документы работников, журнал
+ * инструктажей, наряды-допуски. Решение владельца 13.09.2026 — развести
+ * технику и охрану труда по разным модулям, чтобы не путаться: всё людское
+ * переехало в «ТБ и допуски» (`SAFETY_TABS`, маршрут `/admin/safety`).
+ */
 export const MODULE_TABS = [
   { id: 'readiness', label: 'Центр готовности', icon: 'technical-readiness' },
   { id: 'fleet', label: 'Готовность парка', icon: 'equipment-rig' },
   { id: 'shifts', label: 'Смены', icon: 'shift-start' },
   { id: 'maintenance', label: 'Обслуживание', icon: 'repair' },
-  { id: 'documents', label: 'Документы', icon: 'documents' },
-  // «Инструктажи» стоят рядом с «Документами»: обе вкладки про людей, и
-  // открывает их один и тот же человек по одному праву. Разница в вопросе —
-  // «что просрочено сейчас» против «кто и когда проходил за период».
-  { id: 'briefings', label: 'Инструктажи', icon: 'risk' },
   { id: 'reports', label: 'Отчёты', icon: 'reports' },
-  // Наряды в ОРИОН не выписывают и в расчёт допуска они не входят
-  // (`readiness-rules.ts`, 07.09.2026). Реестр оставлен — организация, которая
-  // наряды ведёт, включает их правилами, — но между «Сменами» и
-  // «Обслуживанием» он стоял как обязательный шаг смены. Место по частоте
-  // обращения: рядом с настройками, а не в начале полосы.
-  { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
   { id: 'settings', label: 'Настройки', icon: 'settings' },
-] as const satisfies ReadonlyArray<{ id: ReferenceView; label: string; icon: PilingIconName }>;
+] as const satisfies ReadonlyArray<ModuleTab>;
+
+/**
+ * Вкладки модуля «ТБ и допуски» — всё про ЛЮДЕЙ.
+ *
+ * Порядок — от вопроса «кого нельзя пускать сегодня» к подробностям и
+ * истории: сводка, бумаги, журнал инструктажей, разбор происшествий и в конце
+ * реестр нарядов (в ОРИОН их не выписывают, см. `readiness-rules.ts`).
+ */
+export const SAFETY_TABS = [
+  // «Мой допуск» открыт КАЖДОЙ роли и стоит первым: модуль доступен всем,
+  // потому что инструктаж проходит каждый, а остальные вкладки — рабочее
+  // место инженера ОТ. Без личного раздела «доступ для всех» означал бы
+  // модуль, где все вкладки отвечают отказом.
+  { id: 'my-clearance', label: 'Мой допуск', icon: 'operator' },
+  { id: 'safety', label: 'Обзор', icon: 'accepted' },
+  { id: 'documents', label: 'Документы', icon: 'documents' },
+  { id: 'briefings', label: 'Журнал инструктажей', icon: 'risk' },
+  { id: 'incidents', label: 'Происшествия', icon: 'defect' },
+  { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
+] as const satisfies ReadonlyArray<ModuleTab>;
 
 interface ModuleTabListProps {
   activeView: ReferenceView;
@@ -48,6 +67,10 @@ interface ModuleTabListProps {
   screens?: Record<ReferenceView, boolean> | null;
   /** Контрол в правом конце полосы (переключатель исполняемой роли). */
   trailing?: React.ReactNode;
+  /** Набор вкладок модуля. По умолчанию — «Техготовность». */
+  tabs?: ReadonlyArray<ModuleTab>;
+  /** Чем подписана полоса для скринридера. */
+  ariaLabel?: string;
 }
 
 export function ModuleTabList({
@@ -56,9 +79,11 @@ export function ModuleTabList({
   activeTabRef,
   screens,
   trailing,
+  tabs: moduleTabs = MODULE_TABS,
+  ariaLabel = 'Техническая готовность',
 }: ModuleTabListProps) {
   const localRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const tabs = screens ? MODULE_TABS.filter((tab) => screens[tab.id] !== false) : MODULE_TABS;
+  const tabs = screens ? moduleTabs.filter((tab) => screens[tab.id] !== false) : moduleTabs;
 
   useEffect(() => {
     const activeTab = localRefs.current[tabs.findIndex((tab) => tab.id === activeView)];
@@ -90,7 +115,7 @@ export function ModuleTabList({
 
   return (
     <nav
-      aria-label="Разделы технической готовности"
+      aria-label={`Разделы модуля: ${ariaLabel}`}
       // Полоса вкладок светлая, как везде в приложении. Раньше здесь была
       // тёмная `bg-primary text-white` — она пришла из макета, где модуль был
       // отдельным приложением со своим чёрным топбаром. Внутри нашей
@@ -99,7 +124,7 @@ export function ModuleTabList({
     >
       <div
         role="tablist"
-        aria-label="Техническая готовность"
+        aria-label={ariaLabel}
         data-testid="module-tabs"
         data-scroll-region="module-tabs"
         className="flex h-12 min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"

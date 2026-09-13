@@ -60,6 +60,8 @@ function assertIanaTimezone(timezone: string): string {
 export interface ReadinessExternalGrants {
   /** `users.documents.read_all`: админ, диспетчер, инженер ОТ. */
   documentsControl: boolean;
+  /** `incidents.read`: админ, диспетчер, мастер, инженер ОТ. */
+  incidentsRead: boolean;
 }
 
 export async function queryReadinessBootstrap(
@@ -68,7 +70,7 @@ export async function queryReadinessBootstrap(
   flags = readReadinessFeatureFlags(),
   actingAs: ActingRole | null = null,
   requestId: string | null = null,
-  grants: ReadinessExternalGrants = { documentsControl: false },
+  grants: ReadinessExternalGrants = { documentsControl: false, incidentsRead: false },
 ) {
   // Замещать роль может только администратор. Правило одно на всё приложение,
   // поэтому вызываем `canActAs`, а не повторяем условие здесь. Маршрут его уже
@@ -190,10 +192,20 @@ export async function queryReadinessBootstrap(
         shifts: flags.readiness_shifts_v1 && can('readiness.read'),
         permits: flags.readiness_permits_v1 && can('readiness.read'),
         maintenance: can('readiness.read'),
+        // Сводка допусков — те же подтверждения тех же работников, что
+        // контроль документов, только строкой на человека. Право одно.
+        // Свой допуск и свой журнал инструктажей открыты КАЖДОМУ: инструктаж
+        // проходит каждый работник, и права здесь нет — выборка сужена его
+        // собственным идентификатором из сессии.
+        'my-clearance': true,
+        safety: grants.documentsControl && can('readiness.read'),
         documents: grants.documentsControl && can('readiness.read'),
         // Журнал инструктажей открывает то же право, что контроль документов:
         // это те же подтверждения всех работников, только историей за период.
         briefings: grants.documentsControl && can('readiness.read'),
+        // Происшествия читает более широкий круг, чем документы: мастеру они
+        // открыты, а чужие допуски — нет. Отдельное право, а не то же самое.
+        incidents: grants.incidentsRead && can('readiness.read'),
         reports: can('readiness.audit.read'),
         settings: can('readiness.rules.manage') || can('readiness.audit.read'),
       },

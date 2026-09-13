@@ -52,13 +52,16 @@ export interface ReadinessBootstrap {
   capabilities: {
     abilities: ReadinessAbility[];
     screens: {
+      'my-clearance': boolean;
       readiness: boolean;
       fleet: boolean;
       shifts: boolean;
       permits: boolean;
       maintenance: boolean;
+      safety: boolean;
       documents: boolean;
       briefings: boolean;
+      incidents: boolean;
       reports: boolean;
       settings: boolean;
     };
@@ -391,8 +394,8 @@ export function isReadinessBootstrapEnvelope(
     return false;
   }
   if (!booleanRecord(capabilities.screens, [
-    'readiness', 'fleet', 'shifts', 'permits', 'maintenance', 'documents', 'briefings',
-    'reports', 'settings',
+    'my-clearance', 'readiness', 'fleet', 'shifts', 'permits', 'maintenance', 'safety', 'documents',
+    'briefings', 'incidents', 'reports', 'settings',
   ])) return false;
   if (typeof capabilities.canActAsMechanic !== 'boolean' || !record(capabilities.entities)) {
     return false;

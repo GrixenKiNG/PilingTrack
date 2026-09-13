@@ -16,16 +16,22 @@ describe('ROLE_NAVIGATION', () => {
 
   // Отчёт и техготовность из нижней панели убраны намеренно: первый — шаг
   // смены, вторая — рабочее место механика и диспетчера.
+  //
+  // «ТБ и допуски» добавлены 13.09.2026 решением владельца: инструктаж
+  // проходит каждый, и дорога к своим инструктажам нужна каждому. Обходного
+  // пути мимо шага смены это не открывает — модуль показывает роли машиниста
+  // только его собственный допуск (см. следующий тест, он сторожит именно это).
   it('covers the operator workflow routes', () => {
     expect(ROLE_NAVIGATION.OPERATOR.map(({ href, icon }) => [href, icon])).toEqual([
       [OPERATOR_HOME_ROUTE, 'home'],
+      ['/admin/safety', 'accepted'],
       ['/history', 'history'],
     ]);
     // У помощника своё место, а не урезанное место машиниста: рабочее место
     // машиниста отвечает ему отказом, и пункт меню, ведущий в отказ, — это
     // тупик. Его экран — собственный допуск.
     expect(ROLE_NAVIGATION.ASSISTANT.map(({ href }) => href))
-      .toEqual([ASSISTANT_HOME_ROUTE, '/history']);
+      .toEqual([ASSISTANT_HOME_ROUTE, '/admin/safety', '/history']);
     expect(ROLE_NAVIGATION.ASSISTANT.map(({ href }) => href)).not.toContain(OPERATOR_HOME_ROUTE);
   });
 
@@ -62,18 +68,32 @@ describe('ROLE_NAVIGATION', () => {
    * ОТ, но в меню «Происшествия» стояли только у первых двух. Инженер ОТ —
    * один из трёх, кому разрешено закрывать происшествие разбором, — попадал
    * на экран только по прямому адресу.
+   *
+   * 13.09.2026 разбор переехал вкладкой в модуль «ТБ и допуски»: дорогой к
+   * происшествиям стал `/admin/safety`, само правило не изменилось.
    */
   it('gives every role that may read incidents a way to reach them', () => {
     for (const role of ['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'] as const) {
-      expect(ROLE_NAVIGATION[role].map((item) => item.href)).toContain('/admin/incidents');
+      expect(ROLE_NAVIGATION[role].map((item) => item.href)).toContain('/admin/safety');
     }
-    for (const role of ['OPERATOR', 'ASSISTANT', 'MECHANIC'] as const) {
-      expect(ROLE_NAVIGATION[role].map((item) => item.href)).not.toContain('/admin/incidents');
+    // Модуль охраны труда открыт всем ролям, поэтому «нет пункта» больше не
+    // доказывает «нет доступа к происшествиям». Разделяет их сервер: у этих
+    // трёх ролей нет `incidents.read`, и вкладку им не покажет bootstrap.
+    // Сторожим здесь то, что осталось проверяемым в навигации: пункт ведёт в
+    // модуль, а не на старый прямой адрес разбора происшествий.
+    for (const items of Object.values(ROLE_NAVIGATION)) {
+      expect(items.map((item) => item.href)).not.toContain('/admin/incidents');
     }
   });
 
-  it('gives mechanics only the readiness destination', () => {
-    expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href)).toEqual(['/admin/to']);
+  /**
+   * Механику по-прежнему не место в администраторских разделах: его список —
+   * готовность техники и общий для всех ролей модуль охраны труда, где он
+   * видит свой допуск. Ни объектов, ни отчётов, ни пользователей.
+   */
+  it('keeps mechanics to readiness and the shared safety module', () => {
+    expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href))
+      .toEqual(['/admin/to', '/admin/safety']);
   });
 
   it('folds Telegram and DLQ into Settings (out of top-level navigation)', () => {

@@ -18,6 +18,10 @@ import { FleetScreen } from './readiness/screens/fleet-screen';
 import { ShiftsScreen } from './readiness/screens/shifts-screen';
 import { PermitsScreen } from './readiness/screens/permits-screen';
 import { MaintenanceScreen } from './readiness/screens/maintenance-screen';
+import { SafetyScreen } from './readiness/screens/safety-screen';
+import { MyClearanceScreen } from './readiness/screens/my-clearance-screen';
+import { AdminIncidents } from '@/components/piling/admin-incidents';
+import { MODULE_TABS, SAFETY_TABS } from './readiness/module-tab-list';
 import { DocumentsScreen } from './readiness/screens/documents-screen';
 import { BriefingsScreen } from './readiness/screens/briefings-screen';
 import { ReportsScreen } from './readiness/screens/reports-screen';
@@ -57,6 +61,19 @@ const VIEW_ITEMS: Array<{
   { id: 'settings', label: 'Настройки', icon: Settings2 },
 ];
 
+/**
+ * Заголовок страницы для скринридера: «модуль — раздел».
+ *
+ * Раньше он брался из VIEW_ITEMS — внутренней навигации, куда вкладки про
+ * людей никогда не попадали, и «Документы», «Инструктажи» и любой новый
+ * раздел молча читались как «Центр готовности». Источник — сами полосы
+ * вкладок обоих модулей: раздел, которого нет ни в одной, не существует.
+ */
+const MODULE_TITLE_BY_VIEW = new Map<ReferenceView, string>([
+  ...MODULE_TABS.map((tab) => [tab.id, `Техническая готовность — ${tab.label}`] as const),
+  ...SAFETY_TABS.map((tab) => [tab.id, `ТБ и допуски — ${tab.label}`] as const),
+]);
+
 export function ReadinessReferenceUi(props: ReferenceUiProps) {
   const initialLoading = props.loading && props.equipment.length === 0;
   const fatalError = Boolean(props.workspaceError && props.equipment.length === 0);
@@ -72,7 +89,7 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
             Скрыт визуально — на экране роль заголовка играет полоса вкладок,
             дублировать её текстом незачем. */}
         <h1 className="sr-only">
-          Техническая готовность — {VIEW_ITEMS.find((item) => item.id === props.view)?.label ?? 'Центр готовности'}
+          {MODULE_TITLE_BY_VIEW.get(props.view) ?? 'Техническая готовность — Центр готовности'}
         </h1>
         {props.showInternalNavigation && <header
           aria-label="Разделы модуля технической готовности"
@@ -179,6 +196,13 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
             {props.view === 'shifts' && <ShiftsScreen {...props} />}
             {props.view === 'permits' && <PermitsScreen {...props} />}
             {props.view === 'maintenance' && <MaintenanceScreen {...props} />}
+            {props.view === 'my-clearance' && <MyClearanceScreen />}
+            {props.view === 'safety' && <SafetyScreen {...props} />}
+            {/* Разбор происшествий переехал сюда из собственного маршрута
+                `/admin/incidents`: модуль «ТБ и допуски» собирает всё про
+                людей в одном месте. Экран самодостаточен — сам ходит в свой
+                API и ничего из контура готовности не просит. */}
+            {props.view === 'incidents' && <AdminIncidents />}
             {props.view === 'documents' && <DocumentsScreen {...props} />}
             {props.view === 'briefings' && <BriefingsScreen {...props} />}
             {props.view === 'reports' && <ReportsScreen {...props} />}

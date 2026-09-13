@@ -271,7 +271,7 @@ export function buildAuthoritativeReadinessPresentation(
   if (evidence.permitId) {
     // Отдельной страницы у наряда нет — ведём на реестр внутри контура.
     evidenceCards.push({key: 'permit', label: 'Допуск', reference: evidence.permitId,
-      links: [{text: 'Открыть реестр нарядов', href: '/admin/to?view=permits'}]});
+      links: [{text: 'Открыть реестр нарядов', href: '/admin/safety?view=permits'}]});
   }
   if (evidence.maintenanceRecordIds.length > 0) {
     evidenceCards.push({key: 'maintenance', label: 'Записи ТО',
