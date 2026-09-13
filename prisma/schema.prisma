@@ -53,6 +53,9 @@ model Tenant {
   operatorChecklistAnswers OperatorChecklistAnswerRecord[]
   operatorShiftEvidence OperatorShiftEvidence[]
 
+  shifts      Shift[]
+  workPermits WorkPermit[]
+
   @@index([slug])
   @@index([isActive])
   @@index([subscriptionStatus])
@@ -108,7 +111,7 @@ model User {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  tenant          Tenant?              @relation(fields: [tenantId], references: [id])
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   reports         Report[]
   sites           UserSiteAssignment[]
   crews           Crew[]               @relation("CrewOperator")
@@ -120,6 +123,19 @@ model User {
   operatorChecklistExecutionsStarted OperatorChecklistExecution[] @relation("OperatorChecklistExecutionStartedBy")
   operatorChecklistAnswersRecorded OperatorChecklistAnswerRecord[] @relation("OperatorChecklistAnswerRecordedBy")
   operatorShiftEvidenceRecorded OperatorShiftEvidence[] @relation("OperatorShiftEvidenceRecordedBy")
+
+  shiftsCreated            Shift[]              @relation("ShiftCreatedBy")
+  shiftsEdited             Shift[]              @relation("ShiftEditedBy")
+  shiftsStarted            Shift[]              @relation("ShiftStartedBy")
+  shiftsClosed             Shift[]              @relation("ShiftClosedBy")
+  shiftsCancelled          Shift[]              @relation("ShiftCancelledBy")
+  shiftHandoversSubmitted  ShiftHandover[]      @relation("ShiftHandoverSubmittedBy")
+  shiftHandoversAccepted   ShiftHandover[]      @relation("ShiftHandoverAcceptedBy")
+  shiftHandoversReworked   ShiftHandover[]      @relation("ShiftHandoverReworkedBy")
+  workPermitsAuthored      WorkPermit[]         @relation("WorkPermitAuthoredBy")
+  workPermitsEdited        WorkPermit[]         @relation("WorkPermitEditedBy")
+  workPermitsRevoked       WorkPermit[]         @relation("WorkPermitRevokedBy")
+  workPermitApprovals      WorkPermitApproval[] @relation("WorkPermitApprovedBy")
 
   @@unique([tenantId, id])
   @@index([email])
@@ -270,6 +286,9 @@ model Equipment {
   maintenancePlans      MaintenancePlan[]
   operatorChecklistExecutions OperatorChecklistExecution[]
   operatorShiftEvidence OperatorShiftEvidence[]
+
+  shifts      Shift[]
+  workPermits WorkPermit[]
 
   @@unique([tenantId, id])
   @@index([tenantId])
@@ -750,7 +769,11 @@ model ReadinessScoreSnapshot {
   factsHash      Bytes    @db.ByteA
   calculatedAt   DateTime @default(now()) @db.Timestamptz(3)
 
+  shiftsStarted Shift[] @relation("ShiftStartSnapshot")
+
   @@unique([tenantId, equipmentId, triggerType, triggerId])
+  currentReadiness CurrentReadiness[]
+
   @@unique([tenantId, id])
   @@index([tenantId, equipmentId, calculatedAt])
   @@index([tenantId, status, calculatedAt])
@@ -768,7 +791,9 @@ model CurrentReadiness {
   score        Int
   calculatedAt DateTime @db.Timestamptz(3)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  snapshot ReadinessScoreSnapshot @relation(fields: [tenantId, snapshotId], references: [tenantId, id], onDelete: Restrict)
 
   @@id([tenantId, equipmentId])
   @@index([tenantId, status, calculatedAt])
@@ -785,7 +810,7 @@ model ReadinessBackfillProgress {
   status          String    @default("RUNNING")
   startedAt       DateTime  @default(now()) @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  updatedAt       DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
   completedAt     DateTime? @db.Timestamptz(3)
 
   @@index([status, updatedAt])
@@ -868,9 +893,20 @@ model Shift {
   operatorChecklistExecutions OperatorChecklistExecution[]
   operatorShiftEvidence OperatorShiftEvidence[]
 
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  equipment     Equipment               @relation(fields: [tenantId, equipmentId], references: [tenantId, id], onDelete: Restrict)
+  creator       User                    @relation("ShiftCreatedBy", fields: [tenantId, createdById], references: [tenantId, id], onDelete: Restrict)
+  editor        User                    @relation("ShiftEditedBy", fields: [tenantId, lastEditedById], references: [tenantId, id], onDelete: Restrict)
+  starter       User?                   @relation("ShiftStartedBy", fields: [tenantId, startedById], references: [tenantId, id], onDelete: Restrict)
+  closer        User?                   @relation("ShiftClosedBy", fields: [tenantId, closedById], references: [tenantId, id], onDelete: Restrict)
+  canceller     User?                   @relation("ShiftCancelledBy", fields: [tenantId, cancelledById], references: [tenantId, id], onDelete: Restrict)
+  startSnapshot ReadinessScoreSnapshot? @relation("ShiftStartSnapshot", fields: [tenantId, startSnapshotId], references: [tenantId, id], onDelete: Restrict)
+
   @@unique([tenantId, id])
   @@index([tenantId, equipmentId, productionDate])
   @@index([tenantId, state, updatedAt])
+  @@index([tenantId, autoClosedAt])
+  @@index([tenantId, startSnapshotId])
 }
 
 /// Разрешение диспетчера на пуск заблокированной машины.
@@ -917,6 +953,10 @@ model ShiftHandover {
   updatedAt     DateTime           @updatedAt @db.Timestamptz(3)
   shift         Shift              @relation(fields: [tenantId, shiftId], references: [tenantId, id], onDelete: Restrict)
 
+  submitter User  @relation("ShiftHandoverSubmittedBy", fields: [tenantId, submittedById], references: [tenantId, id], onDelete: Restrict)
+  acceptor  User? @relation("ShiftHandoverAcceptedBy", fields: [tenantId, acceptedById], references: [tenantId, id], onDelete: Restrict)
+  reworker  User? @relation("ShiftHandoverReworkedBy", fields: [tenantId, reworkedById], references: [tenantId, id], onDelete: Restrict)
+
   @@unique([tenantId, id])
   @@index([tenantId, shiftId, state])
   @@index([tenantId, state, updatedAt])
@@ -944,7 +984,7 @@ model OperatorChecklistTemplate {
   definition     Json
   createdById    String
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
   tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy   User                         @relation("OperatorChecklistTemplateCreatedBy", fields: [tenantId, createdById], references: [tenantId, id], onDelete: Restrict)
@@ -1072,6 +1112,7 @@ model SafetyIncident {
   @@index([tenantId, shiftId, state])
   @@index([tenantId, equipmentId, occurredAt])
   @@index([tenantId, relatedDefectId])
+  @@index([tenantId, reviewedAt, occurredAt(sort: Desc)])
 }
 
 model RepairVerification {
@@ -1155,13 +1196,13 @@ model PermitWorkType {
   /// организации свои, и решать за него разработчик не вправе. Пусто — наряд
   /// согласовывать некому, поэтому пустой список считается ошибкой настройки
   /// (см. effectiveApprovalRule).
-  requiredApprovals   WorkPermitApprovalRole[]
+  requiredApprovals   WorkPermitApprovalRole[] @default([DISPATCHER])
   /// Может ли автор подписать собственный наряд. Тоже решение заказчика:
   /// «второй глаз» стоит денег и времени, и где он обязателен — знает он.
   allowAuthorApproval Boolean        @default(true)
   /// Типовые опасные факторы этого вида работ: подсказки в форме наряда.
   /// Админ пополняет их прямо из наряда кнопкой «сохранить в шаблон».
-  hazardPresets  String[]
+  hazardPresets  String[] @default([])
   isActive       Boolean        @default(true)
   sortOrder      Int            @default(0)
 
@@ -1192,7 +1233,7 @@ model WorkPermit {
   /// наряды разом стали бы недоподписанными или, наоборот, «согласованными» без
   /// нужной подписи. Снимок обновляется при правке наряда, а она и так
   /// аннулирует подписи.
-  requiredApprovals   WorkPermitApprovalRole[]
+  requiredApprovals   WorkPermitApprovalRole[] @default([])
   allowAuthorApproval Boolean              @default(true)
   /// Наименование работ — короткая строка в реестре: «Сварочные работы по
   /// ремонту гидравлики». До этого в реестре показывали начало `scope`.
@@ -1205,7 +1246,7 @@ model WorkPermit {
   objectName     String               @default("")
   /// Опасные факторы этого наряда. Заполняются из типовых факторов вида работ
   /// либо вписываются руками.
-  hazards        String[]
+  hazards        String[] @default([])
   /// Три ответственных лица. Гибрид по решению владельца: либо учётная запись,
   /// либо просто ФИО — у наблюдающего учётки может не быть вовсе.
   /// ФИО хранится ВСЕГДА, даже когда выбран пользователь: это снимок на момент
@@ -1235,6 +1276,12 @@ model WorkPermit {
   approvals      WorkPermitApproval[]
   shift          Shift?               @relation(fields: [tenantId, shiftId], references: [tenantId, id], onDelete: Restrict)
 
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  equipment Equipment @relation(fields: [tenantId, equipmentId], references: [tenantId, id], onDelete: Restrict)
+  author    User      @relation("WorkPermitAuthoredBy", fields: [tenantId, authorId], references: [tenantId, id], onDelete: Restrict)
+  editor    User      @relation("WorkPermitEditedBy", fields: [tenantId, lastEditedById], references: [tenantId, id], onDelete: Restrict)
+  revoker   User?     @relation("WorkPermitRevokedBy", fields: [tenantId, revokedById], references: [tenantId, id], onDelete: Restrict)
+
   @@unique([tenantId, id])
   @@index([tenantId, equipmentId, state, validTo])
   @@index([tenantId, state, updatedAt])
@@ -1256,6 +1303,8 @@ model WorkPermitApproval {
   invalidatedAt      DateTime?              @db.Timestamptz(3)
   invalidationReason String?
   permit             WorkPermit             @relation(fields: [tenantId, permitId], references: [tenantId, id], onDelete: Restrict)
+
+  approver User @relation("WorkPermitApprovedBy", fields: [tenantId, approvedById], references: [tenantId, id], onDelete: Restrict)
 
   @@unique([tenantId, permitId, permitVersion, role])
   @@index([tenantId, permitId, permitVersion, valid])
@@ -1932,6 +1981,7 @@ model PileWork {
   @@index([pileGradeId])
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, shiftId, occurredAt])
+  @@index([correctsId])
 }
 
 // ============================================================
@@ -2071,6 +2121,7 @@ model LeaderDrilling {
   @@index([typeId])
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, shiftId, occurredAt])
+  @@index([correctsId])
 }
 
 // ============================================================
@@ -2114,6 +2165,7 @@ model ReportDowntime {
   @@index([reasonId])
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, shiftId, status])
+  @@index([correctsId])
   // В базе есть ограничение ReportDowntime_reason_present: простой (kind =
   // DOWNTIME) обязан иметь либо reasonId, либо reasonText. Перерыв причины не
   // требует. CHECK Prisma не описывает — он задан миграцией.
@@ -2303,7 +2355,7 @@ model TenantAuditChain {
   tenantId     String   @id
   lastSequence BigInt   @default(0)
   headHash     Bytes?   @db.ByteA
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(3)
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 }
 
