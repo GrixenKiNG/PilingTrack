@@ -16,7 +16,7 @@ import {
   type OperatorPhase,
 } from '../domain/shift-phases';
 import {toDefectViews} from './defect-views';
-import {collectWarnings, isWorkAllowed} from '../domain/work-warnings';
+import {collectWarnings} from '../domain/work-warnings';
 import {isIncidentOpen} from '../domain/incidents';
 import type {
   ChecklistView, IncidentView, OperatorMobileState, ProductionEntryView, ReadWeather,
@@ -254,7 +254,6 @@ export async function queryOperatorMobileState(input: {
         temperatureC: null,
         maintenance: {overdue: false, soon: false, daysLeft: null},
       }),
-      workAllowed: true,
       production: {piles: {count: 0, meters: 0}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
       entries: [],
       incidents: [],
@@ -531,7 +530,6 @@ export async function queryOperatorMobileState(input: {
       : null,
     checklists,
     warnings,
-    workAllowed: isWorkAllowed(warnings),
     entries,
     incidents: incidentViews,
     defects: defectViews,

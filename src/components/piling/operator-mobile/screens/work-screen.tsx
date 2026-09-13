@@ -144,15 +144,15 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
       footer={(
         <>
           {/*
-            Погодный запрет гасит запись выработки, но не простоя: простой —
-            это и есть то, чем оператор объясняет остановку по погоде. Сервер
-            отказывает по тому же правилу, кнопка лишь избавляет от отказа
-            после заполнения формы.
+            Погода остаётся красным предупреждением, но не гасит учёт:
+            установка не передаёт телеметрию, поэтому решение принимает
+            ответственный на площадке. Чек-лист ТБ по виду работ остаётся
+            обязательным действием, которое оператор выполняет прямо здесь.
           */}
           {!passportMode ? (
             <BigButton
               onClick={() => void submit()}
-              disabled={!ready || busy || needsSafety || (!state.workAllowed && tab !== 'DOWNTIME')}
+              disabled={!ready || busy || needsSafety}
             >
               {busy ? 'Записываем…' : 'Записать'}
             </BigButton>
@@ -179,10 +179,8 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
     >
       <WarningsPanel warnings={state.warnings} />
 
-      <Panel tone={state.workAllowed ? 'plain' : 'danger'}>
-        <PanelTitle tone={state.workAllowed ? 'plain' : 'danger'}>
-          {state.workAllowed ? 'Учёт выполненных работ' : 'Работы прекращают'}
-        </PanelTitle>
+      <Panel>
+        <PanelTitle>Учёт выполненных работ</PanelTitle>
         <div className="mt-2">
           <VolumeFact
             label="Свай за смену"
@@ -222,7 +220,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             type="button"
             onClick={() => switchTab(option.value)}
             className={cn(
-              'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
+              'min-h-11 flex-1 rounded-md text-sm font-medium transition-colors',
               tab === option.value ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
             )}
           >
@@ -250,7 +248,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
           <PileModeSwitch mode={pileMode} onChange={setPileMode} />
           <PilePassportForm
             grades={state.dictionaries.pileGrades}
-            busy={busy || !state.workAllowed}
+            busy={busy}
             onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
           />
           {/*
@@ -348,7 +346,7 @@ function PileModeSwitch({mode, onChange}: {
           type="button"
           onClick={() => onChange(option.value)}
           className={cn(
-            'min-h-10 flex-1 rounded-md text-sm font-medium transition-colors',
+            'min-h-11 flex-1 rounded-md text-sm font-medium transition-colors',
             mode === option.value ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
           )}
         >

@@ -10,7 +10,7 @@ const TONE = {
 } as const;
 
 const CAPTION = {
-  STOP: 'Работы прекращают',
+  STOP: 'Критическое предупреждение',
   ALERT: 'Нарушение · видит диспетчер',
   NOTE: 'К сведению',
 } as const;

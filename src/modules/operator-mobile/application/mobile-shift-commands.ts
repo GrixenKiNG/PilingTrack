@@ -21,7 +21,6 @@ import {SLINGER_BRIEFING} from '../domain/slinger-briefing';
 import {validatePassport} from '../domain/pile-passport';
 import {resolveShiftConditions, selectChecklistItems} from '../domain/shift-conditions';
 import type {ReadWeather} from '../domain/view-contracts';
-import {weatherStop} from '../domain/work-warnings';
 import {shiftWindow} from '../domain/shift-window';
 import {missingPrerequisites} from '../domain/shift-phases';
 import {
@@ -148,6 +147,53 @@ async function upsertOperatorDocument(tx: Tx, input: {
 }
 
 /**
+ * Строка журнала инструктажей.
+ *
+ * Документ работника (выше) хранит состояние «подтверждение есть и действует»,
+ * и обновляется на месте. Здесь пишется сам факт: кто, когда, какую редакцию
+ * инструкции читал и с каким результатом сдавал. Две записи об одном действии —
+ * не дублирование: у них разные вопросы и разный срок жизни, и журнал ОТ
+ * собирается только из второй.
+ *
+ * ФИО и должность снимаются сюда копией — см. примечание к модели
+ * `BriefingRecord`. Лишний чтение пользователя на команду допустимо: инструктаж
+ * проходят раз в смену, а не в цикле.
+ */
+async function recordBriefingHistory(tx: Tx, input: {
+  tenantId: string;
+  operatorId: string;
+  kind: 'INSTRUCTION' | 'KNOWLEDGE';
+  briefing: {code: string; title: string; version: string};
+  correct?: number;
+  total?: number;
+  validUntil?: Date | null;
+  now: Date;
+}) {
+  const person = await tx.user.findFirst({
+    where: {tenantId: input.tenantId, id: input.operatorId},
+    select: {name: true, role: true},
+  });
+  await tx.briefingRecord.create({
+    data: {
+      tenantId: input.tenantId,
+      userId: input.operatorId,
+      kind: input.kind,
+      // Учётку без имени в журнал пускаем с явной оговоркой: пустая графа
+      // «ФИО» в распечатке читалась бы как сбой вывода.
+      userName: person?.name?.trim() || 'Имя не указано',
+      userRole: person?.role ?? '',
+      documentCode: input.briefing.code,
+      documentTitle: input.briefing.title,
+      documentVersion: input.briefing.version,
+      correct: input.correct ?? null,
+      total: input.total ?? null,
+      validUntil: input.validUntil ?? null,
+      recordedAt: input.now,
+    },
+  });
+}
+
+/**
  * Кто читает инструкцию: машинист или его помощник.
  *
  * Инструкции у них разные — про машину и про стропы, — и отметка о
@@ -185,6 +231,13 @@ export async function acknowledgeBriefing(input: {
       issuedAt: now,
       expiresAt: null,
     });
+    await recordBriefingHistory(tx, {
+      tenantId: input.tenantId,
+      operatorId: input.operatorId,
+      kind: 'INSTRUCTION',
+      briefing: kind.briefing,
+      now,
+    });
     return {version: kind.briefing.version};
   });
 }
@@ -220,10 +273,9 @@ export async function submitKnowledgeTest(input: {
   }
 
   const validUntil = new Date(now.getTime() + KNOWLEDGE_VALID_DAYS * DAY_MS);
+  const kind = BRIEFING_BY_AUDIENCE[input.audience ?? 'OPERATOR'];
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const typeId = await ensureDocumentType(
-      tx, input.tenantId, BRIEFING_BY_AUDIENCE[input.audience ?? 'OPERATOR'].knowledgeType,
-    );
+    const typeId = await ensureDocumentType(tx, input.tenantId, kind.knowledgeType);
     await upsertOperatorDocument(tx, {
       tenantId: input.tenantId,
       operatorId: input.operatorId,
@@ -231,6 +283,18 @@ export async function submitKnowledgeTest(input: {
       number: `${result.correct} из ${result.total}`,
       issuedAt: now,
       expiresAt: validUntil,
+    });
+    // Проверка знаний относится к той же инструкции, по которой составлен
+    // набор вопросов: в журнале она стоит рядом с ознакомлением той же версии.
+    await recordBriefingHistory(tx, {
+      tenantId: input.tenantId,
+      operatorId: input.operatorId,
+      kind: 'KNOWLEDGE',
+      briefing: kind.briefing,
+      correct: result.correct,
+      total: result.total,
+      validUntil,
+      now,
     });
     return {correct: result.correct, total: result.total, validUntil: validUntil.toISOString()};
   });
@@ -852,7 +916,7 @@ export async function logProduction(input: {
     //
     // Ниже стоит перехват P2002 — он спасает мгновенный повтор при обрыве. Но
     // между первой отправкой и повтором проходит время, а правила ниже от
-    // времени зависят: смена успевает закрыться, ветер — подняться. Тогда
+    // времени зависят: смена успевает закрыться. Тогда
     // повтор отвергается ещё до `create`, и машинист получает отказ по записи,
     // которая давно принята. Для отложенной отправки с телефона это обычный
     // случай, а не редкость.
@@ -885,44 +949,33 @@ export async function logProduction(input: {
     // что записи, сделанные до завершения, уходят раньше него. Повтор уже
     // принятой команды отсекается выше по clientCommandId и сюда не доходит.
     if (shift.state !== 'STARTED' && input.entry.kind !== 'DOWNTIME') {
+      /*
+        Два разных состояния — два разных сообщения.
+
+        Раньше здесь на оба случая стоял один ответ «работа завершена». Для
+        смены, которая ещё НЕ начата, он говорил ровно противоположное правде:
+        машинист читал, что работа кончилась, хотя не принял установку
+        (поймано на бою 12.09.2026 — см. `admissionAccepted` в
+        mobile-shift-query). Экран эту дорогу больше не открывает, но
+        сообщение остаётся последней защитой: оно обязано называть
+        действие, а не вводить в заблуждение.
+      */
+      const notStarted = shift.state === 'PLANNED' || shift.state === 'PENDING_ACCEPTANCE';
       throw new OperatorCommandError(
         409,
-        'Работа по смене завершена — выработку больше не записать. '
-        + 'Если запись пропущена, её вносит мастер в журнале забивки.',
+        notStarted
+          ? 'Смена ещё не начата: примите установку на экране приёма, и запись выработки откроется.'
+          : 'Работа по смене завершена — выработку больше не записать. '
+            + 'Если запись пропущена, её вносит мастер в журнале забивки.',
       );
     }
 
-    // Погодный запрет проверяет сервер, а не только кнопка.
-    //
-    // Это единственное, что в модуле действительно запрещает работу, и раньше
-    // запрет существовал только как погашенная кнопка на экране: прямой запрос
-    // к API писал сваи при ветре 25 м/с. Порог измеряет внешний сервис, а не
-    // человек, поэтому запрету здесь место.
-    //
-    // Простой пишется всегда: он и есть то, чем оператор объясняет остановку
-    // по погоде. Запретить его значило бы оставить часы непогоды нигде.
-    //
-    // Обращение к погоде идёт внутри транзакции сознательно: ответ лежит в
-    // общем кэше на 15 минут и защищён предохранителем с таймаутом в 3 с, так
-    // что соединение почти всегда занято на время чтения из памяти. Ради
-    // разрыва транзакции надвое пришлось бы читать смену дважды.
-    if (input.entry.kind !== 'DOWNTIME' && input.readWeather) {
-      const site = await tx.site.findFirst({
-        where: {tenantId: input.tenantId, id: crew.siteId},
-        select: {latitude: true, longitude: true},
-      });
-      const reading = site?.latitude != null && site.longitude != null
-        ? await input.readWeather(site.latitude, site.longitude)
-        : null;
-      const stops = weatherStop(reading?.windMs ?? null, reading?.temperatureC ?? null);
-      if (stops.length > 0) {
-        throw new OperatorCommandError(
-          409,
-          `Работы прекращают: ${stops.map((stop) => stop.title).join(', ')}. `
-          + 'Отметьте простой по погоде.',
-        );
-      }
-    }
+    // Погода не блокирует запись на сервере. На установках нет телеметрии и
+    // удалённого управления, а внешний метеосервис может быть устаревшим или
+    // измерять не в точке работ. Критический порог остаётся красным
+    // предупреждением в состоянии смены; решение об остановке принимает
+    // ответственный на площадке. readWeather сохранён во входном контракте
+    // на время совместимого обновления API-клиентов.
 
     // Чек-лист ТБ — пропуск к работе этого вида, а не бумажка «на потом».
     // Он спрашивается один раз за смену перед первой записью: забивка и

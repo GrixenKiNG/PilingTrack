@@ -14,3 +14,7 @@ export type {ProductionEntry} from './application/mobile-shift-commands';
 
 export * from './contracts';
 export {queryAssistantState} from './application/assistant-query';
+export {listBriefingJournal} from './application/briefing-journal-query';
+export type {
+  BriefingJournalFilters, BriefingJournalRow,
+} from './application/briefing-journal-query';

@@ -70,6 +70,7 @@ const VIEW_IDS = new Set<ReferenceView>([
   'permits',
   'maintenance',
   'documents',
+  'briefings',
   'reports',
   'settings',
 ]);

@@ -191,6 +191,9 @@ export async function queryReadinessBootstrap(
         permits: flags.readiness_permits_v1 && can('readiness.read'),
         maintenance: can('readiness.read'),
         documents: grants.documentsControl && can('readiness.read'),
+        // Журнал инструктажей открывает то же право, что контроль документов:
+        // это те же подтверждения всех работников, только историей за период.
+        briefings: grants.documentsControl && can('readiness.read'),
         reports: can('readiness.audit.read'),
         settings: can('readiness.rules.manage') || can('readiness.audit.read'),
       },

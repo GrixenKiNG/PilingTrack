@@ -1,6 +1,7 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
+import {HardHat, TriangleAlert, UserRound, Wrench} from 'lucide-react';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
@@ -9,6 +10,7 @@ import {
   sendQueuedCommand, type ProductionEntryInput,
 } from './api';
 import {flushQueue, readQueue, retry, subscribeQueue, type QueuedCommand} from './offline-queue';
+import {OperatorStatusStrip} from './operator-status-strip';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
@@ -58,6 +60,7 @@ export function OperatorMobileApp() {
   // Что лежит на устройстве и ещё не ушло. Держим в состоянии, чтобы машинист
   // видел это постоянно, а не узнавал по факту пропажи.
   const [queued, setQueued] = useState<QueuedCommand[]>([]);
+  const [online, setOnline] = useState(true);
   const [detour, setDetour] = useState<Detour | null>(null);
   /**
    * Выбранная установка. По умолчанию её выбирает сервер (первая бригада);
@@ -122,6 +125,17 @@ export function OperatorMobileApp() {
       await reload();
     })();
   }, [reload]);
+
+  useEffect(() => {
+    const update = () => setOnline(globalThis.navigator?.onLine ?? true);
+    update();
+    globalThis.addEventListener?.('online', update);
+    globalThis.addEventListener?.('offline', update);
+    return () => {
+      globalThis.removeEventListener?.('online', update);
+      globalThis.removeEventListener?.('offline', update);
+    };
+  }, []);
 
   /**
    * Выполнить команду и сказать, получилось ли.
@@ -201,37 +215,44 @@ export function OperatorMobileApp() {
 
   if (forbidden) {
     return (
-      <Screen title="Рабочее место машиниста">
-        <Panel>
-          <PanelTitle>{forbidden}</PanelTitle>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах
-            подаёт он.
-          </p>
-        </Panel>
-      </Screen>
+      <OperatorFrame>
+        <Screen title="Рабочее место машиниста">
+          <Panel>
+            <PanelTitle>{forbidden}</PanelTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах
+              подаёт он.
+            </p>
+          </Panel>
+        </Screen>
+      </OperatorFrame>
     );
   }
 
   if (loadError) {
     return (
-      <Screen title="Нет связи" footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}>
-        <Panel tone="danger">
-          <PanelTitle tone="danger">{loadError}</PanelTitle>
-          <p className="mt-1 text-sm">
-            Рабочее место работает только на связи. Дождитесь сети и повторите — записывать смену
-            «в стол» приложение не станет, чтобы не потерять её молча.
-          </p>
-        </Panel>
-      </Screen>
+      <OperatorFrame>
+        <OperatorStatusStrip online={online} items={queued} />
+        <Screen title="Нет связи" footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}>
+          <Panel tone="danger">
+            <PanelTitle tone="danger">{loadError}</PanelTitle>
+            <p className="mt-1 text-sm">
+              Без загруженного состояния нельзя безопасно открыть или закрыть смену. Восстановите
+              связь и повторите. Уже сохранённые на устройстве выработка и события не пропадут.
+            </p>
+          </Panel>
+        </Screen>
+      </OperatorFrame>
     );
   }
 
   if (!state) {
     return (
-      <Screen title="Загрузка смены">
-        <p className="text-sm text-muted-foreground">Считываем допуски, машину и погоду…</p>
-      </Screen>
+      <OperatorFrame>
+        <Screen title="Загрузка смены">
+          <p className="text-sm text-muted-foreground">Считываем допуски, машину и погоду…</p>
+        </Screen>
+      </OperatorFrame>
     );
   }
 
@@ -272,15 +293,20 @@ export function OperatorMobileApp() {
       active={workTab}
       onSelect={setWorkTab}
       tabs={[
-        {id: 'SHIFT', label: state.phase === 'CLOSING' ? 'Сдача' : 'Работа'},
-        {id: 'EQUIPMENT', label: 'Техника', badge: state.defects.length},
+        {
+          id: 'SHIFT',
+          label: state.phase === 'CLOSING' ? 'Сдача' : 'Работа',
+          icon: <HardHat />,
+        },
+        {id: 'EQUIPMENT', label: 'Техника', icon: <Wrench />, badge: state.defects.length},
         {
           id: 'INCIDENTS',
           label: 'События',
+          icon: <TriangleAlert />,
           badge: alarmingIncidents,
           alarming: alarmingIncidents > 0,
         },
-        {id: 'PROFILE', label: 'Профиль'},
+        {id: 'PROFILE', label: 'Профиль', icon: <UserRound />},
       ]}
     />
   ) : undefined;
@@ -362,6 +388,7 @@ export function OperatorMobileApp() {
     if (checklist) {
       return (
         <ChecklistScreen
+          key={checklist.stage}
           checklist={checklist}
           warnings={state.warnings}
           onSubmit={submitChecklist(checklist.stage)}
@@ -443,10 +470,28 @@ export function OperatorMobileApp() {
   };
 
   return (
-    <div className="mx-auto min-h-dvh max-w-[560px] bg-background">
+    <OperatorFrame>
       <PhaseBar progress={state.progress} />
+      <OperatorStatusStrip online={online} items={queued} />
       <QueueBanner items={queued} />
       {screen()}
+    </OperatorFrame>
+  );
+}
+
+function OperatorFrame({children}: {children: ReactNode}) {
+  return (
+    <div className={[
+      'operator-mobile-theme mx-auto flex min-h-dvh max-w-[560px] flex-col overflow-x-hidden',
+      'bg-[#f2f4f6] text-[#16212b] md:border-x md:border-[#d4dbe1] md:shadow-2xl',
+      '[&_.operator-screen]:min-h-0 [&_.operator-screen]:flex-1 [&_.operator-screen]:bg-transparent',
+      '[&_.operator-screen-header]:border-b-0 [&_.operator-screen-header]:pb-2',
+      '[&_.operator-panel]:border-[#d7dde3] [&_.operator-panel]:shadow-[0_3px_14px_rgba(15,23,42,0.06)]',
+      '[&_.operator-fact]:border-[#e1e6ea]',
+      '[&_.operator-screen-footer]:border-[#ced6dd] [&_.operator-screen-footer]:bg-white/95',
+      '[&_.operator-tab-bar]:border-[#dce2e7] [&_.operator-tab-bar]:bg-white',
+    ].join(' ')}>
+      {children}
     </div>
   );
 }
@@ -466,14 +511,14 @@ function QueueBanner({items}: {items: QueuedCommand[]}) {
   return (
     <div className="space-y-1 px-3 pt-2">
       {pending.length > 0 && (
-        <div className="rounded-md border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
+        <div className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
           На устройстве: {pending.map((item) => item.label).join(', ')}. Отправим, когда появится связь.
         </div>
       )}
       {failed.map((item) => (
         <div
           key={item.clientCommandId}
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong"
+          className="flex items-start justify-between gap-2 rounded-xl border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong"
         >
           <span className="min-w-0">
             {item.label} не принята: {item.lastError ?? 'причина неизвестна'}

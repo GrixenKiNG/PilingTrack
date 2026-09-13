@@ -33,6 +33,7 @@ export function bootstrapEnvelope(
           permits: true,
           maintenance: true,
           documents: true,
+          briefings: true,
           reports: true,
           settings: true,
         },
