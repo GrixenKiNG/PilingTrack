@@ -8,6 +8,8 @@ import { ServiceError } from '@/lib/service-error';
 
 export const runtime = 'nodejs';
 
+const BRIEFING_TYPES = ['INDUCTION', 'PRIMARY', 'REPEAT', 'UNSCHEDULED', 'TARGETED'] as const;
+
 /** Граница периода из строки запроса. Мусор в параметре — не фильтр, а ошибка. */
 function parseDate(value: string | null, edge: 'from' | 'to'): Date | undefined {
   if (!value) return undefined;
@@ -36,6 +38,18 @@ export const GET = withApi(
     if (rawKind && !kind) {
       return NextResponse.json({ error: 'Неизвестный вид записи' }, { status: 400 });
     }
+    // Мусор в фильтре — это ошибка, а не «показать всё»: молча расширенная
+    // выборка выглядит как ответ на заданный вопрос.
+    const rawType = params.get('type');
+    const type = BRIEFING_TYPES.find((value) => value === rawType) ?? null;
+    if (rawType && !type) {
+      return NextResponse.json({ error: 'Неизвестный вид инструктажа' }, { status: 400 });
+    }
+    const rawStatus = params.get('status');
+    const status = rawStatus === 'signed' || rawStatus === 'awaiting' ? rawStatus : null;
+    if (rawStatus && !status) {
+      return NextResponse.json({ error: 'Неизвестный статус записи' }, { status: 400 });
+    }
 
     try {
       const journal = await listBriefingJournal({
@@ -49,6 +63,9 @@ export const GET = withApi(
           to: parseDate(params.get('to'), 'to'),
           userId: params.get('userId') ?? undefined,
           kind: kind ?? undefined,
+          type: type ?? undefined,
+          instructorId: params.get('instructorId') ?? undefined,
+          status: status ?? undefined,
         },
       });
       return NextResponse.json(journal);

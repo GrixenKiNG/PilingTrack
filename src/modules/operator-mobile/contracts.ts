@@ -37,7 +37,10 @@ export type {KnowledgeQuestion, KnowledgeTopic} from './domain/knowledge-bank';
 
 export * from './domain/incidents';
 export {
-  BRIEFING_KIND_LABELS, currentMonthRange, dayRangeToInstants, formatJournalDay,
+  BRIEFING_KIND_LABELS, BRIEFING_TYPE_LABELS, BRIEFING_TYPE_ORDER,
+  BRIEFING_STATUS_LABELS, currentMonthRange, dayRangeToInstants, formatJournalDay,
   formatJournalMoment, toDayValue,
 } from './domain/briefing-journal-view';
-export type {BriefingJournalEntry, BriefingKind} from './domain/briefing-journal-view';
+export type {
+  BriefingJournalEntry, BriefingKind, BriefingType, BriefingJournalStatus,
+} from './domain/briefing-journal-view';

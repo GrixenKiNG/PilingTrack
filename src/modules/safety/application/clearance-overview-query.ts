@@ -31,6 +31,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { evaluateOperatorClearance } from '@/modules/users';
+import type { BriefingType } from '@/generated/postgres-client/client';
 
 /**
  * Чей допуск вообще имеет смысл считать.
@@ -73,8 +74,19 @@ export interface SafetyClearanceRow {
   lastInstructionAt: string | null;
 }
 
+/** Сколько инструктажей каждого вида провели за сегодня. */
+export type TodayBriefingCounts = Record<BriefingType, number>;
+
 export interface SafetyClearanceOverview {
   rows: SafetyClearanceRow[];
+  /** Счётчики сводки «Журнал за сегодня». Ноль — это факт, а не пустота. */
+  todayByType: TodayBriefingCounts;
+  /**
+   * Происшествия за последние 30 дней и за предыдущие 30 — плитка показывает
+   * не только число, но и куда оно движется. Одно число без сравнения не
+   * говорит, стало хуже или лучше.
+   */
+  incidents: { last30: number; previous30: number };
   totals: {
     people: number;
     cleared: number;
@@ -123,6 +135,13 @@ export async function querySafetyClearanceOverview(input: {
     }),
   ]);
 
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+  const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 3600 * 1000);
+
   const userIds = users.map((user) => user.id);
   const [documents, briefings] = await Promise.all([
     requiredTypes.length === 0 || userIds.length === 0
@@ -150,6 +169,31 @@ export async function querySafetyClearanceOverview(input: {
           distinct: ['userId', 'kind'],
         }),
   ]);
+
+  const [todayGroups, incidentsLast30, incidentsPrevious30] = await Promise.all([
+    db.briefingRecord.groupBy({
+      by: ['type'],
+      where: {
+        tenantId,
+        kind: 'INSTRUCTION',
+        recordedAt: { gte: startOfToday, lt: endOfToday },
+      },
+      _count: { _all: true },
+    }),
+    db.safetyIncident.count({ where: { tenantId, occurredAt: { gte: monthAgo } } }),
+    db.safetyIncident.count({
+      where: { tenantId, occurredAt: { gte: twoMonthsAgo, lt: monthAgo } },
+    }),
+  ]);
+
+  // Все пять видов присутствуют всегда, даже нулями: «Внеплановый 0» — это
+  // ответ, а исчезнувшая строка читается как «не считали».
+  const todayByType: TodayBriefingCounts = {
+    INDUCTION: 0, PRIMARY: 0, REPEAT: 0, UNSCHEDULED: 0, TARGETED: 0,
+  };
+  for (const group of todayGroups) {
+    if (group.type) todayByType[group.type] = group._count._all;
+  }
 
   const documentsByUser = new Map<string, Array<{ typeId: string; expiresAt: Date | null }>>();
   for (const document of documents) {
@@ -208,6 +252,8 @@ export async function querySafetyClearanceOverview(input: {
 
   return {
     rows,
+    todayByType,
+    incidents: { last30: incidentsLast30, previous30: incidentsPrevious30 },
     totals: {
       people: rows.length,
       cleared: rows.filter((row) => row.cleared).length,

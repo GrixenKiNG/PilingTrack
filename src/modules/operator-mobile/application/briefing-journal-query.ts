@@ -1,6 +1,6 @@
 import {db} from '@/lib/db';
 import {ServiceError} from '@/lib/service-error';
-import type {BriefingRecordKind} from '@/generated/postgres-client/client';
+import type {BriefingRecordKind, BriefingType} from '@/generated/postgres-client/client';
 
 /**
  * Журнал инструктажей: кто и когда читал инструкцию и сдавал проверку знаний.
@@ -31,6 +31,26 @@ export interface BriefingJournalFilters {
   to?: Date;
   userId?: string;
   kind?: BriefingRecordKind;
+  type?: BriefingType;
+  instructorId?: string;
+  /** Незакрытые подписи — рабочий фильтр инженера ОТ. */
+  status?: BriefingJournalStatus;
+}
+
+/**
+ * Состояние записи — ВЫЧИСЛЯЕТСЯ, а не хранится.
+ *
+ * Хранимый статус пришлось бы пересчитывать при каждой подписи и он неизбежно
+ * разошёлся бы с самими подписями — единственным фактом, который здесь важен.
+ * «Ожидает подписи» ровно означает «стоит меньше двух отметок».
+ */
+export type BriefingJournalStatus = 'signed' | 'awaiting';
+
+function journalStatus(record: {
+  employeeSignedAt: Date | null;
+  instructorSignedAt: Date | null;
+}): BriefingJournalStatus {
+  return record.employeeSignedAt && record.instructorSignedAt ? 'signed' : 'awaiting';
 }
 
 export interface BriefingJournalRow {
@@ -46,6 +66,14 @@ export interface BriefingJournalRow {
   /** Итог проверки знаний словами: «8 из 8». У ознакомления результата нет. */
   result: string | null;
   validUntil: string | null;
+  /** Вид инструктажа. null у проверки знаний и у записей до 13.09.2026. */
+  type: BriefingType | null;
+  instructorId: string | null;
+  instructorName: string;
+  reason: string;
+  employeeSignedAt: string | null;
+  instructorSignedAt: string | null;
+  status: BriefingJournalStatus;
 }
 
 /**
@@ -76,6 +104,16 @@ export async function listBriefingJournal(input: {
       tenantId: input.tenantId,
       ...(filters.userId ? {userId: filters.userId} : {}),
       ...(filters.kind ? {kind: filters.kind} : {}),
+      ...(filters.type ? {type: filters.type} : {}),
+      ...(filters.instructorId ? {instructorId: filters.instructorId} : {}),
+      // Статус — производная от двух колонок, и фильтр по нему должен уходить
+      // в базу тем же условием, иначе постраничная выборка отдавала бы
+      // «первую тысячу строк, из которых видно три».
+      ...(filters.status === 'signed'
+        ? {employeeSignedAt: {not: null}, instructorSignedAt: {not: null}}
+        : filters.status === 'awaiting'
+          ? {OR: [{employeeSignedAt: null}, {instructorSignedAt: null}]}
+          : {}),
       ...(filters.from || filters.to
         ? {
             recordedAt: {
@@ -105,6 +143,13 @@ export async function listBriefingJournal(input: {
         ? `${record.correct} из ${record.total}`
         : null,
       validUntil: record.validUntil?.toISOString() ?? null,
+      type: record.type,
+      instructorId: record.instructorId,
+      instructorName: record.instructorName,
+      reason: record.reason,
+      employeeSignedAt: record.employeeSignedAt?.toISOString() ?? null,
+      instructorSignedAt: record.instructorSignedAt?.toISOString() ?? null,
+      status: journalStatus(record),
     })),
     truncated,
   };

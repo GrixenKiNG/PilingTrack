@@ -10,9 +10,12 @@
  */
 
 export { querySafetyClearanceOverview } from './application/clearance-overview-query';
+export { conductBriefing, signBriefingRecord } from './application/briefing-commands';
+export type { ConductBriefingInput, BriefingActor } from './application/briefing-commands';
 export { querySelfSafetyView } from './application/self-clearance-query';
 export type { SelfSafetyView, SelfBriefingRecord } from './application/self-clearance-query';
 export type {
+  TodayBriefingCounts,
   SafetyClearanceOverview,
   SafetyClearanceRow,
   KnowledgeStatus,

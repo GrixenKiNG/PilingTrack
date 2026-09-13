@@ -199,6 +199,9 @@ export async function queryReadinessBootstrap(
         // собственным идентификатором из сессии.
         'my-clearance': true,
         safety: grants.documentsControl && can('readiness.read'),
+        employees: grants.documentsControl && can('readiness.read'),
+        instructions: grants.documentsControl && can('readiness.read'),
+        knowledge: grants.documentsControl && can('readiness.read'),
         documents: grants.documentsControl && can('readiness.read'),
         // Журнал инструктажей открывает то же право, что контроль документов:
         // это те же подтверждения всех работников, только историей за период.

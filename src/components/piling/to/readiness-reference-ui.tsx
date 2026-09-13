@@ -19,6 +19,9 @@ import { ShiftsScreen } from './readiness/screens/shifts-screen';
 import { PermitsScreen } from './readiness/screens/permits-screen';
 import { MaintenanceScreen } from './readiness/screens/maintenance-screen';
 import { SafetyScreen } from './readiness/screens/safety-screen';
+import { SafetyOverviewScreen } from './readiness/screens/safety-overview-screen';
+import { InstructionsScreen } from './readiness/screens/instructions-screen';
+import { KnowledgeScreen } from './readiness/screens/knowledge-screen';
 import { MyClearanceScreen } from './readiness/screens/my-clearance-screen';
 import { AdminIncidents } from '@/components/piling/admin-incidents';
 import { MODULE_TABS, SAFETY_TABS } from './readiness/module-tab-list';
@@ -197,7 +200,10 @@ export function ReadinessReferenceUi(props: ReferenceUiProps) {
             {props.view === 'permits' && <PermitsScreen {...props} />}
             {props.view === 'maintenance' && <MaintenanceScreen {...props} />}
             {props.view === 'my-clearance' && <MyClearanceScreen />}
-            {props.view === 'safety' && <SafetyScreen {...props} />}
+            {props.view === 'safety' && <SafetyOverviewScreen {...props} />}
+            {props.view === 'employees' && <SafetyScreen {...props} />}
+            {props.view === 'instructions' && <InstructionsScreen />}
+            {props.view === 'knowledge' && <KnowledgeScreen />}
             {/* Разбор происшествий переехал сюда из собственного маршрута
                 `/admin/incidents`: модуль «ТБ и допуски» собирает всё про
                 людей в одном месте. Экран самодостаточен — сам ходит в свой

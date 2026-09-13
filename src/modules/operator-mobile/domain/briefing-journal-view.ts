@@ -11,6 +11,35 @@
 
 export type BriefingKind = 'INSTRUCTION' | 'KNOWLEDGE';
 
+/**
+ * Вид инструктажа по охране труда — пять значений, заданных нормативом.
+ *
+ * Порядок здесь — порядок жизни работника: вводный при приёме, первичный на
+ * рабочем месте, дальше повторные по графику, внеплановые по событию и
+ * целевые под разовую работу. В этом же порядке они стоят в сводке за день.
+ */
+export type BriefingType = 'INDUCTION' | 'PRIMARY' | 'REPEAT' | 'UNSCHEDULED' | 'TARGETED';
+
+export const BRIEFING_TYPE_ORDER: readonly BriefingType[] = [
+  'INDUCTION', 'PRIMARY', 'REPEAT', 'UNSCHEDULED', 'TARGETED',
+];
+
+export const BRIEFING_TYPE_LABELS: Record<BriefingType, string> = {
+  INDUCTION: 'Вводный',
+  PRIMARY: 'Первичный',
+  REPEAT: 'Повторный',
+  UNSCHEDULED: 'Внеплановый',
+  TARGETED: 'Целевой',
+};
+
+/** Состояние записи: обе отметки стоят или нет. */
+export type BriefingJournalStatus = 'signed' | 'awaiting';
+
+export const BRIEFING_STATUS_LABELS: Record<BriefingJournalStatus, string> = {
+  signed: 'Подтверждён',
+  awaiting: 'Ожидает подтверждения',
+};
+
 /** Вид записи словами — так он стоит в графе журнала и в распечатке. */
 export const BRIEFING_KIND_LABELS: Record<BriefingKind, string> = {
   INSTRUCTION: 'Ознакомление с инструкцией',
@@ -30,6 +59,14 @@ export interface BriefingJournalEntry {
   documentVersion: string;
   result: string | null;
   validUntil: string | null;
+  /** Вид инструктажа. null у проверки знаний и у записей до 13.09.2026. */
+  type: BriefingType | null;
+  instructorId: string | null;
+  instructorName: string;
+  reason: string;
+  employeeSignedAt: string | null;
+  instructorSignedAt: string | null;
+  status: BriefingJournalStatus;
 }
 
 /**

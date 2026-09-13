@@ -49,9 +49,15 @@ export const SAFETY_TABS = [
   // модуль, где все вкладки отвечают отказом.
   { id: 'my-clearance', label: 'Мой допуск', icon: 'operator' },
   { id: 'safety', label: 'Обзор', icon: 'accepted' },
+  { id: 'employees', label: 'Сотрудники', icon: 'users' },
+  { id: 'briefings', label: 'Журнал инструктажей', icon: 'documents' },
+  { id: 'instructions', label: 'Инструкции и регламенты', icon: 'reports' },
+  { id: 'knowledge', label: 'Проверка знаний', icon: 'accepted' },
+  { id: 'incidents', label: 'Нарушения и инциденты', icon: 'defect' },
+  // «Документы» и «Наряд-допуски» на макете отдельными вкладками не значились,
+  // но это работающие экраны с живыми данными: срок удостоверения и реестр
+  // нарядов. Убрать их значило бы потерять готовое ради сходства картинки.
   { id: 'documents', label: 'Документы', icon: 'documents' },
-  { id: 'briefings', label: 'Журнал инструктажей', icon: 'risk' },
-  { id: 'incidents', label: 'Происшествия', icon: 'defect' },
   { id: 'permits', label: 'Наряд-допуски', icon: 'work-order' },
 ] as const satisfies ReadonlyArray<ModuleTab>;
 
