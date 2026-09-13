@@ -12,7 +12,7 @@ import {admissionAccepted, derivePhase, missingPrerequisites} from '../shift-pha
 import {classifyObservedHazard, validateIncident} from '../incidents';
 import {buildSlingerAttempt} from '../knowledge-bank';
 import {shiftWindow} from '../shift-window';
-import {collectWarnings, isWorkAllowed, weatherStop} from '../work-warnings';
+import {collectWarnings, weatherStop} from '../work-warnings';
 
 /**
  * Правила, от которых зависит безопасность и учёт. Проверяется только то, чья
@@ -74,7 +74,6 @@ describe('предупреждения смены', () => {
       ...base,
       openDefects: [{title: 'Трещина в мачте', severity: 'HIGH'}],
     });
-    expect(isWorkAllowed(warnings)).toBe(true);
     expect(warnings.find((warning) => warning.code === 'OPEN_ALERT_DEFECT')?.level).toBe('ALERT');
   });
 
@@ -86,21 +85,20 @@ describe('предупреждения смены', () => {
     );
     const warnings = collectWarnings({...base, documents: expired});
     expect(warnings.find((warning) => warning.code === 'DOCUMENT_INVALID')?.level).toBe('ALERT');
-    expect(isWorkAllowed(warnings)).toBe(true);
   });
 
   it('ветер выше 15 м/с даёт красное предупреждение, но не блокирует учёт', () => {
     const warnings = collectWarnings({...base, windMs: 17});
     expect(warnings.find((warning) => warning.code === 'WIND_STOP')?.level).toBe('STOP');
-    expect(isWorkAllowed(warnings)).toBe(true);
-    expect(isWorkAllowed(collectWarnings({...base, windMs: 14}))).toBe(true);
+    // Граница: 14 м/с ниже порога и предупреждения не даёт.
+    expect(collectWarnings({...base, windMs: 14}).find((w) => w.code === 'WIND_STOP')).toBeUndefined();
   });
 
   it('мороз ниже −25 °C даёт красное предупреждение, но не блокирует учёт', () => {
     const warnings = collectWarnings({...base, temperatureC: -27});
     expect(warnings.find((warning) => warning.code === 'COLD_STOP')?.level).toBe('STOP');
-    expect(isWorkAllowed(warnings)).toBe(true);
-    expect(isWorkAllowed(collectWarnings({...base, temperatureC: -24}))).toBe(true);
+    // Граница: -24 °C выше порога и предупреждения не даёт.
+    expect(collectWarnings({...base, temperatureC: -24}).find((w) => w.code === 'COLD_STOP')).toBeUndefined();
   });
 
   it('закрытый дефект исчезает из предупреждений сам', () => {

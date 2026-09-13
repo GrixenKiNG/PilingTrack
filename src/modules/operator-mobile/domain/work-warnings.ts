@@ -237,17 +237,6 @@ export function collectWarnings(input: WarningInput): WorkWarning[] {
   return warnings;
 }
 
-/**
- * Обратная совместимость контракта мобильного состояния.
- *
- * Поле раньше управляло программной блокировкой по внешнему метеосервису.
- * Без телеметрии установки такая блокировка создаёт ложную уверенность.
- * Предупреждения уровня STOP остаются красными, но учёт не запирают.
- */
-export function isWorkAllowed(_warnings: WorkWarning[]): boolean {
-  return true;
-}
-
 /** Есть ли красное, что должен увидеть и диспетчер. */
 export function hasAlerts(warnings: WorkWarning[]): boolean {
   return warnings.some((warning) => warning.level === 'STOP' || warning.level === 'ALERT');

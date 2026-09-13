@@ -158,8 +158,6 @@ export interface OperatorMobileState {
   checklists: ChecklistView[];
   /** Предупреждения смены. Даже красные не блокируют учёт программно. */
   warnings: WorkWarning[];
-  /** Совместимость со старым клиентом; при политике предупреждений всегда true. */
-  workAllowed: boolean;
   production: ProductionView;
   /** Записи смены поимённо — чтобы ошибочную можно было поправить. */
   entries: ProductionEntryView[];
