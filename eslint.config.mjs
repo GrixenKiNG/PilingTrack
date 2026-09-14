@@ -143,7 +143,14 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "coverage/**",
     ".codex/**",
     "output/**",
-    "andrej-karpathy-skills-main/**"
+    "andrej-karpathy-skills-main/**",
+    // Черновики и прототипы, которых нет в git: отладочные скрипты прошлых
+    // сессий и статика HTML-прототипов. Линтер видел их, git — нет, и
+    // npm run lint падал на 37 ошибках в коде, который никуда не поедет.
+    ".cluster/**",
+    ".tmp/**",
+    "public/prototypes/**",
+    "docs/**"
   ]
 }];
 
