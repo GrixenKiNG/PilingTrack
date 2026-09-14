@@ -2,6 +2,7 @@
 
 import {useState, type ReactNode} from 'react';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import {formatDateTimeInTimezone} from '@/lib/timezone';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 
@@ -102,11 +103,38 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs}
 
 /** Экран после закрытия: отчёт отправлен, действий больше нет. */
 export function ClosedScreen({state}: {state: OperatorMobileState}) {
+  const receiptTime = state.receipt?.submittedAt ?? state.receipt?.closedAt ?? null;
+  const reportAccepted = Boolean(state.receipt?.submittedAt);
+
   return (
     <Screen title="Смена закрыта" subtitle={state.assignment?.equipmentName}>
-      <Panel tone="ok">
-        <PanelTitle tone="ok">Отчёт отправлен диспетчеру</PanelTitle>
-        <p className="mt-1 text-sm">Спасибо. Можно закрывать приложение.</p>
+      <Panel tone={reportAccepted ? 'ok' : 'warning'}>
+        <PanelTitle tone={reportAccepted ? 'ok' : 'warning'}>
+          {reportAccepted ? 'Принято сервером' : state.receipt ? 'Смена закрыта сервером' : 'Смена закрыта'}
+        </PanelTitle>
+        <p className="mt-1 text-sm">
+          {reportAccepted
+            ? 'Отчёт отправлен диспетчеру. Можно закрывать приложение.'
+            : state.receipt
+              ? 'Номер отчёта сформирован, подтверждение отправки пока не получено.'
+              : 'Номер отчёта пока недоступен'}
+        </p>
+        {state.receipt ? (
+          <dl className="mt-3 grid gap-2 rounded-lg border border-success/25 bg-card/70 p-3 text-sm">
+            <div className="grid gap-1">
+              <dt className="text-2xs text-muted-foreground">Номер отчёта</dt>
+              <dd className="break-all font-semibold tabular-nums">{state.receipt.reportId}</dd>
+            </div>
+            {receiptTime ? (
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-muted-foreground">Принят</dt>
+                <dd className="text-right font-semibold tabular-nums">
+                  {formatDateTimeInTimezone(receiptTime, state.receipt.timezone)}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
       </Panel>
       <Panel>
         <VolumeFact

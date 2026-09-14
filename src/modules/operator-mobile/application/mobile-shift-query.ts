@@ -266,6 +266,7 @@ export async function queryOperatorMobileState(input: {
       weather: null,
       conditions: [],
       shift: null,
+      receipt: null,
       checklists: [],
       warnings: collectWarnings({
         documents: checks,
@@ -326,7 +327,7 @@ export async function queryOperatorMobileState(input: {
         ],
       },
       orderBy: [{startedAt: {sort: 'desc', nulls: 'last'}}, {updatedAt: 'desc'}],
-      select: {id: true, state: true, startedAt: true, productionDate: true},
+      select: {id: true, state: true, startedAt: true, closedAt: true, productionDate: true, timezone: true},
     }),
     db.equipmentDefect.findMany({
       where: {tenantId, equipmentId, status: {in: ['OPEN', 'IN_WORK']}},
@@ -380,6 +381,8 @@ export async function queryOperatorMobileState(input: {
       db.report.findFirst({
         where: {tenantId, shiftId: shift.id},
         select: {
+          reportId: true,
+          submittedAt: true,
           piles: {
             select: {
               id: true, count: true, pileGradeId: true, occurredAt: true,
@@ -551,6 +554,14 @@ export async function queryOperatorMobileState(input: {
         productionDate: shift.productionDate.toISOString().slice(0, 10),
         startedAt: shift.startedAt?.toISOString() ?? null,
         state: shift.state,
+      }
+      : null,
+    receipt: shift?.state === 'CLOSED' && report
+      ? {
+        reportId: report.reportId,
+        submittedAt: report.submittedAt?.toISOString() ?? null,
+        closedAt: shift.closedAt?.toISOString() ?? null,
+        timezone: shift.timezone,
       }
       : null,
     checklists,

@@ -900,9 +900,23 @@ async function ensureReport(tx: Tx, input: {
   return created.id;
 }
 
+/** Один залог: серия ударов и погружение сваи за неё. */
+export interface PileDrivingSetEntry {
+  blows: number;
+  penetrationMm: number;
+  dropHeightM?: number | null;
+}
+
 /** Замеры и отметки журнала забивки. Обязателен только номер сваи. */
 export interface PilePassportEntry {
   pileNumber: string;
+  /**
+   * Залоги по порядку — построчная часть журнала забивки.
+   *
+   * Номер залога не приходит с телефона: порядок задаёт сам массив, и
+   * присланная нумерация означала бы второй источник правды о порядке.
+   */
+  sets?: PileDrivingSetEntry[];
   picketId?: string;
   designHeadLevelM?: number | null;
   actualHeadLevelM?: number | null;
@@ -1100,6 +1114,20 @@ export async function logProduction(input: {
         throw new OperatorCommandError(400, 'Паспорт заполнен не полностью', problems);
       }
 
+      // Залог без ударов или с отрицательным погружением — не замер, а мусор,
+      // из которого потом посчитается отказ и уедет решение по свае. Ноль
+      // погружения законен: свая встала.
+      const sets = entry.passport.sets ?? [];
+      for (const [index, set] of sets.entries()) {
+        const bad = !Number.isFinite(set.blows) || set.blows <= 0
+          || !Number.isFinite(set.penetrationMm) || set.penetrationMm < 0;
+        if (bad) {
+          throw new OperatorCommandError(400, `Залог № ${index + 1} заполнен неверно`, [
+            {field: 'sets', message: 'В залоге нужны число ударов больше нуля и погружение от нуля'},
+          ]);
+        }
+      }
+
       // Молот снимаем с карточки установки: позднейшая замена молота не должна
       // переписывать журнал уже забитых свай.
       const equipment = await tx.equipment.findFirst({
@@ -1150,6 +1178,20 @@ export async function logProduction(input: {
           note: entry.passport.note?.trim() || null,
           drivenAt: now,
           recordedById: input.operatorId,
+          // Залоги пишутся одной вставкой вместе с паспортом: журнал без хода
+          // забивки и ход забивки без журнала одинаково бесполезны, и
+          // разорванная запись оставила бы одно без другого при сбое.
+          sets: sets.length > 0
+            ? {
+              create: sets.map((set, index) => ({
+                tenantId: input.tenantId,
+                ordinal: index + 1,
+                blows: set.blows,
+                penetrationMm: set.penetrationMm,
+                dropHeightM: set.dropHeightM ?? null,
+              })),
+            }
+            : undefined,
         },
       });
     } else if (entry.kind === 'DRILLING') {

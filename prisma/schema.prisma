@@ -2296,6 +2296,8 @@ model PilePassport {
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   pileWork PileWork @relation(fields: [pileWorkId], references: [id], onDelete: Cascade)
+  /// Залоги — построчная часть журнала забивки.
+  sets PileDrivingSet[]
 
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, pileNumber])
@@ -2304,6 +2306,37 @@ model PilePassport {
 }
 
 /// Что мастер постановил по свае.
+/// Залог: серия ударов и погружение сваи за неё.
+///
+/// ЗАЧЕМ ОТДЕЛЬНАЯ ТАБЛИЦА. Нормативная форма журнала забивки требует
+/// «погружение сваи от каждого залога», а не итоговую цифру: по ряду залогов
+/// видно, как свая входила. Одна пара полей в паспорте хранит последний замер
+/// и стирает ход забивки.
+///
+/// ПОЧЕМУ ОТКАЗ ЗДЕСЬ НЕ ХРАНИТСЯ. Он частное от погружения и числа ударов —
+/// правило одно на весь продукт (`operator-mobile/domain/pile-passport`).
+model PileDrivingSet {
+  id         String @id @default(cuid())
+  tenantId   String
+  passportId String
+
+  /// № залога по порядку, с единицы.
+  ordinal Int
+  /// Ударов в залоге (обычно 10).
+  blows Int
+  /// Погружение сваи за залог, мм. Ноль законен: свая встала.
+  penetrationMm Float
+  /// Высота подъёма бойка на этом залоге, м. Машинист меняет её по ходу.
+  dropHeightM Float?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  passport PilePassport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+
+  @@unique([passportId, ordinal])
+  @@index([tenantId, passportId])
+}
+
 enum PileAcceptance {
   PENDING // не разобрана
   ACCEPTED // принята

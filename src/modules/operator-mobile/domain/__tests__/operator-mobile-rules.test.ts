@@ -5,7 +5,9 @@ import {getChecklist} from '../checklist-catalog';
 import {collectDefectDrafts, validateChecklistRun} from '../checklist-run';
 import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
 import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
-import {actualRefusalMm, validatePassport} from '../pile-passport';
+import {
+  actualRefusalMm, drivingComplete, journalRefusalMm, validatePassport,
+} from '../pile-passport';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
 import {admissionAccepted, derivePhase, missingPrerequisites} from '../shift-phases';
@@ -406,6 +408,45 @@ describe('запреты, которые обязан держать серве�
     expect(validatePassport({
       pileNumber: 'С-130', refusalSetPenetrationMm: 18, refusalSetBlows: null,
     }).map((problem) => problem.field)).toContain('refusalSetBlows');
+  });
+
+  /*
+    Отказ сваи — среднее по ТРЁМ ПОСЛЕДНИМ залогам (СП 45.13330). Ранние
+    залоги в него не входят: свая идёт легко, пока не дошла до несущего слоя,
+    и включить их значило бы записать свае отказ, которого у неё нет.
+  */
+  it('отказ берётся по трём последним залогам, ранние в него не входят', () => {
+    const set = (ordinal: number, penetrationMm: number) => ({
+      ordinal, blows: 10, penetrationMm, dropHeightM: null,
+    });
+
+    // Первый залог — 100 мм за 10 ударов (10 мм/уд) — в счёт не идёт.
+    expect(journalRefusalMm([set(1, 100), set(2, 30), set(3, 20), set(4, 10)]))
+      .toEqual({refusalMm: 2, setsUsed: 3});
+
+    // Один замер — тоже ответ: он подписан числом залогов за ним.
+    expect(journalRefusalMm([set(1, 18)])).toEqual({refusalMm: 1.8, setsUsed: 1});
+    expect(journalRefusalMm([])).toBeNull();
+  });
+
+  /*
+    Среднее прячет разброс: два тугих залога и один провальный дают пристойное
+    среднее, хотя на последнем свая ушла вниз. Норма требует трёх ПОДРЯД.
+  */
+  it('забита по норме — только когда все три последних залога в пределах проектного', () => {
+    const set = (ordinal: number, penetrationMm: number) => ({
+      ordinal, blows: 10, penetrationMm, dropHeightM: null,
+    });
+
+    expect(drivingComplete({sets: [set(1, 20), set(2, 18), set(3, 19)], designRefusalMm: 2}))
+      .toBe(true);
+    // Последний залог 40 мм = 4 мм/уд — свая ушла, хотя среднее ещё приличное.
+    expect(drivingComplete({sets: [set(1, 10), set(2, 10), set(3, 40)], designRefusalMm: 2}))
+      .toBe(false);
+    // Судить нечем: залогов меньше трёх либо нет проектного отказа.
+    expect(drivingComplete({sets: [set(1, 18), set(2, 18)], designRefusalMm: 2})).toBeNull();
+    expect(drivingComplete({sets: [set(1, 18), set(2, 18), set(3, 18)], designRefusalMm: null}))
+      .toBeNull();
   });
 });
 

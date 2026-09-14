@@ -51,8 +51,17 @@ export async function fetchState(input: {
   return parse<OperatorMobileState>(response);
 }
 
+/** Один залог: серия ударов и погружение сваи за неё. */
+export interface PileDrivingSetInput {
+  blows: number;
+  penetrationMm: number;
+  dropHeightM?: number | null;
+}
+
 export interface PilePassportInput {
   pileNumber: string;
+  /** Залоги по порядку. Номер задаёт сам массив. */
+  sets?: PileDrivingSetInput[];
   picketId?: string;
   designHeadLevelM?: number | null;
   actualHeadLevelM?: number | null;

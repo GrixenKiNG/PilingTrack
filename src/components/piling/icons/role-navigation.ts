@@ -67,20 +67,20 @@ const assistantNavigation: NavigationItem[] = [
  * четыре смысловые связки подряд, а не десять равнозначных строк:
  *
  *   обзор       — дашборд, мониторинг
- *   работа      — объекты, журнал забивки, отчёты
+ *   работа      — объекты, отчёты (отчёты смен + журнал забивки)
  *   техника     — установки, техготовность
  *   люди        — бригады, происшествия
  *   итоги       — аналитика
  *
- * Раньше «Происшествия» стояли между техникой и людьми, а «Журнал забивки» —
- * после «Отчётов», хотя паспорт сваи и приходит из отчёта смены: мастер
- * открывает их подряд.
+ * Раньше «Происшествия» стояли между техникой и людьми, а «Журнал забивки»
+ * был отдельным пунктом. Журнал переехал вкладкой внутрь «Отчётов»
+ * (14.09.2026): паспорт сваи приходит из отчёта смены, это одна работа с
+ * разной подробностью, и мастер открывает их подряд.
  */
 const dispatcherNavigation: NavigationItem[] = [
   { label: 'Дашборд', href: '/admin', icon: 'dashboard' },
   { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring', tone: 'info' },
   { label: 'Объекты', href: '/admin/sites', icon: 'site' },
-  { label: 'Журнал забивки', href: '/admin/piles', icon: 'pile-group' },
   { label: 'Отчёты', href: '/admin/reports', icon: 'reports' },
   { label: 'Установки', href: '/admin/equipment', icon: 'equipment-rig' },
   { label: 'Техготовность', href: '/admin/to', icon: 'technical-readiness', tone: 'success' },
@@ -106,7 +106,6 @@ export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   // и без управления бригадами: их права уже сужены в authorization-service.
   FOREMAN: [
     { label: 'Дашборд', href: '/admin', icon: 'dashboard' },
-    { label: 'Журнал забивки', href: '/admin/piles', icon: 'pile-group' },
     { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring' },
     { label: 'Объекты', href: '/admin/sites', icon: 'site' },
     { label: 'Бригады', href: '/admin/crews', icon: 'crew' },

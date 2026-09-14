@@ -190,13 +190,19 @@ export function PhaseBar({progress}: {
   progress: {phase: string; label: string; done: boolean; current: boolean}[];
 }) {
   const current = progress.find((step) => step.current);
-  const currentIndex = Math.max(0, progress.findIndex((step) => step.current));
+  const currentIndex = progress.findIndex((step) => step.current);
+  const completed = progress.length > 0 && progress.every((step) => step.done);
+  const displayedStep = currentIndex >= 0
+    ? currentIndex + 1
+    : completed
+      ? progress.length
+      : Math.min(progress.filter((step) => step.done).length + 1, progress.length);
   return (
     <div className="operator-phase-bar border-b border-white/10 bg-[#121a22] px-4 pb-3 pt-3 text-white">
       <div className="mb-2.5 flex items-end justify-between gap-3">
         <div>
           <p className="text-3xs font-bold uppercase tracking-[0.18em] text-white/55">
-            Шаг {currentIndex + 1} из {progress.length}
+            {completed ? `${progress.length} из ${progress.length}` : `Шаг ${displayedStep} из ${progress.length}`}
           </p>
           <p className="mt-0.5 text-sm font-bold">{current?.label ?? 'Смена завершена'}</p>
         </div>
@@ -218,7 +224,7 @@ export function PhaseBar({progress}: {
             )}
           >
             <span className={cn(
-              'relative z-10 flex size-6 items-center justify-center rounded-full border text-[10px] font-black tabular-nums',
+              'relative z-10 flex size-6 items-center justify-center rounded-full border text-3xs font-black tabular-nums',
               step.done && 'border-success bg-success text-white',
               step.current && 'border-signal bg-signal text-white ring-4 ring-signal/20',
               !step.done && !step.current && 'border-white/30 bg-[#121a22] text-white/45',

@@ -18,6 +18,21 @@ describe('рабочая оболочка машиниста', () => {
     expect(screen.getByRole('listitem', {name: 'Допуск — выполнено'})).toBeInTheDocument();
   });
 
+  it('показывает завершённую смену как семь из семи, а не как первый шаг', () => {
+    const completed = Array.from({length: 7}, (_, index) => ({
+      phase: `PHASE_${index}`,
+      label: `Этап ${index + 1}`,
+      done: true,
+      current: false,
+    }));
+
+    render(<PhaseBar progress={completed} />);
+
+    expect(screen.getByText('7 из 7')).toBeInTheDocument();
+    expect(screen.getByText('Смена завершена')).toBeInTheDocument();
+    expect(screen.queryByText('Шаг 1 из 7')).not.toBeInTheDocument();
+  });
+
   it('явно показывает, где находятся записи при потере связи', () => {
     const {rerender} = render(<OperatorStatusStrip online items={[]} />);
     expect(screen.getByRole('status')).toHaveTextContent('Синхронизировано');

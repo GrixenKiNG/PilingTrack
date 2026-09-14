@@ -164,3 +164,117 @@ export function validatePassport(input: {
 
   return problems;
 }
+
+// ============================================================
+// Залоги — то, из чего журнал забивки состоит по норме.
+//
+// ЧТО ТАКОЕ ЗАЛОГ. Серия ударов (обычно десять), после которой по рейке
+// снимают, на сколько свая ушла. Нормативная форма журнала (СП 45.13330,
+// бывш. СНиП 3.02.01-87) требует не итоговую цифру, а «погружение сваи от
+// каждого залога»: по ряду залогов видно, как свая входила — равномерно,
+// уткнулась в линзу или провалилась.
+//
+// ПОЧЕМУ ОТКАЗ БЕРЁТСЯ ПО ТРЁМ ПОСЛЕДНИМ. Один залог — это один замер с
+// рейкой и одной оговоркой машиниста. Норма велит мерить погружение в трёх
+// последних залогах и брать среднее: случайный удар по валуну или сбитый
+// отсчёт так не становится приговором свае.
+// ============================================================
+
+/** Сколько последних залогов даёт отказ по норме. */
+export const REFUSAL_SET_WINDOW = 3;
+
+/**
+ * Сколько суток грунт «отдыхает» перед добивкой.
+ *
+ * Забивка разжижает грунт вокруг сваи, и отказ выходит завышенным — «ложный
+ * отказ». Через двое-трое суток грунт восстанавливается, и добивка показывает
+ * настоящее сопротивление. Берём три: нижняя граница (двое) слишком часто даёт
+ * повторную добивку, и свая проходит круг заново.
+ */
+export const SOIL_REST_DAYS = 3;
+
+/** Один залог журнала. */
+export interface DrivingSet {
+  /** № залога по порядку, с единицы. */
+  ordinal: number;
+  /** Ударов в залоге. */
+  blows: number;
+  /** Погружение за залог, мм. */
+  penetrationMm: number;
+  /** Высота подъёма бойка на залоге, м. Машинист меняет её по ходу. */
+  dropHeightM: number | null;
+}
+
+/** Отказ на этом залоге, мм/удар. `null` — замер бессмысленный. */
+export function setRefusalMm(set: Pick<DrivingSet, 'blows' | 'penetrationMm'>): number | null {
+  return actualRefusalMm({penetrationMm: set.penetrationMm, blows: set.blows});
+}
+
+/**
+ * Отказ сваи по журналу: среднее по трём последним залогам.
+ *
+ * ПОЧЕМУ СРЕДНЕЕ ПО ОТКАЗАМ, А НЕ ПО СУММАМ. Норма говорит именно о средней
+ * величине отказа за залог. При равном числе ударов в залогах это одно и то
+ * же; при разном — среднее по отказам не даёт длинному залогу перевесить
+ * короткий, а сравнивают с проектным отказом именно отказ за удар.
+ *
+ * ПОЧЕМУ РАБОТАЕТ И НА ОДНОМ ЗАЛОГЕ. Залоги ведутся не на каждой свае: старые
+ * паспорта и быстрая запись с телефона дают один замер. Считать по тому, что
+ * есть, честнее, чем молчать: число подписано тем, сколько залогов за ним
+ * стоит (`setsUsed`).
+ *
+ * `null` — залогов нет вовсе.
+ */
+export function journalRefusalMm(sets: readonly DrivingSet[]): {
+  refusalMm: number;
+  setsUsed: number;
+} | null {
+  const measured = sets
+    .slice()
+    .sort((left, right) => left.ordinal - right.ordinal)
+    .map((set) => setRefusalMm(set))
+    .filter((refusal): refusal is number => refusal !== null);
+  if (measured.length === 0) return null;
+
+  const window = measured.slice(-REFUSAL_SET_WINDOW);
+  const sum = window.reduce((total, refusal) => total + refusal, 0);
+  return {
+    refusalMm: Math.round((sum / window.length) * 100) / 100,
+    setsUsed: window.length,
+  };
+}
+
+/**
+ * Свая забита по норме: три последних залога подряд дали отказ не больше
+ * проектного.
+ *
+ * ПОЧЕМУ НЕ ХВАТАЕТ СРЕДНЕГО. Среднее прячет разброс: два тугих залога и один
+ * провальный дадут пристойное среднее, хотя свая на последнем ушла вниз —
+ * значит опора под ней ещё не найдена. Норма требует именно трёх подряд.
+ *
+ * `null` — сказать нечего: залогов меньше трёх либо нет проектного отказа.
+ */
+export function drivingComplete(input: {
+  sets: readonly DrivingSet[];
+  designRefusalMm: number | null;
+}): boolean | null {
+  const design = input.designRefusalMm;
+  if (design === null) return null;
+  const measured = input.sets
+    .slice()
+    .sort((left, right) => left.ordinal - right.ordinal)
+    .map((set) => setRefusalMm(set))
+    .filter((refusal): refusal is number => refusal !== null);
+  if (measured.length < REFUSAL_SET_WINDOW) return null;
+  return measured.slice(-REFUSAL_SET_WINDOW).every((refusal) => refusal <= design);
+}
+
+/**
+ * Когда сваю, отправленную на добивку, можно добивать.
+ *
+ * Раньше срока добивка меряет не грунт, а его разжиженное состояние, и вторая
+ * запись в журнале выйдет такой же негодной, как первая.
+ */
+export function redriveReadyAt(decidedAt: Date): Date {
+  return new Date(decidedAt.getTime() + SOIL_REST_DAYS * 24 * 60 * 60 * 1000);
+}

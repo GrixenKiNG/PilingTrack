@@ -31,9 +31,9 @@ const commandSchema = z.discriminatedUnion('command', [
   z.object({command: z.literal('acknowledge-briefing')}),
   z.object({
     command: z.literal('confirm-ppe'),
-    // Производственные сутки считает СЕРВЕР и отдаёт в состоянии; телефон
-    // возвращает их обратно. Формат проверяем строго: мусор в дате тихо
-    // создал бы запись не за те сутки.
+    // Производственные сутки считает клиент по часовому поясу работника — тот
+    // же расчёт, что в выборке состояния. Формат проверяем строго: мусор в
+    // дате тихо создал бы запись не за те сутки.
     productionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     items: z.array(z.string().min(1).max(32)).max(20),
   }),
@@ -81,6 +81,14 @@ const commandSchema = z.discriminatedUnion('command', [
         passport: z.object({
           pileNumber: z.string().trim().min(1).max(50),
           picketId: z.string().min(1).optional(),
+          // Залоги журнала забивки. Предел в 60 — не оценка работы, а потолок
+          // против мусорной отправки: свая за 60 залогов по 10 ударов — это
+          // 600 ударов, вдвое больше любой реальной забивки.
+          sets: z.array(z.object({
+            blows: z.number().int().min(1).max(1000),
+            penetrationMm: z.number().min(0).max(10_000),
+            dropHeightM: z.number().min(0).max(20).nullish(),
+          })).max(60).optional(),
           // Отметка головы бывает отрицательной: отсчёт от нуля здания.
           designHeadLevelM: z.number().min(-200).max(200).nullish(),
           actualHeadLevelM: z.number().min(-200).max(200).nullish(),

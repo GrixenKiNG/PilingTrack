@@ -2,7 +2,8 @@
 
 import {useState} from 'react';
 import {
-  actualRefusalMm, DEFAULT_SET_BLOWS, refusalExceedsDesign, validatePassport,
+  DEFAULT_SET_BLOWS, journalRefusalMm, REFUSAL_SET_WINDOW, refusalExceedsDesign,
+  setRefusalMm, validatePassport,
 } from '@/modules/operator-mobile/domain/pile-passport';
 import type {PilePassportInput} from '../api';
 import {BigButton, Panel, PanelTitle} from '../ui';
@@ -21,6 +22,12 @@ import {BigButton, Panel, PanelTitle} from '../ui';
  * ПОЧЕМУ ОТКАЗ НЕ ВВОДИТСЯ, А ПОКАЗЫВАЕТСЯ. Меряют залог: серию ударов и
  * погружение по рейке. Отказ — частное. Поле для него означало бы третье
  * число, которое может не сойтись с первыми двумя.
+ *
+ * ПОЧЕМУ ЗАЛОГОВ НЕСКОЛЬКО. Нормативный журнал забивки требует погружение от
+ * КАЖДОГО залога, а отказ считает как среднее по трём последним: один замер —
+ * это одна рейка и одна оговорка, тремя подряд случайность не подтвердится.
+ * Машинист добавляет залог за залогом по ходу добивки, а не переписывает одну
+ * строку поверх предыдущей.
  */
 
 /** Числовое поле паспорта. Пустое — законно: замера пока нет. */
@@ -76,6 +83,39 @@ function num(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** Черновик залога: поля пустые, пока машинист не снял рейку. */
+interface SetDraft {
+  blows: string;
+  penetration: string;
+  dropHeight: string;
+}
+
+function emptySet(): SetDraft {
+  return {blows: String(DEFAULT_SET_BLOWS), penetration: '', dropHeight: ''};
+}
+
+/**
+ * Заполненные залоги по порядку.
+ *
+ * Незаполненная строка — не ноль, а «ещё не мерили»: она молча выпадает,
+ * иначе пустая последняя строка обнулила бы отказ сваи.
+ */
+function toMeasuredSets(drafts: SetDraft[]) {
+  const measured: {ordinal: number; blows: number; penetrationMm: number; dropHeightM: number | null}[] = [];
+  for (const draft of drafts) {
+    const blows = num(draft.blows);
+    const penetrationMm = num(draft.penetration);
+    if (blows === null || penetrationMm === null || blows <= 0 || penetrationMm < 0) continue;
+    measured.push({
+      ordinal: measured.length + 1,
+      blows,
+      penetrationMm,
+      dropHeightM: num(draft.dropHeight),
+    });
+  }
+  return measured;
+}
+
 export function PilePassportForm({grades, busy, onSubmit}: {
   grades: {id: string; name: string; lengthMm: number | null}[];
   busy: boolean;
@@ -86,8 +126,7 @@ export function PilePassportForm({grades, busy, onSubmit}: {
   const [designHead, setDesignHead] = useState('');
   const [actualHead, setActualHead] = useState('');
   const [depth, setDepth] = useState('');
-  const [penetration, setPenetration] = useState('');
-  const [blows, setBlows] = useState(String(DEFAULT_SET_BLOWS));
+  const [sets, setSets] = useState<SetDraft[]>([emptySet()]);
   const [designRefusal, setDesignRefusal] = useState('');
   const [totalBlows, setTotalBlows] = useState('');
   const [blowsLastMeter, setBlowsLastMeter] = useState('');
@@ -99,9 +138,11 @@ export function PilePassportForm({grades, busy, onSubmit}: {
   const [headCutOff, setHeadCutOff] = useState(false);
   const [note, setNote] = useState('');
 
-  // Отказ считаем тем же правилом, что и сервер: экран и журнал обязаны
-  // показывать одно число.
-  const refusal = actualRefusalMm({penetrationMm: num(penetration), blows: num(blows)});
+  // Отказ считаем тем же правилом, что и журнал: экран машиниста и экран
+  // мастера обязаны показывать одно число.
+  const measuredSets = toMeasuredSets(sets);
+  const journal = journalRefusalMm(measuredSets);
+  const refusal = journal?.refusalMm ?? null;
   const exceeds = refusalExceedsDesign({actual: refusal, design: num(designRefusal)});
 
   // Глубину сверяем с длиной сваи из марки — тем же правилом, что и сервер:
@@ -125,8 +166,15 @@ export function PilePassportForm({grades, busy, onSubmit}: {
       designHeadLevelM: num(designHead),
       actualHeadLevelM: num(actualHead),
       drivenDepthM: num(depth),
-      refusalSetPenetrationMm: num(penetration),
-      refusalSetBlows: num(blows),
+      // Последний залог кладём и в поля паспорта: по ним читают сваю там, где
+      // залоги не разворачивают, — и два источника обязаны сойтись.
+      sets: measuredSets.map((set) => ({
+        blows: set.blows,
+        penetrationMm: set.penetrationMm,
+        dropHeightM: set.dropHeightM,
+      })),
+      refusalSetPenetrationMm: measuredSets.at(-1)?.penetrationMm ?? null,
+      refusalSetBlows: measuredSets.at(-1)?.blows ?? null,
       designRefusalMm: num(designRefusal),
       totalBlows: num(totalBlows),
       blowsLastMeter: num(blowsLastMeter),
@@ -146,7 +194,7 @@ export function PilePassportForm({grades, busy, onSubmit}: {
     setPileNumber('');
     setActualHead('');
     setDepth('');
-    setPenetration('');
+    setSets([emptySet()]);
     setTotalBlows('');
     setBlowsLastMeter('');
     setPlanDeviation('');
@@ -200,26 +248,80 @@ export function PilePassportForm({grades, busy, onSubmit}: {
       </Panel>
 
       <Panel tone={exceeds === true ? 'warning' : 'plain'}>
-        <PanelTitle tone={exceeds === true ? 'warning' : 'plain'}>Отказ</PanelTitle>
+        <PanelTitle tone={exceeds === true ? 'warning' : 'plain'}>Залоги и отказ</PanelTitle>
         <p className="mt-1 text-2xs text-muted-foreground">
-          Замеряется залогом: сколько свая ушла за серию ударов.
+          Залог — серия ударов, после которой снимают по рейке, на сколько свая ушла.
+          Отказ считается по трём последним залогам.
         </p>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <Num label="Погружение за залог" unit="мм" value={penetration} onChange={setPenetration} step="0.1" />
-          <Num label="Ударов в залоге" value={blows} onChange={setBlows} step="1" />
+
+        <div className="mt-2 space-y-3">
+          {sets.map((set, index) => {
+            const setRefusal = setRefusalMm({
+              blows: num(set.blows) ?? 0,
+              penetrationMm: num(set.penetration) ?? -1,
+            });
+            return (
+              <div key={index} className="rounded-md border bg-muted/40 p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xs font-semibold text-muted-foreground">
+                    Залог № {index + 1}
+                    {setRefusal !== null ? ` · отказ ${setRefusal} мм/удар` : ''}
+                  </span>
+                  {sets.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setSets((current) => current.filter((_, i) => i !== index))}
+                      className="text-2xs font-medium text-muted-foreground underline"
+                    >
+                      убрать
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <Num
+                    label="Ударов" value={set.blows} step="1"
+                    onChange={(value) => setSets((current) =>
+                      current.map((item, i) => (i === index ? {...item, blows: value} : item)))}
+                  />
+                  <Num
+                    label="Погружение" unit="мм" value={set.penetration} step="0.1"
+                    onChange={(value) => setSets((current) =>
+                      current.map((item, i) => (i === index ? {...item, penetration: value} : item)))}
+                  />
+                  <Num
+                    label="Высота" unit="м" value={set.dropHeight} step="0.01"
+                    onChange={(value) => setSets((current) =>
+                      current.map((item, i) => (i === index ? {...item, dropHeight: value} : item)))}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setSets((current) => [...current, emptySet()])}
+          className="mt-2 h-11 w-full rounded-md border border-dashed text-sm font-semibold text-muted-foreground"
+        >
+          + Добавить залог
+        </button>
+
         <div className="mt-3">
           <Num
             label="Проектный отказ" unit="мм/удар" value={designRefusal} onChange={setDesignRefusal} step="0.01"
             hint="Из проекта. С ним сравнивают полученный."
           />
         </div>
-        {refusal !== null ? (
+        {refusal !== null && journal ? (
           <p className={exceeds === true
             ? 'mt-3 rounded-md bg-warning/15 px-3 py-2 text-sm font-semibold text-warning-strong'
             : 'mt-3 rounded-md bg-info/10 px-3 py-2 text-sm font-semibold text-info-strong'}
           >
             Отказ: {refusal} мм/удар
+            {journal.setsUsed < REFUSAL_SET_WINDOW
+              ? ` (по ${journal.setsUsed} залогу — по норме нужно ${REFUSAL_SET_WINDOW})`
+              : ''}
             {exceeds === true
               ? ' — больше проектного. Свая не добита, скажите диспетчеру.'
               : exceeds === false ? ' — в пределах проектного.' : ''}

@@ -1,7 +1,13 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { PileJournal } from '@/components/piling/pile-journal';
-
+/**
+ * Журнал забивки переехал вкладкой в «Отчёты»: паспорт сваи приходит из отчёта
+ * смены, и мастер открывает их подряд.
+ *
+ * Адрес оставлен живым, а не удалён: на него ведут закладки и ссылки из
+ * прошлых уведомлений. Право проверяет layout этого раздела и сам раздел
+ * отчётов — редирект никого не пускает дальше, чем пускал старый экран.
+ */
 export default function AdminPilesPage() {
-  return <PileJournal />;
+  redirect('/admin/reports?view=piles');
 }

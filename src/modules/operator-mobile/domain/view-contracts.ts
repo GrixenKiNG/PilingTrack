@@ -175,6 +175,13 @@ export interface OperatorMobileState {
   weather: WeatherView | null;
   conditions: ShiftCondition[];
   shift: {id: string; productionDate: string; startedAt: string | null; state: string} | null;
+  /** Серверная квитанция закрытия: человекочитаемый номер и точные отметки времени. */
+  receipt: {
+    reportId: string;
+    submittedAt: string | null;
+    closedAt: string | null;
+    timezone: string;
+  } | null;
   checklists: ChecklistView[];
   /** Предупреждения смены. Даже красные не блокируют учёт программно. */
   warnings: WorkWarning[];

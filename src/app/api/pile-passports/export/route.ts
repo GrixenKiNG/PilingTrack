@@ -3,10 +3,7 @@ import { withApi } from '@/core/api-wrapper';
 import { requireAuth } from '@/lib/auth';
 import { requireTenantId } from '@/lib/tenant';
 import { assertCan } from '@/services/auth/authorization-service';
-import {
-  listPilePassports,
-  pileJournalHeader,
-} from '@/modules/reports/application/queries/pile-passport.service';
+import { exportPileJournalXlsx } from '@/modules/reports/application/queries/pile-passport.service';
 import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
 
 export const runtime = 'nodejs';
@@ -15,14 +12,15 @@ const ACCEPTANCE_VALUES: PileAcceptanceValue[] = ['PENDING', 'ACCEPTED', 'NEEDS_
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Журнал забивки: строки по сваям и титул журнала.
+ * Выгрузка журнала забивки в .xlsx — то, что распечатывают и подшивают.
  *
- * ПОЧЕМУ ТИТУЛ СЧИТАЕТСЯ ЗДЕСЬ, А НЕ НА ЭКРАНЕ. Он обязан описывать ровно ту
- * выборку, которую видно в таблице, — и ту же, которая уйдёт в выгрузку.
- * Второй счёт на клиенте разошёлся бы с выгрузкой на первом же фильтре.
+ * ПРАВО ТО ЖЕ, ЧТО У ЭКРАНА (`piles.manage`), а не `reports.export`: журнал
+ * забивки — документ по сваям, и открыт он тем же, кто по сваям решает.
  *
- * Кеш здесь не включаем: список меняется каждым решением мастера, и десять
- * секунд устаревшего разбора — это свая, принятая дважды.
+ * ПОЧЕМУ БЕЗ ОГРАНИЧЕНИЯ ПЕРИОДА В 92 ДНЯ, как у отчётов. Журнал ведётся на
+ * объект целиком и подшивается по завершении свайного поля — квартальная
+ * граница разрезала бы документ пополам. Размер держит лимит строк (500) в
+ * самой выборке.
  */
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -45,16 +43,22 @@ export const GET = withApi(
       return NextResponse.json({ error: 'Даты периода задаются как ГГГГ-ММ-ДД' }, { status: 400 });
     }
 
-    const rows = await listPilePassports({
+    const xlsx = await exportPileJournalXlsx({
       tenantId,
       siteId: params.get('siteId') || undefined,
-      pendingOnly: params.get('pendingOnly') === 'true',
       acceptance: (acceptanceParam as PileAcceptanceValue | null) ?? undefined,
       dateFrom,
       dateTo,
       pileNumber: params.get('pileNumber')?.trim() || undefined,
     });
-    return NextResponse.json({ data: rows, header: pileJournalHeader(rows) });
+
+    const today = new Date().toISOString().slice(0, 10);
+    return new NextResponse(new Uint8Array(xlsx), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="pile-driving-journal-${today}.xlsx"`,
+      },
+    });
   },
   { domain: 'piles' },
 );
