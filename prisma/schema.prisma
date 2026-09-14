@@ -119,6 +119,7 @@ model User {
   feedbackReads   FeedbackEventRead[]
   documents       UserDocument[]
   equipmentPermits UserEquipmentPermit[]
+  ppeChecks       PpeCheck[]
   briefings       BriefingRecord[]
   placePresets    UserPlacePreset[]
   operatorChecklistTemplatesCreated OperatorChecklistTemplate[] @relation("OperatorChecklistTemplateCreatedBy")
