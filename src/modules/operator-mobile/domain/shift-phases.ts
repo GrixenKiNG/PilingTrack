@@ -99,6 +99,13 @@ export function admissionAccepted(shiftState: string | null | undefined): boolea
 }
 
 export interface ShiftFacts {
+  /**
+   * Оператор проверил средства защиты на эти производственные сутки.
+   *
+   * Именно ПРОВЕРИЛ, а не «комплект полон»: нехватка даёт предупреждение, но
+   * не запирает — см. `domain/ppe.ts`, там записано почему.
+   */
+  ppeConfirmed: boolean;
   /** Оператор ознакомился с действующей версией инструкции. */
   briefingAcknowledged: boolean;
   /** Результат проверки знаний действителен. */
@@ -123,10 +130,16 @@ export interface ShiftFacts {
  *
  * Документы на порядок не влияют: просроченная справка даёт красное
  * предупреждение оператору и диспетчеру, но экран не запирает — решение о
- * работе принимает человек.
+ * работе принимает человек. Нехватка СИЗ — из той же породы: запирает не она,
+ * а отсутствие самой проверки.
  */
 export function derivePhase(facts: ShiftFacts): OperatorPhase {
   if (facts.shiftClosed) return 'CLOSED';
+  // СИЗ идёт первым внутри допуска: проверять каску после проверки знаний
+  // поздно — человек уже мысленно на площадке. Отдельной фазы не заводим:
+  // все три шага закрывают один и тот же экран допуска, и дробить полосу
+  // прогресса на восемь делений ради одного нажатия незачем.
+  if (!facts.ppeConfirmed) return 'IDENTITY';
   if (!facts.briefingAcknowledged || !facts.knowledgeValid) return 'IDENTITY';
   if (!facts.admissionAccepted) return 'ADMISSION';
   if (facts.workFinished) return 'CLOSING';

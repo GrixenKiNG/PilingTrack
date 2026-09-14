@@ -15,6 +15,7 @@ import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen} from './screens/knowledge-screen';
+import {PpeScreen} from './screens/ppe-screen';
 import {AdmissionScreen} from './screens/admission-screen';
 import {ChecklistScreen} from './screens/checklist-screen';
 import {WorkScreen} from './screens/work-screen';
@@ -41,7 +42,11 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
 type WorkTab = 'SHIFT' | 'EQUIPMENT' | 'INCIDENTS' | 'PROFILE';
 
 /** Экраны, открываемые вне очереди фаз. */
-type Detour = {kind: 'BRIEFING'} | {kind: 'KNOWLEDGE'} | {kind: 'CHECKLIST'; stage: ChecklistStage};
+type Detour =
+  | {kind: 'PPE'}
+  | {kind: 'BRIEFING'}
+  | {kind: 'KNOWLEDGE'}
+  | {kind: 'CHECKLIST'; stage: ChecklistStage};
 
 /**
  * Мобильное рабочее место машиниста.
@@ -364,6 +369,24 @@ export function OperatorMobileApp() {
       );
     }
 
+    if (detour?.kind === 'PPE') {
+      return (
+        <PpeScreen
+          busy={busy}
+          error={actionError}
+          onConfirm={(items) => void run(() => sendCommand({
+            command: 'confirm-ppe',
+            // Сутки считает сервер и отдаёт в состоянии: у машиниста в ночной
+            // смене полночь наступает посреди работы, и расчёт по часам
+            // телефона записал бы проверку за другие сутки.
+            productionDate: state.productionDate,
+            items,
+          }))}
+          onBack={() => setDetour(null)}
+        />
+      );
+    }
+
     if (detour?.kind === 'BRIEFING') {
       return (
         <BriefingScreen
@@ -408,6 +431,7 @@ export function OperatorMobileApp() {
             identity={state.identity}
             operatorName={state.operator.name}
             warnings={state.warnings}
+            onPpe={() => setDetour({kind: 'PPE'})}
             onBriefing={() => setDetour({kind: 'BRIEFING'})}
             onKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
             onContinue={() => void reload()}

@@ -80,6 +80,7 @@ export type ProductionEntryInput =
 
 type Command =
   | {command: 'acknowledge-briefing'}
+  | {command: 'confirm-ppe'; productionDate: string; items: string[]}
   | {command: 'submit-knowledge'; attemptToken: string; picks: {questionId: string; picked: number}[]}
   | {command: 'accept-equipment'; clientCommandId: string; equipmentId: string; shiftType: 'DAY' | 'NIGHT'}
   | {command: 'submit-checklist'; clientCommandId: string; shiftId: string; equipmentId: string; stage: ChecklistStage; answers: ChecklistAnswer[]}

@@ -75,6 +75,17 @@ export interface ProductionView {
 /** Ознакомление с инструкцией и проверка знаний. */
 export interface IdentityView {
   documents: DocumentCheck[];
+  /**
+   * Проверка средств защиты на сегодня. `confirmed` — шаг пройден; `missing` —
+   * чего работник честно не досчитался. Пустой `missing` при `confirmed` —
+   * комплект полон.
+   */
+  ppe: {
+    confirmed: boolean;
+    items: string[];
+    missing: string[];
+    confirmedAt: string | null;
+  };
   briefing: {
     code: string;
     title: string;
@@ -149,6 +160,15 @@ export interface OperatorMobileState {
   phase: OperatorPhase;
   progress: {phase: OperatorPhase; label: string; done: boolean; current: boolean}[];
   identity: IdentityView;
+  /**
+   * Производственные сутки работника по его часовому поясу — их считает
+   * СЕРВЕР и отдаёт наружу.
+   *
+   * Телефон не должен вычислять их сам: у машиниста в ночной смене полночь
+   * наступает посреди работы, и клиентский расчёт записал бы проверку СИЗ за
+   * другие сутки, чем та, за которую сервер ищет смену.
+   */
+  productionDate: string;
   /** Установки, закреплённые за оператором. Пусто — работать не на чем. */
   options: {crewId: string; equipmentId: string; equipmentName: string; siteName: string}[];
   assignment: AssignmentView | null;

@@ -44,3 +44,6 @@ export {
 export type {
   BriefingJournalEntry, BriefingKind, BriefingType, BriefingJournalStatus,
 } from './domain/briefing-journal-view';
+
+export {PPE_ITEMS, PPE_LABELS, missingPpeLabels} from './domain/ppe';
+export type {PpeItem} from './domain/ppe';

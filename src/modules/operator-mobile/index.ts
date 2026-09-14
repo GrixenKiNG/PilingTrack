@@ -7,7 +7,7 @@
  */
 export {queryOperatorMobileState} from './application/mobile-shift-query';
 export {
-  acknowledgeBriefing, submitKnowledgeTest, acceptEquipment, submitChecklist,
+  acknowledgeBriefing, confirmPpe, submitKnowledgeTest, acceptEquipment, submitChecklist,
   logProduction, correctProduction, reportIncident, finishWork, closeShift, OperatorCommandError,
 } from './application/mobile-shift-commands';
 export type {ProductionEntry} from './application/mobile-shift-commands';

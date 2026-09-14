@@ -111,6 +111,7 @@ describe('предупреждения смены', () => {
 
 describe('фазы смены', () => {
   const facts = {
+    ppeConfirmed: true,
     briefingAcknowledged: true,
     knowledgeValid: true,
     admissionAccepted: true,
@@ -120,6 +121,9 @@ describe('фазы смены', () => {
   };
 
   it('порядок этапов не обходится', () => {
+    // СИЗ — первый шаг допуска: без проверки человек остаётся на нём, даже
+    // когда инструктаж прочитан и проверка знаний сдана.
+    expect(derivePhase({...facts, ppeConfirmed: false})).toBe('IDENTITY');
     expect(derivePhase({...facts, briefingAcknowledged: false})).toBe('IDENTITY');
     expect(derivePhase({...facts, knowledgeValid: false})).toBe('IDENTITY');
     expect(derivePhase({...facts, admissionAccepted: false})).toBe('ADMISSION');

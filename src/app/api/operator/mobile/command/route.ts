@@ -3,7 +3,7 @@ import {z} from 'zod';
 import {withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
 import {
-  acceptEquipment, acknowledgeBriefing, closeShift, finishWork, logProduction,
+  acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction,
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
 } from '@/modules/operator-mobile';
 import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/contracts';
@@ -29,6 +29,14 @@ const answerSchema = z.object({
 
 const commandSchema = z.discriminatedUnion('command', [
   z.object({command: z.literal('acknowledge-briefing')}),
+  z.object({
+    command: z.literal('confirm-ppe'),
+    // Производственные сутки считает СЕРВЕР и отдаёт в состоянии; телефон
+    // возвращает их обратно. Формат проверяем строго: мусор в дате тихо
+    // создал бы запись не за те сутки.
+    productionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    items: z.array(z.string().min(1).max(32)).max(20),
+  }),
   z.object({
     command: z.literal('submit-knowledge'),
     attemptToken: z.string().min(1).max(4096),
@@ -178,6 +186,8 @@ export const POST = withMutation(
       switch (body.command) {
         case 'acknowledge-briefing':
           return NextResponse.json({data: await acknowledgeBriefing(actor)});
+        case 'confirm-ppe':
+          return NextResponse.json({data: await confirmPpe({...actor, ...body})});
         case 'submit-knowledge':
           return NextResponse.json({data: await submitKnowledgeTest({...actor, ...body})});
         case 'accept-equipment':

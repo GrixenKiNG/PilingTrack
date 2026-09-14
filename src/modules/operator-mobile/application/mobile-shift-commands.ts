@@ -17,6 +17,7 @@ import {
 } from '../domain/operator-credentials';
 import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../domain/knowledge-bank';
 import {SAFETY_BRIEFING} from '../domain/safety-briefing';
+import {PPE_ITEMS} from '../domain/ppe';
 import {SLINGER_BRIEFING} from '../domain/slinger-briefing';
 import {validatePassport} from '../domain/pile-passport';
 import {resolveShiftConditions, selectChecklistItems} from '../domain/shift-conditions';
@@ -214,6 +215,55 @@ const BRIEFING_BY_AUDIENCE = {
     knowledgeType: SLINGER_KNOWLEDGE_DOCUMENT_TYPE,
   },
 } as const;
+
+/**
+ * Работник проверил средства индивидуальной защиты на сегодня.
+ *
+ * ЗАПИСЫВАЕМ ФАКТ ПРОВЕРКИ, А НЕ ПОЛНОТУ КОМПЛЕКТА. Нехватка попадает в
+ * `missing` и даёт предупреждение, но шаг закрывает: запертый работник
+ * отметит, что каска есть, лишь бы начать смену, и мы получим ложную запись
+ * вместо честной (см. `domain/ppe.ts`).
+ *
+ * ПОВТОРНОЕ ПОДТВЕРЖДЕНИЕ ЗА ТЕ ЖЕ СУТКИ ПЕРЕЗАПИСЫВАЕТ ЗАПИСЬ. Работник
+ * может обнаружить нехватку позже и исправить отметку — вторая строка за те
+ * же сутки была бы спором о том, какая из них верна.
+ */
+export async function confirmPpe(input: {
+  tenantId: string;
+  operatorId: string;
+  productionDate: string;
+  items: string[];
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  // Коды приходят с телефона, и доверять им нельзя: чужой код в списке
+  // означал бы подтверждение того, чего в каталоге нет.
+  const known = new Set(PPE_ITEMS.map((item) => item.code));
+  const items = input.items.filter((code) => known.has(code));
+  const missing = PPE_ITEMS.map((item) => item.code).filter((code) => !items.includes(code));
+
+  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    await tx.ppeCheck.upsert({
+      where: {
+        tenantId_userId_productionDate: {
+          tenantId: input.tenantId,
+          userId: input.operatorId,
+          productionDate: new Date(input.productionDate),
+        },
+      },
+      create: {
+        tenantId: input.tenantId,
+        userId: input.operatorId,
+        productionDate: new Date(input.productionDate),
+        items,
+        missing,
+        confirmedAt: now,
+      },
+      update: {items, missing, confirmedAt: now},
+    });
+    return {items, missing};
+  });
+}
 
 /** Работник прочитал свою инструкцию. Отметка привязана к версии текста. */
 export async function acknowledgeBriefing(input: {

@@ -1,5 +1,6 @@
 'use client';
 
+import {missingPpeLabels} from '@/modules/operator-mobile/contracts';
 import type {DocumentCheck, IdentityView, WorkWarning} from '@/modules/operator-mobile/contracts';
 import {BigButton, Panel, PanelTitle, Screen, Sign} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
@@ -26,22 +27,25 @@ function documentTone(check: DocumentCheck) {
  * вещи: непрочитанная инструкция и непройденная проверка знаний, потому что
  * это ровно то, что оператор может исправить прямо здесь за две минуты.
  */
-export function IdentityScreen({identity, operatorName, warnings, onBriefing, onKnowledge, onContinue}: {
+export function IdentityScreen({identity, operatorName, warnings, onPpe, onBriefing, onKnowledge, onContinue}: {
   identity: IdentityView;
   operatorName: string;
   warnings: WorkWarning[];
+  onPpe: () => void;
   onBriefing: () => void;
   onKnowledge: () => void;
   onContinue: () => void;
 }) {
-  const ready = identity.briefing.ok && identity.knowledge.ok;
+  const ready = identity.ppe.confirmed && identity.briefing.ok && identity.knowledge.ok;
   // Обязательные документы показываем карточками, остальные — свёрнутым
   // списком. Одиннадцать красных карточек про документы, которых никто не
   // требовал, оператор пролистывает не читая, и настоящее предупреждение
   // тонет среди них.
   const required = identity.documents.filter((document) => document.required);
   const optional = identity.documents.filter((document) => !document.required);
-  const nextAction = !identity.briefing.ok
+  const nextAction = !identity.ppe.confirmed
+    ? {label: 'Проверить средства защиты', run: onPpe}
+    : !identity.briefing.ok
     ? {label: 'Прочитать инструкцию', run: onBriefing}
     : !identity.knowledge.ok
       ? {label: 'Пройти проверку знаний', run: onKnowledge}
@@ -54,6 +58,56 @@ export function IdentityScreen({identity, operatorName, warnings, onBriefing, on
       footer={<BigButton onClick={nextAction.run}>{nextAction.label}</BigButton>}
     >
       <WarningsPanel warnings={warnings} />
+
+      {/* Итог допуска. Не отдельный экран: это то же состояние, только всё
+          пройдено — лишний переход между «готово» и «готово» человек в шесть
+          утра воспринимает как сбой. Перечисляем шаги поимённо, потому что
+          зелёная галочка без расшифровки не говорит, ЧТО именно зачтено. */}
+      {ready && (
+        <Panel tone="ok">
+          <div className="flex gap-3">
+            <Sign tone="ok" />
+            <div className="min-w-0 flex-1">
+              <PanelTitle tone="ok">Вы допущены к смене</PanelTitle>
+              <ul className="mt-2 grid gap-1 text-sm">
+                <li>
+                  ✓ Средства защиты —{' '}
+                  {identity.ppe.missing.length
+                    ? `проверены, не хватает: ${missingPpeLabels(identity.ppe.missing).join(', ')}`
+                    : 'комплект полон'}
+                </li>
+                <li>✓ Ознакомление с инструкцией — версия {identity.briefing.version}</li>
+                <li>
+                  ✓ Проверка знаний{identity.knowledge.lastResult ? ` — ${identity.knowledge.lastResult}` : ''}
+                </li>
+              </ul>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Осталось принять установку — дальше начинается смена.
+              </p>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* СИЗ стоит первым: проверять каску после проверки знаний поздно —
+          человек уже мысленно на площадке. */}
+      <Panel tone={identity.ppe.confirmed ? (identity.ppe.missing.length ? 'warning' : 'ok') : 'warning'}>
+        <div className="flex gap-3">
+          <Sign tone={identity.ppe.confirmed && !identity.ppe.missing.length ? 'ok' : 'warning'} />
+          <div className="min-w-0 flex-1">
+            <PanelTitle tone={identity.ppe.confirmed && !identity.ppe.missing.length ? 'ok' : 'warning'}>
+              Средства индивидуальной защиты
+            </PanelTitle>
+            <p className="mt-1 text-sm">
+              {!identity.ppe.confirmed
+                ? 'Комплект ещё не проверен. Это первый шаг допуска, занимает полминуты.'
+                : identity.ppe.missing.length
+                  ? `Проверено, но не хватает: ${missingPpeLabels(identity.ppe.missing).join(', ')}.`
+                  : 'Комплект проверен, всё на месте.'}
+            </p>
+          </div>
+        </div>
+      </Panel>
 
       <Panel tone={identity.briefing.ok ? 'ok' : 'warning'}>
         <div className="flex gap-3">

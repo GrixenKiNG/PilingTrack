@@ -181,6 +181,18 @@ export async function queryOperatorMobileState(input: {
   ]);
 
   // Инструктаж и проверка знаний — документы работника, а не отдельная сущность.
+  // Производственные сутки нужны уже здесь: проверка СИЗ относится к суткам,
+  // а не к смене, и спрашивается ДО того, как машина выбрана. Ниже это же
+  // значение используется для поиска смены — второй расчёт дал бы расхождение
+  // на границе суток.
+  const productionDate = todayInTimezone(profile?.timezone ?? 'Europe/Moscow', now);
+  /// Те же сутки строкой — их отдаём наружу и принимаем обратно в команде СИЗ.
+  const productionDay = productionDate.toISOString().slice(0, 10);
+  const ppeCheck = await db.ppeCheck.findFirst({
+    where: {tenantId, userId: operatorId, productionDate},
+    select: {items: true, missing: true, confirmedAt: true},
+  });
+
   const briefingDoc = documents.find((d) => d.type.name === BRIEFING_DOCUMENT_TYPE);
   const knowledgeDoc = documents.find((d) => d.type.name === KNOWLEDGE_DOCUMENT_TYPE);
   const briefingOk = briefingUpToDate(briefingDoc?.number ?? null, SAFETY_BRIEFING.version);
@@ -195,6 +207,12 @@ export async function queryOperatorMobileState(input: {
 
   const identity = {
     documents: checks,
+    ppe: {
+      confirmed: ppeCheck != null,
+      items: ppeCheck?.items ?? [],
+      missing: ppeCheck?.missing ?? [],
+      confirmedAt: ppeCheck?.confirmedAt.toISOString() ?? null,
+    },
     briefing: {
       code: SAFETY_BRIEFING.code,
       title: SAFETY_BRIEFING.title,
@@ -231,12 +249,18 @@ export async function queryOperatorMobileState(input: {
   };
 
   if (!crew) {
-    const phase: OperatorPhase = briefingOk && knowledgeOk ? 'ADMISSION' : 'IDENTITY';
+    // Тот же порядок, что в derivePhase: без СИЗ человек ещё на допуске, даже
+    // если инструктаж пройден. Разойдясь, две ветки дали бы оператору без
+    // машины экран приёма, а оператору с машиной — экран допуска.
+    const phase: OperatorPhase = ppeCheck != null && briefingOk && knowledgeOk
+      ? 'ADMISSION'
+      : 'IDENTITY';
     return {
       operator: {id: operatorId, name: input.operatorName},
       phase,
       progress: buildProgress(phase),
       identity,
+      productionDate: productionDay,
       options,
       assignment: null,
       weather: null,
@@ -264,7 +288,6 @@ export async function queryOperatorMobileState(input: {
 
   const equipmentId = crew.equipment.id;
   const siteId = crew.site.id;
-  const productionDate = todayInTimezone(profile?.timezone ?? 'Europe/Moscow', now);
 
   const [sitePiles, siteDrilling, siteDowntime, lastFuel, lastMeter, shift, openDefects] = await Promise.all([
     sitePileVolume(tenantId, siteId, dictionaries.pileGrades),
@@ -467,6 +490,7 @@ export async function queryOperatorMobileState(input: {
   });
 
   const phase = derivePhase({
+    ppeConfirmed: ppeCheck != null,
     briefingAcknowledged: briefingOk,
     knowledgeValid: knowledgeOk,
     // Выборка выше берёт сегодняшнюю смену в любом состоянии, кроме отменённой,
@@ -495,6 +519,7 @@ export async function queryOperatorMobileState(input: {
     phase,
     progress: buildProgress(phase),
     identity,
+    productionDate: productionDay,
     options,
     assignment: {
       crewId: crew.id,
