@@ -7,6 +7,7 @@ import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Trash2, Power, PowerOff }
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { pluralizeRu } from '@/lib/format';
 import {
   OpsPage,
@@ -52,7 +53,8 @@ export function AdminCrews() {
   const canManage = useAbility('crews.manage');
   const {
     crews, setCrews, equipmentList, sites,
-    loading, loadingReferenceData, loadReferenceData,
+    loading, loadError, reloadCrews, referenceError,
+    loadingReferenceData, loadReferenceData,
     availableOperators, assistantUsers, activeEquipment, activeSites,
     toggleActive, createCrew, updateCrew, deleteCrew,
   } = useCrewsData();
@@ -191,7 +193,7 @@ export function AdminCrews() {
     <OpsHeader
       icon={Users}
       title="Бригады"
-      countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['бригада', 'бригады', 'бригад'])}`}
+      countLabel={loadError ? '—' : `${filtered.length} ${pluralizeRu(filtered.length, ['бригада', 'бригады', 'бригад'])}`}
       subtitle="Сменные назначения: оператор, помощники, установка, объект"
       actions={canManage &&
         <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
@@ -215,29 +217,42 @@ export function AdminCrews() {
               onToggle={() => toggleActive(active)}
             />
           )
-          : <OpsDetailEmpty message="Выберите бригаду, чтобы увидеть состав и историю назначений." />}
-        kpi={<OpsKpiBar items={kpis} />}
+          : <OpsDetailEmpty message={loadError
+            ? 'Данные бригад не прочитаны — показывать нечего.'
+            : 'Выберите бригаду, чтобы увидеть состав и историю назначений.'} />}
+        kpi={loadError ? undefined : <OpsKpiBar items={kpis} />}
       >
-        <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${crews.length}`} />
-        <OpsTable
-          columns={columns}
-          rows={filtered}
-          getRowId={(c) => c.id}
-          activeId={active?.id ?? null}
-          onRowSelect={(c) => setActiveId(c.id)}
-          empty={<OpsTableEmpty icon={Users} title="Бригады не найдены" hint="Создайте бригаду или измените фильтр." />}
-        />
+        {/*
+          Показатели и таблица при сбое чтения скрыты целиком: нули и «бригад
+          не найдено» по этим данным принимают решение о выходе на смену, и
+          устаревшее здесь опаснее, чем отсутствие экрана.
+        */}
+        {loadError
+          ? <QueryErrorBanner message={loadError} onRetry={reloadCrews} />
+          : (
+            <>
+              <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${crews.length}`} />
+              <OpsTable
+                columns={columns}
+                rows={filtered}
+                getRowId={(c) => c.id}
+                activeId={active?.id ?? null}
+                onRowSelect={(c) => setActiveId(c.id)}
+                empty={<OpsTableEmpty icon={Users} title="Бригады не найдены" hint="Создайте бригаду или измените фильтр." />}
+              />
+            </>
+          )}
       </OpsPage>
 
       <CrewFormDialog open={showCreate} onClose={() => setShowCreate(false)} mode="create"
         editItem={null} operators={availableOperators} equipment={activeEquipment} sites={activeSites}
         assistants={assistantUsers}
-        loadingReferenceData={loadingReferenceData} onSubmit={handleCreate} submitting={submitting} />
+        loadingReferenceData={loadingReferenceData} referenceError={referenceError} onSubmit={handleCreate} submitting={submitting} />
 
       <CrewFormDialog open={!!editItem} onClose={() => setEditItem(null)} mode="edit"
         editItem={editItem} operators={availableOperators} equipment={equipmentList} sites={sites}
         assistants={assistantUsers} excludeCrewId={editItem?.id}
-        loadingReferenceData={loadingReferenceData} onSubmit={handleEdit} submitting={submitting} />
+        loadingReferenceData={loadingReferenceData} referenceError={referenceError} onSubmit={handleEdit} submitting={submitting} />
 
       <DeleteDialog open={!!deleteItem} onClose={() => setDeleteItem(null)}
         crewName={deleteItem?.name || ''} deleting={submitting} onConfirm={handleDelete} />

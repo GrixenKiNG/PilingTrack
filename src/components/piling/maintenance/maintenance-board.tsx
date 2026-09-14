@@ -20,7 +20,8 @@ import {
   Wrench,
 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
-import { authFetch } from '@/lib/api';
+import { authFetch, loadJson } from '@/lib/api';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import {
   type QuickFilter,
   quickFilterMatches,
@@ -63,6 +64,7 @@ export function MaintenanceBoard() {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [crews, setCrews] = useState<CrewAssignment[]>([]);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [filter, setFilter] = useState<MaintenanceFilter>({});
   const [equipmentFilterId, setEquipmentFilterId] = useState('');
   const [siteFilterId, setSiteFilterId] = useState('');
@@ -99,29 +101,34 @@ export function MaintenanceBoard() {
 
   useEffect(() => {
     void (async () => {
-      try {
-        const [assigneeRes, equipmentRes, sitesRes, crewsRes] = await Promise.all([
-          authFetch('/api/maintenance/assignees'),
-          authFetch('/api/equipment?limit=100'),
-          authFetch('/api/sites?limit=100'),
-          authFetch('/api/crews?limit=100'),
-        ]);
-        if (assigneeRes.ok) setAssignees(((await assigneeRes.json()).users ?? []) as AssigneeOption[]);
-        if (equipmentRes.ok) {
-          const data = await equipmentRes.json();
-          setEquipment((data.data ?? data.equipment ?? []) as EquipmentDTO[]);
-        }
-        if (sitesRes.ok) {
-          const data = await sitesRes.json();
-          setSites((data.data ?? data.sites ?? []) as SiteOption[]);
-        }
-        if (crewsRes.ok) {
-          const data = await crewsRes.json();
-          setCrews(((data.data ?? data.crews ?? []) as CrewAssignment[]).filter((crew) => crew.isActive));
-        }
-      } catch {
-        toast.error('Не удалось загрузить фильтры (исполнители/установки/объекты/бригады)');
-      }
+      const [assigneeRes, equipmentRes, sitesRes, crewsRes] = await Promise.allSettled([
+        loadJson<{ users?: AssigneeOption[] }>('/api/maintenance/assignees'),
+        loadJson<{ data?: EquipmentDTO[]; equipment?: EquipmentDTO[] }>('/api/equipment?limit=100'),
+        loadJson<{ data?: SiteOption[]; sites?: SiteOption[] }>('/api/sites?limit=100'),
+        loadJson<{ data?: CrewAssignment[]; crews?: CrewAssignment[] }>('/api/crews?limit=100'),
+      ]);
+
+      /*
+        Фильтры дополняют журнал, поэтому отказ одного не гасит доску. Но
+        молчать нельзя: пустой фильтр «Исполнитель» выглядел как «исполнителей
+        нет», и работу было не на кого назначить.
+      */
+      const missing: string[] = [];
+      if (assigneeRes.status === 'fulfilled') setAssignees(assigneeRes.value.users ?? []);
+      else missing.push('исполнители');
+
+      if (equipmentRes.status === 'fulfilled') {
+        setEquipment(equipmentRes.value.data ?? equipmentRes.value.equipment ?? []);
+      } else missing.push('установки');
+
+      if (sitesRes.status === 'fulfilled') setSites(sitesRes.value.data ?? sitesRes.value.sites ?? []);
+      else missing.push('объекты');
+
+      if (crewsRes.status === 'fulfilled') {
+        setCrews((crewsRes.value.data ?? crewsRes.value.crews ?? []).filter((crew) => crew.isActive));
+      } else missing.push('бригады');
+
+      setFilterError(missing.length ? `Не загружено: ${missing.join(', ')}. Фильтры неполные.` : null);
     })();
   }, []);
 
@@ -252,6 +259,9 @@ export function MaintenanceBoard() {
           <KpiTile icon={Truck} label="в ремонте" value={stats.inRepair} />
           <KpiTile icon={CheckCircle2} label="выполнено ТО" value={`${stats.readiness}%`} />
         </div>
+
+        {/* Пустой фильтр без объяснения читался как «исполнителей нет». */}
+        {filterError ? <QueryErrorBanner title="Фильтры загружены не полностью" message={filterError} /> : null}
       </div>
 
       <div className="grid w-full lg:grid-cols-[minmax(0,1fr)_420px]">

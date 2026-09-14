@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { authFetch } from '@/lib/api';
+import { authFetch, isAbort, loadJson } from '@/lib/api';
 import { toast } from 'sonner';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
 
@@ -9,6 +9,8 @@ interface OperatorUser {
   id: string;
   name: string;
 }
+
+type NamedOption = { id: string; name: string };
 
 export interface UseReportsDataReturn {
   reports: ReportDTO[];
@@ -32,6 +34,8 @@ export interface UseReportsDataReturn {
    *  show a real error state instead of a silently-empty list — see the
    *  2026-05-30 incident where a failing query rendered as "no reports". */
   error: string | null;
+  /** Списки для отбора прочитаны не полностью — фильтр показывает не всё. */
+  filterError: string | null;
   loadingReferenceData: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -49,6 +53,8 @@ const REPORTS_PAGE_LIMIT = 100;
 export function useReportsData(): UseReportsDataReturn {
   const [reports, setReports] = useState<ReportDTO[]>([]);
   const [sites, setSites] = useState<SiteFlatDTO[]>([]);
+  const [filterError, setFilterError] = useState<string | null>(null);
+
   const [operators, setOperators] = useState<OperatorUser[]>([]);
   const [pileGrades, setPileGrades] = useState<PileGradeDTO[]>([]);
   const [drillingTypes, setDrillingTypes] = useState<DrillingTypeDTO[]>([]);
@@ -81,28 +87,31 @@ export function useReportsData(): UseReportsDataReturn {
 
     const loadSitesAndOperators = async () => {
       try {
-        const [sitesRes, operatorsRes, equipmentRes] = await Promise.all([
-          authFetch('/api/sites/all', { signal: abortController.signal }),
-          authFetch('/api/users?role=OPERATOR', { signal: abortController.signal }),
-          authFetch('/api/equipment', { signal: abortController.signal }),
+        const [sitesRes, operatorsRes, equipmentRes] = await Promise.allSettled([
+          loadJson<{ sites?: SiteFlatDTO[] }>('/api/sites/all', { signal: abortController.signal }),
+          loadJson<{ users?: NamedOption[] }>('/api/users?role=OPERATOR', { signal: abortController.signal }),
+          loadJson<{ data?: NamedOption[]; equipment?: NamedOption[] }>('/api/equipment', { signal: abortController.signal }),
         ]);
         if (!isMounted) return;
-        if (sitesRes.ok) {
-          const data = await sitesRes.json();
-          setSites(data.sites || []);
-        }
-        if (operatorsRes.ok) {
-          const data = await operatorsRes.json();
-          setOperators((data.users || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
-        }
-        if (equipmentRes.ok) {
-          const data = await equipmentRes.json();
-          setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
-        }
-      } catch (error) {
-        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
-          /* ignore */
-        }
+
+        // Отбор строится из этих трёх списков, а отказ здесь молча проглатывался.
+        // Пустой фильтр объекта читался как «объектов нет», и отчёты искали не по тому.
+        const missing: string[] = [];
+        if (sitesRes.status === 'fulfilled') setSites(sitesRes.value.sites || []);
+        else if (!isAbort(sitesRes.reason)) missing.push('объекты');
+
+        if (operatorsRes.status === 'fulfilled') {
+          setOperators((operatorsRes.value.users || []).map((u) => ({ id: u.id, name: u.name })));
+        } else if (!isAbort(operatorsRes.reason)) missing.push('операторы');
+
+        if (equipmentRes.status === 'fulfilled') {
+          const list = equipmentRes.value.data || equipmentRes.value.equipment || [];
+          setEquipment(list.map((e) => ({ id: e.id, name: e.name })));
+        } else if (!isAbort(equipmentRes.reason)) missing.push('установки');
+
+        setFilterError(missing.length ? `Не загружено: ${missing.join(', ')}. Отбор неполный.` : null);
+      } catch {
+        if (isMounted) setFilterError('Не удалось загрузить списки для отбора.');
       }
     };
 
@@ -274,7 +283,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error, filterError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

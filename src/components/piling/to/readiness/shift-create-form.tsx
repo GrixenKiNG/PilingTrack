@@ -20,7 +20,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { authFetch } from '@/lib/api';
+import { authFetch, loadJson } from '@/lib/api';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -86,6 +87,7 @@ export function ShiftCreateForm({ timezone, backHref }: Props) {
   const params = useSearchParams();
 
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [crews, setCrews] = useState<CrewOption[]>([]);
   const [equipmentId, setEquipmentId] = useState(params.get('equipmentId') ?? '');
   const [type, setType] = useState<ShiftType>('DAY');
@@ -102,16 +104,25 @@ export function ShiftCreateForm({ timezone, backHref }: Props) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [equipmentRes, crewRes] = await Promise.all([
-        authFetch('/api/equipment?limit=100'),
-        authFetch('/api/crews'),
+      const [equipmentRes, crewRes] = await Promise.allSettled([
+        loadJson<{ data?: EquipmentOption[] }>('/api/equipment?limit=100'),
+        loadJson<{ data?: CrewOption[]; crews?: CrewOption[] }>('/api/crews'),
       ]);
       if (cancelled) return;
-      if (equipmentRes.ok) setEquipment(((await equipmentRes.json()).data ?? []) as EquipmentOption[]);
-      if (crewRes.ok) {
-        const body = await crewRes.json();
-        setCrews((body.data ?? body.crews ?? []) as CrewOption[]);
-      }
+
+      /*
+        Пустой выбор установки читался как «свободной техники нет», и смену
+        просто не заводили. Форма остаётся рабочей, но честно говорит, какой
+        список не прочитан.
+      */
+      const missing: string[] = [];
+      if (equipmentRes.status === 'fulfilled') setEquipment(equipmentRes.value.data ?? []);
+      else missing.push('установки');
+
+      if (crewRes.status === 'fulfilled') setCrews(crewRes.value.data ?? crewRes.value.crews ?? []);
+      else missing.push('бригады');
+
+      setReferenceError(missing.length ? `Не загружено: ${missing.join(', ')}. Выбор неполный.` : null);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -183,6 +194,8 @@ export function ShiftCreateForm({ timezone, backHref }: Props) {
       onSubmit={() => void submit()}
       busy={busy}
     >
+      {referenceError ? <QueryErrorBanner title="Справочники загружены не полностью" message={referenceError} /> : null}
+
       <FormSection title="Тип смены">
         <TilePicker name="Тип смены" value={type} options={SHIFT_TYPES} onChange={applyType} />
       </FormSection>

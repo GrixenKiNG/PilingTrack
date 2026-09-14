@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
-import { authFetch } from '@/lib/api';
+import { authFetch, isAbort, loadErrorMessage, loadJson } from '@/lib/api';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { MeterReadingDialog } from '@/components/piling/operator/meter-reading-dialog';
@@ -52,6 +53,7 @@ export function OperatorDashboard() {
   const [reports, setReports] = useState<ReportListItemDTO[]>([]);
   const [todayReport, setTodayReport] = useState<ReportListItemDTO | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [today, setToday] = useState('');
   const [meterOpen, setMeterOpen] = useState(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
@@ -77,36 +79,41 @@ export function OperatorDashboard() {
     if (!user) return;
     setLoading(true);
     try {
-      const [sitesRes, reportsRes, crewRes, shiftRes] = await Promise.all([
-        authFetch(`/api/sites?userId=${user.id}`),
-        authFetch(`/api/reports/my?userId=${user.id}`),
-        authFetch('/api/crews/my'),
-        authFetch('/api/operator/shift'),
+      const [sitesRes, reportsRes, crewRes, shiftRes] = await Promise.allSettled([
+        loadJson<{ data?: SiteFlatDTO[]; sites?: SiteFlatDTO[] }>(`/api/sites?userId=${user.id}`),
+        loadJson<{ data?: ReportListItemDTO[]; reports?: ReportListItemDTO[] }>(`/api/reports/my?userId=${user.id}`),
+        loadJson<{ crew?: { equipmentId: string; equipmentName: string } | null }>('/api/crews/my'),
+        loadJson<OperatorShiftFacts>('/api/operator/shift'),
       ]);
       // Контур готовности не должен ронять экран: без него оператор всё ещё
       // может вести отчёт, просто без подсказки о следующем шаге.
-      setShiftFacts(shiftRes.ok ? await shiftRes.json() : null);
-      if (crewRes.ok) {
-        const { crew: myCrew } = await crewRes.json();
+      setShiftFacts(shiftRes.status === 'fulfilled' ? shiftRes.value : null);
+
+      /*
+        Объекты, отчёты и бригада — то, по чему оператор решает, куда выходить
+        и что уже сдано. Пустой список при сбое чтения выглядел как «объектов
+        нет» и «отчётов нет»: показываем причину вместо выдуманного нуля.
+      */
+      if (crewRes.status === 'fulfilled') {
+        const myCrew = crewRes.value.crew;
         setCrew(myCrew ? { equipmentId: myCrew.equipmentId, equipmentName: myCrew.equipmentName } : null);
       }
-      if (sitesRes.ok) {
-        const sitesData = await sitesRes.json();
-        const accessibleSites = sitesData.data || sitesData.sites || [];
+      if (sitesRes.status === 'fulfilled') {
+        const accessibleSites = sitesRes.value.data || sitesRes.value.sites || [];
         setSites(accessibleSites);
         if (accessibleSites.length === 0) setSelectedSite(null);
         else if (!selectedSiteId || !accessibleSites.some((site: SiteFlatDTO) => site.id === selectedSiteId)) {
           setSelectedSite(accessibleSites[0].id);
         }
       }
-      if (reportsRes.ok) {
-        const reportsData = await reportsRes.json();
-        const items = reportsData.data || reportsData.reports || [];
+      if (reportsRes.status === 'fulfilled') {
+        const items = reportsRes.value.data || reportsRes.value.reports || [];
         setReports(items);
         setTodayReport(items.find((report: ReportListItemDTO) => report.date === today) || null);
       }
-    } catch {
-      toast.error('Ошибка загрузки данных');
+
+      const failed = [sitesRes, reportsRes, crewRes].find((result) => result.status === 'rejected');
+      setLoadError(failed && !isAbort(failed.reason) ? loadErrorMessage(failed.reason) : null);
     } finally {
       setLoading(false);
     }
@@ -143,6 +150,19 @@ export function OperatorDashboard() {
         <Skeleton className="h-12 w-48" />
         <Skeleton className="h-52 w-full rounded-2xl" />
         <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  /*
+    Оператор по этому экрану решает, куда выходить и что уже сдано. Пустые
+    списки после сбоя чтения выглядели как «объектов нет» и «отчётов нет» —
+    показываем причину и повтор вместо выдуманной пустоты.
+  */
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-xl p-4">
+        <QueryErrorBanner message={loadError} onRetry={() => void loadData()} />
       </div>
     );
   }

@@ -77,7 +77,7 @@ function toListItem(row: SiteOverviewRow): SiteListItem {
 export function AdminSites() {
   const canManage = useAbility('sites.manage');
   const { rows, loading, error, reload } = useSitesOverview();
-  const { sites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
+  const { sites, sitesError, reloadSites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
 
   const [quick, setQuick] = useState<QuickKey>('all');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -247,12 +247,17 @@ export function AdminSites() {
     />
   );
 
-  if (error) {
+  // Таблица собирается из двух источников — сбой любого делает её неполной.
+  if (error || sitesError) {
     return (
       <div className="min-h-full bg-muted/60 p-4 lg:p-6">
         <div className="space-y-4">
           {header}
-          <QueryErrorBanner title="Не удалось загрузить объекты" message={error} onRetry={reload} />
+          <QueryErrorBanner
+            title="Не удалось загрузить объекты"
+            message={error ?? sitesError ?? ''}
+            onRetry={() => { reload(); reloadSites(); }}
+          />
         </div>
       </div>
     );

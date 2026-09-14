@@ -47,7 +47,7 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, filterError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports,
   } = useReportsData();
 
@@ -241,6 +241,9 @@ export function AdminReports() {
             exporting={exporting}
             onCreate={mayManage ? () => { setEditReport(null); setShowCreateDialog(true); } : undefined}
           />
+
+          {/* Неполный отбор молчал: пустой фильтр объекта читался как «объектов нет». */}
+          {filterError ? <QueryErrorBanner title="Отбор загружен не полностью" message={filterError} /> : null}
 
           <EvidenceSummary
             reportCount={filteredReports.length}

@@ -89,6 +89,49 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
   return res;
 }
 
+/**
+ * Сбой загрузки — это не «данных нет».
+ *
+ * `authFetch` отдаёт ответ как есть, поэтому типовое `if (res.ok) setRows(...)`
+ * при 403/500 молча оставляло пустой список: экран писал «записей не найдено»
+ * там, где на самом деле не удалось прочитать. Хуже всего это на 403 — он не
+ * поднимает даже уведомление, а именно его получают механик и диспетчер.
+ *
+ * Читающие места берут данные через `loadJson`: не-ok ответ здесь всегда
+ * исключение, поэтому забыть про ошибку нельзя. Мутации остаются на
+ * `authFetch` — им нужно тело ошибки из не-ok ответа.
+ */
+export class LoadFailed extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'LoadFailed';
+  }
+}
+
+function loadFailureMessage(status: number): string {
+  if (status === 403) return 'Нет доступа к этим данным. Обратитесь к администратору.';
+  if (status === 404) return 'Данные не найдены.';
+  if (status >= 500) return 'Сервер временно недоступен.';
+  return 'Не удалось загрузить данные.';
+}
+
+/** Текст для пользователя: отказ сервера и обрыв связи объясняются одинаково понятно. */
+export function loadErrorMessage(cause: unknown): string {
+  if (cause instanceof LoadFailed) return cause.message;
+  return 'Нет соединения с сервером.';
+}
+
+/** Прерванный запрос — это не сбой: экран уже уходит, показывать нечего. */
+export function isAbort(cause: unknown): boolean {
+  return cause instanceof Error && cause.name === 'AbortError';
+}
+
+export async function loadJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const res = await authFetch(url, options);
+  if (!res.ok) throw new LoadFailed(res.status, loadFailureMessage(res.status));
+  return (await res.json()) as T;
+}
+
 export async function logoutClient() {
   try {
     await fetch('/api/auth/logout', {

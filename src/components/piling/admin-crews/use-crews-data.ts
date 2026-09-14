@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { authFetch } from '@/lib/api';
+import { authFetch, isAbort, loadErrorMessage, loadJson } from '@/lib/api';
 import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
 
 export interface UseCrewsDataReturn {
@@ -12,6 +12,11 @@ export interface UseCrewsDataReturn {
   equipmentList: EquipmentDTO[];
   sites: SiteDTO[];
   loading: boolean;
+  /** Список не прочитан. Пустая таблица в этом случае — враньё, показываем ошибку. */
+  loadError: string | null;
+  reloadCrews: () => void;
+  /** Справочники формы прочитать не удалось: форма работает, но выбор неполный. */
+  referenceError: string | null;
   loadingReferenceData: boolean;
   availableOperators: UserDTO[];
   assistantUsers: UserDTO[];
@@ -45,6 +50,9 @@ export function useCrewsData(): UseCrewsDataReturn {
   const [equipmentList, setEquipmentList] = useState<EquipmentDTO[]>([]);
   const [sites, setSites] = useState<SiteDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [crewsAttempt, setCrewsAttempt] = useState(0);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [loadingReferenceData, setLoadingReferenceData] = useState(false);
   const referenceDataLoadedRef = useRef(false);
   const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
@@ -61,35 +69,39 @@ export function useCrewsData(): UseCrewsDataReturn {
     const promise = (async () => {
       setLoadingReferenceData(true);
 
-      try {
-        const [usersRes, equipmentRes, sitesRes] = await Promise.all([
-          authFetch('/api/users'),
-          authFetch('/api/equipment'),
-          authFetch('/api/sites/all'),
-        ]);
+      /*
+        Справочники формы грузятся независимо: отказ одного не должен гасить
+        остальные. Но и молчать нельзя — пустой список операторов раньше
+        выглядел как «операторов нет», и бригаду просто не на кого было
+        завести без объяснения причины.
+      */
+      const missing: string[] = [];
+      const [usersRes, equipmentRes, sitesRes] = await Promise.allSettled([
+        loadJson<{ data?: UserDTO[]; users?: UserDTO[] }>('/api/users'),
+        loadJson<{ data?: EquipmentDTO[]; equipment?: EquipmentDTO[] }>('/api/equipment'),
+        loadJson<{ sites?: SiteDTO[] }>('/api/sites/all'),
+      ]);
 
-        if (usersRes.ok) {
-          const data = await usersRes.json();
-          setUsers(data.data || data.users || []);
-        }
+      if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data || usersRes.value.users || []);
+      else missing.push('сотрудники');
 
-        if (equipmentRes.ok) {
-          const data = await equipmentRes.json();
-          setEquipmentList(data.data || data.equipment || []);
-        }
+      if (equipmentRes.status === 'fulfilled') {
+        setEquipmentList(equipmentRes.value.data || equipmentRes.value.equipment || []);
+      } else missing.push('техника');
 
-        if (sitesRes.ok) {
-          const data = await sitesRes.json();
-          setSites(data.sites || []);
-        }
+      if (sitesRes.status === 'fulfilled') setSites(sitesRes.value.sites || []);
+      else missing.push('объекты');
 
+      if (missing.length === 0) {
         referenceDataLoadedRef.current = true;
-      } catch {
-        toast.error('Ошибка загрузки справочников для формы бригады');
-      } finally {
-        setLoadingReferenceData(false);
-        referenceDataPromiseRef.current = null;
+        setReferenceError(null);
+      } else {
+        // Не помечаем загруженным: при следующем открытии формы будет новая попытка.
+        setReferenceError(`Не загружено: ${missing.join(', ')}. Выбор в форме неполный.`);
       }
+
+      setLoadingReferenceData(false);
+      referenceDataPromiseRef.current = null;
     })();
 
     referenceDataPromiseRef.current = promise;
@@ -108,7 +120,7 @@ export function useCrewsData(): UseCrewsDataReturn {
       setLoading(true);
 
       try {
-        const crewsRes = await authFetch('/api/crews', {
+        const data = await loadJson<{ data?: CrewDTO[]; crews?: CrewDTO[] }>('/api/crews', {
           signal: abortController.signal,
         });
 
@@ -116,13 +128,12 @@ export function useCrewsData(): UseCrewsDataReturn {
           return;
         }
 
-        if (crewsRes.ok) {
-          const data = await crewsRes.json();
-          setCrews(data.data || data.crews || []);
-        }
+        setCrews(data.data || data.crews || []);
+        setLoadError(null);
       } catch (error: unknown) {
-        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
-          toast.error('Ошибка загрузки данных');
+        if (isMounted && !isAbort(error)) {
+          // Список остаётся пустым — значит вместо него показываем причину, а не «бригад нет».
+          setLoadError(loadErrorMessage(error));
         }
       } finally {
         if (isMounted) {
@@ -137,7 +148,7 @@ export function useCrewsData(): UseCrewsDataReturn {
       isMounted = false;
       abortController.abort();
     };
-  }, []);
+  }, [crewsAttempt]);
 
   const availableOperators = useMemo(
     () => users.filter(user => user.role === 'OPERATOR' && user.isActive),
@@ -240,6 +251,9 @@ export function useCrewsData(): UseCrewsDataReturn {
     equipmentList,
     sites,
     loading,
+    loadError,
+    reloadCrews: () => setCrewsAttempt((attempt) => attempt + 1),
+    referenceError,
     loadingReferenceData,
     availableOperators,
     assistantUsers,

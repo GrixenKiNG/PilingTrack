@@ -14,7 +14,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Layers, Hammer, RotateCw, ShoppingCart, Copy } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
-import { authFetch } from '@/lib/api';
+import { authFetch, loadErrorMessage, loadJson } from '@/lib/api';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -65,14 +66,17 @@ export function StartInspectionForm() {
   const [shift, setShift] = useState('');
   const [engineHours, setEngineHours] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const eqRes = await authFetch('/api/equipment?limit=100');
-      if (eqRes.ok) setEquipment(((await eqRes.json()).data ?? []) as EquipmentOption[]);
-    } catch {
-      toast.error('Не удалось загрузить технику');
+      const body = await loadJson<{ data?: EquipmentOption[] }>('/api/equipment?limit=100');
+      setEquipment(body.data ?? []);
+      setLoadError(null);
+    } catch (error) {
+      // Пустой выбор установки читался как «техники нет» — осмотр просто не заводили.
+      setLoadError(loadErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -169,8 +173,11 @@ export function StartInspectionForm() {
 
       <h1 className="mb-5 text-lg font-semibold text-foreground">Провести осмотр / ТО</h1>
 
+      {/* Без списка установок форма бессмысленна: показываем причину, а не пустой выбор. */}
       {loading ? (
         <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
+      ) : loadError ? (
+        <QueryErrorBanner message={loadError} onRetry={() => void load()} />
       ) : (
         <div className="space-y-4">
           <div>

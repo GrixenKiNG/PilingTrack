@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { authFetch } from '@/lib/api';
+import { authFetch, isAbort, loadErrorMessage, loadJson } from '@/lib/api';
 import type { PileGradeDTO } from '@/lib/types';
 import type { SiteListItem } from './types';
 
@@ -23,6 +23,8 @@ export function useSitesData() {
   const [users, setUsers] = useState<AdminSitesUser[]>([]);
   const [pileGrades, setPileGrades] = useState<PileGradeDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingPileGrades, setLoadingPileGrades] = useState(false);
 
@@ -39,17 +41,18 @@ export function useSitesData() {
       if (!isMounted) return;
       setLoading(true);
       try {
-        const sitesRes = await authFetch('/api/sites/all', { signal: abortController.signal });
+        const data = await loadJson<{ sites?: SiteListItem[] }>('/api/sites/all', {
+          signal: abortController.signal,
+        });
 
         if (!isMounted) return;
 
-        if (sitesRes.ok) {
-          const data = await sitesRes.json();
-          setSites(data.sites || []);
-        }
+        setSites(data.sites || []);
+        setLoadError(null);
       } catch (error: unknown) {
-        if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
-          toast.error('Ошибка загрузки данных');
+        if (isMounted && !isAbort(error)) {
+          // Пустой список объектов при сбое читался как «объектов нет».
+          setLoadError(loadErrorMessage(error));
         }
       } finally {
         if (isMounted) {
@@ -64,7 +67,7 @@ export function useSitesData() {
       isMounted = false;
       abortController.abort();
     };
-  }, []);
+  }, [attempt]);
 
   const loadUsers = useCallback(async () => {
     if (usersLoadedRef.current) return;
@@ -122,6 +125,12 @@ export function useSitesData() {
     users,
     pileGrades,
     loading,
+    /*
+      Таблица объектов строится из этого списка, а не из сводки: без него
+      экран показывал «объекты не найдены» даже когда не удалось прочитать.
+    */
+    sitesError: loadError,
+    reloadSites: () => setAttempt((value) => value + 1),
     loadingUsers,
     loadingPileGrades,
     loadUsers,

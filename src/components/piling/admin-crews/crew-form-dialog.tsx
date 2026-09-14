@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -41,6 +42,8 @@ interface CrewFormDialogProps {
   assistants: UserDTO[];
   excludeCrewId?: string;
   loadingReferenceData: boolean;
+  /** Часть справочников не прочитана — выбор неполный, но форма работает. */
+  referenceError: string | null;
   onSubmit: (data: {
     operatorId: string;
     equipmentId: string;
@@ -108,6 +111,7 @@ export function CrewFormDialog({
   sites,
   assistants,
   loadingReferenceData,
+  referenceError,
   onSubmit,
   submitting,
 }: CrewFormDialogProps) {
@@ -180,6 +184,9 @@ export function CrewFormDialog({
               {mode === 'edit' ? 'Редактировать бригаду' : 'Новая бригада'}
             </DialogTitle>
           </DialogHeader>
+
+          {/* Пустой выпадающий список без объяснения читается как «операторов нет». */}
+          {referenceError ? <QueryErrorBanner title="Справочники загружены не полностью" message={referenceError} /> : null}
 
           {loadingReferenceData ? (
             <div className="space-y-3 py-2">
