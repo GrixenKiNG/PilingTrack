@@ -28,25 +28,17 @@ import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { RefKpi } from './shared';
 import { EquipmentPermitMatrix } from './equipment-permit-matrix';
+import { EmployeeCard, type ClearanceRow } from './employee-card';
 import { usePilingStore } from '@/lib/store';
 import { resolveEffectiveRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
 import type { ReferenceUiProps } from './types';
 
-interface ClearanceRow {
-  userId: string;
-  name: string;
-  role: string;
-  cleared: boolean;
-  blockers: string[];
-  warnings: string[];
-  nextExpiryAt: string | null;
-  knowledge: { status: 'valid' | 'expired' | 'never'; validUntil: string | null; result: string | null };
-  lastInstructionAt: string | null;
-  acquainted: boolean;
-  pendingInstructions: string[];
-  overdueBriefings: string[];
-}
+// Строка допуска описана рядом с карточкой сотрудника (`./employee-card`):
+// список и карточка показывают один и тот же расчёт, и типу нельзя разойтись.
+// Состав полей: userId, name, role, cleared, blockers, warnings, nextExpiryAt,
+// knowledge{status,validUntil,result}, lastInstructionAt, acquainted,
+// pendingInstructions, overdueBriefings.
 
 interface ClearanceOverview {
   rows: ClearanceRow[];
@@ -84,6 +76,8 @@ export function SafetyScreen(props: ReferenceUiProps) {
   const [query, setQuery] = useState('');
   /** Выбранная строка: под таблицей раскрывается матрица допусков этого человека. */
   const [selected, setSelected] = useState<{ id: string; name: string } | null>(null);
+  /** Открытая карточка сотрудника: пока она открыта, список скрыт. */
+  const [cardRow, setCardRow] = useState<ClearanceRow | null>(null);
 
   const currentUser = usePilingStore((state) => state.currentUser);
   const actingAs = usePilingStore((state) => state.actingAs);
@@ -129,7 +123,16 @@ export function SafetyScreen(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle
+      {cardRow ? (
+        <EmployeeCard
+          row={cardRow}
+          editable={mayManage}
+          onBack={() => setCardRow(null)}
+          onGoTo={(view) => { setCardRow(null); props.onViewChange(view); }}
+        />
+      ) : (
+        <>
+          <ScreenTitle
         heading="ТБ и допуски"
         subtitle="Кто допущен к работе сегодня — по обязательным документам и проверке знаний"
         actions={(
@@ -298,6 +301,10 @@ export function SafetyScreen(props: ReferenceUiProps) {
                 <Button asChild variant="outline" className="h-8 text-2xs">
                   <Link href="/admin/users">Карточка</Link>
                 </Button>
+                <Button variant="outline" className="h-8 text-2xs"
+                  onClick={() => setCardRow(row)}>
+                  Карточка ТБ и допуски
+                </Button>
               </div>
             ))}
           </div>
@@ -317,6 +324,8 @@ export function SafetyScreen(props: ReferenceUiProps) {
         вкладке «Документы», история проведённых инструктажей — на вкладке «Инструктажи».
         {props.bootstrap?.tenant.timezone ? ` Время тенанта: ${props.bootstrap.tenant.timezone}.` : ''}
       </p>
+        </>
+      )}
     </>
   );
 }

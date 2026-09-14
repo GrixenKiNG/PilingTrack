@@ -15,9 +15,10 @@
  * каталогом, а срок — её периодичностью. Отдельная таблица «назначений»
  * добавила бы третий источник правды к двум уже имеющимся.
  *
- * ЧЕГО ЗДЕСЬ НЕТ. Плитки «Назначены проверки знаний»: проверку работник
- * проходит сам после ознакомления, и назначать её некому. Её место заняла
- * честная «ожидают подтверждения» — записи журнала без двух отметок.
+ * ПЛИТКА «НАЗНАЧЕНЫ ПРОВЕРКИ ЗНАНИЙ» И «ОЖИДАЮТ ПОДТВЕРЖДЕНИЯ» ЖИВУТ ВМЕСТЕ.
+ * Первая считает просроченные или вовсе не сданные проверки (тот же расчёт, что
+ * и в строке человека), вторая — записи журнала без двух отметок. Это разные
+ * вопросы, и обе плитки отвечают на свой.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -27,8 +28,10 @@ import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import {
-  BRIEFING_TYPE_LABELS, BRIEFING_TYPE_ORDER, type BriefingType,
+  BRIEFING_KIND_LABELS, BRIEFING_TYPE_LABELS, BRIEFING_TYPE_ORDER,
+  formatJournalMoment, type BriefingJournalEntry, type BriefingType,
 } from '@/modules/operator-mobile/contracts';
+import { SAFETY_INSTRUCTIONS } from '@/modules/safety/instructions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
@@ -49,6 +52,12 @@ interface ClearanceRow {
   acquainted: boolean;
   pendingInstructions: string[];
   overdueBriefings: string[];
+  /** Объект, к которому прикреплён работник. Появится, когда его отдаст API. */
+  siteName?: string;
+  /** Установка и тип допуска работника. */
+  equipment?: string;
+  /** Медосмотр: статус и дата окончания. */
+  medical?: { status: string; expiresAt: string | null } | null;
 }
 
 interface Overview {
@@ -68,10 +77,15 @@ interface AttentionItem {
   tone: 'danger' | 'warning' | 'info';
   title: string;
   who: string;
+  /** Момент события. Поле готово к данным API; сейчас остаётся пустым. */
+  when?: string;
 }
 
 /** Сколько строк показываем в каждой ленте: обзор, а не полный список. */
 const PREVIEW_LIMIT = 7;
+
+/** Сколько последних записей журнала выводим под сводкой. */
+const JOURNAL_PREVIEW_LIMIT = 5;
 
 /**
  * Лента событий строится из того же расчёта, что и таблица.
@@ -128,6 +142,8 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
   const [data, setData] = useState<Overview | null>(null);
   const [awaiting, setAwaiting] = useState<number | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [journal, setJournal] = useState<BriefingJournalEntry[]>([]);
+  const [journalLoading, setJournalLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -159,8 +175,31 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
     }
   }, []);
 
+  /**
+   * Последние записи журнала инструктажей — дополнение к сводке допусков.
+   *
+   * Загружаются отдельно от основного `load()`: сбой этой догрузки не должен
+   * гасить экран, допуски важнее. Пустой список и ошибка выглядят одинаково —
+   * «записей пока нет», и это осознанный компромисс.
+   */
+  const loadJournal = useCallback(async () => {
+    try {
+      const response = await authFetch('/api/briefings/journal');
+      if (!response.ok) return;
+      const body = await response.json() as { rows?: BriefingJournalEntry[] };
+      setJournal(body.rows ?? []);
+    } catch {
+      // Журнал — дополнение: его отсутствие не должно ломать обзор.
+    } finally {
+      setJournalLoading(false);
+    }
+  }, []);
+
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount; the async loaders set state
   useEffect(() => { void load(); void loadAwaiting(); }, [load, loadAwaiting]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- supplemental journal load on mount
+  useEffect(() => { void loadJournal(); }, [loadJournal]);
 
   const totals = data?.totals;
   const attention = data ? buildAttention(data.rows) : [];
@@ -172,13 +211,18 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
     <>
       <ScreenTitle
         heading="ТБ и допуски"
-        subtitle="Допуски сотрудников, журнал инструктажей и проверка знаний"
+        subtitle="Допуски сотрудников, журнал инструктажей, проверка знаний и ознакомление с инструкциями"
         actions={(
-          <Button variant="outline" onClick={() => { setData(null); void load(); void loadAwaiting(); }}>
+          <Button variant="outline" onClick={() => { setData(null); void load(); void loadAwaiting(); void loadJournal(); }}>
             Обновить
           </Button>
         )}
       />
+
+      <p className="mb-1 mt-1 inline-flex items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1 text-2xs font-bold tracking-wide text-success-strong">
+        <PilingIcon name="accepted" size={12} tone="success" decorative />
+        БЕЗОПАСНОСТЬ СЕГОДНЯ — СТАБИЛЬНАЯ РАБОТА ЗАВТРА
+      </p>
 
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(6)}>
         <RefKpi icon="accepted" label="Допущены к работе" tone="success"
@@ -196,6 +240,9 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
           detail="с действующей редакцией инструкции" />
         <RefKpi icon="accepted" label="Ожидают подтверждения" tone="info" value={awaiting ?? '—'}
           detail="записей журнала без двух отметок" />
+        <RefKpi icon="accepted" label="Назначены проверки знаний" tone="info"
+          value={totals?.knowledgeOverdue ?? '—'} alert={Boolean(totals?.knowledgeOverdue)}
+          detail="просрочена или не сдавалась" />
         <RefKpi icon="risk" label="Происшествия за месяц" tone="danger"
           value={data?.incidents.last30 ?? '—'}
           detail={data
@@ -247,7 +294,9 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                     </span>
                     <div className="min-w-0">
                       <div className="text-sm leading-snug">{item.title}</div>
-                      <div className="text-2xs text-muted-foreground">{item.who}</div>
+                      <div className="text-2xs text-muted-foreground">
+                        {item.who}{item.when ? ` · ${item.when}` : ''}
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -270,15 +319,19 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
               </button>
             </div>
             <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-2xs uppercase text-muted-foreground">
                     <th scope="col" className="py-2 pr-3 font-semibold">Сотрудник</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Роль</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Объект</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Установка / тип допуска</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Медосмотр</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Инструктаж</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Ознакомление</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Проверка знаний</th>
-                    <th scope="col" className="py-2 font-semibold">Статус допуска</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Статус допуска</th>
+                    <th scope="col" className="py-2 font-semibold">Действие</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -287,6 +340,17 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                       <td className="py-2 pr-3 font-medium">{row.name}</td>
                       <td className="py-2 pr-3 text-xs text-muted-foreground">
                         {ROLE_LABELS[row.role as UserRole] ?? row.role}
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap text-xs text-muted-foreground">
+                        {row.siteName || '—'}
+                      </td>
+                      <td className="py-2 pr-3 text-xs text-muted-foreground">
+                        {row.equipment || '—'}
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap text-xs">
+                        {row.medical
+                          ? `${row.medical.status}${row.medical.expiresAt ? ` · ${formatRuDate(row.medical.expiresAt)}` : ''}`
+                          : '—'}
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap text-xs">
                         <span className={row.overdueBriefings.length ? 'font-semibold text-destructive-strong' : ''}>
@@ -303,13 +367,19 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                           {row.knowledge.status === 'valid' ? 'Пройдена' : row.knowledge.status === 'expired' ? 'Просрочена' : 'Не сдавал'}
                         </span>
                       </td>
-                      <td className="py-2 whitespace-nowrap">
+                      <td className="py-2 pr-3 whitespace-nowrap">
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-2xs font-semibold',
                           row.cleared ? 'bg-success/10 text-success-strong' : 'bg-destructive/10 text-destructive-strong',
                         )}>
                           {row.cleared ? 'Допущен' : 'Нет допуска'}
                         </span>
+                      </td>
+                      <td className="py-2 whitespace-nowrap">
+                        <button type="button" onClick={() => props.onViewChange('employees')}
+                          className="text-xs font-medium text-info hover:underline">
+                          Все сотрудники →
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -358,11 +428,96 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                   <PilingIcon name="risk" size={14} decorative />
                   Происшествия
                 </Button>
+                <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('knowledge')}>
+                  <PilingIcon name="accepted" size={14} decorative />
+                  Назначить проверку знаний
+                </Button>
+                <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('instructions')}>
+                  <PilingIcon name="add" size={14} decorative />
+                  Добавить инструкцию
+                </Button>
+                <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('reports')}>
+                  <PilingIcon name="download" size={14} decorative />
+                  Сформировать выгрузку
+                </Button>
               </div>
+            </section>
+
+            <section className={cn(card, 'p-3')}>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-bold">Документы ТБ</h2>
+                <button type="button" onClick={() => props.onViewChange('documents')}
+                  className="text-xs font-medium text-info hover:underline">
+                  Все документы →
+                </button>
+              </div>
+              {/* Статическая библиотека инструкций: файлов нет, поэтому действие
+                  «скачать» здесь неуместно — только название, код и редакция. */}
+              <ul className="mt-2 divide-y divide-border">
+                {SAFETY_INSTRUCTIONS.map((instruction) => (
+                  <li key={instruction.code} className="flex items-center gap-2 py-2">
+                    <PilingIcon name="documents" size={14} tone="neutral" decorative />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm leading-snug">{instruction.title}</div>
+                      <div className="text-2xs text-muted-foreground">
+                        {instruction.code} · редакция {instruction.version}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </section>
           </div>
         </div>
       )}
+
+      <section className={cn(card, 'mt-3 p-3')}>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-bold">Последние записи в журнале инструктажей</h2>
+          <button type="button" onClick={() => props.onViewChange('briefings')}
+            className="text-xs font-medium text-info hover:underline">
+            Все записи →
+          </button>
+        </div>
+        {journalLoading && journal.length === 0 ? (
+          <div className="flex justify-center py-6 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
+        ) : journal.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Записей пока нет.</p>
+        ) : (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-2xs uppercase text-muted-foreground">
+                  <th scope="col" className="py-2 pr-3 font-semibold">Дата и время</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">Вид инструктажа</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">Сотрудник</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">Инструктор</th>
+                  <th scope="col" className="py-2 pr-3 font-semibold">Подпись</th>
+                  <th scope="col" className="py-2 font-semibold">Комментарий</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {journal.slice(0, JOURNAL_PREVIEW_LIMIT).map((row) => (
+                  <tr key={row.id}>
+                    <td className="py-2 pr-3 whitespace-nowrap text-xs">{formatJournalMoment(row.recordedAt)}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-xs">
+                      {row.type ? BRIEFING_TYPE_LABELS[row.type] : BRIEFING_KIND_LABELS[row.kind]}
+                    </td>
+                    <td className="py-2 pr-3 font-medium">{row.userName}</td>
+                    <td className="py-2 pr-3 text-xs text-muted-foreground">{row.instructorName}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-xs">
+                      <span className={row.employeeSignedAt ? 'text-success-strong' : 'text-muted-foreground'}>
+                        {row.employeeSignedAt ? '✓ Подписано' : '—'}
+                      </span>
+                    </td>
+                    <td className="py-2 text-xs text-muted-foreground">{row.reason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </>
   );
 }
