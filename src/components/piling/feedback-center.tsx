@@ -170,7 +170,11 @@ export function FeedbackCenter() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <button className="hit-target relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-muted">
+        <button
+          type="button"
+          aria-label="Открыть уведомления"
+          className="hit-target relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-muted"
+        >
           <Bell className="h-4.5 w-4.5 text-muted-foreground" />
           {/* destructive-strong, а не red-500: белым по red-500 на 10px
               контраст 3.81 — ниже нормы для мелкого текста. */}
