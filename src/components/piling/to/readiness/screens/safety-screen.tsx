@@ -27,6 +27,10 @@ import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { RefKpi } from './shared';
+import { EquipmentPermitMatrix } from './equipment-permit-matrix';
+import { usePilingStore } from '@/lib/store';
+import { resolveEffectiveRole } from '@/lib/types';
+import { can } from '@/services/auth/authorization-service';
 import type { ReferenceUiProps } from './types';
 
 interface ClearanceRow {
@@ -78,6 +82,17 @@ export function SafetyScreen(props: ReferenceUiProps) {
   const [data, setData] = useState<ClearanceOverview | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  /** Выбранная строка: под таблицей раскрывается матрица допусков этого человека. */
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null);
+
+  const currentUser = usePilingStore((state) => state.currentUser);
+  const actingAs = usePilingStore((state) => state.actingAs);
+  // Та же матрица прав, по которой откажет сервер: кнопку показываем только
+  // тому, кто действительно может выдать допуск.
+  const mayManage = can(
+    { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
+    'users.manage',
+  );
 
   const load = useCallback(async () => {
     try {
@@ -273,8 +288,13 @@ export function SafetyScreen(props: ReferenceUiProps) {
                   </div>
                 </div>
 
-                {/* Строка заканчивается действием: продлевают документы и
-                    заводят записи в карточке работника — туда и ведём. */}
+                {/* Матрица допусков раскрывается тут же: уводить ради неё на
+                    другой экран значит потерять место в списке. */}
+                <Button variant="outline" className="h-8 text-2xs"
+                  onClick={() => setSelected((current) =>
+                    current?.id === row.userId ? null : { id: row.userId, name: row.name })}>
+                  {selected?.id === row.userId ? 'Скрыть допуски' : 'Допуски к технике'}
+                </Button>
                 <Button asChild variant="outline" className="h-8 text-2xs">
                   <Link href="/admin/users">Карточка</Link>
                 </Button>
@@ -283,6 +303,12 @@ export function SafetyScreen(props: ReferenceUiProps) {
           </div>
         )}
       </section>
+
+      {selected && (
+        <div className="mt-2">
+          <EquipmentPermitMatrix userId={selected.id} userName={selected.name} editable={mayManage} />
+        </div>
+      )}
 
       <p className="mt-2 rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
         Допуск к смене держат обязательные документы: пока хоть один просрочен или отсутствует,

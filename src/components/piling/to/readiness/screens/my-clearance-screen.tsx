@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { RefKpi } from './shared';
+import { EquipmentPermitMatrix } from './equipment-permit-matrix';
 
 interface ClearanceDocument {
   typeId: string;
@@ -213,6 +214,11 @@ export function MyClearanceScreen() {
           )}
         </section>
       )}
+
+      {/* Свою матрицу работник ВИДИТ, но не правит: допуск к технике выдаёт
+          администратор, и кнопка правки у своего же допуска была бы дверью,
+          которую сервер всё равно закроет. */}
+      {data && <div className="mt-2"><EquipmentPermitMatrix editable={false} /></div>}
 
       {data && (
         <section className={cn(card, 'mt-2 p-3')}>

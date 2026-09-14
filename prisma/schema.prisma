@@ -118,6 +118,7 @@ model User {
   crewAssistantOf CrewAssistant[]      @relation("CrewAssistantUser")
   feedbackReads   FeedbackEventRead[]
   documents       UserDocument[]
+  equipmentPermits UserEquipmentPermit[]
   briefings       BriefingRecord[]
   placePresets    UserPlacePreset[]
   operatorChecklistTemplatesCreated OperatorChecklistTemplate[] @relation("OperatorChecklistTemplateCreatedBy")
@@ -310,6 +311,85 @@ model BriefingRecord {
   /// «Что провели сегодня по видам» — счётчики сводки, отдельный вопрос к тем
   /// же строкам.
   @@index([tenantId, type, recordedAt])
+}
+
+/// Вид работ, на который работнику даётся допуск к технике.
+///
+/// Перечисление, а не справочник: пять категорий заданы тем, что человек
+/// физически делает с машиной, и шестую организация не придумает. Появление
+/// новой означает новый код, который её учитывает (правило CLAUDE.md про
+/// enum→таблицу: это фича, а не уборка).
+enum EquipmentWorkScope {
+  OPERATION // управление
+  ASSEMBLY // монтаж и демонтаж
+  MAINTENANCE // обслуживание и ремонт
+  RIGGING // стропальные работы
+  SUPPORT // вспомогательные работы
+}
+
+/// Состояние допуска в матрице.
+///
+/// «Ограничен» — не полумера ради красоты: удостоверение часто даёт право
+/// работать с оговоркой (без подъёма людей, до определённой массы). Свести
+/// его к «допущен» значит потерять оговорку, к «не допущен» — запретить
+/// разрешённое.
+enum EquipmentPermitStatus {
+  ALLOWED
+  LIMITED
+  DENIED
+}
+
+/// Допуск РАБОТНИКА к технике: человек × вид техники × вид работ.
+///
+/// НЕ ПУТАТЬ С ТРЕМЯ СОСЕДНИМИ «ДОПУСКАМИ» ПРОДУКТА:
+///   • `WorkPermit` — наряд-допуск: документ на конкретные опасные работы в
+///     конкретную смену, с подписями. Живёт часами, здесь — годами.
+///   • допуск ТЕХНИКИ к смене (контур готовности) — про машину, не про людей.
+///   • `getOperatorClearance` — допуск по ДОКУМЕНТАМ (медосмотр, удостоверение):
+///     отвечает «можно ли этому человеку работать вообще», тогда как матрица
+///     отвечает «на чём именно и что делать».
+///
+/// ПОЧЕМУ ВИД ТЕХНИКИ, А НЕ КОНКРЕТНАЯ МАШИНА. Удостоверение выдают на тип
+/// машины, а не на инвентарный номер: купили вторую такую же — допуск не
+/// переоформляют. Поэтому ключ — `equipmentKind`, а `equipmentModel`
+/// необязателен и сужает допуск до одной модели, когда это действительно так
+/// («С-200», но не «С-150»). Пустая строка означает «весь вид».
+model UserEquipmentPermit {
+  id       String @id @default(cuid())
+  tenantId String
+  userId   String
+
+  equipmentKind EquipmentKind
+  /// Модель, если допуск сужен до неё. '' — весь вид техники.
+  equipmentModel String @default("")
+  scope          EquipmentWorkScope
+
+  status EquipmentPermitStatus @default(ALLOWED)
+  /// Чем именно ограничен допуск. Обязателен по смыслу при статусе LIMITED:
+  /// «ограничен» без объяснения нечитаем — проверка живёт в команде.
+  restriction String @default("")
+
+  /// До какой даты действует. null — бессрочно: такие допуски существуют, и
+  /// подставлять им выдуманный срок нельзя.
+  validUntil DateTime? @db.Timestamptz(3)
+  notes      String    @default("")
+
+  /// Кто выдал. ФИО снимком — переживёт переименование и удаление учётки, как
+  /// у ответственных в наряде-допуске. Внешнего ключа намеренно нет.
+  grantedById   String?
+  grantedByName String  @default("")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Restrict)
+
+  /// Одна строка на сочетание: два допуска «машинист × копёр × управление» с
+  /// разными сроками — это не история, а спор о том, какой действует.
+  /// Историю ведёт журнал изменений, а не дубли в матрице.
+  @@unique([tenantId, userId, equipmentKind, equipmentModel, scope])
+  @@index([tenantId, userId])
+  @@index([tenantId, validUntil])
 }
 
 // ============================================================
