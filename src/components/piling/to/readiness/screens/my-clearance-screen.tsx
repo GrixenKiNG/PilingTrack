@@ -39,6 +39,12 @@ interface SelfView {
     warnings: Array<{ label: string }>;
     documents: ClearanceDocument[];
   };
+  briefings: {
+    required: Array<{ code: string; title: string; version: string; repeatMonths: number }>;
+    pending: Array<{ code: string; title: string; version: string; reason: 'never' | 'outdated' }>;
+    overdue: Array<{ code: string; title: string; dueAt: string; daysOverdue: number }>;
+    lastBriefingAt: string | null;
+  };
   knowledgeValidUntil: string | null;
   history: Array<{
     id: string;
@@ -98,7 +104,7 @@ export function MyClearanceScreen() {
         )}
       />
 
-      <section className={COMPACT_KPI_GRID} style={kpiGridStyle(3)}>
+      <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi
           icon="accepted"
           label="Допуск к работе"
@@ -113,6 +119,15 @@ export function MyClearanceScreen() {
           tone="warning"
           value={clearance?.warnings.length ?? '—'}
           detail="документов требуют продления"
+        />
+        <RefKpi
+          icon="documents"
+          label="Инструктажи"
+          tone={data && (data.briefings.pending.length || data.briefings.overdue.length) ? 'warning' : 'success'}
+          value={data ? (data.briefings.pending.length + data.briefings.overdue.length || 'В норме') : '—'}
+          detail={data?.briefings.lastBriefingAt
+            ? `последний ${formatRuDate(data.briefings.lastBriefingAt)}`
+            : 'записей нет'}
         />
         <RefKpi
           icon="risk"
@@ -133,12 +148,29 @@ export function MyClearanceScreen() {
         <div className="flex justify-center py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
       )}
 
-      {clearance && (clearance.blockers.length > 0 || clearance.warnings.length > 0) && (
+      {data && clearance
+        && (clearance.blockers.length > 0 || clearance.warnings.length > 0
+          || data.briefings.pending.length > 0 || data.briefings.overdue.length > 0) && (
         <section className={cn(card, 'mt-2 p-3')}>
           <h2 className="font-bold">Что нужно сделать</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {clearance.blockers.map((issue) => (
               <li key={issue.label} className="text-destructive-strong">{issue.label}</li>
+            ))}
+            {/* Просроченный повторный инструктаж — нарушение, непрочитанная
+                редакция — задача на сегодня. Разные цвета, потому что разные
+                последствия. */}
+            {data.briefings.overdue.map((item) => (
+              <li key={`o-${item.code}`} className="text-destructive-strong">
+                Просрочен повторный инструктаж: {item.title} — {item.daysOverdue} дн.
+              </li>
+            ))}
+            {data.briefings.pending.map((item) => (
+              <li key={`p-${item.code}`} className="text-warning-strong">
+                {item.reason === 'never'
+                  ? `Не пройден инструктаж: ${item.title}`
+                  : `Вышла новая редакция ${item.version}: ${item.title} — прочитайте заново`}
+              </li>
             ))}
             {clearance.warnings.map((issue) => (
               <li key={issue.label} className="text-warning-strong">{issue.label}</li>
@@ -146,7 +178,8 @@ export function MyClearanceScreen() {
           </ul>
           <p className="mt-2 text-xs text-muted-foreground">
             Документы прикладывает администратор или инженер ОТ — обратитесь к ним, срок продления
-            бывает несколько недель.
+            бывает несколько недель. Инструктаж и проверку знаний вы проходите сами перед сменой на
+            своём рабочем экране.
           </p>
         </section>
       )}

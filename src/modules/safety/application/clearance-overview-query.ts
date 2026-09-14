@@ -32,6 +32,8 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { evaluateOperatorClearance } from '@/modules/users';
 import type { BriefingType } from '@/generated/postgres-client/client';
+import { SAFETY_INSTRUCTIONS } from '../instructions';
+import { evaluateBriefingRequirements } from '../domain/briefing-requirements';
 
 /**
  * Чей допуск вообще имеет смысл считать.
@@ -72,6 +74,23 @@ export interface SafetyClearanceRow {
   };
   /** Когда последний раз знакомился с инструкцией. null — никогда. */
   lastInstructionAt: string | null;
+  /**
+   * Ознакомлен ли со всеми обязательными его роли инструкциями в ДЕЙСТВУЮЩЕЙ
+   * редакции. Колонка «Ознакомление» из макета.
+   */
+  acquainted: boolean;
+  /** Названия инструкций, которые ждут прочтения. */
+  pendingInstructions: string[];
+  /** Просроченные повторные инструктажи, готовыми строками. */
+  overdueBriefings: string[];
+}
+
+/** Строка истории ознакомлений — ровно то, из чего считаются требования. */
+interface AcquaintanceEntry {
+  userId: string;
+  documentCode: string;
+  documentVersion: string;
+  recordedAt: Date;
 }
 
 /** Сколько инструктажей каждого вида провели за сегодня. */
@@ -95,6 +114,10 @@ export interface SafetyClearanceOverview {
     expiring: number;
     /** У скольких проверка знаний просрочена или не сдавалась. */
     knowledgeOverdue: number;
+    /** У скольких просрочен повторный инструктаж. Плитка макета. */
+    briefingsOverdue: number;
+    /** Скольким нужно прочитать новую или непрочитанную редакцию. */
+    awaitingAcquaintance: number;
   };
   /**
    * Заведён ли хоть один обязательный вид документа.
@@ -170,7 +193,18 @@ export async function querySafetyClearanceOverview(input: {
         }),
   ]);
 
-  const [todayGroups, incidentsLast30, incidentsPrevious30] = await Promise.all([
+  const [acquaintance, todayGroups, incidentsLast30, incidentsPrevious30] = await Promise.all([
+    // Для требований по инструктажам нужна ИСТОРИЯ ознакомлений, а не только
+    // последняя запись: «читал ли действующую редакцию» и «когда был
+    // последний инструктаж» — разные вопросы к разным строкам. Берём только
+    // то, из чего они считаются, — три поля.
+    userIds.length === 0
+      ? Promise.resolve<AcquaintanceEntry[]>([])
+      : db.briefingRecord.findMany({
+          where: { tenantId, kind: 'INSTRUCTION', userId: { in: userIds } },
+          select: { userId: true, documentCode: true, documentVersion: true, recordedAt: true },
+          orderBy: { recordedAt: 'desc' },
+        }),
     db.briefingRecord.groupBy({
       by: ['type'],
       where: {
@@ -193,6 +227,13 @@ export async function querySafetyClearanceOverview(input: {
   };
   for (const group of todayGroups) {
     if (group.type) todayByType[group.type] = group._count._all;
+  }
+
+  const historyByUser = new Map<string, AcquaintanceEntry[]>();
+  for (const entry of acquaintance) {
+    const own = historyByUser.get(entry.userId);
+    if (own) own.push(entry);
+    else historyByUser.set(entry.userId, [entry]);
   }
 
   const documentsByUser = new Map<string, Array<{ typeId: string; expiresAt: Date | null }>>();
@@ -218,6 +259,10 @@ export async function querySafetyClearanceOverview(input: {
       .filter((value): value is string => value != null)
       .map((value) => new Date(value).getTime())
       .filter((time) => !Number.isNaN(time));
+
+    const requirements = evaluateBriefingRequirements(
+      SAFETY_INSTRUCTIONS, user.role, historyByUser.get(user.id) ?? [], now,
+    );
 
     const knowledge = knowledgeByUser.get(user.id);
     const knowledgeStatus: KnowledgeStatus = !knowledge
@@ -247,6 +292,15 @@ export async function querySafetyClearanceOverview(input: {
           : null,
       },
       lastInstructionAt: instructionByUser.get(user.id)?.recordedAt.toISOString() ?? null,
+      // Роль без обязательных инструкций числится ознакомленной: требований к
+      // ней нет, и красить её в красное значило бы выдумать нарушение.
+      acquainted: requirements.pending.length === 0,
+      pendingInstructions: requirements.pending.map((item) =>
+        item.reason === 'never'
+          ? `Не ознакомлен: ${item.title}`
+          : `Новая редакция ${item.version}: ${item.title}`),
+      overdueBriefings: requirements.overdue.map((item) =>
+        `Просрочен повторный инструктаж: ${item.title} — ${item.daysOverdue} дн.`),
     };
   });
 
@@ -260,6 +314,8 @@ export async function querySafetyClearanceOverview(input: {
       blocked: rows.filter((row) => !row.cleared).length,
       expiring: rows.filter((row) => row.warnings.length > 0).length,
       knowledgeOverdue: rows.filter((row) => row.knowledge.status !== 'valid').length,
+      briefingsOverdue: rows.filter((row) => row.overdueBriefings.length > 0).length,
+      awaitingAcquaintance: rows.filter((row) => !row.acquainted).length,
     },
     requiredTypesConfigured: requiredTypes.length > 0,
   };

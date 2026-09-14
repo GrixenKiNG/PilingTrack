@@ -17,6 +17,10 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { getOperatorClearance, type OperatorClearance } from '@/modules/users';
+import { SAFETY_INSTRUCTIONS } from '../instructions';
+import {
+  evaluateBriefingRequirements, type BriefingRequirements,
+} from '../domain/briefing-requirements';
 
 /** Сколько последних записей журнала показываем человеку. */
 const HISTORY_LIMIT = 20;
@@ -35,6 +39,11 @@ export interface SelfBriefingRecord {
 export interface SelfSafetyView {
   /** Тот же расчёт, по которому сервер пускает смену. */
   clearance: OperatorClearance;
+  /**
+   * Что осталось пройти по инструктажам. Тот же расчёт, что видит инженер ОТ
+   * в сводке: человек и проверяющий должны читать про один день одно и то же.
+   */
+  briefings: BriefingRequirements;
   /** Последние записи журнала: ознакомления и проверки знаний вперемешку. */
   history: SelfBriefingRecord[];
   /** Действующая проверка знаний, если она есть. */
@@ -51,7 +60,11 @@ export async function querySelfSafetyView(input: {
   if (!input.userId) throw new ServiceError('userId is required', 400);
 
   const now = input.now ?? new Date();
-  const [clearance, records] = await Promise.all([
+  const [user, clearance, records, acquaintance] = await Promise.all([
+    db.user.findFirst({
+      where: { id: input.userId, tenantId: input.tenantId },
+      select: { role: true },
+    }),
     getOperatorClearance(input.tenantId, input.userId, now),
     db.briefingRecord.findMany({
       where: { tenantId: input.tenantId, userId: input.userId },
@@ -62,7 +75,18 @@ export async function querySelfSafetyView(input: {
       orderBy: { recordedAt: 'desc' },
       take: HISTORY_LIMIT,
     }),
+    // История ознакомлений берётся ОТДЕЛЬНО и без ограничения по числу строк.
+    // Считать требования по показанным двадцати записям нельзя: у человека с
+    // длинной историей нужное прочтение оказалось бы за краем выборки, и он
+    // без всякой причины попал бы в «ожидают ознакомления».
+    db.briefingRecord.findMany({
+      where: { tenantId: input.tenantId, userId: input.userId, kind: 'INSTRUCTION' },
+      select: { documentCode: true, documentVersion: true, recordedAt: true },
+      orderBy: { recordedAt: 'desc' },
+    }),
   ]);
+
+  if (!user) throw new ServiceError('Работник не найден', 404);
 
   // Действующей считаем самую свежую проверку знаний: старая с более длинным
   // сроком встречается после пересдачи и говорит не о том.
@@ -70,6 +94,7 @@ export async function querySelfSafetyView(input: {
 
   return {
     clearance,
+    briefings: evaluateBriefingRequirements(SAFETY_INSTRUCTIONS, user.role, acquaintance, now),
     knowledgeValidUntil: latestKnowledge?.validUntil?.toISOString() ?? null,
     history: records.map((record) => ({
       id: record.id,

@@ -8,12 +8,16 @@
  * допуск — состояние, а не события. Справа «что происходило сегодня»: счётчики
  * проведённых инструктажей по видам.
  *
- * ЧЕГО ЗДЕСЬ НЕТ И ПОЧЕМУ. На макете были плитки «Ожидают ознакомления» и
- * «Назначены проверки знаний». Их не существует в данных: понятия «назначено»
- * в системе нет — ознакомление происходит, когда работник открыл инструкцию
- * сам. Нарисовать число значило бы поставить выдуманную цифру на экран,
- * которым решают, кого пускать на площадку. Плитки появятся вместе с
- * назначениями.
+ * ПЛИТКИ СЧИТАЮТСЯ, А НЕ ХРАНЯТСЯ. «Ожидают ознакомления» — это работники, не
+ * читавшие ДЕЙСТВУЮЩУЮ редакцию обязательной им инструкции; «просроченные
+ * инструктажи» — те, у кого со дня последнего прошло больше срока повторного.
+ * Ни того, ни другого не нужно назначать: обязательность инструкции задана её
+ * каталогом, а срок — её периодичностью. Отдельная таблица «назначений»
+ * добавила бы третий источник правды к двум уже имеющимся.
+ *
+ * ЧЕГО ЗДЕСЬ НЕТ. Плитки «Назначены проверки знаний»: проверку работник
+ * проходит сам после ознакомления, и назначать её некому. Её место заняла
+ * честная «ожидают подтверждения» — записи журнала без двух отметок.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -42,13 +46,19 @@ interface ClearanceRow {
   nextExpiryAt: string | null;
   knowledge: { status: 'valid' | 'expired' | 'never'; validUntil: string | null };
   lastInstructionAt: string | null;
+  acquainted: boolean;
+  pendingInstructions: string[];
+  overdueBriefings: string[];
 }
 
 interface Overview {
   rows: ClearanceRow[];
   todayByType: Record<BriefingType, number>;
   incidents: { last30: number; previous30: number };
-  totals: { people: number; cleared: number; blocked: number; expiring: number; knowledgeOverdue: number };
+  totals: {
+    people: number; cleared: number; blocked: number; expiring: number;
+    knowledgeOverdue: number; briefingsOverdue: number; awaitingAcquaintance: number;
+  };
   requiredTypesConfigured: boolean;
 }
 
@@ -75,6 +85,16 @@ function buildAttention(rows: ClearanceRow[]): AttentionItem[] {
   for (const row of rows) {
     for (const blocker of row.blockers) {
       items.push({ id: `${row.userId}-b-${blocker}`, icon: 'defect', tone: 'danger', title: blocker, who: row.name });
+    }
+  }
+  for (const row of rows) {
+    for (const overdue of row.overdueBriefings) {
+      items.push({ id: `${row.userId}-o-${overdue}`, icon: 'risk', tone: 'danger', title: overdue, who: row.name });
+    }
+  }
+  for (const row of rows) {
+    for (const pending of row.pendingInstructions) {
+      items.push({ id: `${row.userId}-p-${pending}`, icon: 'documents', tone: 'warning', title: pending, who: row.name });
     }
   }
   for (const row of rows) {
@@ -160,7 +180,7 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
         )}
       />
 
-      <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
+      <section className={COMPACT_KPI_GRID} style={kpiGridStyle(6)}>
         <RefKpi icon="accepted" label="Допущены к работе" tone="success"
           value={totals ? `${totals.cleared} из ${totals.people}` : '—'}
           detail="все обязательные документы действуют" />
@@ -168,7 +188,13 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
           alert={Boolean(totals?.blocked)} detail="работать нельзя до продления" />
         <RefKpi icon="history" label="Истекают допуски" tone="warning" value={totals?.expiring ?? '—'}
           detail="в окне предупреждения" />
-        <RefKpi icon="documents" label="Ожидают подтверждения" tone="info" value={awaiting ?? '—'}
+        <RefKpi icon="risk" label="Просроченные инструктажи" tone="danger"
+          value={totals?.briefingsOverdue ?? '—'} alert={Boolean(totals?.briefingsOverdue)}
+          detail="повторный не проведён в срок" />
+        <RefKpi icon="documents" label="Ожидают ознакомления" tone="warning"
+          value={totals?.awaitingAcquaintance ?? '—'}
+          detail="с действующей редакцией инструкции" />
+        <RefKpi icon="accepted" label="Ожидают подтверждения" tone="info" value={awaiting ?? '—'}
           detail="записей журнала без двух отметок" />
         <RefKpi icon="risk" label="Происшествия за месяц" tone="danger"
           value={data?.incidents.last30 ?? '—'}
@@ -250,6 +276,7 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                     <th scope="col" className="py-2 pr-3 font-semibold">Сотрудник</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Роль</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Инструктаж</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Ознакомление</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Проверка знаний</th>
                     <th scope="col" className="py-2 font-semibold">Статус допуска</th>
                   </tr>
@@ -262,7 +289,14 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                         {ROLE_LABELS[row.role as UserRole] ?? row.role}
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap text-xs">
-                        {row.lastInstructionAt ? formatRuDate(row.lastInstructionAt) : '—'}
+                        <span className={row.overdueBriefings.length ? 'font-semibold text-destructive-strong' : ''}>
+                          {row.lastInstructionAt ? formatRuDate(row.lastInstructionAt) : '—'}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-3 whitespace-nowrap text-xs">
+                        <span className={row.acquainted ? 'text-success-strong' : 'text-warning-strong'}>
+                          {row.acquainted ? 'Да' : 'Нет'}
+                        </span>
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap text-xs">
                         <span className={row.knowledge.status === 'valid' ? 'text-success-strong' : 'text-warning-strong'}>

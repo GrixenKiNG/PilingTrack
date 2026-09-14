@@ -39,11 +39,17 @@ interface ClearanceRow {
   nextExpiryAt: string | null;
   knowledge: { status: 'valid' | 'expired' | 'never'; validUntil: string | null; result: string | null };
   lastInstructionAt: string | null;
+  acquainted: boolean;
+  pendingInstructions: string[];
+  overdueBriefings: string[];
 }
 
 interface ClearanceOverview {
   rows: ClearanceRow[];
-  totals: { people: number; cleared: number; blocked: number; expiring: number; knowledgeOverdue: number };
+  totals: {
+    people: number; cleared: number; blocked: number; expiring: number;
+    knowledgeOverdue: number; briefingsOverdue: number; awaitingAcquaintance: number;
+  };
   requiredTypesConfigured: boolean;
 }
 
@@ -59,9 +65,13 @@ const KNOWLEDGE_LABEL: Record<ClearanceRow['knowledge']['status'], string> = {
  */
 function severity(row: ClearanceRow): number {
   if (!row.cleared) return 0;
-  if (row.knowledge.status !== 'valid') return 1;
-  if (row.warnings.length > 0) return 2;
-  return 3;
+  // Просроченный повторный инструктаж — нарушение, а не предупреждение: он
+  // идёт сразу за отсутствием допуска и раньше непройденной проверки знаний.
+  if (row.overdueBriefings.length > 0) return 1;
+  if (!row.acquainted) return 2;
+  if (row.knowledge.status !== 'valid') return 3;
+  if (row.warnings.length > 0) return 4;
+  return 5;
 }
 
 export function SafetyScreen(props: ReferenceUiProps) {
@@ -112,7 +122,7 @@ export function SafetyScreen(props: ReferenceUiProps) {
         )}
       />
 
-      <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
+      <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
         <RefKpi
           icon="accepted"
           label="Допущены к работе"
@@ -134,6 +144,13 @@ export function SafetyScreen(props: ReferenceUiProps) {
           tone="warning"
           value={totals?.expiring ?? '—'}
           detail="в пределах срока предупреждения"
+        />
+        <RefKpi
+          icon="documents"
+          label="Ожидают ознакомления"
+          tone="warning"
+          value={totals?.awaitingAcquaintance ?? '—'}
+          detail="не читали действующую редакцию"
         />
         <RefKpi
           icon="risk"
@@ -218,6 +235,12 @@ export function SafetyScreen(props: ReferenceUiProps) {
                   {row.blockers.map((blocker) => (
                     <div key={blocker} className="mt-1 text-xs text-destructive-strong">{blocker}</div>
                   ))}
+                  {row.overdueBriefings.map((overdue) => (
+                    <div key={overdue} className="mt-1 text-xs text-destructive-strong">{overdue}</div>
+                  ))}
+                  {row.pendingInstructions.map((pending) => (
+                    <div key={pending} className="mt-1 text-xs text-warning-strong">{pending}</div>
+                  ))}
                   {row.warnings.map((warning) => (
                     <div key={warning} className="mt-1 text-xs text-warning-strong">{warning}</div>
                   ))}
@@ -241,8 +264,12 @@ export function SafetyScreen(props: ReferenceUiProps) {
 
                 <div className="w-36 shrink-0 text-xs">
                   <div className="text-muted-foreground">Инструктаж</div>
-                  <div className="font-semibold">
+                  <div className={cn('font-semibold',
+                    row.overdueBriefings.length ? 'text-destructive-strong' : '')}>
                     {row.lastInstructionAt ? formatRuDate(row.lastInstructionAt) : 'нет записей'}
+                  </div>
+                  <div className={row.acquainted ? 'text-success-strong' : 'text-warning-strong'}>
+                    {row.acquainted ? 'ознакомлен' : 'ждёт ознакомления'}
                   </div>
                 </div>
 
