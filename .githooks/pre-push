@@ -16,6 +16,11 @@
 #
 #   git push --no-verify
 #
+# Runs `npm run verify:push`, NOT the full `npm run verify`: the build step
+# (inside typecheck) is what catches dead barrel re-exports — that is kept.
+# The 2006 unit tests and the auth smoke run in CI right after the push, so
+# duplicating them here only costs push latency. Owner decision 2026-09-15.
+#
 # Skipped automatically when LOCAL=0 commits are being pushed
 # (no-op pushes, branch deletions).
 
@@ -34,10 +39,10 @@ if [ "$have_changes" -eq 0 ]; then
   exit 0
 fi
 
-echo "→ pre-push: running verify (lint + typecheck + tests + build + smoke)"
+echo "→ pre-push: running verify:push (migrations + layers + lint + typecheck/build)"
 echo "  bypass with: git push --no-verify"
 echo
 
 # Run from repo root.
 cd "$(git rev-parse --show-toplevel)"
-npm run verify
+npm run verify:push
