@@ -29,6 +29,7 @@
     "test:load:spike": "npx k6 run scripts/load-test.js --vus 100 --duration 30s",
     "verify": "npm run db:check-migrations && npm run check:layers && npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run test:smoke:auth-access",
     "verify:push": "npm run db:check-migrations && npm run check:layers && npm run lint && npm run typecheck",
+    "verify:push:fast": "npm run db:check-migrations && npm run check:layers && npm run lint",
     "db:check-migrations": "node scripts/check-migrations.js",
     "check:layers": "tsx scripts/check-layer-boundaries.ts",
     "cleanup:local": "powershell -ExecutionPolicy Bypass -File scripts/cleanup-local-artifacts.ps1",

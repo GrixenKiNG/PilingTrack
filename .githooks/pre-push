@@ -2,7 +2,7 @@
 #
 # Pre-push hook — fail fast before barrel-export breakage reaches the
 # remote (and from there, prod). vitest covers individual imports but
-# NOT the full compile graph; only `npm run build` catches dead
+# NOT the full compile graph; only a real build catches dead
 # re-exports in barrel index.ts files. See lessons-learned 2026-05-21:
 # the deleted modules/reports/application/event-bus.ts was still
 # re-exported from modules/reports/index.ts:60, vitest stayed green,
@@ -16,22 +16,52 @@
 #
 #   git push --no-verify
 #
-# Runs `npm run verify:push`, NOT the full `npm run verify`: the build step
-# (inside typecheck) is what catches dead barrel re-exports — that is kept.
-# The 2006 unit tests and the auth smoke run in CI right after the push, so
-# duplicating them here only costs push latency. Owner decision 2026-09-15.
+# WHAT RUNS (owner decision 2026-09-15, revised same day):
 #
-# Skipped automatically when LOCAL=0 commits are being pushed
+#   push touches compiled code  -> npm run verify:push       (~4.5 min)
+#     = migrations + layers + lint + typecheck (which builds)
+#   push touches only docs/etc  -> npm run verify:push:fast  (~40 s)
+#     = migrations + layers + lint
+#
+# The build is the slow part AND the only thing that catches dead barrel
+# re-exports, so it is kept whenever compiled code moves and skipped when
+# nothing compiled changed. The 2006 unit tests and the auth smoke are NOT
+# run here — CI runs them right after the push, so duplicating them locally
+# only costs push latency.
+#
+# "Compiled code" = src/, prisma/, scripts/, package.json, package-lock.json,
+# and the next/ts/eslint config files. When the range cannot be determined
+# (new branch with no remote counterpart), the FULL check runs — fail safe.
+#
+# Skipped automatically when no commits are being pushed
 # (no-op pushes, branch deletions).
 
 set -euo pipefail
 
-# Read git's stdin to detect deletion / no-op push.
+cd "$(git rev-parse --show-toplevel)"
+
+ZERO="0000000000000000000000000000000000000000"
 have_changes=0
-while read -r _local_ref _local_sha _remote_ref _remote_sha; do
-  zero="0000000000000000000000000000000000000000"
-  if [ "$_local_sha" != "$zero" ]; then
-    have_changes=1
+needs_build=0
+undetermined=0
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue   # branch deletion
+  have_changes=1
+
+  if [ "$remote_sha" = "$ZERO" ]; then
+    # New branch on the remote: no reliable base to diff against.
+    undetermined=1
+    continue
+  fi
+
+  if ! changed="$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)"; then
+    undetermined=1
+    continue
+  fi
+
+  if printf '%s\n' "$changed" | grep -qE '^(src/|prisma/|scripts/|package(-lock)?\.json$|next\.config\.|tsconfig|eslint\.config\.|vitest\.config\.)'; then
+    needs_build=1
   fi
 done
 
@@ -39,10 +69,20 @@ if [ "$have_changes" -eq 0 ]; then
   exit 0
 fi
 
-echo "→ pre-push: running verify:push (migrations + layers + lint + typecheck/build)"
+if [ "$undetermined" -eq 1 ]; then
+  echo "→ pre-push: push range undetermined (new branch) — running FULL check"
+  needs_build=1
+fi
+
 echo "  bypass with: git push --no-verify"
 echo
 
-# Run from repo root.
-cd "$(git rev-parse --show-toplevel)"
-npm run verify:push
+if [ "$needs_build" -eq 1 ]; then
+  echo "→ pre-push: compiled code changed — verify:push (migrations + layers + lint + typecheck/build)"
+  echo
+  npm run verify:push
+else
+  echo "→ pre-push: no compiled code in this push — verify:push:fast (migrations + layers + lint)"
+  echo
+  npm run verify:push:fast
+fi
