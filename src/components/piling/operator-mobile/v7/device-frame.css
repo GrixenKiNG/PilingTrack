@@ -1,0 +1,213 @@
+/* ============================================================================
+   Корпус телефона для операторских экранов.
+
+   ПОЧЕМУ ТОЛЬКО НА ШИРОКОМ ЭКРАНЕ. Экраны машиниста, v2 и v5 уже полноэкранные
+   мобильные: у них свой заголовок, свой прилипший низ и безопасные зоны. На
+   настоящем телефоне вторая рамка отняла бы место, нарисованный статус-бар лёг
+   бы поверх системного, а нижнее меню оказалось бы вторым подряд. Поэтому до
+   560 px обёртка не делает ничего вовсе — боевой контур не меняется ни на
+   пиксель. На мониторе она собирает тот же корпус, что на баннерах
+   визуализации, чтобы макет и живой экран сверялись рядом.
+   ========================================================================== */
+
+/*
+ * До 560 px обёртки нет вовсе: `display: contents` убирает её собственный блок,
+ * и экран остаётся прямым потомком страницы — ровно как без рамки.
+ *
+ * Внутренние блоки тоже обязаны исчезнуть, а статус-бар — спрятаться совсем.
+ * `display: contents` на родителе потомков не убирает: без этих двух строк
+ * нарисованный статус-бар оставался на экране телефона вторым, поверх
+ * системного (поймано при проверке 15.09.2026).
+ */
+.opdev,
+.opdev .opdev-body,
+.opdev .opdev-host {
+  display: contents;
+}
+
+.opdev .opdev-status,
+.opdev .opdev-home {
+  display: none;
+}
+
+@media (min-width: 560px) {
+  .opdev {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 24px 16px;
+    background: radial-gradient(1200px 500px at 50% -10%, #e8eef6 0%, #f5f6f8 60%);
+  }
+
+  .opdev .opdev-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 375px;
+    height: min(812px, calc(100dvh - 48px));
+    flex: 0 0 auto;
+    border-radius: 42px;
+    border: 9px solid #1b2430;
+    background: #ffffff;
+    box-shadow: 0 18px 40px rgba(16, 30, 54, 0.22);
+    overflow: hidden;
+  }
+
+  .opdev .opdev-body::before {
+    /* Вырез динамика — как в макете. */
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 108px;
+    height: 22px;
+    border-radius: 0 0 999px 999px;
+    background: #1b2430;
+    z-index: 30;
+  }
+
+  .opdev .opdev-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    height: 40px;
+    padding: 0 18px 0 22px;
+    background: #0d2b4e;
+    color: #fff;
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /*
+   * Низ корпуса: полоса жеста, как на баннерах визуализации. Без неё телефон
+   * выглядел обрезанным — вырез сверху есть, а снизу ничего.
+   *
+   * Полоса лежит ПОВЕРХ содержимого и не перехватывает нажатия
+   * (`pointer-events: none`): собственный док экрана прижат к тому же низу, и
+   * отдельная строка под ним съела бы у него место.
+   */
+  .opdev .opdev-home {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    height: 20px;
+    padding-bottom: 7px;
+    pointer-events: none;
+  }
+
+  .opdev .opdev-home i {
+    display: block;
+    width: 134px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(20, 30, 45, 0.28);
+  }
+
+  /* Место под полосу, чтобы она не легла на последнюю строку дока. */
+  .opdev .opdev-host { padding-bottom: 14px; }
+
+  .opdev .opdev-status .icons { display: flex; align-items: center; gap: 6px; }
+  .opdev .opdev-status .bars { display: flex; align-items: flex-end; gap: 1.5px; height: 10px; }
+  .opdev .opdev-status .bars i { display: block; width: 2.5px; border-radius: 1px; background: #fff; }
+  .opdev .opdev-status .bars i:nth-child(1) { height: 4px; }
+  .opdev .opdev-status .bars i:nth-child(2) { height: 6px; }
+  .opdev .opdev-status .bars i:nth-child(3) { height: 8px; }
+  .opdev .opdev-status .bars i:nth-child(4) { height: 10px; }
+
+  .opdev .opdev-status .battery {
+    position: relative;
+    width: 22px;
+    height: 11px;
+    border: 1.5px solid #fff;
+    border-radius: 3px;
+  }
+  .opdev .opdev-status .battery::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: -3px;
+    width: 2px;
+    height: 3px;
+    border-radius: 0 1px 1px 0;
+    background: #fff;
+  }
+  .opdev .opdev-status .battery i { position: absolute; inset: 1.5px; border-radius: 1px; background: #fff; }
+
+  .opdev .opdev-host {
+    /*
+     * Обязательно `block`: снаружи медиазапроса он `display: contents`.
+     *
+     * И именно `block`, а не `flex`. Flex-контейнер здесь ломает
+     * `position: sticky` у прижатого низа боевого экрана: футер с главным
+     * действием переставал прилипать и уезжал на 2400 px вниз (поймано
+     * 15.09.2026). Высоту детям задаём процентами, а не flex-цепочкой.
+     */
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /*
+   * Экраны внутри объявлены на всю высоту ОКНА (`min-height: 100dvh`). В корпусе
+   * это больше самого корпуса: экран вылезает за нижний край, появляется скролл
+   * там, где содержимое на самом деле помещается, а прижатый к низу док с
+   * главным действием уезжает из виду.
+   *
+   * `min-height: 100%` растягивает экран на корпус и позволяет ему вырасти
+   * выше — тогда прокручивается `.opdev-host`. Значит скролл появляется ровно
+   * тогда, когда содержимое не помещается, и не появляется, когда помещается.
+   *
+   * `!important` перебивает служебный класс утилитарного CSS (у него тот же вес)
+   * и `100dvh` из стилей макета. Правило живёт только внутри рамки и только на
+   * широком экране.
+   */
+  .opdev .opdev-host > * {
+    min-height: 100% !important;
+    height: 100%;
+  }
+
+  /*
+   * У v5 до содержимого три уровня: `.v5` → `.v5-shell` → `.app`, и `100dvh`
+   * объявлен на двух нижних. Процент разрешается только против ПРЕДКА С
+   * ОПРЕДЕЛЁННОЙ высотой, поэтому середине цепочки высоту задаём явно — иначе
+   * `.app` не узнает высоту корпуса, док перестанет прижиматься к низу, а
+   * скролл появится там, где содержимое на самом деле помещается.
+   *
+   * `.app` оставляем на `min-height`: так он заполняет корпус, когда экран
+   * короткий, и растёт, когда длинный.
+   */
+  .opdev .opdev-host .v5-shell {
+    /*
+     * `block`, а не flex. Оболочка макета — flex-контейнер со `stretch` по
+     * умолчанию, и он растягивал `.app` РОВНО по своей высоте: длинный экран
+     * упирался в потолок корпуса, содержимое вываливалось наружу, а док
+     * оказывался посреди него. Блочной оболочке растягивать нечего.
+     *
+     * Центрировать тоже больше нечего: ширину `.app` ниже снимаем, он занимает
+     * весь корпус.
+     */
+    display: block;
+    min-height: 100% !important;
+    height: 100%;
+  }
+
+  .opdev .opdev-host .v5 .app {
+    min-height: 100% !important;
+    /* Ширину макет ограничивает сам (`max-width: 430px`); в корпусе места ровно
+       375 px, и ограничение только мешает. */
+    max-width: none;
+    width: 100%;
+  }
+}

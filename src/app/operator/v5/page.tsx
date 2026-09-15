@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import {Oswald, PT_Sans} from 'next/font/google';
 import {OperatorV5App} from '@/components/piling/operator-v5/operator-v5-app';
+import {DeviceFrame} from '@/components/piling/operator-mobile/v7/device-frame';
 import './operator-v5-screens.css';
 import './operator-v5-app.css';
 
@@ -29,8 +30,10 @@ export const metadata: Metadata = {title: 'Смена оператора'};
  */
 export default function OperatorV5Page() {
   return (
-    <div className={`v5 ${oswald.variable} ${ptSans.variable}`}>
-      <OperatorV5App />
-    </div>
+    <DeviceFrame>
+      <div className={`v5 ${oswald.variable} ${ptSans.variable}`}>
+        <OperatorV5App />
+      </div>
+    </DeviceFrame>
   );
 }
