@@ -1,0 +1,384 @@
+/* ============================================================================
+   Модуль оператора v7 — дизайн-система визуализации на живых данных.
+
+   Токены и компоненты перенесены из прототипа
+   `docs/operator-module/site/operator-module.css`. Отличие одно и намеренное:
+   каркаса телефона здесь нет. Прототип рисовал 36 макетов на одном борде, и
+   рамка отделяла их друг от друга; на настоящем телефоне рамка внутри рамки
+   съедает и без того узкий экран. Всё под `.ov7`, чтобы не задеть ни живой
+   `/operator`, ни макеты v2/v5.
+   ========================================================================== */
+
+.ov7 {
+  --navy: #0d2b4e;
+  --navy-2: #16324e;
+  --blue: #1565c0;
+  --blue-2: #1256b4;
+  --blue-tint: #e8f1fb;
+  --green: #2f9e44;
+  --green-tint: #e9f6ee;
+  --amber: #e8a33d;
+  --amber-tint: #fef6e2;
+  --red: #c62828;
+  --red-2: #e8402f;
+  --red-tint: #fce7e6;
+  --ink: #1c2b3a;
+  --muted: #7a8699;
+  --muted-2: #8a94a6;
+  --line: #e4e8ee;
+  --field: #f1f3f6;
+  --bg: #f5f6f8;
+  --white: #ffffff;
+  --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.05);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.42;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ov7 *,
+.ov7 *::before,
+.ov7 *::after { box-sizing: border-box; }
+
+.ov7 svg { width: 18px; height: 18px; flex: 0 0 auto; }
+
+/* --------------------------------------------------------------- шапка --- */
+.ov7 .head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 10px 16px 12px;
+  background: var(--navy);
+  color: #fff;
+}
+
+.ov7 .head .top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ov7 .head .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #cfe0f4;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ov7 .head .sync { color: #9fb8d4; font-weight: 500; }
+
+.ov7 .head .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: var(--green);
+  vertical-align: 1px;
+}
+
+.ov7 .head .dot.off { background: var(--amber); }
+
+.ov7 .head h1 {
+  margin: 10px 0 2px;
+  font-size: 19px;
+  line-height: 1.24;
+  font-weight: 700;
+}
+
+.ov7 .head .sub { color: #b9cde4; font-size: 12px; }
+
+/* ------------------------------------------------------------ таймлайн --- */
+.ov7 .tl { display: flex; gap: 6px; margin-top: 12px; }
+
+.ov7 .tl .ph {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 3px solid rgba(255, 255, 255, 0.22);
+  color: #9fb8d4;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov7 .tl .ph.done { border-top-color: var(--green); color: #d6ead9; }
+.ov7 .tl .ph.now { border-top-color: #ffffff; color: #ffffff; }
+
+/* ---------------------------------------------------------------- тело --- */
+.ov7 .body {
+  flex: 1 1 auto;
+  padding: 14px 14px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ov7 .card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.ov7 .card > .ct {
+  padding: 11px 13px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ov7 .card > .cb { padding: 11px 13px; display: flex; flex-direction: column; gap: 10px; }
+
+/* --------------------------------------------------------------- строки --- */
+.ov7 .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-top: 1px solid var(--line);
+}
+
+.ov7 .card > .row:first-child,
+.ov7 .card > .ct + .row { border-top: 0; }
+
+.ov7 .row .num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #b9c3cf;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ov7 .row.done .num { background: var(--green); }
+.ov7 .row.now .num { background: var(--blue); }
+.ov7 .row.now { background: var(--blue-tint); }
+
+/* Заголовок и подпись строки — блочные.
+   Строчными они слипались в одну строку: `margin-top` на строчном элементе
+   не работает вовсе. Дефект прототипа, пойман при сверке 15.09.2026. */
+.ov7 .row .rb { flex: 1 1 auto; min-width: 0; }
+.ov7 .row .rb .t { display: block; font-size: 13px; font-weight: 700; color: var(--ink); }
+.ov7 .row .rb .s { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+/* ---------------------------------------------------------------- чипы --- */
+.ov7 .chip {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--field);
+  color: var(--muted);
+}
+
+.ov7 .chip.ok { background: var(--green-tint); color: var(--green); }
+.ov7 .chip.warn { background: var(--amber-tint); color: #a86a10; }
+.ov7 .chip.bad { background: var(--red-tint); color: var(--red); }
+.ov7 .chip.info { background: var(--blue-tint); color: var(--blue-2); }
+
+/* ------------------------------------------------------------- баннеры --- */
+.ov7 .banner {
+  display: flex;
+  gap: 9px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+
+.ov7 .banner .bt { font-size: 12.5px; font-weight: 700; }
+.ov7 .banner .bs { margin-top: 2px; font-size: 11px; color: var(--muted); }
+.ov7 .banner .br { margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--ink); }
+
+.ov7 .banner.info { background: var(--blue-tint); border-color: #cfe0f4; }
+.ov7 .banner.ok { background: var(--green-tint); border-color: #c9e7d2; }
+.ov7 .banner.warn { background: var(--amber-tint); border-color: var(--amber); }
+.ov7 .banner.bad { background: var(--red-tint); border-color: #f2c4c1; }
+
+.ov7 .banner.warn svg { color: #a86a10; }
+.ov7 .banner.bad svg { color: var(--red); }
+.ov7 .banner.ok svg { color: var(--green); }
+.ov7 .banner.info svg { color: var(--blue); }
+
+/* -------------------------------------------------------------- метрики --- */
+.ov7 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+.ov7 .metric {
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.ov7 .metric .mv { font-size: 19px; font-weight: 700; line-height: 1.1; }
+.ov7 .metric .ml { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+.ov7 .metric .mx { margin-top: 2px; font-size: 10.5px; color: var(--blue-2); font-weight: 600; }
+
+/* ----------------------------------------------------------- пары полей --- */
+.ov7 .pairs { display: flex; flex-direction: column; gap: 8px; }
+
+.ov7 .pair {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+.ov7 .pair .pl { color: var(--muted); }
+.ov7 .pair .pv { font-weight: 700; text-align: right; }
+
+/* -------------------------------------------------------------- секции --- */
+.ov7 .sect { border-top: 1px solid var(--line); }
+.ov7 .card > .sect:first-child { border-top: 0; }
+
+.ov7 .sect .sh {
+  padding: 9px 13px;
+  background: #fafbfc;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.ov7 .item {
+  display: flex;
+  gap: 9px;
+  padding: 9px 13px;
+  border-top: 1px solid var(--line);
+}
+
+.ov7 .item .bul {
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--muted-2);
+}
+
+.ov7 .item.alert .bul { background: var(--red-2); }
+/* Блочные по той же причине, что и `.row .rb .t/.s`: строчными текст пункта и
+   подсказка слипаются в одну строку, а `margin-top` на строчном не действует. */
+.ov7 .item .it { display: block; font-size: 12.5px; font-weight: 600; }
+.ov7 .item .ih { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+/* --------------------------------------------------------------- пусто --- */
+.ov7 .empty {
+  padding: 22px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* --------------------------------------------------------------- низ --- */
+.ov7 .tabs {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--line);
+  background: var(--white);
+}
+
+.ov7 .tabs button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  border: 0;
+  background: none;
+  color: var(--muted-2);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ov7 .tabs button.on { color: var(--blue); }
+
+.ov7 .tabs button .cnt {
+  position: absolute;
+  transform: translate(12px, -3px);
+  min-width: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red-2);
+  color: #fff;
+  font-size: 9.5px;
+  line-height: 15px;
+}
+
+/* --------------------------------------------------------- состояния --- */
+.ov7 .state {
+  margin: auto;
+  padding: 28px 22px;
+  max-width: 340px;
+  text-align: center;
+}
+
+.ov7 .state h2 { margin: 0 0 6px; font-size: 16px; }
+.ov7 .state p { margin: 0 0 14px; color: var(--muted); }
+
+.ov7 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ov7 .btn.ghost {
+  background: var(--white);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+/* Широкий экран — держим колонку телефонной ширины по центру, чтобы макет
+   не растягивался на весь монитор при проверке с ноутбука. */
+@media (min-width: 560px) {
+  .ov7 .head,
+  .ov7 .body,
+  .ov7 .tabs { width: 100%; max-width: 480px; margin-inline: auto; }
+  .ov7 { align-items: center; }
+  .ov7 > * { width: 100%; }
+}
