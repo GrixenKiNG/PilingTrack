@@ -1,12 +1,13 @@
 /* ============================================================================
-   Модуль оператора v7 — дизайн-система визуализации на живых данных.
+   Модуль оператора v7 — дизайн-система визуализации.
 
-   Токены и компоненты перенесены из прототипа
-   `docs/operator-module/site/operator-module.css`. Отличие одно и намеренное:
-   каркаса телефона здесь нет. Прототип рисовал 36 макетов на одном борде, и
-   рамка отделяла их друг от друга; на настоящем телефоне рамка внутри рамки
-   съедает и без того узкий экран. Всё под `.ov7`, чтобы не задеть ни живой
-   `/operator`, ни макеты v2/v5.
+   Токены и компоненты перенесены из макета `docs/operator-module/`. Каркас
+   телефона здесь двойной по назначению: на настоящем телефоне экран идёт во всю
+   ширину (рамка внутри рамки съедает и без того узкое место), на широком окне
+   раскладка рисует корпус с вырезом — ровно как на баннерах визуализации,
+   чтобы макет и живой экран можно было сверять рядом.
+
+   Всё под `.ov7`, чтобы не задеть ни рабочий `/operator`, ни макеты v2/v5.
    ========================================================================== */
 
 .ov7 {
@@ -15,10 +16,12 @@
   --blue: #1565c0;
   --blue-2: #1256b4;
   --blue-tint: #e8f1fb;
+  --blue-line: #cfe0f4;
   --green: #2f9e44;
   --green-tint: #e9f6ee;
   --amber: #e8a33d;
   --amber-tint: #fef6e2;
+  --amber-ink: #a86a10;
   --red: #c62828;
   --red-2: #e8402f;
   --red-tint: #fce7e6;
@@ -29,16 +32,13 @@
   --field: #f1f3f6;
   --bg: #f5f6f8;
   --white: #ffffff;
+  --bezel: #1b2430;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.05);
 
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-  background: var(--bg);
-  color: var(--ink);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
   line-height: 1.42;
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -48,40 +48,121 @@
 
 .ov7 svg { width: 18px; height: 18px; flex: 0 0 auto; }
 
-/* --------------------------------------------------------------- шапка --- */
-.ov7 .head {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  padding: 10px 16px 12px;
-  background: var(--navy);
-  color: #fff;
+/* ---------------------------------------------------------------- сцена --- */
+/* Телефон: приложение во весь экран, без подложки и рамки. */
+.ov7 .stage {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
 }
 
-.ov7 .head .top {
+.ov7 .device {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.ov7 .viewport {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ----------------------------------------------------------- статус-бар --- */
+.ov7 .statusbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 18px 0 22px;
+  padding-top: env(safe-area-inset-top);
+  height: calc(40px + env(safe-area-inset-top));
+  background: var(--navy);
+  color: #fff;
   font-size: 12px;
   font-weight: 600;
 }
 
-.ov7 .head .back {
+.ov7 .statusbar .icons { display: flex; align-items: center; gap: 6px; }
+
+.ov7 .statusbar .bars { display: flex; align-items: flex-end; gap: 1.5px; height: 10px; }
+.ov7 .statusbar .bars i {
+  display: block;
+  width: 2.5px;
+  border-radius: 1px;
+  background: #fff;
+}
+.ov7 .statusbar .bars i:nth-child(1) { height: 4px; }
+.ov7 .statusbar .bars i:nth-child(2) { height: 6px; }
+.ov7 .statusbar .bars i:nth-child(3) { height: 8px; }
+.ov7 .statusbar .bars i:nth-child(4) { height: 10px; }
+
+.ov7 .statusbar .battery {
+  width: 22px;
+  height: 11px;
+  position: relative;
+  border: 1.5px solid #fff;
+  border-radius: 3px;
+}
+.ov7 .statusbar .battery::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: -3px;
+  width: 2px;
+  height: 3px;
+  border-radius: 0 1px 1px 0;
+  background: #fff;
+}
+.ov7 .statusbar .battery i {
+  position: absolute;
+  inset: 1.5px;
+  border-radius: 1px;
+  background: #fff;
+}
+
+/* --------------------------------------------------------------- шапка --- */
+.ov7 .navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+}
+
+.ov7 .navbar .back {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   padding: 0;
   border: 0;
   background: none;
-  color: #cfe0f4;
+  color: var(--blue);
   font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.ov7 .head .sync { color: #9fb8d4; font-weight: 500; }
+/* Обе строки блочные: строчными «Онлайн» и «Синхронизировано 09:13» слипаются
+   в одну строку. Третий случай той же ошибки в этом макете — правило вынесено
+   в комментарий, чтобы четвёртого не было. */
+.ov7 .navbar .sync { text-align: right; font-size: 10.5px; line-height: 1.3; }
+.ov7 .navbar .sync .st { display: block; font-weight: 700; color: var(--ink); }
+.ov7 .navbar .sync .sd { display: block; color: var(--muted); }
 
-.ov7 .head .dot {
+.ov7 .navbar .dot {
   display: inline-block;
   width: 7px;
   height: 7px;
@@ -90,45 +171,58 @@
   background: var(--green);
   vertical-align: 1px;
 }
+.ov7 .navbar .dot.off { background: var(--amber); }
 
-.ov7 .head .dot.off { background: var(--amber); }
-
-.ov7 .head h1 {
-  margin: 10px 0 2px;
-  font-size: 19px;
-  line-height: 1.24;
-  font-weight: 700;
+/* ------------------------------------------------------------ заголовок --- */
+.ov7 .title {
+  flex: 0 0 auto;
+  padding: 14px 16px 10px;
+  background: var(--white);
 }
 
-.ov7 .head .sub { color: #b9cde4; font-size: 12px; }
+.ov7 .title h1 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.ov7 .title p { margin: 5px 0 0; color: var(--muted); font-size: 12.5px; }
 
 /* ------------------------------------------------------------ таймлайн --- */
-.ov7 .tl { display: flex; gap: 6px; margin-top: 12px; }
+.ov7 .tl {
+  display: flex;
+  gap: 5px;
+  padding: 0 16px 12px;
+  background: var(--white);
+}
 
 .ov7 .tl .ph {
   flex: 1 1 0;
   min-width: 0;
-  padding-top: 6px;
-  border-top: 3px solid rgba(255, 255, 255, 0.22);
-  color: #9fb8d4;
-  font-size: 10px;
-  font-weight: 600;
+  padding-top: 5px;
+  border-top: 3px solid var(--line);
+  color: var(--muted-2);
+  font-size: 9.5px;
+  font-weight: 700;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ov7 .tl .ph.done { border-top-color: var(--green); color: #d6ead9; }
-.ov7 .tl .ph.now { border-top-color: #ffffff; color: #ffffff; }
+.ov7 .tl .ph.done { border-top-color: var(--green); color: var(--green); }
+.ov7 .tl .ph.now { border-top-color: var(--blue); color: var(--blue); }
 
 /* ---------------------------------------------------------------- тело --- */
 .ov7 .body {
   flex: 1 1 auto;
-  padding: 14px 14px 22px;
+  padding: 12px 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 11px;
+  background: var(--bg);
 }
 
 .ov7 .card {
@@ -141,7 +235,7 @@
 
 .ov7 .card > .ct {
   padding: 11px 13px 0;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -155,9 +249,18 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 13px;
+  width: 100%;
+  padding: 11px 13px;
+  border: 0;
   border-top: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
 }
+
+.ov7 button.row { cursor: pointer; }
+.ov7 button.row:disabled { cursor: default; opacity: 0.65; }
 
 .ov7 .card > .row:first-child,
 .ov7 .card > .ct + .row { border-top: 0; }
@@ -166,8 +269,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: #b9c3cf;
@@ -178,14 +281,18 @@
 
 .ov7 .row.done .num { background: var(--green); }
 .ov7 .row.now .num { background: var(--blue); }
-.ov7 .row.now { background: var(--blue-tint); }
+.ov7 .row.now { background: var(--blue-tint); box-shadow: inset 0 0 0 1px var(--blue-line); }
 
-/* Заголовок и подпись строки — блочные.
-   Строчными они слипались в одну строку: `margin-top` на строчном элементе
-   не работает вовсе. Дефект прототипа, пойман при сверке 15.09.2026. */
-.ov7 .row .rb { flex: 1 1 auto; min-width: 0; }
-.ov7 .row .rb .t { display: block; font-size: 13px; font-weight: 700; color: var(--ink); }
-.ov7 .row .rb .s { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+/* Заголовок с подписью — где угодно, а не только в строке списка.
+   Правило намеренно не привязано к `.row`: тот же блок стоит и в вариантах
+   выбора, и привязка к одному родителю уже дважды давала слипшийся текст.
+   Блочность обязательна: строчными они идут в одну строку, а `margin-top`
+   на строчном элементе не действует вовсе. */
+.ov7 .rb { flex: 1 1 auto; min-width: 0; }
+.ov7 .rb .t { display: block; font-size: 13px; font-weight: 700; }
+.ov7 .rb .s { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+.ov7 .row .caret { color: var(--muted-2); font-size: 15px; }
 
 /* ---------------------------------------------------------------- чипы --- */
 .ov7 .chip {
@@ -200,7 +307,7 @@
 }
 
 .ov7 .chip.ok { background: var(--green-tint); color: var(--green); }
-.ov7 .chip.warn { background: var(--amber-tint); color: #a86a10; }
+.ov7 .chip.warn { background: var(--amber-tint); color: var(--amber-ink); }
 .ov7 .chip.bad { background: var(--red-tint); color: var(--red); }
 .ov7 .chip.info { background: var(--blue-tint); color: var(--blue-2); }
 
@@ -216,17 +323,12 @@
 
 .ov7 .banner .bt { font-size: 12.5px; font-weight: 700; }
 .ov7 .banner .bs { margin-top: 2px; font-size: 11px; color: var(--muted); }
-.ov7 .banner .br { margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--ink); }
+.ov7 .banner .br { margin-top: 4px; font-size: 11px; font-weight: 700; }
 
-.ov7 .banner.info { background: var(--blue-tint); border-color: #cfe0f4; }
+.ov7 .banner.info { background: var(--blue-tint); border-color: var(--blue-line); }
 .ov7 .banner.ok { background: var(--green-tint); border-color: #c9e7d2; }
 .ov7 .banner.warn { background: var(--amber-tint); border-color: var(--amber); }
 .ov7 .banner.bad { background: var(--red-tint); border-color: #f2c4c1; }
-
-.ov7 .banner.warn svg { color: #a86a10; }
-.ov7 .banner.bad svg { color: var(--red); }
-.ov7 .banner.ok svg { color: var(--green); }
-.ov7 .banner.info svg { color: var(--blue); }
 
 /* -------------------------------------------------------------- метрики --- */
 .ov7 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -238,9 +340,9 @@
   background: var(--white);
 }
 
-.ov7 .metric .mv { font-size: 19px; font-weight: 700; line-height: 1.1; }
+.ov7 .metric .mv { font-size: 19px; font-weight: 800; line-height: 1.1; }
 .ov7 .metric .ml { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
-.ov7 .metric .mx { margin-top: 2px; font-size: 10.5px; color: var(--blue-2); font-weight: 600; }
+.ov7 .metric .mx { margin-top: 2px; font-size: 10.5px; color: var(--blue-2); font-weight: 700; }
 
 /* ----------------------------------------------------------- пары полей --- */
 .ov7 .pairs { display: flex; flex-direction: column; gap: 8px; }
@@ -263,122 +365,283 @@
 .ov7 .sect .sh {
   padding: 9px 13px;
   background: #fafbfc;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--muted);
 }
 
-.ov7 .item {
-  display: flex;
-  gap: 9px;
-  padding: 9px 13px;
-  border-top: 1px solid var(--line);
-}
+/* ---------------------------------------------- пункты осмотра и выбор --- */
+.ov7 .item { padding: 10px 13px; border-top: 1px solid var(--line); }
 
-.ov7 .item .bul {
-  width: 6px;
-  height: 6px;
-  margin-top: 6px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--muted-2);
-}
-
-.ov7 .item.alert .bul { background: var(--red-2); }
-/* Блочные по той же причине, что и `.row .rb .t/.s`: строчными текст пункта и
-   подсказка слипаются в одну строку, а `margin-top` на строчном не действует. */
-.ov7 .item .it { display: block; font-size: 12.5px; font-weight: 600; }
+.ov7 .item .it { display: block; font-size: 12.5px; font-weight: 700; }
 .ov7 .item .ih { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
 
-/* --------------------------------------------------------------- пусто --- */
-.ov7 .empty {
-  padding: 22px 14px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 12.5px;
-}
+.ov7 .answers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
 
-/* --------------------------------------------------------------- низ --- */
-.ov7 .tabs {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-top: 1px solid var(--line);
+.ov7 .answers button {
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
   background: var(--white);
-}
-
-.ov7 .tabs button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-  border: 0;
-  background: none;
-  color: var(--muted-2);
+  color: var(--muted);
   font: inherit;
-  font-size: 10.5px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.ov7 .tabs button.on { color: var(--blue); }
+.ov7 .answers button.on.ok { background: var(--green-tint); border-color: var(--green); color: var(--green); }
+.ov7 .answers button.on.remark { background: var(--amber-tint); border-color: var(--amber); color: var(--amber-ink); }
+.ov7 .answers button.on.fault { background: var(--red-tint); border-color: var(--red-2); color: var(--red); }
 
-.ov7 .tabs button .cnt {
-  position: absolute;
-  transform: translate(12px, -3px);
-  min-width: 15px;
-  padding: 0 4px;
+/* -------------------------------------------------------- поля и выбор --- */
+.ov7 .field { display: flex; flex-direction: column; gap: 5px; }
+
+.ov7 .field > label { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+
+.ov7 input[type="text"],
+.ov7 input[type="number"],
+.ov7 textarea,
+.ov7 select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px; /* ниже 16px iOS Safari масштабирует страницу при фокусе */
+}
+
+.ov7 textarea { min-height: 84px; resize: vertical; }
+
+.ov7 input:focus-visible,
+.ov7 textarea:focus-visible,
+.ov7 select:focus-visible,
+.ov7 button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+/* Радио-строка макета: кружок слева, подпись, синяя подсветка выбранной. */
+.ov7 .pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ov7 .pick .mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border: 2px solid #c3ccd8;
   border-radius: 999px;
-  background: var(--red-2);
+  background: var(--white);
+}
+
+.ov7 .pick.on { border-color: var(--blue); background: var(--blue-tint); }
+.ov7 .pick.on .mark { border-color: var(--blue); }
+.ov7 .pick.on .mark::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--blue);
+}
+
+.ov7 .pick.box .mark { border-radius: 5px; }
+.ov7 .pick.box.on .mark { background: var(--blue); border-color: var(--blue); }
+.ov7 .pick.box.on .mark::after {
+  content: "✓";
+  width: auto;
+  height: auto;
+  background: none;
   color: #fff;
-  font-size: 9.5px;
-  line-height: 15px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
 }
 
-/* --------------------------------------------------------- состояния --- */
-.ov7 .state {
-  margin: auto;
-  padding: 28px 22px;
-  max-width: 340px;
-  text-align: center;
-}
+.ov7 .picks { display: flex; flex-direction: column; gap: 7px; }
 
-.ov7 .state h2 { margin: 0 0 6px; font-size: 16px; }
-.ov7 .state p { margin: 0 0 14px; color: var(--muted); }
-
+/* --------------------------------------------------------------- кнопки --- */
 .ov7 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   width: 100%;
+  min-height: 48px;
   padding: 12px 14px;
   border: 0;
   border-radius: 10px;
   background: var(--blue);
   color: #fff;
   font: inherit;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.ov7 .btn.ghost {
-  background: var(--white);
-  border: 1px solid var(--line);
-  color: var(--ink);
+.ov7 .btn:disabled { opacity: 0.55; cursor: default; }
+.ov7 .btn.ghost { background: var(--white); border: 1px solid var(--line); color: var(--ink); }
+.ov7 .btn.soft { background: var(--blue-tint); color: var(--blue-2); }
+.ov7 .btn.danger { background: var(--red-2); color: #fff; }
+
+.ov7 .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+/* ------------------------------------------------------- красная кнопка --- */
+.ov7 .incident {
+  flex: 0 0 auto;
+  padding: 9px 14px 10px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
 }
 
-/* Широкий экран — держим колонку телефонной ширины по центру, чтобы макет
-   не растягивался на весь монитор при проверке с ноутбука. */
+/* --------------------------------------------------------- нижнее меню --- */
+.ov7 .dock {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--line);
+  background: var(--white);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.ov7 .dock button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 52px;
+  padding: 7px 2px 8px;
+  border: 0;
+  background: none;
+  color: var(--muted-2);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ov7 .dock button.on { color: var(--blue); }
+
+/* Центральная кнопка «ТБ» приподнята — как в макете. */
+.ov7 .dock button.mid .glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-top: -13px;
+  border-radius: 11px;
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(21, 101, 192, 0.35);
+}
+
+.ov7 .dock button.mid.on .glyph { background: var(--blue-2); }
+
+.ov7 .dock .badge {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(4px);
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red-2);
+  color: #fff;
+  font-size: 9.5px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------- пусто --- */
+.ov7 .empty { padding: 22px 14px; text-align: center; color: var(--muted); font-size: 12.5px; }
+
+.ov7 .state { margin: auto; padding: 28px 22px; text-align: center; }
+.ov7 .state h2 { margin: 0 0 6px; font-size: 16px; }
+.ov7 .state p { margin: 0 0 14px; color: var(--muted); }
+
+.ov7 .note { font-size: 11.5px; color: var(--muted); }
+
+/* ------------------------------------------------------------ прогресс --- */
+.ov7 .bar {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--field);
+  overflow: hidden;
+}
+
+.ov7 .bar i { display: block; height: 100%; border-radius: 999px; background: var(--blue); }
+
+/* --------------------------------------------------------------- итог --- */
+.ov7 .seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 74px;
+  height: 74px;
+  margin: 4px auto 10px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 36px;
+  font-weight: 800;
+}
+
+/* ================================================== широкий экран: корпус ===
+   На мониторе показываем телефон целиком — тот же корпус, что на баннерах
+   визуализации, чтобы макет и живой экран сверялись один в один. */
 @media (min-width: 560px) {
-  .ov7 .head,
-  .ov7 .body,
-  .ov7 .tabs { width: 100%; max-width: 480px; margin-inline: auto; }
-  .ov7 { align-items: center; }
-  .ov7 > * { width: 100%; }
+  .ov7 .stage {
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background:
+      radial-gradient(1200px 500px at 50% -10%, #e8eef6 0%, #f5f6f8 60%);
+  }
+
+  .ov7 .device {
+    position: relative;
+    width: 375px;
+    height: min(812px, calc(100dvh - 48px));
+    flex: 0 0 auto;
+    border-radius: 42px;
+    border: 9px solid var(--bezel);
+    box-shadow: 0 18px 40px rgba(16, 30, 54, 0.22);
+  }
+
+  .ov7 .device::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 108px;
+    height: 22px;
+    border-radius: 0 0 999px 999px;
+    background: var(--bezel);
+    z-index: 5;
+  }
+
+  .ov7 .statusbar { height: 40px; padding-top: 0; }
+  .ov7 .dock { padding-bottom: 0; }
 }
