@@ -54,6 +54,7 @@ docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_
 |---|---|---|---|---|
 | **2026-07-17** | `pilingtrack-20260717-033347.sql.gz` (221 KB) | ✅ Без ошибок. 58 таблиц; Report=131, Crew=8, Equipment=8, User=13, Media(equipment)=19, ModuleLayoutTemplate=7, SiteWeeklyTrend=17; last migration `20260712090000_tenant_settings` (= v2.7.0). Дамп захватил данные, загруженные накануне (фото техники, раскладки) — цикл «изменение → ночной бэкап → восстановление» подтверждён. | ~1 с (БД 16 МБ) | Claude + владелец |
 | **2026-08-13** — **источник: off-site копия из R2**, а не файл с VPS | `pilingtrack-20260813-033928.sql.gz` (253 KB) | ✅ Без ошибок. Копия скачана из `R2:pilingtrack/db-backups/`, sha256 совпал с ночным дампом на VPS (`2b48de3f…`), `pg_restore --list` показал 481 объект. Восстановлено в чистую `pilingtrack_r2drill`: 58 таблиц; Report=153, Crew=8, Equipment=8, User=13, Inspection=1, MaintenanceRecord=1; last migration `20260712090000_tenant_settings`, применено 35 из 54 миграций репозитория (прод на v2.8.0). Всего в R2 44 копии, 9.85 МБ. | ~1 с | Claude |
+| **2026-09-15** — **проверялась модель прав, а не данные** | `local_pilingtrack_test_20260913_102831.sql.gz` | ⚠️ Данные и RLS возвращаются, **гранты — нет**. Из одного дампа поднято две базы: `drill_full` (как есть) и `drill_norights` (с вырезанными `GRANT`/`OWNER TO` — это ровно то, что делает `pg_restore --no-owner --no-privileges` из процедуры выше). В обеих одинаково: 73 политики, 73 таблицы с RLS, 73 с FORCE, Report=205. Но `grants_to_app`: **320 против 0**. Негативный тест от роли `pilingtrack_app`: в `drill_full` без тенант-контекста → 0 строк (fail-closed ✅), с `app.current_tenant=orion` → 204, с чужим тенантом → 0 (изоляция ✅); в `drill_norights` → `ERROR: permission denied for table Report`. Вывод: процедура выше даёт корректную и защищённую базу, к которой **приложение не может подключиться**. | ~40 с | Claude |
 
 ## Ограничения (честно)
 
@@ -81,3 +82,53 @@ docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_
 
   Дальше — обычная процедура выше, но `scp` берёт файл из `/tmp/r2pull/`, а
   не из `/var/backups/`. Не забыть `rm -rf /tmp/r2pull` в конце.
+
+## ⚠️ Гранты не переживают восстановление (проверено 15.09.2026)
+
+Процедура выше восстанавливает **данные и защиту**, но не **доступ**. Флаги
+`--no-owner --no-privileges` нужны, чтобы дамп лёг в базу, где может не быть
+роли-владельца, — но они же выбрасывают все `GRANT`. Замер на реальном дампе:
+
+| Что проверяли | С грантами | Как в процедуре (`--no-privileges`) |
+|---|---|---|
+| Политик RLS | 73 | 73 |
+| Таблиц с `FORCE RLS` | 73 | 73 |
+| `Report` | 205 | 205 |
+| Грантов роли `pilingtrack_app` | 320 | **0** |
+| `SELECT` от `pilingtrack_app` | 0 строк (fail-closed) | **`ERROR: permission denied`** |
+
+Иначе говоря: в реальной аварии вы восстановите базу, сверите `count(*)`,
+увидите, что всё сошлось, объявите успех — и получите неподнимающееся
+приложение. Отлаживать `GRANT` вы будете под нагрузкой инцидента.
+
+**Поэтому после каждого restore — обязательный шаг:**
+
+```bash
+# 1. Роль приложения существует и НЕ обходит RLS
+docker exec pilingtrack-postgres psql -U postgres -d <db> \
+  -c "SELECT rolname, rolbypassrls, rolsuper FROM pg_roles WHERE rolname='pilingtrack_app';"
+
+# 2. Гранты на месте (0 = база восстановлена, но приложение работать не будет)
+docker exec pilingtrack-postgres psql -U postgres -d <db> \
+  -c "SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='pilingtrack_app';"
+
+# 3. Негативный тест: без тенант-контекста должно быть 0 строк, НЕ ошибка прав
+docker exec pilingtrack-postgres psql -U pilingtrack_app -d <db> \
+  -c 'SELECT count(*) FROM "Report";'
+
+# 4. Положительный тест: с контекстом данные видны, с чужим тенантом — нет
+docker exec pilingtrack-postgres psql -U pilingtrack_app -d <db> \
+  -c "SET app.current_tenant='orion'; SELECT count(*) FROM \"Report\";" \
+  -c "SET app.current_tenant='nobody'; SELECT count(*) FROM \"Report\";"
+```
+
+**Критерии:** шаг 1 — роль есть, `rolbypassrls=false`; шаг 2 — счётчик > 0;
+шаг 3 — **`0`, а не `permission denied`** (ошибка прав = гранты не восстановлены);
+шаг 4 — свой тенант отдаёт строки, чужой отдаёт 0.
+
+Если на шаге 2 ноль — гранты нужно накатить отдельно (см. runbook 011
+«роль приложения»), и только после этого поднимать приложение.
+
+**Хорошая новость:** сами политики, `ENABLE`/`FORCE ROW LEVEL SECURITY` и
+tenant-изоляция переживают восстановление полностью. Сценария «данные вернулись,
+а RLS молча не применяется» — которого мы опасались — не происходит.
