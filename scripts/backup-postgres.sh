@@ -59,24 +59,46 @@ fi
 find "$BACKUP_DIR" -name "${POSTGRES_DB}-*.sql.gz" -mtime "+${RETENTION_DAYS}" -delete
 
 echo "✓ Backup complete: $(du -h "$OUT" | cut -f1)"
+# Off-site copy via rclone.
+#
+# Credentials: prefer dedicated BACKUP_S3_* vars; fall back to the app's own
+# S3_* (media) credentials when BACKUP_S3_* are absent, so existing installs
+# keep working with no config change.
+#
+# ⚠️ Why the dedicated vars exist (audit 2026-09-15). On the fallback path ONE
+# set of S3 keys opens BOTH the app's primary photo storage (media/) and every
+# database dump (db-backups/) — same bucket, same token. A leaked, rotated or
+# revoked app key therefore takes the backups with it: the copy is off-site,
+# but not off-credential, so the failure modes are correlated. Pointing
+# BACKUP_S3_* at a separate bucket with its own token removes that link and
+# is the recommended production setup. See docs/audit.md.
+#
+# A failed off-site copy is a warning, not a hard failure — the local dump
+# already succeeded and that's what matters for the exit code.
+read_env() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2-; }
 
-# Optional off-site copy via rclone, reusing the SAME S3-compatible
-# credentials the app already uses for photo storage (S3_BUCKET/
-# S3_ENDPOINT/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY in $ENV_FILE —
-# Cloudflare R2 in prod, bucket "pilingtrack"). No separate backup
-# credentials needed. Dumps land under db-backups/, alongside the
-# media/ prefix the app already writes to. A failed off-site copy is
-# a warning, not a hard failure — the local dump already succeeded
-# and that's what matters for the exit code.
-S3_ENDPOINT_VAL="$(grep -E '^S3_ENDPOINT=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
-S3_BUCKET_VAL="$(grep -E '^S3_BUCKET=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
-S3_ACCESS_KEY_ID_VAL="$(grep -E '^S3_ACCESS_KEY_ID=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
-S3_SECRET_ACCESS_KEY_VAL="$(grep -E '^S3_SECRET_ACCESS_KEY=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+S3_ENDPOINT_VAL="$(read_env BACKUP_S3_ENDPOINT)"
+S3_BUCKET_VAL="$(read_env BACKUP_S3_BUCKET)"
+S3_ACCESS_KEY_ID_VAL="$(read_env BACKUP_S3_ACCESS_KEY_ID)"
+S3_SECRET_ACCESS_KEY_VAL="$(read_env BACKUP_S3_SECRET_ACCESS_KEY)"
+
+if [ -n "$S3_ENDPOINT_VAL" ] && [ -n "$S3_BUCKET_VAL" ] && \
+   [ -n "$S3_ACCESS_KEY_ID_VAL" ] && [ -n "$S3_SECRET_ACCESS_KEY_VAL" ]; then
+  CRED_SOURCE="BACKUP_S3_* (dedicated backup credentials)"
+else
+  S3_ENDPOINT_VAL="$(read_env S3_ENDPOINT)"
+  S3_BUCKET_VAL="$(read_env S3_BUCKET)"
+  S3_ACCESS_KEY_ID_VAL="$(read_env S3_ACCESS_KEY_ID)"
+  S3_SECRET_ACCESS_KEY_VAL="$(read_env S3_SECRET_ACCESS_KEY)"
+  CRED_SOURCE="S3_* (shared with app media — see warning above)"
+fi
+
 if [ -z "$S3_ENDPOINT_VAL" ] || [ -z "$S3_BUCKET_VAL" ] || [ -z "$S3_ACCESS_KEY_ID_VAL" ] || [ -z "$S3_SECRET_ACCESS_KEY_VAL" ]; then
-  echo "Off-site copy skipped (S3_ENDPOINT/S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY not all set in $ENV_FILE)"
+  echo "Off-site copy skipped (neither BACKUP_S3_* nor S3_* fully set in $ENV_FILE)"
 elif ! command -v rclone &> /dev/null; then
   echo "WARNING: S3 storage is configured but rclone is not installed — off-site copy skipped" >&2
 else
+  echo "Off-site credentials: $CRED_SOURCE"
   export RCLONE_CONFIG_R2_TYPE=s3
   export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
   export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID_VAL"
