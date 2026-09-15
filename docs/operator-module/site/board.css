@@ -1,0 +1,73 @@
+/* Презентационный борд — воспроизведение визуализации (5 баннеров). */
+html, body { margin: 0; background: #fff; }
+body { font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif; color: #16324f; }
+
+.board-page { background: #fff; }
+
+.board { background: #fff; padding: 0 0 26px; }
+.board + .board { border-top: 10px solid #eef1f5; }
+
+.board-title {
+  background: #12395b;
+  color: #fff;
+  font-weight: 700;
+  font-size: 27px;
+  padding: 17px 28px;
+  letter-spacing: 0.01em;
+}
+
+.board-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 22px;
+  padding: 26px 16px 10px;
+}
+
+.cell { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.cell figcaption {
+  color: #16324f; font-weight: 700; font-size: 15px; text-align: center;
+  max-width: 190px; line-height: 1.25;
+}
+.cell .pb {
+  --s: 0.51;
+  width: calc(375px * var(--s));
+  height: calc(812px * var(--s));
+  position: relative;
+}
+.cell .pb .phone { transform: scale(var(--s)); transform-origin: top left; }
+.chev-sep { color: #1f6feb; font-size: 26px; align-self: center; padding-bottom: 40px; }
+
+/* --- промо-баннер «Перед сменой — ТБ» --- */
+.board.promo .cell .pb { --s: 0.92; }
+.board.promo .board-row { gap: 16px; padding-top: 30px; }
+
+.promo-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 22px 34px 18px; border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #eaf1f7, #dfe9f2);
+}
+.ph-left { display: flex; align-items: center; gap: 12px; }
+.ph-left .logo {
+  width: 44px; height: 44px; border-radius: 12px; background: #1f6feb; color: #fff;
+  font-weight: 800; font-size: 26px; display: flex; align-items: center; justify-content: center;
+}
+.wordmark { font-size: 28px; font-weight: 800; color: #12325b; line-height: 1.1; }
+.tagline { font-size: 13px; color: #6b7a90; }
+.ph-center { text-align: center; }
+.ph-center h1 { margin: 0; font-size: 25px; font-weight: 800; color: #12325b; }
+.ph-center p { margin: 6px 0 0; font-size: 15px; color: #5e7290; }
+.ph-right { display: flex; align-items: center; gap: 10px; }
+.ph-right svg { width: 44px; height: 44px; color: #1f6feb; }
+.ph-right .r1 { font-size: 16px; font-weight: 700; color: #12325b; }
+.ph-right .r2 { font-size: 14px; color: #6b7a90; }
+
+.promo-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 14px 34px; border-top: 1px solid #e2e8f0; background: #eef4f9;
+  font-size: 14px; color: #5e7290;
+}
+.promo-foot b { color: #12325b; font-size: 16px; }
+.promo-foot .fr { display: flex; align-items: center; gap: 8px; }
+.promo-foot .fr svg { width: 20px; height: 20px; color: #1f6feb; }
+.promo-foot .sep { color: #b7c2d0; margin: 0 4px; }

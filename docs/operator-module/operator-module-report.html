@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Модуль оператора PilingTrack — реализация по визуализации</title>
+<style>
+  :root{
+    --ink:#16212b; --muted:#5b6b7c; --faint:#8b98a6; --line:#dbe2e9; --line2:#eef1f5;
+    --navy:#0d2b4e; --blue:#1565c0; --green:#2f9e44; --amber:#c07c08; --red:#c62828;
+    --paper:#f7f9fb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Segoe UI","Inter",system-ui,-apple-system,Arial,sans-serif;font-size:15px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 64px}
+  header.top{background:var(--navy);color:#fff;padding:38px 0 30px;margin-bottom:26px}
+  header.top .wrap{padding-bottom:0}
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8fb4d8;margin:0 0 8px}
+  h1{font-size:30px;line-height:1.15;margin:0 0 10px;font-weight:750}
+  header.top p{margin:0;color:#cfe0f2;max-width:70ch}
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 8px}
+  p{margin:10px 0}
+  code{font-family:Consolas,ui-monospace,monospace;font-size:12.5px;background:#eef2f6;padding:1px 5px;border-radius:3px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0 4px}
+  .metric{border:1px solid var(--line);background:#fff;padding:14px 16px}
+  .metric .v{font-size:26px;font-weight:750;color:var(--navy);font-variant-numeric:tabular-nums}
+  .metric .k{font-size:12px;color:var(--muted)}
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:14px 0}
+  .card{border:1px solid var(--line);background:#fff;padding:14px 16px}
+  .card h3{margin:0 0 6px;font-size:14px}
+  .card p{margin:0;font-size:13px;color:var(--muted)}
+  .tl{border-left:2px solid var(--line);margin:14px 0 0;padding-left:0;list-style:none}
+  .tl li{position:relative;padding:0 0 16px 22px}
+  .tl li::before{content:"";position:absolute;left:-7px;top:5px;width:12px;height:12px;border-radius:50%;
+    background:#fff;border:2px solid var(--blue)}
+  .tl b{display:block;font-size:14px}
+  .tl span{font-size:13px;color:var(--muted)}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border:1px solid var(--line);color:var(--muted);border-radius:3px}
+  .badge.ok{color:var(--green);border-color:#c9e6d3}
+  .badge.warn{color:var(--amber);border-color:#f0dcae}
+  figure{margin:14px 0;border:1px solid var(--line);background:#fff}
+  figure img{display:block;width:100%;height:auto}
+  figcaption{padding:8px 12px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line2)}
+  ul.plain{margin:10px 0;padding-left:20px}
+  ul.plain li{margin:5px 0;font-size:13.5px}
+  .note{border:1px solid var(--line);border-left:3px solid var(--amber);background:#fff;padding:12px 14px;font-size:13.5px;margin:14px 0}
+  .note b{color:var(--amber)}
+  .sw{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+  .sw div{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .sw i{width:16px;height:16px;border:1px solid rgba(0,0,0,.12);display:inline-block}
+  footer{color:var(--faint);font-size:12px;margin-top:34px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <p class="eyebrow">PilingTrack · Модуль оператора</p>
+  <h1>Мобильный модуль оператора, воспроизведённый по визуализации</h1>
+  <p>36 экранов в каркасе телефона по 5 баннерам-визуализации: флоу «Перед сменой — ТБ» и «Подэкраны 1/4…4/4».
+     Единая дизайн-система, интерактивный просмотр и презентационный борд, сверенный с оригиналами.</p>
+</div></header>
+
+<div class="wrap">
+
+  <div class="metrics">
+    <div class="metric"><div class="v">36</div><div class="k">экранов реализовано</div></div>
+    <div class="metric"><div class="v">5</div><div class="k">баннеров-визуализаций</div></div>
+    <div class="metric"><div class="v">0</div><div class="k">переполнений контента</div></div>
+    <div class="metric"><div class="v">100%</div><div class="k">текстов экранов сверено</div></div>
+  </div>
+
+  <h2>Что сделано</h2>
+  <ol class="tl">
+    <li><b>Разбор визуализации</b><span>5 изображений распознаны, собраны точные описания экранов, текстов, цветов и состояний →
+      <code>.cluster/operator-viz-match/viz1…viz5_description.md</code></span></li>
+    <li><b>Дизайн-система</b><span>выделены единые токены (тёмно-синий хром, синий акцент, зелёный/янтарный/красный семантические цвета) и каркас телефона</span></li>
+    <li><b>Свёрстаны все 36 экранов</b><span>5 групп, каждая — отдельный файл <code>screens-*.js</code> с дословным текстом визуализации</span></li>
+    <li><b>Сборка борда и плеера</b><span>борд повторяет 5 баннеров один-в-один; плеер даёт доступ к любому экрану по клику и стрелкам</span></li>
+    <li><b>Проверка рендера</b><span>Playwright/Chromium снял 5 баннеров при ширине 1700 px; авто-проверка нашла и устранила переполнения контента</span></li>
+  </ol>
+
+  <h2>Состав экранов</h2>
+  <table>
+    <thead><tr><th>Баннер</th><th>Экраны</th><th>Шт.</th></tr></thead>
+    <tbody>
+      <tr><td>Перед сменой — ТБ</td><td>Оператор (список шагов) · Ознакомление · Проверка знаний · Итог</td><td>4</td></tr>
+      <tr><td>Подэкраны 1/4</td><td>Главный экран смены · Профиль оператора · Проверка документов · Инструктажи · Проверка знаний по ТБ · Результат проверки допуска · Выбор объекта · Принятие установки</td><td>8</td></tr>
+      <tr><td>Подэкраны 2/4</td><td>Погода и условия · Параметры установки · Предсменный осмотр · Визуальный осмотр техники · Проверка двигателя · Проверка гидравлики · Осмотр площадки · Блокирующее замечание</td><td>8</td></tr>
+      <tr><td>Подэкраны 3/4</td><td>Запуск двигателя · Прогрев до рабочих температур · Проверка функций · Ежесменное обслуживание · Главный экран работы · Забивка свай · Лидерное бурение · Простой / Дефект / Инцидент</td><td>8</td></tr>
+      <tr><td>Подэкраны 4/4</td><td>Чек-лист ТБ (забивка) · Чек-лист ТБ (бурение) · После смены: обслуживание · Послесменный осмотр · Жидкости после смены · Итоги смены · Передача смены · Закрытие смены</td><td>8</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Дизайн-токены</h2>
+  <div class="sw">
+    <div><i style="background:#0d2b4e"></i>#0D2B4E — хедер/статус-бар</div>
+    <div><i style="background:#1565c0"></i>#1565C0 — акцент/кнопки</div>
+    <div><i style="background:#2f9e44"></i>#2F9E44 — успех</div>
+    <div><i style="background:#f5a623"></i>#F5A623 — предупреждение</div>
+    <div><i style="background:#c62828"></i>#C62828 — критично</div>
+    <div><i style="background:#f5f6f8"></i>#F5F6F8 — фон</div>
+    <div><i style="background:#e4e8ee"></i>#E4E8EE — границы</div>
+  </div>
+
+  <h2>Сверка рендера с визуализацией</h2>
+  <p>Ниже — рендер каждого баннера. Полная сверка «оригинал ↔ рендер» — в файле <code>verify/compare.html</code>.</p>
+
+  <figure><img src="banner-1.png" alt="Баннер 1 — Перед сменой — ТБ">
+    <figcaption>Баннер 1: «Перед сменой — Техника безопасности», 4 экрана, белый хром и кнопка «Сообщить об инциденте».</figcaption></figure>
+
+  <figure><img src="banner-2.png" alt="Баннер 2 — Подэкраны 1/4">
+    <figcaption>Баннер 2: «Модуль Оператора. Подэкраны 1/4» — от главного экрана смены до принятия установки.</figcaption></figure>
+
+  <figure><img src="banner-3.png" alt="Баннер 3 — Подэкраны 2/4">
+    <figcaption>Баннер 3: «Подэкраны 2/4» — погода, параметры установки, осмотры, блокирующее замечание.</figcaption></figure>
+
+  <figure><img src="banner-4.png" alt="Баннер 4 — Подэкраны 3/4">
+    <figcaption>Баннер 4: «Подэкраны 3/4» — запуск, прогрев, проверка функций, обслуживание, работа, забивка, бурение, простой.</figcaption></figure>
+
+  <figure><img src="banner-5.png" alt="Баннер 5 — Подэкраны 4/4">
+    <figcaption>Баннер 5: «Подэкраны 4/4» — чек-листы ТБ, послесменные экраны, жидкости, итоги, передача и закрытие смены.</figcaption></figure>
+
+  <h2>Результаты проверки</h2>
+  <div class="cards">
+    <div class="card"><h3>Автопроверка текстов <span class="badge ok">142/142</span></h3>
+      <p>Построчная проверка ключевых строк каждого экрана по актуальному описанию визуализации: <code>CHECKS=142 FAILED=0</code>.</p></div>
+    <div class="card"><h3>Рендер <span class="badge ok">пройдено</span></h3>
+      <p>5 баннеров, 36 телефонов; <code>CONTENT_OVERFLOWING=[]</code>, подписи с номерами 32/32, ошибок консоли 0.</p></div>
+    <div class="card"><h3>Текст <span class="badge ok">сверено</span></h3>
+      <p>Заголовки, подписи, кнопки и значения полей совпадают с распознанными описаниями визуализации.</p></div>
+    <div class="card"><h3>Совместимость <span class="badge ok">без изменений</span></h3>
+      <p>Живой модуль <code>/operator</code>, <code>/operator/v2</code>, <code>/operator/v5</code> и тесты не затронуты — добавлены только новые файлы.</p></div>
+    <div class="card"><h3>Ограничение <span class="badge warn">внимание</span></h3>
+      <p>Прототип не подключён к API: данные демонстрационные, как в визуализации. Подключение к домену — отдельный шаг.</p></div>
+  </div>
+
+  <div class="note"><b>Допущение.</b> Визуализация — это макет (дизайн), а не текущий живой экран. Чтобы не сломать
+    производственный контур, модуль реализован как самодостаточный прототип в <code>public/prototypes/operator-module/</code>
+    (конвенция проекта). Отклонение: строка «Прохождение занимает 5–10 минут» дана в корректной орфографии
+    (в макете — опечатка «Проходжение»).</div>
+
+  <h2>Где лежит и как открыть</h2>
+  <table>
+    <thead><tr><th>Артефакт</th><th>Путь</th></tr></thead>
+    <tbody>
+      <tr><td>Исходник модуля (в git)</td><td><code>docs/operator-module/site/</code> — правки только здесь</td></tr>
+      <tr><td>Интерактивный плеер экранов</td><td><code>http://localhost:3000/prototypes/operator-module/index.html</code></td></tr>
+      <tr><td>Презентационный борд (5 баннеров)</td><td><code>http://localhost:3000/prototypes/operator-module/board.html</code></td></tr>
+      <tr><td>Стили/скрипты</td><td><code>operator-module.css</code>, <code>extra.css</code>, <code>board.css</code>, <code>icons.js</code>, <code>common.js</code>, <code>screens-*.js</code>, <code>app.js</code></td></tr>
+      <tr><td>Скриншоты рендера</td><td><code>output/operator-module/banner-1…5.png</code>, <code>board-full.png</code>, <code>viewer.png</code></td></tr>
+      <tr><td>Сверка с оригиналом</td><td><code>output/operator-module/verify/compare.html</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Следующие шаги</h2>
+  <ul class="plain">
+    <li>Сравнить макет с живым контуром поэкранно: 8 фаз и экраны в <code>src/components/piling/operator-mobile/screens/</code> уже покрывают почти весь набор — переписывать целиком нечего.</li>
+    <li>Единственный экран без пары в коде — <b>«Передача смены»</b> (4/4 №7): решить, нужен ли он в контуре.</li>
+    <li>Заместить CSS-заглушки фото (установка, карта, канат) реальными изображениями из хранилища.</li>
+  </ul>
+
+  <footer>Проект: D:\PillingR\my-project · исходник: docs/operator-module/site/ · AutoClaw</footer>
+</div>
+</body>
+</html>
