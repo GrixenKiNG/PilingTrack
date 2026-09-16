@@ -1,0 +1,191 @@
+/* ============================================================
+   Модуль оператора v10 — рабочее место машиниста на телефоне.
+
+   Каркас снят с эталона: тёмная шапка, тёмное нижнее меню, светлая рабочая
+   область, поток сверху вниз. Рамки телефона здесь НЕТ ни на каком экране:
+   на телефоне рамка внутри рамки съедает место, а на мониторе она
+   превращает рабочий экран в картинку. Вместо неё — колонка телефонной
+   ширины по центру.
+
+   Область применения ограничена классом .ov10.
+   ============================================================ */
+
+.ov10{
+  --orange:#ff6b16;
+  --orange-d:#e05500;
+  --orange-bg:#fff0e2;
+  --ink:#16263d;
+  --ink-2:#3c4e66;
+  --muted:#6f7f95;
+  --line:#e8edf3;
+  --line-2:#eef2f7;
+  --bg:#eef1f5;
+  --card:#ffffff;
+  --green:#16a34a;
+  --green-bg:#e8f7ee;
+  --amber:#f59e0b;
+  --amber-bg:#fff6e6;
+  --red:#dc2626;
+  --red-bg:#fdeaea;
+  --blue:#1499dc;
+  --blue-bg:#eaf6fd;
+  --navy:#0d2b4e;
+  --radius:13px;
+
+  /* Шаг плотности. Подтягивается вверх, когда содержимое чуть не помещается:
+     поджать на десятую лучше, чем заставить листать экран из шести строк. */
+  --k:1;
+
+  display:flex;
+  justify-content:center;
+  height:100dvh;
+  overflow:hidden;
+  background:var(--navy);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,system-ui,Arial,sans-serif;
+}
+
+.ov10 *,.ov10 *::before,.ov10 *::after{box-sizing:border-box}
+
+.ov10-screen{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  max-width:480px;
+  height:100%;
+  background:var(--bg);
+  overflow:hidden;
+}
+
+/* ------------------------------------------------------------- шапка --- */
+.ov10-top{background:var(--navy);color:#fff;flex:0 0 auto;padding-top:env(safe-area-inset-top)}
+.ov10-status{display:flex;justify-content:space-between;align-items:center;height:calc(34px * var(--k));padding:0 26px;font-size:11.5px;font-weight:600;color:#fff}
+.ov10-status .icons{display:flex;gap:3px;align-items:center}
+.ov10-status .bar{display:inline-block;width:3px;border-radius:1px;background:#fff}
+.ov10-status .batt{display:inline-block;width:22px;height:11px;border:1.4px solid #fff;border-radius:3px;position:relative}
+.ov10-status .batt i{position:absolute;left:1.5px;top:1.5px;bottom:1.5px;width:70%;background:#fff;border-radius:1px}
+
+.ov10-nav{padding:0 18px calc(14px * var(--k));display:flex;flex-direction:column;gap:2px}
+.ov10-nav .row{display:flex;align-items:center;gap:10px;min-height:34px}
+.ov10-nav .ttl{flex:1 1 auto;font-size:calc(20px * var(--k));font-weight:700;letter-spacing:-.3px;color:#fff;line-height:1.15}
+.ov10-nav .sub{font-size:12px;color:#9fb3c8;font-weight:500}
+.ov10-nav .iconbtn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;
+  background:transparent;border:0;color:#fff;cursor:pointer;flex:0 0 auto}
+.ov10-nav .iconbtn:hover{background:rgba(255,255,255,.1)}
+
+/* Значки набора — растровые и нарисованы для светлого фона. В тёмной шапке и
+   в тёмном меню осветляем их, иначе тёмное на тёмном не читается. */
+.ov10-top .piling-icon img,
+.ov10-tabs .piling-icon img{filter:brightness(0) invert(1)}
+.ov10-tabs button.on .piling-icon img{filter:brightness(0) invert(64%) sepia(72%) saturate(3200%) hue-rotate(348deg) brightness(101%) contrast(102%)}
+
+/* ---------------------------------------------------------- контент --- */
+.ov10-content{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:calc(14px * var(--k)) 16px calc(18px * var(--k));
+  display:flex;
+  flex-direction:column;
+  gap:calc(11px * var(--k));
+  scrollbar-width:thin;
+}
+.ov10-content::-webkit-scrollbar{width:6px}
+.ov10-content::-webkit-scrollbar-thumb{background:#d3dbe4;border-radius:6px}
+
+/* ------------------------------------------------------------ меню --- */
+.ov10-tabs{background:var(--navy);flex:0 0 auto;display:grid;padding:9px 2px calc(12px + env(safe-area-inset-bottom))}
+.ov10-tabs button{border:0;background:transparent;font:inherit;font-size:10px;color:#8fa7c0;display:flex;flex-direction:column;
+  align-items:center;gap:3px;cursor:pointer;padding:2px 0;min-height:44px;transition:color .15s ease}
+.ov10-tabs button.on{color:var(--orange);font-weight:700}
+
+/* -------------------------------------------------------- карточки --- */
+.ov10-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:calc(11px * var(--k)) 13px}
+.ov10-card-title{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.ov10-row{display:flex;align-items:center;gap:12px;padding:calc(11px * var(--k)) 1px;border-bottom:1px solid var(--line-2);width:100%;
+  background:transparent;border-left:0;border-right:0;border-top:0;text-align:left;font:inherit}
+.ov10-row:last-child{border-bottom:0}
+button.ov10-row{cursor:pointer}
+.ov10-row .ic{width:calc(38px * var(--k));height:calc(38px * var(--k));flex:0 0 calc(38px * var(--k));border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--blue-bg);color:var(--blue)}
+.ov10-row .ic.ok{background:var(--green-bg);color:var(--green)}
+.ov10-row .ic.warn{background:var(--amber-bg);color:var(--amber)}
+.ov10-row .ic.bad{background:var(--red-bg);color:var(--red)}
+.ov10-row .ic.orange{background:var(--orange-bg);color:var(--orange)}
+.ov10-row .body{flex:1 1 auto;min-width:0}
+.ov10-row .t{font-size:calc(15px * var(--k));font-weight:600;color:var(--ink);display:block}
+.ov10-row .s{font-size:calc(12.5px * var(--k));color:var(--muted);margin-top:2px;display:block}
+.ov10-row .chev{color:#c3ccd8;flex:0 0 auto}
+
+.ov10-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;align-self:flex-start}
+.ov10-badge.ok{background:var(--green-bg);color:var(--green)}
+.ov10-badge.warn{background:var(--amber-bg);color:var(--amber)}
+.ov10-badge.bad{background:var(--red-bg);color:var(--red)}
+.ov10-badge.info{background:var(--blue-bg);color:var(--blue)}
+.ov10-badge.gray{background:#eef1f5;color:var(--muted)}
+
+.ov10-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ov10-metrics.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ov10-metric{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:calc(11px * var(--k)) 12px}
+.ov10-metric .ml{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;line-height:1.2}
+.ov10-metric .mv{font-size:calc(23px * var(--k));font-weight:800;letter-spacing:-.5px;margin-top:3px;font-variant-numeric:tabular-nums}
+.ov10-metric .ms{font-size:calc(12px * var(--k));color:var(--muted);margin-top:2px}
+.ov10-metric .ms.up{color:var(--green);font-weight:600}
+
+.ov10-btn{display:block;width:100%;border:0;border-radius:12px;padding:calc(15px * var(--k));font:inherit;font-size:calc(15px * var(--k));font-weight:700;
+  background:var(--orange);color:#fff;cursor:pointer;transition:background-color .15s ease}
+.ov10-btn:hover{background:var(--orange-d)}
+.ov10-btn.green{background:var(--green)}
+.ov10-btn.orange{background:var(--orange)}
+.ov10-btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.ov10-btn:disabled{opacity:.55;cursor:default}
+
+/* ------------------------------------------------- пункт осмотра --- */
+.ov10-item{padding:calc(10px * var(--k)) 0;border-bottom:1px solid var(--line-2)}
+.ov10-item:last-child{border-bottom:0}
+.ov10-item .t{font-size:calc(13.5px * var(--k));font-weight:600;color:var(--ink)}
+.ov10-item .s{font-size:calc(11.5px * var(--k));color:var(--muted);margin-top:2px}
+.ov10-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:calc(8px * var(--k))}
+.ov10-chips button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:calc(8px * var(--k)) 4px;font:inherit;
+  font-size:calc(11.5px * var(--k));font-weight:700;color:var(--muted);cursor:pointer;min-height:36px;
+  transition:background-color .15s ease,border-color .15s ease,color .15s ease}
+.ov10-chips button.on.ok{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.ov10-chips button.on.warn{background:var(--amber-bg);border-color:var(--amber);color:var(--amber)}
+.ov10-chips button.on.bad{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+
+.ov10-textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 11px;font:inherit;font-size:16px;
+  color:var(--ink);min-height:calc(78px * var(--k));resize:vertical}
+.ov10-textarea:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+
+.ov10-pair{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:calc(7px * var(--k)) 0;border-bottom:1px solid var(--line-2)}
+.ov10-pair:last-child{border-bottom:0}
+.ov10-pair .k{font-size:calc(13px * var(--k));color:var(--muted)}
+.ov10-pair .v{font-size:calc(14px * var(--k));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
+.ov10-pair .v.warn{color:var(--red)}
+
+.ov10-banner{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:calc(11px * var(--k)) 12px;font-size:calc(13px * var(--k))}
+.ov10-banner.info{background:var(--blue-bg);color:#2b5a76}
+.ov10-banner.warn{background:var(--amber-bg);color:#8a5a00}
+.ov10-banner.bad{background:var(--red-bg);color:#8c2020}
+.ov10-banner b{display:block;font-size:calc(13.5px * var(--k));color:inherit}
+
+.ov10-nodata{padding:calc(18px * var(--k)) 6px;text-align:center;color:var(--muted);font-size:calc(13px * var(--k))}
+
+.ov10-skel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);height:76px;animation:ov10pulse 1.4s ease-in-out infinite}
+.ov10-skel.short{height:52px}
+@keyframes ov10pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+.ov10 button:focus-visible,.ov10 textarea:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+
+@media (prefers-reduced-motion:reduce){
+  .ov10-skel{animation:none}
+  .ov10-btn,.ov10-tabs button,.ov10-chips button{transition:none}
+}
+
+/* На мониторе — та же колонка телефонной ширины, с мягкими границами, чтобы
+   было видно, где кончается экран. Ни корпуса, ни выреза. */
+@media (min-width:520px){
+  .ov10{background:#0b1725;padding:0}
+  .ov10-screen{border-left:1px solid #17304c;border-right:1px solid #17304c}
+}
