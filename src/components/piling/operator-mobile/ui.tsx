@@ -27,11 +27,27 @@ export function Screen({title, subtitle, children, footer, tabs}: {
         <h1 className="text-[1.65rem] font-black leading-tight tracking-[-0.025em] text-balance">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
       </header>
-      <main className={cn('operator-screen-main flex-1 space-y-3 px-4 py-4', tabs ? 'pb-56' : 'pb-40')}>{children}</main>
-      <div className="operator-screen-footer sticky bottom-0 z-20 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
-        {footer ? <div className="space-y-2 px-4 py-3">{footer}</div> : null}
-        {tabs}
-      </div>
+      {/*
+        Отступ снизу отмеряется под то, что там ДЕЙСТВИТЕЛЬНО есть.
+        Прилипшая панель перекрывает конец списка, поэтому под неё оставляют
+        место — но раньше `pb-40` (160 px) ставился и тогда, когда ни кнопки, ни
+        вкладок внизу нет. На экране «Смена закрыта» это давало полосу пустоты и
+        прокрутку там, где всё помещалось (жалоба 16.09.2026).
+      */}
+      <main className={cn(
+        'operator-screen-main flex-1 space-y-3 px-4 py-4',
+        footer && tabs ? 'pb-56' : footer ? 'pb-40' : tabs ? 'pb-24' : 'pb-6',
+      )}>{children}</main>
+      {/*
+        Пустую панель не рисуем вовсе: с рамкой и тенью она выглядела как
+        оборванный низ экрана.
+      */}
+      {footer || tabs ? (
+        <div className="operator-screen-footer sticky bottom-0 z-20 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+          {footer ? <div className="space-y-2 px-4 py-3">{footer}</div> : null}
+          {tabs}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -186,8 +202,19 @@ export function VolumeFact({label, count, meters}: {label: string; count: number
   );
 }
 
-export function PhaseBar({progress}: {
+/**
+ * Полоса хода смены. Пройденные шаги можно открыть и посмотреть.
+ *
+ * ПОЧЕМУ ТОЛЬКО ПРОЙДЕННЫЕ И ТОЛЬКО ПОСМОТРЕТЬ. Фазу выводит сервер из
+ * записанных фактов, и «вернуться» в смысле отменить — значит развести экран с
+ * фактами. Но человеку нужно другое: свериться, что он записал на осмотре, уже
+ * стоя на площадке. Это чтение, и оно ничего не меняет.
+ *
+ * Без `onOpen` полоса остаётся прежней — просто индикатор.
+ */
+export function PhaseBar({progress, onOpen}: {
   progress: {phase: string; label: string; done: boolean; current: boolean}[];
+  onOpen?: (phase: string) => void;
 }) {
   const current = progress.find((step) => step.current);
   const currentIndex = progress.findIndex((step) => step.current);
@@ -213,16 +240,9 @@ export function PhaseBar({progress}: {
         style={{gridTemplateColumns: `repeat(${progress.length}, minmax(0, 1fr))`}}
         aria-label="Ход смены"
       >
-        {progress.map((step, index) => (
-          <li
-            key={step.phase}
-            aria-label={`${step.label} — ${step.done ? 'выполнено' : step.current ? 'текущий этап' : 'впереди'}`}
-            className={cn(
-              'relative flex min-w-0 flex-col items-center',
-              index > 0 && 'before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-white/20',
-              index > 0 && (step.done || step.current) && 'before:bg-success/80',
-            )}
-          >
+        {progress.map((step, index) => {
+          const openable = Boolean(onOpen) && step.done && !step.current;
+          const mark = (
             <span className={cn(
               'relative z-10 flex size-6 items-center justify-center rounded-full border text-3xs font-black tabular-nums',
               step.done && 'border-success bg-success text-white',
@@ -231,8 +251,32 @@ export function PhaseBar({progress}: {
             )}>
               {step.done ? '✓' : index + 1}
             </span>
-          </li>
-        ))}
+          );
+          return (
+            <li
+              key={step.phase}
+              aria-label={`${step.label} — ${step.done ? 'выполнено' : step.current ? 'текущий этап' : 'впереди'}`}
+              className={cn(
+                'relative flex min-w-0 flex-col items-center',
+                index > 0 && 'before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-white/20',
+                index > 0 && (step.done || step.current) && 'before:bg-success/80',
+              )}
+            >
+              {openable ? (
+                <button
+                  type="button"
+                  // Палец в перчатке меньше 44 px не попадает: кружок 24 px
+                  // расширяем прозрачной областью, не двигая саму полосу.
+                  className="relative -m-2.5 flex size-11 items-center justify-center p-2.5"
+                  onClick={() => onOpen?.(step.phase)}
+                  title={`Посмотреть: ${step.label}`}
+                >
+                  {mark}
+                </button>
+              ) : mark}
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

@@ -102,12 +102,12 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs}
 }
 
 /** Экран после закрытия: отчёт отправлен, действий больше нет. */
-export function ClosedScreen({state}: {state: OperatorMobileState}) {
+export function ClosedScreen({state, tabs}: {state: OperatorMobileState; tabs?: ReactNode}) {
   const receiptTime = state.receipt?.submittedAt ?? state.receipt?.closedAt ?? null;
   const reportAccepted = Boolean(state.receipt?.submittedAt);
 
   return (
-    <Screen title="Смена закрыта" subtitle={state.assignment?.equipmentName}>
+    <Screen title="Смена закрыта" subtitle={state.assignment?.equipmentName} tabs={tabs}>
       <Panel tone={reportAccepted ? 'ok' : 'warning'}>
         <PanelTitle tone={reportAccepted ? 'ok' : 'warning'}>
           {reportAccepted ? 'Принято сервером' : state.receipt ? 'Смена закрыта сервером' : 'Смена закрыта'}
