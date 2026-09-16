@@ -1,7 +1,6 @@
 'use client';
 
 import { OperatorShiftV2 } from '@/components/piling/operator-v2/operator-shift-v2';
-import { DeviceFrame } from '@/components/piling/operator-mobile/v7/device-frame';
 
 /**
  * Модуль-кандидат экрана оператора. Действующий экран — `/operator`.
@@ -9,8 +8,6 @@ import { DeviceFrame } from '@/components/piling/operator-mobile/v7/device-frame
  */
 export default function OperatorV2Page() {
   return (
-    <DeviceFrame>
-      <OperatorShiftV2 />
-    </DeviceFrame>
+    <OperatorShiftV2 />
   );
 }

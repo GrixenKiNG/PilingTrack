@@ -1,6 +1,5 @@
 import type {Metadata} from 'next';
 import {OperatorMobileApp} from '@/components/piling/operator-mobile/operator-mobile-app';
-import {DeviceFrame} from '@/components/piling/operator-mobile/v7/device-frame';
 
 export const metadata: Metadata = {title: 'Смена машиниста'};
 
@@ -22,8 +21,6 @@ export default function OperatorPage() {
   // Корпус телефона добавляется только на широком экране: на устройстве, где
   // этот экран работает, обёртка не делает ничего. См. device-frame.css.
   return (
-    <DeviceFrame>
-      <OperatorMobileApp />
-    </DeviceFrame>
+    <OperatorMobileApp />
   );
 }
