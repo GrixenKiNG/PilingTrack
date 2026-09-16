@@ -11,6 +11,7 @@ import {
 } from '../api';
 import {flushQueue, readQueue, retry, subscribeQueue, type QueuedCommand} from '../offline-queue';
 import {Banner, Button, Dock, OPERATOR_DOCK, PhoneShell as Shell, Title, type DockTab} from './v7-ui';
+import {admissionSteps} from '../safety/admission-steps';
 import {AdmissionResult, BriefingFlow, KnowledgeFlow, PpeFlow} from './v7-identity';
 import {AcceptFlow, ChecklistFlow, CloseFlow, IncidentFlow, ProductionFlow} from './v7-shift';
 import {
@@ -446,21 +447,26 @@ function SafetyTab({state, onStep}: {state: OperatorMobileState; onStep: (detour
     <>
       <div className="card">
         <div className="ct">Допуск</div>
-        <button type="button" className={`row ${state.identity.ppe.confirmed ? 'done' : ''}`} onClick={() => onStep({kind: 'PPE'})}>
-          <span className="num">{state.identity.ppe.confirmed ? '✓' : 1}</span>
-          <span className="rb"><span className="t">СИЗ</span><span className="s">Проверка средств индивидуальной защиты</span></span>
-          <span className="caret">›</span>
-        </button>
-        <button type="button" className={`row ${state.identity.briefing.ok ? 'done' : ''}`} onClick={() => onStep({kind: 'BRIEFING'})}>
-          <span className="num">{state.identity.briefing.ok ? '✓' : 2}</span>
-          <span className="rb"><span className="t">Ознакомление с инструкциями</span><span className="s">{state.identity.briefing.title}</span></span>
-          <span className="caret">›</span>
-        </button>
-        <button type="button" className={`row ${state.identity.knowledge.ok ? 'done' : ''}`} onClick={() => onStep({kind: 'KNOWLEDGE'})}>
-          <span className="num">{state.identity.knowledge.ok ? '✓' : 3}</span>
-          <span className="rb"><span className="t">Проверка знаний по ТБ</span><span className="s">{state.identity.knowledge.lastResult ?? 'Не выполнено'}</span></span>
-          <span className="caret">›</span>
-        </button>
+        {admissionSteps(state).map((step) => {
+          const body = (
+            <>
+              <span className="num">{step.done ? '✓' : step.n}</span>
+              <span className="rb"><span className="t">{step.title}</span><span className="s">{step.hint}</span></span>
+              {step.opens ? <span className="caret">›</span> : <span className="s">{step.note}</span>}
+            </>
+          );
+          // Строки без действия (подпись ставится с ознакомлением, допуск даёт
+          // сервер) не притворяются кнопками: нажатие, которое ничего не
+          // делает, человек читает как поломку.
+          return step.opens
+            ? (
+              <button key={step.id} type="button" className={`row ${step.done ? 'done' : ''}`}
+                onClick={() => onStep({kind: step.opens as 'PPE' | 'BRIEFING' | 'KNOWLEDGE'})}>
+                {body}
+              </button>
+            )
+            : <div key={step.id} className={`row ${step.done ? 'done' : ''}`}>{body}</div>;
+        })}
       </div>
 
       <div className="card">

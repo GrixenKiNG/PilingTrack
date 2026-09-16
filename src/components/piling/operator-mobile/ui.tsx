@@ -79,7 +79,16 @@ export function TabBar<T extends string>({tabs, active, onSelect}: {
   onSelect: (id: T) => void;
 }) {
   return (
-    <nav className="operator-tab-bar grid grid-cols-4 border-t" aria-label="Разделы смены">
+    /*
+      Колонок ровно столько, сколько вкладок. Жёсткое `grid-cols-4` ломалось на
+      пятой вкладке («ТБ»): она уезжала во второй ряд, и панель становилась
+      двухэтажной.
+    */
+    <nav
+      className="operator-tab-bar grid border-t"
+      style={{gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`}}
+      aria-label="Разделы смены"
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}

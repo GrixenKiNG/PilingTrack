@@ -116,6 +116,12 @@ async function recordBriefingHistory(tx: Tx, input: {
       correct: input.correct ?? null,
       total: input.total ?? null,
       validUntil: input.validUntil ?? null,
+      // Отметка работника ставится сразу, и по той же причине, по какой её
+      // сразу ставит инструктор в `conductBriefing`: он и есть тот, кто нажал
+      // кнопку. Здесь инструктора нет вовсе — человек читал сам, — и просить
+      // его отдельным действием «подписать своё» было бы обрядом. Без этой
+      // строки запись навсегда оставалась в журнале ОТ как «ожидает подписи».
+      employeeSignedAt: input.now,
       recordedAt: input.now,
     },
   });

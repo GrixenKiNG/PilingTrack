@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
-import {HardHat, TriangleAlert, UserRound, Wrench} from 'lucide-react';
+import {HardHat, ShieldCheck, TriangleAlert, UserRound, Wrench} from 'lucide-react';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile/contracts';
@@ -25,6 +25,8 @@ import {ReviewScreen} from './screens/review-screen';
 import {EquipmentTab} from './screens/equipment-tab';
 import {IncidentsTab} from './screens/incidents-tab';
 import {ProfileTab} from './screens/profile-tab';
+import {SafetyTab} from './screens/safety-tab';
+import {admissionBlockers, admissionSteps} from './safety/admission-steps';
 
 /** Чек-лист, закрывающий фазу. Тот же порядок, что на сервере. */
 const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>> = {
@@ -40,7 +42,7 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
  * площадка, — и порядок здесь не удобство, а безопасность. Когда работа
  * началась, ведение заканчивается, и машинист сам решает, куда смотреть.
  */
-type WorkTab = 'SHIFT' | 'EQUIPMENT' | 'INCIDENTS' | 'PROFILE';
+type WorkTab = 'SHIFT' | 'EQUIPMENT' | 'SAFETY' | 'INCIDENTS' | 'PROFILE';
 
 /** Экраны, открываемые вне очереди фаз. */
 type Detour =
@@ -291,10 +293,19 @@ export function OperatorMobileApp() {
   // тупиком — ни вкладок, ни возврата, только текст квитанции (жалоба
   // 16.09.2026). Работа там уже не ведётся, но посмотреть технику, события и
   // свои допуски человек вправе.
-  const tabsVisible = Boolean(shift)
-    && (state.phase === 'WORK' || state.phase === 'CLOSING' || state.phase === 'CLOSED')
-    && !detour
-    && !checklist;
+  /*
+    Панель скрыта РОВНО ТАМ, ГДЕ ЕЁ НЕЛЬЗЯ ПОКАЗЫВАТЬ: пока человек проходит
+    чек-лист или обходной экран. Причина прежняя — отказы дешевле находить на
+    земле, чем на четвёртой свае, и «сходить в другую вкладку» посреди осмотра
+    значит дать возможность его не закончить.
+
+    Раньше условие было шире: панель появлялась только с началом работы. Под
+    запрет попадали и фаза допуска, и приём — там бросать нечего, а вкладка
+    «ТБ» нужна как раз до смены, а не после. Теперь запрет привязан к тому, что
+    его и оправдывает: `checklist` закрывает осмотр, пуск и площадку,
+    `detour` — любой открытый шаг.
+  */
+  const tabsVisible = !detour && !checklist;
 
   const alarmingIncidents = state.incidents.filter(
     (incident) => isIncidentOpen(incident.reviewedAt),
@@ -307,11 +318,19 @@ export function OperatorMobileApp() {
       tabs={[
         {
           id: 'SHIFT',
-          label: state.phase === 'CLOSED' ? 'Смена'
-            : state.phase === 'CLOSING' ? 'Сдача' : 'Работа',
+          label: state.phase === 'IDENTITY' ? 'Допуск'
+            : state.phase === 'CLOSED' ? 'Смена'
+              : state.phase === 'CLOSING' ? 'Сдача' : 'Работа',
           icon: <HardHat />,
         },
         {id: 'EQUIPMENT', label: 'Техника', icon: <Wrench />, badge: state.defects.length},
+        {
+          id: 'SAFETY',
+          label: 'ТБ',
+          icon: <ShieldCheck />,
+          // На значке — число непройденных шагов допуска. Ноль значка не рисует.
+          badge: admissionBlockers(admissionSteps(state)).length,
+        },
         {
           id: 'INCIDENTS',
           label: 'События',
@@ -353,7 +372,8 @@ export function OperatorMobileApp() {
     // нет нижней кнопки действия — действие у каждой своё и внутри.
     if (tabsVisible && workTab !== 'SHIFT') {
       const title = workTab === 'EQUIPMENT' ? 'Техника'
-        : workTab === 'INCIDENTS' ? 'Происшествия' : 'Мои допуски';
+        : workTab === 'SAFETY' ? 'Техника безопасности'
+          : workTab === 'INCIDENTS' ? 'Происшествия' : 'Мои допуски';
       return (
         <Screen title={title} subtitle={state.assignment?.equipmentName} tabs={tabBar}>
           {workTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
@@ -364,6 +384,15 @@ export function OperatorMobileApp() {
               error={actionError}
               commandId={incidentCommandId}
               onReport={reportIncident}
+            />
+          ) : null}
+          {workTab === 'SAFETY' ? (
+            <SafetyTab
+              state={state}
+              onOpen={(step) => setDetour(
+                step === 'PPE' ? {kind: 'PPE'}
+                  : step === 'BRIEFING' ? {kind: 'BRIEFING'} : {kind: 'KNOWLEDGE'},
+              )}
             />
           ) : null}
           {workTab === 'PROFILE' ? (
@@ -443,6 +472,7 @@ export function OperatorMobileApp() {
             identity={state.identity}
             operatorName={state.operator.name}
             warnings={state.warnings}
+            tabs={tabBar}
             onPpe={() => setDetour({kind: 'PPE'})}
             onBriefing={() => setDetour({kind: 'BRIEFING'})}
             onKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
@@ -453,6 +483,7 @@ export function OperatorMobileApp() {
         return (
           <AdmissionScreen
             state={state}
+            tabs={tabBar}
             busy={busy}
             error={actionError}
             onSelectEquipment={setEquipmentId}
@@ -608,3 +639,4 @@ function QueueBanner({items}: {items: QueuedCommand[]}) {
     </div>
   );
 }
+

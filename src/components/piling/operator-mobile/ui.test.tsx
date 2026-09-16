@@ -2,6 +2,7 @@ import {render, screen} from '@testing-library/react';
 import {describe, expect, it} from 'vitest';
 import {OperatorStatusStrip} from './operator-status-strip';
 import {PhaseBar} from './ui';
+import {admissionBlockers, admissionSteps} from './safety/admission-steps';
 
 const progress = [
   {phase: 'IDENTITY', label: 'Допуск', done: true, current: false},
@@ -57,5 +58,41 @@ describe('рабочая оболочка машиниста', () => {
 
     rerender(<OperatorStatusStrip online items={failed} />);
     expect(screen.getByRole('status')).toHaveTextContent('Нужно проверить: 1');
+  });
+});
+
+/*
+ * Шаги допуска решают, что человек прочитает о своём праве выйти на площадку.
+ * Две проверки ниже держат ровно то, что нельзя сломать молча: допуск
+ * объявляет сервер, а подпись без отметки о ознакомлении не существует.
+ */
+describe('шаги допуска к смене', () => {
+  const identity = {
+    documents: [],
+    ppe: {confirmed: true, items: [], missing: [], confirmedAt: '2026-09-17T05:00:00.000Z'},
+    briefing: {
+      code: 'И-СМ-04', title: 'Инструкция', version: '2.4',
+      acknowledgedVersion: '2.4', acknowledgedAt: '2026-09-17T05:01:00.000Z', ok: true,
+    },
+    knowledge: {validUntil: '2027-01-01T00:00:00.000Z', lastResult: '4 из 4', ok: true},
+  };
+
+  it('не объявляет допуск, пока сервер держит фазу «допуск»', () => {
+    const steps = admissionSteps({phase: 'IDENTITY', identity} as never);
+    const admission = steps.find((step) => step.id === 'ADMISSION');
+
+    expect(admission?.done).toBe(false);
+    expect(admission?.note).toBe('Ожидает');
+    expect(admissionBlockers(steps)).toEqual([]);
+  });
+
+  it('не считает подпись поставленной без отметки об ознакомлении', () => {
+    const steps = admissionSteps({
+      phase: 'WORK',
+      identity: {...identity, briefing: {...identity.briefing, acknowledgedAt: null}},
+    } as never);
+
+    expect(steps.find((step) => step.id === 'SIGNATURE')?.done).toBe(false);
+    expect(steps.find((step) => step.id === 'ADMISSION')?.done).toBe(true);
   });
 });

@@ -92,6 +92,11 @@ export interface IdentityView {
     version: string;
     /** С какой версией оператор ознакомлен. null — ни с какой. */
     acknowledgedVersion: string | null;
+    /**
+     * Когда работник подтвердил ознакомление. Это и есть его отметка под
+     * записью журнала: отдельного действия «подписать» в системе нет.
+     */
+    acknowledgedAt: string | null;
     ok: boolean;
   };
   knowledge: {

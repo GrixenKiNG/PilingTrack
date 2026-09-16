@@ -46,8 +46,14 @@ import { DefectSheet } from './defect-sheet';
 import { DowntimeSheet, HandoverSheet, PileSheet } from './sheets';
 import { useShiftReport } from './use-shift-report';
 import {
-  BigCheck, BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow,
+  BigCheck, BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow, type V2Tab,
 } from './ui';
+import type { OperatorMobileState } from '@/modules/operator-mobile/contracts';
+import { fetchState, sendCommand } from '@/components/piling/operator-mobile/api';
+import { SafetyTab } from '@/components/piling/operator-mobile/screens/safety-tab';
+import { PpeScreen } from '@/components/piling/operator-mobile/screens/ppe-screen';
+import { BriefingScreen } from '@/components/piling/operator-mobile/screens/briefing-screen';
+import { KnowledgeScreen } from '@/components/piling/operator-mobile/screens/knowledge-screen';
 import { ChecklistAccordion } from './checklist-accordion';
 import {
   ENGINE_START_CONFIRMATIONS, SITE_SAFETY_GROUPS, STARTUP_GROUPS,
@@ -124,7 +130,16 @@ export function OperatorShiftV2() {
   const [pileOpen, setPileOpen] = useState(false);
   const [downtimeOpen, setDowntimeOpen] = useState(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
-  const [tab, setTab] = useState<'shift' | 'journal' | 'more'>('shift');
+  const [tab, setTab] = useState<V2Tab>('shift');
+  /*
+    Вкладка ТБ живёт на собственном источнике — снимке рабочего места
+    (`/api/operator/mobile/state`). Контур готовности, на котором держится
+    остальной экран, знает про документы, но не знает ни про СИЗ, ни про
+    ознакомление, ни про проверку знаний: это разные наборы фактов.
+  */
+  const [safetyState, setSafetyState] = useState<OperatorMobileState | null>(null);
+  const [safetyError, setSafetyError] = useState<string | null>(null);
+  const [safetyStep, setSafetyStep] = useState<'PPE' | 'BRIEFING' | 'KNOWLEDGE' | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,10 +153,43 @@ export function OperatorShiftV2() {
     }
   }, []);
 
+  /** Перечитать снимок рабочего места — источник вкладки ТБ. */
+  const loadSafety = useCallback(async () => {
+    try {
+      setSafetyState(await fetchState({}));
+      setSafetyError(null);
+    } catch (cause) {
+      setSafetyError(cause instanceof Error ? cause.message : 'Раздел ТБ недоступен');
+    }
+  }, []);
+
+  /* Шаги допуска записываются теми же командами, что и в остальных модулях:
+     своих у вкладки нет — иначе один и тот же факт писался бы двумя путями. */
+  const runSafety = useCallback(async (command: Parameters<typeof sendCommand>[0]) => {
+    setBusy(true);
+    try {
+      await sendCommand(command);
+      await loadSafety();
+      setSafetyStep(null);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Действие не выполнено');
+    } finally {
+      setBusy(false);
+    }
+  }, [loadSafety]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- загрузка фактов смены
     void load();
   }, [load]);
+
+  // Снимок рабочего места читаем при первом открытии вкладки ТБ, а не на входе
+  // в смену: большинству она за смену не понадобится ни разу.
+  useEffect(() => {
+    if (tab !== 'safety' || safetyState) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- загрузка снимка для вкладки ТБ
+    void loadSafety();
+  }, [tab, safetyState, loadSafety]);
 
   const siteSafetyDone = allDone(SITE_SAFETY_GROUPS, siteChecks);
   const startupDone = engineStartedAt !== null && allDone(STARTUP_GROUPS, startChecks);
@@ -319,6 +367,46 @@ export function OperatorShiftV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openInspection пересоздаётся каждый рендер, защёлка выше держит один запуск
   }, [state?.step, facts?.inspection.preShift]);
 
+  if (safetyStep && safetyState) {
+    /*
+      Шаги допуска показываются во весь экран поверх смены: у каждого свой
+      порядок и своя кнопка, и оболочка шага сюда не налезает. Экраны взяты
+      готовыми из рабочего места `/operator` — своих копий у вкладки нет.
+    */
+    const back = () => setSafetyStep(null);
+    if (safetyStep === 'PPE') {
+      return (
+        <PpeScreen
+          busy={busy}
+          error={safetyError}
+          onBack={back}
+          onConfirm={(items) => void runSafety({
+            command: 'confirm-ppe', productionDate: safetyState.productionDate, items,
+          })}
+        />
+      );
+    }
+    if (safetyStep === 'BRIEFING') {
+      return (
+        <BriefingScreen
+          busy={busy}
+          onBack={back}
+          onAcknowledge={() => void runSafety({command: 'acknowledge-briefing'})}
+        />
+      );
+    }
+    return (
+      <KnowledgeScreen
+        busy={busy}
+        error={safetyError}
+        onBack={back}
+        onDone={(picks, attemptToken) => void runSafety({
+          command: 'submit-knowledge', attemptToken, picks,
+        })}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-md space-y-4 p-4">
@@ -349,18 +437,44 @@ export function OperatorShiftV2() {
     const documents = facts.clearance.documents;
     return (
       <StepShell
-        title="Личный допуск"
+        title={tab === 'safety' ? 'Техника безопасности' : 'Личный допуск'}
         subtitle={stepLabel}
         tone={cleared ? 'green' : 'blue'}
-        footer={
-          <StepButton
-            label={cleared ? 'Продолжить' : 'Допуск закрыт'}
-            onClick={() => setAdmitted(true)}
-            disabled={!cleared}
-            tone={cleared ? 'green' : 'blue'}
-          />
-        }
+        /*
+          Панель здесь стоит вместе с кнопкой шага, а не вместо неё. Вкладка
+          «ТБ» нужна ИМЕННО НА ЭТОМ ШАГЕ: СИЗ, инструкция и проверка знаний
+          проходятся до смены, а не после, и открыть их из «работы» — значит
+          открыть их поздно. Дальше по ходу смены панель снова появляется
+          только на экране работы: бросать осмотр на середине нельзя.
+        */
+        footer={(
+          <>
+            {tab === 'shift' ? (
+              <StepButton
+                label={cleared ? 'Продолжить' : 'Допуск закрыт'}
+                onClick={() => setAdmitted(true)}
+                disabled={!cleared}
+                tone={cleared ? 'green' : 'blue'}
+              />
+            ) : null}
+            <BottomTabs active={tab} onSelect={setTab} />
+          </>
+        )}
       >
+        {tab !== 'shift' ? (
+          tab === 'safety'
+            ? (
+              safetyState
+                ? <SafetyTab state={safetyState} onOpen={setSafetyStep} />
+                : <p className="text-sm text-muted-foreground">{safetyError ?? 'Читаем ваш допуск…'}</p>
+            )
+            : (
+              <p className="text-sm text-muted-foreground">
+                Журнал и прочие разделы открываются после начала работы.
+              </p>
+            )
+        ) : (
+        <>
         {/* Документы проверены автоматически: открывать по карточке на каждое
             удостоверение оператор не должен — это его же документы, и он знает
             их наизусть. Экран отвечает на один вопрос: пускают ли сегодня. */}
@@ -403,6 +517,8 @@ export function OperatorShiftV2() {
               <li key={item} className="text-sm text-warning-strong">{item}</li>
             ))}
           </ul>
+        )}
+        </>
         )}
       </StepShell>
     );
@@ -680,7 +796,9 @@ export function OperatorShiftV2() {
     return (
       <>
         <StepShell
-          title={tab === 'shift' ? V2_STEP_TITLE.work : tab === 'journal' ? 'Журнал смены' : 'Ещё'}
+          title={tab === 'shift' ? V2_STEP_TITLE.work
+            : tab === 'safety' ? 'Техника безопасности'
+              : tab === 'journal' ? 'Журнал смены' : 'Ещё'}
           subtitle={stepLabel}
           footer={<BottomTabs active={tab} onSelect={setTab} />}
         >
@@ -725,6 +843,16 @@ export function OperatorShiftV2() {
                 Завершить работу
               </button>
             </>
+          )}
+
+          {tab === 'safety' && (
+            safetyState
+              ? <SafetyTab state={safetyState} onOpen={setSafetyStep} />
+              : (
+                <p className="text-sm text-muted-foreground">
+                  {safetyError ?? 'Читаем ваш допуск…'}
+                </p>
+              )
           )}
 
           {tab === 'journal' && (

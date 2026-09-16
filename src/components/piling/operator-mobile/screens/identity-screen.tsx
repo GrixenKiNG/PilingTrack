@@ -1,5 +1,6 @@
 'use client';
 
+import type {ReactNode} from 'react';
 import {missingPpeLabels} from '@/modules/operator-mobile/contracts';
 import type {DocumentCheck, IdentityView, WorkWarning} from '@/modules/operator-mobile/contracts';
 import {BigButton, Panel, PanelTitle, Screen, Sign} from '../ui';
@@ -27,10 +28,12 @@ function documentTone(check: DocumentCheck) {
  * вещи: непрочитанная инструкция и непройденная проверка знаний, потому что
  * это ровно то, что оператор может исправить прямо здесь за две минуты.
  */
-export function IdentityScreen({identity, operatorName, warnings, onPpe, onBriefing, onKnowledge, onContinue}: {
+export function IdentityScreen({identity, operatorName, warnings, tabs, onPpe, onBriefing, onKnowledge, onContinue}: {
   identity: IdentityView;
   operatorName: string;
   warnings: WorkWarning[];
+  /** Нижние вкладки. На фазе допуска они ведут в «ТБ» — см. `operator-mobile-app`. */
+  tabs?: ReactNode;
   onPpe: () => void;
   onBriefing: () => void;
   onKnowledge: () => void;
@@ -56,6 +59,7 @@ export function IdentityScreen({identity, operatorName, warnings, onPpe, onBrief
       title="Допуск к работе"
       subtitle={`${operatorName} · машинист сваебойной установки`}
       footer={<BigButton onClick={nextAction.run}>{nextAction.label}</BigButton>}
+      tabs={tabs}
     >
       <WarningsPanel warnings={warnings} />
 

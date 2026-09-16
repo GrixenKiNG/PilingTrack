@@ -158,7 +158,7 @@ export async function queryOperatorMobileState(input: {
     }),
     db.userDocument.findMany({
       where: {tenantId, userId: operatorId},
-      select: {typeId: true, number: true, expiresAt: true, type: {select: {name: true}}},
+      select: {typeId: true, number: true, issuedAt: true, expiresAt: true, type: {select: {name: true}}},
       orderBy: {createdAt: 'desc'},
     }),
     db.crew.findMany({
@@ -218,6 +218,9 @@ export async function queryOperatorMobileState(input: {
       title: SAFETY_BRIEFING.title,
       version: SAFETY_BRIEFING.version,
       acknowledgedVersion: briefingDoc?.number ?? null,
+      // Время отметки берём из уже загруженного документа: отдельный запрос в
+      // журнал ради одной даты удвоил бы чтение на самом частом маршруте.
+      acknowledgedAt: briefingDoc?.issuedAt?.toISOString() ?? null,
       ok: briefingOk,
     },
     knowledge: {

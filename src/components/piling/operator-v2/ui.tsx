@@ -173,13 +173,21 @@ export function BigCheck({ tone }: { tone: 'green' | 'purple' }) {
   );
 }
 
-/** Нижняя навигация макета: Смена / Журнал / Ещё. */
+export type V2Tab = 'shift' | 'safety' | 'journal' | 'more';
+
+/**
+ * Нижняя навигация макета: Смена / ТБ / Журнал / Ещё.
+ *
+ * «ТБ» стоит вторым, а не в «Ещё»: допуск и инструктажи человек открывает не в
+ * конце смены, а до неё, и искать их в списке «прочего» он не станет.
+ */
 export function BottomTabs({ active, onSelect }: {
-  active: 'shift' | 'journal' | 'more';
-  onSelect: (tab: 'shift' | 'journal' | 'more') => void;
+  active: V2Tab;
+  onSelect: (tab: V2Tab) => void;
 }) {
   const tabs = [
     { id: 'shift' as const, label: 'Смена' },
+    { id: 'safety' as const, label: 'ТБ' },
     { id: 'journal' as const, label: 'Журнал' },
     { id: 'more' as const, label: 'Ещё' },
   ];

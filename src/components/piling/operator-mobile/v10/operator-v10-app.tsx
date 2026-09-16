@@ -4,7 +4,9 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type {
   ChecklistView, DocumentVerdict, OperatorAnswer, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
-import {measureRequired} from '@/modules/operator-mobile/contracts';
+import {PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired} from '@/modules/operator-mobile/contracts';
+import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
+import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
 import {DOCUMENT_EXPIRY_LABELS, type DocumentExpiryStatus} from '@/lib/document-expiry';
 import {ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand} from '../api';
@@ -100,6 +102,9 @@ const SCREENS: ScreenDef[] = [
   {id: 'closing', n: 8, title: 'Закрытие смены', short: 'Закрытие', tab: 'report'},
   {id: 'report', n: 9, title: 'Отчёт и синхронизация', short: 'Отчёт', tab: 'report'},
   {id: 'safety', n: 10, title: 'ТБ и допуски', short: 'ТБ', tab: 'safety'},
+  {id: 'ppe', n: 11, title: 'Средства защиты', short: 'СИЗ', tab: 'safety'},
+  {id: 'briefing', n: 12, title: 'Ознакомление с инструкцией', short: 'Инструкция', tab: 'safety'},
+  {id: 'knowledge', n: 13, title: 'Проверка знаний по ТБ', short: 'Знания', tab: 'safety'},
 ];
 
 /**
@@ -536,12 +541,50 @@ function ScreenReport({state}: {state: OperatorMobileState}) {
 }
 
 /** ТБ и допуски — тот же личный раздел, что во вкладке ТБ модуля v7. */
-function ScreenSafety({view, error}: {view: SelfSafetyView | null; error: string | null}) {
-  if (error) return <Card><Nodata>{error}</Nodata></Card>;
-  if (!view) return <Card><Nodata>Читаем ваш допуск…</Nodata></Card>;
-  const pending = view.briefings.pending.length + view.briefings.overdue.length;
+/**
+ * Вкладка «ТБ» — шаги допуска к смене по эталону визуализации.
+ *
+ * Пять строк вместо трёх: к СИЗ, инструкции и проверке знаний добавлены
+ * «Подпись» и «Допуск к смене». Обе — не действия, а факты, и нажатия под ними
+ * нет; почему именно так — в `safety/admission-steps.ts`.
+ */
+function ScreenSafety({state, view, error, go}: {
+  state: OperatorMobileState | null;
+  view: SelfSafetyView | null;
+  error: string | null;
+  go: Go;
+}) {
+  const steps = state ? admissionSteps(state) : [];
+  const left = admissionBlockers(steps);
+  const pending = view ? view.briefings.pending.length + view.briefings.overdue.length : 0;
   return (
     <>
+      {state ? (
+        <Card title="Перед сменой">
+          {steps.map((step) => (
+            <Row
+              key={step.id}
+              icon={STEP_ICON[step.id]}
+              tone={step.done ? 'ok' : step.id === 'ADMISSION' ? 'warn' : ''}
+              title={`${step.n}. ${step.title}`}
+              note={`${step.hint} · ${step.note}`}
+              chevron={step.opens !== null}
+              onClick={step.opens ? () => go(STEP_SCREEN[step.opens as 'PPE' | 'BRIEFING' | 'KNOWLEDGE']) : undefined}
+            />
+          ))}
+        </Card>
+      ) : null}
+      {state ? (
+        <Banner tone={left.length === 0 ? 'info' : 'warn'} title={left.length === 0
+          ? 'Все шаги пройдены'
+          : `Осталось: ${left.join(', ')}`}>
+          {' '}Прохождение занимает 5–10 минут.
+        </Banner>
+      ) : null}
+      {error ? <Card><Nodata>{error}</Nodata></Card> : null}
+      {!view && !error ? <Card><Nodata>Читаем ваш допуск…</Nodata></Card> : null}
+      {view ? (
+      <>
       <Card>
         <Row icon="shield" tone={view.clearance.cleared ? 'ok' : 'bad'}
           title={view.clearance.cleared ? 'Допуск в порядке' : 'Допуск не оформлен'}
@@ -568,9 +611,205 @@ function ScreenSafety({view, error}: {view: SelfSafetyView | null; error: string
               note={`${dateRu(record.recordedAt)}${record.result ? ` · ${record.result}` : ''}`} />
           ))}
       </Card>
+      </>
+      ) : null}
     </>
   );
 }
+
+/* --------------------------------------------------- шаги допуска (ТБ) --- */
+
+/** СИЗ: отмечает человек, нехватка записывается как есть и не запирает экран. */
+function ScreenPpe({state, busy, onConfirm}: {
+  state: OperatorMobileState;
+  busy: boolean;
+  onConfirm: (items: string[]) => void;
+}) {
+  const [items, setItems] = useState<string[]>(
+    state.identity.ppe.confirmed && state.identity.ppe.items.length > 0
+      ? state.identity.ppe.items
+      : PPE_ITEMS.map((item) => item.code),
+  );
+  const missing = PPE_ITEMS.filter((item) => !items.includes(item.code));
+  const toggle = (code: string) => setItems((current) => (
+    current.includes(code) ? current.filter((value) => value !== code) : [...current, code]
+  ));
+
+  return (
+    <>
+      <Card title="Отметьте то, что у вас есть и исправно">
+        {PPE_ITEMS.map((item) => (
+          <Row
+            key={item.code}
+            icon={items.includes(item.code) ? 'check' : 'minus'}
+            tone={items.includes(item.code) ? 'ok' : 'bad'}
+            title={item.label}
+            note={item.hint}
+            onClick={() => toggle(item.code)}
+          />
+        ))}
+      </Card>
+      {missing.length > 0 ? (
+        <Banner tone="warn" title={`Не хватает: ${missing.map((item) => item.label).join(', ')}`}>
+          {' '}Запишем как есть — нехватка уйдёт предупреждением диспетчеру.
+        </Banner>
+      ) : null}
+      <button type="button" className="ov10-btn" disabled={busy} onClick={() => onConfirm(items)}>
+        {busy ? 'Записываем…' : 'Подтвердить проверку'}
+      </button>
+    </>
+  );
+}
+
+/** Ознакомление с инструкцией: текст целиком, затем отметка. */
+function ScreenBriefing({state, busy, onAcknowledge}: {
+  state: OperatorMobileState;
+  busy: boolean;
+  onAcknowledge: () => void;
+}) {
+  const [read, setRead] = useState(false);
+  const {briefing} = state.identity;
+  return (
+    <>
+      <Card>
+        <Row icon="doc" tone={briefing.ok ? 'ok' : 'warn'} title={SAFETY_BRIEFING.title}
+          note={`${SAFETY_BRIEFING.code} · версия ${briefing.version} · чтение ${SAFETY_BRIEFING.readingMinutes} мин`} />
+      </Card>
+      {SAFETY_BRIEFING.sections.map((section) => (
+        <Card key={section.id} title={section.title}>
+          {section.rules.map((rule) => (
+            <div className="ov10-item" key={rule}><div className="t">{rule}</div></div>
+          ))}
+        </Card>
+      ))}
+      <Card>
+        <Row
+          icon={read ? 'check' : 'minus'}
+          tone={read ? 'ok' : ''}
+          title="Я ознакомился с инструкцией"
+          note="понимаю требования и обязуюсь их соблюдать"
+          onClick={() => setRead((value) => !value)}
+        />
+      </Card>
+      <button type="button" className="ov10-btn" disabled={busy || !read} onClick={onAcknowledge}>
+        {busy ? 'Записываем…' : 'Ознакомлен'}
+      </button>
+    </>
+  );
+}
+
+interface Attempt {questions: KnowledgeQuestion[]; attemptToken: string}
+
+/**
+ * Проверка знаний.
+ *
+ * Ошибка не заваливает попытку: показываем верный ответ, вопрос возвращается в
+ * конец очереди. Цель — чтобы человек ушёл на площадку, зная правило, а не
+ * чтобы он не прошёл. Итог всё равно считает сервер по своему банку.
+ */
+function ScreenKnowledge({busy, onDone}: {
+  busy: boolean;
+  onDone: (picks: {questionId: string; picked: number}[], attemptToken: string) => void;
+}) {
+  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [queue, setQueue] = useState<KnowledgeQuestion[]>([]);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [shown, setShown] = useState(false);
+  const [picks, setPicks] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const abort = new AbortController();
+    void fetch('/api/operator/knowledge-attempt', {cache: 'no-store', signal: abort.signal})
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? 'Не удалось получить вопросы');
+        if (abort.signal.aborted) return;
+        setAttempt(payload.data as Attempt);
+        setQueue((payload.data as Attempt).questions);
+      })
+      .catch((cause: Error) => { if (!abort.signal.aborted) setError(cause.message); });
+    return () => abort.abort();
+  }, []);
+
+  if (error) return <Card><Nodata>{error}</Nodata></Card>;
+  if (!attempt) return <Card><Nodata>Получаем вопросы…</Nodata></Card>;
+
+  const total = attempt.questions.length;
+  const question = queue[0];
+
+  if (!question) {
+    return (
+      <>
+        <Card><Row icon="check" tone="ok" title="Все ответы верные" note={`${total} из ${total}`} /></Card>
+        <button
+          type="button"
+          className="ov10-btn green"
+          disabled={busy}
+          onClick={() => onDone(
+            Object.entries(picks).map(([questionId, value]) => ({questionId, picked: value})),
+            attempt.attemptToken,
+          )}
+        >
+          {busy ? 'Записываем…' : 'Записать результат'}
+        </button>
+      </>
+    );
+  }
+
+  const answered = total - queue.length;
+  const correct = picked !== null && picked === question.correct;
+  const next = () => {
+    if (picked === null) return;
+    setPicks((current) => ({...current, [question.id]: picked}));
+    setQueue((current) => (picked === question.correct
+      ? current.slice(1)
+      : [...current.slice(1), question]));
+    setPicked(null);
+    setShown(false);
+  };
+
+  return (
+    <>
+      <Card title={`Вопрос ${answered + 1} из ${total} · ${TOPIC_LABELS[question.topic]}`}>
+        <div className="ov10-item">
+          <div className="t">{question.text}</div>
+        </div>
+        {question.options.map((option, index) => (
+          <Row
+            key={option}
+            icon={picked === index ? 'check' : 'minus'}
+            tone={picked === index ? 'ok' : ''}
+            title={option}
+            onClick={shown ? undefined : () => setPicked(index)}
+          />
+        ))}
+      </Card>
+      {shown
+        ? (
+          <Banner tone={correct ? 'info' : 'warn'} title={correct ? 'Верно' : 'Неверно'}>
+            {correct ? '' : ` Правильный ответ: ${question.options[question.correct]}. Вопрос вернётся в конец.`}
+          </Banner>
+        )
+        : <Banner tone="info" title="Выберите один правильный вариант" />}
+      {shown
+        ? <button type="button" className="ov10-btn" onClick={next}>Далее</button>
+        : (
+          <button type="button" className="ov10-btn" disabled={picked === null} onClick={() => setShown(true)}>
+            Ответить
+          </button>
+        )}
+    </>
+  );
+}
+
+const STEP_ICON: Record<string, string> = {
+  PPE: 'safety', BRIEFING: 'doc', KNOWLEDGE: 'list', SIGNATURE: 'check', ADMISSION: 'shield',
+};
+
+const STEP_SCREEN: Record<'PPE' | 'BRIEFING' | 'KNOWLEDGE', string> = {
+  PPE: 'ppe', BRIEFING: 'briefing', KNOWLEDGE: 'knowledge',
+};
 
 /* ------------------------------------------------------------ приложение --- */
 
@@ -674,6 +913,28 @@ export function OperatorV10App() {
     }), 'Установка принята.');
   }, [commandId, run, state]);
 
+  /* Шаги допуска. Все три — строго онлайн: откладывать допуск в очередь значит
+     пустить человека на площадку по записи, которой сервер ещё не видел. */
+  const confirmPpe = useCallback((items: string[]) => {
+    const day = state?.productionDate;
+    if (!day) {
+      setNotice('Производственные сутки не определены: обновите состояние.');
+      return;
+    }
+    void run(() => sendCommand({command: 'confirm-ppe', productionDate: day, items}), 'СИЗ подтверждены.');
+  }, [run, state]);
+
+  const acknowledgeBriefing = useCallback(() => {
+    void run(() => sendCommand({command: 'acknowledge-briefing'}), 'Ознакомление записано.');
+  }, [run]);
+
+  const submitKnowledge = useCallback(
+    (picks: {questionId: string; picked: number}[], attemptToken: string) => {
+      void run(() => sendCommand({command: 'submit-knowledge', attemptToken, picks}), 'Проверка знаний записана.');
+    },
+    [run],
+  );
+
   /** Сдача осмотра: уходят ОТВЕТЫ ЧЕЛОВЕКА, а не «норма» по всем пунктам. */
   const submitInspection = useCallback(() => {
     const shiftId = state?.shift?.id;
@@ -743,7 +1004,7 @@ export function OperatorV10App() {
     if (loading) {
       return <><div className="ov10-skel" /><div className="ov10-skel short" /><div className="ov10-skel" /></>;
     }
-    if (current.id === 'safety') return <ScreenSafety view={safety} error={safetyError} />;
+    if (current.id === 'safety') return <ScreenSafety state={state} view={safety} error={safetyError} go={setActive} />;
     if (!state) {
       return (
         <Card>
@@ -753,6 +1014,9 @@ export function OperatorV10App() {
     }
     switch (current.id) {
       case 'docs': return <ScreenDocs state={state} />;
+      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} />;
+      case 'briefing': return <ScreenBriefing state={state} busy={busy} onAcknowledge={acknowledgeBriefing} />;
+      case 'knowledge': return <ScreenKnowledge busy={busy} onDone={submitKnowledge} />;
       case 'accept': return <ScreenAccept state={state} busy={busy} onAccept={accept} go={setActive} />;
       case 'inspect': return (
         <ScreenInspect

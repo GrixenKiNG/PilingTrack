@@ -1,5 +1,7 @@
 'use client';
 
+import type {ReactNode} from 'react';
+
 import {useState} from 'react';
 import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
@@ -17,8 +19,10 @@ import {WarningsPanel} from '../warnings-panel';
  * ПОЧЕМУ НЕТ ВВОДА МОТОЧАСОВ. Их снимают при пуске, в ЕО перед работой. Два
  * ввода подряд про одно и то же заполняют не глядя.
  */
-export function AdmissionScreen({state, onAccept, onSelectEquipment, busy, error}: {
+export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy, error}: {
   state: OperatorMobileState;
+  /** Нижние вкладки: на приёме они уже доступны — см. `operator-mobile-app`. */
+  tabs?: ReactNode;
   onAccept: (input: {equipmentId: string; shiftType: 'DAY' | 'NIGHT'}) => void;
   /**
    * Выбор машины поднят в оболочку, потому что от него зависит не только
@@ -35,7 +39,7 @@ export function AdmissionScreen({state, onAccept, onSelectEquipment, busy, error
 
   if (!assignment) {
     return (
-      <Screen title="Приём установки">
+      <Screen title="Приём установки" tabs={tabs}>
         <WarningsPanel warnings={state.warnings} />
         <Panel>
           <p className="text-sm text-muted-foreground">
@@ -54,6 +58,7 @@ export function AdmissionScreen({state, onAccept, onSelectEquipment, busy, error
   return (
     <Screen
       title="Приём установки"
+      tabs={tabs}
       subtitle={`${assignment.siteName} · ${new Date().toLocaleDateString('ru-RU')}`}
       footer={(
         <BigButton
