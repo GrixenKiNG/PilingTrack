@@ -75,7 +75,12 @@ echo "✓ Backup complete: $(du -h "$OUT" | cut -f1)"
 #
 # A failed off-site copy is a warning, not a hard failure — the local dump
 # already succeeded and that's what matters for the exit code.
-read_env() { grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2-; }
+# NOTE: must never fail. The script runs under `set -euo pipefail`, so a
+# grep that finds nothing would return 1, pipefail would surface it, and the
+# whole backup would abort — which is exactly what happened on prod when the
+# optional BACKUP_S3_* keys were absent (2026-09-16). The trailing `|| true`
+# makes a missing key an empty string, not a fatal error.
+read_env() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
 S3_ENDPOINT_VAL="$(read_env BACKUP_S3_ENDPOINT)"
 S3_BUCKET_VAL="$(read_env BACKUP_S3_BUCKET)"
