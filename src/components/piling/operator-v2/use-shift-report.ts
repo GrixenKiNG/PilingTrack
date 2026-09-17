@@ -25,16 +25,34 @@ export interface DowntimeReason { id: string; name: string }
 export interface PileEntry { pileGradeId: string; count: number }
 /** Простой измеряется в ЧАСАХ — сервер сверяет сумму с длиной смены. */
 export interface DowntimeEntry { reasonId: string; duration: number; comment?: string }
+/**
+ * Лидерное бурение. Своего ввода в этом модуле нет, но строки ОБЯЗАНЫ здесь
+ * быть: сохранение отчёта — полная замена его содержимого, и то, чего нет в
+ * черновике, сервер удаляет. Подробности — в примечании к `save`.
+ */
+export interface DrillingEntry {
+  /** Идентификатор существующей строки: по нему сервер узнаёт её, а не заводит новую. */
+  id?: string;
+  typeId: string;
+  count: number;
+  metersPerUnit: number;
+  /** Метры обязательны в схеме сохранения — без них запись не пройдёт проверку. */
+  meters: number;
+  picketId?: string;
+}
 
 interface Draft {
   reportId: string | null;
   version: number | undefined;
   piles: PileEntry[];
+  drillings: DrillingEntry[];
   downtimes: DowntimeEntry[];
   status: 'draft' | 'submitted';
 }
 
-const EMPTY: Draft = { reportId: null, version: undefined, piles: [], downtimes: [], status: 'draft' };
+const EMPTY: Draft = {
+  reportId: null, version: undefined, piles: [], drillings: [], downtimes: [], status: 'draft',
+};
 
 export function useShiftReport(siteId: string | null, equipmentId: string | null, shiftType: string) {
   const [grades, setGrades] = useState<PileGrade[]>([]);
@@ -91,12 +109,49 @@ export function useShiftReport(siteId: string | null, equipmentId: string | null
     const report = body?.report ?? body?.data ?? null;
     if (!report) return;
     setDraft({
-      reportId: report.id ?? null,
+      /*
+        Берём `reportId`, а НЕ `id`. Это разные колонки: `id` — первичный ключ
+        строки, `reportId` — внешний номер отчёта, и сохранение ищет отчёт
+        именно по второму (`report.repository.findUnique({where:{reportId}})`).
+        Здесь стоял `report.id`, поиск не находил ничего, сохранение уходило по
+        ветке СОЗДАНИЯ и падало на уникальности (tenantId, shiftId), потому что
+        отчёт на эту смену уже есть. Оператор получал 409 со стеком Prisma
+        вместо записи. Ломалось это ровно тогда, когда смену открыли в живом
+        `/operator`: там номер отчёта вида «RM-<смена>-<дата>» никогда не
+        совпадает с `id`.
+      */
+      reportId: report.reportId ?? report.id ?? null,
       version: typeof report.version === 'number' ? report.version : undefined,
       piles: (report.piles ?? []).map((row: { pileGradeId: string; count: number }) =>
         ({ pileGradeId: row.pileGradeId, count: row.count })),
-      downtimes: (report.downtimes ?? []).map((row: { reasonId: string; duration: number; comment?: string }) =>
-        ({ reasonId: row.reasonId, duration: row.duration, comment: row.comment })),
+      // Бурение читаем, хотя не показываем и не правим: иначе первое же
+      // сохранение сотрёт его с сервера. Возвращаем строку как есть, включая
+      // идентификатор и метры: метры обязательны в схеме, а без идентификатора
+      // сервер счёл бы строку новой.
+      drillings: (report.drillings ?? []).map((row: {
+        id?: string; typeId: string; count: number; metersPerUnit: number;
+        meters: number; picketId?: string | null;
+      }) => ({
+        id: row.id,
+        typeId: row.typeId,
+        count: row.count,
+        metersPerUnit: row.metersPerUnit,
+        meters: row.meters,
+        ...(row.picketId ? {picketId: row.picketId} : {}),
+      })),
+      /*
+        Пустой комментарий приводим к `undefined`. Сервер отдаёт его как `null`,
+        а схема сохранения ждёт строку либо отсутствие поля и на `null` отвечает
+        «Invalid input: expected string, received null» — то есть прочитанная с
+        сервера запись не проходила обратную отправку.
+      */
+      downtimes: (report.downtimes ?? []).map((row: {
+        reasonId: string; duration: number; comment?: string | null;
+      }) => ({
+        reasonId: row.reasonId,
+        duration: row.duration,
+        ...(row.comment ? {comment: row.comment} : {}),
+      })),
       status: report.status === 'submitted' ? 'submitted' : 'draft',
     });
   }, [siteId, today]);
@@ -108,6 +163,18 @@ export function useShiftReport(siteId: string | null, equipmentId: string | null
 
   /**
    * Записать отчёт.
+   *
+   * СОХРАНЕНИЕ — ПОЛНАЯ ЗАМЕНА СОДЕРЖИМОГО, А НЕ ДОБАВЛЕНИЕ. Сервер
+   * пересобирает отчёт из присланного: `report-command.service` восстанавливает
+   * его с пустыми дочерними списками, репозиторий сверяет их с базой и
+   * УДАЛЯЕТ всё, чего в посылке нет. Здесь стояло `drillings: []` — и первое же
+   * «+ Новая свая» стирало лидерное бурение, записанное диспетчером или живым
+   * `/operator` в тот же отчёт за те же сутки. Молча, без единого сообщения.
+   * Поэтому бурение читается в черновик и возвращается обратно как есть, хотя
+   * своего ввода для него в этом модуле нет.
+   *
+   * Правило общее: любое новое дочернее поле отчёта, появившееся на сервере,
+   * обязано появиться и здесь, иначе оно начнёт исчезать тем же способом.
    *
    * @param status черновик или отправка. Отправка — отдельное решение
    *   человека: молча отправлять отчёт при добавлении сваи нельзя, после
@@ -133,7 +200,7 @@ export function useShiftReport(siteId: string | null, equipmentId: string | null
           status,
           piles: next.piles,
           downtimes: next.downtimes,
-          drillings: [],
+          drillings: next.drillings,
         }),
       });
       const body = await response.json().catch(() => null);
@@ -142,11 +209,22 @@ export function useShiftReport(siteId: string | null, equipmentId: string | null
           ? (body.details?.[0]?.message ?? 'Отчёт не прошёл проверку')
           : (body?.error ?? 'Не удалось сохранить отчёт'));
       }
-      const saved = body?.report ?? body?.data ?? null;
+      /*
+        Номер версии берём из ответа, а он лежит на ДВА уровня глубже, чем
+        читалось раньше: `{report: {report: {...}}}`. Прежнее `body.report.version`
+        всегда давало `undefined`, версия в черновике оставалась прежней, и
+        ВТОРАЯ запись подряд падала с «Отчёт был изменён другим пользователем» —
+        хотя менял его тот же человек секунду назад.
+
+        Поля отчёта берём из ответа целиком, а не собираем из `next`: сервер
+        мог изменить состояние (например, отметить отчёт отправленным), и
+        черновик, разошедшийся с сервером, — это следующая такая же ошибка.
+      */
+      const saved = body?.report?.report ?? body?.report ?? body?.data ?? null;
       setDraft({
         ...next,
-        status,
-        reportId: saved?.id ?? next.reportId,
+        status: saved?.status === 'submitted' ? 'submitted' : status,
+        reportId: saved?.reportId ?? next.reportId,
         version: typeof saved?.version === 'number' ? saved.version : next.version,
       });
       return true;
