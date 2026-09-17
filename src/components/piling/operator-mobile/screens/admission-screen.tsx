@@ -129,36 +129,39 @@ export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy,
         </p>
       </Panel>
 
+      {/* Погода — строкой, а не двумя крупными числами в отдельной карточке.
+          Температура и ветер здесь нужны как условие допуска к работам, а не
+          как сводка: карточка на сто точек ради двух чисел отодвигала кнопку
+          приёмки за край экрана. */}
       <Panel tone={state.weather ? 'plain' : 'warning'}>
-        <PanelTitle>Погода на площадке</PanelTitle>
         {state.weather ? (
           <>
-            <div className="mt-2 flex gap-6">
-              <div>
-                <p className="text-2xl font-bold tabular-nums leading-none">
-                  {state.weather.temperatureC !== null ? `${state.weather.temperatureC}°` : '—'}
-                </p>
-                <p className="mt-1 text-2xs text-muted-foreground">температура</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold tabular-nums leading-none">
-                  {state.weather.windMs !== null ? state.weather.windMs : '—'}
-                </p>
-                <p className="mt-1 text-2xs text-muted-foreground">ветер, м/с</p>
-              </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Погода на площадке
+              </span>
+              <span className="text-sm font-bold tabular-nums">
+                {state.weather.temperatureC !== null ? `${state.weather.temperatureC}°` : '—'}
+                {' · ветер '}
+                {state.weather.windMs !== null ? state.weather.windMs : '—'}
+                {' м/с'}
+              </span>
             </div>
             {state.conditions.length > 0 ? (
-              <p className="mt-3 text-sm">
-                Условия смены: {state.conditions.map((condition) => CONDITION_LABELS[condition]).join(', ')}.
+              <p className="mt-1 text-2xs text-muted-foreground">
+                {state.conditions.map((condition) => CONDITION_LABELS[condition]).join(', ')}.
                 В чек-листы добавлены сезонные пункты.
               </p>
             ) : null}
           </>
         ) : (
-          <p className="mt-1 text-sm">
-            Погода недоступна: нет координат либо сервис молчит. Сезонные пункты чек-листов
-            не добавлены — оцените условия сами.
-          </p>
+          <>
+            <PanelTitle>Погода на площадке</PanelTitle>
+            <p className="mt-1 text-sm">
+              Погода недоступна: нет координат либо сервис молчит. Сезонные пункты чек-листов
+              не добавлены — оцените условия сами.
+            </p>
+          </>
         )}
       </Panel>
 

@@ -24,11 +24,6 @@ export function ProfileTab({state, onOpenBriefing, onOpenKnowledge}: {
 
   return (
     <>
-      <Panel>
-        <PanelTitle>{state.operator.name}</PanelTitle>
-        <p className="text-2xs text-muted-foreground">Машинист</p>
-      </Panel>
-
       <DocumentsPanel documents={documents} />
 
       <Panel tone={briefing.ok ? 'ok' : 'warning'}>

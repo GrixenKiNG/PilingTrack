@@ -1,6 +1,6 @@
 'use client';
 
-import type {ReactNode} from 'react';
+import {useEffect, useRef, type ReactNode} from 'react';
 import {cn} from '@/lib/utils';
 
 /**
@@ -21,35 +21,91 @@ export function Screen({title, subtitle, children, footer, tabs}: {
   /** Нижние вкладки. Появляются только после начала работы — см. TabBar. */
   tabs?: ReactNode;
 }) {
+  const main = useDensityFit([title, subtitle, children, footer, tabs]);
   return (
     <div className="operator-screen flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="operator-screen-header border-b px-4 pb-3 pt-4">
-        <h1 className="text-[1.65rem] font-black leading-tight tracking-[-0.025em] text-balance">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
+      <header className="operator-screen-header border-b px-4 pb-2.5 pt-3">
+        <h1 className="text-[1.4rem] font-black leading-tight tracking-[-0.025em] text-balance">{title}</h1>
+        {subtitle ? <p className="mt-0.5 text-2xs text-muted-foreground">{subtitle}</p> : null}
       </header>
       {/*
-        Отступ снизу отмеряется под то, что там ДЕЙСТВИТЕЛЬНО есть.
-        Прилипшая панель перекрывает конец списка, поэтому под неё оставляют
-        место — но раньше `pb-40` (160 px) ставился и тогда, когда ни кнопки, ни
-        вкладок внизу нет. На экране «Смена закрыта» это давало полосу пустоты и
-        прокрутку там, где всё помещалось (жалоба 16.09.2026).
+        Снизу — только дыхание, а не место под панель.
+
+        Раньше здесь стояло `pb-56` (224 px) «под прилипшую панель». Панель
+        прилипшая, но она же — обычный элемент колонки и занимает свою строку
+        ПОСЛЕ содержимого: замер показал 81 + 935 + 152 = 1168, то есть высота
+        панели была посчитана дважды. Эти 224 px и были главной причиной
+        прокрутки там, где всё помещалось (жалоба 17.09.2026).
       */}
-      <main className={cn(
-        'operator-screen-main flex-1 space-y-3 px-4 py-4',
-        footer && tabs ? 'pb-56' : footer ? 'pb-40' : tabs ? 'pb-24' : 'pb-6',
-      )}>{children}</main>
+      <main className="operator-screen-main flex-1 space-y-2.5 px-4 pb-3 pt-2.5"
+        ref={main}>{children}</main>
       {/*
         Пустую панель не рисуем вовсе: с рамкой и тенью она выглядела как
         оборванный низ экрана.
       */}
       {footer || tabs ? (
         <div className="operator-screen-footer sticky bottom-0 z-20 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
-          {footer ? <div className="space-y-2 px-4 py-3">{footer}</div> : null}
+          {footer ? <div className="space-y-2 px-4 py-1.5">{footer}</div> : null}
           {tabs}
         </div>
       ) : null}
     </div>
   );
+}
+
+/**
+ * Поджать содержимое вместо прокрутки.
+ *
+ * Экран из трёх карточек, который приходится листать, раздражает сильнее, чем
+ * шрифт на десятую меньше: в рукавице прокрутка — это отдельное действие, а
+ * половину смены человек смотрит на экран одной рукой. Поэтому при небольшом
+ * перехлёсте содержимое сжимается — но не ниже 0,8: дальше страдает
+ * читаемость на морозе, а осмотр с нечитаемым пунктом опаснее прокрутки.
+ *
+ * Сжимается ТОЛЬКО содержимое. Шапка и нижняя панель остаются в полный
+ * размер: цель нажатия во вкладках не должна уезжать ниже 44 точек, ради чего
+ * вкладок и оставлено четыре.
+ *
+ * `zoom`, а не `transform: scale` — масштаб должен менять занимаемое место, а
+ * не рисовать уменьшенную картинку поверх прежнего. Коэффициент ставится прямо
+ * на узел: это подгонка вида, перерисовка ради неё не нужна.
+ */
+function useDensityFit(deps: unknown[]) {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+
+    const fit = () => {
+      /*
+        Считаем по фактическому перехлёсту страницы, а не по сумме высот
+        окружения. Складывать шапку приложения, полосу фаз, строку связи и
+        нижнюю панель значит повторять в коде вёрстку — и ошибаться на
+        десяток точек при любой её правке. Вопрос у нас ровно один: «страница
+        сейчас листается?», и браузер отвечает на него сам.
+      */
+      node.style.removeProperty('zoom');
+      const page = document.documentElement;
+      const overflow = page.scrollHeight - page.clientHeight;
+      if (overflow <= 0) return;
+
+      const height = node.getBoundingClientRect().height;
+      const target = height - overflow;
+      if (height <= 0 || target <= 0) return;
+
+      // Округляем ВНИЗ: лишняя сотая сжатия незаметна, недостающая оставляет
+      // прокрутку — ровно то, ради чего всё и затевалось.
+      node.style.zoom = String(Math.max(0.8, Math.floor((target / height) * 100) / 100));
+    };
+
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- пересчёт при любой смене содержимого экрана
+  }, deps);
+
+  return ref;
 }
 
 export interface TabDefinition<T extends string> {
@@ -234,15 +290,16 @@ export function PhaseBar({progress, onOpen}: {
       ? progress.length
       : Math.min(progress.filter((step) => step.done).length + 1, progress.length);
   return (
-    <div className="operator-phase-bar border-b border-white/10 bg-[#121a22] px-4 pb-3 pt-3 text-white">
-      <div className="mb-2.5 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-3xs font-bold uppercase tracking-[0.18em] text-white/55">
-            {completed ? `${progress.length} из ${progress.length}` : `Шаг ${displayedStep} из ${progress.length}`}
-          </p>
-          <p className="mt-0.5 text-sm font-bold">{current?.label ?? 'Смена завершена'}</p>
-        </div>
-        <p className="text-right text-3xs font-medium text-white/55">Контроль смены</p>
+    <div className="operator-phase-bar border-b border-white/10 bg-[#121a22] px-4 pb-1.5 pt-1.5 text-white">
+      {/* Шаг и его название — одной строкой. Тремя строками («Шаг 2 из 7»,
+          «Приём», «Контроль смены») этот заголовок занимал больше места, чем
+          сама шкала под ним, а подпись «Контроль смены» не сообщала ничего,
+          чего не видно из шкалы. */}
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span className="text-3xs font-bold uppercase tracking-[0.18em] text-white/55">
+          {completed ? `${progress.length} из ${progress.length}` : `Шаг ${displayedStep} из ${progress.length}`}
+        </span>
+        <span className="min-w-0 truncate text-sm font-bold">{current?.label ?? 'Смена завершена'}</span>
       </div>
       <ol
         className="grid"
