@@ -1,14 +1,8 @@
 'use client';
 
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {BigButton, Panel, PanelTitle, Sign} from '../ui';
-
-const VERDICT_LABELS: Record<string, string> = {
-  VALID: 'действует',
-  EXPIRING: 'скоро истекает',
-  EXPIRED: 'просрочен',
-  MISSING: 'не заведён',
-};
+import {BigButton, Panel, PanelTitle} from '../ui';
+import {DocumentsPanel} from './documents-panel';
 
 /**
  * Свои допуски: документы, инструктаж, проверка знаний.
@@ -35,31 +29,7 @@ export function ProfileTab({state, onOpenBriefing, onOpenKnowledge}: {
         <p className="text-2xs text-muted-foreground">Машинист</p>
       </Panel>
 
-      <Panel>
-        <PanelTitle>Документы</PanelTitle>
-        <ul className="mt-2 space-y-2">
-          {documents.map((document) => (
-            <li key={document.name} className="flex gap-2 border-t pt-2 first:border-t-0 first:pt-0">
-              <Sign
-                tone={
-                  document.verdict === 'VALID' ? 'ok'
-                    : document.verdict === 'EXPIRING' ? 'warning' : 'danger'
-                }
-              />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">{document.name}</p>
-                <p className="text-2xs text-muted-foreground">
-                  {VERDICT_LABELS[document.verdict] ?? document.verdict}
-                  {document.daysLeft !== null ? ` · ${document.daysLeft} дн.` : ''}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-2xs text-muted-foreground">
-          Документы заводит администратор. Если срок подходит — скажите диспетчеру заранее.
-        </p>
-      </Panel>
+      <DocumentsPanel documents={documents} />
 
       <Panel tone={briefing.ok ? 'ok' : 'warning'}>
         <PanelTitle tone={briefing.ok ? 'ok' : 'warning'}>{briefing.title}</PanelTitle>

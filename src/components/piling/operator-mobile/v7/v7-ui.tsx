@@ -217,11 +217,19 @@ export interface DockItem<K extends string> {
   mid?: boolean;
 }
 
+/**
+ * Нижнее меню: четыре раздела, один набор во всех модулях оператора.
+ *
+ * ПОЧЕМУ ЧЕТЫРЕ. Палец в рукавице — около 20 мм. На экране 375 px пять кнопок
+ * дают по 75 px, четыре — по 94 px; это разница между «попал» и «попал не
+ * туда». Прежние «Задания» и «Журнал» вкладок не заслужили: учёт выработки
+ * относится к смене и уехал в «Смену», журнал открывают раз в день — он в
+ * «Ещё».
+ */
 export const OPERATOR_DOCK = [
-  {key: 'HOME', label: 'Главная', glyph: '⌂'},
-  {key: 'TASKS', label: 'Задания', glyph: '☰'},
+  {key: 'HOME', label: 'Смена', glyph: '⌂'},
   {key: 'SAFETY', label: 'ТБ', glyph: '⛨', mid: true},
-  {key: 'JOURNAL', label: 'Журнал', glyph: '▤'},
+  {key: 'EQUIP', label: 'Техника', glyph: '⚙'},
   {key: 'MORE', label: 'Ещё', glyph: '⋯'},
 ] as const satisfies readonly DockItem<string>[];
 

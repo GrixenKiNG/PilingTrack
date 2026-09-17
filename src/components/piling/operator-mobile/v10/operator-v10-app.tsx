@@ -7,8 +7,8 @@ import type {
 import {PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired} from '@/modules/operator-mobile/contracts';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
+import {documentsSummary} from '../safety/documents-summary';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
-import {DOCUMENT_EXPIRY_LABELS, type DocumentExpiryStatus} from '@/lib/document-expiry';
 import {ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand} from '../api';
 import {formatHours, formatNumber} from '@/lib/format';
 import {
@@ -49,16 +49,6 @@ const DOC_TONE: Record<DocumentVerdict, Tone> = {
   VALID: 'ok', EXPIRING: 'warn', EXPIRED: 'bad', MISSING: 'bad',
 };
 
-/** Подписи состояния документа в разделе ТБ — из общего словаря приложения. */
-const CLEARANCE_LABEL: Record<DocumentExpiryStatus | 'missing', string> = {
-  ...DOCUMENT_EXPIRY_LABELS,
-  missing: 'не заведён',
-};
-
-const CLEARANCE_TONE: Record<DocumentExpiryStatus | 'missing', Tone> = {
-  perpetual: 'ok', ok: 'ok', expiring: 'warn', expired: 'bad', missing: 'bad',
-};
-
 /** Прочерк вместо выдуманного значения. */
 const DASH = '—';
 
@@ -92,33 +82,35 @@ interface ScreenDef {
 }
 
 const SCREENS: ScreenDef[] = [
-  {id: 'today', n: 1, title: 'Сегодня', short: 'Лента смены', tab: 'today'},
+  {id: 'today', n: 1, title: 'Смена', short: 'Лента смены', tab: 'today'},
   {id: 'docs', n: 2, title: 'Документы', short: 'Документы', tab: 'more'},
-  {id: 'accept', n: 3, title: 'Принять установку', short: 'Приёмка', tab: 'work'},
-  {id: 'inspect', n: 4, title: 'Предсменный осмотр', short: 'Осмотр', tab: 'work'},
-  {id: 'ready', n: 5, title: 'Готовность', short: 'Готовность', tab: 'work'},
-  {id: 'work', n: 6, title: 'Работа', short: 'Работа', tab: 'work'},
+  {id: 'accept', n: 3, title: 'Принять установку', short: 'Приёмка', tab: 'today'},
+  {id: 'inspect', n: 4, title: 'Предсменный осмотр', short: 'Осмотр', tab: 'today'},
+  {id: 'ready', n: 5, title: 'Готовность', short: 'Готовность', tab: 'today'},
+  {id: 'work', n: 6, title: 'Работа', short: 'Работа', tab: 'today'},
   {id: 'maint', n: 7, title: 'Ежесменное обслуживание', short: 'Обслуживание', tab: 'equip'},
-  {id: 'closing', n: 8, title: 'Закрытие смены', short: 'Закрытие', tab: 'report'},
-  {id: 'report', n: 9, title: 'Отчёт и синхронизация', short: 'Отчёт', tab: 'report'},
+  {id: 'closing', n: 8, title: 'Закрытие смены', short: 'Закрытие', tab: 'more'},
+  {id: 'report', n: 9, title: 'Отчёт и синхронизация', short: 'Отчёт', tab: 'more'},
   {id: 'safety', n: 10, title: 'ТБ и допуски', short: 'ТБ', tab: 'safety'},
   {id: 'ppe', n: 11, title: 'Средства защиты', short: 'СИЗ', tab: 'safety'},
   {id: 'briefing', n: 12, title: 'Ознакомление с инструкцией', short: 'Инструкция', tab: 'safety'},
   {id: 'knowledge', n: 13, title: 'Проверка знаний по ТБ', short: 'Знания', tab: 'safety'},
+  {id: 'more', n: 14, title: 'Ещё', short: 'Ещё', tab: 'more'},
 ];
 
 /**
- * Нижнее меню. Шесть разделов: пять с эталона плюс «ТБ» — его попросили вынести
- * отдельно, потому что допуск и инструктажи человек открывает не в конце смены,
- * а до неё, и искать их во вкладке «Ещё» он не станет.
+ * Нижнее меню: четыре раздела, один набор во всех модулях оператора.
+ *
+ * Было шесть. «Работа» ушла в «Смену» — приёмка, осмотр и учёт это один
+ * сквозной ход, и разрывать его вкладкой незачем. «Отчёт» ушёл в «Ещё»:
+ * закрытие смены бывает раз в день, а постоянная кнопка под однократное
+ * действие — это шесть часов мёртвого места.
  */
 const TABS: ScreenTab[] = [
-  {key: 'today', title: 'Сегодня', icon: 'home', screen: 'today'},
-  {key: 'work', title: 'Работа', icon: 'work', screen: 'work'},
-  {key: 'equip', title: 'Техника', icon: 'equip', screen: 'maint'},
+  {key: 'today', title: 'Смена', icon: 'home', screen: 'today'},
   {key: 'safety', title: 'ТБ', icon: 'safety', screen: 'safety'},
-  {key: 'report', title: 'Отчёт', icon: 'report', screen: 'closing'},
-  {key: 'more', title: 'Ещё', icon: 'more', screen: 'docs'},
+  {key: 'equip', title: 'Техника', icon: 'equip', screen: 'maint'},
+  {key: 'more', title: 'Ещё', icon: 'more', screen: 'more'},
 ];
 
 /* ------------------------------------------------------------ состояние --- */
@@ -594,14 +586,13 @@ function ScreenSafety({state, view, error, go}: {
         <Row icon="inspect" tone={pending > 0 ? 'warn' : 'ok'} title="Инструктажи"
           note={pending > 0 ? `ожидают: ${pending}` : 'пройдены'} />
       </Card>
-      <Card title="Документы">
-        {view.clearance.documents.length === 0
-          ? <Nodata>Обязательных документов для вашей роли нет</Nodata>
-          : view.clearance.documents.map((doc) => (
-            <Row key={doc.typeId} icon="doc" tone={CLEARANCE_TONE[doc.status] ?? ''}
-              title={doc.typeName}
-              note={`${CLEARANCE_LABEL[doc.status] ?? doc.status}${doc.expiresAt ? ` · до ${dateRu(doc.expiresAt)}` : ''}`} />
-          ))}
+      {/* Список документов сюда не разворачиваем: одиннадцать строк «действует
+          до 14.09.2029» отодвигают шаги допуска на два экрана вниз. Одна
+          строка отвечает на тот же вопрос, а список — в одном нажатии. */}
+      <Card>
+        <Row icon="doc" tone={documentsTone(state)} title="Документы"
+          note={state ? documentsSummary(state.identity.documents).note : `всего: ${view.clearance.documents.length}`}
+          chevron onClick={() => go('docs')} />
       </Card>
       <Card title="Журнал ТБ">
         {view.history.length === 0
@@ -614,6 +605,21 @@ function ScreenSafety({state, view, error, go}: {
       </>
       ) : null}
     </>
+  );
+}
+
+/** «Ещё»: разделы, которые открывают раз в смену, а не раз в час. */
+function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
+  const summary = documentsSummary(state.identity.documents);
+  return (
+    <Card>
+      <Row icon="doc" title="Документы" note={summary.note} chevron onClick={() => go('docs')} />
+      <Row icon="handoff" title="Закрытие смены"
+        note={state.shift ? 'сдать смену и записать замечания' : 'смена не открыта'}
+        chevron onClick={() => go('closing')} />
+      <Row icon="report" title="Отчёт и синхронизация" note="что уже ушло на сервер"
+        chevron onClick={() => go('report')} />
+    </Card>
   );
 }
 
@@ -801,6 +807,14 @@ function ScreenKnowledge({busy, onDone}: {
         )}
     </>
   );
+}
+
+function documentsTone(state: OperatorMobileState | null): Tone {
+  if (!state) return '';
+  const summary = documentsSummary(state.identity.documents);
+  if (summary.blocking > 0) return 'bad';
+  if (summary.expiring > 0) return 'warn';
+  return 'ok';
 }
 
 const STEP_ICON: Record<string, string> = {
@@ -1014,6 +1028,7 @@ export function OperatorV10App() {
     }
     switch (current.id) {
       case 'docs': return <ScreenDocs state={state} />;
+      case 'more': return <ScreenMore state={state} go={setActive} />;
       case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} />;
       case 'briefing': return <ScreenBriefing state={state} busy={busy} onAcknowledge={acknowledgeBriefing} />;
       case 'knowledge': return <ScreenKnowledge busy={busy} onDone={submitKnowledge} />;

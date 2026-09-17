@@ -376,7 +376,7 @@ export function OperatorV7App() {
         <Dock
           items={OPERATOR_DOCK}
           active={tab}
-          badges={{JOURNAL: openIncidents}}
+          badges={{MORE: openIncidents}}
           onSelect={(next) => { setTab(next); setActionError(null); }}
         />
       )}
@@ -418,26 +418,29 @@ export function OperatorV7App() {
           />
         ) : null}
 
-        {tab === 'TASKS' ? <TasksScreen state={state} onEntry={(entry) => setDetour({kind: 'PRODUCTION', entry})} /> : null}
+        {/* Учёт выработки — часть смены, а не отдельный раздел: машинист
+            записывает сваи там же, где видит, на каком он шаге. */}
+        {tab === 'HOME' ? (
+          <TasksScreen state={state} onEntry={(entry) => setDetour({kind: 'PRODUCTION', entry})} />
+        ) : null}
         {tab === 'SAFETY' ? (
           <SafetyTab state={state} onStep={(step) => setDetour(step)} />
         ) : null}
-        {tab === 'JOURNAL' ? (
+        {tab === 'EQUIP' ? <EquipmentScreen defects={state.defects} /> : null}
+        {tab === 'MORE' ? (
           <>
             <JournalScreen state={state} />
             <IncidentsScreen incidents={state.incidents} />
-            <EquipmentScreen defects={state.defects} />
+            <MoreScreen state={state} onResult={() => setDetour({kind: 'RESULT'})} />
           </>
         ) : null}
-        {tab === 'MORE' ? <MoreScreen state={state} onResult={() => setDetour({kind: 'RESULT'})} /> : null}
       </div>
     </Shell>
   );
 }
 
 const TAB_TITLES: Record<DockTab, string> = {
-  HOME: 'Смена', TASKS: 'Задания', SAFETY: 'Техника безопасности',
-  JOURNAL: 'Журнал смены', MORE: 'Ещё',
+  HOME: 'Смена', SAFETY: 'Техника безопасности', EQUIP: 'Техника', MORE: 'Ещё',
 };
 
 /** Чек-листы ТБ и шаги допуска — вкладка «ТБ» нижнего меню. */

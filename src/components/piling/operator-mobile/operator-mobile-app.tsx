@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
-import {HardHat, ShieldCheck, TriangleAlert, UserRound, Wrench} from 'lucide-react';
+import {Ellipsis, HardHat, ShieldCheck, Wrench} from 'lucide-react';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile/contracts';
@@ -42,7 +42,7 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
  * площадка, — и порядок здесь не удобство, а безопасность. Когда работа
  * началась, ведение заканчивается, и машинист сам решает, куда смотреть.
  */
-type WorkTab = 'SHIFT' | 'EQUIPMENT' | 'SAFETY' | 'INCIDENTS' | 'PROFILE';
+type WorkTab = 'SHIFT' | 'SAFETY' | 'EQUIPMENT' | 'MORE';
 
 /** Экраны, открываемые вне очереди фаз. */
 type Detour =
@@ -323,7 +323,6 @@ export function OperatorMobileApp() {
               : state.phase === 'CLOSING' ? 'Сдача' : 'Работа',
           icon: <HardHat />,
         },
-        {id: 'EQUIPMENT', label: 'Техника', icon: <Wrench />, badge: state.defects.length},
         {
           id: 'SAFETY',
           label: 'ТБ',
@@ -331,14 +330,16 @@ export function OperatorMobileApp() {
           // На значке — число непройденных шагов допуска. Ноль значка не рисует.
           badge: admissionBlockers(admissionSteps(state)).length,
         },
+        {id: 'EQUIPMENT', label: 'Техника', icon: <Wrench />, badge: state.defects.length},
         {
-          id: 'INCIDENTS',
-          label: 'События',
-          icon: <TriangleAlert />,
+          id: 'MORE',
+          label: 'Ещё',
+          icon: <Ellipsis />,
+          // Происшествия переехали сюда, поэтому их счётчик — на «Ещё»: иначе
+          // неразобранное событие пропадало бы с глаз вместе со вкладкой.
           badge: alarmingIncidents,
           alarming: alarmingIncidents > 0,
         },
-        {id: 'PROFILE', label: 'Профиль', icon: <UserRound />},
       ]}
     />
   ) : undefined;
@@ -372,20 +373,10 @@ export function OperatorMobileApp() {
     // нет нижней кнопки действия — действие у каждой своё и внутри.
     if (tabsVisible && workTab !== 'SHIFT') {
       const title = workTab === 'EQUIPMENT' ? 'Техника'
-        : workTab === 'SAFETY' ? 'Техника безопасности'
-          : workTab === 'INCIDENTS' ? 'Происшествия' : 'Мои допуски';
+        : workTab === 'SAFETY' ? 'Техника безопасности' : 'Ещё';
       return (
         <Screen title={title} subtitle={state.assignment?.equipmentName} tabs={tabBar}>
           {workTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
-          {workTab === 'INCIDENTS' ? (
-            <IncidentsTab
-              state={state}
-              busy={busy}
-              error={actionError}
-              commandId={incidentCommandId}
-              onReport={reportIncident}
-            />
-          ) : null}
           {workTab === 'SAFETY' ? (
             <SafetyTab
               state={state}
@@ -395,12 +386,27 @@ export function OperatorMobileApp() {
               )}
             />
           ) : null}
-          {workTab === 'PROFILE' ? (
-            <ProfileTab
-              state={state}
-              onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}
-              onOpenKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
-            />
+          {/*
+            «Ещё» собирает то, что открывают редко: происшествия (форма внутри
+            свёрнута) и свои допуски. Отдельные вкладки под них съедали ширину
+            панели: в рукавице палец — это 20 мм, и пять кнопок на 375 px дают
+            по 75 px, четыре — по 94 px.
+          */}
+          {workTab === 'MORE' ? (
+            <>
+              <IncidentsTab
+                state={state}
+                busy={busy}
+                error={actionError}
+                commandId={incidentCommandId}
+                onReport={reportIncident}
+              />
+              <ProfileTab
+                state={state}
+                onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}
+                onOpenKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
+              />
+            </>
           ) : null}
         </Screen>
       );

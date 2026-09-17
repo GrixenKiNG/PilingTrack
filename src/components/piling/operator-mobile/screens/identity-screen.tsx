@@ -2,22 +2,10 @@
 
 import type {ReactNode} from 'react';
 import {missingPpeLabels} from '@/modules/operator-mobile/contracts';
-import type {DocumentCheck, IdentityView, WorkWarning} from '@/modules/operator-mobile/contracts';
+import type {IdentityView, WorkWarning} from '@/modules/operator-mobile/contracts';
 import {BigButton, Panel, PanelTitle, Screen, Sign} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
-
-const VERDICT_TEXT: Record<DocumentCheck['verdict'], string> = {
-  VALID: 'Действует',
-  EXPIRING: 'Скоро истекает',
-  EXPIRED: 'Просрочен',
-  MISSING: 'Не заведён',
-};
-
-function documentTone(check: DocumentCheck) {
-  if (check.verdict === 'VALID') return 'ok' as const;
-  if (check.verdict === 'EXPIRING') return 'warning' as const;
-  return 'danger' as const;
-}
+import {DocumentsPanel} from './documents-panel';
 
 /**
  * Первый экран смены: инструктаж, проверка знаний и документы.
@@ -40,12 +28,6 @@ export function IdentityScreen({identity, operatorName, warnings, tabs, onPpe, o
   onContinue: () => void;
 }) {
   const ready = identity.ppe.confirmed && identity.briefing.ok && identity.knowledge.ok;
-  // Обязательные документы показываем карточками, остальные — свёрнутым
-  // списком. Одиннадцать красных карточек про документы, которых никто не
-  // требовал, оператор пролистывает не читая, и настоящее предупреждение
-  // тонет среди них.
-  const required = identity.documents.filter((document) => document.required);
-  const optional = identity.documents.filter((document) => !document.required);
   const nextAction = !identity.ppe.confirmed
     ? {label: 'Проверить средства защиты', run: onPpe}
     : !identity.briefing.ok
@@ -147,63 +129,7 @@ export function IdentityScreen({identity, operatorName, warnings, tabs, onPpe, o
         </div>
       </Panel>
 
-      <div className="space-y-2 pt-1">
-        <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Документы
-        </h2>
-        {identity.documents.length === 0 ? (
-          <Panel>
-            <p className="text-sm text-muted-foreground">
-              Виды документов в справочнике не заведены. Проверять нечего — уточните у диспетчера.
-            </p>
-          </Panel>
-        ) : null}
-        {required.map((document) => (
-          <Panel key={document.typeId} tone={documentTone(document)}>
-            <div className="flex gap-3">
-              <Sign tone={documentTone(document)} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="text-sm font-medium leading-snug">{document.name}</span>
-                  <span className="shrink-0 text-2xs font-semibold">
-                    {document.verdict === 'EXPIRING' && document.daysLeft !== null
-                      ? `${document.daysLeft} дн.`
-                      : VERDICT_TEXT[document.verdict]}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-2xs text-muted-foreground">
-                  {document.number ? `№ ${document.number}` : 'номер не указан'}
-                  {document.expiresAt
-                    ? ` · до ${new Date(document.expiresAt).toLocaleDateString('ru-RU')}`
-                    : document.verdict === 'VALID' ? ' · бессрочный' : ''}
-                </p>
-              </div>
-            </div>
-          </Panel>
-        ))}
-      </div>
-
-      {optional.length > 0 ? (
-        <details className="rounded-lg border bg-card p-4 shadow-xs">
-          <summary className="cursor-pointer text-sm font-medium">
-            Остальные документы ({optional.length})
-          </summary>
-          <ul className="mt-3 space-y-2">
-            {optional.map((document) => (
-              <li key={document.typeId} className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">{document.name}</span>
-                <span className="shrink-0 text-2xs font-medium text-muted-foreground">
-                  {VERDICT_TEXT[document.verdict]}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-2xs text-muted-foreground">
-            Эти виды администратор не отметил обязательными для машиниста, поэтому их отсутствие
-            смену не задерживает.
-          </p>
-        </details>
-      ) : null}
+      <DocumentsPanel documents={identity.documents} />
 
       {!ready ? null : (
         <Panel tone="ok">

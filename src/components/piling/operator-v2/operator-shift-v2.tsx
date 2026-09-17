@@ -470,7 +470,8 @@ export function OperatorShiftV2() {
             )
             : (
               <p className="text-sm text-muted-foreground">
-                Журнал и прочие разделы открываются после начала работы.
+                Техника, журнал и прочие разделы открываются после начала работы:
+                до приёмки установки показывать там нечего.
               </p>
             )
         ) : (
@@ -798,7 +799,7 @@ export function OperatorShiftV2() {
         <StepShell
           title={tab === 'shift' ? V2_STEP_TITLE.work
             : tab === 'safety' ? 'Техника безопасности'
-              : tab === 'journal' ? 'Журнал смены' : 'Ещё'}
+              : tab === 'equipment' ? 'Техника' : 'Ещё'}
           subtitle={stepLabel}
           footer={<BottomTabs active={tab} onSelect={setTab} />}
         >
@@ -855,7 +856,29 @@ export function OperatorShiftV2() {
               )
           )}
 
-          {tab === 'journal' && (
+          {tab === 'equipment' && (
+            <RowList>
+              <li><ValueRow label="Установка" value={facts.equipment?.name ?? '—'} /></li>
+              <li><ValueRow label="Модель" value={facts.equipment?.model ?? '—'} /></li>
+              <li>
+                <ValueRow
+                  label="Моточасы"
+                  value={facts.meterCurrent != null ? `${formatNumber(facts.meterCurrent)} м/ч` : '—'}
+                />
+              </li>
+              <li>
+                <ValueRow
+                  label="Предсменный осмотр"
+                  value={facts.inspection.preShift?.status === 'COMPLETED' ? 'закрыт' : 'не закрыт'}
+                  tone={facts.inspection.preShift?.status === 'COMPLETED' ? 'ok' : 'warn'}
+                />
+              </li>
+            </RowList>
+          )}
+
+          {/* Журнал смены переехал сюда из собственной вкладки: его открывают
+              раз в день, а место в панели он занимал постоянно. */}
+          {tab === 'more' && (
             report.draft.piles.length === 0 && report.draft.downtimes.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">За смену пока ничего не записано</p>
             ) : (
@@ -891,15 +914,7 @@ export function OperatorShiftV2() {
 
           {tab === 'more' && (
             <RowList>
-              <li><ValueRow label="Установка" value={facts.equipment?.name ?? '—'} /></li>
               <li><ValueRow label="Смена" value={facts.shift?.type === 'NIGHT' ? 'Ночная' : 'Дневная'} /></li>
-              <li>
-                <ValueRow
-                  label="Предсменный осмотр"
-                  value={facts.inspection.preShift?.status === 'COMPLETED' ? 'закрыт' : 'не закрыт'}
-                  tone={facts.inspection.preShift?.status === 'COMPLETED' ? 'ok' : 'warn'}
-                />
-              </li>
               <li><ValueRow label="Отчёт" value={report.draft.status === 'submitted' ? 'отправлен' : 'черновик'} /></li>
             </RowList>
           )}

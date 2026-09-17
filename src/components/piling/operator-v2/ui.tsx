@@ -173,13 +173,15 @@ export function BigCheck({ tone }: { tone: 'green' | 'purple' }) {
   );
 }
 
-export type V2Tab = 'shift' | 'safety' | 'journal' | 'more';
+export type V2Tab = 'shift' | 'safety' | 'equipment' | 'more';
 
 /**
- * Нижняя навигация макета: Смена / ТБ / Журнал / Ещё.
+ * Нижняя навигация: Смена / ТБ / Техника / Ещё — один набор во всех модулях
+ * оператора.
  *
  * «ТБ» стоит вторым, а не в «Ещё»: допуск и инструктажи человек открывает не в
- * конце смены, а до неё, и искать их в списке «прочего» он не станет.
+ * конце смены, а до неё, и искать их в списке «прочего» он не станет. Журнал
+ * смены, наоборот, открывают раз в день — он уехал в «Ещё».
  */
 export function BottomTabs({ active, onSelect }: {
   active: V2Tab;
@@ -188,7 +190,7 @@ export function BottomTabs({ active, onSelect }: {
   const tabs = [
     { id: 'shift' as const, label: 'Смена' },
     { id: 'safety' as const, label: 'ТБ' },
-    { id: 'journal' as const, label: 'Журнал' },
+    { id: 'equipment' as const, label: 'Техника' },
     { id: 'more' as const, label: 'Ещё' },
   ];
   return (
