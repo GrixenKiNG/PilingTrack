@@ -419,8 +419,10 @@ export function OperatorV7App() {
         ) : null}
 
         {/* Учёт выработки — часть смены, а не отдельный раздел: машинист
-            записывает сваи там же, где видит, на каком он шаге. */}
-        {tab === 'HOME' ? (
+            записывает сваи там же, где видит, на каком он шаге. На фазе работы
+            это уже делает `WorkBlock` внутри `HomeScreen`; отдельная карточка
+            нужна только на прочих фазах, иначе выработка выводится дважды. */}
+        {tab === 'HOME' && state.phase !== 'WORK' ? (
           <TasksScreen state={state} onEntry={(entry) => setDetour({kind: 'PRODUCTION', entry})} />
         ) : null}
         {tab === 'SAFETY' ? (
