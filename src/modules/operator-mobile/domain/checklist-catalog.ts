@@ -17,7 +17,7 @@ import type {ChecklistDefinition, ChecklistStage} from './checklist-types';
 export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
   {
     stage: 'PRESHIFT_INSPECTION',
-    version: '2.0',
+    version: '3.0',
     title: 'Предсменный осмотр',
     purpose: 'Обход холодной машины до пуска. Ищем то, что не видно на ходу.',
     sections: [
@@ -62,7 +62,7 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
       },
       {
         id: 'mast',
-        title: 'Мачта, молот, тросы',
+        title: 'Мачта и молот',
         items: [
           {
             id: 'mast',
@@ -84,19 +84,6 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
             severity: 'ALERT',
             photoOnIssue: true,
             unit: 'ROTATOR',
-          },
-          {
-            id: 'ropes',
-            text: 'Тросы: обрывы прядей, износ, крепление коушей',
-            hint: 'Обрывы на длине одного шага свивки — трос под замену',
-            severity: 'ALERT',
-            photoOnIssue: true,
-          },
-          {
-            id: 'hook',
-            text: 'Крюковая обойма: замок исправен',
-            hint: 'Отказ замка — падение груза',
-            severity: 'ALERT',
           },
         ],
       },
@@ -152,6 +139,25 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
         ],
       },
       {
+        id: 'winches',
+        title: 'Лебёдки',
+        items: [
+          {
+            id: 'ropes',
+            text: 'Тросы: обрывы прядей, износ, крепление коушей',
+            hint: 'Обрывы на длине одного шага свивки — трос под замену',
+            severity: 'ALERT',
+            photoOnIssue: true,
+          },
+          {
+            id: 'hook',
+            text: 'Крюковая обойма: замок исправен',
+            hint: 'Отказ замка — падение груза',
+            severity: 'ALERT',
+          },
+        ],
+      },
+      {
         id: 'general',
         title: 'Общее',
         items: [
@@ -178,10 +184,69 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
     ],
   },
   {
+    stage: 'SITE_READY',
+    version: '3.0',
+    title: 'Готовность площадки',
+    purpose: 'Где машина встанет и что вокруг. Оценивается до пуска, пока ничто не движется.',
+    sections: [
+      {
+        id: 'base',
+        title: 'Основание',
+        items: [
+          {
+            id: 'ground',
+            text: 'Основание плотное и устойчивое, установка не проседает',
+            hint: 'Просадка под одной гусеницей при развороте — опрокидывание',
+            severity: 'ALERT',
+            photoOnIssue: true,
+          },
+          {
+            id: 'level',
+            text: 'Машина выровнена, уклон в допуске по руководству',
+            severity: 'ALERT',
+          },
+          {
+            id: 'frost-snow',
+            text: 'Снег и наледь с рабочей площадки убраны',
+            hint: 'Под снегом не видно ни колеи, ни просадки',
+            severity: 'ALERT',
+            onlyWhen: ['FROST'],
+          },
+          {
+            id: 'rain-bearing',
+            text: 'Основание не размокло, при необходимости отсыпка или плиты',
+            severity: 'ALERT',
+            photoOnIssue: true,
+            onlyWhen: ['RAIN'],
+          },
+        ],
+      },
+      {
+        id: 'zone',
+        title: 'Зона работ',
+        items: [
+          {
+            id: 'clearance',
+            text: 'Зона работ свободна: габариты до ЛЭП и зданий, есть куда манёвр',
+            hint: 'Один взгляд по кругу. До проводов — по наряду-допуску, «на глаз» нельзя',
+            severity: 'ALERT',
+          },
+          {
+            id: 'lighting',
+            text: 'Освещённость рабочей зоны достаточна',
+            hint: 'Исправных фар мало — нужна освещённость самой зоны',
+            severity: 'ALERT',
+            onlyWhen: ['DARK'],
+          },
+        ],
+      },
+    ],
+  },
+  {
     stage: 'EO_BEFORE',
-    version: '2.1',
+    version: '3.1',
     title: 'ЕО перед работой',
-    purpose: 'Пуск, прогрев и холостая проверка. Машина показывает себя без нагрузки.',
+    purpose: 'Пуск, прогрев и холостая проверка. Первое опасное движение — уже на принятой площадке.',
     sections: [
       {
         id: 'start',
@@ -189,21 +254,14 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
         items: [
           {
             id: 'start',
-            text: 'Двигатель запущен, давление масла в норме, аварийных ламп нет',
+            text: 'Двигатель запущен: давление масла в норме, аварийных ламп и ошибок нет',
             severity: 'ALERT',
-          },
-          {
-            id: 'ecu',
-            text: 'Ошибок блока управления двигателем нет',
-            hint: 'Машина сообщает о неисправности сама, если посмотреть',
-            severity: 'NOTE',
           },
           {
             id: 'warmup',
             text: 'Прогрет до рабочей температуры ОЖ и гидромасла',
             hint: 'Нагружать холодную гидравлику — это ремонт насоса',
             severity: 'ALERT',
-            measure: {key: 'warmupMin', label: 'Прогрев', unit: 'мин'},
           },
           {
             id: 'frost-hydraulic-warmup',
@@ -261,91 +319,13 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
             text: 'Смазка узлов по карте смазки выполнена',
             severity: 'NOTE',
           },
-          {
-            // Единственное место, где моточасы попадают в журнал наработки:
-            // на приёме установки их не спрашивают, а планы ТО без них слепнут.
-            id: 'meter',
-            text: 'Показание моточасов снято',
-            severity: 'ALERT',
-            measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'},
-          },
-        ],
-      },
-    ],
-  },
-  {
-    stage: 'SITE_READY',
-    version: '2.0',
-    title: 'Готовность площадки',
-    purpose: 'Машина исправна — теперь под ней должно быть на чём стоять.',
-    sections: [
-      {
-        id: 'base',
-        title: 'Основание',
-        items: [
-          {
-            id: 'ground',
-            text: 'Основание плотное и устойчивое, установка не проседает',
-            hint: 'Просадка под одной гусеницей при развороте — опрокидывание',
-            severity: 'ALERT',
-            photoOnIssue: true,
-          },
-          {
-            id: 'level',
-            text: 'Машина выровнена, уклон в допуске по руководству',
-            severity: 'ALERT',
-          },
-          {
-            id: 'frost-snow',
-            text: 'Снег и наледь с рабочей площадки убраны',
-            hint: 'Под снегом не видно ни колеи, ни просадки',
-            severity: 'ALERT',
-            onlyWhen: ['FROST'],
-          },
-          {
-            id: 'rain-bearing',
-            text: 'Основание не размокло, при необходимости отсыпка или плиты',
-            severity: 'ALERT',
-            photoOnIssue: true,
-            onlyWhen: ['RAIN'],
-          },
-        ],
-      },
-      {
-        id: 'zone',
-        title: 'Зона работ',
-        items: [
-          {
-            id: 'clearance',
-            text: 'Габариты выдержаны: ЛЭП, здания, соседняя техника',
-            hint: 'Расстояние до проводов — по наряду-допуску, «на глаз» нельзя',
-            severity: 'ALERT',
-          },
-          {
-            id: 'maneuver',
-            text: 'Доступ для манёвра обеспечен',
-            hint: 'Есть куда развернуться и отойти, не подрезая основание',
-            severity: 'ALERT',
-          },
-          {
-            id: 'obstacles',
-            text: 'Препятствия отсутствуют',
-            severity: 'ALERT',
-          },
-          {
-            id: 'lighting',
-            text: 'Освещённость рабочей зоны достаточна',
-            hint: 'Исправных фар мало — нужна освещённость самой зоны',
-            severity: 'ALERT',
-            onlyWhen: ['DARK'],
-          },
         ],
       },
     ],
   },
   {
     stage: 'TB_PILING',
-    version: '2.0',
+    version: '3.0',
     title: 'ТБ: забивка свай',
     purpose: 'Что должно быть верно каждый раз, когда молот идёт вверх.',
     sections: [
@@ -353,11 +333,6 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
         id: 'people',
         title: 'Люди и связь',
         items: [
-          {
-            id: 'ppe',
-            text: 'СИЗ надеты: каска, жилет, защита слуха, обувь',
-            severity: 'ALERT',
-          },
           {
             id: 'comms',
             text: 'Связь с помощником установлена: рация или условные знаки',
@@ -411,7 +386,7 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
   },
   {
     stage: 'TB_DRILLING',
-    version: '2.0',
+    version: '3.0',
     title: 'ТБ: лидерное бурение',
     purpose: 'Вращающийся шнек прощает меньше, чем молот.',
     sections: [
@@ -420,8 +395,8 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
         title: 'Люди и зона',
         items: [
           {
-            id: 'ppe',
-            text: 'СИЗ надеты, свободной одежды и шарфов нет',
+            id: 'loose-clothing',
+            text: 'Свободной одежды, шарфов и незастёгнутых рукавов нет',
             hint: 'Шнек затягивает одежду быстрее, чем человек успевает отпрянуть',
             severity: 'ALERT',
           },
@@ -476,7 +451,7 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
   },
   {
     stage: 'EO_AFTER',
-    version: '2.1',
+    version: '3.1',
     title: 'ЕО после работы',
     purpose: 'Что сделать до ухода, чтобы завтра машина завелась и поехала.',
     sections: [
@@ -503,15 +478,11 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
         title: 'Очистка',
         items: [
           {
-            id: 'cabin-clean',
-            text: 'Кабина очищена',
-            severity: 'NOTE',
-          },
-          {
             id: 'tracks-clean',
             text: 'Гусеницы и ходовая очищены от грунта',
             hint: 'Грунт, замёрзший за ночь, утром снимается вместе с башмаком',
             severity: 'NOTE',
+            onlyWhen: ['FROST'],
           },
         ],
       },
@@ -556,7 +527,7 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
             text: 'Остаток топлива снят с указателя',
             hint: 'Пойдёт в отчёт и покажется утром при приёме установки',
             severity: 'NOTE',
-            measure: {key: 'fuelPercent', label: 'Остаток топлива', unit: '%'},
+            measure: {key: 'fuelPercent', label: 'Остаток топлива', unit: '%', min: 0, max: 100},
           },
           {
             id: 'frost-fuel',

@@ -14,8 +14,8 @@ export type OperatorPhase =
   | 'IDENTITY' // допуск: инструктаж и проверка знаний
   | 'ADMISSION' // приём установки: объект, машина, погода
   | 'PRESHIFT_INSPECTION' // предсменный осмотр
+  | 'SITE_READY' // осмотр площадки — до первого опасного движения
   | 'STARTUP' // пуск, прогрев, холостая проверка (ЕО перед работой)
-  | 'SITE_READY' // осмотр площадки
   | 'WORK' // работа и учёт выработки
   | 'CLOSING' // ЕО после работы и отправка отчёта
   | 'CLOSED';
@@ -24,8 +24,8 @@ export const PHASE_ORDER: OperatorPhase[] = [
   'IDENTITY',
   'ADMISSION',
   'PRESHIFT_INSPECTION',
-  'STARTUP',
   'SITE_READY',
+  'STARTUP',
   'WORK',
   'CLOSING',
   'CLOSED',
@@ -35,8 +35,8 @@ export const PHASE_LABELS: Record<OperatorPhase, string> = {
   IDENTITY: 'Допуск',
   ADMISSION: 'Приём',
   PRESHIFT_INSPECTION: 'Осмотр',
-  STARTUP: 'Пуск',
   SITE_READY: 'Площадка',
+  STARTUP: 'Пуск',
   WORK: 'Работа',
   CLOSING: 'Сдача',
   CLOSED: 'Смена закрыта',
@@ -49,8 +49,8 @@ export const PHASE_LABELS: Record<OperatorPhase, string> = {
  */
 export const PHASE_CHECKLIST: Partial<Record<OperatorPhase, ChecklistStage>> = {
   PRESHIFT_INSPECTION: 'PRESHIFT_INSPECTION',
-  STARTUP: 'EO_BEFORE',
   SITE_READY: 'SITE_READY',
+  STARTUP: 'EO_BEFORE',
   CLOSING: 'EO_AFTER',
 };
 
@@ -58,18 +58,26 @@ export const PHASE_CHECKLIST: Partial<Record<OperatorPhase, ChecklistStage>> = {
  * Какие чек-листы должны быть завершены до этого.
  *
  * ПОЧЕМУ ЭТО НА СЕРВЕРЕ, А НЕ ТОЛЬКО В ЭКРАНЕ. Порядок этапов — не подсказка
- * интерфейса, а правило: нельзя осмотреть площадку раньше, чем машина заведена.
- * Пока проверял только экран, прямой запрос к API позволял закрыть будущий
- * чек-лист заранее и получить смену, где послесменное обслуживание сдано до
- * предсменного осмотра. Экран подсказывает, сервер отвечает.
+ * интерфейса, а правило. Пока проверял только экран, прямой запрос к API
+ * позволял закрыть будущий чек-лист заранее и получить смену, где послесменное
+ * обслуживание сдано до предсменного осмотра. Экран подсказывает, сервер
+ * отвечает.
+ *
+ * ПЛОЩАДКА ИДЁТ ДО ПУСКА (решение владельца 19.09.2026). Раньше порядок был
+ * обратный, и обоснование звучало логично: сначала убедись, что машина жива,
+ * потом смотри, где ей стоять. Цена этого порядка — оценка грунта, откоса,
+ * проводов и людей вокруг делалась, когда установка уже заведена и стрела уже
+ * ходит. То есть первое опасное движение происходило на непринятой площадке.
+ * Теперь наоборот: машину осматривают неподвижной (предсменный осмотр),
+ * принимают площадку, и только потом заводят.
  */
 export const STAGE_PREREQUISITES: Record<ChecklistStage, ChecklistStage[]> = {
   PRESHIFT_INSPECTION: [],
-  EO_BEFORE: ['PRESHIFT_INSPECTION'],
-  SITE_READY: ['PRESHIFT_INSPECTION', 'EO_BEFORE'],
-  TB_PILING: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
-  TB_DRILLING: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
-  EO_AFTER: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
+  SITE_READY: ['PRESHIFT_INSPECTION'],
+  EO_BEFORE: ['PRESHIFT_INSPECTION', 'SITE_READY'],
+  TB_PILING: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'],
+  TB_DRILLING: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'],
+  EO_AFTER: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'],
 };
 
 /** Чего не хватает, чтобы приступить к этому чек-листу. */
@@ -123,15 +131,15 @@ export interface ShiftFacts {
 /**
  * Текущая фаза = первая незакрытая.
  *
- * Порядок жёсткий: нельзя осмотреть площадку раньше, чем машина заведена, и
- * нельзя работать, не осмотрев площадку. Это не бюрократия — это тот порядок,
- * в котором отказы обнаруживаются дёшево: холодную течь видно на земле, а не
- * на четвёртой свае.
+ * Порядок жёсткий: машину осматривают неподвижной, площадку принимают до
+ * пуска, и только потом заводят. Это не бюрократия — это тот порядок, в
+ * котором отказы обнаруживаются дёшево: холодную течь видно на земле, а не на
+ * четвёртой свае, а яму под гусеницей — до того, как в неё съехали.
  *
- * Документы на порядок не влияют: просроченная справка даёт красное
- * предупреждение оператору и диспетчеру, но экран не запирает — решение о
- * работе принимает человек. Нехватка СИЗ — из той же породы: запирает не она,
- * а отсутствие самой проверки.
+ * ФАЗА — НЕ РАЗРЕШЕНИЕ. Здесь считается только «где я в последовательности».
+ * Право вести работу считается отдельно, в `production-permit.ts`: просроченный
+ * документ или неустранённый критический дефект не двигают человека назад по
+ * шагам — они запрещают выработку, оставляя запись фактов открытой.
  */
 export function derivePhase(facts: ShiftFacts): OperatorPhase {
   if (facts.shiftClosed) return 'CLOSED';
@@ -144,8 +152,8 @@ export function derivePhase(facts: ShiftFacts): OperatorPhase {
   if (!facts.admissionAccepted) return 'ADMISSION';
   if (facts.workFinished) return 'CLOSING';
   if (!facts.completedStages.includes('PRESHIFT_INSPECTION')) return 'PRESHIFT_INSPECTION';
-  if (!facts.completedStages.includes('EO_BEFORE')) return 'STARTUP';
   if (!facts.completedStages.includes('SITE_READY')) return 'SITE_READY';
+  if (!facts.completedStages.includes('EO_BEFORE')) return 'STARTUP';
   return 'WORK';
 }
 

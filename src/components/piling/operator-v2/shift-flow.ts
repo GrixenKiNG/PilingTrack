@@ -1,3 +1,4 @@
+import type {ChecklistStage, OperatorPhase} from '@/modules/operator-mobile/contracts';
 /**
  * Порядок экранов смены в модуле-кандидате (v2).
  *
@@ -13,19 +14,22 @@
  * предыдущей смены — это лишь дополнительные сведения на том же шаге, а не
  * условие его существования.
  *
- * ПОЧЕМУ ДО РАБОТЫ РОВНО ШЕСТЬ ЭКРАНОВ (решение владельца 30.08.2026). Раньше
- * их было восемь, и каждый узел осмотра открывался своей карточкой — до
- * рычагов человек проходил пятнадцать-двадцать экранов. Норматив на штатную
- * смену без замечаний: 7–10 минут всего, из них не больше 3–5 минут в
- * телефоне. Такой путь помещается в шесть последовательных экранов, а
- * подробности раскрываются ВНУТРИ них:
+ * ПОЧЕМУ ДО РАБОТЫ ПЯТЬ ЭКРАНОВ. Было восемь, и каждый узел осмотра открывался
+ * своей карточкой — до рычагов человек проходил пятнадцать-двадцать экранов.
+ * Норматив на штатную смену без замечаний: 7–10 минут всего, из них не больше
+ * 3–5 минут в телефоне. Отсюда короткий путь, где подробности раскрываются
+ * ВНУТРИ экранов, а не разносятся по новым:
  *
- *   1. Допуск            — одна карточка, документы проверены автоматически
- *   2. Принятие установки — машина, моточасы, погода, передача
- *   3. Предсменный осмотр — один список разделов, раскрывается по одному
- *   4. Площадка и ТБ      — зона, коммуникации, СИЗ в одном сценарии
- *   5. Запуск и проверка  — пуск двигателя и функции без нагрузки
- *   6. Работа
+ *   1. Допуск и приёмка   — допуск свёрнут строкой, машина, моточасы, погода
+ *   2. Предсменный осмотр — один список разделов, раскрывается по одному
+ *   3. Площадка и ТБ      — зона, коммуникации, связь в одном сценарии
+ *   4. Запуск и проверка  — пуск двигателя и функции без нагрузки
+ *   5. Работа
+ *
+ * Допуск и приёмка слиты в один экран 18.09.2026: это один разговор — «пускают
+ * ли меня и на чём я сегодня работаю». Два подтверждения подряд человек
+ * нажимает не глядя, а документы, проверенные автоматически, разговором не
+ * являются вовсе — поэтому они свёрнуты в строку.
  *
  * Осмотр после работ, отчёт и закрытие идут ПОСЛЕ работы и в эти шесть не
  * входят — их считать «дорогой до рычагов» неверно.
@@ -39,7 +43,6 @@
 import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
 
 export const V2_STEPS = [
-  'admission',
   'acceptance',
   'inspection',
   'site-safety',
@@ -53,11 +56,10 @@ export const V2_STEPS = [
 export type V2Step = (typeof V2_STEPS)[number];
 
 export const V2_STEP_TITLE: Record<V2Step, string> = {
-  admission: 'Допуск',
-  acceptance: 'Принятие установки',
+  acceptance: 'Допуск и приёмка',
   inspection: 'Предсменный осмотр',
-  'site-safety': 'Площадка и ТБ',
-  startup: 'Запуск и проверка',
+  'site-safety': 'Готовность площадки',
+  startup: 'Пуск и ЕО до работы',
   work: 'Работа',
   'post-inspection': 'Послесменный осмотр',
   report: 'Отчёт о смене',
@@ -65,7 +67,7 @@ export const V2_STEP_TITLE: Record<V2Step, string> = {
 };
 
 /** Экраны до рычагов включительно. Всё, что дальше, — уже после работы. */
-export const V2_PRE_WORK_STEPS = V2_STEPS.slice(0, 6) as readonly V2Step[];
+export const V2_PRE_WORK_STEPS = V2_STEPS.slice(0, 5) as readonly V2Step[];
 export const V2_PRE_WORK_COUNT = V2_PRE_WORK_STEPS.length;
 
 const isPreWork = (step: V2Step) => V2_PRE_WORK_STEPS.includes(step);
@@ -80,19 +82,29 @@ export function stepCaption(step: V2Step): string {
   return 'После работы';
 }
 
-/** Что оператор подтвердил в этой сессии — на сервере эти шаги не хранятся. */
+/**
+ * Что оператор подтвердил в этой вкладке.
+ *
+ * Здесь осталось ровно два признака, и оба — про намерение человека, а не про
+ * факт работы. Раньше тут же жили «площадка пройдена» и «пуск пройден»: эти
+ * шаги нигде не сохранялись, перезагрузка страницы их теряла, и в заключении
+ * аудита они честно названы несохраняемыми. Теперь оба — настоящие чек-листы
+ * каталога, и об их прохождении знает сервер.
+ */
 export interface V2Session {
-  /** Личный допуск просмотрен и подтверждён. */
-  admitted: boolean;
-  /** Машина принята. */
+  /** Машина принята. Вместе с ней подтверждён и личный допуск: шаг один. */
   accepted: boolean;
-  /** Чек-лист площадки и ТБ пройден. */
-  siteSafetyDone: boolean;
-  /** Функциональная проверка после пуска двигателя пройдена. */
-  startupDone: boolean;
   /** Оператор сам нажал «Завершить работу». */
   finishing: boolean;
 }
+
+/** Этап каталога, который закрывает шаг. Нет — шаг без чек-листа. */
+export const V2_STEP_STAGE: Partial<Record<V2Step, ChecklistStage>> = {
+  inspection: 'PRESHIFT_INSPECTION',
+  'site-safety': 'SITE_READY',
+  startup: 'EO_BEFORE',
+  'post-inspection': 'EO_AFTER',
+};
 
 export interface V2State {
   step: V2Step;
@@ -106,18 +118,44 @@ export interface V2State {
  * @param facts состояние смены с сервера
  * @param session что подтверждено в этой вкладке (см. `V2Session`)
  */
-export function resolveV2State(facts: OperatorShiftFacts, session: V2Session): V2State {
-  const started = facts.shift?.state === 'STARTED' || facts.shift?.state === 'HANDOVER_PENDING';
-
+/**
+ * Какой экран оператор проходит сейчас.
+ *
+ * ОСМОТРЫ БЕРУТСЯ ИЗ КАТАЛОГА В КОДЕ, А НЕ ИЗ ШАБЛОНОВ МЕХАНИКА.
+ *
+ * Раньше модуль вёл предсменный и послесменный осмотр через контур готовности
+ * (`Inspection` + `ChecklistTemplate`), а площадку и пуск — двумя списками,
+ * зашитыми в экран и нигде не сохранявшимися. Получалось три источника правды
+ * на одну смену: у машины LRH 100 осмотр разрастался до 78 проверок в 17
+ * узлах, у смены при этом было НОЛЬ записей чек-листов, а отчёт уходил без
+ * моточасов и остатка топлива — их просто негде было снять.
+ *
+ * Теперь все четыре списка — этапы одного каталога (`checklist-catalog.ts`):
+ * PRESHIFT_INSPECTION → EO_BEFORE → SITE_READY → EO_AFTER. Состав правит
+ * разработчик, порядок проверяет сервер, ответы ложатся теми же командами, что
+ * и в остальных модулях.
+ *
+ * ПОРЯДОК ПУСКА И ПЛОЩАДКИ. Здесь он серверный: сначала ЕО до работы, потом
+ * готовность площадки. Прежний порядок модуля (площадка раньше пуска) сервер
+ * отвергает, и спорить с ним экраном нельзя — расхождение вынесено владельцу
+ * отдельно.
+ *
+ * @param facts состояние смены с сервера (контур готовности — жизненный цикл)
+ * @param phase фаза рабочего места (мобильный контур — осмотры и выработка)
+ * @param session что подтверждено в этой вкладке (см. `V2Session`)
+ */
+export function resolveV2State(
+  facts: OperatorShiftFacts,
+  phase: OperatorPhase | null,
+  /** ЕО после работы сдан. Фаза CLOSING держится и до него, и после. */
+  postDone: boolean,
+  session: V2Session,
+): V2State {
   // Допуск по документам — раньше всего: с просроченным удостоверением
   // человеку нельзя за рычаги, и обсуждать осмотр незачем.
-  if (!started) {
-    if (facts.clearance.blockers.length > 0) {
-      return { step: 'admission', blockers: facts.clearance.blockers };
-    }
-    if (!session.admitted) {
-      return { step: 'admission', blockers: [] };
-    }
+  const started = facts.shift?.state === 'STARTED' || facts.shift?.state === 'HANDOVER_PENDING';
+  if (!started && facts.clearance.blockers.length > 0) {
+    return { step: 'acceptance', blockers: facts.clearance.blockers };
   }
 
   if (facts.assignments.length === 0) {
@@ -133,41 +171,68 @@ export function resolveV2State(facts: OperatorShiftFacts, session: V2Session): V
     return { step: 'closed', blockers: [] };
   }
 
-  if (facts.shift.state === 'STARTED') {
-    // Смена идёт — человек работает, а не заполняет отчёт. Пока он сам не
-    // нажал «Завершить работу», экран остаётся на «Работе».
-    //
-    // Без этого признака шаг «Работа» был недостижим: сразу после пуска
-    // экран прыгал на осмотр после работ (а у машины без такого раздела — на
-    // отчёт), то есть предлагал закрывать смену в момент её начала.
-    if (!session.finishing) {
-      return { step: 'work', blockers: [] };
-    }
-    const postDone = facts.inspection.postShift?.status === 'COMPLETED';
-    // Требуем только выполнимое: нет раздела «после работ» в шаблоне машины —
-    // осмотра для неё не существует, и смена не должна на нём застревать.
-    if (!postDone && facts.postShiftAvailable) {
-      return { step: 'post-inspection', blockers: [] };
-    }
-    return {
-      step: 'report',
-      blockers: facts.report?.status === 'submitted' ? [] : ['Сменный отчёт не отправлен'],
-    };
-  }
-
-  // До пуска: приёмка → осмотр → площадка → запуск.
   const incoming = facts.incomingHandover;
   const handoverPending = Boolean(incoming && incoming.shiftId !== facts.shift.id);
-  if (!session.accepted || handoverPending) {
+  /*
+    Признак «принял» из вкладки нужен ТОЛЬКО пока сервер об этом не знает.
+
+    Он живёт в памяти страницы, а приёмка — записанный факт: после неё смена
+    живая, и рабочее место ушло с фазы приёма. Без этой оговорки перезагрузка
+    посреди осмотра возвращала человека на экран приёмки уже принятой машины и
+    предлагала принять её второй раз.
+  */
+  const serverAccepted = phase !== null && phase !== 'IDENTITY' && phase !== 'ADMISSION';
+  if ((!session.accepted && !serverAccepted) || handoverPending) {
     return { step: 'acceptance', blockers: [] };
   }
-  if (facts.inspection.preShift?.status !== 'COMPLETED') {
-    return { step: 'inspection', blockers: [] };
+
+  /*
+    Дальше ведёт ФАЗА РАБОЧЕГО МЕСТА, а не признаки вкладки.
+
+    Фаза выведена сервером из записанных фактов, поэтому перезагрузка страницы
+    возвращает человека туда, где он остановился, а не на шаг назад. Прежние
+    признаки `siteSafetyDone` и `startupDone` жили в памяти вкладки и терялись
+    при любом обновлении.
+  */
+  switch (phase) {
+    /*
+      Допуск ещё не пройден — держим человека на приёмке и НЕ пускаем дальше.
+
+      Без этой ветки экран проваливался в конец: фаза IDENTITY не совпадала ни
+      с одним осмотром, и разбор доходил до последнего `return`, то есть до
+      «Отчёта о смене» — у смены, которая даже не начиналась. Оператор с
+      неподтверждёнными СИЗ видел кнопку «Отправить отчёт» вместо шага допуска.
+
+      Что именно осталось, называем словами: «допуск не пройден» без подробностей
+      отправляет человека искать по вкладкам.
+    */
+    case 'IDENTITY': return {
+      step: 'acceptance',
+      blockers: ['Допуск не пройден — откройте вкладку «ТБ» и завершите шаги'],
+    };
+    case 'ADMISSION': return { step: 'acceptance', blockers: [] };
+    case 'PRESHIFT_INSPECTION': return { step: 'inspection', blockers: [] };
+    case 'SITE_READY': return { step: 'site-safety', blockers: [] };
+    case 'STARTUP': return { step: 'startup', blockers: [] };
+    default: break;
   }
-  if (!session.siteSafetyDone) {
-    return { step: 'site-safety', blockers: [] };
+
+  // Смена идёт — человек работает, а не заполняет отчёт. Пока он сам не нажал
+  // «Завершить работу», экран остаётся на «Работе».
+  if (phase === 'WORK' && !session.finishing) {
+    return { step: 'work', blockers: [] };
   }
-  const readinessBlockers = facts.readiness?.blockers.map((item) => item.label) ?? [];
-  const allowed = readinessBlockers.length === 0 || facts.startWaiver !== null;
-  return { step: 'startup', blockers: allowed ? [] : readinessBlockers };
+  // Фаза CLOSING держится от «работа завершена» до закрытия смены, поэтому
+  // одной её мало: без ЕО после работы это осмотр, после него — отчёт.
+  if (!postDone && (phase === 'CLOSING' || (phase === 'WORK' && session.finishing))) {
+    return { step: 'post-inspection', blockers: [] };
+  }
+  if (phase === 'CLOSED') {
+    return { step: 'closed', blockers: [] };
+  }
+
+  return {
+    step: 'report',
+    blockers: facts.report?.status === 'submitted' ? [] : ['Сменный отчёт не отправлен'],
+  };
 }

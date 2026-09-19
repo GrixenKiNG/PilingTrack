@@ -130,12 +130,13 @@ describe('фазы смены', () => {
     expect(derivePhase({...facts, knowledgeValid: false})).toBe('IDENTITY');
     expect(derivePhase({...facts, admissionAccepted: false})).toBe('ADMISSION');
     expect(derivePhase(facts)).toBe('PRESHIFT_INSPECTION');
-    expect(derivePhase({...facts, completedStages: ['PRESHIFT_INSPECTION']})).toBe('STARTUP');
-    expect(derivePhase({...facts, completedStages: ['PRESHIFT_INSPECTION', 'EO_BEFORE']}))
-      .toBe('SITE_READY');
+    // Площадка идёт до пуска: пока она не принята, заводить нечего.
+    expect(derivePhase({...facts, completedStages: ['PRESHIFT_INSPECTION']})).toBe('SITE_READY');
+    expect(derivePhase({...facts, completedStages: ['PRESHIFT_INSPECTION', 'SITE_READY']}))
+      .toBe('STARTUP');
     expect(derivePhase({
       ...facts,
-      completedStages: ['PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY'],
+      completedStages: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'],
     })).toBe('WORK');
   });
 
@@ -380,9 +381,9 @@ describe('запреты, которые обязан держать серве�
 
   it('этап нельзя сдать раньше предыдущих', () => {
     expect(missingPrerequisites('EO_AFTER', [])).toEqual([
-      'PRESHIFT_INSPECTION', 'EO_BEFORE', 'SITE_READY',
+      'PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE',
     ]);
-    expect(missingPrerequisites('SITE_READY', ['PRESHIFT_INSPECTION'])).toEqual(['EO_BEFORE']);
+    expect(missingPrerequisites('EO_BEFORE', ['PRESHIFT_INSPECTION'])).toEqual(['SITE_READY']);
     expect(missingPrerequisites('PRESHIFT_INSPECTION', [])).toEqual([]);
   });
 
