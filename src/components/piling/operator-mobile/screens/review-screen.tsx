@@ -1,6 +1,7 @@
 'use client';
 
 import type {OperatorMobileState, OperatorPhase} from '@/modules/operator-mobile/contracts';
+import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import {PHASE_CHECKLIST, PHASE_LABELS} from '@/modules/operator-mobile/domain/shift-phases';
 import {formatRuDate} from '@/lib/format';
 import {BigButton, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
@@ -153,7 +154,7 @@ function WorkReview({state}: {state: OperatorMobileState}) {
             count={state.production.drilling.count}
             meters={state.production.drilling.meters}
           />
-          <Fact label="Простой" value={state.production.downtimeHours.toFixed(1)} unit="ч" />
+          <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
         </div>
       </Panel>
       <Panel>

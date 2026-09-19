@@ -6,7 +6,6 @@
  * и свой путь повтора команды при обрыве сети.
  */
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
-import {roundDowntimeHours} from '@/modules/reports';
 import {OperatorCommandError, requireCrew, requireOpenShift} from './shared';
 import {findByCommand} from './production';
 
@@ -143,7 +142,7 @@ export async function correctProduction(input: {
     // неполный вверх. Схема команды округлить это не может — `actual` там один
     // на сваи, бурение и простой, а часы из них только у простого. Ноль
     // остаётся нулём: «простоя не было» — законный ответ.
-    const actual = roundDowntimeHours(input.actual);
+    const actual = input.actual;
     const delta = Math.round((actual - current) * 100) / 100;
     if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
     const created = await tx.reportDowntime.create({

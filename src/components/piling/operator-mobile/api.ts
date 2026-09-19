@@ -85,7 +85,7 @@ export type ProductionEntryInput =
   | {kind: 'PILES'; pileGradeId: string; count: number; comment?: string}
   | {kind: 'PILE_PASSPORT'; pileGradeId: string; passport: PilePassportInput}
   | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
-  | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
+  | {kind: 'DOWNTIME'; reasonId: string; startedAt: string; endedAt: string; comment?: string};
 
 type Command =
   | {command: 'acknowledge-briefing'}
@@ -97,6 +97,8 @@ type Command =
   | {command: 'correct-production'; clientCommandId: string; shiftId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; entryId: string; actual: number; reason: string}
   | {command: 'report-incident'; clientCommandId: string; shiftId: string; category: string; signs: string[]; injured: boolean; description: string; mediaIds?: string[]}
   | {command: 'finish-work'; shiftId: string}
+  /** Отчёт сдан, смена ещё живёт до передачи машины — контур готовности. */
+  | {command: 'submit-report'; shiftId: string; comment: string}
   | {command: 'close-shift'; shiftId: string; comment: string};
 
 /**

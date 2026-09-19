@@ -1,6 +1,7 @@
 'use client';
 
 import type {ReactNode} from 'react';
+import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 
 import {useState} from 'react';
 import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/contracts';
@@ -112,7 +113,7 @@ export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy,
             count={assignment.siteDrilling.count}
             meters={assignment.siteDrilling.meters}
           />
-          <Fact label="Простой" value={assignment.siteDowntimeHours.toFixed(1)} unit="ч" />
+          <Fact label="Простой" value={formatDowntimeHours(assignment.siteDowntimeHours)} />
           <Fact
             label="Топливо"
             value={assignment.fuelPercent === null ? '—' : assignment.fuelPercent}

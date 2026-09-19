@@ -33,12 +33,12 @@ describe('ReportSentScreen', () => {
   });
 
   it('shows the downtime row when present', () => {
-    // Неполный час округляется вверх: простой в отчётности считается только
-    // полными часами, десятых долей у него не бывает. Раньше здесь ожидалось
-    // «2,5 ч» — то самое дробное представление, от которого отказались.
+    // Простой показывается как он есть — часами и минутами. Округление вверх
+    // (2,5 ч → «3 ч») отменено 19.09.2026 вместе с переходом на интервал:
+    // отчёт, завышающий простой на известную величину, нельзя предъявить.
     render(<ReportSentScreen {...baseProps} hasDowntime totalDowntime={2.5} />);
     expect(screen.getByText('Простой')).toBeTruthy();
-    expect(screen.getByText('3 ч')).toBeTruthy();
+    expect(screen.getByText('2 ч 30 мин')).toBeTruthy();
   });
 
   it('calls onDone when "Готово" is pressed', () => {

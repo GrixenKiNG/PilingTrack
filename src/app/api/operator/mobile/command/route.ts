@@ -3,14 +3,14 @@ import {z} from 'zod';
 import {withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
 import {
-  acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction,
+  acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction, submitReport,
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
 } from '@/modules/operator-mobile';
 import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/contracts';
 // Напрямую из `application`, а не через `@/modules/readiness`: тот барьер
 // импортируют клиентские компоненты, и серверный модуль в нём тянет `lib/db`
 // в браузерный бандл.
-import {DOWNTIME_MAX_HOURS, roundDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+
 import {getWeatherAt} from '@/services/weather/weather-client';
 
 export const runtime = 'nodejs';
@@ -118,11 +118,12 @@ const commandSchema = z.discriminatedUnion('command', [
       z.object({
         kind: z.literal('DOWNTIME'),
         reasonId: z.string().min(1),
-        // Простой измеряется полными часами: неполный округляется вверх
-        // (правило и причина — reports/domain/downtime-hours). Округляем, а не
-        // отвергаем: старый телефон в кармане не обязан знать о правиле.
-        // Максимум в 24 отсекает опечатку «ввёл минуты».
-        hours: z.number().min(0.1).max(DOWNTIME_MAX_HOURS).transform(roundDowntimeHours),
+        // Простой — ИНТЕРВАЛ: начало и конец, длительность считает сервер
+        // (правило и причина — reports/domain/downtime-hours). Метки времени
+        // ставит телефон по своим часам, поэтому границы проверяются в
+        // команде, а не здесь: схема отвечает за форму, команда — за смысл.
+        startedAt: z.string().datetime({offset: true}),
+        endedAt: z.string().datetime({offset: true}),
         comment: z.string().max(500).optional(),
       }),
     ]),
@@ -152,6 +153,16 @@ const commandSchema = z.discriminatedUnion('command', [
     mediaIds: z.array(z.string()).max(10).optional(),
   }),
   z.object({command: z.literal('finish-work'), shiftId: z.string().min(1)}),
+  /*
+    Сдача отчёта без закрытия смены — для контура готовности, где смену после
+    отчёта принимает следующий оператор. Что именно записывается, решает одна
+    общая функция вместе с закрытием (`submitShiftReport`).
+  */
+  z.object({
+    command: z.literal('submit-report'),
+    shiftId: z.string().min(1),
+    comment: z.string().max(2000).default(''),
+  }),
   z.object({
     command: z.literal('close-shift'),
     shiftId: z.string().min(1),
@@ -227,6 +238,8 @@ export const POST = withMutation(
         }
         case 'finish-work':
           return NextResponse.json({data: await finishWork({...actor, ...body})});
+        case 'submit-report':
+          return NextResponse.json({data: await submitReport({...actor, ...body})});
         case 'close-shift':
           return NextResponse.json({data: await closeShift({...actor, ...body})});
       }

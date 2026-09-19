@@ -2,11 +2,13 @@
 
 import {useState} from 'react';
 import type {ProductionEntryView} from '@/modules/operator-mobile/contracts';
+import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import {BigButton, Panel, PanelTitle} from '../ui';
 
 const KIND_UNIT: Record<ProductionEntryView['kind'], string> = {
   PILES: 'шт',
   DRILLING: 'шт',
+  // Простой печатается своим форматом — часами и минутами, а не дробью.
   DOWNTIME: 'ч',
 };
 
@@ -68,7 +70,9 @@ export function EntriesList({entries, busy, onCorrect}: {
             <div className="flex items-baseline justify-between gap-2">
               <span className="min-w-0 truncate text-sm font-medium">{entry.label}</span>
               <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
-                {entry.value} {KIND_UNIT[entry.kind]}
+                {entry.kind === 'DOWNTIME'
+                  ? formatDowntimeHours(entry.value)
+                  : `${entry.value} ${KIND_UNIT[entry.kind]}`}
                 {entry.meters !== null ? ` · ${entry.meters.toFixed(1)} м.п.` : ''}
               </span>
             </div>
