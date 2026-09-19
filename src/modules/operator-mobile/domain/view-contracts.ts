@@ -1,8 +1,10 @@
+import type {SafetyChecklistPeriod} from './safety-checklist-period';
 import type {ChecklistSection, ChecklistStage, ShiftCondition} from './checklist-types';
 import type {IncidentCategory, IncidentSeverity, IncidentSign} from './incidents';
 import type {DocumentCheck} from './operator-admission';
 import type {OperatorPhase} from './shift-phases';
 import type {WorkWarning} from './work-warnings';
+import type {ProductionPermit} from './production-permit';
 
 /**
  * Форма ответа, которую видит телефон.
@@ -62,7 +64,16 @@ export interface ChecklistView {
   title: string;
   purpose: string;
   version: string;
+  /**
+   * Требование этого этапа закрыто.
+   *
+   * У ежесменных списков это «пройден в этой смене». У чек-листов ТБ — «срок
+   * ещё не вышел»: они периодические, и прохождение действует до даты в
+   * period.validUntil, а не до конца смены.
+   */
   done: boolean;
+  /** Срок для периодических чек-листов ТБ. null — список ежесменный. */
+  period: SafetyChecklistPeriod | null;
   sections: ChecklistSection[];
 }
 
@@ -188,8 +199,13 @@ export interface OperatorMobileState {
     timezone: string;
   } | null;
   checklists: ChecklistView[];
-  /** Предупреждения смены. Даже красные не блокируют учёт программно. */
+  /** Предупреждения смены: сообщают, но ничего не запрещают. */
   warnings: WorkWarning[];
+  /**
+   * Право вести выработку. Запрещает только её: простой, дефект,
+   * происшествие, осмотр и отчёт остаются открытыми при любом запрете.
+   */
+  permit: ProductionPermit;
   production: ProductionView;
   /** Записи смены поимённо — чтобы ошибочную можно было поправить. */
   entries: ProductionEntryView[];

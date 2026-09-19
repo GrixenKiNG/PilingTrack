@@ -7,9 +7,14 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
+import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/modules/reports/domain/downtime-hours';
 import {validatePassport} from '../../domain/pile-passport';
+import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import type {ReadWeather} from '../../domain/view-contracts';
-import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport} from './shared';
+import {
+  OperatorCommandError, requireCrew, requireOpenShift, ensureReport,
+  requireDowntimeReason, requireDrillingType, requirePileGrade, requireProductionPermit,
+} from './shared';
 import type {Tx} from './shared';
 
 /** Один залог: серия ударов и погружение сваи за неё. */
@@ -62,7 +67,7 @@ export type ProductionEntry =
    */
   | {kind: 'PILE_PASSPORT'; pileGradeId: string; passport: PilePassportEntry}
   | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
-  | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
+  | {kind: 'DOWNTIME'; reasonId: string; startedAt: string; endedAt: string; comment?: string};
 
 /**
  * Запись выработки по ходу смены, а не одним отчётом в конце.
@@ -154,27 +159,36 @@ export async function logProduction(input: {
     // на время совместимого обновления API-клиентов.
 
     // Чек-лист ТБ — пропуск к работе этого вида, а не бумажка «на потом».
-    // Он спрашивается один раз за смену перед первой записью: забивка и
-    // бурение опасны по-разному, и общий инструктаж эти различия стирает.
+    // Забивка и бурение опасны по-разному, и общий инструктаж эти различия
+    // стирает, поэтому пропуска два.
+    //
+    // СРОК, А НЕ СМЕНА (решение владельца 18.09.2026). Раньше пропуск истекал
+    // в полночь и список правил проходили заново каждое утро — сорок раз в
+    // месяц. Норматив требует повторять инструктаж по графику, и срок берётся
+    // у той же инструкции, которой управляет инженер по охране труда.
     const requiredSafety = input.entry.kind === 'PILES' || input.entry.kind === 'PILE_PASSPORT'
       ? 'TB_PILING'
       : input.entry.kind === 'DRILLING' ? 'TB_DRILLING' : null;
     if (requiredSafety) {
+      // Срок принадлежит человеку и ходит с ним между машинами и объектами,
+      // поэтому ищем по работнику, а не по смене или установке.
       const passed = await tx.operatorChecklistExecution.findFirst({
         where: {
           tenantId: input.tenantId,
-          shiftId: input.shiftId,
+          startedById: input.operatorId,
           status: 'COMPLETED',
           template: {templateKey: requiredSafety},
         },
-        select: {id: true},
+        select: {startedAt: true},
+        orderBy: {startedAt: 'desc'},
       });
-      if (!passed) {
+      const period = safetyChecklistPeriod(requiredSafety, passed?.startedAt ?? null, input.now);
+      if (period.due) {
         throw new OperatorCommandError(
           409,
           requiredSafety === 'TB_PILING'
-            ? 'Сначала пройдите чек-лист ТБ по забивке свай'
-            : 'Сначала пройдите чек-лист ТБ по лидерному бурению',
+            ? 'Подошёл срок чек-листа ТБ по забивке свай — пройдите его'
+            : 'Подошёл срок чек-листа ТБ по лидерному бурению — пройдите его',
         );
       }
     }
@@ -191,8 +205,37 @@ export async function logProduction(input: {
     });
 
     const {entry} = input;
+
+    /*
+      ЗАПРЕТ ПРОВЕРЯЕТСЯ ЗДЕСЬ И ТОЛЬКО ДЛЯ ВЫРАБОТКИ.
+
+      Сваи, паспорт и бурение — это продолжение операции: их запрещает
+      неустранённый критический дефект, просроченный обязательный документ,
+      нехватка СИЗ, выведенная из эксплуатации машина и неразобранное
+      происшествие с требованием остановки.
+
+      Простой намеренно проходит без проверки. Он и есть честная запись о том,
+      что машина стоит, — в том числе стоит из-за этого самого запрета. Закрыв
+      простой вместе с выработкой, мы получили бы смену, где работа запрещена,
+      а сказать об этом нечем: четыре часа ожидания механика просто исчезли бы
+      из отчёта.
+    */
+    if (entry.kind !== 'DOWNTIME') {
+      await requireProductionPermit(tx, {
+        tenantId: input.tenantId,
+        operatorId: input.operatorId,
+        equipmentId: shift.equipmentId,
+        shiftId: input.shiftId,
+        productionDate: shift.productionDate,
+        now,
+      });
+    }
+
     if (entry.kind === 'PILES') {
       if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество свай должно быть больше нуля');
+      // Марка — только своей организации (см. requirePileGrade): чужая
+      // записывалась молча и портила расчёт погонных метров.
+      await requirePileGrade(tx, input.tenantId, entry.pileGradeId);
       await tx.pileWork.create({
         data: {
           reportId,
@@ -209,10 +252,7 @@ export async function logProduction(input: {
       // Длину сваи берём из её марки — единственного источника длины в
       // продукте (см. lib/pile-length). Она нужна правилу глубины: свая не
       // уходит глубже собственной длины, кроме погружения добойником.
-      const grade = await tx.pileGrade.findFirst({
-        where: {id: entry.pileGradeId},
-        select: {lengthMm: true},
-      });
+      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId);
 
       const problems = validatePassport({
         pileNumber: entry.passport.pileNumber,
@@ -309,6 +349,7 @@ export async function logProduction(input: {
     } else if (entry.kind === 'DRILLING') {
       if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество скважин должно быть больше нуля');
       if (entry.metersPerUnit <= 0) throw new OperatorCommandError(400, 'Глубина скважины должна быть больше нуля');
+      await requireDrillingType(tx, input.tenantId, entry.typeId);
       await tx.leaderDrilling.create({
         data: {
           reportId,
@@ -323,7 +364,39 @@ export async function logProduction(input: {
         },
       });
     } else {
-      if (entry.hours <= 0) throw new OperatorCommandError(400, 'Длительность простоя должна быть больше нуля');
+      const startedAt = new Date(entry.startedAt);
+      const endedAt = new Date(entry.endedAt);
+      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+        throw new OperatorCommandError(400, 'Не разобрать время простоя');
+      }
+
+      // Длительность считает сервер по интервалу — округления нет вовсе
+      // (см. reports/domain/downtime-hours). Переход через полночь разобран там же.
+      const hours = downtimeHoursBetween(startedAt, endedAt);
+      if (hours <= 0) {
+        throw new OperatorCommandError(400, 'Конец простоя совпадает с началом. Укажите, когда машина снова пошла.');
+      }
+      if (hours > DOWNTIME_MAX_HOURS) {
+        throw new OperatorCommandError(400, `Простой длиннее суток (${Math.round(hours)} ч). Проверьте время.`);
+      }
+
+      /*
+        БУДУЩЕЕ ВРЕМЯ ОТВЕРГАЕМ, ПРОШЛОЕ — НЕТ.
+
+        Часы на телефоне идут своим ходом, и небольшое расхождение с сервером
+        нормально; допуск в пять минут закрывает его, не мешая записать простой
+        сразу, как машина пошла. А вот простой, «закончившийся» через два часа
+        после сейчас, — это опечатка в поле времени, и принять её значит
+        получить смену, где машина стояла в своё будущее.
+
+        Начало в прошлом не ограничиваем: вспомнить утренний простой после
+        обеда — нормальный ход смены, ради которого журнал и ведётся.
+      */
+      if (endedAt.getTime() > now.getTime() + 5 * 60_000) {
+        throw new OperatorCommandError(400, 'Простой не может заканчиваться в будущем');
+      }
+
+      await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
       await tx.reportDowntime.create({
         data: {
           reportId,
@@ -331,14 +404,17 @@ export async function logProduction(input: {
           shiftId: input.shiftId,
           clientCommandId: input.clientCommandId,
           reasonId: entry.reasonId,
-          // Простой в системе измеряется в ЧАСАХ. Единица здесь одна на всё
-          // приложение: смешение часов и минут уже приводило к отчётам,
-          // где простой измерялся сутками.
-          duration: entry.hours,
+          // `duration` — часы дробным числом: единица хранения одна на всё
+          // приложение. Рядом лежит сам интервал, ради которого всё и затеяно:
+          // из числа часов нельзя узнать, КОГДА машина стояла.
+          duration: hours,
+          startedAt,
+          endedAt,
+          durationSeconds: Math.round(hours * 3600),
           kind: 'DOWNTIME',
           status: 'CLOSED',
           comment: entry.comment ?? null,
-          occurredAt: now,
+          occurredAt: startedAt,
         },
       });
     }

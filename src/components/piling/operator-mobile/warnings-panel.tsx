@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {ChevronDown, ChevronRight} from 'lucide-react';
-import type {WorkWarning} from '@/modules/operator-mobile/contracts';
+import type {ProductionPermit, WorkWarning} from '@/modules/operator-mobile/contracts';
 import {Panel, PanelTitle, Sign} from './ui';
 
 const TONE = {
@@ -97,5 +97,43 @@ export function WarningsPanel({warnings}: {warnings: WorkWarning[]}) {
         </Panel>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Запрет на работу — то, что отличается от предупреждения делом, а не цветом.
+ *
+ * Стоит ВЫШЕ предупреждений и не сворачивается: это единственное на экране,
+ * что действительно останавливает. Последняя строка про открытый журнал — не
+ * вежливость, а рабочая инструкция: человек, прочитавший «работа запрещена»,
+ * по опыту бросает и запись тоже, и смена остаётся без причины простоя.
+ */
+export function PermitPanel({permit}: {permit: ProductionPermit}) {
+  if (permit.allowed) return null;
+
+  return (
+    <Panel tone="danger">
+      <div className="flex gap-3">
+        <Sign tone="danger" />
+        <div className="min-w-0 flex-1">
+          <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+            Запрет · выработку записать нельзя
+          </p>
+          <PanelTitle tone="danger">Работа запрещена</PanelTitle>
+          <ul className="mt-1 space-y-2">
+            {permit.blocks.map((block) => (
+              <li key={block.code}>
+                <p className="text-sm font-semibold">{block.title}</p>
+                <p className="mt-0.5 text-sm">{block.detail}</p>
+                <p className="mt-1 text-sm font-medium">{block.resolution}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 border-t pt-2 text-sm font-medium">
+            Простой, происшествие, дефект и отчёт записываются как обычно — запрет их не закрывает.
+          </p>
+        </div>
+      </div>
+    </Panel>
   );
 }

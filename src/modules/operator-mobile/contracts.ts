@@ -18,6 +18,7 @@ export {measureRequired} from './domain/checklist-run';
 export type {DocumentCheck, DocumentVerdict} from './domain/operator-admission';
 export type {OperatorPhase} from './domain/shift-phases';
 export type {WarningCode, WarningLevel, WorkWarning} from './domain/work-warnings';
+export type {ProductionBlock, ProductionBlockCode, ProductionPermit} from './domain/production-permit';
 export type {
   AssignmentView, AssistantState, ChecklistView, DefectView, IdentityView, IncidentView,
   OperatorMobileState, ProductionEntryView, ProductionView, WeatherView, WorkVolume,

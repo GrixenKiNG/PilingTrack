@@ -7,6 +7,7 @@ import type {ChecklistStage, ShiftCondition} from '../domain/checklist-types';
 import {
   BRIEFING_DOCUMENT_TYPE, briefingUpToDate, KNOWLEDGE_DOCUMENT_TYPE, knowledgeValid,
 } from '../domain/operator-credentials';
+import {isPeriodicSafetyStage, safetyChecklistPeriod} from '../domain/safety-checklist-period';
 import {SAFETY_BRIEFING} from '../domain/safety-briefing';
 import {
   resolveShiftConditions, selectChecklistSections, type EquipmentCapabilities,
@@ -17,6 +18,7 @@ import {
 } from '../domain/shift-phases';
 import {toDefectViews} from './defect-views';
 import {collectWarnings} from '../domain/work-warnings';
+import {productionPermit} from '../domain/production-permit';
 import {isIncidentOpen} from '../domain/incidents';
 import type {
   ChecklistView, IncidentView, OperatorMobileState, ProductionEntryView, ReadWeather,
@@ -271,6 +273,15 @@ export async function queryOperatorMobileState(input: {
       shift: null,
       receipt: null,
       checklists: [],
+      // Запрет считается и без машины: просроченное удостоверение человек
+      // должен увидеть на экране допуска, а не после приёмки установки.
+      permit: productionPermit({
+        documents: checks,
+        ppeMissing: ppeCheck?.missing ?? [],
+        openDefects: [],
+        openIncidents: [],
+        equipmentActive: true,
+      }),
       warnings: collectWarnings({
         documents: checks,
         hasEquipmentAssignment: false,
@@ -292,6 +303,28 @@ export async function queryOperatorMobileState(input: {
 
   const equipmentId = crew.equipment.id;
   const siteId = crew.site.id;
+
+  /**
+   * Марки свай, закреплённые за объектом (решение владельца 18.09.2026).
+   *
+   * Общий справочник даёт машинисту список из двенадцати марок, из которых на
+   * его объекте забивают две. Лишние десять — это не выбор, а десять способов
+   * ошибиться, и ошибку потом ищет администратор по отчёту.
+   *
+   * Закрепление уже ведётся планом объекта (SitePilePlan) — тем самым, по
+   * которому считают выполнение. Второго списка заводить не нужно.
+   *
+   * Пустой план — показываем весь справочник: иначе машинист на объекте, где
+   * план ещё не заполнен, не сможет записать ни одной сваи.
+   */
+  const sitePlan = await db.sitePilePlan.findMany({
+    where: {siteId},
+    select: {pileGradeId: true},
+  });
+  const plannedGradeIds = new Set(sitePlan.map((row) => row.pileGradeId));
+  const offeredGrades = plannedGradeIds.size > 0
+    ? dictionaries.pileGrades.filter((grade) => plannedGradeIds.has(grade.id))
+    : dictionaries.pileGrades;
 
   const [sitePiles, siteDrilling, siteDowntime, lastFuel, lastMeter, shift, openDefects] = await Promise.all([
     sitePileVolume(tenantId, siteId, dictionaries.pileGrades),
@@ -386,6 +419,9 @@ export async function queryOperatorMobileState(input: {
         select: {
           reportId: true,
           submittedAt: true,
+          // Сдан ли отчёт — отдельный факт от того, закрыта ли смена: в
+          // контуре готовности отчёт сдают, а смену потом ПЕРЕДАЮТ.
+          status: true,
           piles: {
             select: {
               id: true, count: true, pileGradeId: true, occurredAt: true,
@@ -456,6 +492,30 @@ export async function queryOperatorMobileState(input: {
     : null;
   const checklistConditions = shiftConditions ?? conditions;
 
+  /**
+   * Когда этот машинист последний раз проходил каждый чек-лист ТБ — по ВСЕМ
+   * сменам, а не по текущей.
+   *
+   * Запрос отдельный и по работнику, а не по смене: срок принадлежит человеку,
+   * он ходит с ним между машинами и объектами. Записи по смене выше для этого
+   * не годятся — они знают только сегодняшний день.
+   */
+  const tbPassings = await db.operatorChecklistExecution.findMany({
+    where: {
+      tenantId,
+      startedById: operatorId,
+      status: 'COMPLETED',
+      template: {templateKey: {in: ['TB_PILING', 'TB_DRILLING']}},
+    },
+    select: {startedAt: true, template: {select: {templateKey: true}}},
+    orderBy: {startedAt: 'desc'},
+  });
+  const tbLastPassed = new Map<ChecklistStage, Date>();
+  for (const passing of tbPassings) {
+    const stage = passing.template.templateKey as ChecklistStage;
+    if (!tbLastPassed.has(stage)) tbLastPassed.set(stage, passing.startedAt);
+  }
+
   const completedStages = executions
     .filter((execution) => execution.status === 'COMPLETED')
     .map((execution) => (execution.templateSnapshot as {stage?: ChecklistStage}).stage)
@@ -495,6 +555,14 @@ export async function queryOperatorMobileState(input: {
     maintenance,
   });
 
+  const permit = productionPermit({
+    documents: checks,
+    ppeMissing: ppeCheck?.missing ?? [],
+    openDefects,
+    openIncidents,
+    equipmentActive: crew.equipment.isActive,
+  });
+
   const phase = derivePhase({
     ppeConfirmed: ppeCheck != null,
     briefingAcknowledged: briefingOk,
@@ -508,14 +576,22 @@ export async function queryOperatorMobileState(input: {
     shiftClosed: shift?.state === 'CLOSED',
   });
 
-  const checklists: ChecklistView[] = OPERATOR_CHECKLISTS.map((definition) => ({
-    stage: definition.stage,
-    title: definition.title,
-    purpose: definition.purpose,
-    version: definition.version,
-    done: completedStages.includes(definition.stage),
-    sections: selectChecklistSections(definition, checklistConditions, capabilities),
-  }));
+  const checklists: ChecklistView[] = OPERATOR_CHECKLISTS.map((definition) => {
+    // Чек-листы ТБ периодические: их закрывает срок повторного инструктажа, а
+    // не конец смены. Ежесменные списки закрывает прохождение в этой смене.
+    const period = isPeriodicSafetyStage(definition.stage)
+      ? safetyChecklistPeriod(definition.stage, tbLastPassed.get(definition.stage) ?? null, now)
+      : null;
+    return {
+      stage: definition.stage,
+      title: definition.title,
+      purpose: definition.purpose,
+      version: definition.version,
+      done: period ? !period.due : completedStages.includes(definition.stage),
+      period,
+      sections: selectChecklistSections(definition, checklistConditions, capabilities),
+    };
+  });
 
   const gradeLength = new Map(dictionaries.pileGrades.map((g) => [g.id, g.lengthMm]));
   const entries = buildEntries(report, dictionaries, gradeLength);
@@ -559,16 +635,28 @@ export async function queryOperatorMobileState(input: {
         state: shift.state,
       }
       : null,
-    receipt: shift?.state === 'CLOSED' && report
+    /*
+      Квитанция — то, что сервер записал об отчёте этой смены.
+
+      Условием было «смена ЗАКРЫТА», и это сшивало два разных факта. Сдача
+      отчёта и закрытие смены расходятся в контуре готовности: там отчёт
+      сдают, а машину потом передают следующему оператору, и смена живёт
+      дальше. Модуль на этом контуре не получал квитанцию никогда — номер
+      отчёта ему было взять неоткуда, а экран вечно показывал «черновик» по
+      уже сданному отчёту. Условие теперь по отчёту; `closedAt` остаётся
+      пустым, пока смену не закрыли, и это честно: закрытия ещё не было.
+    */
+    receipt: report?.status === 'submitted'
       ? {
         reportId: report.reportId,
         submittedAt: report.submittedAt?.toISOString() ?? null,
-        closedAt: shift.closedAt?.toISOString() ?? null,
-        timezone: shift.timezone,
+        closedAt: shift?.closedAt?.toISOString() ?? null,
+        timezone: shift?.timezone ?? 'Europe/Moscow',
       }
       : null,
     checklists,
     warnings,
+    permit,
     entries,
     incidents: incidentViews,
     defects: defectViews,
@@ -588,7 +676,7 @@ export async function queryOperatorMobileState(input: {
         .filter((downtime) => downtime.kind !== 'BREAK')
         .reduce((sum, downtime) => sum + downtime.duration, 0) ?? 0),
     },
-    dictionaries,
+    dictionaries: {...dictionaries, pileGrades: offeredGrades},
   };
 }
 

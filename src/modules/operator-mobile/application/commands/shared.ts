@@ -11,6 +11,9 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {type ChecklistAnswer} from '../../domain/checklist-run';
+import {checkOperatorDocuments} from '../../domain/operator-admission';
+import {BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE} from '../../domain/operator-credentials';
+import {productionRefusal, productionBlocks} from '../../domain/production-permit';
 
 
 export class OperatorCommandError extends Error {
@@ -58,6 +61,64 @@ export function productionDateOf(timezone: string, now: Date): Date {
 
 
 /**
+ * Запись справочника — ТОЛЬКО СВОЕЙ ОРГАНИЗАЦИИ.
+ *
+ * ЗАЧЕМ ЭТО ЕСТЬ. Марка сваи, тип бурения и причина простоя приходят с
+ * телефона идентификатором, и до этой проверки он писался в отчёт как есть.
+ * Оператор одной организации мог прислать `pileGradeId` чужой — сервер
+ * отвечал 200 и записывал чужую марку в свою выработку. Ломалось при этом не
+ * только разграничение: длина сваи берётся из её марки, чужая марка в расчёте
+ * не разрешалась, и пять двенадцатиметровых свай давали 48 метров вместо 60.
+ * То есть утечка границы сразу портила и цифры в отчёте.
+ *
+ * Закрепление за установкой при этом проверялось правильно (чужая машина
+ * отвергалась с 403) — и именно поэтому дыра дожила до аудита: одна закрытая
+ * граница выглядит как закрытые все.
+ *
+ * Проверка ПО ЗАПИСИ, а не по фильтру в основном запросе: `findFirst` с чужим
+ * идентификатором вернул бы `null`, и вместо отказа получилась бы запись с
+ * пустым полем. Нет записи — отказ с именем справочника.
+ */
+async function requireDictionaryRow<T>(
+  find: () => Promise<T | null>,
+  message: string,
+): Promise<T> {
+  const row = await find();
+  if (!row) throw new OperatorCommandError(400, message);
+  return row;
+}
+
+export function requirePileGrade(tx: Tx, tenantId: string, id: string) {
+  return requireDictionaryRow(
+    () => tx.pileGrade.findFirst({
+      where: {tenantId, id, isActive: true},
+      select: {id: true, lengthMm: true},
+    }),
+    'Марка сваи не найдена в справочнике вашей организации',
+  );
+}
+
+export function requireDrillingType(tx: Tx, tenantId: string, id: string) {
+  return requireDictionaryRow(
+    () => tx.drillingType.findFirst({
+      where: {tenantId, id, isActive: true},
+      select: {id: true},
+    }),
+    'Тип бурения не найден в справочнике вашей организации',
+  );
+}
+
+export function requireDowntimeReason(tx: Tx, tenantId: string, id: string) {
+  return requireDictionaryRow(
+    () => tx.downtimeReason.findFirst({
+      where: {tenantId, id, isActive: true},
+      select: {id: true},
+    }),
+    'Причина простоя не найдена в справочнике вашей организации',
+  );
+}
+
+/**
  * Моточасы: журнал показаний — источник истины, поле в карточке техники —
  * денормализованный кэш последнего значения. Обновляем оба, иначе списки
  * техники показывают вчерашнюю наработку.
@@ -66,17 +127,41 @@ export async function recordMeter(tx: Tx, input: {
   tenantId: string; equipmentId: string; engineHours: number;
   operatorId: string; note: string; now: Date;
 }) {
-  const previous = await tx.meterReading.findFirst({
-    where: {tenantId: input.tenantId, equipmentId: input.equipmentId},
-    orderBy: {recordedAt: 'desc'},
-    select: {engineHours: true},
-  });
+  /*
+    СРАВНИВАЕМ С ОБОИМИ ИСТОЧНИКАМИ НАРАБОТКИ, А НЕ ТОЛЬКО С ЖУРНАЛОМ.
+
+    Журнал показаний ведётся с момента, как машину начали снимать с телефона, а
+    наработка в карточке установки есть с самого её заведения — её вносит
+    администратор. У новой машины журнал ПУСТ, и проверка «меньше предыдущего»
+    не срабатывала вовсе: в карточке стояло 100 м/ч, первый же послесменный
+    ввод 99 проходил, и 99 уезжало и в карточку, и в закрытый отчёт. Наработка
+    машины уменьшилась на глазах, а вместе с ней поехали планы ТО, которые от
+    неё считаются.
+
+    Берём максимум из двух: счётчик не крутится назад ни по одному из них.
+  */
+  const [previous, equipment] = await Promise.all([
+    tx.meterReading.findFirst({
+      where: {tenantId: input.tenantId, equipmentId: input.equipmentId},
+      orderBy: {recordedAt: 'desc'},
+      select: {engineHours: true},
+    }),
+    tx.equipment.findFirst({
+      where: {tenantId: input.tenantId, id: input.equipmentId},
+      select: {engineHoursTotal: true},
+    }),
+  ]);
+
+  const known = [previous?.engineHours, equipment?.engineHoursTotal]
+    .filter((value): value is number => typeof value === 'number');
+  const floor = known.length > 0 ? Math.max(...known) : null;
+
   // Счётчик моточасов не крутится назад. Меньшее значение — опечатка, и
   // принять её значит испортить и наработку, и планы ТО, которые от неё зависят.
-  if (previous && input.engineHours < previous.engineHours) {
+  if (floor !== null && input.engineHours < floor) {
     throw new OperatorCommandError(
       400,
-      `Моточасы меньше предыдущего показания (${previous.engineHours}). Проверьте цифру.`,
+      `Моточасы меньше известной наработки (${floor}). Проверьте цифру.`,
     );
   }
 
@@ -95,6 +180,84 @@ export async function recordMeter(tx: Tx, input: {
     where: {tenantId_id: {tenantId: input.tenantId, id: input.equipmentId}},
     data: {engineHoursTotal: input.engineHours},
   });
+}
+
+
+/**
+ * Запрет на продолжение работы — проверяется СЕРВЕРОМ, перед записью выработки.
+ *
+ * ПОЧЕМУ НЕ ТОЛЬКО НА ЭКРАНЕ. Экран прячет кнопку, а прямой запрос к API её не
+ * спрашивает. Ровно этим путём аудит и прошёл: просроченный документ рисовался
+ * красным, а выработка записывалась. Запрет, который живёт в интерфейсе, —
+ * это не запрет, а совет.
+ *
+ * ЧТО ИМЕННО ЗАКРЫВАЕТСЯ. Только выработка: сваи, паспорт сваи, бурение.
+ * Простой, происшествие, дефект, осмотр, поправка, отчёт и закрытие смены
+ * вызывают эту проверку намеренно НЕ — обоснование в `domain/production-permit.ts`.
+ *
+ * Запрос отдельный от экрана состояния и намеренно узкий: четыре выборки
+ * вместо двадцати. Цена — четыре чтения на запись выработки; альтернатива —
+ * повторить здесь весь сбор состояния смены и разойтись с ним на первой правке.
+ */
+export async function requireProductionPermit(tx: Tx, input: {
+  tenantId: string; operatorId: string; equipmentId: string; shiftId: string;
+  productionDate: Date; now: Date;
+}) {
+  const [types, documents, ppeCheck, defects, incidents, equipment] = await Promise.all([
+    tx.userDocumentType.findMany({
+      where: {tenantId: input.tenantId, isActive: true},
+      select: {id: true, name: true, requiresExpiry: true, leadTimeDays: true, requiredForOperator: true},
+    }),
+    tx.userDocument.findMany({
+      where: {tenantId: input.tenantId, userId: input.operatorId},
+      select: {typeId: true, number: true, expiresAt: true},
+    }),
+    tx.ppeCheck.findFirst({
+      where: {tenantId: input.tenantId, userId: input.operatorId, productionDate: input.productionDate},
+      select: {missing: true},
+    }),
+    tx.equipmentDefect.findMany({
+      where: {
+        tenantId: input.tenantId, equipmentId: input.equipmentId,
+        status: {in: ['OPEN', 'IN_WORK']}, severity: 'CRITICAL',
+      },
+      select: {title: true, severity: true},
+    }),
+    tx.safetyIncident.findMany({
+      where: {
+        tenantId: input.tenantId, shiftId: input.shiftId,
+        reviewedAt: null, stopRequired: true,
+      },
+      select: {description: true, stopRequired: true},
+    }),
+    tx.equipment.findFirst({
+      where: {tenantId: input.tenantId, id: input.equipmentId},
+      select: {isActive: true},
+    }),
+  ]);
+
+  // Инструктаж и проверка знаний — служебные виды документов: их состояние
+  // держит фазу допуска, и второй раз как «просроченный документ» они
+  // показываться не должны. Тот же фильтр стоит в запросе состояния.
+  const visibleTypes = types.filter(
+    (type) => type.name !== BRIEFING_DOCUMENT_TYPE && type.name !== KNOWLEDGE_DOCUMENT_TYPE,
+  );
+
+  const blocks = productionBlocks({
+    documents: checkOperatorDocuments(visibleTypes, documents, input.now),
+    ppeMissing: ppeCheck?.missing ?? [],
+    openDefects: defects,
+    openIncidents: incidents,
+    equipmentActive: equipment?.isActive ?? true,
+  });
+
+  if (blocks.length > 0) {
+    throw new OperatorCommandError(
+      409,
+      `Работа запрещена: ${productionRefusal(blocks)}`,
+      {blocks},
+    );
+  }
 }
 
 
