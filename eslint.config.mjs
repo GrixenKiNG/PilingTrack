@@ -124,6 +124,11 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
   ignores: [
     "node_modules/**",
     ".next/**",
+    // Черновики и следы прогонов вне git: .tmp/ хранит записи отката
+    // тестовых данных после живых проходов, .tmp-check/ — разовые пробники.
+    // Кодом проекта они не являются, в сборку не попадают.
+    ".tmp/**",
+    ".tmp-check/**",
     ".worktrees/**",
     ".claude/worktrees/**",
     ".claude/skills/**",

@@ -1,5 +1,4 @@
-import {addMonths} from '@/modules/safety/domain/briefing-requirements';
-import {SAFETY_INSTRUCTIONS} from '@/modules/safety/instructions';
+import {addMonths, SAFETY_INSTRUCTIONS} from '@/modules/safety';
 import type {ChecklistStage} from './checklist-types';
 
 /**

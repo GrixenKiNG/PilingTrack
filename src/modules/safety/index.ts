@@ -9,6 +9,14 @@
  * по которому сервер пускает смену.
  */
 
+// Каталог инструкций и календарная арифметика сроков: ими пользуется
+// operator-mobile, решая, когда машинисту снова проходить чек-лист ТБ.
+// Срок повторения обязан быть ОДИН — иначе появится второе мнение о том,
+// просрочен ли инструктаж, расходящееся с журналом.
+export { SAFETY_INSTRUCTIONS } from './instructions';
+export type { SafetyInstruction } from './instructions';
+export { addMonths } from './domain/briefing-requirements';
+
 export { querySafetyClearanceOverview } from './application/clearance-overview-query';
 export { conductBriefing, signBriefingRecord } from './application/briefing-commands';
 export {

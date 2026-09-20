@@ -7,7 +7,7 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
-import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/modules/reports/domain/downtime-hours';
+import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/modules/reports';
 import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import type {ReadWeather} from '../../domain/view-contracts';
