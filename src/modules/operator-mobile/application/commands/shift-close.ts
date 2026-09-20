@@ -66,62 +66,20 @@ export async function closeShift(input: {
       throw new OperatorCommandError(409, 'Сначала выполните ЕО после работы');
     }
 
-    // Отчёт может не существовать: смена без единой сваи — это тоже смена, и
-    // сдать её надо, иначе простой объекта нигде не отразится.
-    const reportId = await ensureReport(tx, {
+    const {reportId} = await submitShiftReport(tx, {
       tenantId: input.tenantId,
-      shiftId: input.shiftId,
       operatorId: input.operatorId,
-      siteId: crew.siteId,
+      shiftId: input.shiftId,
       equipmentId: shift.equipmentId,
       crewId: crew.id,
-      productionDate: shift.productionDate.toISOString().slice(0, 10),
+      siteId: crew.siteId,
+      productionDate: shift.productionDate,
       shiftType: shift.type,
+      startedAt: started?.startedAt ?? null,
+      timezone: started?.timezone ?? null,
+      comment: input.comment,
+      now,
     });
-
-    const [lastMeter, fuelEvidence] = await Promise.all([
-      tx.meterReading.findFirst({
-        where: {tenantId: input.tenantId, equipmentId: shift.equipmentId},
-        orderBy: {recordedAt: 'desc'},
-        select: {engineHours: true},
-      }),
-      tx.operatorShiftEvidence.findFirst({
-        where: {tenantId: input.tenantId, shiftId: input.shiftId, kind: 'FLUID_READING'},
-        orderBy: {occurredAt: 'desc'},
-        select: {payload: true},
-      }),
-    ]);
-
-    const fuelPayload = fuelEvidence?.payload as {fuelPercent?: number} | null;
-    const fuelPercent = typeof fuelPayload?.fuelPercent === 'number'
-      ? Math.round(fuelPayload.fuelPercent)
-      : null;
-
-    // Время смены в журнал отчётов: без него администратор видит «смена не
-    // указана» и не знает, во сколько машина вышла и во сколько встала.
-    // Часы берём из самой смены, а не из телефона: она их и так помнит.
-    const timezone = started?.timezone ?? 'Europe/Moscow';
-    const clock = (at: Date | null | undefined) => (at
-      ? new Intl.DateTimeFormat('ru-RU', {
-        timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
-      }).format(at)
-      : null);
-
-    await tx.report.update({
-      where: {id: reportId},
-      data: {
-        status: 'submitted',
-        submittedAt: now,
-        shiftStart: clock(started?.startedAt),
-        shiftEnd: clock(now),
-        closingComment: input.comment,
-        endingEngineHours: lastMeter?.engineHours ?? null,
-        endingFuelPercent: fuelPercent,
-        lastEditedById: input.operatorId,
-      },
-    });
-
-    await publishReportSubmitted(tx, input.tenantId, reportId);
 
     await tx.shift.update({
       where: {tenantId_id: {tenantId: input.tenantId, id: input.shiftId}},
@@ -132,6 +90,175 @@ export async function closeShift(input: {
     });
 
     return {ok: true, reportId};
+  });
+}
+
+/**
+ * Сдача отчёта смены — ЧТО ИМЕННО СЧИТАЕТСЯ СДАННЫМ ОТЧЁТОМ.
+ *
+ * ПОЧЕМУ ЭТО ОТДЕЛЬНАЯ ФУНКЦИЯ. Смену заканчивают двумя разными способами, и
+ * это не дублирование, а два живых контура. Мобильный (`closeShift`) закрывает
+ * смену сразу: принимать машину некому, утром выйдет тот же машинист.
+ * Контур готовности ведёт приёмку и передачу, и там смена после отчёта
+ * переходит к следующему оператору, а не закрывается, — `submitHandoverCommand`
+ * прямо требует уже сданный отчёт.
+ *
+ * Пока сдачу писал каждый контур по-своему, отчёты расходились: закрытые с
+ * телефона получали номер «RM-<смена>-<дата>», время смены, моточасы и остаток
+ * топлива, а сданные через контур готовности — чужой номер, пустое время и
+ * строку «Смена не указана» в журнале диспетчера. Разным было не оформление,
+ * а ответ на вопрос, что такое сданный отчёт. Ответ должен быть один, и он
+ * здесь.
+ *
+ * Смену эта функция НЕ трогает: её судьбу решает вызывающий контур.
+ */
+export async function submitShiftReport(tx: Tx, input: {
+  tenantId: string;
+  operatorId: string;
+  shiftId: string;
+  equipmentId: string;
+  crewId: string;
+  siteId: string;
+  productionDate: Date;
+  shiftType: string;
+  startedAt: Date | null;
+  timezone: string | null;
+  comment: string;
+  now: Date;
+}) {
+  // Отчёт может не существовать: смена без единой сваи — это тоже смена, и
+  // сдать её надо, иначе простой объекта нигде не отразится.
+  const reportId = await ensureReport(tx, {
+    tenantId: input.tenantId,
+    shiftId: input.shiftId,
+    operatorId: input.operatorId,
+    siteId: input.siteId,
+    equipmentId: input.equipmentId,
+    crewId: input.crewId,
+    productionDate: input.productionDate.toISOString().slice(0, 10),
+    shiftType: input.shiftType,
+  });
+
+  const [lastMeter, fuelEvidence] = await Promise.all([
+    tx.meterReading.findFirst({
+      where: {tenantId: input.tenantId, equipmentId: input.equipmentId},
+      orderBy: {recordedAt: 'desc'},
+      select: {engineHours: true},
+    }),
+    tx.operatorShiftEvidence.findFirst({
+      where: {tenantId: input.tenantId, shiftId: input.shiftId, kind: 'FLUID_READING'},
+      orderBy: {occurredAt: 'desc'},
+      select: {payload: true},
+    }),
+  ]);
+
+  const fuelPayload = fuelEvidence?.payload as {fuelPercent?: number} | null;
+  const fuelPercent = typeof fuelPayload?.fuelPercent === 'number'
+    ? Math.round(fuelPayload.fuelPercent)
+    : null;
+
+  // Время смены в журнал отчётов: без него администратор видит «смена не
+  // указана» и не знает, во сколько машина вышла и во сколько встала.
+  // Часы берём из самой смены, а не из телефона: она их и так помнит.
+  const timezone = input.timezone ?? 'Europe/Moscow';
+  const clock = (at: Date | null | undefined) => (at
+    ? new Intl.DateTimeFormat('ru-RU', {
+      timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(at)
+    : null);
+
+  await tx.report.update({
+    where: {id: reportId},
+    data: {
+      status: 'submitted',
+      submittedAt: input.now,
+      shiftStart: clock(input.startedAt),
+      shiftEnd: clock(input.now),
+      closingComment: input.comment,
+      endingEngineHours: lastMeter?.engineHours ?? null,
+      endingFuelPercent: fuelPercent,
+      lastEditedById: input.operatorId,
+    },
+  });
+
+  await publishReportSubmitted(tx, input.tenantId, reportId);
+  return {reportId};
+}
+
+/**
+ * Отчёт сдан, но смена продолжается до передачи машины.
+ *
+ * Команда контура готовности: там после отчёта смену принимает следующий
+ * оператор, и закрывать её здесь нельзя — `submitHandoverCommand` работает с
+ * ещё живой сменой. Послесменный осмотр обязателен так же, как при закрытии:
+ * машина, оставленная без осмотра, утром становится чужой проблемой.
+ */
+export async function submitReport(input: {
+  tenantId: string;
+  operatorId: string;
+  shiftId: string;
+  comment: string;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+
+  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    const started = await tx.shift.findFirst({
+      where: {tenantId: input.tenantId, id: input.shiftId},
+      select: {startedAt: true, timezone: true},
+    });
+
+    /*
+      Осмотр после работы записывается ДВУМЯ способами, и это не дубль.
+
+      Мобильный контур кладёт его чек-листом `EO_AFTER`
+      (`OperatorChecklistExecution`). Контур готовности — осмотром фазы
+      POST_SHIFT (`Inspection`), и модули на нём чек-листов вообще не пишут: у
+      смены v2 их ноль. Требование здесь одно — «машину после работы
+      смотрели», — и спрашивать надо про факт, а не про таблицу. Проверка по
+      одной таблице заперла бы половину модулей на пустом месте: человек
+      осмотр прошёл, а отчёт сдать не может.
+    */
+    const [checklistDone, inspectionDone] = await Promise.all([
+      tx.operatorChecklistExecution.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          shiftId: input.shiftId,
+          status: 'COMPLETED',
+          template: {templateKey: 'EO_AFTER'},
+        },
+        select: {id: true},
+      }),
+      tx.inspection.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          shiftId: input.shiftId,
+          status: 'COMPLETED',
+          phase: 'POST_SHIFT',
+        },
+        select: {id: true},
+      }),
+    ]);
+    if (!checklistDone && !inspectionDone) {
+      throw new OperatorCommandError(409, 'Сначала выполните осмотр после работы');
+    }
+
+    return submitShiftReport(tx, {
+      tenantId: input.tenantId,
+      operatorId: input.operatorId,
+      shiftId: input.shiftId,
+      equipmentId: shift.equipmentId,
+      crewId: crew.id,
+      siteId: crew.siteId,
+      productionDate: shift.productionDate,
+      shiftType: shift.type,
+      startedAt: started?.startedAt ?? null,
+      timezone: started?.timezone ?? null,
+      comment: input.comment,
+      now,
+    });
   });
 }
 

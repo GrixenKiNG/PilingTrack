@@ -74,7 +74,6 @@ export function SafetyV7App() {
   const [view, setView] = useState<SelfSafetyView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
-  const [clock, setClock] = useState('');
   const [online, setOnline] = useState(true);
   const [tab, setTab] = useState<Tab>('CLEARANCE');
 
@@ -97,13 +96,6 @@ export function SafetyV7App() {
   }, [load]);
 
   useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     const update = () => setOnline(globalThis.navigator?.onLine ?? true);
     update();
     globalThis.addEventListener?.('online', update);
@@ -118,7 +110,7 @@ export function SafetyV7App() {
 
   if (error) {
     return (
-      <PhoneShell clock={clock} online={online} syncedAt={syncedAt} pending={0} back="Смена" onBack={back}>
+      <PhoneShell online={online} syncedAt={syncedAt} pending={0} back="Смена" onBack={back}>
         <div className="state">
           <h2>Допуск недоступен</h2>
           <p>{error}</p>
@@ -130,7 +122,7 @@ export function SafetyV7App() {
 
   if (!view) {
     return (
-      <PhoneShell clock={clock} online={online} syncedAt={syncedAt} pending={0} back="Смена" onBack={back}>
+      <PhoneShell online={online} syncedAt={syncedAt} pending={0} back="Смена" onBack={back}>
         <div className="state"><h2>Загрузка</h2><p>Читаем ваш допуск</p></div>
       </PhoneShell>
     );
@@ -141,7 +133,6 @@ export function SafetyV7App() {
 
   return (
     <PhoneShell
-      clock={clock}
       online={online}
       syncedAt={syncedAt}
       pending={0}

@@ -510,3 +510,137 @@
     transition: none !important;
   }
 }
+
+/* --------------------------------------------------- живой модуль v5 --- */
+/* Макет был неинтерактивным: строки дока, сегментов и ответов рисовались
+   элементом span. В работающем модуле это кнопки — иначе их нельзя нажать с
+   клавиатуры и не видит скринридер. Вид остаётся макетным: те же правила,
+   просто адресованные button. */
+.v5 .dock button,
+.v5 .seg button,
+.v5 .ans button {
+  font: inherit;
+  background: none;
+  cursor: pointer;
+}
+.v5 .dock button {
+  padding: .6rem .2rem;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: .6rem;
+  color: var(--ink-muted);
+  border: 0;
+  border-right: 1px solid var(--line);
+  letter-spacing: .02em;
+  min-height: 44px;
+}
+.v5 .dock button:last-child { border-right: none; }
+.v5 .dock button.on { color: var(--signal); background: var(--surface); }
+
+.v5 .seg { grid-template-columns: repeat(3, 1fr); }
+.v5 .seg button {
+  padding: .5rem .3rem;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: .68rem;
+  color: var(--ink-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  min-height: 40px;
+}
+.v5 .seg button.on { background: var(--signal); border-color: var(--signal); color: #fff; }
+
+.v5 .ans button {
+  font-family: var(--f-mono);
+  font-size: .64rem;
+  padding: .38rem .45rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-muted);
+  border-radius: 3px;
+  min-height: 34px;
+}
+.v5 .ans button.on { background: var(--keep); border-color: var(--keep); color: #fff; }
+.v5 .ans button.bad { background: var(--stop); border-color: var(--stop); color: #fff; }
+
+/* Плитки выработки идут по три: сваи, бурение, простой. */
+.v5 .tiles { grid-template-columns: repeat(3, 1fr); }
+.v5 .tile .m { font-size: .62rem; color: var(--ink-muted); }
+
+/* Поля ввода. В макете их не было вовсе — записывать было нечего. */
+.v5 .card select,
+.v5 .card input {
+  width: 100%;
+  font: inherit;
+  font-size: .9rem;
+  padding: .55rem .5rem;
+  margin-top: .2rem;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  min-height: 44px;
+}
+.v5 .card input {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+.v5 .rowline .r { font-size: .7rem; color: var(--ink-muted); }
+
+/*
+  Строка-кнопка: чек-лист ТБ по сроку открывается касанием самой строки.
+  Кнопка, а не div с обработчиком, — иначе до неё не добраться с клавиатуры и
+  её не объявит экранный диктор.
+*/
+.v5 button.rowline {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  cursor: pointer;
+}
+.v5 button.rowline.tap:active { background: var(--surface-2, rgba(0, 0, 0, .04)); }
+
+/* Признаки происшествия отмечают пачкой — строка их переносит. */
+.v5 .ans.wrap { display: flex; flex-wrap: wrap; gap: .25rem; }
+
+.v5 .badge.good { background: var(--keep); border-color: var(--keep); color: #fff; }
+
+/* Описание происшествия: единственное место, где человек пишет словами. */
+.v5 .card textarea {
+  width: 100%;
+  font: inherit;
+  font-size: .85rem;
+  padding: .55rem .5rem;
+  margin-top: .2rem;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  resize: vertical;
+}
+
+/* Пять вкладок вместо четырёх — подписи ужимаем, а не прячем. */
+.v5 .dock button { font-size: .62rem; padding-left: .2rem; padding-right: .2rem; }
+
+/* Подсказка под полями ввода: длительность простоя и причина запрета работы. */
+.ov5-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ov5-soft, #eef2f7);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+/* Кнопка-строка «Закончился сейчас» рядом с полем времени. */
+.ov5-rowbtn {
+  margin-top: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--ov5-line, #d5dbe3);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}

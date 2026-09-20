@@ -27,9 +27,28 @@ export const GET = withApi(
     }
 
     const parameters = request.nextUrl.searchParams;
-    const latitude = Number(parameters.get('lat'));
-    const longitude = Number(parameters.get('lon'));
-    const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude)
+    /*
+      ОТСУТСТВИЕ КООРДИНАТ И КООРДИНАТЫ 0°,0° — РАЗНЫЕ ВЕЩИ.
+
+      Было `Number(parameters.get('lat'))`. Для отсутствующего параметра это
+      `Number(null)`, то есть НОЛЬ, а ноль проходит и `isFinite`, и проверку
+      диапазона. Телефон без геопозиции молча получал погоду для точки 0°,0° —
+      это Гвинейский залив, полторы тысячи километров от берега. Проверено:
+      запрос без координат и запрос с lat=0&lon=0 давали одинаковые 24,3 °C и
+      6,2 м/с, а по настоящим координатам объекта выходило 16,2 °C и 3 м/с.
+
+      Цена ошибки не в погрешности прогноза: по ветру решают, поднимать ли
+      мачту, и по нему же экран подставляет ответ в чек-лист ТБ вместо
+      человека. Поэтому сначала спрашиваем, ПРИСЛАЛИ ли параметр, и только
+      потом разбираем число. Нет координат — нет погоды, и это честно.
+    */
+    const rawLatitude = parameters.get('lat');
+    const rawLongitude = parameters.get('lon');
+    const latitude = Number(rawLatitude);
+    const longitude = Number(rawLongitude);
+    const hasCoordinates = rawLatitude !== null && rawLatitude.trim() !== ''
+      && rawLongitude !== null && rawLongitude.trim() !== ''
+      && Number.isFinite(latitude) && Number.isFinite(longitude)
       && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
 
     const state = await queryOperatorMobileState({

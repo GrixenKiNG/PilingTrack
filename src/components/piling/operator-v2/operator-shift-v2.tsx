@@ -23,52 +23,45 @@
  * подписи шага показывает фактическое время, чтобы норматив можно было
  * проверить, а не обсуждать.
  *
- * ЧЕГО НЕТ. Приёмка без передачи, чек-лист площадки с ТБ и функциональная
- * проверка после пуска нигде не сохраняются: под них нет ни таблиц, ни команд.
- * Заводить схему под невыбранный вариант преждевременно, поэтому они живут в
- * памяти вкладки и помечены на экране.
+ * ОСМОТРЫ — ИЗ КАТАЛОГА В КОДЕ. Все четыре списка смены (предсменный осмотр,
+ * ЕО до работы, готовность площадки, ЕО после работы) приходят из
+ * `checklist-catalog.ts` и сдаются командой `submit-checklist` — теми же, что
+ * у остальных модулей. Раньше их было три разных источника: шаблоны механика
+ * для осмотров и два списка, зашитых в экран, которые нигде не сохранялись.
  */
 
 import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
+import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
-import { getTodayInTimezone } from '@/lib/timezone';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber } from '@/lib/format';
 import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
 import type { ClearanceDocument } from '@/modules/users';
-import { CompactInspection } from './compact-inspection';
 import { WeatherCard } from './weather-card';
 import { DefectSheet } from './defect-sheet';
-import { DowntimeSheet, HandoverSheet, PileSheet } from './sheets';
-import { useShiftReport } from './use-shift-report';
+import { DowntimeSheet, DrillingSheet, HandoverSheet, PileSheet } from './sheets';
+import { PilePassportForm } from '@/components/piling/operator-mobile/screens/pile-passport-form';
+import { IncidentsTab } from '@/components/piling/operator-mobile/screens/incidents-tab';
 import {
   BigCheck, BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow, type V2Tab,
 } from './ui';
-import type { OperatorMobileState } from '@/modules/operator-mobile/contracts';
-import { fetchState, sendCommand } from '@/components/piling/operator-mobile/api';
+import type {
+  ChecklistAnswer, ChecklistStage, OperatorMobileState,
+} from '@/modules/operator-mobile/contracts';
+import {
+  fetchState, sendCommand, type ProductionEntryInput,
+} from '@/components/piling/operator-mobile/api';
 import { SafetyTab } from '@/components/piling/operator-mobile/screens/safety-tab';
 import { PpeScreen } from '@/components/piling/operator-mobile/screens/ppe-screen';
 import { BriefingScreen } from '@/components/piling/operator-mobile/screens/briefing-screen';
 import { KnowledgeScreen } from '@/components/piling/operator-mobile/screens/knowledge-screen';
-import { ChecklistAccordion } from './checklist-accordion';
-import {
-  ENGINE_START_CONFIRMATIONS, SITE_SAFETY_GROUPS, STARTUP_GROUPS,
-  allDone, countItems, type CheckGroup,
-} from './checklists';
-import { V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
-
-/** Пометка о шаге, который пока не сохраняется. Молчать об этом нельзя. */
-function DraftNote() {
-  return (
-    <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-      Черновой шаг: в этом варианте он ещё не сохраняется на сервере
-    </p>
-  );
-}
+import { ChecklistScreen } from '@/components/piling/operator-mobile/screens/checklist-screen';
+import { knownAnswers } from '@/components/piling/operator-mobile/safety/known-answers';
+import { V2_STEP_STAGE, V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
 
 /**
  * Строка состояния документа в карточке допуска.
@@ -87,6 +80,80 @@ function documentStatusText(document: ClearanceDocument): string {
     case 'perpetual': return 'бессрочный';
     default: return until ? `до ${until}` : 'действителен';
   }
+}
+
+/**
+ * Личный допуск одной строкой, раскрывается касанием.
+ *
+ * Список из тринадцати удостоверений — это лист на полэкрана, который человек
+ * видит каждое утро и мимо которого проходит, не читая. Ему нужен ответ на
+ * один вопрос: пускают ли сегодня. Сроки нужны раз в несколько месяцев, когда
+ * что-то подходит к концу, — тогда их и открывают.
+ */
+function ClearanceRow({ cleared, operatorName, documents }: {
+  cleared: boolean;
+  operatorName: string;
+  documents: ClearanceDocument[];
+}) {
+  const [open, setOpen] = useState(false);
+  const attention = documents.filter(
+    (document) => document.status === 'expired'
+      || document.status === 'missing'
+      || document.status === 'expiring',
+  );
+  const nearest = documents
+    .map((document) => document.expiresAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0];
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex min-h-12 w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted/60"
+      >
+        <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white',
+          cleared ? 'bg-[#12a150]' : 'bg-warning')}>
+          {cleared ? '✓' : '!'}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-foreground">
+            {cleared ? 'Допуск подтверждён' : 'К работе не допущен'}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {operatorName} · документов: {documents.length}
+            {attention.length > 0
+              ? ' · требуют внимания: ' + attention.length
+              : nearest ? ' · ближайший срок ' + new Date(nearest).toLocaleDateString('ru-RU') : ''}
+          </span>
+        </span>
+        <span className="shrink-0 text-muted-foreground">{open ? '⌄' : '›'}</span>
+      </button>
+
+      {open && (
+        documents.length > 0 ? (
+          <RowList>
+            {documents.map((document) => (
+              <li key={document.typeId}>
+                <ValueRow
+                  label={document.typeName}
+                  value={documentStatusText(document)}
+                  tone={document.status === 'expired' || document.status === 'missing'
+                    || document.status === 'expiring' ? 'warn' : 'ok'}
+                />
+              </li>
+            ))}
+          </RowList>
+        ) : (
+          <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+            Обязательные документы администратором не заданы — проверять нечего
+          </p>
+        )
+      )}
+    </div>
+  );
 }
 
 function Blockers({ items }: { items: string[] }) {
@@ -119,26 +186,42 @@ export function OperatorShiftV2() {
   const [facts, setFacts] = useState<OperatorShiftFacts | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [admitted, setAdmitted] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [siteChecks, setSiteChecks] = useState<Record<string, boolean>>({});
-  const [startChecks, setStartChecks] = useState<Record<string, boolean>>({});
-  const [engineStartedAt, setEngineStartedAt] = useState<string | null>(null);
-  const [inspectionOpen, setInspectionOpen] = useState(false);
+  /*
+    Ключ команды осмотра и его ошибка.
+
+    Ключ переживает нажатие: на морозе в перчатке по кнопке попадают дважды, и
+    второй запрос с тем же ключом сервер узнаёт как повтор вместо второго
+    осмотра. Новый ключ выдаётся только после удачной сдачи.
+  */
+  const [checklistCommandId, setChecklistCommandId] = useState(() => crypto.randomUUID());
+  const [checklistError, setChecklistError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [defectOpen, setDefectOpen] = useState(false);
   const [pileOpen, setPileOpen] = useState(false);
+  const [passportOpen, setPassportOpen] = useState(false);
+  const [drillingOpen, setDrillingOpen] = useState(false);
   const [downtimeOpen, setDowntimeOpen] = useState(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [tab, setTab] = useState<V2Tab>('shift');
   /*
-    Вкладка ТБ живёт на собственном источнике — снимке рабочего места
-    (`/api/operator/mobile/state`). Контур готовности, на котором держится
-    остальной экран, знает про документы, но не знает ни про СИЗ, ни про
-    ознакомление, ни про проверку знаний: это разные наборы фактов.
+    Снимок рабочего места (`/api/operator/mobile/state`) — второй источник
+    экрана, и он же единственный источник выработки.
+
+    ПОЧЕМУ ВЫРАБОТКА ЖИВЁТ ЗДЕСЬ, А НЕ В СВОЁМ СЛОЕ. Раньше модуль писал сваи и
+    простои через `/api/reports/upsert` — своим путём, не тем, которым пишут
+    остальные четыре версии. Расходились не только оформление отчёта (чужой
+    номер вместо «RM-<смена>-<дата>», пустые время смены, моточасы и топливо),
+    но и правила: `upsert` требует, чтобы марка была в плане объекта, а
+    `log-production` — нет. На объекте без плана один модуль записывал сваю, а
+    этот отказывал, и спорить об этом можно было бесконечно, потому что оба
+    поступали по-своему верно. Путь оставлен один.
+
+    Контур готовности, на котором держится остальной экран, про выработку,
+    СИЗ, ознакомление и проверку знаний не знает — это разные наборы фактов.
   */
-  const [safetyState, setSafetyState] = useState<OperatorMobileState | null>(null);
-  const [safetyError, setSafetyError] = useState<string | null>(null);
+  const [mobile, setMobile] = useState<OperatorMobileState | null>(null);
+  const [mobileError, setMobileError] = useState<string | null>(null);
   const [safetyStep, setSafetyStep] = useState<'PPE' | 'BRIEFING' | 'KNOWLEDGE' | null>(null);
 
   const load = useCallback(async () => {
@@ -153,13 +236,13 @@ export function OperatorShiftV2() {
     }
   }, []);
 
-  /** Перечитать снимок рабочего места — источник вкладки ТБ. */
-  const loadSafety = useCallback(async () => {
+  /** Перечитать снимок рабочего места — источник выработки, допуска и ТБ. */
+  const loadMobile = useCallback(async () => {
     try {
-      setSafetyState(await fetchState({}));
-      setSafetyError(null);
+      setMobile(await fetchState({}));
+      setMobileError(null);
     } catch (cause) {
-      setSafetyError(cause instanceof Error ? cause.message : 'Раздел ТБ недоступен');
+      setMobileError(cause instanceof Error ? cause.message : 'Рабочее место недоступно');
     }
   }, []);
 
@@ -169,34 +252,72 @@ export function OperatorShiftV2() {
     setBusy(true);
     try {
       await sendCommand(command);
-      await loadSafety();
+      await loadMobile();
       setSafetyStep(null);
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Действие не выполнено');
     } finally {
       setBusy(false);
     }
-  }, [loadSafety]);
+  }, [loadMobile]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- загрузка фактов смены
     void load();
   }, [load]);
 
-  // Снимок рабочего места читаем при первом открытии вкладки ТБ, а не на входе
-  // в смену: большинству она за смену не понадобится ни разу.
-  useEffect(() => {
-    if (tab !== 'safety' || safetyState) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- загрузка снимка для вкладки ТБ
-    void loadSafety();
-  }, [tab, safetyState, loadSafety]);
+  /*
+    Снимок читаем сразу, а не при открытии вкладки ТБ.
 
-  const siteSafetyDone = allDone(SITE_SAFETY_GROUPS, siteChecks);
-  const startupDone = engineStartedAt !== null && allDone(STARTUP_GROUPS, startChecks);
+    Раньше он грузился лениво — вкладку за смену открывали не все. Теперь на
+    нём держится выработка: счётчики смены, журнал записей и справочники. Без
+    него экран работы пуст, поэтому он больше не ждёт касания.
+  */
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- снимок рабочего места
+    void loadMobile();
+  }, [loadMobile]);
+
+  /**
+   * Ответы, которые на площадке даёт не человек, а измерение.
+   *
+   * Ветер оператор всё равно не «проверяет» — он смотрит на ту же цифру,
+   * которую приложение уже получило и показало на приёмке. Повторный вопрос
+   * не добавляет ни знания, ни ответственности, зато учит пролистывать список.
+   *
+   * Порог здесь тот же, по которому карточка погоды рисует предупреждение:
+   * два разных порога на двух экранах одной смены — это не осторожность, а
+   * противоречие. ВНИМАНИЕ: карточка считает опасным ветром 20 м/с, а правила
+   * смены в modules/operator-mobile — 15 м/с. Расхождение вынесено владельцу,
+   * до его решения экраны v2 держатся одного числа между собой.
+   *
+   * Ветер выше порога ответа не получает: там решает человек на площадке.
+   */
+
+  const postDone = mobile?.checklists.find((item) => item.stage === 'EO_AFTER')?.done ?? false;
   const state = facts
-    ? resolveV2State(facts, { admitted, accepted, siteSafetyDone, startupDone, finishing })
+    ? resolveV2State(facts, mobile?.phase ?? null, postDone, { accepted, finishing })
     : null;
   const elapsed = useElapsed(facts?.shift?.startedAt ?? null);
+
+  /**
+   * Пока контур готовности держит машину — перечитываем факты.
+   *
+   * ПОЧЕМУ ЭТО НУЖНО. Оценка готовности считается НЕ в момент запроса: закрытие
+   * осмотра кладёт в очередь событие, и снимок обновляется через долю секунды
+   * после ответа сервера. Экран успевал прочитать факты в этот зазор, получал
+   * «Нет осмотра за сегодня» по только что закрытому осмотру — и застревал
+   * навсегда: кнопка на этом шаге выключена, перечитать было нечем.
+   *
+   * Отсюда короткий опрос вместо одного чтения. Он живёт только на шаге пуска
+   * и только пока есть блокировки: как только машину пустили, опрос прекращается.
+   */
+  const blockedAtStartup = state?.step === 'startup' && state.blockers.length > 0;
+  useEffect(() => {
+    if (!blockedAtStartup) return;
+    const timer = setInterval(() => { void load(); }, 6000);
+    return () => clearInterval(timer);
+  }, [blockedAtStartup, load]);
 
   // Секундомер приёмки — от открытия экрана до пуска. Норматив владельца:
   // 7–10 минут на всю штатную процедуру, из них не больше 3–5 минут в
@@ -211,7 +332,128 @@ export function OperatorShiftV2() {
   const siteId = facts?.assignments.find(
     (item) => item.equipmentId === facts.equipment?.id,
   )?.siteId ?? facts?.assignments[0]?.siteId ?? null;
-  const report = useShiftReport(siteId, facts?.equipment?.id ?? null, facts?.shift?.type ?? 'DAY');
+  /**
+   * Выработка смены — из снимка рабочего места.
+   *
+   * Счётчики и журнал считает сервер по записанным командам, а не экран по
+   * своему черновику: черновик, разошедшийся с сервером, — это спор бригадира
+   * с диспетчером в конце месяца, и именно он здесь и случался.
+   */
+  const production = mobile?.production ?? null;
+  const entries = mobile?.entries ?? [];
+  const grades = mobile?.dictionaries.pileGrades ?? [];
+  const drillingTypes = mobile?.dictionaries.drillingTypes ?? [];
+  const reasons = mobile?.dictionaries.downtimeReasons ?? [];
+  const totalPiles = production?.piles.count ?? 0;
+  const totalDrilling = production?.drilling.count ?? 0;
+  const totalDowntime = production?.downtimeHours ?? 0;
+  // Выработку запрещает сервер; экран гасит кнопки той же причиной.
+  const workForbidden = mobile ? !mobile.permit.allowed : false;
+
+  /*
+    Ключ команды происшествия живёт дольше формы: снимки привязываются к нему
+    ДО того, как запись появилась, — привязать их иначе не к чему. После
+    удачной записи ключ меняем, иначе фото следующего происшествия уехало бы
+    к предыдущему.
+  */
+  const [incidentCommandId, setIncidentCommandId] = useState(() => crypto.randomUUID());
+
+  const reportIncident = useCallback(async (input: {
+    category: string; signs: string[]; injured: boolean; description: string; mediaIds: string[];
+  }) => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    if (!shiftId) {
+      toast.error('Смена не найдена — записать некуда');
+      return false;
+    }
+    setBusy(true);
+    try {
+      await sendCommand({
+        command: 'report-incident',
+        clientCommandId: incidentCommandId,
+        shiftId,
+        category: input.category,
+        signs: input.signs,
+        injured: input.injured,
+        description: input.description,
+        mediaIds: input.mediaIds,
+      });
+      setIncidentCommandId(crypto.randomUUID());
+      await loadMobile();
+      return true;
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Происшествие не записано');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, facts?.shift?.id, incidentCommandId, loadMobile]);
+
+  /**
+   * Сдать осмотр — той же командой, что и остальные модули.
+   *
+   * Порядок этапов проверяет сервер: он знает, что до ЕО площадку не смотрят,
+   * и откажет раньше, чем это сделает экран. Вторая копия правила здесь рано
+   * или поздно разошлась бы с первой и начала разрешать запрещённое.
+   */
+  const submitChecklist = useCallback(async (stage: ChecklistStage, answers: ChecklistAnswer[]) => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    const equipmentId = mobile?.assignment?.equipmentId ?? facts?.equipment?.id;
+    if (!shiftId || !equipmentId) {
+      setChecklistError('Смена не найдена — осмотр не к чему приложить');
+      return;
+    }
+    setBusy(true);
+    setChecklistError(null);
+    try {
+      await sendCommand({
+        command: 'submit-checklist',
+        clientCommandId: checklistCommandId,
+        shiftId,
+        equipmentId,
+        stage,
+        answers,
+      });
+      setChecklistCommandId(crypto.randomUUID());
+      await Promise.all([loadMobile(), load()]);
+    } catch (cause) {
+      setChecklistError(cause instanceof Error ? cause.message : 'Осмотр не принят');
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, mobile?.assignment?.equipmentId, facts?.shift?.id, facts?.equipment?.id,
+    checklistCommandId, loadMobile, load]);
+
+  /**
+   * Записать выработку той же командой, что и остальные модули.
+   *
+   * Ключ команды — свой на каждую запись: сервер узнаёт по нему повтор и
+   * второй сваи не заводит, если ответ потерялся в дороге. Это же делает
+   * запись пригодной для очереди на устройстве: обрыв связи её не теряет.
+   */
+  const logProduction = useCallback(async (entry: ProductionEntryInput) => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    if (!shiftId) {
+      toast.error('Смена не найдена — записать некуда');
+      return false;
+    }
+    setBusy(true);
+    try {
+      await sendCommand({
+        command: 'log-production',
+        clientCommandId: crypto.randomUUID(),
+        shiftId,
+        entry,
+      });
+      await loadMobile();
+      return true;
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Запись не прошла');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, facts?.shift?.id, loadMobile]);
 
   const command = async (path: string, version: number, body: Record<string, unknown> = {}) => {
     const shiftId = facts?.shift?.id;
@@ -230,35 +472,48 @@ export function OperatorShiftV2() {
     return payload?.data as { version: number } | undefined;
   };
 
-  const openShift = async (equipmentId: string) => {
+  /**
+   * Принять машину.
+   *
+   * ПРИЁМКА ИДЁТ ТОЙ ЖЕ КОМАНДОЙ, ЧТО И У ОСТАЛЬНЫХ МОДУЛЕЙ.
+   *
+   * Раньше модуль открывал смену через контур готовности
+   * (`POST /api/readiness/shifts` + команда `start`). С переходом осмотров на
+   * каталог это перестало сходиться: контур готовности не пускает смену, пока
+   * нет «осмотра за сегодня» в его собственной таблице `Inspection`, а осмотр
+   * каталога пишется в `OperatorChecklistExecution` и такой записи не делает.
+   * Получался замкнутый круг — смена не пускалась без осмотра, а осмотр не
+   * начинался без пущенной смены. Экран возвращал человека на приёмку по кругу
+   * и ничего не объяснял.
+   *
+   * `accept-equipment` заводит смену сразу живой и снимает показания погоды и
+   * условий — то, ради чего приёмка и существует. Приём ПЕРЕДАЧИ от прошлой
+   * смены остаётся на контуре готовности: это отдельный факт со своим
+   * журналом, и он у модуля свой.
+   */
+  const acceptOn = async (equipmentId: string) => {
     setBusy(true);
     try {
       const hour = new Date().getHours();
-      const response = await authFetch('/api/readiness/shifts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
-        body: JSON.stringify({ equipmentId, type: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY' }),
+      await sendCommand({
+        command: 'accept-equipment',
+        clientCommandId: crypto.randomUUID(),
+        equipmentId,
+        shiftType: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY',
       });
-      if (!response.ok) {
-        throw new Error((await response.json().catch(() => null))?.error?.message ?? 'Не удалось открыть смену');
-      }
-      await load();
+      setAccepted(true);
+      await Promise.all([load(), loadMobile()]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось открыть смену');
+      toast.error(error instanceof Error ? error.message : 'Не удалось принять машину');
     } finally {
       setBusy(false);
     }
   };
 
-  /** Принять машину: есть передача — принимаем её, иначе просто расписываемся. */
   const acceptEquipment = async () => {
     const incoming = facts?.incomingHandover;
-    if (!facts?.shift) {
-      const assignments = facts?.assignments ?? [];
-      if (assignments.length === 0) return;
-      return void openShift(assignments[0].equipmentId);
-    }
-    if (incoming && incoming.shiftId !== facts.shift.id) {
+
+    if (incoming && facts?.shift && incoming.shiftId !== facts.shift.id) {
       // Свою передачу принять можно: при работе в одну смену принимать её
       // больше некому, и машина иначе оставалась запертой. Самоприёмка
       // помечается в журнале — см. `isSelfAcceptedHandover`.
@@ -279,7 +534,7 @@ export function OperatorShiftV2() {
           throw new Error((await response.json().catch(() => null))?.error?.message ?? 'Не удалось принять машину');
         }
         setAccepted(true);
-        await load();
+        await Promise.all([load(), loadMobile()]);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Не удалось принять машину');
       } finally {
@@ -287,28 +542,54 @@ export function OperatorShiftV2() {
       }
       return;
     }
-    setAccepted(true);
-  };
 
-  const startShift = async () => {
-    const shift = facts?.shift;
-    if (!shift) return;
+    const equipmentId = mobile?.assignment?.equipmentId
+      ?? facts?.equipment?.id
+      ?? facts?.assignments[0]?.equipmentId;
+    if (!equipmentId) {
+      toast.error('Установка за вами не закреплена');
+      return;
+    }
     setBusy(true);
     try {
-      let version = shift.version;
-      if (shift.state === 'PLANNED') {
-        version = (await command('request-acceptance', version))?.version ?? version + 1;
-      }
-      await command('start', version);
-      await load();
+      const hour = new Date().getHours();
+      await sendCommand({
+        command: 'accept-equipment',
+        clientCommandId: crypto.randomUUID(),
+        equipmentId,
+        shiftType: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY',
+      });
+      setAccepted(true);
+      await Promise.all([load(), loadMobile()]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось начать смену');
+      toast.error(error instanceof Error ? error.message : 'Не удалось принять машину');
     } finally {
       setBusy(false);
     }
   };
 
   /** Передать смену следующему оператору — последняя команда цикла. */
+  /**
+   * Сдать отчёт — той же командой и с тем же содержимым, что и остальные модули.
+   *
+   * Смену она не закрывает: здесь её принимает следующий оператор, и передача
+   * (ниже) работает с ещё живой сменой.
+   */
+  const submitReport = useCallback(async () => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    if (!shiftId) return;
+    setBusy(true);
+    try {
+      await sendCommand({command: 'submit-report', shiftId, comment: ''});
+      await Promise.all([loadMobile(), load()]);
+      toast.success('Отчёт отправлен');
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Отчёт не отправлен');
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, facts?.shift?.id, loadMobile, load]);
+
   const submitHandover = async (summary: string) => {
     const shift = facts?.shift;
     if (!shift) return;
@@ -324,50 +605,8 @@ export function OperatorShiftV2() {
     }
   };
 
-  const openInspection = async (phase: 'PRE_SHIFT' | 'POST_SHIFT') => {
-    const existing = phase === 'POST_SHIFT' ? facts?.inspection.postShift : facts?.inspection.preShift;
-    if (existing) return setInspectionOpen(true);
-    const equipmentId = facts?.equipment?.id;
-    const shiftId = facts?.shift?.id;
-    if (!equipmentId || !shiftId) return toast.error('Смена или установка не определены');
-    setBusy(true);
-    try {
-      const response = await authFetch('/api/inspections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          equipmentId, level: 'EO', inspectionDate: getTodayInTimezone(), shiftId, phase,
-        }),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Не удалось начать осмотр');
-      await load();
-      setInspectionOpen(true);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось начать осмотр');
-    } finally {
-      setBusy(false);
-    }
-  };
 
-  // Осмотр заводится САМ, как только человек до него дошёл.
-  //
-  // Раньше здесь был экран с единственной кнопкой «Начать осмотр»: он ничего не
-  // сообщал и ничего не решал — чистый лишний шаг на пути к рычагам, а таких в
-  // прежнем варианте набиралось пятнадцать-двадцать. Защёлка `creatingRef`
-  // обязательна: без неё двойное монтирование в разработке завело бы два
-  // осмотра на одну смену.
-  const creatingRef = useRef(false);
-  useEffect(() => {
-    if (state?.step !== 'inspection') return;
-    if (facts?.inspection.preShift) return;
-    if (creatingRef.current) return;
-    creatingRef.current = true;
-    void openInspection('PRE_SHIFT');
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- openInspection пересоздаётся каждый рендер, защёлка выше держит один запуск
-  }, [state?.step, facts?.inspection.preShift]);
-
-  if (safetyStep && safetyState) {
+  if (safetyStep && mobile) {
     /*
       Шаги допуска показываются во весь экран поверх смены: у каждого свой
       порядок и своя кнопка, и оболочка шага сюда не налезает. Экраны взяты
@@ -378,10 +617,10 @@ export function OperatorShiftV2() {
       return (
         <PpeScreen
           busy={busy}
-          error={safetyError}
+          error={mobileError}
           onBack={back}
           onConfirm={(items) => void runSafety({
-            command: 'confirm-ppe', productionDate: safetyState.productionDate, items,
+            command: 'confirm-ppe', productionDate: mobile.productionDate, items,
           })}
         />
       );
@@ -398,7 +637,7 @@ export function OperatorShiftV2() {
     return (
       <KnowledgeScreen
         busy={busy}
-        error={safetyError}
+        error={mobileError}
         onBack={back}
         onDone={(picks, attemptToken) => void runSafety({
           command: 'submit-knowledge', attemptToken, picks,
@@ -422,40 +661,41 @@ export function OperatorShiftV2() {
   const { step } = state;
   const equipment = facts.equipment;
   const photo = getEquipmentPhoto(equipment?.model);
-  const inspectionId = (step === 'post-inspection'
-    ? facts.inspection.postShift?.id
-    : facts.inspection.preShift?.id) ?? null;
   // Секундомер приёмки в подписи виден до пуска: после него он теряет смысл,
   // а место занимает счётчик отработанного времени.
   const stepLabel = step === 'work' || step === 'closed'
     ? stepCaption(step)
     : `${stepCaption(step)}${prepElapsed ? ` · ${prepElapsed}` : ''}`;
 
-  // ---------- 1. Допуск ----------
-  if (step === 'admission') {
+  // ---------- 1. Допуск и приёмка ----------
+  //
+  // Один экран вместо двух (решение владельца 18.09.2026). Раньше человек
+  // подтверждал допуск кнопкой «Продолжить», а следом принимал машину кнопкой
+  // «Принять установку» — два нажатия подряд, из которых первое ничего не
+  // решало: документы проверены автоматически, и оператор знает их наизусть.
+  //
+  // Допуск здесь свёрнут в одну строку и раскрывается касанием. Раскрытым он
+  // был листом на полэкрана, мимо которого проходят каждое утро.
+  if (step === 'acceptance') {
     const cleared = state.blockers.length === 0;
     const documents = facts.clearance.documents;
+    // До открытия смены кнопки внизу нет: машину выбирают из списка, и
+    // единственная закреплённая — тоже выбор, а не подстановка за человека.
+    const canAct = cleared && Boolean(facts.shift);
     return (
       <StepShell
-        title={tab === 'safety' ? 'Техника безопасности' : 'Личный допуск'}
+        title={tab === 'safety' ? 'Техника безопасности' : V2_STEP_TITLE.acceptance}
         subtitle={stepLabel}
         tone={cleared ? 'green' : 'blue'}
         /*
-          Панель здесь стоит вместе с кнопкой шага, а не вместо неё. Вкладка
-          «ТБ» нужна ИМЕННО НА ЭТОМ ШАГЕ: СИЗ, инструкция и проверка знаний
-          проходятся до смены, а не после, и открыть их из «работы» — значит
-          открыть их поздно. Дальше по ходу смены панель снова появляется
-          только на экране работы: бросать осмотр на середине нельзя.
+          Вкладка «ТБ» нужна ИМЕННО НА ЭТОМ ШАГЕ: СИЗ, инструкция и проверка
+          знаний проходятся до смены, а не после. Дальше по ходу смены панель
+          появляется только на экране работы: бросать осмотр на середине нельзя.
         */
         footer={(
           <>
-            {tab === 'shift' ? (
-              <StepButton
-                label={cleared ? 'Продолжить' : 'Допуск закрыт'}
-                onClick={() => setAdmitted(true)}
-                disabled={!cleared}
-                tone={cleared ? 'green' : 'blue'}
-              />
+            {tab === 'shift' && canAct ? (
+              <StepButton label="Принять установку" onClick={() => void acceptEquipment()} busy={busy} />
             ) : null}
             <BottomTabs active={tab} onSelect={setTab} />
           </>
@@ -464,9 +704,9 @@ export function OperatorShiftV2() {
         {tab !== 'shift' ? (
           tab === 'safety'
             ? (
-              safetyState
-                ? <SafetyTab state={safetyState} onOpen={setSafetyStep} />
-                : <p className="text-sm text-muted-foreground">{safetyError ?? 'Читаем ваш допуск…'}</p>
+              mobile
+                ? <SafetyTab state={mobile} onOpen={setSafetyStep} />
+                : <p className="text-sm text-muted-foreground">{mobileError ?? 'Читаем ваш допуск…'}</p>
             )
             : (
               <p className="text-sm text-muted-foreground">
@@ -476,39 +716,11 @@ export function OperatorShiftV2() {
             )
         ) : (
         <>
-        {/* Документы проверены автоматически: открывать по карточке на каждое
-            удостоверение оператор не должен — это его же документы, и он знает
-            их наизусть. Экран отвечает на один вопрос: пускают ли сегодня. */}
-        <div className="pt-4 text-center">
-          {cleared && <BigCheck tone="green" />}
-          <p className="mt-4 text-base font-semibold text-foreground">
-            {cleared ? 'Допуск подтверждён' : 'К работе не допущен'}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {user?.name?.trim() || 'Оператор'} · {new Date().toLocaleString('ru-RU', {
-              day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-            })}
-          </p>
-        </div>
-
-        {documents.length > 0 ? (
-          <RowList>
-            {documents.map((document) => (
-              <li key={document.typeId}>
-                <ValueRow
-                  label={document.typeName}
-                  value={documentStatusText(document)}
-                  tone={document.status === 'expired' || document.status === 'missing' ? 'warn'
-                    : document.status === 'expiring' ? 'warn' : 'ok'}
-                />
-              </li>
-            ))}
-          </RowList>
-        ) : (
-          <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-            Обязательные документы администратором не заданы — проверять нечего
-          </p>
-        )}
+        <ClearanceRow
+          cleared={cleared}
+          operatorName={user?.name?.trim() || 'Оператор'}
+          documents={documents}
+        />
 
         <Blockers items={state.blockers} />
 
@@ -519,28 +731,7 @@ export function OperatorShiftV2() {
             ))}
           </ul>
         )}
-        </>
-        )}
-      </StepShell>
-    );
-  }
 
-  // ---------- 2. Принятие установки ----------
-  if (step === 'acceptance') {
-    // До открытия смены кнопки внизу нет: машину выбирают из списка, и
-    // единственная закреплённая — тоже выбор, а не подстановка за человека.
-    // Раньше при одной установке смена открывалась кнопкой «Открыть смену», и
-    // оператор не видел, НА ЧЁМ она открывается.
-    const canAct = state.blockers.length === 0 && Boolean(facts.shift);
-    return (
-      <StepShell
-        title={V2_STEP_TITLE.acceptance}
-        subtitle={stepLabel}
-        onBack={() => setAdmitted(false)}
-        footer={canAct ? (
-          <StepButton label="Принять установку" onClick={() => void acceptEquipment()} busy={busy} />
-        ) : undefined}
-      >
         {equipment ? (
           <>
             <p className="text-lg font-semibold text-foreground">{equipment.name}</p>
@@ -585,8 +776,6 @@ export function OperatorShiftV2() {
           </p>
         )}
 
-        <Blockers items={state.blockers} />
-
         {/* Выбор установки — всегда, даже когда закреплена одна. Список тот,
             что администратор закрепил за оператором; чужую машину сюда не
             подставить, границу держит команда на сервере. */}
@@ -599,7 +788,7 @@ export function OperatorShiftV2() {
                   <CheckRow
                     label={assignment.equipmentName}
                     hint={`${assignment.model} · ${assignment.siteName}`}
-                    onToggle={() => void openShift(assignment.equipmentId)}
+                    onToggle={() => void acceptOn(assignment.equipmentId)}
                   />
                 </li>
               ))}
@@ -609,185 +798,59 @@ export function OperatorShiftV2() {
 
         {/* Погода на площадке — по геопозиции телефона. Ветер это прямое
             ограничение свайных работ, и узнать о нём надо до подъёма мачты. */}
+        {/* Ответы, которые система знает сама (ветер при свежем прогнозе),
+            подставляет общий модуль `known-answers` прямо в экране чек-листа —
+            своей копии этого правила у модуля больше нет. */}
         <WeatherCard
           siteId={siteId}
           siteName={facts.assignments.find((item) => item.siteId === siteId)?.siteName ?? null}
         />
 
-        {facts.shift && !facts.incomingHandover && <DraftNote />}
-      </StepShell>
-    );
-  }
-
-  // ---------- 3. Предсменный осмотр (и осмотр после работ) ----------
-  if (step === 'inspection' || step === 'post-inspection') {
-    const title = V2_STEP_TITLE[step];
-    return (
-      <StepShell title={title} subtitle={stepLabel} onBack={() => setInspectionOpen(false)}>
-        {(step === 'inspection' || inspectionOpen) && inspectionId ? (
-          <CompactInspection
-            inspectionId={inspectionId}
-            signedByName={user?.name?.trim() || 'Оператор'}
-            onDone={() => { setInspectionOpen(false); void load(); }}
-          />
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground">
-              {step === 'post-inspection'
-                ? 'Проверьте машину после работ — по узлам'
-                : 'Обойдите машину и отметьте узлы'}
-            </p>
-            <StepButton
-              label={inspectionId ? 'Продолжить осмотр' : 'Начать осмотр'}
-              onClick={() => void openInspection(step === 'post-inspection' ? 'POST_SHIFT' : 'PRE_SHIFT')}
-              busy={busy}
-            />
-          </>
+        </>
         )}
       </StepShell>
     );
   }
 
-  // ---------- 4. Площадка и ТБ ----------
-  if (step === 'site-safety') {
-    // Зона, коммуникации, погода и СИЗ — один сценарий, а не четыре экрана:
-    // человек обходит площадку один раз, и в телефоне это должен быть один
-    // проход сверху вниз.
-    const toggleGroup = (group: CheckGroup, next: boolean) =>
-      setSiteChecks((prev) => ({
-        ...prev,
-        ...Object.fromEntries(group.items.map((item) => [item.id, next])),
-      }));
-    return (
-      <StepShell
-        title={V2_STEP_TITLE['site-safety']}
-        subtitle={stepLabel}
-      >
-        <ChecklistAccordion
-          groups={SITE_SAFETY_GROUPS}
-          checked={siteChecks}
-          onToggle={(id) => setSiteChecks((prev) => ({ ...prev, [id]: !prev[id] }))}
-          onToggleGroup={toggleGroup}
-        />
-        {/* Кнопки «Далее» нет намеренно: шаг закрывается последней галочкой и
-            экран сам уходит на пуск. Кнопка была бы доступна ровно тогда,
-            когда шага уже нет. */}
-        <p className="text-xs text-muted-foreground">
-          Осталось отметить: {countItems(SITE_SAFETY_GROUPS)
-            - SITE_SAFETY_GROUPS.flatMap((group) => group.items).filter((item) => siteChecks[item.id]).length}
-        </p>
-        <DraftNote />
-      </StepShell>
-    );
-  }
-
-  // ---------- 5. Запуск и функциональная проверка ----------
-  if (step === 'startup') {
-    const allowed = state.blockers.length === 0;
-    const confirmed = ENGINE_START_CONFIRMATIONS.every((item) => startChecks[item.id]);
-
-    // Двигатель ещё не пущен: подтверждения безопасности и ключ. Проверять
-    // функции до пуска нечем, поэтому чек-лист ниже появляется после.
-    if (engineStartedAt === null) {
+  // ---------- 3–5. Осмотры каталога: предсменный, ЕО до работы, площадка, ЕО после ----------
+  //
+  // ОДИН ЭКРАН НА ЧЕТЫРЕ ЭТАПА. Раньше это были три разных механизма: осмотр
+  // через контур готовности (шаблоны механика), площадка и пуск — списками,
+  // зашитыми в экран и нигде не сохранявшимися. Теперь все четыре — этапы
+  // одного каталога, и экран у них тот же, что у действующего `/operator`:
+  // свёрнутые разделы, «Весь раздел в норме», замеры с границами, ответы
+  // системы по погоде. Расходиться этим экранам больше не на чем.
+  const catalogStage = V2_STEP_STAGE[step];
+  if (catalogStage) {
+    const list = mobile?.checklists.find((item) => item.stage === catalogStage) ?? null;
+    if (!mobile || !list) {
       return (
-        <StepShell
-          title="Запуск двигателя"
-          subtitle={stepLabel}
-          footer={
-            <StepButton
-              label="Запустить двигатель"
-              onClick={() => setEngineStartedAt(new Date().toISOString())}
-              disabled={!confirmed}
-              tone="green"
-            />
-          }
-        >
-          <p className="text-sm text-muted-foreground">Подтвердите безопасность пуска</p>
-          <RowList>
-            {ENGINE_START_CONFIRMATIONS.map((item) => (
-              <li key={item.id}>
-                <CheckRow
-                  label={item.label}
-                  checked={Boolean(startChecks[item.id])}
-                  onToggle={() => setStartChecks((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                />
-              </li>
-            ))}
-          </RowList>
-          {facts.meterCurrent != null && (
-            <RowList>
-              <li>
-                <ValueRow label="Моточасы на старт" value={`${formatNumber(facts.meterCurrent)} м/ч`} />
-              </li>
-            </RowList>
-          )}
-          <DraftNote />
+        <StepShell title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+          <p className="text-sm text-muted-foreground">
+            {mobileError ?? 'Читаем список осмотра…'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadMobile()}
+            className="min-h-12 w-full rounded-lg border border-border bg-card text-sm font-semibold text-foreground"
+          >
+            Обновить
+          </button>
         </StepShell>
       );
     }
-
-    // Двигатель работает: функции проверяются БЕЗ нагрузки, прогрев идёт
-    // параллельно — держать человека на пустом экране «ждите прогрева» значит
-    // приписывать приложению минуты, которых оно не тратит.
-    const ready = startupDone && allowed;
-    const toggleGroup = (group: CheckGroup, next: boolean) =>
-      setStartChecks((prev) => ({
-        ...prev,
-        ...Object.fromEntries(group.items.map((item) => [item.id, next])),
-      }));
     return (
-      <StepShell
-        title={V2_STEP_TITLE.startup}
-        subtitle={stepLabel}
-        tone={ready ? 'green' : 'blue'}
-        onBack={() => setEngineStartedAt(null)}
-        footer={
-          <StepButton
-            label={allowed ? 'Начать смену' : 'Запросить разрешение'}
-            onClick={() => void startShift()}
-            disabled={!ready}
-            busy={busy}
-            tone={ready ? 'green' : 'blue'}
-          />
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          Двигатель пущен в {new Date(engineStartedAt).toLocaleTimeString('ru-RU', {
-            hour: '2-digit', minute: '2-digit',
-          })} · проверка функций без нагрузки
-        </p>
-        <ChecklistAccordion
-          groups={STARTUP_GROUPS}
-          checked={startChecks}
-          onToggle={(id) => setStartChecks((prev) => ({ ...prev, [id]: !prev[id] }))}
-          onToggleGroup={toggleGroup}
+      <StepShell title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+        <ChecklistScreen
+          checklist={list}
+          warnings={mobile.warnings}
+          busy={busy}
+          error={checklistError}
+          commandId={checklistCommandId}
+          lastMeter={mobile.assignment?.lastMeter ?? null}
+          known={knownAnswers(catalogStage, mobile)}
+          onSubmit={(answers) => void submitChecklist(catalogStage, answers)}
         />
-        <div className="pt-2 text-center">
-          {ready && <BigCheck tone="green" />}
-          <p className="mt-3 text-base font-semibold text-foreground">
-            {!allowed ? 'Контур готовности не пускает машину'
-              : ready ? 'Работа разрешена' : 'Пройдите проверку функций'}
-          </p>
-          {facts.meterCurrent != null && (
-            <>
-              <p className="mt-6 text-2xl font-bold tabular-nums text-foreground">
-                {formatNumber(facts.meterCurrent)} <span className="text-base font-medium">м/ч</span>
-              </p>
-              {/* Голое число вызывало вопрос «это откуда?». Говорим источник:
-                  снятое показание счётчика с датой — или наработка из карточки
-                  установки, которую последним правил администратор. */}
-              <p className="text-xs text-muted-foreground">
-                {facts.meterSource === 'reading'
-                  ? `последнее показание счётчика${facts.meterRecordedAt
-                    ? ` от ${new Date(facts.meterRecordedAt).toLocaleDateString('ru-RU')}` : ''}`
-                  : facts.meterSource === 'equipment'
-                    ? 'наработка по карточке установки — счётчик за смену не снимали'
-                    : 'на старт'}
-              </p>
-            </>
-          )}
-        </div>
-        <Blockers items={state.blockers} />
       </StepShell>
     );
   }
@@ -820,15 +883,55 @@ export function OperatorShiftV2() {
                     value={facts.meterCurrent != null ? `${formatNumber(facts.meterCurrent)} м/ч` : '—'}
                   />
                 </li>
-                <li><ValueRow label="Сваи сегодня" value={`${report.totalPiles} шт`} /></li>
-                {report.totalDowntime > 0 && (
-                  <li><ValueRow label="Простой" value={formatDowntimeHours(report.totalDowntime)} tone="warn" /></li>
+                <li>
+                  <ValueRow label="Сваи сегодня"
+                    value={`${totalPiles} шт · ${formatNumber(production?.piles.meters ?? 0)} м.п.`} />
+                </li>
+                {totalDrilling > 0 && (
+                  <li>
+                    <ValueRow label="Бурение"
+                      value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
+                  </li>
+                )}
+                {totalDowntime > 0 && (
+                  <li><ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)} tone="warn" /></li>
                 )}
               </RowList>
 
-              <StepButton label="+ Новая свая" onClick={() => setPileOpen(true)} />
+              {/* Запрет закрывает выработку и не трогает простой, дефект и
+                  сдачу смены — обоснование в domain/production-permit.ts. */}
+              {mobile && !mobile.permit.allowed ? (
+                <div className="rounded-lg border border-danger/40 bg-danger/10 p-3">
+                  <p className="text-sm font-bold text-danger-strong">Работа запрещена</p>
+                  <ul className="mt-1 space-y-1">
+                    {mobile.permit.blocks.map((block) => (
+                      <li key={block.code} className="text-sm">
+                        <span className="font-semibold">{block.title}.</span> {block.resolution}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-sm font-medium">
+                    Простой, дефект и отчёт записываются как обычно.
+                  </p>
+                </div>
+              ) : null}
 
+              <StepButton label="+ Новая свая" disabled={workForbidden}
+                onClick={() => setPileOpen(true)} />
+
+              {/* Паспорт — отдельная кнопка, а не режим внутри формы сваи.
+                  Пачка это две цифры на ходу, паспорт — полтора десятка
+                  замеров: тот, кто пишет пачкой, не должен каждый раз
+                  проходить мимо полей отказа. */}
               <div className="grid grid-cols-2 gap-2">
+                <button type="button" disabled={workForbidden} onClick={() => setPassportOpen(true)}
+                  className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground disabled:opacity-50">
+                  Свая с паспортом
+                </button>
+                <button type="button" disabled={workForbidden} onClick={() => setDrillingOpen(true)}
+                  className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground disabled:opacity-50">
+                  Бурение
+                </button>
                 <button type="button" onClick={() => setDefectOpen(true)}
                   className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground">
                   Дефект
@@ -847,11 +950,25 @@ export function OperatorShiftV2() {
           )}
 
           {tab === 'safety' && (
-            safetyState
-              ? <SafetyTab state={safetyState} onOpen={setSafetyStep} />
+            mobile
+              ? (
+                <>
+                  <SafetyTab state={mobile} onOpen={setSafetyStep} />
+                  {/* Происшествие — про смену, а не про машину: ушибся человек,
+                      посторонний в опасной зоне, разлили масло. Дефект чинит
+                      механик, происшествие разбирают, и место ему здесь. */}
+                  <IncidentsTab
+                    state={mobile}
+                    busy={busy}
+                    error={mobileError}
+                    commandId={incidentCommandId}
+                    onReport={reportIncident}
+                  />
+                </>
+              )
               : (
                 <p className="text-sm text-muted-foreground">
-                  {safetyError ?? 'Читаем ваш допуск…'}
+                  {mobileError ?? 'Читаем ваш допуск…'}
                 </p>
               )
           )}
@@ -878,67 +995,101 @@ export function OperatorShiftV2() {
 
           {/* Журнал смены переехал сюда из собственной вкладки: его открывают
               раз в день, а место в панели он занимал постоянно. */}
+          {/* Журнал — поимённо, как его отдаёт сервер, а не свёрнутый по
+              маркам. Поправка к записи видна рядом с ней: гладкий журнал без
+              следов правок непроверяем. */}
           {tab === 'more' && (
-            report.draft.piles.length === 0 && report.draft.downtimes.length === 0 ? (
+            entries.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">За смену пока ничего не записано</p>
             ) : (
-              <>
-                {report.draft.piles.length > 0 && (
-                  <RowList>
-                    {report.draft.piles.map((row) => (
-                      <li key={row.pileGradeId}>
-                        <ValueRow
-                          label={report.grades.find((g) => g.id === row.pileGradeId)?.name ?? 'Свая'}
-                          value={`${row.count} шт`}
-                        />
-                      </li>
+              <RowList>
+                {entries.map((row) => (
+                  <li key={row.id}>
+                    <ValueRow
+                      label={row.label}
+                      value={row.kind === 'DOWNTIME'
+                        ? formatDowntimeHours(row.value)
+                        : `${row.value} ${row.kind === 'PILES' ? 'шт' : 'скв'}`
+                          + (row.meters != null ? ` · ${formatNumber(row.meters)} м` : '')}
+                      tone={row.kind === 'DOWNTIME' ? 'warn' : undefined}
+                    />
+                    {row.corrections.map((fix, index) => (
+                      <p key={index} className="px-3 pb-1.5 text-xs text-muted-foreground">
+                        поправка {fix.delta > 0 ? `+${fix.delta}` : fix.delta}: {fix.note}
+                      </p>
                     ))}
-                  </RowList>
-                )}
-                {report.draft.downtimes.length > 0 && (
-                  <RowList>
-                    {report.draft.downtimes.map((row, index) => (
-                      <li key={`${row.reasonId}-${index}`}>
-                        <ValueRow
-                          label={report.reasons.find((r) => r.id === row.reasonId)?.name ?? 'Простой'}
-                          value={`${row.duration} ч`}
-                          tone="warn"
-                        />
-                      </li>
-                    ))}
-                  </RowList>
-                )}
-              </>
+                  </li>
+                ))}
+              </RowList>
             )
           )}
 
           {tab === 'more' && (
             <RowList>
               <li><ValueRow label="Смена" value={facts.shift?.type === 'NIGHT' ? 'Ночная' : 'Дневная'} /></li>
-              <li><ValueRow label="Отчёт" value={report.draft.status === 'submitted' ? 'отправлен' : 'черновик'} /></li>
+              <li><ValueRow label="Объект" value={mobile?.assignment?.siteName ?? '—'} /></li>
             </RowList>
           )}
         </StepShell>
 
         <PileSheet
           open={pileOpen}
-          grades={report.grades}
-          busy={report.saving}
+          grades={grades}
+          busy={busy}
           onClose={() => setPileOpen(false)}
           onAdd={(gradeId, count) => void (async () => {
-            if (await report.addPile({ pileGradeId: gradeId, count })) {
+            if (await logProduction({ kind: 'PILES', pileGradeId: gradeId, count })) {
               setPileOpen(false);
               toast.success(`Записано: ${count} шт`);
             }
           })()}
         />
+        <DrillingSheet
+          open={drillingOpen}
+          types={drillingTypes}
+          busy={busy}
+          onClose={() => setDrillingOpen(false)}
+          onAdd={(typeId, count, metersPerUnit) => void (async () => {
+            if (await logProduction({ kind: 'DRILLING', typeId, count, metersPerUnit })) {
+              setDrillingOpen(false);
+              toast.success(`Записано: ${count} скв`);
+            }
+          })()}
+        />
+        {passportOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-background">
+            <header className="flex items-center gap-2 bg-[#1e5bd6] px-3 py-3 text-white">
+              <button type="button" onClick={() => setPassportOpen(false)}
+                className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/15">
+                ✕<span className="sr-only">Закрыть</span>
+              </button>
+              <p className="text-base font-semibold">Свая с паспортом</p>
+            </header>
+            <div className="flex-1 overflow-y-auto p-4">
+              <PilePassportForm
+                grades={grades}
+                busy={busy}
+                onSubmit={async (pileGradeId, passport) => {
+                  const ok = await logProduction({ kind: 'PILE_PASSPORT', pileGradeId, passport });
+                  if (ok) {
+                    setPassportOpen(false);
+                    toast.success('Свая записана с паспортом');
+                  }
+                  return ok;
+                }}
+              />
+            </div>
+          </div>
+        )}
         <DowntimeSheet
           open={downtimeOpen}
-          reasons={report.reasons}
-          busy={report.saving}
+          reasons={reasons}
+          busy={busy}
           onClose={() => setDowntimeOpen(false)}
-          onAdd={(reasonId, hours, comment) => void (async () => {
-            if (await report.addDowntime({ reasonId, duration: hours, comment: comment || undefined })) {
+          onAdd={(reasonId, startedAt, endedAt, comment) => void (async () => {
+            if (await logProduction({
+              kind: 'DOWNTIME', reasonId, startedAt, endedAt, comment: comment || undefined,
+            })) {
               setDowntimeOpen(false);
               toast.success('Простой записан');
             }
@@ -956,7 +1107,12 @@ export function OperatorShiftV2() {
 
   // ---------- 7. Отчёт о смене ----------
   if (step === 'report') {
-    const submitted = report.draft.status === 'submitted';
+    /*
+      Сдан ли отчёт, спрашиваем у сервера, а не у своего черновика: квитанция
+      появляется ровно тогда, когда отчёт стал сданным, и разойтись с сервером
+      она не может.
+    */
+    const submitted = mobile?.receipt != null;
     return (
       <>
         <StepShell
@@ -967,8 +1123,8 @@ export function OperatorShiftV2() {
               label={submitted ? 'Сдать смену' : 'Отправить отчёт'}
               onClick={() => submitted
                 ? setHandoverOpen(true)
-                : void (async () => { if (await report.submit()) toast.success('Отчёт отправлен'); })()}
-              busy={busy || report.saving}
+                : void submitReport()}
+              busy={busy}
             />
           }
         >
@@ -980,22 +1136,34 @@ export function OperatorShiftV2() {
                 value={facts.meterCurrent != null ? `${formatNumber(facts.meterCurrent)} м/ч` : '—'}
               />
             </li>
-            <li><ValueRow label="Сваи выполнено" value={`${report.totalPiles} шт`} /></li>
             <li>
-              <ValueRow label="Простой" value={formatDowntimeHours(report.totalDowntime)}
-                tone={report.totalDowntime > 0 ? 'warn' : undefined} />
+              <ValueRow label="Сваи выполнено"
+                value={`${totalPiles} шт · ${formatNumber(production?.piles.meters ?? 0)} м.п.`} />
             </li>
             <li>
+              <ValueRow label="Бурение"
+                value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
+            </li>
+            <li>
+              <ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)}
+                tone={totalDowntime > 0 ? 'warn' : undefined} />
+            </li>
+            <li>
+              {/* Спрашиваем каталог, а не контур готовности: осмотр после
+                  работы теперь чек-лист ЕО, и строка «не закрыт» по уже
+                  сданному списку — это ложь на последнем экране смены. */}
               <ValueRow
-                label="Осмотр после работ"
-                value={facts.inspection.postShift?.status === 'COMPLETED' ? 'закрыт'
-                  : facts.postShiftAvailable ? 'не закрыт' : 'не настроен'}
-                tone={facts.inspection.postShift?.status === 'COMPLETED' ? 'ok' : 'warn'}
+                label="ЕО после работы"
+                value={postDone ? 'сдан' : 'не сдан'}
+                tone={postDone ? 'ok' : 'warn'}
               />
             </li>
             <li>
-              <ValueRow label="Отчёт" value={submitted ? 'отправлен' : 'черновик'}
-                tone={submitted ? 'ok' : 'warn'} />
+              <ValueRow
+                label="Отчёт"
+                value={mobile?.receipt?.reportId ?? 'черновик'}
+                tone={submitted ? 'ok' : 'warn'}
+              />
             </li>
           </RowList>
           {!submitted && (
@@ -1031,12 +1199,8 @@ export function OperatorShiftV2() {
           label="На главную"
           tone="purple"
           onClick={() => {
-            setAdmitted(false);
             setAccepted(false);
             setFinishing(false);
-            setSiteChecks({});
-            setStartChecks({});
-            setEngineStartedAt(null);
             setTab('shift');
             void load();
           }}
@@ -1055,10 +1219,22 @@ export function OperatorShiftV2() {
           значит выкидывать человека из модуля на последнем шаге. */}
       <RowList>
         <li><ValueRow label="Время работы" value={elapsed ?? '—'} /></li>
-        <li><ValueRow label="Сваи выполнено" value={`${report.totalPiles} шт`} /></li>
-        <li><ValueRow label="Простой" value={formatDowntimeHours(report.totalDowntime)} /></li>
+        <li>
+          <ValueRow label="Сваи выполнено"
+            value={`${totalPiles} шт · ${formatNumber(production?.piles.meters ?? 0)} м.п.`} />
+        </li>
+        <li>
+          <ValueRow label="Бурение"
+            value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
+        </li>
+        <li><ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)} /></li>
         {facts.meterCurrent != null && (
           <li><ValueRow label="Моточасы" value={`${formatNumber(facts.meterCurrent)} м/ч`} /></li>
+        )}
+        {/* Номер отчёта — то, чем смена опознаётся в разговоре с диспетчером.
+            Без него человек не знает, что именно ушло. */}
+        {mobile?.receipt && (
+          <li><ValueRow label="Отчёт" value={mobile.receipt.reportId} tone="ok" /></li>
         )}
       </RowList>
     </StepShell>

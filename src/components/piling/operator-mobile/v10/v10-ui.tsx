@@ -76,28 +76,6 @@ export interface ScreenTab {
   screen: string;
 }
 
-/**
- * Статус-бар телефона: время настоящее, а не «10:42» из макета.
- *
- * Часы в шапке, врущие на полсмены, — первое, чему человек перестаёт верить.
- * До первого тика строка пустая: подставленное время успело бы мелькнуть.
- */
-export function StatusBar({time}: {time: string}) {
-  return (
-    <div className="ov10-status">
-      <span>{time}</span>
-      <span className="icons" aria-hidden="true">
-        <span className="bar" style={{height: 6}} />
-        <span className="bar" style={{height: 8}} />
-        <span className="bar" style={{height: 10}} />
-        <span className="bar" style={{height: 12}} />
-        <span style={{width: 7}} />
-        <span className="batt"><i /></span>
-      </span>
-    </div>
-  );
-}
-
 export function Navbar({title, sub, right, onBack}: {
   title: string;
   sub?: string;

@@ -11,7 +11,17 @@
 import { useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { StepButton } from './ui';
-import type { DowntimeReason, PileGrade } from './use-shift-report';
+import { downtimeInterval, formatIntervalMinutes, hhmm } from '../operator-mobile/downtime-interval';
+
+/*
+  Справочники приходят из снимка рабочего места — того же, что кормит все
+  остальные модули оператора. Своих описаний у форм больше нет: пока они
+  тянулись из `use-shift-report`, модуль вёл отдельный список марок и отдельный
+  путь записи, и то и другое расходилось с остальными версиями.
+*/
+export interface PileGrade { id: string; name: string; lengthMm: number | null }
+export interface DowntimeReason { id: string; name: string }
+export interface DrillingType { id: string; name: string }
 
 /** Панель поверх экрана: шапка, содержимое, кнопка внизу. */
 function Sheet({ title, onClose, children, footer }: {
@@ -71,11 +81,11 @@ export function PileSheet({ open, grades, busy, onClose, onAdd }: {
     >
       <Field label="Марка сваи" htmlFor="pile-grade">
         {grades.length === 0 ? (
-          // Пустой список — не поломка формы: на объекте нет плана свай, и
-          // принять их сервер всё равно не даст. Говорим это словами, а не
-          // пустым выпадающим списком.
+          // Пустой список — не поломка формы. Марки берутся из плана объекта, а
+          // если плана нет — из общего справочника; пусто здесь означает, что
+          // марок нет нигде, и это заводит администратор, а не оператор.
           <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-strong">
-            На объекте не запланировано ни одной марки свай — обратитесь к диспетчеру
+            Марки свай не заведены — обратитесь к диспетчеру
           </p>
         ) : (
           <select id="pile-grade" value={gradeId}
@@ -112,22 +122,105 @@ export function PileSheet({ open, grades, busy, onClose, onAdd }: {
   );
 }
 
+/**
+ * Лидерное бурение: тип, количество скважин и метры на скважину.
+ *
+ * ПОЧЕМУ ЭТА ФОРМА ПОЯВИЛАСЬ. Ввода бурения в модуле не было вообще, хотя
+ * комбинированная установка за смену бурит и бьёт. Смена закрывалась с нулём
+ * скважин — не потому, что не бурили, а потому что записать было негде.
+ *
+ * Метры спрашиваем на ОДНУ скважину, а не итогом: глубину машинист знает по
+ * проходке, а общий метраж считает в уме и ошибается на кратное число.
+ */
+export function DrillingSheet({ open, types, busy, onClose, onAdd }: {
+  open: boolean;
+  types: DrillingType[];
+  busy: boolean;
+  onClose: () => void;
+  onAdd: (typeId: string, count: number, metersPerUnit: number) => void;
+}) {
+  const [typeId, setTypeId] = useState('');
+  const [count, setCount] = useState(1);
+  const [meters, setMeters] = useState('');
+  if (!open) return null;
+
+  const metersPerUnit = Number(meters.replace(',', '.'));
+  const metersOk = Number.isFinite(metersPerUnit) && metersPerUnit > 0;
+
+  return (
+    <Sheet
+      title="Лидерное бурение"
+      onClose={onClose}
+      footer={
+        <StepButton
+          label={metersOk ? `Записать ${(count * metersPerUnit).toFixed(1)} м` : 'Записать бурение'}
+          onClick={() => onAdd(typeId, count, metersPerUnit)}
+          disabled={!typeId || !metersOk}
+          busy={busy}
+        />
+      }
+    >
+      <Field label="Тип бурения" htmlFor="drilling-type">
+        {types.length === 0 ? (
+          <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-strong">
+            Типы бурения не заведены — обратитесь к диспетчеру
+          </p>
+        ) : (
+          <select id="drilling-type" value={typeId}
+            onChange={(event) => setTypeId(event.target.value)} className={control}>
+            <option value="">Выберите тип</option>
+            {types.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        )}
+      </Field>
+
+      <Field label="Скважин">
+        <div className="flex items-stretch gap-2">
+          <button type="button" onClick={() => setCount((value) => Math.max(1, value - 1))}
+            className="h-14 w-16 rounded-lg border border-border bg-card text-2xl font-semibold">−</button>
+          <input
+            inputMode="numeric"
+            aria-label="Количество скважин"
+            value={count}
+            onChange={(event) => setCount(Math.max(1, Number(event.target.value.replace(/\D/g, '')) || 1))}
+            className="h-14 flex-1 rounded-lg border border-border bg-card text-center text-2xl font-bold tabular-nums"
+          />
+          <button type="button" onClick={() => setCount((value) => value + 1)}
+            className="h-14 w-16 rounded-lg border border-border bg-card text-2xl font-semibold">+</button>
+        </div>
+      </Field>
+
+      <Field label="Глубина одной скважины, м" htmlFor="drilling-meters">
+        <input
+          id="drilling-meters"
+          inputMode="decimal"
+          value={meters}
+          onChange={(event) => setMeters(event.target.value)}
+          placeholder="Например, 9,5"
+          className="h-14 w-full rounded-lg border border-border bg-card px-3 text-center text-2xl font-bold tabular-nums"
+        />
+      </Field>
+    </Sheet>
+  );
+}
+
 /** Зафиксировать простой: причина и продолжительность в часах. */
 export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
   open: boolean;
   reasons: DowntimeReason[];
   busy: boolean;
   onClose: () => void;
-  onAdd: (reasonId: string, hours: number, comment: string) => void;
+  onAdd: (reasonId: string, startedAt: string, endedAt: string, comment: string) => void;
 }) {
   const [reasonId, setReasonId] = useState('');
-  const [hours, setHours] = useState(0.5);
+  const [startedHm, setStartedHm] = useState('');
+  const [endedHm, setEndedHm] = useState('');
   const [comment, setComment] = useState('');
-  if (!open) return null;
 
-  const label = hours >= 1
-    ? `${Math.floor(hours)} ч${hours % 1 ? ' 30 мин' : ''}`
-    : '30 мин';
+  // Хук обязан вызываться до любого раннего возврата, поэтому интервал
+  // считается здесь, а не после проверки `open`.
+  const interval = downtimeInterval(startedHm, endedHm);
+  if (!open) return null;
 
   return (
     <Sheet
@@ -136,8 +229,8 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
       footer={
         <StepButton
           label="Записать простой"
-          onClick={() => onAdd(reasonId, hours, comment.trim())}
-          disabled={!reasonId}
+          onClick={() => interval && onAdd(reasonId, interval.startedAt, interval.endedAt, comment.trim())}
+          disabled={!reasonId || !interval}
           busy={busy}
         />
       }
@@ -150,19 +243,32 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
         </select>
       </Field>
 
-      <Field label="Сколько простояли">
+      {/* Начало и конец вместо шага в полчаса: шаг округлял двадцать минут до
+          получаса, а получас — до часа на сервере, и в отчёт уходило втрое
+          больше простоя, чем было. */}
+      <Field label="Простой начался" htmlFor="downtime-start">
+        <input id="downtime-start" type="time" value={startedHm}
+          onChange={(event) => setStartedHm(event.target.value)}
+          className={`${control} tabular-nums`} />
+      </Field>
+
+      <Field label="Закончился" htmlFor="downtime-end">
         <div className="flex items-stretch gap-2">
-          {/* Шаг полчаса: простой в минутах оператор всё равно округляет, а
-              часы — та единица, в которой его сверяет сервер. */}
-          <button type="button" onClick={() => setHours((value) => Math.max(0.5, value - 0.5))}
-            className="h-14 w-16 rounded-lg border border-border bg-card text-2xl font-semibold">−</button>
-          <div className="flex h-14 flex-1 items-center justify-center rounded-lg border border-border bg-card text-xl font-bold tabular-nums">
-            {label}
-          </div>
-          <button type="button" onClick={() => setHours((value) => Math.min(24, value + 0.5))}
-            className="h-14 w-16 rounded-lg border border-border bg-card text-2xl font-semibold">+</button>
+          <input id="downtime-end" type="time" value={endedHm}
+            onChange={(event) => setEndedHm(event.target.value)}
+            className={`${control} tabular-nums`} />
+          <button type="button" onClick={() => setEndedHm(hhmm(new Date()))}
+            className="h-14 shrink-0 rounded-lg border border-border bg-card px-4 text-sm font-semibold">
+            Сейчас
+          </button>
         </div>
       </Field>
+
+      {interval ? (
+        <p className="rounded-lg bg-info/10 px-3 py-2 text-sm font-semibold text-info-strong">
+          Простой: {formatIntervalMinutes(interval.minutes)}
+        </p>
+      ) : null}
 
       <Field label="Комментарий" htmlFor="downtime-comment">
         <textarea id="downtime-comment" rows={3} value={comment} maxLength={1000}

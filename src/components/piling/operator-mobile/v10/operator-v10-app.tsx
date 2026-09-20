@@ -1,18 +1,27 @@
 'use client';
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import type {
-  ChecklistView, DocumentVerdict, OperatorAnswer, OperatorMobileState,
+  ChecklistStage, ChecklistView, DocumentVerdict, IncidentCategory, IncidentSign,
+  OperatorAnswer, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
-import {PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired} from '@/modules/operator-mobile/contracts';
+import {
+  INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
+  INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
+  PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired,
+} from '@/modules/operator-mobile/contracts';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import {documentsSummary} from '../safety/documents-summary';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
 import {ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand} from '../api';
-import {formatHours, formatNumber} from '@/lib/format';
+import type {ProductionEntryInput} from '../api';
+import {downtimeInterval, formatIntervalMinutes, hhmm} from '@/components/piling/operator-mobile/downtime-interval';
+import {PilePassportForm} from '../screens/pile-passport-form';
+import {formatNumber} from '@/lib/format';
 import {
-  Badge, Banner, Card, Icon, Metric, Navbar, Nodata, Pair, Row, StatusBar, Tabbar,
+  Badge, Banner, Card, Icon, Metric, Navbar, Nodata, Pair, Row, Tabbar,
   type ScreenTab, type Tone,
 } from './v10-ui';
 
@@ -95,6 +104,8 @@ const SCREENS: ScreenDef[] = [
   {id: 'ppe', n: 11, title: 'Средства защиты', short: 'СИЗ', tab: 'safety'},
   {id: 'briefing', n: 12, title: 'Ознакомление с инструкцией', short: 'Инструкция', tab: 'safety'},
   {id: 'knowledge', n: 13, title: 'Проверка знаний по ТБ', short: 'Знания', tab: 'safety'},
+  {id: 'incidents', n: 15, title: 'Происшествия', short: 'ЧП', tab: 'safety'},
+  {id: 'tb', n: 16, title: 'Чек-листы ТБ', short: 'ТБ по работам', tab: 'safety'},
   {id: 'more', n: 14, title: 'Ещё', short: 'Ещё', tab: 'more'},
 ];
 
@@ -145,6 +156,25 @@ function ScreenToday({state, go}: {state: OperatorMobileState; go: Go}) {
 
   return (
     <>
+      {/* Запрет показываем ПЕРВЫМ и отдельно от допуска.
+          «Допуск получен» и «работа запрещена» — не одно и то же: корочки в
+          порядке, а выработку писать нельзя. Пока этой карточки не было,
+          человек узнавал о запрете только упёршись в отказ сервера на вводе. */}
+      {!state.permit.allowed ? (
+        <Card>
+          <Row
+            icon="shield"
+            tone="bad"
+            title="Работа запрещена"
+            note={state.permit.blocks.map((block) => `${block.title}: ${block.detail}`).join(' · ')}
+          />
+          <Row
+            icon="check"
+            title="Что записывать можно"
+            note="Простой, дефект, происшествие и отчёт — как обычно."
+          />
+        </Card>
+      ) : null}
       <Card>
         <Row
           icon="shield"
@@ -278,26 +308,14 @@ const ANSWERS: {value: OperatorAnswer; label: string; cls: string}[] = [
  * Разделы эталона оставлены заголовками, но отвечают не за раздел, а за пункт:
  * один ответ на шесть пунктов — это тот же «всё норма», только руками.
  */
-function ScreenInspect({checklist, answers, onAnswer, go}: {
-  checklist: ChecklistView | undefined;
+/** Пункты чек-листа с ответами. Одна разметка на осмотр и на ЕО. */
+function ChecklistItems({checklist, answers, measures, onAnswer, onMeasure}: {
+  checklist: ChecklistView;
   answers: Record<string, OperatorAnswer>;
+  measures: Record<string, string>;
   onAnswer: (itemId: string, answer: OperatorAnswer) => void;
-  go: Go;
+  onMeasure: (key: string, value: string) => void;
 }) {
-  if (!checklist) {
-    return <Card><Nodata>Осмотр станет доступен после приёма установки</Nodata></Card>;
-  }
-  if (checklist.done) {
-    return (
-      <>
-        <Banner tone="info" title="Осмотр сдан" />
-        <Card title={checklist.title}>
-          <Pair label="Версия" value={checklist.version} />
-          <Pair label="Разделов" value={String(checklist.sections.length)} />
-        </Card>
-      </>
-    );
-  }
   return (
     <>
       {checklist.sections.map((section) => (
@@ -319,10 +337,55 @@ function ScreenInspect({checklist, answers, onAnswer, go}: {
                   </button>
                 ))}
               </div>
+              {item.measure && measureRequired(item, answers[item.id] ?? 'OK') ? (
+                <label className="ov10-field">
+                  <span className="lab">
+                    {item.measure.label}, {item.measure.unit}
+                    {item.measure.max !== undefined
+                      ? ` (от ${item.measure.min ?? 0} до ${item.measure.max})`
+                      : ''}
+                  </span>
+                  <input
+                    inputMode="decimal"
+                    value={measures[item.measure.key] ?? ''}
+                    onChange={(event) => onMeasure(item.measure?.key ?? '', event.target.value)}
+                  />
+                </label>
+              ) : null}
             </div>
           ))}
         </Card>
       ))}
+    </>
+  );
+}
+
+function ScreenInspect({checklist, answers, measures, onAnswer, onMeasure, go}: {
+  checklist: ChecklistView | undefined;
+  answers: Record<string, OperatorAnswer>;
+  measures: Record<string, string>;
+  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
+  onMeasure: (key: string, value: string) => void;
+  go: Go;
+}) {
+  if (!checklist) {
+    return <Card><Nodata>Осмотр станет доступен после приёма установки</Nodata></Card>;
+  }
+  if (checklist.done) {
+    return (
+      <>
+        <Banner tone="info" title="Осмотр сдан" />
+        <Card title={checklist.title}>
+          <Pair label="Версия" value={checklist.version} />
+          <Pair label="Разделов" value={String(checklist.sections.length)} />
+        </Card>
+      </>
+    );
+  }
+  return (
+    <>
+      <ChecklistItems checklist={checklist} answers={answers} measures={measures}
+        onAnswer={onAnswer} onMeasure={onMeasure} />
       <button type="button" className="ov10-btn ghost" onClick={() => go('ready')}>К готовности</button>
     </>
   );
@@ -383,7 +446,170 @@ function ScreenReady({state, checklist, answers, busy, onSubmit, go}: {
   );
 }
 
-function ScreenWork({state, go}: {state: OperatorMobileState; go: Go}) {
+/**
+ * Запись выработки прямо здесь (решение владельца 18.09.2026).
+ *
+ * Раньше на этом месте стояла плашка «формы живут на Смене машиниста» — то
+ * есть модуль предлагал машинисту уйти в ДРУГОЙ модуль, чтобы записать сваю.
+ * Модуль, из которого нельзя записать выработку, рабочим местом не является.
+ *
+ * Поля те же, что и в рабочем экране /operator, и уходят той же командой
+ * log-production: сервер один, и правила приёмки записи тоже одни.
+ */
+function ProductionForm({state, busy, onLog}: {
+  state: OperatorMobileState;
+  busy: boolean;
+  onLog: (entry: ProductionEntryInput) => void;
+}) {
+  const [kind, setKind] = useState<'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME'>('PILES');
+  const [optionId, setOptionId] = useState('');
+  const [count, setCount] = useState('');
+  const [meters, setMeters] = useState('');
+  const [startedHm, setStartedHm] = useState('');
+  const [endedHm, setEndedHm] = useState('');
+
+
+  const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
+    : kind === 'DRILLING' ? state.dictionaries.drillingTypes
+      : state.dictionaries.downtimeReasons;
+
+  const switchKind = (next: typeof kind) => {
+    setKind(next);
+    setOptionId('');
+    setCount('');
+    setMeters('');
+    setStartedHm('');
+    setEndedHm('');
+  };
+
+  const amount = Number(count.replace(',', '.'));
+  const perUnit = Number(meters.replace(',', '.'));
+  // Простой задаётся интервалом: подпись под полями и то, что уйдёт на
+  // сервер, — одна и та же величина (см. downtime-interval).
+  const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  // Запрет закрывает выработку и не трогает простой — domain/production-permit.ts.
+  const forbidden = kind !== 'DOWNTIME' && !state.permit.allowed;
+  const ready = !forbidden && optionId !== '' && (
+    kind === 'DOWNTIME'
+      ? interval !== null
+      : Number.isFinite(amount) && amount > 0
+        && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
+  );
+
+  const submit = () => {
+    if (!ready) return;
+    if (kind === 'PILES') onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
+    else if (kind === 'DRILLING') {
+      onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
+    } else if (interval) {
+      onLog({
+        kind: 'DOWNTIME', reasonId: optionId,
+        startedAt: interval.startedAt, endedAt: interval.endedAt,
+      });
+    }
+    setOptionId('');
+    setCount('');
+    setMeters('');
+    setStartedHm('');
+    setEndedHm('');
+  };
+
+  return (
+    <Card title="Записать выработку">
+      <div className="ov10-chips on-work">
+        <button type="button" className={kind === 'PILES' ? 'on' : ''}
+          aria-pressed={kind === 'PILES'} onClick={() => switchKind('PILES')}>Свая</button>
+        <button type="button" className={kind === 'PASSPORT' ? 'on' : ''}
+          aria-pressed={kind === 'PASSPORT'} onClick={() => switchKind('PASSPORT')}>Паспорт</button>
+        <button type="button" className={kind === 'DRILLING' ? 'on' : ''}
+          aria-pressed={kind === 'DRILLING'} onClick={() => switchKind('DRILLING')}>Бурение</button>
+        <button type="button" className={kind === 'DOWNTIME' ? 'on' : ''}
+          aria-pressed={kind === 'DOWNTIME'} onClick={() => switchKind('DOWNTIME')}>Простой</button>
+      </div>
+
+      {/* Паспорт — журнал забивки на одну сваю по СП 45.13330: номер, залоги,
+          отказ, отметки головы. Форма общая со всеми модулями: требование к
+          ней нормативное, и расходиться ей нельзя. */}
+      {kind === 'PASSPORT' ? (
+        <PilePassportForm
+          grades={state.dictionaries.pileGrades}
+          busy={busy}
+          onSubmit={async (pileGradeId, passport) => {
+            onLog({kind: 'PILE_PASSPORT', pileGradeId, passport});
+            return true;
+          }}
+        />
+      ) : (
+      <>
+      <label className="ov10-field">
+        <span className="lab">
+          {kind === 'PILES' ? 'Марка сваи' : kind === 'DRILLING' ? 'Тип бурения' : 'Причина простоя'}
+        </span>
+        <select value={optionId} onChange={(event) => setOptionId(event.target.value)}>
+          <option value="">Выберите…</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>{option.name}</option>
+          ))}
+        </select>
+      </label>
+
+      {forbidden ? (
+        <p className="ov10-hint">
+          Работа запрещена: {state.permit.blocks.map((block) => block.title).join('; ')}.
+          Простой записывается как обычно.
+        </p>
+      ) : null}
+
+      {kind === 'DOWNTIME' ? (
+        <>
+          <label className="ov10-field">
+            <span className="lab">Простой начался</span>
+            <input type="time" value={startedHm}
+              onChange={(event) => setStartedHm(event.target.value)} />
+          </label>
+          <label className="ov10-field">
+            <span className="lab">Закончился</span>
+            <input type="time" value={endedHm}
+              onChange={(event) => setEndedHm(event.target.value)} />
+          </label>
+          <button type="button" className="ov10-rowbtn"
+            onClick={() => setEndedHm(hhmm(new Date()))}>Закончился сейчас</button>
+          {interval ? (
+            <p className="ov10-hint">Простой: {formatIntervalMinutes(interval.minutes)}</p>
+          ) : null}
+        </>
+      ) : (
+        <label className="ov10-field">
+          <span className="lab">Количество, шт</span>
+          <input inputMode="decimal" value={count}
+            onChange={(event) => setCount(event.target.value)} />
+        </label>
+      )}
+
+      {kind === 'DRILLING' ? (
+        <label className="ov10-field">
+          <span className="lab">Метров на скважину</span>
+          <input inputMode="decimal" value={meters}
+            onChange={(event) => setMeters(event.target.value)} />
+        </label>
+      ) : null}
+
+      <button type="button" className="ov10-btn" style={{marginTop: 12}}
+        disabled={busy || !ready} onClick={submit}>
+        {busy ? 'Записываем…' : 'Записать'}
+      </button>
+      </>
+      )}
+    </Card>
+  );
+}
+
+function ScreenWork({state, busy, onLog, go}: {
+  state: OperatorMobileState;
+  busy: boolean;
+  onLog: (entry: ProductionEntryInput) => void;
+  go: Go;
+}) {
   const {assignment} = state;
   return (
     <>
@@ -403,29 +629,66 @@ function ScreenWork({state, go}: {state: OperatorMobileState; go: Go}) {
           note={`${formatNumber(state.production.piles.meters, 0)} м.п.`} />
         <Metric label="Бурение" value={formatNumber(state.production.drilling.count, 0)}
           note={`${formatNumber(state.production.drilling.meters, 0)} м.п.`} />
-        <Metric label="Простой" value={formatHours(state.production.downtimeHours)} />
+        <Metric label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
       </div>
-      <Banner tone="info" title="Запись выработки — на рабочем экране">
-        {' '}Свая, бурение и простой требуют выбора марки и причины: формы живут на «Смене машиниста».
-      </Banner>
+      <ProductionForm state={state} busy={busy} onLog={onLog} />
       <button type="button" className="ov10-btn ghost" onClick={() => go('closing')}>К закрытию смены</button>
     </>
   );
 }
 
-function ScreenMaint({state, go}: {state: OperatorMobileState; go: Go}) {
-  const lists = state.checklists.filter(
-    (list) => list.stage === 'EO_BEFORE' || list.stage === 'EO_AFTER');
+/**
+ * ЕО здесь ПРОХОДЯТ, а не читают (решение владельца 18.09.2026).
+ *
+ * Экран показывал «Не отмечено» и не давал ответить ни на один пункт. Сервер
+ * при этом не закрывает смену без ЕО после работы — поэтому смену, начатую в
+ * v10, закрыть было нельзя вовсе. Это и была жалоба «не могу закрыть смену».
+ */
+function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSubmit, go}: {
+  state: OperatorMobileState;
+  answers: Record<string, OperatorAnswer>;
+  measures: Record<string, string>;
+  busy: boolean;
+  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
+  onMeasure: (key: string, value: string) => void;
+  onSubmit: (stage: ChecklistStage) => void;
+  go: Go;
+}) {
+  // ВСЕ списки смены, а не только ЕО. Раньше здесь были два чек-листа из
+  // четырёх, и «Готовность площадки» пройти было негде: сервер не закрывал
+  // смену, а экрана под неё в модуле не существовало.
+  const lists = state.checklists.filter((list) => list.stage !== 'TB_PILING'
+    && list.stage !== 'TB_DRILLING');
   return (
     <>
       {lists.length === 0
         ? <Card><Nodata>Чек-листы обслуживания недоступны</Nodata></Card>
-        : lists.map((list) => (
-          <Card key={list.stage} title={list.title}>
-            <Row icon="wrench" tone={list.done ? 'ok' : 'warn'} title={list.done ? 'Выполнено' : 'Не отмечено'}
-              note={`${list.sections.reduce((sum, section) => sum + section.items.length, 0)} пунктов · версия ${list.version}`} />
-          </Card>
-        ))}
+        : lists.map((list) => {
+          const items = list.sections.flatMap((section) => section.items);
+          const left = items.filter((item) => !answers[item.id]).length;
+          if (list.done) {
+            return (
+              <Card key={list.stage} title={list.title}>
+                <Row icon="wrench" tone="ok" title="Выполнено"
+                  note={`${items.length} пунктов · версия ${list.version}`} />
+              </Card>
+            );
+          }
+          return (
+            <div key={list.stage}>
+              <Card title={list.title}>
+                <Row icon="wrench" tone="warn" title="Не отмечено"
+                  note={`${items.length} пунктов · версия ${list.version}`} />
+              </Card>
+              <ChecklistItems checklist={list} answers={answers} measures={measures}
+                onAnswer={onAnswer} onMeasure={onMeasure} />
+              <button type="button" className="ov10-btn green" disabled={busy || left > 0}
+                onClick={() => onSubmit(list.stage)}>
+                {busy ? 'Отправляем…' : left > 0 ? `Осталось ответить: ${left}` : 'Сдать ' + list.title}
+              </button>
+            </div>
+          );
+        })}
       <Card title="Открытые неисправности">
         {state.defects.length === 0
           ? <Nodata>Открытых неисправностей нет</Nodata>
@@ -439,15 +702,115 @@ function ScreenMaint({state, go}: {state: OperatorMobileState; go: Go}) {
   );
 }
 
-function ScreenClosing({state, busy, comment, onComment, onClose}: {
+
+
+/**
+ * Строка ТБ в разделе допуска: срок ближайшего периодического чек-листа.
+ *
+ * Показываем худшее из двух: просроченный важнее того, у которого запас три
+ * месяца. Человеку нужен один ответ — надо ли идти проходить.
+ */
+function tbTone(state: OperatorMobileState | null): Tone {
+  const lists = state?.checklists.filter((list) => list.period !== null) ?? [];
+  if (lists.some((list) => list.period?.due)) return 'bad';
+  if (lists.some((list) => list.period?.warn)) return 'warn';
+  return 'ok';
+}
+
+function tbNote(state: OperatorMobileState | null): string {
+  const lists = state?.checklists.filter((list) => list.period !== null) ?? [];
+  if (lists.length === 0) return 'нет доступных списков';
+  const due = lists.filter((list) => list.period?.due);
+  if (due.length > 0) return `подошёл срок: ${due.map((list) => list.title).join(', ')}`;
+  const soon = lists
+    .map((list) => list.period?.daysLeft)
+    .filter((value): value is number => typeof value === 'number')
+    .sort((a, b) => a - b)[0];
+  return soon === undefined ? 'сроки не определены' : `ближайший срок через ${soon} дн.`;
+}
+
+/**
+ * Периодические чек-листы ТБ по виду работ.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНЫЙ ЭКРАН, А НЕ СТРОКА В ОБСЛУЖИВАНИИ. Ежесменные списки (ЕО,
+ * осмотр, площадка) проходят каждую смену; ТБ по забивке и бурению —
+ * периодические, по сроку инструкции, и между сроками их не трогают. Смешать
+ * их значило бы каждое утро показывать человеку список, который он проходил
+ * три месяца назад и пройдёт через три.
+ *
+ * ПОЧЕМУ ЭТОТ ЭКРАН ПОЯВИЛСЯ. Из обслуживания оба списка исключены намеренно,
+ * а перехода к ним не было нигде. Новый оператор упирался в 409 «Подошёл срок
+ * чек-листа ТБ по забивке свай» при попытке записать сваю — и пройти этот
+ * чек-лист в модуле было НЕГДЕ. Свайный цикл не завершался вовсе.
+ */
+function ScreenSafetyChecklists({state, answers, measures, busy, onAnswer, onMeasure, onSubmit, go}: {
+  state: OperatorMobileState;
+  answers: Record<string, OperatorAnswer>;
+  measures: Record<string, string>;
+  busy: boolean;
+  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
+  onMeasure: (key: string, value: string) => void;
+  onSubmit: (stage: ChecklistStage) => void;
+  go: Go;
+}) {
+  const lists = state.checklists.filter((list) => list.period !== null);
+  return (
+    <>
+      {lists.length === 0
+        ? <Card><Nodata>Чек-листы ТБ недоступны</Nodata></Card>
+        : lists.map((list) => {
+          const items = list.sections.flatMap((section) => section.items);
+          const left = items.filter((item) => !answers[item.id]).length;
+          const period = list.period;
+          const due = period?.due ?? false;
+          const warn = period?.warn ?? false;
+          return (
+            <div key={list.stage}>
+              <Card title={list.title}>
+                <Row
+                  icon="safety"
+                  tone={due ? 'bad' : warn ? 'warn' : 'ok'}
+                  title={due ? 'Срок подошёл'
+                    : warn ? `Срок через ${period?.daysLeft} дн.`
+                      : 'Действует'}
+                  note={due
+                    ? 'без него запись выработки не примут'
+                    : `до ${dateRu(period?.validUntil)} · ${items.length} пунктов`}
+                />
+              </Card>
+              {/* Пройти заранее — законное действие, за которое не наказывают:
+                  список открыт и когда срок ещё не вышел. */}
+              <ChecklistItems checklist={list} answers={answers} measures={measures}
+                onAnswer={onAnswer} onMeasure={onMeasure} />
+              <button type="button" className="ov10-btn green" disabled={busy || left > 0}
+                onClick={() => onSubmit(list.stage)}>
+                {busy ? 'Отправляем…' : left > 0 ? `Осталось ответить: ${left}` : 'Сдать ' + list.title}
+              </button>
+            </div>
+          );
+        })}
+      <button type="button" className="ov10-btn ghost" onClick={() => go('safety')}>К разделу ТБ</button>
+    </>
+  );
+}
+
+/**
+ * Закрытие смены. Поля комментария здесь нет (решение владельца 18.09.2026):
+ * то, что надо передать следующей смене, — это передача машины, отдельное
+ * действие со своим адресатом, а не строчка в закрытии.
+ */
+function ScreenClosing({state, busy, onClose, go}: {
   state: OperatorMobileState;
   busy: boolean;
-  comment: string;
-  onComment: (value: string) => void;
   onClose: () => void;
+  go: Go;
 }) {
   const {assignment} = state;
   const closed = state.phase === 'CLOSED';
+  // Сервер не закроет смену без послесменного обслуживания. Пока экран об
+  // этом молчал, человек упирался в отказ и не знал, куда идти: ЕО после
+  // работы живёт на другом экране, и попасть туда отсюда было нечем.
+  const afterDone = state.checklists.some((list) => list.stage === 'EO_AFTER' && list.done);
   return (
     <>
       <div className="ov10-metrics">
@@ -462,24 +825,35 @@ function ScreenClosing({state, busy, comment, onComment, onClose}: {
           note={String(state.defects.length)} />
         <Row icon="list" title="Записи выработки" note={String(state.entries.length)} />
       </Card>
-      <Card title="Комментарий">
-        {/* Поле пустое. Прежняя версия подставляла сюда фразу из макета — и
-            выдуманное «бетонирование сваи С-131 не завершено» уходило в
-            закрытие настоящей смены как слова машиниста. */}
-        <textarea
-          className="ov10-textarea"
-          value={comment}
-          placeholder="Что передать следующей смене"
-          onChange={(event) => onComment(event.target.value)}
-        />
-      </Card>
-      {closed
-        ? <Banner tone="info" title="Смена закрыта" />
-        : (
-          <button type="button" className="ov10-btn orange" disabled={busy} onClick={onClose}>
-            {busy ? 'Закрываем…' : 'Закрыть смену'}
+      {/* Номер отчёта — здесь, а не только на экране «Отчёт и синхронизация».
+          Человек закрывает смену на этом экране и уходит; номер, которым смену
+          опознают в разговоре с диспетчером, не должен лежать через два
+          нажатия в другом разделе. */}
+      {closed && state.receipt ? (
+        <Card title="Квитанция">
+          <Pair label="Отчёт" value={state.receipt.reportId} />
+          <Pair label="Отправлен" value={dateRu(state.receipt.submittedAt)} />
+        </Card>
+      ) : null}
+      {closed ? <Banner tone="info" title="Смена закрыта" /> : null}
+      {!closed && !afterDone ? (
+        <>
+          <Banner tone="warn" title="Сначала ЕО после работы" />
+          <button type="button" className="ov10-btn green" onClick={() => go('maint')}>
+            Выполнить ЕО после работы
           </button>
-        )}
+        </>
+      ) : null}
+      {!closed ? (
+        <button
+          type="button"
+          className="ov10-btn orange"
+          disabled={busy || !afterDone}
+          onClick={onClose}
+        >
+          {busy ? 'Закрываем…' : 'Закрыть смену'}
+        </button>
+      ) : null}
     </>
   );
 }
@@ -514,7 +888,7 @@ function ScreenReport({state}: {state: OperatorMobileState}) {
           note={`${formatNumber(state.production.piles.meters, 0)} м.п.`} />
         <Metric label="Бурение" value={formatNumber(state.production.drilling.count, 0)}
           note={`${formatNumber(state.production.drilling.meters, 0)} м.п.`} />
-        <Metric label="Простой" value={formatHours(state.production.downtimeHours)} />
+        <Metric label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
       </div>
       <Card title="Состояние модуля">
         {queue.map((item) => (
@@ -594,6 +968,18 @@ function ScreenSafety({state, view, error, go}: {
           note={state ? documentsSummary(state.identity.documents).note : `всего: ${view.clearance.documents.length}`}
           chevron onClick={() => go('docs')} />
       </Card>
+      <Card>
+        <Row icon="safety" tone={tbTone(state)} title="Чек-листы ТБ по видам работ"
+          note={tbNote(state)} chevron onClick={() => go('tb')} />
+      </Card>
+      <Card>
+        <Row icon="warn" tone={state && state.incidents.length > 0 ? 'warn' : 'ok'}
+          title="Происшествия смены"
+          note={state && state.incidents.length > 0
+            ? `записано: ${state.incidents.length}`
+            : 'записать ушиб, постороннего в зоне, разлив'}
+          chevron onClick={() => go('incidents')} />
+      </Card>
       <Card title="Журнал ТБ">
         {view.history.length === 0
           ? <Nodata>Записей пока нет</Nodata>
@@ -604,6 +990,127 @@ function ScreenSafety({state, view, error, go}: {
       </Card>
       </>
       ) : null}
+    </>
+  );
+}
+
+
+/**
+ * Происшествия смены: журнал и запись нового.
+ *
+ * ЧЕМ ОТЛИЧАЕТСЯ ОТ НЕИСПРАВНОСТИ. Неисправность — про машину, её чинит
+ * механик. Происшествие — про смену: человек ушибся, посторонний зашёл в
+ * опасную зону, разлили масло. Его не чинят, его разбирают, поэтому место ему
+ * здесь, в разделе ТБ, а не в карточке техники.
+ *
+ * ПОЧЕМУ ЗАПИСЬ НИЧЕГО НЕ ЗАПИРАЕТ. Правило по признакам само решает,
+ * насколько это опасно, и может сказать «работы прекращают». Но прекращает их
+ * человек: приложение не видит площадку и не знает, чем обернётся остановка
+ * посреди погружения сваи.
+ */
+function ScreenIncidents({state, busy, onReport}: {
+  state: OperatorMobileState;
+  busy: boolean;
+  onReport: (input: {
+    category: IncidentCategory; signs: IncidentSign[]; injured: boolean; description: string;
+  }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<IncidentCategory | ''>('');
+  const [signs, setSigns] = useState<IncidentSign[]>([]);
+  const [injured, setInjured] = useState(false);
+  const [description, setDescription] = useState('');
+
+  const ready = category !== '' && signs.length > 0
+    && description.trim().length >= INCIDENT_DESCRIPTION_MIN;
+
+  const toggle = (sign: IncidentSign) => setSigns((current) => (
+    current.includes(sign) ? current.filter((item) => item !== sign) : [...current, sign]
+  ));
+
+  return (
+    <>
+      <Card title="Происшествия смены">
+        {state.incidents.length === 0
+          ? <Nodata>Происшествий не записано</Nodata>
+          : state.incidents.map((incident) => (
+            <Row
+              key={incident.id}
+              icon="warn"
+              tone={incident.reviewedAt ? 'ok' : 'warn'}
+              title={INCIDENT_CATEGORY_LABELS[incident.category]}
+              note={`${timeRu(incident.occurredAt)} · ${incident.description}`}
+            />
+          ))}
+      </Card>
+
+      {!open ? (
+        <button type="button" className="ov10-btn ghost" onClick={() => setOpen(true)}>
+          Записать происшествие
+        </button>
+      ) : (
+        <Card title="Что произошло">
+          <label className="ov10-field">
+            <span className="lab">Событие</span>
+            <select value={category}
+              onChange={(event) => setCategory(event.target.value as IncidentCategory)}>
+              <option value="">Выберите…</option>
+              {INCIDENT_CATEGORIES.map((item) => (
+                <option key={item} value={item}>{INCIDENT_CATEGORY_LABELS[item]}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* Хотя бы один признак обязателен: по ним правило решает, насколько
+              это опасно. Без них запись не говорит, надо ли бежать. */}
+          <div className="ov10-chips wrap">
+            {INCIDENT_SIGNS.map((sign) => (
+              <button
+                key={sign}
+                type="button"
+                className={signs.includes(sign) ? 'on' : ''}
+                aria-pressed={signs.includes(sign)}
+                onClick={() => toggle(sign)}
+              >
+                {INCIDENT_SIGN_LABELS[sign]}
+              </button>
+            ))}
+          </div>
+
+          <div className="ov10-chips">
+            <button type="button" className={injured ? 'on' : ''} aria-pressed={injured}
+              onClick={() => setInjured(true)}>Есть пострадавшие</button>
+            <button type="button" className={injured ? '' : 'on'} aria-pressed={!injured}
+              onClick={() => setInjured(false)}>Пострадавших нет</button>
+          </div>
+
+          <label className="ov10-field">
+            <span className="lab">Как было дело</span>
+            <textarea rows={4} value={description} maxLength={4000}
+              onChange={(event) => setDescription(event.target.value)} />
+          </label>
+
+          <button
+            type="button"
+            className="ov10-btn"
+            style={{marginTop: 12}}
+            disabled={busy || !ready}
+            onClick={() => {
+              if (!ready) return;
+              onReport({category, signs, injured, description: description.trim()});
+              setOpen(false);
+              setCategory('');
+              setSigns([]);
+              setInjured(false);
+              setDescription('');
+            }}
+          >
+            {busy ? 'Записываем…'
+              : ready ? 'Записать происшествие'
+                : `Опишите подробнее — не меньше ${INCIDENT_DESCRIPTION_MIN} знаков`}
+          </button>
+        </Card>
+      )}
     </>
   );
 }
@@ -625,7 +1132,18 @@ function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
 
 /* --------------------------------------------------- шаги допуска (ТБ) --- */
 
-/** СИЗ: отмечает человек, нехватка записывается как есть и не запирает экран. */
+/**
+ * СИЗ: отмечают ОТСУТСТВИЕ, нехватка записывается как есть и не запирает экран.
+ *
+ * ПОЧЕМУ ГАЛОЧКИ СТОЯТ ЗАРАНЕЕ. У работника, вышедшего на смену, комплект
+ * обычно полон, и шесть обязательных нажатий в шесть утра превращаются в
+ * шесть нажатий не глядя. Снимать отметку человек будет осознанно.
+ *
+ * ПОЧЕМУ ПОДПИСЬ ПЕРЕПИСАНА. Стояло «Отметьте то, что у вас есть» — при уже
+ * расставленных галочках это читается как «пройдитесь по списку», и человек,
+ * добросовестно нажав на каждую строку, СНИМАЛ весь комплект. Подтверждение
+ * уходило с пометкой «не хватает каски». Экран должен просить то, что делает.
+ */
 function ScreenPpe({state, busy, onConfirm}: {
   state: OperatorMobileState;
   busy: boolean;
@@ -643,7 +1161,7 @@ function ScreenPpe({state, busy, onConfirm}: {
 
   return (
     <>
-      <Card title="Отметьте то, что у вас есть и исправно">
+      <Card title="Комплект отмечен полностью — снимите отметку с того, чего нет">
         {PPE_ITEMS.map((item) => (
           <Row
             key={item.code}
@@ -657,11 +1175,14 @@ function ScreenPpe({state, busy, onConfirm}: {
       </Card>
       {missing.length > 0 ? (
         <Banner tone="warn" title={`Не хватает: ${missing.map((item) => item.label).join(', ')}`}>
-          {' '}Запишем как есть — нехватка уйдёт предупреждением диспетчеру.
+          {' '}Запишем как есть. Пока не получите недостающее, выработку записать
+          нельзя — простой и происшествия записываются как обычно.
         </Banner>
       ) : null}
       <button type="button" className="ov10-btn" disabled={busy} onClick={() => onConfirm(items)}>
-        {busy ? 'Записываем…' : 'Подтвердить проверку'}
+        {busy ? 'Записываем…'
+          : missing.length === 0 ? 'Комплект в порядке'
+            : `Подтвердить (нет: ${missing.length})`}
       </button>
     </>
   );
@@ -836,9 +1357,9 @@ export function OperatorV10App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState('today');
-  const [comment, setComment] = useState('');
   const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
-  const [clock, setClock] = useState('');
+  /** Числовые замеры: моточасы, остаток топлива, доливы. */
+  const [measures, setMeasures] = useState<Record<string, string>>({});
 
   /**
    * Ключ команды переживает нажатие.
@@ -885,13 +1406,6 @@ export function OperatorV10App() {
         setSafetyError(cause instanceof Error ? cause.message : 'Раздел ТБ недоступен');
       }
     })();
-  }, []);
-
-  useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
   }, []);
 
   const run = useCallback(async (fn: () => Promise<unknown>, done: string) => {
@@ -949,18 +1463,32 @@ export function OperatorV10App() {
     [run],
   );
 
-  /** Сдача осмотра: уходят ОТВЕТЫ ЧЕЛОВЕКА, а не «норма» по всем пунктам. */
-  const submitInspection = useCallback(() => {
+  const reportIncident = useCallback((input: {
+    category: IncidentCategory; signs: IncidentSign[]; injured: boolean; description: string;
+  }) => {
     const shiftId = state?.shift?.id;
-    const equipmentId = state?.assignment?.equipmentId;
-    if (!shiftId || !equipmentId || !inspection) {
-      setNotice('Осмотр недоступен: сначала примите установку.');
+    if (!shiftId) {
+      setNotice('Смена не открыта: записать происшествие некуда.');
       return;
     }
-    const items = inspection.sections.flatMap((section) => section.items);
+    void run(() => sendCommand({
+      command: 'report-incident', clientCommandId: commandId, shiftId, ...input,
+    }), 'Происшествие записано.');
+  }, [commandId, run, state]);
+
+  /** Сдача осмотра: уходят ОТВЕТЫ ЧЕЛОВЕКА, а не «норма» по всем пунктам. */
+  const submitChecklist = useCallback((stage: ChecklistStage) => {
+    const shiftId = state?.shift?.id;
+    const equipmentId = state?.assignment?.equipmentId;
+    const list = state?.checklists.find((item) => item.stage === stage);
+    if (!shiftId || !equipmentId || !list) {
+      setNotice('Список недоступен: сначала примите установку.');
+      return;
+    }
+    const items = list.sections.flatMap((section) => section.items);
     const missing = items.filter((item) => !answers[item.id]);
     if (missing.length > 0) {
-      setNotice(`Без ответа пунктов: ${missing.length}. Осмотр сдаётся целиком.`);
+      setNotice(`Без ответа пунктов: ${missing.length}. Список сдаётся целиком.`);
       return;
     }
     void run(() => sendCommand({
@@ -968,10 +1496,34 @@ export function OperatorV10App() {
       clientCommandId: commandId,
       shiftId,
       equipmentId,
-      stage: 'PRESHIFT_INSPECTION',
-      answers: items.map((item) => ({itemId: item.id, answer: answers[item.id]})),
-    }), 'Осмотр сдан.');
-  }, [answers, commandId, inspection, run, state]);
+      stage,
+      answers: items.map((item) => ({
+        itemId: item.id,
+        answer: answers[item.id],
+        measures: item.measure && (measures[item.measure.key] ?? '').trim() !== ''
+          ? {[item.measure.key]: Number((measures[item.measure.key] ?? '').replace(',', '.'))}
+          : undefined,
+      })),
+    }), list.title + ': сдано.');
+    setMeasures({});
+  }, [answers, commandId, measures, run, state]);
+
+  const submitInspection = useCallback(
+    () => submitChecklist('PRESHIFT_INSPECTION'),
+    [submitChecklist],
+  );
+
+  const logProduction = useCallback((entry: ProductionEntryInput) => {
+    const shiftId = state?.shift?.id;
+    if (!shiftId) {
+      setNotice('Смена не начата: записывать некуда.');
+      return;
+    }
+    void run(
+      () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
+      'Записано.',
+    );
+  }, [commandId, run, state]);
 
   const closeShift = useCallback(() => {
     const shiftId = state?.shift?.id;
@@ -979,8 +1531,8 @@ export function OperatorV10App() {
       setNotice('Смена не начата: закрывать нечего.');
       return;
     }
-    void run(() => sendCommand({command: 'close-shift', shiftId, comment}), 'Смена закрыта.');
-  }, [comment, run, state]);
+    void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
+  }, [run, state]);
 
   const current = SCREENS.find((screen) => screen.id === active) ?? SCREENS[0];
   const activeTab = TABS.find((tab) => tab.screen === current.id)?.key ?? current.tab;
@@ -1012,7 +1564,7 @@ export function OperatorV10App() {
     fit();
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
-  }, [active, state, safety, safetyError, answers, loading, notice, loadError, comment]);
+  }, [active, state, safety, safetyError, answers, loading, notice, loadError]);
 
   const body = (() => {
     if (loading) {
@@ -1032,12 +1584,27 @@ export function OperatorV10App() {
       case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} />;
       case 'briefing': return <ScreenBriefing state={state} busy={busy} onAcknowledge={acknowledgeBriefing} />;
       case 'knowledge': return <ScreenKnowledge busy={busy} onDone={submitKnowledge} />;
+      case 'incidents': return <ScreenIncidents state={state} busy={busy} onReport={reportIncident} />;
+      case 'tb': return (
+        <ScreenSafetyChecklists
+          state={state}
+          answers={answers}
+          measures={measures}
+          busy={busy}
+          onAnswer={(itemId, answer) => setAnswers((current2) => ({...current2, [itemId]: answer}))}
+          onMeasure={(key, value) => setMeasures((current2) => ({...current2, [key]: value}))}
+          onSubmit={submitChecklist}
+          go={setActive}
+        />
+      );
       case 'accept': return <ScreenAccept state={state} busy={busy} onAccept={accept} go={setActive} />;
       case 'inspect': return (
         <ScreenInspect
           checklist={inspection}
           answers={answers}
+          measures={measures}
           onAnswer={(itemId, answer) => setAnswers((current2) => ({...current2, [itemId]: answer}))}
+          onMeasure={(key, value) => setMeasures((current2) => ({...current2, [key]: value}))}
           go={setActive}
         />
       );
@@ -1045,10 +1612,23 @@ export function OperatorV10App() {
         <ScreenReady state={state} checklist={inspection} answers={answers} busy={busy}
           onSubmit={submitInspection} go={setActive} />
       );
-      case 'work': return <ScreenWork state={state} go={setActive} />;
-      case 'maint': return <ScreenMaint state={state} go={setActive} />;
+      case 'work': return (
+        <ScreenWork state={state} busy={busy} onLog={logProduction} go={setActive} />
+      );
+      case 'maint': return (
+        <ScreenMaint
+          state={state}
+          answers={answers}
+          measures={measures}
+          busy={busy}
+          onAnswer={(itemId, answer) => setAnswers((current2) => ({...current2, [itemId]: answer}))}
+          onMeasure={(key, value) => setMeasures((current2) => ({...current2, [key]: value}))}
+          onSubmit={submitChecklist}
+          go={setActive}
+        />
+      );
       case 'closing': return (
-        <ScreenClosing state={state} busy={busy} comment={comment} onComment={setComment} onClose={closeShift} />
+        <ScreenClosing state={state} busy={busy} onClose={closeShift} go={setActive} />
       );
       case 'report': return <ScreenReport state={state} />;
       default: return <ScreenToday state={state} go={setActive} />;
@@ -1058,7 +1638,6 @@ export function OperatorV10App() {
   return (
     <div className="ov10-screen">
       <div className="ov10-top">
-        <StatusBar time={clock} />
         <Navbar
           title={current.title}
           onBack={current.id === 'today' ? undefined : () => setActive('today')}

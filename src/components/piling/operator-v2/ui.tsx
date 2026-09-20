@@ -47,7 +47,7 @@ export function StepShell({
     // край, и нажать её было нельзя. Здесь высота по содержимому, а кнопка
     // прилипает к нижней границе окна — она достижима и на длинном списке
     // осмотра, и на коротком экране пуска.
-    <div className="mx-auto w-full max-w-md bg-background">
+    <div className="mx-auto w-full max-w-[560px] bg-background">
       <header className={cn('flex items-center gap-2 px-3 py-3 text-white', TONE_BAR[tone])}>
         {onBack ? (
           <button type="button" onClick={onBack} aria-label="Назад"

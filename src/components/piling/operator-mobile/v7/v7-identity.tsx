@@ -46,7 +46,7 @@ export function PpeFlow({busy, confirmed, onConfirm, onBack}: {
 
   return (
     <>
-      <Title note="Отметьте то, что у вас есть и исправно. Нехватка не запирает экран — она уходит предупреждением диспетчеру.">
+      <Title note="Комплект отмечен полностью — снимите отметку с того, чего нет или что неисправно.">
         Средства защиты
       </Title>
       <div className="body">
@@ -69,12 +69,14 @@ export function PpeFlow({busy, confirmed, onConfirm, onBack}: {
           <Banner
             tone="warn"
             title={`Не хватает: ${missing.map((item) => item.label).join(', ')}`}
-            note="Запишем как есть. Врать экрану опаснее, чем работать без перчаток."
+            note="Запишем как есть. Врать экрану опаснее, чем работать без перчаток. Пока не получите недостающее, выработку записать нельзя — простой и происшествия записываются как обычно."
           />
         ) : null}
 
         <Button disabled={busy} onClick={() => onConfirm(items)}>
-          {busy ? 'Записываем…' : 'Подтвердить проверку'}
+          {busy
+            ? 'Записываем…'
+            : missing.length === 0 ? 'Комплект в порядке' : `Подтвердить (нет: ${missing.length})`}
         </Button>
         <Button tone="ghost" onClick={onBack}>Назад</Button>
       </div>

@@ -622,7 +622,7 @@
 
   .ov7 .device {
     width: 100%;
-    max-width: 480px;
+    max-width: 560px;
     height: 100dvh;
     flex: 0 0 auto;
     border-left: 1px solid var(--line);

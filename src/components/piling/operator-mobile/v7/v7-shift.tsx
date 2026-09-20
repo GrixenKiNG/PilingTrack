@@ -2,14 +2,16 @@
 
 import {useState} from 'react';
 import type {
-  ChecklistAnswer, ChecklistView, OperatorAnswer, OperatorMobileState,
+  ChecklistAnswer, ChecklistView, IncidentSign, OperatorAnswer, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_HINTS, INCIDENT_CATEGORY_LABELS,
-  INCIDENT_DESCRIPTION_MIN, measureRequired,
+  INCIDENT_DESCRIPTION_MIN, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS, measureRequired,
 } from '@/modules/operator-mobile/contracts';
+import {PilePassportForm} from '../screens/pile-passport-form';
 import type {ProductionEntryInput} from '../api';
-import {Banner, Button, Card, CardBody, Field, Pick, Title} from './v7-ui';
+import {downtimeInterval, formatIntervalMinutes, hhmm} from '../downtime-interval';
+import {Banner, Button, Card, CardBody, Field, Pair, Pick, Title} from './v7-ui';
 
 /**
  * Действия смены: приём установки, чек-листы, учёт выработки, происшествие,
@@ -108,9 +110,11 @@ const ANSWERS: {value: OperatorAnswer; label: string; cls: string}[] = [
  * подписывать нечем. Замер спрашиваем только там, где он обязателен при
  * выбранном ответе (`measureRequired`) — долив масла при «норме» не нужен.
  */
-export function ChecklistFlow({checklist, busy, onSubmit, onBack}: {
+export function ChecklistFlow({checklist, busy, lastMeter, onSubmit, onBack}: {
   checklist: ChecklistView;
   busy: boolean;
+  /** Последнее показание счётчика — подсказка у поля моточасов. */
+  lastMeter: {engineHours: number; recordedAt: string} | null;
   onSubmit: (answers: ChecklistAnswer[]) => void;
   onBack: () => void;
 }) {
@@ -183,13 +187,29 @@ export function ChecklistFlow({checklist, busy, onSubmit, onBack}: {
                   ) : null}
                   {answer && item.measure && measureRequired(item, answer) ? (
                     <div style={{marginTop: 8}}>
-                      <Field label={`${item.measure.label}, ${item.measure.unit}`}>
+                      <Field
+                        label={`${item.measure.label}, ${item.measure.unit}`
+                          + (item.measure.max !== undefined
+                            ? ` (от ${item.measure.min ?? 0} до ${item.measure.max})`
+                            : '')}
+                      >
                         <input
                           type="number"
                           inputMode="decimal"
                           value={measures[item.id] ?? ''}
                           onChange={(event) => setMeasures((current) => ({...current, [item.id]: event.target.value}))}
                         />
+                        {/* Прошлое показание счётчика — у поля, а не на экране
+                            приёмки, который к этому моменту давно закрыт.
+                            Счётчик не крутится назад, и человек, видящий
+                            вчерашнее число, ловит опечатку сам. Поле при этом
+                            не заполняем: подставленное отправят не глядя. */}
+                        {item.measure.key === 'engineHours' && lastMeter ? (
+                          <span className="ih">
+                            было {lastMeter.engineHours} м/ч
+                            {' '}на {new Date(lastMeter.recordedAt).toLocaleDateString('ru-RU')}
+                          </span>
+                        ) : null}
                       </Field>
                     </div>
                   ) : null}
@@ -222,10 +242,13 @@ export function ChecklistFlow({checklist, busy, onSubmit, onBack}: {
 
 /* ------------------------------------------------------------ выработка --- */
 
-type EntryKind = 'PILES' | 'DRILLING' | 'DOWNTIME';
+type EntryKind = 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME';
 
 const ENTRY_TITLE: Record<EntryKind, string> = {
-  PILES: 'Забивка свай', DRILLING: 'Лидерное бурение', DOWNTIME: 'Простой',
+  PILES: 'Забивка свай',
+  PASSPORT: 'Свая с паспортом',
+  DRILLING: 'Лидерное бурение',
+  DOWNTIME: 'Простой',
 };
 
 export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
@@ -236,16 +259,26 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
   onBack: () => void;
 }) {
   const {pileGrades, drillingTypes, downtimeReasons} = state.dictionaries;
-  const options = kind === 'PILES' ? pileGrades : kind === 'DRILLING' ? drillingTypes : downtimeReasons;
+  const options = kind === 'PILES' || kind === 'PASSPORT' ? pileGrades
+    : kind === 'DRILLING' ? drillingTypes : downtimeReasons;
   const [id, setId] = useState(options[0]?.id ?? '');
   const [amount, setAmount] = useState('');
+  const [startedHm, setStartedHm] = useState('');
+  const [endedHm, setEndedHm] = useState('');
   const [meters, setMeters] = useState('');
   const [comment, setComment] = useState('');
 
   const value = Number(amount);
   const metersValue = Number(meters);
-  const ready = Boolean(id) && Number.isFinite(value) && value > 0
-    && (kind !== 'DRILLING' || (Number.isFinite(metersValue) && metersValue > 0));
+  // Простой считается по интервалу, а не по числу в поле: подпись под полями
+  // и то, что уйдёт на сервер, — одна и та же величина.
+  const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  const ready = Boolean(id) && (
+    kind === 'DOWNTIME'
+      ? interval !== null
+      : Number.isFinite(value) && value > 0
+        && (kind !== 'DRILLING' || (Number.isFinite(metersValue) && metersValue > 0))
+  );
 
   const submit = () => {
     if (kind === 'PILES') {
@@ -256,7 +289,12 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
       onSubmit({kind: 'DRILLING', typeId: id, count: value, metersPerUnit: metersValue});
       return;
     }
-    onSubmit({kind: 'DOWNTIME', reasonId: id, hours: value, ...(comment ? {comment} : {})});
+    if (!interval) return;
+    onSubmit({
+      kind: 'DOWNTIME', reasonId: id,
+      startedAt: interval.startedAt, endedAt: interval.endedAt,
+      ...(comment ? {comment} : {}),
+    });
   };
 
   if (options.length === 0) {
@@ -265,6 +303,33 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
         <Title>{ENTRY_TITLE[kind]}</Title>
         <div className="body">
           <Banner tone="warn" title="Справочник пуст" note="Записывать не из чего — справочник заполняет администратор." />
+          <Button tone="ghost" onClick={onBack}>Назад</Button>
+        </div>
+      </>
+    );
+  }
+
+  /*
+    Паспорт — журнал забивки на одну сваю: номер, залоги, отметки головы.
+    Форма общая с остальными модулями, потому что требование к ней нормативное
+    (СП 45.13330), а не наше: разойтись ей нельзя. Пачка при этом остаётся
+    отдельной кнопкой — две цифры на ходу не должны идти мимо полей отказа.
+  */
+  if (kind === 'PASSPORT') {
+    return (
+      <>
+        <Title note="Журнал забивки на одну сваю — залоги, отказ, отметки головы.">
+          {ENTRY_TITLE[kind]}
+        </Title>
+        <div className="body">
+          <PilePassportForm
+            grades={pileGrades}
+            busy={busy}
+            onSubmit={async (pileGradeId, passport) => {
+              onSubmit({kind: 'PILE_PASSPORT', pileGradeId, passport});
+              return true;
+            }}
+          />
           <Button tone="ghost" onClick={onBack}>Назад</Button>
         </div>
       </>
@@ -291,14 +356,33 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
 
         <Card>
           <CardBody>
-            <Field label={kind === 'DOWNTIME' ? 'Часов' : 'Количество, шт.'}>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-            </Field>
+            {kind === 'DOWNTIME' ? (
+              <>
+                <Field label="Простой начался">
+                  <input type="time" value={startedHm}
+                    onChange={(event) => setStartedHm(event.target.value)} />
+                </Field>
+                <Field label="Закончился">
+                  <input type="time" value={endedHm}
+                    onChange={(event) => setEndedHm(event.target.value)} />
+                </Field>
+                <Button tone="ghost" onClick={() => setEndedHm(hhmm(new Date()))}>
+                  Закончился сейчас
+                </Button>
+                {interval ? (
+                  <Pair label="Простой" value={formatIntervalMinutes(interval.minutes)} />
+                ) : null}
+              </>
+            ) : (
+              <Field label="Количество, шт.">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                />
+              </Field>
+            )}
             {kind === 'DRILLING' ? (
               <Field label="Метров на скважину">
                 <input
@@ -330,13 +414,34 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
 
 export function IncidentFlow({busy, onSubmit, onBack}: {
   busy: boolean;
-  onSubmit: (input: {category: string; injured: boolean; description: string}) => void;
+  onSubmit: (input: {
+    category: string; signs: IncidentSign[]; injured: boolean; description: string;
+  }) => void;
   onBack: () => void;
 }) {
   const [category, setCategory] = useState<string>(INCIDENT_CATEGORIES[0]);
+  /*
+    ПРИЗНАКИ СПРАШИВАЕМ, А НЕ ОТПРАВЛЯЕМ ПУСТЫМИ.
+
+    Их не было ни в форме, ни в замысле экрана: оболочка жёстко слала
+    `signs: []`, сервер отвечал 400 «нужен хотя бы один признак», и
+    происшествие НЕ СОЗДАВАЛОСЬ. Текст оставался на экране, человек уходил с
+    ощущением, что записал. Это худший вид потери: не отказ, а молчаливое
+    исчезновение.
+
+    Признак здесь не формальность — по нему правило решает, насколько это
+    опасно и надо ли поднимать тревогу. Происшествие без признаков — запись,
+    по которой нельзя понять, надо ли бежать.
+  */
+  const [signs, setSigns] = useState<IncidentSign[]>([]);
   const [injured, setInjured] = useState(false);
   const [description, setDescription] = useState('');
   const short = description.trim().length < INCIDENT_DESCRIPTION_MIN;
+  const noSigns = signs.length === 0;
+
+  const toggleSign = (sign: IncidentSign) => setSigns((current) => (
+    current.includes(sign) ? current.filter((item) => item !== sign) : [...current, sign]
+  ));
 
   return (
     <>
@@ -359,6 +464,18 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
           </CardBody>
         </Card>
 
+        <Card title="Что было видно — отметьте всё, что подходит">
+          <CardBody>
+            <div className="picks">
+              {INCIDENT_SIGNS.map((sign) => (
+                <Pick key={sign} on={signs.includes(sign)} onClick={() => toggleSign(sign)}>
+                  {INCIDENT_SIGN_LABELS[sign]}
+                </Pick>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+
         <Pick box on={injured} onClick={() => setInjured((value) => !value)}>
           Есть пострадавший
         </Pick>
@@ -374,10 +491,13 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
 
         <Button
           tone="danger"
-          disabled={busy || short}
-          onClick={() => onSubmit({category, injured, description: description.trim()})}
+          disabled={busy || short || noSigns}
+          onClick={() => onSubmit({category, signs, injured, description: description.trim()})}
         >
-          {busy ? 'Отправляем…' : 'Записать происшествие'}
+          {busy ? 'Отправляем…'
+            : noSigns ? 'Отметьте хотя бы один признак'
+              : short ? `Опишите подробнее — не меньше ${INCIDENT_DESCRIPTION_MIN} знаков`
+                : 'Записать происшествие'}
         </Button>
         <Button tone="ghost" onClick={onBack}>Отмена</Button>
       </div>
@@ -387,30 +507,27 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
 
 /* --------------------------------------------------------- сдача смены --- */
 
+/**
+ * Закрытие смены: одна кнопка и предупреждение, что дальше правит администратор.
+ *
+ * ЧЕГО ЗДЕСЬ БОЛЬШЕ НЕТ (решение владельца 18.09.2026). Поля «что передать
+ * следующей смене» — передача машины это отдельное действие со своим
+ * адресатом, а не строчка в закрытии. И галочки «выработка записана полностью»:
+ * человек ставит её не глядя, потому что она стоит между ним и кнопкой, —
+ * подтверждения она не даёт, а закрытие задерживает.
+ */
 export function CloseFlow({busy, onClose, onBack}: {
   busy: boolean;
   onClose: (comment: string) => void;
   onBack: () => void;
 }) {
-  const [comment, setComment] = useState('');
-  const [sure, setSure] = useState(false);
   return (
     <>
       <Title note="После закрытия смена уходит в отчёт и правится только администратором.">
         Закрытие смены
       </Title>
       <div className="body">
-        <Card>
-          <CardBody>
-            <Field label="Что передать следующей смене">
-              <textarea value={comment} onChange={(event) => setComment(event.target.value)} />
-            </Field>
-          </CardBody>
-        </Card>
-        <Pick box on={sure} onClick={() => setSure((value) => !value)}>
-          Выработка записана полностью, замечания внесены
-        </Pick>
-        <Button disabled={busy || !sure} onClick={() => onClose(comment.trim())}>
+        <Button disabled={busy} onClick={() => onClose('')}>
           {busy ? 'Закрываем…' : 'Закрыть смену'}
         </Button>
         <Button tone="ghost" onClick={onBack}>Назад</Button>

@@ -18,24 +18,6 @@ const CHIP_CLASS: Record<Tone, string> = {
 
 /* ------------------------------------------------------------ хром --- */
 
-/**
- * Статус-бар телефона.
- *
- * Время настоящее, а не «9:41» из макета: экран живой, и часы в шапке, врущие
- * на полсмены, — это первое, чему человек перестаёт верить.
- */
-export function StatusBar({time}: {time: string}) {
-  return (
-    <div className="statusbar">
-      <span>{time}</span>
-      <span className="icons" aria-hidden="true">
-        <span className="bars"><i /><i /><i /><i /></span>
-        <span className="battery"><i /></span>
-      </span>
-    </div>
-  );
-}
-
 /** Шапка: возврат слева, состояние связи и время синхронизации справа. */
 export function NavBar({back, onBack, online, syncedAt, pending}: {
   back: string;
@@ -268,8 +250,7 @@ export function Dock<K extends string>({items, active, badges, onSelect}: {
  * нижнее меню. Один на все операторские модули — иначе хром разойдётся между
  * экранами, и человек перестанет узнавать своё приложение.
  */
-export function PhoneShell({clock, online, syncedAt, pending, back, onBack, children, action, dock}: {
-  clock: string;
+export function PhoneShell({online, syncedAt, pending, back, onBack, children, action, dock}: {
   online: boolean;
   syncedAt: string | null;
   pending: number;
@@ -282,7 +263,6 @@ export function PhoneShell({clock, online, syncedAt, pending, back, onBack, chil
   return (
     <div className="stage">
       <div className="device">
-        <StatusBar time={clock} />
         <NavBar back={back ?? 'Оператор'} onBack={onBack} online={online} syncedAt={syncedAt} pending={pending} />
         <div className="viewport">{children}</div>
         {action ? <div className="incident">{action}</div> : null}

@@ -52,7 +52,7 @@
   display:flex;
   flex-direction:column;
   width:100%;
-  max-width:480px;
+  max-width:560px;
   height:100%;
   background:var(--bg);
   overflow:hidden;
@@ -188,4 +188,56 @@ button.ov10-row{cursor:pointer}
 @media (min-width:520px){
   .ov10{background:#0b1725;padding:0}
   .ov10-screen{border-left:1px solid #17304c;border-right:1px solid #17304c}
+}
+
+/* ------------------------------------------------- запись выработки --- */
+/* Поля ввода на рабочем экране. Раньше их здесь не было вовсе: модуль
+   отправлял человека «на Смену машиниста», то есть в другой модуль, — записать
+   сваю из v10 было нельзя. */
+.ov10-field{display:block;margin-top:calc(9px * var(--k))}
+.ov10-field .lab{display:block;font-size:calc(11.5px * var(--k));font-weight:700;color:var(--muted);margin-bottom:4px}
+.ov10-field select,.ov10-field input{
+  width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);
+  font:inherit;font-size:calc(15px * var(--k));padding:calc(11px * var(--k)) calc(10px * var(--k));min-height:44px}
+.ov10-field input{font-variant-numeric:tabular-nums;font-weight:700}
+.ov10-chips.on-work button.on{background:var(--orange);border-color:var(--orange);color:#fff}
+
+/* Признаки происшествия отмечают пачкой — строка их переносит. */
+.ov10 .ov10-chips.wrap { flex-wrap: wrap; }
+
+/* Описание происшествия: единственное место, где человек пишет словами. */
+.ov10 .ov10-field textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--ov10-line, #d8dde5);
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  resize: vertical;
+}
+
+/* Подсказка под полями ввода: длительность простоя и причина запрета работы.
+   Тон нейтральный — она сообщает результат, а не тревожит. */
+.ov10-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ov10-soft, #eef2f7);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+/* Кнопка-строка «Закончился сейчас» рядом с полем времени. */
+.ov10-rowbtn {
+  margin-top: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--ov10-line, #d5dbe3);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
 }

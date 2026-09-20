@@ -23,14 +23,14 @@
  * такое — заводить обязанность, которой сейчас нет.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-interface Weather {
+export interface Weather {
   temperature: number | null;
   windSpeed: number | null;
-  /** Порог прекращения работ — 20 м/с по руководствам машин. */
+  /** Порог прекращения работ — 15 м/с, единый для продукта. */
   windWarning: boolean;
   /** Порог перевода стрелы в транспортное положение — 36 м/с. */
   windCritical: boolean;
@@ -48,10 +48,21 @@ interface Props {
   /** Объект смены — источник запасных координат, когда GPS недоступен. */
   siteId: string | null;
   siteName: string | null;
+  /**
+   * Готовое чтение наверх: им отвечают на пункт «скорость ветра допустима»
+   * в чек-листе площадки, до которого карточка уже не доживёт — она на
+   * предыдущем шаге. null означает «погоды нет», и тогда пункт возвращается
+   * человеку, а не подставляется «нормой».
+   */
+  onReading?: (reading: Weather | null) => void;
 }
 
-export function WeatherCard({ siteId, siteName }: Props) {
+export function WeatherCard({ siteId, siteName, onReading }: Props) {
   const [state, setState] = useState<State>({ kind: 'working', note: 'Определяем, где вы…' });
+  // Через ссылку, а не напрямую: обработчик из пропсов попал бы в зависимости
+  // загрузки, и каждый рендер родителя перезапрашивал бы геопозицию.
+  const report = useRef(onReading);
+  useEffect(() => { report.current = onReading; }, [onReading]);
 
   const fetchWeather = useCallback(async (lat: number, lon: number, origin: Origin) => {
     setState({ kind: 'working', note: 'Смотрим погоду…' });
@@ -59,10 +70,13 @@ export function WeatherCard({ siteId, siteName }: Props) {
       const response = await authFetch(`/api/weather?lat=${lat}&lon=${lon}`);
       const body = await response.json().catch(() => null);
       if (!response.ok) {
+        report.current?.(null);
         return setState({ kind: 'failed', message: body?.error ?? 'Погода недоступна' });
       }
+      report.current?.(body as Weather);
       setState({ kind: 'ready', weather: body as Weather, origin });
     } catch {
+      report.current?.(null);
       setState({ kind: 'failed', message: 'Погода недоступна' });
     }
   }, []);
@@ -183,7 +197,7 @@ export function WeatherCard({ siteId, siteName }: Props) {
         </p>
       ) : weather.windWarning ? (
         <p className="mt-1.5 text-sm font-semibold text-warning-strong">
-          Ветер 20 м/с и выше — работы прекращают, груз опускают, машину на стоянку.
+          Ветер 15 м/с и выше — работы прекращают, груз опускают, машину на стоянку.
           Решение принимает мастер на месте
         </p>
       ) : null}

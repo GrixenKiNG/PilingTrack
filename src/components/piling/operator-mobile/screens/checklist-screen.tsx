@@ -3,13 +3,14 @@
 import {useMemo, useRef, useState} from 'react';
 import {
   measureRequired,
-  type ChecklistAnswer, type ChecklistItem, type ChecklistView,
+  type ChecklistAnswer, type ChecklistItem, type ChecklistSection, type ChecklistView,
   type OperatorAnswer, type WorkWarning,
 } from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
 import {uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
+import type {KnownAnswer} from '../safety/known-answers';
 
 const ANSWERS: {value: OperatorAnswer; label: string}[] = [
   {value: 'OK', label: 'Норма'},
@@ -36,6 +37,29 @@ function filled(raw: string | undefined): boolean {
 }
 
 /**
+ * Пункты раздела, которые закрываются одной кнопкой «весь раздел в норме».
+ *
+ * ПРАВИЛО ИСКЛЮЧЕНИЯ. Кнопка не трогает пункт, где неисправность требует
+ * снимка, и пункт с обязательным замером. Это ровно те строки, где слепая
+ * «норма» опасна: трещина в мачте, обрыв пряди троса, подтёк РВД, показание
+ * счётчика. На них человек отвечает поимённо — и видит, что кнопка их не
+ * закрыла.
+ *
+ * ПОЧЕМУ РАЗДЕЛ, А НЕ ВЕСЬ СПИСОК. Раздел из четырёх строк помещается на
+ * экране целиком, и человек действительно может окинуть узел взглядом. Одна
+ * кнопка на восемнадцать пунктов подтверждает не осмотр, а нажатие кнопки —
+ * такую из v10 пришлось убирать.
+ */
+function bulkItems(
+  section: ChecklistSection,
+  known: Record<string, KnownAnswer>,
+): ChecklistItem[] {
+  return section.items.filter(
+    (item) => !known[item.id] && !item.photoOnIssue && !measureRequired(item, 'OK'),
+  );
+}
+
+/**
  * Универсальный экран чек-листа: один и тот же для осмотра, ЕО и ТБ.
  *
  * ПОЧЕМУ СПИСОК С СЕКЦИЯМИ, А НЕ МАСТЕР ПО ОДНОМУ ПУНКТУ. Мастер экономит место
@@ -44,7 +68,7 @@ function filled(raw: string | undefined): boolean {
  * Секции по узлам дают ориентир: течь была «где-то в гидравлике».
  */
 export function ChecklistScreen({
-  checklist, warnings, onSubmit, busy, error, commandId, onBack, lastMeter,
+  checklist, warnings, onSubmit, busy, error, commandId, onBack, lastMeter, known = {},
 }: {
   checklist: ChecklistView;
   warnings: WorkWarning[];
@@ -60,9 +84,24 @@ export function ChecklistScreen({
    * опечатку сам: до отказа сервера, а не после.
    */
   lastMeter?: {engineHours: number; recordedAt: string} | null;
+  /**
+   * Пункты, ответ на которые система знает сама (см. safety/known-answers).
+   * Человеку они показаны фактом, а не вопросом, и уходят ответом «норма»
+   * с основанием в примечании.
+   */
+  known?: Record<string, KnownAnswer>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [showGaps, setShowGaps] = useState(false);
+  /**
+   * Раскрыт ровно один раздел.
+   *
+   * Оператор в перчатке смотрит на машину, а не в телефон: открытый список из
+   * восемнадцати строк он закрывает не глядя. Один узел на экране — это и есть
+   * тот обход, который он делает ногами. Такой же порядок на осмотре в v2:
+   * два экрана одной смены обязаны отвечать одинаково.
+   */
+  const [openSection, setOpenSection] = useState<string | null>(null);
 
   const items = useMemo(
     () => checklist.sections.flatMap((section) => section.items),
@@ -73,8 +112,24 @@ export function ChecklistScreen({
     setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...patch}}));
   };
 
-  const answered = items.filter((item) => drafts[item.id]?.answer).length;
-  const gaps = useMemo(() => collectGaps(items, drafts), [items, drafts]);
+  const answered = items.filter((item) => known[item.id] || drafts[item.id]?.answer).length;
+  const gaps = useMemo(() => collectGaps(items, drafts, known), [items, drafts, known]);
+
+  /** Отметить весь раздел нормой или снять отметку, поставленную галочкой. */
+  const answerSection = (section: ChecklistSection, value: OperatorAnswer | undefined) => {
+    setDrafts((current) => {
+      const next = {...current};
+      for (const item of bulkItems(section, known)) {
+        next[item.id] = {...(next[item.id] ?? emptyDraft()), answer: value};
+      }
+      return next;
+    });
+  };
+
+  /** Ответ на все пункты раздела есть — раздел закрыт. */
+  const sectionDone = (section: ChecklistSection) => section.items.every(
+    (item) => known[item.id] || drafts[item.id]?.answer,
+  );
 
   const submit = () => {
     if (gaps.length > 0) {
@@ -88,10 +143,13 @@ export function ChecklistScreen({
           .filter(([, value]) => filled(value))
           .map(([key, value]) => [key, Number(value)] as const),
       );
+      const fact = known[item.id];
       return {
         itemId: item.id,
-        answer: draft.answer as OperatorAnswer,
-        note: draft.note.trim() || undefined,
+        answer: fact ? ('OK' as OperatorAnswer) : (draft.answer as OperatorAnswer),
+        // Основание системного ответа уходит в журнал: проверяющий через
+        // полгода должен отличать подтверждённое человеком от вычисленного.
+        note: fact ? `Подтверждено системой: ${fact.fact}` : draft.note.trim() || undefined,
         measures: Object.keys(measures).length > 0 ? measures : undefined,
         mediaIds: draft.mediaIds.length > 0 ? draft.mediaIds : undefined,
       };
@@ -131,38 +189,130 @@ export function ChecklistScreen({
         </Panel>
       ) : null}
 
-      {checklist.sections.map((section) => (
-        <section key={section.id} className="space-y-2">
-          <h2 className="border-b pb-1.5 pt-2 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {section.title}
-          </h2>
-          {section.items.map((item) => (
-            <ItemCard
-              key={item.id}
-              item={item}
-              draft={drafts[item.id] ?? emptyDraft()}
-              commandId={commandId}
-              lastMeter={lastMeter}
-              onChange={(patch) => update(item.id, patch)}
-            />
-          ))}
-        </section>
-      ))}
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border bg-card">
+        {checklist.sections.map((section, index) => {
+          const bulk = bulkItems(section, known);
+          const bulkOn = bulk.length > 0 && bulk.every((item) => drafts[item.id]?.answer === 'OK');
+          const apart = section.items.length - bulk.length;
+          const done = sectionDone(section);
+          const answered = section.items.filter(
+            (item) => known[item.id] || drafts[item.id]?.answer,
+          ).length;
+          const open = openSection === section.id;
+
+          /** Закрыли раздел галочкой — открываем следующий незакрытый сам. */
+          const advance = () => {
+            const rest = checklist.sections.slice(index + 1);
+            setOpenSection(rest.find((next) => !sectionDone(next))?.id ?? null);
+          };
+
+          return (
+            <li key={section.id}>
+              <div className="flex items-stretch">
+                {/*
+                  Галочка отдельной кнопкой, а не по всей строке: касание по
+                  названию раскрывает раздел, касание по галочке отвечает за
+                  него. Одна кнопка на два действия заставляла бы выбирать
+                  между «посмотреть» и «подтвердить не глядя».
+                */}
+                <button
+                  type="button"
+                  aria-pressed={bulkOn}
+                  aria-label={`Весь раздел «${section.title}» в норме`}
+                  disabled={bulk.length === 0}
+                  onClick={() => {
+                    answerSection(section, bulkOn ? undefined : 'OK');
+                    if (!bulkOn && apart === 0) advance();
+                    else if (!bulkOn) setOpenSection(section.id);
+                  }}
+                  className="flex min-h-12 w-12 shrink-0 items-center justify-center disabled:opacity-40"
+                >
+                  <span
+                    className={cn(
+                      'flex h-6 w-6 items-center justify-center rounded-md border text-sm font-bold',
+                      done
+                        ? 'border-success bg-success text-white'
+                        : answered > 0
+                          ? 'border-info bg-info/15 text-info-strong'
+                          : 'border-border bg-card',
+                    )}
+                  >
+                    {done ? '✓' : ''}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenSection(open ? null : section.id)}
+                  className="flex min-h-12 flex-1 items-center gap-2 pr-3 text-left"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className={cn('block truncate text-sm', done ? 'text-muted-foreground' : 'font-medium')}>
+                      {section.title}
+                    </span>
+                    {/*
+                      Почему галочка не работает — словами, а не серым цветом.
+
+                      В разделе, где КАЖДЫЙ пункт требует снимка или замера,
+                      отмечать разом нечего, и кнопка выключалась молча:
+                      человек видел бледную галочку, нажимал, ничего не
+                      происходило, и он шёл искать поломку телефона. Разделов
+                      с таким составом в предсменном осмотре три из семи.
+                    */}
+                    {!open && apart > 0 ? (
+                      <span className="block text-3xs text-muted-foreground">
+                        {bulk.length > 0
+                          ? `Со снимком и замером — отдельно (${apart})`
+                          : 'Каждый пункт со снимком или замером — откройте раздел'}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
+                    {answered}/{section.items.length}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">{open ? '⌄' : '›'}</span>
+                </button>
+              </div>
+
+              {open ? (
+                <div className="space-y-2 border-t bg-background/40 p-2.5">
+                  {section.items.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      draft={drafts[item.id] ?? emptyDraft()}
+                      known={known[item.id]}
+                      commandId={commandId}
+                      lastMeter={lastMeter}
+                      onChange={(patch) => update(item.id, patch)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
 
       <ErrorNote message={error} />
     </Screen>
   );
 }
 
-function ItemCard({item, draft, commandId, onChange, lastMeter}: {
+function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
   item: ChecklistItem;
   draft: Draft;
   commandId: string;
+  known?: KnownAnswer;
   onChange: (patch: Partial<Draft>) => void;
   lastMeter?: {engineHours: number; recordedAt: string} | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // Пункт, на который ответила система, показан фактом, а не вопросом: кнопки
+  // «Норма / Замечание / Отказ» здесь означали бы, что мнения расходятся.
+  if (known) return <KnownCard item={item} known={known} />;
   const isIssue = draft.answer === 'REMARK' || draft.answer === 'FAULT';
   const wantsMeasure = Boolean(item.measure) && measureRequired(item, draft.answer ?? 'OK');
 
@@ -234,6 +384,9 @@ function ItemCard({item, draft, commandId, onChange, lastMeter}: {
         <label className="mt-3 block">
           <span className="text-2xs font-medium text-muted-foreground">
             {item.measure.label}, {item.measure.unit}
+            {item.measure.max !== undefined
+              ? ` (от ${item.measure.min ?? 0} до ${item.measure.max})`
+              : ''}
           </span>
           <input
             type="number"
@@ -318,6 +471,21 @@ function ItemCard({item, draft, commandId, onChange, lastMeter}: {
  * заполнения всего списка — плохой способ. Здесь то же правило, только
  * видно сразу.
  */
+/**
+ * Пункт, ответ на который дала система. Всегда «норма» и всегда с основанием:
+ * строка на экране — та же, что уйдёт в журнал примечанием.
+ */
+function KnownCard({item, known}: {item: ChecklistItem; known: KnownAnswer}) {
+  return (
+    <div className="rounded-lg border border-success/40 bg-success/5 p-3">
+      <p className="text-sm font-medium leading-snug text-muted-foreground">{item.text}</p>
+      <p className="mt-1.5 text-2xs font-semibold text-success-strong">
+        Подтверждено системой · {known.fact}
+      </p>
+    </div>
+  );
+}
+
 function MeterHint({last, typed, unit}: {
   last: {engineHours: number; recordedAt: string};
   typed: string | undefined;
@@ -340,9 +508,14 @@ function MeterHint({last, typed, unit}: {
   );
 }
 
-function collectGaps(items: ChecklistItem[], drafts: Record<string, Draft>): string[] {
+function collectGaps(
+  items: ChecklistItem[],
+  drafts: Record<string, Draft>,
+  known: Record<string, KnownAnswer>,
+): string[] {
   const gaps: string[] = [];
   for (const item of items) {
+    if (known[item.id]) continue;
     const draft = drafts[item.id];
     if (!draft?.answer) {
       gaps.push(`«${item.text}» — не отмечен`);

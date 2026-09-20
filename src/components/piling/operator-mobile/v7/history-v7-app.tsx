@@ -58,7 +58,6 @@ export function HistoryV7App() {
   const [error, setError] = useState<string | null>(null);
   const [site, setSite] = useState<string>('all');
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
-  const [clock, setClock] = useState('');
   const [online, setOnline] = useState(true);
 
   const load = useCallback(async () => {
@@ -85,13 +84,6 @@ export function HistoryV7App() {
   useEffect(() => {
     void (async () => { await load(); })();
   }, [load]);
-
-  useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const update = () => setOnline(globalThis.navigator?.onLine ?? true);
@@ -123,7 +115,6 @@ export function HistoryV7App() {
 
   return (
     <PhoneShell
-      clock={clock}
       online={online}
       syncedAt={syncedAt}
       pending={0}

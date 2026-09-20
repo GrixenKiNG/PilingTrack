@@ -1,22 +1,16 @@
 'use client';
 
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {
-  DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
-} from '@/modules/operator-mobile/domain/defect-labels';
-import {Fact, Panel, PanelTitle, Sign} from '../ui';
+import {Fact, Panel, PanelTitle} from '../ui';
 
 /**
- * Карточка машины и её открытые неисправности.
+ * Карточка машины: что закреплено за машинистом и в каком оно состоянии.
  *
- * ПОЧЕМУ ДЕФЕКТЫ ЗДЕСЬ, А НЕ В СВОЕЙ ВКЛАДКЕ. Неисправность — свойство машины,
- * а не отдельная сущность в голове машиниста: он думает «что с моим копром»,
- * а не «открой журнал дефектов». Отдельная вкладка добавила бы пятую кнопку
- * внизу и заставила бы искать в двух местах то, что относится к одному.
- *
- * ПОЧЕМУ ЗДЕСЬ НЕЧЕГО НАЖАТЬ. Дефект заводит осмотр и закрывает механик.
- * Кнопка «закрыть» у машиниста означала бы, что неисправность исчезает по
- * решению того, кому она мешает работать.
+ * ПОЧЕМУ БЕЗ СПИСКА НЕИСПРАВНОСТЕЙ (решение владельца 18.09.2026). Здесь висел
+ * перечень открытых дефектов со счётчиком. Заводит их осмотр, закрывает
+ * механик, нажать машинисту нечего — на экране смены это семь строк, мимо
+ * которых он проходит каждый день. Неисправности остались там, где с ними
+ * работают: у механика и в карточке техники.
  */
 export function EquipmentTab({state}: {state: OperatorMobileState}) {
   const assignment = state.assignment;
@@ -57,42 +51,6 @@ export function EquipmentTab({state}: {state: OperatorMobileState}) {
             <Fact label="Помощники" value={assignment.assistants.join(', ')} />
           ) : null}
         </div>
-      </Panel>
-
-      <Panel tone={state.defects.length > 0 ? 'warning' : 'ok'}>
-        <PanelTitle tone={state.defects.length > 0 ? 'warning' : 'ok'}>
-          {state.defects.length > 0
-            ? `Открытых неисправностей: ${state.defects.length}`
-            : 'Открытых неисправностей нет'}
-        </PanelTitle>
-        {state.defects.length > 0 ? (
-          <ul className="mt-2 space-y-2">
-            {state.defects.map((defect) => (
-              <li key={defect.id} className="flex gap-2 border-t pt-2 first:border-t-0 first:pt-0">
-                <Sign tone={isAlarmingSeverity(defect.severity) ? 'danger' : 'warning'} />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">{defect.title}</p>
-                  <p className="text-2xs text-muted-foreground">
-                    {DEFECT_SEVERITY_FIELD_LABELS[defect.severity] ?? defect.severity}
-                    {' · '}
-                    {DEFECT_STATUS_FIELD_LABELS[defect.status] ?? defect.status}
-                    {' · с '}
-                    {new Date(defect.reportedAt).toLocaleDateString('ru-RU')}
-                  </p>
-                  {/* Кто заметил. У помощника можно уточнить, где именно он
-                      видел обрыв; про запись без автора спросить некого. */}
-                  <p className="text-2xs text-muted-foreground">
-                    {defect.reportedByMe ? 'Записали вы' : `Записал: ${defect.reportedByName}`}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Неисправности заводятся сами, когда в осмотре отмечен отказ. Закрывает их механик.
-          </p>
-        )}
       </Panel>
     </>
   );

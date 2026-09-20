@@ -1,7 +1,7 @@
 'use client';
 
 import type {
-  ChecklistStage, DefectView, DocumentVerdict, IncidentView, OperatorMobileState, WorkWarning,
+  ChecklistStage, DefectView, DocumentVerdict, IncidentView, OperatorMobileState, ProductionPermit, WorkWarning,
 } from '@/modules/operator-mobile/contracts';
 import {
   CONDITION_LABELS, INCIDENT_CATEGORY_LABELS, PHASE_LABELS,
@@ -10,7 +10,8 @@ import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
 import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
 } from '@/modules/operator-mobile/domain/defect-labels';
-import {formatHours, formatNumber, formatRuDate} from '@/lib/format';
+import {formatNumber, formatRuDate} from '@/lib/format';
+import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import {Banner, Button, Card, CardBody, Chip, Empty, Metric, Pair, Row, type Tone} from './v7-ui';
 
 /**
@@ -29,7 +30,7 @@ export type Detour =
   | {kind: 'KNOWLEDGE'}
   | {kind: 'ACCEPT'}
   | {kind: 'CHECKLIST'; stage: ChecklistStage}
-  | {kind: 'PRODUCTION'; entry: 'PILES' | 'DRILLING' | 'DOWNTIME'}
+  | {kind: 'PRODUCTION'; entry: 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME'}
   | {kind: 'INCIDENT'}
   | {kind: 'CLOSE'}
   | {kind: 'RESULT'};
@@ -212,13 +213,25 @@ function WorkBlock({state, busy, onStep, onFinishWork}: {
   onStep: (detour: Detour) => void;
   onFinishWork: () => void;
 }) {
+  // Запрет закрывает выработку и не трогает простой — обоснование в
+  // domain/production-permit.ts. Кнопки гасим, а не прячем: исчезнувшая кнопка
+  // читается как поломка, погашенная — как запрет, у которого есть причина.
+  const forbidden = !state.permit.allowed;
+
   return (
     <>
       <ProductionCard state={state} />
+      <PermitBanner permit={state.permit} />
       <div className="btn-row">
-        <Button tone="soft" onClick={() => onStep({kind: 'PRODUCTION', entry: 'PILES'})}>Забивка свай</Button>
-        <Button tone="soft" onClick={() => onStep({kind: 'PRODUCTION', entry: 'DRILLING'})}>Бурение</Button>
+        <Button tone="soft" disabled={forbidden} onClick={() => onStep({kind: 'PRODUCTION', entry: 'PILES'})}>Забивка свай</Button>
+        <Button tone="soft" disabled={forbidden} onClick={() => onStep({kind: 'PRODUCTION', entry: 'DRILLING'})}>Бурение</Button>
       </div>
+      {/* Паспорт живёт здесь, а не только во вкладке задач: во время работы
+          та вкладка скрыта, и единственная кнопка на журнал забивки была
+          недостижима ровно тогда, когда сваи и бьют. */}
+      <Button tone="soft" disabled={forbidden} onClick={() => onStep({kind: 'PRODUCTION', entry: 'PASSPORT'})}>
+        Свая с паспортом
+      </Button>
       <Button tone="ghost" onClick={() => onStep({kind: 'PRODUCTION', entry: 'DOWNTIME'})}>Записать простой</Button>
       <Button tone="ghost" disabled={busy} onClick={onFinishWork}>
         {busy ? 'Записываем…' : 'Работа на сегодня завершена'}
@@ -354,10 +367,26 @@ function ProductionCard({state}: {state: OperatorMobileState}) {
         <div className="metrics">
           <Metric value={production.piles.count} label="свай" extra={`${formatNumber(production.piles.meters)} м.п.`} />
           <Metric value={production.drilling.count} label="скважин" extra={`${formatNumber(production.drilling.meters)} м.п.`} />
-          <Metric value={formatHours(production.downtimeHours)} label="простой" />
+          <Metric value={formatDowntimeHours(production.downtimeHours)} label="простой" />
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+/**
+ * Запрет на работу. Отличается от предупреждения тем, что за ним стоит отказ
+ * сервера, а не цвет: см. `domain/production-permit.ts`. Последняя строка обязательна
+ * — без неё человек бросает вместе с работой и запись о простое.
+ */
+function PermitBanner({permit}: {permit: ProductionPermit}) {
+  if (permit.allowed) return null;
+  return (
+    <Banner
+      tone="bad"
+      title="Работа запрещена"
+      note={`${permit.blocks.map((block) => `${block.title}. ${block.resolution}`).join(' ')} Простой, происшествие и отчёт записываются как обычно.`}
+    />
   );
 }
 
@@ -365,16 +394,19 @@ function ProductionCard({state}: {state: OperatorMobileState}) {
 
 export function TasksScreen({state, onEntry}: {
   state: OperatorMobileState;
-  onEntry: (entry: 'PILES' | 'DRILLING' | 'DOWNTIME') => void;
+  onEntry: (entry: 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME') => void;
 }) {
   const started = state.phase === 'WORK' || state.phase === 'CLOSING';
+  const forbidden = !state.permit.allowed;
   return (
     <>
       <ProductionCard state={state} />
+      <PermitBanner permit={state.permit} />
       {started ? (
         <>
-          <Button tone="soft" onClick={() => onEntry('PILES')}>Записать забивку свай</Button>
-          <Button tone="soft" onClick={() => onEntry('DRILLING')}>Записать бурение</Button>
+          <Button tone="soft" disabled={forbidden} onClick={() => onEntry('PILES')}>Записать забивку свай</Button>
+          <Button tone="soft" disabled={forbidden} onClick={() => onEntry('PASSPORT')}>Свая с паспортом</Button>
+          <Button tone="soft" disabled={forbidden} onClick={() => onEntry('DRILLING')}>Записать бурение</Button>
           <Button tone="ghost" onClick={() => onEntry('DOWNTIME')}>Записать простой</Button>
         </>
       ) : (
@@ -390,7 +422,7 @@ export function TasksScreen({state, onEntry}: {
             <div className="metrics">
               <Metric value={state.assignment.sitePiles.count} label="свай" extra={`${formatNumber(state.assignment.sitePiles.meters)} м.п.`} />
               <Metric value={state.assignment.siteDrilling.count} label="скважин" extra={`${formatNumber(state.assignment.siteDrilling.meters)} м.п.`} />
-              <Metric value={formatHours(state.assignment.siteDowntimeHours)} label="простой" />
+              <Metric value={formatDowntimeHours(state.assignment.siteDowntimeHours)} label="простой" />
             </div>
           </CardBody>
         </Card>
@@ -416,7 +448,9 @@ export function JournalScreen({state}: {state: OperatorMobileState}) {
             ].filter(Boolean).join(' · ') || undefined}
             chip={(
               <Chip tone={entry.kind === 'DOWNTIME' ? 'warn' : 'info'}>
-                {formatNumber(entry.value)} {ENTRY_UNIT[entry.kind] ?? ''}
+                {entry.kind === 'DOWNTIME'
+                  ? formatDowntimeHours(entry.value)
+                  : `${formatNumber(entry.value)} ${ENTRY_UNIT[entry.kind] ?? ''}`}
               </Chip>
             )}
           />

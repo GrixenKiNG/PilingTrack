@@ -27,6 +27,7 @@ import {IncidentsTab} from './screens/incidents-tab';
 import {ProfileTab} from './screens/profile-tab';
 import {SafetyTab} from './screens/safety-tab';
 import {admissionBlockers, admissionSteps} from './safety/admission-steps';
+import {knownAnswers} from './safety/known-answers';
 
 /** Чек-лист, закрывающий фазу. Тот же порядок, что на сервере. */
 const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>> = {
@@ -466,6 +467,7 @@ export function OperatorMobileApp() {
           error={actionError}
           commandId={checklistCommandId}
           lastMeter={state.assignment?.lastMeter ?? null}
+          known={knownAnswers(checklist.stage, state)}
           onBack={detour ? () => setDetour(null) : undefined}
         />
       );

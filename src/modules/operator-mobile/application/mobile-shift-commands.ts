@@ -32,4 +32,4 @@ export {correctProduction} from './commands/production-corrections';
 export type {PileDrivingSetEntry, PilePassportEntry, ProductionEntry} from './commands/production';
 
 export {reportIncident} from './commands/incidents';
-export {finishWork, closeShift} from './commands/shift-close';
+export {finishWork, closeShift, submitReport} from './commands/shift-close';

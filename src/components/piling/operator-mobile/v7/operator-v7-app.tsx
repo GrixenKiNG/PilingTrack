@@ -59,7 +59,6 @@ export function OperatorV7App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
-  const [clock, setClock] = useState('');
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState<QueuedCommand[]>([]);
   const [tab, setTab] = useState<DockTab>('HOME');
@@ -99,13 +98,6 @@ export function OperatorV7App() {
       await reload();
     })();
   }, [reload]);
-
-  useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const update = () => setOnline(globalThis.navigator?.onLine ?? true);
@@ -176,7 +168,7 @@ export function OperatorV7App() {
 
   if (loadError) {
     return (
-      <Shell clock={clock} online={online} syncedAt={syncedAt} pending={0}>
+      <Shell online={online} syncedAt={syncedAt} pending={0}>
         <div className="state">
           <h2>Состояние смены недоступно</h2>
           <p>{loadError}</p>
@@ -188,7 +180,7 @@ export function OperatorV7App() {
 
   if (!state) {
     return (
-      <Shell clock={clock} online={online} syncedAt={syncedAt} pending={0}>
+      <Shell online={online} syncedAt={syncedAt} pending={0}>
         <div className="state"><h2>Загрузка</h2><p>Читаем состояние смены</p></div>
       </Shell>
     );
@@ -231,7 +223,7 @@ export function OperatorV7App() {
   if (detour) {
     const back = () => { setDetour(null); setActionError(null); };
     return (
-      <Shell clock={clock} online={online} syncedAt={syncedAt} pending={pending}
+      <Shell online={online} syncedAt={syncedAt} pending={pending}
         back={DETOUR_BACK[detour.kind]} onBack={back}>
         {detour.kind === 'PPE' ? (
           <PpeFlow
@@ -318,7 +310,7 @@ export function OperatorV7App() {
               }
               void run({
                 command: 'report-incident', clientCommandId: commandId, shiftId,
-                category: input.category, signs: [], injured: input.injured,
+                category: input.category, signs: input.signs, injured: input.injured,
                 description: input.description,
               });
             }}
@@ -367,7 +359,6 @@ export function OperatorV7App() {
 
   return (
     <Shell
-      clock={clock}
       online={online}
       syncedAt={syncedAt}
       pending={pending}
@@ -419,10 +410,14 @@ export function OperatorV7App() {
         ) : null}
 
         {/* Учёт выработки — часть смены, а не отдельный раздел: машинист
-            записывает сваи там же, где видит, на каком он шаге. На фазе работы
-            это уже делает `WorkBlock` внутри `HomeScreen`; отдельная карточка
-            нужна только на прочих фазах, иначе выработка выводится дважды. */}
-        {tab === 'HOME' && state.phase !== 'WORK' ? (
+            записывает сваи там же, где видит, на каком он шаге. Но на фазах
+            работы, завершения и закрытия карточку выработки уже рисует сам
+            HomeScreen (WorkBlock, ClosingBlock, ClosedBlock) — там отдельная
+            выводила бы выработку смены дважды. */}
+        {tab === 'HOME'
+          && state.phase !== 'WORK'
+          && state.phase !== 'CLOSING'
+          && state.phase !== 'CLOSED' ? (
           <TasksScreen state={state} onEntry={(entry) => setDetour({kind: 'PRODUCTION', entry})} />
         ) : null}
         {tab === 'SAFETY' ? (
@@ -513,6 +508,14 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack}: {
       </>
     );
   }
-  return <ChecklistFlow checklist={checklist} busy={busy} onSubmit={onSubmit} onBack={onBack} />;
+  return (
+    <ChecklistFlow
+      checklist={checklist}
+      busy={busy}
+      lastMeter={state.assignment?.lastMeter ?? null}
+      onSubmit={onSubmit}
+      onBack={onBack}
+    />
+  );
 }
 

@@ -1,11 +1,13 @@
 'use client';
 
 import {useState, type ReactNode} from 'react';
+import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
 import type {ProductionEntryInput} from '../api';
+import {downtimeInterval, formatIntervalMinutes, hhmm} from '../downtime-interval';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
-import {WarningsPanel} from '../warnings-panel';
+import {PermitPanel, WarningsPanel} from '../warnings-panel';
 import {EntriesList} from './entries-list';
 import {PilePassportForm} from './pile-passport-form';
 
@@ -67,7 +69,8 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
   const [reference, setReference] = useState('');
   const [count, setCount] = useState('');
   const [metersPerUnit, setMetersPerUnit] = useState('');
-  const [hours, setHours] = useState('');
+  const [startedHm, setStartedHm] = useState('');
+  const [endedHm, setEndedHm] = useState('');
   const [comment, setComment] = useState('');
   // Завершение работы обратного хода не имеет: смена уходит в сдачу, и
   // записать сваю после этого уже нельзя. Кнопка стоит вплотную к «Записать»,
@@ -83,18 +86,24 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
     setReference('');
     setCount('');
     setMetersPerUnit('');
-    setHours('');
+    setStartedHm('');
+    setEndedHm('');
     setComment('');
   };
 
-  const safetyDone = (stage: 'TB_PILING' | 'TB_DRILLING') =>
-    state.checklists.find((checklist) => checklist.stage === stage)?.done ?? false;
+  const safetyOf = (stage: 'TB_PILING' | 'TB_DRILLING') =>
+    state.checklists.find((checklist) => checklist.stage === stage) ?? null;
+  const safetyDone = (stage: 'TB_PILING' | 'TB_DRILLING') => safetyOf(stage)?.done ?? false;
 
   // Паспорт заполняется своей формой: у неё своя кнопка и свои поля.
   const passportMode = tab === 'PILES' && pileMode === 'PASSPORT';
 
-  const needsSafety = (tab === 'PILES' && !safetyDone('TB_PILING'))
-    || (tab === 'DRILLING' && !safetyDone('TB_DRILLING'));
+  const activeStage: 'TB_PILING' | 'TB_DRILLING' = tab === 'DRILLING' ? 'TB_DRILLING' : 'TB_PILING';
+  const needsSafety = (tab === 'PILES' || tab === 'DRILLING') && !safetyDone(activeStage);
+  // Срок подходит — предупреждаем, но работать не мешаем: запрет посреди
+  // рабочего дня стоит дороже, чем напоминание за неделю.
+  const safetySoon = safetyOf(activeStage)?.period?.warn ?? false;
+  const safetyDaysLeft = safetyOf(activeStage)?.period?.daysLeft ?? null;
 
   const options = tab === 'PILES'
     ? state.dictionaries.pileGrades
@@ -102,14 +111,28 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
       ? state.dictionaries.drillingTypes
       : state.dictionaries.downtimeReasons;
 
+  // Интервал пересчитывается на каждый ввод: подпись под полями обязана
+  // отвечать тому, что уйдёт на сервер, иначе «30 мин» на экране и час в
+  // отчёте разойдутся ровно так, как это было до перехода на интервал.
+  const interval = tab === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+
   const grade = state.dictionaries.pileGrades.find((item) => item.id === reference);
   const pileMeters = grade?.lengthMm ? (Number(count || 0) * grade.lengthMm) / 1000 : 0;
   const drillVolume = Number(count || 0) * Number(metersPerUnit || 0);
 
-  const ready = Boolean(reference) && (
+  /*
+    Запрет закрывает ВЫРАБОТКУ и не трогает простой.
+
+    Экран прячет кнопку, сервер отвечает отказом — и это разные защиты, а не
+    дублирование: без серверной запрет обходится прямым запросом, без экранной
+    человек упирается в отказ уже после того, как всё набрал.
+  */
+  const forbidden = tab !== 'DOWNTIME' && !state.permit.allowed;
+
+  const ready = !forbidden && Boolean(reference) && (
     tab === 'PILES' ? Number(count) > 0
       : tab === 'DRILLING' ? Number(count) > 0 && Number(metersPerUnit) > 0
-        : Number(hours) > 0
+        : interval !== null
   );
 
   // Форма очищается только после того, как сервер подтвердил запись. Раньше
@@ -121,14 +144,19 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
       ? {kind: 'PILES', pileGradeId: reference, count: Number(count), comment: comment || undefined}
       : tab === 'DRILLING'
         ? {kind: 'DRILLING', typeId: reference, count: Number(count), metersPerUnit: Number(metersPerUnit)}
-        : {kind: 'DOWNTIME', reasonId: reference, hours: Number(hours), comment: comment || undefined};
+        : {
+          kind: 'DOWNTIME', reasonId: reference,
+          startedAt: interval?.startedAt ?? '', endedAt: interval?.endedAt ?? '',
+          comment: comment || undefined,
+        };
 
     const recorded = await onLog(entry);
     if (!recorded) return;
 
     setCount('');
     setMetersPerUnit('');
-    setHours('');
+    setStartedHm('');
+    setEndedHm('');
     setComment('');
   };
 
@@ -164,7 +192,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
               </p>
               <p className="text-2xs text-muted-foreground">
                 За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин,
-                {' '}простой {state.production.downtimeHours} ч. Дальше — ЕО после работы.
+                {' '}простой {formatDowntimeHours(state.production.downtimeHours)}. Дальше — ЕО после работы.
               </p>
               <BigButton tone="danger" onClick={onFinish} disabled={busy}>
                 Да, работа завершена
@@ -177,6 +205,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
         </>
       )}
     >
+      <PermitPanel permit={state.permit} />
       <WarningsPanel warnings={state.warnings} />
 
       <Panel>
@@ -194,7 +223,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
           />
           {/* Без .toFixed(1): часы целые, и «0,0 ч» подсказывало бы, что
               бывает 0,3. Ранее записанные дробные показываем как есть. */}
-          <Fact label="Простой" value={String(state.production.downtimeHours)} unit="ч" />
+          <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
           {/*
             Ветер показываем вместе с тем, когда его измерили: работа
             прекращается при 15 м/с, и цифра без времени не даёт понять,
@@ -229,16 +258,27 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
         ))}
       </div>
 
+      {!needsSafety && safetySoon ? (
+        <button
+          type="button"
+          onClick={() => onOpenSafety(activeStage)}
+          className="w-full rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-left text-2xs font-semibold text-warning-strong"
+        >
+          {tab === 'PILES' ? 'ТБ по забивке' : 'ТБ по бурению'}: срок через{' '}
+          {safetyDaysLeft ?? 0} дн. — можно пройти заранее
+        </button>
+      ) : null}
+
       {needsSafety ? (
         <Panel tone="warning">
-          <PanelTitle tone="warning">Нужен чек-лист ТБ</PanelTitle>
+          <PanelTitle tone="warning">Подошёл срок чек-листа ТБ</PanelTitle>
           <p className="mt-1 text-sm">
             {tab === 'PILES'
-              ? 'Перед первой сваей за смену пройдите инструктаж по забивке.'
-              : 'Перед первой скважиной за смену пройдите инструктаж по бурению.'}
+              ? 'Инструктаж по забивке проходят по графику. Срок вышел — пройдите заново.'
+              : 'Инструктаж по бурению проходят по графику. Срок вышел — пройдите заново.'}
           </p>
           <div className="mt-3">
-            <BigButton onClick={() => onOpenSafety(tab === 'PILES' ? 'TB_PILING' : 'TB_DRILLING')}>
+            <BigButton onClick={() => onOpenSafety(activeStage)}>
               Пройти чек-лист
             </BigButton>
           </div>
@@ -290,7 +330,39 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
           ) : null}
 
           {tab === 'DOWNTIME' ? (
-            <NumberField label="Длительность, полных часов" value={hours} onChange={setHours} />
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="text-2xs font-medium text-muted-foreground">Простой начался</span>
+                  <input
+                    type="time" value={startedHm}
+                    onChange={(event) => setStartedHm(event.target.value)}
+                    className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base tabular-nums shadow-xs"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-2xs font-medium text-muted-foreground">Закончился</span>
+                  <input
+                    type="time" value={endedHm}
+                    onChange={(event) => setEndedHm(event.target.value)}
+                    className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base tabular-nums shadow-xs"
+                  />
+                </label>
+              </div>
+              {/* Самый частый случай: машина только что пошла. */}
+              <button
+                type="button"
+                onClick={() => setEndedHm(hhmm(new Date()))}
+                className="h-9 rounded-md border px-3 text-sm font-medium"
+              >
+                Закончился сейчас
+              </button>
+              {interval ? (
+                <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
+                  Простой: {formatIntervalMinutes(interval.minutes)}
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           {tab === 'PILES' && grade?.lengthMm && Number(count) > 0 ? (

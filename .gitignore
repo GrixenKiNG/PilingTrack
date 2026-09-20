@@ -178,3 +178,9 @@ config/mcp-tools-cache.json
 _migration/
 .openclaw-attachments/
 public/__concept-preview.html
+
+# Черновики сессий: скрипты проверок, снимки экрана, выгрузки аудита.
+# Попадали в `git status` как неотслеживаемые и рисковали уехать в коммит.
+.tmp/
+.tmp-check/
+.openclaw-audit.json

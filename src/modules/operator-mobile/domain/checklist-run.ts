@@ -54,8 +54,19 @@ export function validateChecklistRun(
 
     if (item.measure && measureRequired(item, answer.answer)) {
       const value = answer.measures?.[item.measure.key];
+      const {min, max, label, unit} = item.measure;
       if (!Number.isFinite(value)) {
-        problems.push({itemId: item.id, message: `Укажите: ${item.measure.label}, ${item.measure.unit}`});
+        problems.push({itemId: item.id, message: `Укажите: ${label}, ${unit}`});
+      } else if (
+        (min !== undefined && (value as number) < min)
+        || (max !== undefined && (value as number) > max)
+      ) {
+        // Границы проверяет сервер, а не только экран: значение уходит в отчёт
+        // диспетчеру, и «1290 %» там появиться не должно ни при какой опечатке.
+        problems.push({
+          itemId: item.id,
+          message: `${label}: допустимо от ${min ?? 0} до ${max ?? '∞'} ${unit}`,
+        });
       }
     }
   }

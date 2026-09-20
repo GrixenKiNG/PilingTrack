@@ -86,7 +86,6 @@ export function AssistantV7App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
-  const [clock, setClock] = useState('');
   const [online, setOnline] = useState(true);
   const [tab, setTab] = useState<Tab>('HOME');
   const [detour, setDetour] = useState<Detour | null>(null);
@@ -111,13 +110,6 @@ export function AssistantV7App() {
     // только после await: setState прямо в теле эффекта даёт каскад перерисовок.
     void (async () => { await reload(); })();
   }, [reload]);
-
-  useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
-    tick();
-    const timer = setInterval(tick, 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const update = () => setOnline(globalThis.navigator?.onLine ?? true);
@@ -146,7 +138,7 @@ export function AssistantV7App() {
 
   if (loadError) {
     return (
-      <PhoneShell clock={clock} online={online} syncedAt={syncedAt} pending={0}>
+      <PhoneShell online={online} syncedAt={syncedAt} pending={0}>
         <div className="state">
           <h2>Состояние недоступно</h2>
           <p>{loadError}</p>
@@ -158,7 +150,7 @@ export function AssistantV7App() {
 
   if (!state) {
     return (
-      <PhoneShell clock={clock} online={online} syncedAt={syncedAt} pending={0}>
+      <PhoneShell online={online} syncedAt={syncedAt} pending={0}>
         <div className="state"><h2>Загрузка</h2><p>Читаем ваши допуски</p></div>
       </PhoneShell>
     );
@@ -172,7 +164,7 @@ export function AssistantV7App() {
     const back = () => { setDetour(null); setActionError(null); };
     return (
       <PhoneShell
-        clock={clock} online={online} syncedAt={syncedAt} pending={0}
+        online={online} syncedAt={syncedAt} pending={0}
         back={detour === 'BRIEFING' ? 'Ознакомление' : 'Проверка знаний'} onBack={back}
       >
         {detour === 'BRIEFING' ? (
@@ -199,7 +191,6 @@ export function AssistantV7App() {
 
   return (
     <PhoneShell
-      clock={clock}
       online={online}
       syncedAt={syncedAt}
       pending={0}
