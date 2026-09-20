@@ -17,6 +17,7 @@
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.resolve(ROOT, 'src');
@@ -56,7 +57,23 @@ interface Violation {
   reason: string;
 }
 
-const IMPORT_RE = /^\s*(?:import|export)\s[^'"]*from\s+['"]([^'"]+)['"]|^\s*(?:import|export)\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+/**
+ * Every module specifier in a file, with the 1-based line it sits on.
+ *
+ * Uses the TypeScript scanner rather than a regex: the previous regex was
+ * anchored per line, so a multi-line `import {\n  a,\n} from '@/x'` was never
+ * seen (the line carrying `from` starts with `}`). That silently hid real
+ * violations AND made baseline entries look "fixed" when an import was merely
+ * reformatted. preProcessFile also covers side-effect imports, `export ... from`,
+ * dynamic `import()` and `require()` for free.
+ */
+function importSpecifiers(text: string): { line: number; importPath: string }[] {
+  const pre = ts.preProcessFile(text, /* readImportFiles */ true, /* detectJavaScriptImports */ true);
+  return pre.importedFiles.map((ref) => ({
+    line: text.slice(0, ref.pos).split('\n').length,
+    importPath: ref.fileName,
+  }));
+}
 
 async function walk(dir: string, out: string[]) {
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
@@ -102,15 +119,10 @@ async function main() {
     if (FORBIDDEN[fromInfo.layer].length === 0 && fromInfo.layer !== 'modules') continue;
 
     const text = await fs.readFile(file, 'utf8');
-    const lines = text.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i += 1) {
-      const m = lines[i].match(IMPORT_RE);
-      if (!m) continue;
-      const importPath = m[1] || m[2];
-      if (!importPath) continue;
+    for (const { line, importPath } of importSpecifiers(text)) {
       const reason = checkImport(fromInfo, importPath);
       if (reason) {
-        violations.push({ file: path.relative(ROOT, file), line: i + 1, importPath, reason });
+        violations.push({ file: path.relative(ROOT, file), line, importPath, reason });
       }
     }
   }
