@@ -59,5 +59,3 @@ export { startProjectionWorker } from './application/projections/projection-work
 // Infrastructure
 export { getReportRepository, PrismaReportRepository } from './infrastructure';
 export type { ReportRepository } from './infrastructure';
-
-export {downtimeHoursBetween, DOWNTIME_MAX_HOURS} from './domain/downtime-hours';

@@ -7,7 +7,7 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
-import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/modules/reports';
+import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/lib/downtime-hours';
 import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import type {ReadWeather} from '../../domain/view-contracts';
@@ -371,7 +371,7 @@ export async function logProduction(input: {
       }
 
       // Длительность считает сервер по интервалу — округления нет вовсе
-      // (см. reports/domain/downtime-hours). Переход через полночь разобран там же.
+      // (см. lib/downtime-hours). Переход через полночь разобран там же.
       const hours = downtimeHoursBetween(startedAt, endedAt);
       if (hours <= 0) {
         throw new OperatorCommandError(400, 'Конец простоя совпадает с началом. Укажите, когда машина снова пошла.');

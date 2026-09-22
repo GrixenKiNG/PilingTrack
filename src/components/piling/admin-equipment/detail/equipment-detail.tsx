@@ -45,7 +45,7 @@ import {
   type DetailsResponse,
   type TabKey,
 } from './equipment-detail-overview';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 interface Props {
   equipmentId: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import type {ReactNode} from 'react';
-import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 
 import {useState} from 'react';
 import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/contracts';

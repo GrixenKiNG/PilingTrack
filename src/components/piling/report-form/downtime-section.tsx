@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import type { DowntimeReasonDTO } from '@/lib/types';
 import { PilingIcon } from '@/components/piling/icons';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 interface DowntimeSectionProps {
   downtimes: { id: string; reasonId: string; duration: number; comment: string }[];

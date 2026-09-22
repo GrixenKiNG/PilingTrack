@@ -23,7 +23,7 @@ import {
   ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from './kpi-catalog';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 export interface AnalyticsKpiData {
   totalEquipment: number;

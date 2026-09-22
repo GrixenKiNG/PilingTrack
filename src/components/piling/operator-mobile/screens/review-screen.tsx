@@ -1,7 +1,7 @@
 'use client';
 
 import type {OperatorMobileState, OperatorPhase} from '@/modules/operator-mobile/contracts';
-import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 import {PHASE_CHECKLIST, PHASE_LABELS} from '@/modules/operator-mobile/domain/shift-phases';
 import {formatRuDate} from '@/lib/format';
 import {BigButton, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';

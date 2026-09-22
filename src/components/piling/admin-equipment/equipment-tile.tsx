@@ -10,7 +10,7 @@ import type { FleetCard } from './fleet-types';
 import { STATUS_META, KIND_LABEL } from './equipment-status';
 import { getMaintenanceFlag } from './equipment-maintenance-flag';
 import { getEquipmentBrand } from './equipment-brand-logo';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('ru'));
 const formatNum = (n: number | null | undefined, digits = 0) =>

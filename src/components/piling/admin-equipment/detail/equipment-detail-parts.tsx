@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO } from '@/lib/types';
 import { computeOperatorRotation } from './operator-rotation';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 // --------------------------------------------------------------------------
 // Generic layout pieces

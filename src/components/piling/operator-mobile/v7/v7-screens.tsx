@@ -11,7 +11,7 @@ import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
 } from '@/modules/operator-mobile/domain/defect-labels';
 import {formatNumber, formatRuDate} from '@/lib/format';
-import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 import {Banner, Button, Card, CardBody, Chip, Empty, Metric, Pair, Row, type Tone} from './v7-ui';
 
 /**

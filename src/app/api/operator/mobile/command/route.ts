@@ -119,7 +119,7 @@ const commandSchema = z.discriminatedUnion('command', [
         kind: z.literal('DOWNTIME'),
         reasonId: z.string().min(1),
         // Простой — ИНТЕРВАЛ: начало и конец, длительность считает сервер
-        // (правило и причина — reports/domain/downtime-hours). Метки времени
+        // (правило и причина — lib/downtime-hours). Метки времени
         // ставит телефон по своим часам, поэтому границы проверяются в
         // команде, а не здесь: схема отвечает за форму, команда — за смысл.
         startedAt: z.string().datetime({offset: true}),
