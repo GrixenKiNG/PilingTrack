@@ -235,7 +235,7 @@
 }
 .site[data-reveal-active] :global([data-reveal]:hover [data-revealed='true']) { transition-delay: 0ms; }
 
-:global([data-tilt] > *) {
+.site :global([data-tilt] > *) {
   transform-style: preserve-3d;
   will-change: transform;
   transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
