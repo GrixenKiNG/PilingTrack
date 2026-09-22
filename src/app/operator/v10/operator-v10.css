@@ -1,7 +1,7 @@
 /* ============================================================
    Модуль оператора v10 — рабочее место машиниста на телефоне.
 
-   Каркас снят с эталона: тёмная шапка, тёмное нижнее меню, светлая рабочая
+   Каркас снят с эталона: светлая шапка, светлое нижнее меню, светлая рабочая
    область, поток сверху вниз. Рамки телефона здесь НЕТ ни на каком экране:
    на телефоне рамка внутри рамки съедает место, а на мониторе она
    превращает рабочий экран в картинку. Вместо неё — колонка телефонной
@@ -11,26 +11,24 @@
    ============================================================ */
 
 .ov10{
-  --orange:#ff6b16;
-  --orange-d:#e05500;
-  --orange-bg:#fff0e2;
-  --ink:#16263d;
-  --ink-2:#3c4e66;
-  --muted:#6f7f95;
-  --line:#e8edf3;
-  --line-2:#eef2f7;
-  --bg:#eef1f5;
-  --card:#ffffff;
-  --green:#16a34a;
-  --green-bg:#e8f7ee;
-  --amber:#f59e0b;
-  --amber-bg:#fff6e6;
-  --red:#dc2626;
-  --red-bg:#fdeaea;
-  --blue:#1499dc;
-  --blue-bg:#eaf6fd;
-  --navy:#0d2b4e;
-  --radius:13px;
+  --orange:var(--signal);
+  --orange-d:var(--signal-strong);
+  --orange-bg:color-mix(in oklab, var(--signal) 8%, var(--card));
+  --ink:var(--foreground);
+  --ink-2:var(--foreground);
+  --muted:var(--muted-foreground);
+  --line:var(--border);
+  --line-2:var(--border);
+  --bg:var(--background);
+  --green:var(--success-strong);
+  --green-bg:color-mix(in oklab, var(--success) 8%, var(--card));
+  --amber:var(--warning-strong);
+  --amber-bg:color-mix(in oklab, var(--warning) 10%, var(--card));
+  --red:var(--destructive-strong);
+  --red-bg:color-mix(in oklab, var(--destructive) 8%, var(--card));
+  --blue:var(--info-strong);
+  --blue-bg:color-mix(in oklab, var(--info) 8%, var(--card));
+  --navy:var(--card);
 
   /* Шаг плотности. Подтягивается вверх, когда содержимое чуть не помещается:
      поджать на десятую лучше, чем заставить листать экран из шести строк. */
@@ -42,7 +40,7 @@
   overflow:hidden;
   background:var(--navy);
   color:var(--ink);
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,system-ui,Arial,sans-serif;
+  font-family:var(--font-sans);
 }
 
 .ov10 *,.ov10 *::before,.ov10 *::after{box-sizing:border-box}
@@ -74,11 +72,7 @@
   background:transparent;border:0;color:#fff;cursor:pointer;flex:0 0 auto}
 .ov10-nav .iconbtn:hover{background:rgba(255,255,255,.1)}
 
-/* Значки набора — растровые и нарисованы для светлого фона. В тёмной шапке и
-   в тёмном меню осветляем их, иначе тёмное на тёмном не читается. */
-.ov10-top .piling-icon img,
-.ov10-tabs .piling-icon img{filter:brightness(0) invert(1)}
-.ov10-tabs button.on .piling-icon img{filter:brightness(0) invert(64%) sepia(72%) saturate(3200%) hue-rotate(348deg) brightness(101%) contrast(102%)}
+/* Утверждённые значки отображаются в исходных цветах на светлой поверхности. */
 
 /* ---------------------------------------------------------- контент --- */
 .ov10-content{
@@ -186,8 +180,8 @@ button.ov10-row{cursor:pointer}
 /* На мониторе — та же колонка телефонной ширины, с мягкими границами, чтобы
    было видно, где кончается экран. Ни корпуса, ни выреза. */
 @media (min-width:520px){
-  .ov10{background:#0b1725;padding:0}
-  .ov10-screen{border-left:1px solid #17304c;border-right:1px solid #17304c}
+  .ov10{background:var(--background);padding:0}
+  .ov10-screen{border-left:1px solid var(--border);border-right:1px solid var(--border)}
 }
 
 /* ------------------------------------------------- запись выработки --- */
@@ -241,3 +235,18 @@ button.ov10-row{cursor:pointer}
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Светлая навигация и контрастные подписи из общей темы приложения. */
+.ov10-top { color: var(--foreground); border-bottom: 1px solid var(--border); }
+.ov10-status, .ov10-nav .ttl, .ov10-nav .iconbtn { color: var(--foreground); }
+.ov10-nav .sub { color: var(--muted-foreground); }
+.ov10-nav .iconbtn { width: 44px; height: 44px; }
+.ov10-nav .iconbtn:hover { background: var(--secondary); }
+.ov10-tabs { border-top: 1px solid var(--border); }
+.ov10-tabs button { color: var(--muted-foreground); font-size: 12px; min-height: 52px; }
+.ov10-tabs button.on { color: var(--signal-strong); background: color-mix(in oklab, var(--signal) 6%, var(--card)); box-shadow: inset 0 -3px var(--signal); }
+.ov10-card-title { color: var(--foreground); font-size: 14px; letter-spacing: 0; text-transform: none; }
+.ov10 button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.ov10 input, .ov10 select { min-height: 44px; }
+
+.ov10-chips button { min-height: 44px; font-size: 13px; }

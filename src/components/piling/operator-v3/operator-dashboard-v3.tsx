@@ -22,31 +22,7 @@ const OPERATOR_ACTIONS: { label: string; icon: PilingIconName; target: string }[
 
 const SHIFT_STEPS = ['Осмотр', 'Моточасы', 'Дефект', 'Передано диспетчеру'];
 
-/**
- * Экран оператора из сборки v2.8.0 (`D:\PillingR\v2.8.0`), перенесённый сюда
- * как версия v3 — для сравнения с действующим `/operator` и с макетами
- * v5/v7/v10.
- *
- * Перенос ДОСЛОВНЫЙ, правлено только имя экспорта. Это снимок промежуточного
- * состояния: плитки действий и полоса шагов смены здесь уже нарисованы, но
- * ещё не подключены к контуру готовности. Подтягивать сюда нынешнюю
- * механику нельзя — сравнивать имеет смысл только с оригиналом.
- *
- * ВНИМАНИЕ, ПОЛОСА ШАГОВ НИЧЕГО НЕ ПОКАЗЫВАЕТ. Её условие —
- * `submitted && index === SHIFT_STEPS.length - 1`: зажечься может только
- * последняя точка и только после сдачи отчёта. «Осмотр», «Моточасы» и
- * «Дефект» остаются серыми при любых действиях оператора. Это дефект
- * оригинала, он сохранён намеренно; в действующем `operator-dashboard.tsx`
- * фазы давно считаются из `/api/operator/shift`.
- *
- * Пять плиток — не отдельные экраны, а якоря одной формы отчёта
- * (`/report#inspection` и далее). Все пять якорей в `report-form.tsx`
- * и `shift-info.tsx` на месте.
- *
- * Данные живые: `/api/sites` и `/api/reports/my`. Своей нижней панели у
- * экрана нет, он рассчитывает на общую из раскладки `(app)`, поэтому в
- * `operatorRouteOwnsNavigation` маршрут не добавлен.
- */
+/** Главная v3. Действия открывают отдельный отчёт внутри этой версии. */
 export function OperatorDashboardV3() {
   const user = usePilingStore((s) => s.currentUser);
   const router = useRouter();
@@ -114,7 +90,7 @@ export function OperatorDashboardV3() {
   const active = Boolean(todayReport);
   const submitted = todayReport?.status === 'submitted';
   const displayName = user?.name?.trim() || 'Оператор';
-  const openReport = (target?: string) => router.push(target ? `/report#${target}` : '/report');
+  const openReport = (target?: string) => router.push(target ? `/operator/v3/report#${target}` : '/operator/v3/report');
 
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
@@ -136,7 +112,7 @@ export function OperatorDashboardV3() {
         disabled={ctaDisabled}
         className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-orange-500 bg-white px-6 py-5 text-center shadow-sm transition hover:bg-orange-50/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-slate-300 disabled:opacity-60"
       >
-        <PilingIcon name={active ? 'reports' : 'shift-start'} size={126} decorative />
+        <PilingIcon name={active ? 'reports' : 'shift-start'} size={64} decorative />
         <span className="mt-1 text-xl font-semibold text-slate-900">
           {active ? 'Редактировать отчёт' : 'Начало смены'}
         </span>
@@ -152,9 +128,9 @@ export function OperatorDashboardV3() {
             type="button"
             onClick={() => openReport(action.target)}
             disabled={ctaDisabled}
-            className={`col-span-2 flex min-h-36 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
+            className={`col-span-2 flex min-h-28 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/30 active:scale-[0.99] disabled:opacity-50 ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
           >
-            <PilingIcon name={action.icon} size={82} decorative />
+            <PilingIcon name={action.icon} size={36} decorative />
             <span className="mt-1 text-base font-semibold text-slate-800">{action.label}</span>
           </button>
         ))}

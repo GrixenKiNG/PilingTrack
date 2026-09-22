@@ -1,36 +1,28 @@
 'use client';
 
-/**
- * Обвязка экранов модуля-кандидата — ровно та, что на макете владельца.
- *
- * ПОЧЕМУ ОТДЕЛЬНЫЙ НАБОР, А НЕ ОБЩИЕ КОМПОНЕНТЫ ПРОДУКТА. Макет задаёт свой
- * язык: цветная шапка шага, плоский список строк с галочкой справа, одна синяя
- * кнопка внизу. Это НЕ действующая палитра PilingTrack (там оранжевый
- * `--signal`), и подмешивать её сюда нельзя: смысл модуля в том, чтобы владелец
- * увидел макет как есть и сравнил с текущим экраном. Если выбор падёт сюда —
- * цвет приводится к бренду отдельным решением.
- */
+/** Рабочие экраны v2 в общей светлой теме PilingTrack. */
 
 import type { ReactNode } from 'react';
+import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { Check, ChevronLeft } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 
-/** Цвет шапки шага. На макете синий у рабочих шагов, зелёный у пуска, фиолетовый у закрытия. */
+/** Имена фаз сохранены для совместимости; оформление использует токены продукта. */
 export type StepTone = 'blue' | 'green' | 'purple';
 
 const TONE_BAR: Record<StepTone, string> = {
-  blue: 'bg-[#1e5bd6]',
-  green: 'bg-[#12a150]',
-  purple: 'bg-[#7c3aed]',
+  blue: 'border-b-signal',
+  green: 'border-b-success',
+  purple: 'border-b-signal',
 };
 
 const TONE_BUTTON: Record<StepTone, string> = {
-  blue: 'bg-[#1e5bd6]',
-  green: 'bg-[#12a150]',
-  purple: 'bg-[#7c3aed]',
+  blue: 'bg-signal hover:bg-signal-strong',
+  green: 'bg-signal hover:bg-signal-strong',
+  purple: 'bg-signal hover:bg-signal-strong',
 };
 
-/** Экран шага: цветная шапка, содержимое, кнопка внизу. */
+/** Экран шага: светлая шапка с акцентом фазы, содержимое и основное действие. */
 export function StepShell({
   title, subtitle, tone = 'blue', onBack, children, footer,
 }: {
@@ -48,16 +40,16 @@ export function StepShell({
     // прилипает к нижней границе окна — она достижима и на длинном списке
     // осмотра, и на коротком экране пуска.
     <div className="mx-auto w-full max-w-[560px] bg-background">
-      <header className={cn('flex items-center gap-2 px-3 py-3 text-white', TONE_BAR[tone])}>
+      <header className={cn('flex items-center gap-2 border-b-2 bg-card px-3 py-3 text-foreground', TONE_BAR[tone])}>
         {onBack ? (
           <button type="button" onClick={onBack} aria-label="Назад"
-            className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/15">
+            className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
             <ChevronLeft className="h-5 w-5" />
           </button>
         ) : <span className="w-7" />}
         <div className="min-w-0">
           <p className="truncate text-base font-semibold leading-tight">{title}</p>
-          {subtitle && <p className="truncate text-xs text-white/85">{subtitle}</p>}
+          {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       </header>
 
@@ -119,7 +111,7 @@ export function CheckRow({
       </span>
       {right ?? (
         <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border',
-          checked ? 'border-[#12a150] bg-[#12a150] text-white' : 'border-border')}>
+          checked ? 'border-success bg-success text-white' : 'border-border')}>
           {checked && <Check className="h-4 w-4" />}
         </span>
       )}
@@ -154,7 +146,7 @@ export function ValueRow({ label, value, tone }: {
     <div className="flex items-baseline justify-between gap-3 px-3 py-2.5">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className={cn('text-sm font-semibold',
-        tone === 'ok' ? 'text-[#12a150]'
+        tone === 'ok' ? 'text-success-strong'
           : tone === 'warn' ? 'text-warning-strong' : 'text-foreground')}>{value}</span>
     </div>
   );
@@ -164,9 +156,9 @@ export function ValueRow({ label, value, tone }: {
 export function BigCheck({ tone }: { tone: 'green' | 'purple' }) {
   return (
     <div className={cn('mx-auto flex h-24 w-24 items-center justify-center rounded-full',
-      tone === 'green' ? 'bg-[#12a150]/12' : 'bg-[#7c3aed]/12')}>
+      tone === 'green' ? 'bg-success/12' : 'bg-success/12')}>
       <div className={cn('flex h-16 w-16 items-center justify-center rounded-full border-[3px]',
-        tone === 'green' ? 'border-[#12a150] text-[#12a150]' : 'border-[#7c3aed] text-[#7c3aed]')}>
+        tone === 'green' ? 'border-success text-success-strong' : 'border-success text-success-strong')}>
         <Check className="h-9 w-9" />
       </div>
     </div>
@@ -187,18 +179,19 @@ export function BottomTabs({ active, onSelect }: {
   active: V2Tab;
   onSelect: (tab: V2Tab) => void;
 }) {
-  const tabs = [
-    { id: 'shift' as const, label: 'Смена' },
-    { id: 'safety' as const, label: 'ТБ' },
-    { id: 'equipment' as const, label: 'Техника' },
-    { id: 'more' as const, label: 'Ещё' },
+  const tabs: {id: V2Tab; label: string; icon: PilingIconName}[] = [
+    { id: 'shift', label: 'Смена', icon: 'home' },
+    { id: 'safety', label: 'ТБ', icon: 'accepted' },
+    { id: 'equipment', label: 'Техника', icon: 'equipment-rig' },
+    { id: 'more', label: 'Ещё', icon: 'menu' },
   ];
   return (
-    <nav className="-m-3 flex border-t border-border bg-card">
+    <nav aria-label="Разделы смены" className="-m-3 flex border-t border-border bg-card">
       {tabs.map((tab) => (
-        <button key={tab.id} type="button" onClick={() => onSelect(tab.id)}
-          className={cn('flex-1 py-2.5 text-xs font-medium',
-            active === tab.id ? 'text-[#1e5bd6]' : 'text-muted-foreground')}>
+        <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} aria-current={active === tab.id ? 'page' : undefined}
+          className={cn('flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-signal',
+            active === tab.id ? 'bg-signal/5 text-signal-strong shadow-[inset_0_-3px_var(--signal)]' : 'text-muted-foreground')}>
+          <PilingIcon name={tab.icon} size={24} decorative />
           {tab.label}
         </button>
       ))}

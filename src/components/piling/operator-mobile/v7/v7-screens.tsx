@@ -1,5 +1,6 @@
 'use client';
 
+import {OperatorWorkOverview} from '../operator-work-overview';
 import type {
   ChecklistStage, DefectView, DocumentVerdict, IncidentView, OperatorMobileState, ProductionPermit, WorkWarning,
 } from '@/modules/operator-mobile/contracts';
@@ -213,31 +214,9 @@ function WorkBlock({state, busy, onStep, onFinishWork}: {
   onStep: (detour: Detour) => void;
   onFinishWork: () => void;
 }) {
-  // Запрет закрывает выработку и не трогает простой — обоснование в
-  // domain/production-permit.ts. Кнопки гасим, а не прячем: исчезнувшая кнопка
-  // читается как поломка, погашенная — как запрет, у которого есть причина.
-  const forbidden = !state.permit.allowed;
-
-  return (
-    <>
-      <ProductionCard state={state} />
-      <PermitBanner permit={state.permit} />
-      <div className="btn-row">
-        <Button tone="soft" disabled={forbidden} onClick={() => onStep({kind: 'PRODUCTION', entry: 'PILES'})}>Забивка свай</Button>
-        <Button tone="soft" disabled={forbidden} onClick={() => onStep({kind: 'PRODUCTION', entry: 'DRILLING'})}>Бурение</Button>
-      </div>
-      {/* Паспорт живёт здесь, а не только во вкладке задач: во время работы
-          та вкладка скрыта, и единственная кнопка на журнал забивки была
-          недостижима ровно тогда, когда сваи и бьют. */}
-      <Button tone="soft" disabled={forbidden} onClick={() => onStep({kind: 'PRODUCTION', entry: 'PASSPORT'})}>
-        Свая с паспортом
-      </Button>
-      <Button tone="ghost" onClick={() => onStep({kind: 'PRODUCTION', entry: 'DOWNTIME'})}>Записать простой</Button>
-      <Button tone="ghost" disabled={busy} onClick={onFinishWork}>
-        {busy ? 'Записываем…' : 'Работа на сегодня завершена'}
-      </Button>
-    </>
-  );
+  return <OperatorWorkOverview state={state} variant="v7" busy={busy}
+    onAction={(entry)=>onStep({kind: 'PRODUCTION', entry})}
+    onIncident={()=>onStep({kind: 'INCIDENT'})} onFinish={onFinishWork} />;
 }
 
 function ClosingBlock({state, onStep}: {state: OperatorMobileState; onStep: (detour: Detour) => void}) {

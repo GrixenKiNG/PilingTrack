@@ -29,9 +29,9 @@ function Sheet({ title, onClose, children, footer }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      <header className="flex items-center gap-2 bg-[#1e5bd6] px-3 py-3 text-white">
+      <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-3 text-foreground">
         <button type="button" onClick={onClose}
-          className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/15">
+          className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
           ✕<span className="sr-only">Закрыть</span>
         </button>
         <p className="text-base font-semibold">{title}</p>
@@ -315,7 +315,7 @@ export function HandoverSheet({ open, equipmentName, busy, onClose, onSubmit }: 
       {/* Пустая передача — это «всё нормально», сказанное молчанием. Следующий
           оператор из неё ничего не узнаёт, поэтому три знака минимум требует и
           сервер, и эта форма. */}
-      <p className={cn('text-xs', tooShort ? 'text-muted-foreground' : 'text-[#12a150]')}>
+      <p className={cn('text-xs', tooShort ? 'text-muted-foreground' : 'text-success-strong')}>
         {tooShort ? 'Опишите состояние машины — хотя бы коротко' : 'Готово к передаче'}
       </p>
     </Sheet>

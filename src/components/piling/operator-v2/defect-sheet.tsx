@@ -80,8 +80,8 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      <header className="flex items-center gap-2 bg-[#1e5bd6] px-3 py-3 text-white">
-        <button type="button" onClick={onClose} className="-ml-1 h-8 w-8 rounded-full hover:bg-white/15">
+      <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-3 text-foreground">
+        <button type="button" onClick={onClose} className="-ml-1 h-11 w-11 rounded-lg text-signal-strong hover:bg-secondary">
           ✕<span className="sr-only">Закрыть</span>
         </button>
         <p className="text-base font-semibold">Дефект</p>
@@ -137,7 +137,7 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
               onClick={() => setBlocking(false)}
               className={cn('min-h-12 flex-1 rounded-lg border text-sm font-semibold',
                 blocking === false
-                  ? 'border-[#12a150] bg-[#12a150]/12 text-[#12a150]'
+                  ? 'border-success bg-success/12 text-success-strong'
                   : 'border-border text-muted-foreground')}
             >
               Нет, работаю

@@ -1,5 +1,6 @@
 'use client';
 
+import {PilingIcon} from '@/components/piling/icons';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
@@ -266,6 +267,7 @@ export function OperatorV7App() {
 
         {detour.kind === 'CHECKLIST' ? (
           <ChecklistDetour
+            commandId={commandId}
             state={state}
             stage={detour.stage}
             busy={busy}
@@ -362,7 +364,8 @@ export function OperatorV7App() {
       online={online}
       syncedAt={syncedAt}
       pending={pending}
-      back={state.operator.name.split(' ')[0] ?? 'Оператор'}
+      back="PilingTrack"
+      desktopNav={<aside className="oc-desktop-nav"><div className="oc-brand"><PilingIcon name="equipment-rig" size={30} decorative /><strong>PilingTrack</strong></div><p>Рабочее место оператора</p><nav aria-label="Рабочее место">{OPERATOR_DOCK.map(item=><button type="button" key={item.key} aria-current={tab===item.key?'page':undefined} onClick={()=>setTab(item.key)}><PilingIcon name={item.key==='HOME'?'home':item.key==='SAFETY'?'accepted':item.key==='EQUIP'?'equipment-rig':'menu'} size={24} decorative />{item.label}</button>)}</nav><a href="/operator/v7/history"><PilingIcon name="history" size={24} decorative />История</a></aside>}
       dock={(
         <Dock
           items={OPERATOR_DOCK}
@@ -371,17 +374,17 @@ export function OperatorV7App() {
           onSelect={(next) => { setTab(next); setActionError(null); }}
         />
       )}
-      action={shiftId ? (
+      action={shiftId && !(tab === 'HOME' && state.phase === 'WORK') ? (
         <Button tone="danger" onClick={() => setDetour({kind: 'INCIDENT'})}>
           ⚠ Сообщить об инциденте
         </Button>
       ) : null}
     >
-      <Title note={`${state.operator.name}${state.assignment ? ` · ${state.assignment.siteName} · ${state.assignment.equipmentName}` : ''}`}>
+      {!(tab === 'HOME' && state.phase === 'WORK') && <Title note={`${state.operator.name}${state.assignment ? ` · ${state.assignment.siteName} · ${state.assignment.equipmentName}` : ''}`}>
         {tab === 'HOME' ? PHASE_TITLES[state.phase] : TAB_TITLES[tab]}
-      </Title>
+      </Title>}
 
-      {tab === 'HOME' ? (
+      {tab === 'HOME' && state.phase !== 'WORK' ? (
         <div className="tl">
           {TIMELINE.map((phase, index) => (
             <span
@@ -489,7 +492,8 @@ function SafetyTab({state, onStep}: {state: OperatorMobileState; onStep: (detour
 }
 
 /** Чек-лист по этапу. Нет в ответе сервера — значит, этап сейчас не его. */
-function ChecklistDetour({state, stage, busy, onSubmit, onBack}: {
+function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
+  commandId: string;
   state: OperatorMobileState;
   stage: ChecklistStage;
   busy: boolean;
@@ -510,7 +514,8 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack}: {
   }
   return (
     <ChecklistFlow
-      checklist={checklist}
+      commandId={commandId}
+      checklist={checklist} warnings={state.warnings}
       busy={busy}
       lastMeter={state.assignment?.lastMeter ?? null}
       onSubmit={onSubmit}
@@ -518,4 +523,5 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack}: {
     />
   );
 }
+
 

@@ -10,31 +10,31 @@
    ========================================================================== */
 
 .ov7 {
-  --navy: #0d2b4e;
-  --navy-2: #16324e;
-  --blue: #1565c0;
-  --blue-2: #1256b4;
-  --blue-tint: #e8f1fb;
-  --blue-line: #cfe0f4;
-  --green: #2f9e44;
-  --green-tint: #e9f6ee;
-  --amber: #e8a33d;
-  --amber-tint: #fef6e2;
-  --amber-ink: #a86a10;
-  --red: #c62828;
-  --red-2: #e8402f;
-  --red-tint: #fce7e6;
-  --ink: #1c2b3a;
-  --muted: #7a8699;
-  --muted-2: #8a94a6;
-  --line: #e4e8ee;
-  --field: #f1f3f6;
-  --bg: #f5f6f8;
-  --white: #ffffff;
+  --navy: var(--foreground);
+  --navy-2: var(--foreground);
+  --blue: var(--info-strong);
+  --blue-2: var(--info-strong);
+  --blue-tint: color-mix(in oklab, var(--info) 8%, var(--card));
+  --blue-line: color-mix(in oklab, var(--info) 25%, var(--border));
+  --green: var(--success-strong);
+  --green-tint: color-mix(in oklab, var(--success) 8%, var(--card));
+  --amber: var(--warning);
+  --amber-tint: color-mix(in oklab, var(--warning) 10%, var(--card));
+  --amber-ink: var(--warning-strong);
+  --red: var(--destructive-strong);
+  --red-2: var(--destructive);
+  --red-tint: color-mix(in oklab, var(--destructive) 8%, var(--card));
+  --ink: var(--foreground);
+  --muted: var(--muted-foreground);
+  --muted-2: var(--muted-foreground);
+  --line: var(--border);
+  --field: var(--secondary);
+  --bg: var(--background);
+  --white: var(--card);
   --bezel: #1b2430;
   --shadow-card: 0 1px 2px rgba(16, 30, 54, 0.05);
 
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.42;
   color: var(--ink);
@@ -147,7 +147,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--blue);
+  color: var(--signal);
   font: inherit;
   font-size: 13.5px;
   font-weight: 700;
@@ -212,7 +212,7 @@
 }
 
 .ov7 .tl .ph.done { border-top-color: var(--green); color: var(--green); }
-.ov7 .tl .ph.now { border-top-color: var(--blue); color: var(--blue); }
+.ov7 .tl .ph.now { border-top-color: var(--signal); color: var(--signal); }
 
 /* ---------------------------------------------------------------- тело --- */
 .ov7 .body {
@@ -279,7 +279,7 @@
 }
 
 .ov7 .row.done .num { background: var(--green); }
-.ov7 .row.now .num { background: var(--blue); }
+.ov7 .row.now .num { background: var(--signal); }
 .ov7 .row.now { background: var(--blue-tint); box-shadow: inset 0 0 0 1px var(--blue-line); }
 
 /* Заголовок с подписью — где угодно, а не только в строке списка.
@@ -420,7 +420,7 @@
 .ov7 textarea:focus-visible,
 .ov7 select:focus-visible,
 .ov7 button:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--signal);
   outline-offset: 1px;
 }
 
@@ -453,18 +453,18 @@
   background: var(--white);
 }
 
-.ov7 .pick.on { border-color: var(--blue); background: var(--blue-tint); }
-.ov7 .pick.on .mark { border-color: var(--blue); }
+.ov7 .pick.on { border-color: var(--signal); background: color-mix(in oklab, var(--signal) 8%, var(--card)); }
+.ov7 .pick.on .mark { border-color: var(--signal); }
 .ov7 .pick.on .mark::after {
   content: "";
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: var(--blue);
+  background: var(--signal);
 }
 
 .ov7 .pick.box .mark { border-radius: 5px; }
-.ov7 .pick.box.on .mark { background: var(--blue); border-color: var(--blue); }
+.ov7 .pick.box.on .mark { background: var(--signal); border-color: var(--signal); }
 .ov7 .pick.box.on .mark::after {
   content: "✓";
   width: auto;
@@ -489,7 +489,7 @@
   padding: 12px 14px;
   border: 0;
   border-radius: 10px;
-  background: var(--blue);
+  background: var(--signal);
   color: #fff;
   font: inherit;
   font-size: 14px;
@@ -499,7 +499,7 @@
 
 .ov7 .btn:disabled { opacity: 0.55; cursor: default; }
 .ov7 .btn.ghost { background: var(--white); border: 1px solid var(--line); color: var(--ink); }
-.ov7 .btn.soft { background: var(--blue-tint); color: var(--blue-2); }
+.ov7 .btn.soft { background: color-mix(in oklab, var(--signal) 8%, var(--card)); color: var(--signal-strong); }
 .ov7 .btn.danger { background: var(--red-2); color: #fff; }
 
 .ov7 .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
@@ -539,23 +539,11 @@
   cursor: pointer;
 }
 
-.ov7 .dock button.on { color: var(--blue); }
+.ov7 .dock button.on { color: var(--signal); }
 
-/* Центральная кнопка «ТБ» приподнята — как в макете. */
-.ov7 .dock button.mid .glyph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  margin-top: -13px;
-  border-radius: 11px;
-  background: var(--blue);
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(21, 101, 192, 0.35);
-}
-
-.ov7 .dock button.mid.on .glyph { background: var(--blue-2); }
+/* Все разделы меню имеют одинаковую цель нажатия. */
+.ov7 .dock .glyph { display: flex; align-items: center; justify-content: center; height: 24px; }
+.ov7 .dock button.on { background: color-mix(in oklab, var(--signal) 6%, var(--card)); box-shadow: inset 0 -3px var(--signal); }
 
 .ov7 .dock .badge {
   position: absolute;
@@ -589,7 +577,7 @@
   overflow: hidden;
 }
 
-.ov7 .bar i { display: block; height: 100%; border-radius: 999px; background: var(--blue); }
+.ov7 .bar i { display: block; height: 100%; border-radius: 999px; background: var(--signal); }
 
 /* --------------------------------------------------------------- итог --- */
 .ov7 .seal {
@@ -617,7 +605,7 @@
   .ov7 .stage {
     align-items: stretch;
     justify-content: center;
-    background: #eef1f5;
+    background: var(--background);
   }
 
   .ov7 .device {
@@ -631,4 +619,23 @@
 
   .ov7 .statusbar { padding-top: 0; }
   .ov7 .dock { padding-bottom: 0; }
+}
+
+/* Общие поверхности и доступные цели нажатия PilingTrack. */
+.ov7 .card, .ov7 .banner, .ov7 .metric { border-radius: var(--radius); }
+.ov7 .navbar .back { min-height: 44px; }
+.ov7 .navbar .sync, .ov7 .banner .bs, .ov7 .dock button { font-size: 12px; }
+.ov7 .banner { display: flex; align-items: flex-start; gap: 10px; }
+.ov7 .banner > .piling-icon { margin-top: 1px; }
+.ov7 .banner .bt { font-size: 14px; }
+.ov7 .answers button { min-height: 44px; font-size: 13px; }
+.ov7 .dock button { min-height: 60px; }
+.ov7 .mv { font-variant-numeric: tabular-nums; }
+.ov7 button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.ov7 .btn:not(.ghost):not(.soft):not(.danger):hover:not(:disabled) { background: var(--signal-strong); }
+/* Keep the mobile shell inside the viewport; only its contents scroll. */
+@media (max-width: 1023px) {
+  .ov7 .stage { height: 100dvh; min-height: 0; }
+  .ov7 .device { height: 100%; }
+  .ov7 .device > .dock { flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
 }

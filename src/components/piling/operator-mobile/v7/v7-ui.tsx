@@ -1,6 +1,7 @@
 'use client';
 
 import type {ReactNode} from 'react';
+import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 
 /**
  * Каркас экранов v7: хром телефона, карточки, строки, поля, кнопки.
@@ -29,7 +30,7 @@ export function NavBar({back, onBack, online, syncedAt, pending}: {
   return (
     <div className="navbar">
       {onBack ? (
-        <button type="button" className="back" onClick={onBack}>‹ {back}</button>
+        <button type="button" className="back" onClick={onBack}><PilingIcon name="back" size={14} decorative />{back}</button>
       ) : <span className="back">{back}</span>}
       <span className="sync">
         <span className="st"><span className={online ? 'dot' : 'dot off'} />{online ? 'Онлайн' : 'Офлайн'}</span>
@@ -108,6 +109,7 @@ export function Banner({tone, title, note, action}: {
 }) {
   return (
     <div className={`banner ${tone === 'muted' ? '' : tone}`}>
+      <PilingIcon name={tone === 'ok' ? 'check' : tone === 'bad' ? 'risk' : tone === 'warn' ? 'defect' : 'documents'} size={16} decorative />
       <div>
         <div className="bt">{title}</div>
         {note ? <div className="bs">{note}</div> : null}
@@ -217,6 +219,11 @@ export const OPERATOR_DOCK = [
 
 export type DockTab = (typeof OPERATOR_DOCK)[number]['key'];
 
+const DOCK_ICONS: Record<string, PilingIconName> = {
+  HOME: 'home', SAFETY: 'accepted', EQUIP: 'equipment-rig', EQUIPMENT: 'equipment-rig',
+  MORE: 'menu', CLEARANCE: 'accepted', BRIEFINGS: 'documents', JOURNAL: 'history', HISTORY: 'history',
+};
+
 export function Dock<K extends string>({items, active, badges, onSelect}: {
   items: readonly DockItem<K>[];
   active: K;
@@ -235,7 +242,7 @@ export function Dock<K extends string>({items, active, badges, onSelect}: {
             aria-current={active === tab.key ? 'page' : undefined}
             onClick={() => onSelect(tab.key)}
           >
-            <span className="glyph" aria-hidden="true">{tab.glyph}</span>
+            <span className="glyph"><PilingIcon name={DOCK_ICONS[tab.key] ?? 'documents'} size={24} decorative /></span>
             {tab.label}
             {count > 0 ? <span className="badge">{count}</span> : null}
           </button>
@@ -250,7 +257,7 @@ export function Dock<K extends string>({items, active, badges, onSelect}: {
  * нижнее меню. Один на все операторские модули — иначе хром разойдётся между
  * экранами, и человек перестанет узнавать своё приложение.
  */
-export function PhoneShell({online, syncedAt, pending, back, onBack, children, action, dock}: {
+export function PhoneShell({online, syncedAt, pending, back, onBack, children, action, dock, desktopNav}: {
   online: boolean;
   syncedAt: string | null;
   pending: number;
@@ -259,9 +266,11 @@ export function PhoneShell({online, syncedAt, pending, back, onBack, children, a
   children: ReactNode;
   action?: ReactNode;
   dock?: ReactNode;
+  desktopNav?: ReactNode;
 }) {
   return (
-    <div className="stage">
+    <div className={`stage ${desktopNav ? 'has-desktop-nav' : ''}`}>
+      {desktopNav}
       <div className="device">
         <NavBar back={back ?? 'Оператор'} onBack={onBack} online={online} syncedAt={syncedAt} pending={pending} />
         <div className="viewport">{children}</div>

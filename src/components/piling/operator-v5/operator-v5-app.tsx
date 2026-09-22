@@ -1,6 +1,8 @@
 'use client';
 
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
+import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
 import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
   ChecklistStage, ChecklistView, IncidentCategory, IncidentSign,
@@ -80,12 +82,12 @@ function Top({state}: {state: OperatorMobileState}) {
 }
 
 function Dock({active, onSelect}: {active: Tab; onSelect: (tab: Tab) => void}) {
-  const tabs: {key: Tab; label: string}[] = [
-    {key: 'SHIFT', label: 'Смена'},
-    {key: 'WORK', label: 'Работа'},
-    {key: 'DEFECTS', label: 'Дефекты'},
-    {key: 'EVENTS', label: 'ЧП'},
-    {key: 'MORE', label: 'Ещё'},
+  const tabs: {key: Tab; label: string; icon: PilingIconName}[] = [
+    {key: 'SHIFT', label: 'Смена', icon: 'home'},
+    {key: 'WORK', label: 'Работа', icon: 'pile-driving'},
+    {key: 'DEFECTS', label: 'Дефекты', icon: 'defect'},
+    {key: 'EVENTS', label: 'ЧП', icon: 'risk'},
+    {key: 'MORE', label: 'Ещё', icon: 'menu'},
   ];
   return (
     <div className="dock">
@@ -94,8 +96,10 @@ function Dock({active, onSelect}: {active: Tab; onSelect: (tab: Tab) => void}) {
           key={tab.key}
           type="button"
           className={tab.key === active ? 'on' : ''}
+          aria-current={tab.key === active ? 'page' : undefined}
           onClick={() => onSelect(tab.key)}
         >
+          <PilingIcon name={tab.icon} size={24} decorative />
           {tab.label}
         </button>
       ))}
@@ -587,14 +591,16 @@ function IncidentScreen({state, busy, onReport}: {
 }
 
 /** F. Работа: плитки выработки и запись — экраны F1–F5 макета. */
-function WorkScreen({state, busy, onLog, onFinish, onOpenSafety}: {
+function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
   state: OperatorMobileState;
   busy: boolean;
   onLog: (entry: ProductionEntryInput) => void;
   onFinish: () => void;
+  onIncident: () => void;
   /** Открыть периодический чек-лист ТБ — срок вышел либо подходит. */
   onOpenSafety: (stage: ChecklistStage) => void;
 }) {
+  const [formOpen, setFormOpen] = useState(false);
   const [kind, setKind] = useState<'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT'>('PILES');
   const [optionId, setOptionId] = useState('');
   const [count, setCount] = useState('');
@@ -655,8 +661,14 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety}: {
     setEndedHm('');
   };
 
+  if (!formOpen) return <div className="scr"><OperatorWorkOverview state={state} variant="v5" busy={busy}
+    onAction={(next)=>{pick(next);setFormOpen(true);}} onFinish={onFinish} onIncident={onIncident}>
+    {safety.filter(c=>c.period?.due||c.period?.warn).map(c=><button key={c.stage} type="button" className="oc-form-back" onClick={()=>onOpenSafety(c.stage)}>{c.title} · пройти проверку</button>)}
+  </OperatorWorkOverview></div>;
+
   return (
     <div className="scr">
+      <button type="button" className="oc-form-back" onClick={()=>setFormOpen(false)}>← К смене</button>
       <div className="tiles">
         <div className="tile">
           <span className="k">Сваи</span>
@@ -1109,6 +1121,7 @@ export function OperatorV5App() {
           busy={busy}
           onLog={logProduction}
           onOpenSafety={setSafetyStage}
+          onIncident={()=>setTab('EVENTS')}
           onFinish={() => {
             if (shiftId) void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
           }}

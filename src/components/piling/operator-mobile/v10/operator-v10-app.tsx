@@ -1,5 +1,6 @@
 'use client';
 
+import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
@@ -456,12 +457,13 @@ function ScreenReady({state, checklist, answers, busy, onSubmit, go}: {
  * Поля те же, что и в рабочем экране /operator, и уходят той же командой
  * log-production: сервер один, и правила приёмки записи тоже одни.
  */
-function ProductionForm({state, busy, onLog}: {
+function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
+  initialKind?: WorkAction;
   state: OperatorMobileState;
   busy: boolean;
   onLog: (entry: ProductionEntryInput) => void;
 }) {
-  const [kind, setKind] = useState<'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME'>('PILES');
+  const [kind, setKind] = useState<WorkAction>(initialKind);
   const [optionId, setOptionId] = useState('');
   const [count, setCount] = useState('');
   const [meters, setMeters] = useState('');
@@ -610,31 +612,10 @@ function ScreenWork({state, busy, onLog, go}: {
   onLog: (entry: ProductionEntryInput) => void;
   go: Go;
 }) {
-  const {assignment} = state;
-  return (
-    <>
-      <Card>
-        <Row icon="user" title={state.operator.name}
-          note={state.shift?.startedAt ? `смена с ${timeRu(state.shift.startedAt)}` : 'смена не начата'} />
-      </Card>
-      <div className="ov10-metrics">
-        <Metric label="Моточасы"
-          value={assignment?.lastMeter ? formatNumber(assignment.lastMeter.engineHours, 0) : DASH} note="м/ч" />
-        <Metric label="Топливо"
-          value={assignment?.fuelPercent === null || assignment?.fuelPercent === undefined
-            ? DASH : `${formatNumber(assignment.fuelPercent, 0)}%`} note="прошлая смена" />
-      </div>
-      <div className="ov10-metrics three">
-        <Metric label="Сваи" value={formatNumber(state.production.piles.count, 0)}
-          note={`${formatNumber(state.production.piles.meters, 0)} м.п.`} />
-        <Metric label="Бурение" value={formatNumber(state.production.drilling.count, 0)}
-          note={`${formatNumber(state.production.drilling.meters, 0)} м.п.`} />
-        <Metric label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
-      </div>
-      <ProductionForm state={state} busy={busy} onLog={onLog} />
-      <button type="button" className="ov10-btn ghost" onClick={() => go('closing')}>К закрытию смены</button>
-    </>
-  );
+  const [entry, setEntry] = useState<WorkAction | null>(null);
+  if (entry) return <><button type="button" className="oc-form-back" onClick={()=>setEntry(null)}>← К смене</button><ProductionForm key={entry} state={state} busy={busy} onLog={onLog} initialKind={entry} /></>;
+  return <OperatorWorkOverview state={state} variant="v10" busy={busy} onAction={setEntry}
+    onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />;
 }
 
 /**
@@ -1631,7 +1612,7 @@ export function OperatorV10App() {
         <ScreenClosing state={state} busy={busy} onClose={closeShift} go={setActive} />
       );
       case 'report': return <ScreenReport state={state} />;
-      default: return <ScreenToday state={state} go={setActive} />;
+      default: return state.phase === 'WORK' ? <ScreenWork state={state} busy={busy} onLog={logProduction} go={setActive} /> : <ScreenToday state={state} go={setActive} />;
     }
   })();
 

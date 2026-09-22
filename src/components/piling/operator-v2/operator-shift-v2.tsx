@@ -30,6 +30,7 @@
  * для осмотров и два списка, зашитых в экран, которые нигде не сохранялись.
  */
 
+import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -115,7 +116,7 @@ function ClearanceRow({ cleared, operatorName, documents }: {
         className="flex min-h-12 w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted/60"
       >
         <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white',
-          cleared ? 'bg-[#12a150]' : 'bg-warning')}>
+          cleared ? 'bg-success' : 'bg-warning')}>
           {cleared ? '✓' : '!'}
         </span>
         <span className="min-w-0 flex-1">
@@ -348,7 +349,7 @@ export function OperatorShiftV2() {
   const totalDrilling = production?.drilling.count ?? 0;
   const totalDowntime = production?.downtimeHours ?? 0;
   // Выработку запрещает сервер; экран гасит кнопки той же причиной.
-  const workForbidden = mobile ? !mobile.permit.allowed : false;
+
 
   /*
     Ключ команды происшествия живёт дольше формы: снимки привязываются к нему
@@ -866,88 +867,9 @@ export function OperatorShiftV2() {
           subtitle={stepLabel}
           footer={<BottomTabs active={tab} onSelect={setTab} />}
         >
-          {tab === 'shift' && (
-            <>
-              <div className="rounded-xl border border-border bg-card p-3">
-                <p className="flex items-center gap-2 text-sm font-medium text-[#12a150]">
-                  <span className="h-2 w-2 rounded-full bg-[#12a150]" aria-hidden />
-                  Смена активна
-                </p>
-                <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{elapsed ?? '—'}</p>
-              </div>
-
-              <RowList>
-                <li>
-                  <ValueRow
-                    label="Моточасы"
-                    value={facts.meterCurrent != null ? `${formatNumber(facts.meterCurrent)} м/ч` : '—'}
-                  />
-                </li>
-                <li>
-                  <ValueRow label="Сваи сегодня"
-                    value={`${totalPiles} шт · ${formatNumber(production?.piles.meters ?? 0)} м.п.`} />
-                </li>
-                {totalDrilling > 0 && (
-                  <li>
-                    <ValueRow label="Бурение"
-                      value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
-                  </li>
-                )}
-                {totalDowntime > 0 && (
-                  <li><ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)} tone="warn" /></li>
-                )}
-              </RowList>
-
-              {/* Запрет закрывает выработку и не трогает простой, дефект и
-                  сдачу смены — обоснование в domain/production-permit.ts. */}
-              {mobile && !mobile.permit.allowed ? (
-                <div className="rounded-lg border border-danger/40 bg-danger/10 p-3">
-                  <p className="text-sm font-bold text-danger-strong">Работа запрещена</p>
-                  <ul className="mt-1 space-y-1">
-                    {mobile.permit.blocks.map((block) => (
-                      <li key={block.code} className="text-sm">
-                        <span className="font-semibold">{block.title}.</span> {block.resolution}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-sm font-medium">
-                    Простой, дефект и отчёт записываются как обычно.
-                  </p>
-                </div>
-              ) : null}
-
-              <StepButton label="+ Новая свая" disabled={workForbidden}
-                onClick={() => setPileOpen(true)} />
-
-              {/* Паспорт — отдельная кнопка, а не режим внутри формы сваи.
-                  Пачка это две цифры на ходу, паспорт — полтора десятка
-                  замеров: тот, кто пишет пачкой, не должен каждый раз
-                  проходить мимо полей отказа. */}
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" disabled={workForbidden} onClick={() => setPassportOpen(true)}
-                  className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground disabled:opacity-50">
-                  Свая с паспортом
-                </button>
-                <button type="button" disabled={workForbidden} onClick={() => setDrillingOpen(true)}
-                  className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground disabled:opacity-50">
-                  Бурение
-                </button>
-                <button type="button" onClick={() => setDefectOpen(true)}
-                  className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground">
-                  Дефект
-                </button>
-                <button type="button" onClick={() => setDowntimeOpen(true)}
-                  className="min-h-12 rounded-lg border border-border bg-card text-sm font-medium text-foreground">
-                  Простой
-                </button>
-              </div>
-
-              <button type="button" onClick={() => setFinishing(true)}
-                className="min-h-12 w-full rounded-lg border border-border bg-card text-sm font-semibold text-foreground">
-                Завершить работу
-              </button>
-            </>
-          )}
+          {tab === 'shift' && mobile && <OperatorWorkOverview state={mobile} variant="v2" busy={busy}
+            onAction={(kind)=>{if(kind==='PILES')setPileOpen(true);else if(kind==='PASSPORT')setPassportOpen(true);else if(kind==='DRILLING')setDrillingOpen(true);else setDowntimeOpen(true);}}
+            onIncident={()=>setTab('safety')} onDefect={()=>setDefectOpen(true)} onFinish={()=>setFinishing(true)} />}
 
           {tab === 'safety' && (
             mobile
@@ -1058,9 +980,9 @@ export function OperatorShiftV2() {
         />
         {passportOpen && (
           <div className="fixed inset-0 z-50 flex flex-col bg-background">
-            <header className="flex items-center gap-2 bg-[#1e5bd6] px-3 py-3 text-white">
+            <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-3 text-foreground">
               <button type="button" onClick={() => setPassportOpen(false)}
-                className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/15">
+                className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
                 ✕<span className="sr-only">Закрыть</span>
               </button>
               <p className="text-base font-semibold">Свая с паспортом</p>
@@ -1240,3 +1162,4 @@ export function OperatorShiftV2() {
     </StepShell>
   );
 }
+

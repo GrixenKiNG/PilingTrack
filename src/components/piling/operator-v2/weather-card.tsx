@@ -137,7 +137,7 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
           Погоды нет: телефон не дал геопозицию
           {siteName ? `, а у объекта «${siteName}» не заданы координаты` : ''}
         </p>
-        <button type="button" onClick={load} className="mt-1 text-sm font-medium text-[#1e5bd6]">
+        <button type="button" onClick={load} className="mt-1 text-sm font-medium text-signal-strong">
           Разрешить геопозицию и обновить
         </button>
       </div>
@@ -148,7 +148,7 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
     return (
       <div className="rounded-xl border border-border bg-card px-3 py-2.5">
         <p className="text-sm text-muted-foreground">{state.message}</p>
-        <button type="button" onClick={load} className="mt-1 text-sm font-medium text-[#1e5bd6]">
+        <button type="button" onClick={load} className="mt-1 text-sm font-medium text-signal-strong">
           Повторить
         </button>
       </div>

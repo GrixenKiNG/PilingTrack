@@ -2,6 +2,7 @@
 
 import {useEffect, useRef, type ReactNode} from 'react';
 import {cn} from '@/lib/utils';
+import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 
 /**
  * Части экрана машиниста.
@@ -129,6 +130,8 @@ export interface TabDefinition<T extends string> {
  * заканчивается: дальше машинист сам решает, посмотреть ли карточку машины,
  * записать ли происшествие или проверить свои допуски.
  */
+const TAB_ICONS: Record<string, PilingIconName> = {SHIFT: 'home', SAFETY: 'accepted', EQUIPMENT: 'equipment-rig', MORE: 'menu'};
+
 export function TabBar<T extends string>({tabs, active, onSelect}: {
   tabs: TabDefinition<T>[];
   active: T;
@@ -152,13 +155,13 @@ export function TabBar<T extends string>({tabs, active, onSelect}: {
           onClick={() => onSelect(tab.id)}
           aria-current={tab.id === active ? 'page' : undefined}
           className={cn(
-            'relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-1.5 text-3xs font-bold transition-colors',
+            'relative flex min-h-[60px] flex-col items-center justify-center gap-1 px-1 py-1.5 text-xs font-bold transition-colors',
             tab.id === active
               ? 'border-t-2 border-signal -mt-px text-signal'
               : 'text-muted-foreground hover:bg-secondary',
           )}
         >
-          {tab.icon ? <span className="[&>svg]:size-[18px]" aria-hidden>{tab.icon}</span> : null}
+          {TAB_ICONS[tab.id] ? <PilingIcon name={TAB_ICONS[tab.id]} size={24} decorative /> : tab.icon ? <span className="[&>svg]:size-[18px]" aria-hidden>{tab.icon}</span> : null}
           <span>{tab.label}</span>
           {tab.badge ? (
             <span
@@ -290,13 +293,13 @@ export function PhaseBar({progress, onOpen}: {
       ? progress.length
       : Math.min(progress.filter((step) => step.done).length + 1, progress.length);
   return (
-    <div className="operator-phase-bar border-b border-white/10 bg-[#121a22] px-4 pb-1.5 pt-1.5 text-white">
+    <div className="operator-phase-bar border-b border-border bg-card px-4 pb-2 pt-2 text-foreground">
       {/* Шаг и его название — одной строкой. Тремя строками («Шаг 2 из 7»,
           «Приём», «Контроль смены») этот заголовок занимал больше места, чем
           сама шкала под ним, а подпись «Контроль смены» не сообщала ничего,
           чего не видно из шкалы. */}
       <div className="mb-1.5 flex items-baseline gap-2">
-        <span className="text-3xs font-bold uppercase tracking-[0.18em] text-white/55">
+        <span className="text-3xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
           {completed ? `${progress.length} из ${progress.length}` : `Шаг ${displayedStep} из ${progress.length}`}
         </span>
         <span className="min-w-0 truncate text-sm font-bold">{current?.label ?? 'Смена завершена'}</span>
@@ -313,7 +316,7 @@ export function PhaseBar({progress, onOpen}: {
               'relative z-10 flex size-6 items-center justify-center rounded-full border text-3xs font-black tabular-nums',
               step.done && 'border-success bg-success text-white',
               step.current && 'border-signal bg-signal text-white ring-4 ring-signal/20',
-              !step.done && !step.current && 'border-white/30 bg-[#121a22] text-white/45',
+              !step.done && !step.current && 'border-border bg-secondary text-muted-foreground',
             )}>
               {step.done ? '✓' : index + 1}
             </span>
@@ -324,7 +327,7 @@ export function PhaseBar({progress, onOpen}: {
               aria-label={`${step.label} — ${step.done ? 'выполнено' : step.current ? 'текущий этап' : 'впереди'}`}
               className={cn(
                 'relative flex min-w-0 flex-col items-center',
-                index > 0 && 'before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-white/20',
+                index > 0 && 'before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-border',
                 index > 0 && (step.done || step.current) && 'before:bg-success/80',
               )}
             >

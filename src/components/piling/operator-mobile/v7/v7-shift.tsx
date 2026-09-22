@@ -1,12 +1,13 @@
 'use client';
 
+import {ChecklistScreen as SharedChecklistScreen} from '../screens/checklist-screen';
 import {useState} from 'react';
 import type {
-  ChecklistAnswer, ChecklistView, IncidentSign, OperatorAnswer, OperatorMobileState,
+  ChecklistAnswer, ChecklistView, IncidentSign, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_HINTS, INCIDENT_CATEGORY_LABELS,
-  INCIDENT_DESCRIPTION_MIN, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS, measureRequired,
+  INCIDENT_DESCRIPTION_MIN, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
 } from '@/modules/operator-mobile/contracts';
 import {PilePassportForm} from '../screens/pile-passport-form';
 import type {ProductionEntryInput} from '../api';
@@ -97,12 +98,6 @@ export function AcceptFlow({state, busy, onAccept, onBack}: {
 
 /* --------------------------------------------------------------- осмотр --- */
 
-const ANSWERS: {value: OperatorAnswer; label: string; cls: string}[] = [
-  {value: 'OK', label: 'Норма', cls: 'ok'},
-  {value: 'REMARK', label: 'Замечание', cls: 'remark'},
-  {value: 'FAULT', label: 'Неисправность', cls: 'fault'},
-];
-
 /**
  * Прохождение чек-листа.
  *
@@ -110,134 +105,13 @@ const ANSWERS: {value: OperatorAnswer; label: string; cls: string}[] = [
  * подписывать нечем. Замер спрашиваем только там, где он обязателен при
  * выбранном ответе (`measureRequired`) — долив масла при «норме» не нужен.
  */
-export function ChecklistFlow({checklist, busy, lastMeter, onSubmit, onBack}: {
-  checklist: ChecklistView;
-  busy: boolean;
-  /** Последнее показание счётчика — подсказка у поля моточасов. */
+export function ChecklistFlow({checklist, busy, lastMeter, onSubmit, onBack, commandId, warnings}: {
+  checklist: ChecklistView; busy: boolean; warnings: OperatorMobileState['warnings'];
   lastMeter: {engineHours: number; recordedAt: string} | null;
-  onSubmit: (answers: ChecklistAnswer[]) => void;
-  onBack: () => void;
+  onSubmit: (answers: ChecklistAnswer[]) => void; onBack: () => void; commandId: string;
 }) {
-  const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [measures, setMeasures] = useState<Record<string, string>>({});
-
-  const items = checklist.sections.flatMap((section) => section.items);
-  const unanswered = items.filter((item) => !answers[item.id]);
-  const missingMeasure = items.filter((item) => {
-    const answer = answers[item.id];
-    if (!answer || !item.measure) return false;
-    return measureRequired(item, answer) && !measures[item.id];
-  });
-
-  const submit = () => onSubmit(items.map((item) => {
-    const answer = answers[item.id] as OperatorAnswer;
-    const measureValue = item.measure && measures[item.id] !== undefined
-      ? Number(measures[item.id])
-      : null;
-    return {
-      itemId: item.id,
-      answer,
-      ...(notes[item.id] ? {note: notes[item.id]} : {}),
-      ...(item.measure && measureValue !== null && Number.isFinite(measureValue)
-        ? {measures: {[item.measure.key]: measureValue}}
-        : {}),
-    };
-  }));
-
-  return (
-    <>
-      <Title note={checklist.purpose}>{checklist.title}</Title>
-      <div className="body">
-        <div className="bar">
-          <i style={{width: `${Math.round(((items.length - unanswered.length) / Math.max(items.length, 1)) * 100)}%`}} />
-        </div>
-
-        {checklist.sections.map((section) => (
-          <Card key={section.id} title={section.title}>
-            {section.items.map((item) => {
-              const answer = answers[item.id];
-              return (
-                <div className="item" key={item.id}>
-                  <span className="it">{item.text}</span>
-                  {item.hint ? <span className="ih">{item.hint}</span> : null}
-                  <div className="answers">
-                    {ANSWERS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`${answer === option.value ? 'on ' : ''}${option.cls}`}
-                        aria-pressed={answer === option.value}
-                        onClick={() => setAnswers((current) => ({...current, [item.id]: option.value}))}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  {answer && answer !== 'OK' ? (
-                    <div style={{marginTop: 8}}>
-                      <Field label="Что именно">
-                        <input
-                          type="text"
-                          value={notes[item.id] ?? ''}
-                          onChange={(event) => setNotes((current) => ({...current, [item.id]: event.target.value}))}
-                        />
-                      </Field>
-                    </div>
-                  ) : null}
-                  {answer && item.measure && measureRequired(item, answer) ? (
-                    <div style={{marginTop: 8}}>
-                      <Field
-                        label={`${item.measure.label}, ${item.measure.unit}`
-                          + (item.measure.max !== undefined
-                            ? ` (от ${item.measure.min ?? 0} до ${item.measure.max})`
-                            : '')}
-                      >
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          value={measures[item.id] ?? ''}
-                          onChange={(event) => setMeasures((current) => ({...current, [item.id]: event.target.value}))}
-                        />
-                        {/* Прошлое показание счётчика — у поля, а не на экране
-                            приёмки, который к этому моменту давно закрыт.
-                            Счётчик не крутится назад, и человек, видящий
-                            вчерашнее число, ловит опечатку сам. Поле при этом
-                            не заполняем: подставленное отправят не глядя. */}
-                        {item.measure.key === 'engineHours' && lastMeter ? (
-                          <span className="ih">
-                            было {lastMeter.engineHours} м/ч
-                            {' '}на {new Date(lastMeter.recordedAt).toLocaleDateString('ru-RU')}
-                          </span>
-                        ) : null}
-                      </Field>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </Card>
-        ))}
-
-        {unanswered.length > 0 ? (
-          <Banner tone="warn" title={`Без ответа: ${unanswered.length}`} note="Ответьте по каждому пункту." />
-        ) : null}
-        {missingMeasure.length > 0 ? (
-          <Banner tone="warn" title={`Нужен замер: ${missingMeasure.length}`} />
-        ) : null}
-        {/* Фото к неисправности требует сервер. Съёмку здесь не делаем: это
-            отдельный узел с загрузкой в хранилище, он живёт в рабочем экране. */}
-
-        <Button
-          disabled={busy || unanswered.length > 0 || missingMeasure.length > 0}
-          onClick={submit}
-        >
-          {busy ? 'Отправляем…' : 'Сдать чек-лист'}
-        </Button>
-        <Button tone="ghost" onClick={onBack}>Назад</Button>
-      </div>
-    </>
-  );
+  return <div className="oc-inspection"><SharedChecklistScreen checklist={checklist} busy={busy}
+    lastMeter={lastMeter} onSubmit={onSubmit} onBack={onBack} commandId={commandId} error={null} warnings={warnings} /></div>;
 }
 
 /* ------------------------------------------------------------ выработка --- */
@@ -535,3 +409,6 @@ export function CloseFlow({busy, onClose, onBack}: {
     </>
   );
 }
+
+
+

@@ -13,65 +13,26 @@
  * из `src/proxy.ts`.
  */
 .v5 {
-  --ground: #f3f4f6;
-  --surface: #ffffff;
-  --surface-2: #e9ebee;
-  --ink: #16181a;
-  --ink-muted: #5e6469;
-  --ink-faint: #8c9196;
-  --line: #d5d9dd;
-  --line-strong: #b6bcc2;
-  --signal: #c04300;
-  --signal-fill: #e2650f;
-  --signal-wash: #fbeade;
-  --keep: #1c6b4f;
-  --keep-wash: #e3f0eb;
-  --stop: #a3261f;
-  --stop-wash: #f8e6e4;
+  --ground: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--secondary);
+  --ink: var(--foreground);
+  --ink-muted: var(--muted-foreground);
+  --ink-faint: var(--muted-foreground);
+  --line: var(--border);
+  --line-strong: var(--input);
+  --signal-fill: var(--signal);
+  --signal-wash: color-mix(in oklab, var(--signal) 8%, var(--card));
+  --keep: var(--success-strong);
+  --keep-wash: color-mix(in oklab, var(--success) 8%, var(--card));
+  --stop: var(--destructive-strong);
+  --stop-wash: color-mix(in oklab, var(--destructive) 8%, var(--card));
   --shadow: 0 1px 2px color-mix(in oklab, var(--ink) 10%, transparent), 0 8px 24px color-mix(in oklab, var(--ink) 6%, transparent);
-  --f-display: var(--font-oswald), "Arial Narrow", system-ui, sans-serif;
-  --f-body: var(--font-pt-sans), "Segoe UI", system-ui, sans-serif;
-  --f-mono: var(--font-jetbrains), "Consolas", ui-monospace, monospace;
+  --f-display: var(--font-sans);
+  --f-body: var(--font-sans);
+  --f-mono: var(--font-mono);
   --measure: 62ch;
   --pad: clamp(1.25rem, 4vw, 3rem);
-}
-@media (prefers-color-scheme: dark) {
-  .v5:not([data-theme="light"]) {
-    --ground: #0f1113;
-    --surface: #171a1d;
-    --surface-2: #22262a;
-    --ink: #e7eaec;
-    --ink-muted: #9aa0a5;
-    --ink-faint: #6f757a;
-    --line: #2c3135;
-    --line-strong: #3d4348;
-    --signal: #f5893c;
-    --signal-fill: #e2650f;
-    --signal-wash: #2c1a0f;
-    --keep: #58c398;
-    --keep-wash: #14261f;
-    --stop: #ef7b6e;
-    --stop-wash: #2a1614;
-    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
-  }
-}
-.v5[data-theme="dark"] {
-  --ground: #0f1113;
-  --surface: #171a1d;
-  --surface-2: #22262a;
-  --ink: #e7eaec;
-  --ink-muted: #9aa0a5;
-  --ink-faint: #6f757a;
-  --line: #2c3135;
-  --line-strong: #3d4348;
-  --signal: #f5893c;
-  --signal-fill: #e2650f;
-  --signal-wash: #2c1a0f;
-  --keep: #58c398;
-  --keep-wash: #14261f;
-  --stop: #ef7b6e;
-  --stop-wash: #2a1614;
-  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
 }
 .v5 * {
   box-sizing: border-box;
@@ -460,7 +421,7 @@
 }
 .v5 .dock {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--line);
   background: var(--surface-2);
 }
@@ -644,3 +605,25 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Рабочие экраны используют типографику и поверхности всего приложения. */
+.v5 .h, .v5 .b { font-family: var(--font-sans); font-weight: 700; text-transform: none; letter-spacing: normal; }
+.v5 .card, .v5 .tile, .v5 .b, .v5 .banner { border-radius: var(--radius); }
+.v5 .m, .v5 .rowline, .v5 .note { font-family: var(--font-sans); }
+.v5 .b { min-height: 48px; font-size: 15px; }
+.v5 .dock { background: var(--card); }
+.v5 .dock button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 60px; font-family: var(--font-sans); font-size: 12px; border-right: 0; letter-spacing: normal; }
+.v5 .dock button.on { color: var(--signal-strong); background: color-mix(in oklab, var(--signal) 6%, var(--card)); box-shadow: inset 0 -3px var(--signal); }
+.v5 .ans { flex-wrap: wrap; }
+.v5 .ans button, .v5 .seg button { min-height: 44px; font-family: var(--font-sans); font-size: 13px; border-radius: calc(var(--radius) - 2px); padding: 8px 10px; }
+.v5 .card input, .v5 .card select { min-height: 44px; border-radius: calc(var(--radius) - 2px); }
+.v5 button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.v5 .dock button .piling-icon { padding: 0; border: 0; margin: 0; background: transparent; }
+.v5 .kicker { font-family: var(--font-sans); font-size: 13px; font-weight: 600; letter-spacing: normal; text-transform: none; color: var(--foreground); }
+.v5 .scr > .kicker:first-child { font-size: 21px; font-weight: 700; }
+.v5 .rowline .m { font-family: var(--font-sans); font-size: 12px; }
+.v5 .rowline:has(> .ans) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 0; }
+.v5 .rowline > .ans { display: flex; gap: 8px; }
+.v5 .rowline > .ans button { flex: 1; }
+.v5 .card { background: var(--card); border: 1px solid var(--border); padding: 12px; }
+.v5 .card .lbl { font-size: 12px; letter-spacing: normal; text-transform: none; }

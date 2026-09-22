@@ -46,12 +46,14 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t safe-area-bottom">
       <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
-          const isActive = isActivePath(pathname, item.href);
+          const href = item.href === '/operator' && (pathname === '/operator/v3' || pathname.startsWith('/operator/v3/'))
+            ? '/operator/v3' : item.href;
+          const isActive = isActivePath(pathname, href);
 
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 no-underline transition-colors',

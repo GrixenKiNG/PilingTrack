@@ -66,7 +66,7 @@ const ICONS: Record<string, PilingIconName> = {
  */
 export function Icon({name, size = 20}: {name: string; size?: number}) {
   const resolved = ICONS[name] ?? 'documents';
-  return <PilingIcon name={resolved} size={size / 1.5} decorative />;
+  return <PilingIcon name={resolved} size={Math.max(size, 30) / 1.5} decorative />;
 }
 
 export interface ScreenTab {

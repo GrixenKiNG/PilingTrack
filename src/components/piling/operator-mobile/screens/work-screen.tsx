@@ -1,5 +1,6 @@
 'use client';
 
+import {OperatorWorkOverview} from '../operator-work-overview';
 import {useState, type ReactNode} from 'react';
 import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
@@ -57,6 +58,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
     entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
   }) => Promise<boolean>;
 }) {
+  const [formOpen, setFormOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('PILES');
   /**
    * Как записывают сваи.
@@ -160,6 +162,15 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
     setComment('');
   };
 
+  if (!formOpen) return <Screen title="Моя смена" tabs={tabs}>
+    <WarningsPanel warnings={state.warnings} />
+    <OperatorWorkOverview state={state} variant="base" busy={busy}
+      onAction={(kind)=>{switchTab(kind==='PASSPORT'?'PILES':kind);setPileMode(kind==='PASSPORT'?'PASSPORT':'BATCH');setFormOpen(true);}}
+      onFinish={()=>setFinishing(true)} />
+    {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы. Новую выработку записывать будет нельзя.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
+    <ErrorNote message={error} />
+  </Screen>;
+
   return (
     <Screen
       tabs={tabs}
@@ -205,6 +216,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
         </>
       )}
     >
+      <button type="button" className="oc-form-back" onClick={()=>setFormOpen(false)}>← К смене</button>
       <PermitPanel permit={state.permit} />
       <WarningsPanel warnings={state.warnings} />
 
