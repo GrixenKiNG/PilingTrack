@@ -18,6 +18,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   recordFeedbackEvent: vi.fn().mockResolvedValue(undefined),
   loggerInfo: vi.fn(),
+  loggerWarn: vi.fn(),
 }));
 
 vi.mock('@/services/feedback/feedback-event-service', () => ({
@@ -25,7 +26,7 @@ vi.mock('@/services/feedback/feedback-event-service', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { info: mocks.loggerInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: { info: mocks.loggerInfo, warn: mocks.loggerWarn, error: vi.fn(), debug: vi.fn() },
 }));
 
 import { recordAuditEvent } from '../audit-service';
@@ -137,5 +138,79 @@ describe('recordAuditEvent — failure isolation', () => {
     await expect(
       recordAuditEvent({ action: 'report.created', scope: 'reports' }),
     ).resolves.toBeUndefined();
+  });
+
+  // Сбой записи следа раньше проглатывался пустым catch: в проде это значило,
+  // что лента могла молча перестать наполняться, и в логах не было ни строчки.
+  it('warns in the log when the feedback write fails', async () => {
+    mocks.recordFeedbackEvent.mockRejectedValue(new Error('feedback table missing'));
+
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      'audit.feedback_write_failed',
+      expect.objectContaining({
+        action: 'report.created',
+        scope: 'reports',
+        error: 'feedback table missing',
+      }),
+    );
+  });
+});
+
+/**
+ * Ленту читает владелец. Эти действия раньше уезжали в default и показывали
+ * машинный код вместо заголовка, а вместо текста — «Событие аудита в контуре X»,
+ * хотя нужное название лежало рядом, в metadata.
+ */
+describe('recordAuditEvent — человеческий текст вместо машинного кода', () => {
+  it('подставляет название вида документа работника (случай с боя 22.09.2026)', async () => {
+    await recordAuditEvent({
+      action: 'user.document_type.created',
+      scope: 'users',
+      metadata: { name: 'Удостоверение машиниста копровой установки' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Заведён вид документа работника',
+        message: 'Добавлен вид документа: «Удостоверение машиниста копровой установки».',
+      }),
+    );
+  });
+
+  it('достаёт название из снимка before/after, а не только из metadata.name', async () => {
+    await recordAuditEvent({
+      action: 'dictionary.renamed',
+      scope: 'dictionaries',
+      metadata: { type: 'pileGrade', before: { name: 'С120.35-9' }, after: { name: 'С120.35-10' } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Справочник «Сваи»: запись «С120.35-9» переименована в «С120.35-10».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда metadata пустая', async () => {
+    await recordAuditEvent({ action: 'site.created', scope: 'sites' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Объект создан', message: 'Создан объект.' }),
+    );
+  });
+
+  // Приоритет в ленте зависит от level — описания добавлялись как текстовая
+  // правка и не должны были поднять эти события выше, чем они были.
+  it('не меняет приоритет у событий, которым срочность не назначалась', async () => {
+    for (const action of ['site.created', 'crew.deleted', 'user.created', 'dictionary.deleted']) {
+      mocks.recordFeedbackEvent.mockClear();
+      await recordAuditEvent({ action, scope: 'test' });
+
+      expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'audit', priority: 'MEDIUM' }),
+      );
+    }
   });
 });
