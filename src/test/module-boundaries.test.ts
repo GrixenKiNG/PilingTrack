@@ -5,7 +5,7 @@ describe('module public API boundary', () => {
     expect(isPublicModuleEntry('@/modules/equipment')).toBe(true);
     expect(isPublicModuleEntry('@/modules/readiness/server')).toBe(true);
   });
-  it.each(['@/modules/readiness/application/readiness-score', '@/modules/reports/domain/downtime-hours', '@/modules/readiness/server/private', '@/modules/../lib/db'])('rejects implementation access: %s', path => {
+  it.each(['@/modules/readiness/application/readiness-score', '@/modules/reports/domain/report.aggregate', '@/modules/readiness/server/private', '@/modules/../lib/db'])('rejects implementation access: %s', path => {
     expect(isPublicModuleEntry(path)).toBe(false);
   });
   it('distinguishes server exports from the client-safe entry point', () => {

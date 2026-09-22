@@ -1,7 +1,7 @@
 'use client';
 
 import {useState, type ReactNode} from 'react';
-import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
 import type {ProductionEntryInput} from '../api';

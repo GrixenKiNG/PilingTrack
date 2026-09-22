@@ -2,7 +2,7 @@
 
 import { formatNumber } from '@/lib/format';
 import { IconTile } from '@/components/piling/icons';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 interface ReportSentScreenProps {
   siteName: string;

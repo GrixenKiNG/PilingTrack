@@ -31,7 +31,7 @@ import { getReportTotals, type ReportTotals } from './report-totals';
 import { ReportThumbnail } from './report-thumbnail';
 import { statusLabel } from '@/services/reports/report-history';
 import { shortDate, shiftLabel } from './report-list-format';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 export function ReportsHeader({
   reportWord,

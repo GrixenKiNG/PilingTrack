@@ -39,7 +39,7 @@ import { useSitesData } from './use-sites-data';
 import { useSitesOverview, type SiteOverviewRow } from './use-sites-overview';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import type { SiteCrew, SiteFullData, SiteListItem } from './types';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
   ChecklistStage, ChecklistView, DocumentVerdict, IncidentCategory, IncidentSign,
   OperatorAnswer, OperatorMobileState,

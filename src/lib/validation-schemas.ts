@@ -6,7 +6,7 @@
 import { z } from 'zod';
 // Чистый доменный модуль без зависимостей — безопасен и на клиенте, куда эти
 // схемы тоже попадают.
-import { DOWNTIME_MAX_HOURS } from '@/modules/reports/domain/downtime-hours';
+import { DOWNTIME_MAX_HOURS } from '@/lib/downtime-hours';
 
 // ============================================================
 // Common schemas
@@ -282,7 +282,7 @@ export const reportUpsertSchema = z.object({
     id: internalIdSchema.optional(),
     reasonId: internalIdSchema,
     // Простой измеряется полными часами: неполный округляется вверх (правило
-    // и причина — reports/domain/downtime-hours). Колонка осталась Float ради
+    // и причина — lib/downtime-hours). Колонка осталась Float ради
     // ранее записанных дробных значений — переписывать историю не стали.
     // Ноль допустим: «простоя не было» — законный ответ при правке.
     // Без округления: час — единица хранения, а не шаг ввода (см. downtime-hours).

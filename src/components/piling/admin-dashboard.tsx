@@ -35,7 +35,7 @@ import { getTodayInTimezone } from '@/lib/timezone';
 import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { useMainDashboardLayout } from '@/components/piling/main-dashboard/dashboard-layout';
 import { PageLayoutRenderer, type RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
 import type { SiteAnalyticsDTO } from '@/lib/types';

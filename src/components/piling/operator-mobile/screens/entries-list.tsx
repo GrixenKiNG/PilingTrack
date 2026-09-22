@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import type {ProductionEntryView} from '@/modules/operator-mobile/contracts';
-import {formatDowntimeHours} from '@/modules/reports/domain/downtime-hours';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 import {BigButton, Panel, PanelTitle} from '../ui';
 
 const KIND_UNIT: Record<ProductionEntryView['kind'], string> = {

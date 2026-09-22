@@ -10,7 +10,7 @@ import { KIND_LABELS } from '../equipment-form';
 import { type TimelineRow } from './equipment-detail-parts';
 import { formatFixed } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 export interface DetailsResponse {
   equipment: EquipmentDTO & Record<string, unknown>;

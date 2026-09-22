@@ -34,7 +34,7 @@ import {
   shiftLabel,
   shortDate,
 } from './report-list-format';
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 
 export function ReportEvidencePreview({
   report,

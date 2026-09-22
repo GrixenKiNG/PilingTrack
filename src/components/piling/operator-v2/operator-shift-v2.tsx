@@ -30,7 +30,7 @@
  * для осмотров и два списка, зашитых в экран, которые нигде не сохранялись.
  */
 
-import { formatDowntimeHours } from '@/modules/reports/domain/downtime-hours';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
