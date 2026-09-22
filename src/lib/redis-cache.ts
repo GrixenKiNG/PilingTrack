@@ -43,6 +43,8 @@ import { logger } from '@/lib/logger';
 // Prefer the dedicated cache instance (allkeys-lru). Fall back to
 // REDIS_URL (state instance, noeviction) for single-Redis deployments.
 const REDIS_URL = process.env.REDIS_URL_CACHE || process.env.REDIS_URL || 'redis://localhost:6379';
+// Состояние — всегда на noeviction-инстансе, без подмены на кэш.
+const STATE_REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const CACHE_DEFAULT_TTL = parseInt(process.env.CACHE_DEFAULT_TTL || '300', 10); // 5 min
 const CACHE_MAX_RETRIES = 2;
 const CACHE_CONNECT_TIMEOUT = 5000;
@@ -63,12 +65,18 @@ function getRedisOptions(): RedisOptions {
   };
 }
 
-let redisClient: Redis | null = null;
+interface ClientSlot {
+  client: Redis | null;
+  readonly url: string;
+}
 
-export async function getRedisClient(): Promise<Redis | null> {
-  if (!redisClient) {
-    const client = new Redis(REDIS_URL, getRedisOptions());
-    redisClient = client;
+const cacheSlot: ClientSlot = { client: null, url: REDIS_URL };
+const stateSlot: ClientSlot = { client: null, url: STATE_REDIS_URL };
+
+async function getClient(slot: ClientSlot): Promise<Redis | null> {
+  if (!slot.client) {
+    const client = new Redis(slot.url, getRedisOptions());
+    slot.client = client;
 
     client.on('error', (err) => {
       logger.error('Redis: connection error', err);
@@ -91,7 +99,7 @@ export async function getRedisClient(): Promise<Redis | null> {
       // reset the dead client stayed the singleton forever — a brief startup
       // race became permanent degradation until a container restart
       // (audit M1: ~5760 heartbeat/metrics errors per day at green health).
-      if (redisClient === client) redisClient = null;
+      if (slot.client === client) slot.client = null;
     });
 
     try {
@@ -99,12 +107,35 @@ export async function getRedisClient(): Promise<Redis | null> {
     } catch (err) {
       logger.error('Redis: initial connect failed', err instanceof Error ? err : new Error(String(err)));
       client.disconnect();
-      if (redisClient === client) redisClient = null;
+      if (slot.client === client) slot.client = null;
       return null;
     }
   }
 
-  return redisClient;
+  return slot.client;
+}
+
+export async function getRedisClient(): Promise<Redis | null> {
+  return getClient(cacheSlot);
+}
+
+/**
+ * Клиент к инстансу состояния (REDIS_URL, noeviction) — без подмены на кэш.
+ *
+ * Разведено с `getRedisClient`, потому что тот предпочитает REDIS_URL_CACHE, а
+ * эта переменная задана не во всех контейнерах. На проде это расщепило пульс
+ * служб: ws и workers (без REDIS_URL_CACHE) писали его в инстанс состояния, а
+ * app (с REDIS_URL_CACHE) искал в кэше — и не находил. `/api/health/deep`
+ * отдавал 503 при живом ws-сервере (проверено 22.09.2026: upgrade отвечал 101).
+ *
+ * Пульс — состояние, а не кэш: вытесненная запись читается как «служба мертва».
+ * Тот же довод, что у списка отозванных токенов в services/auth/session-service.
+ *
+ * Отдельного кэш-инстанса нет — это тот же сервер, второе соединение не нужно.
+ */
+export async function getStateRedisClient(): Promise<Redis | null> {
+  if (!process.env.REDIS_URL_CACHE) return getClient(cacheSlot);
+  return getClient(stateSlot);
 }
 
 // ============================================================
@@ -298,9 +329,10 @@ export async function getStats(): Promise<{
  * Graceful shutdown.
  */
 export async function closeRedisConnection(): Promise<void> {
-  if (redisClient) {
-    await redisClient.quit();
-    redisClient = null;
+  for (const slot of [cacheSlot, stateSlot]) {
+    if (!slot.client) continue;
+    await slot.client.quit();
+    slot.client = null;
   }
 }
 

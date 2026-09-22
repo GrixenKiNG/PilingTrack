@@ -1,7 +1,7 @@
 import { getDlqStats } from '@/core/outbox/dead-letter-queue';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { getOutboxStats } from '@/services/reports/outbox-publisher';
-import { getRedisClient } from '@/lib/redis-cache';
+import { getStateRedisClient } from '@/lib/redis-cache';
 import { getLagMetrics } from '../lag-monitor';
 import { checkBackupStatus } from './checkers/backup';
 import { checkDatabase } from './checkers/database';
@@ -72,7 +72,7 @@ async function collectMetrics(): Promise<SystemMetrics> {
   }
 
   try {
-    const client = await getRedisClient();
+    const client = await getStateRedisClient();
     if (client) {
       const wsCount = await client.get('system:ws:connections');
       activeWsConnections = wsCount ? parseInt(wsCount, 10) : 0;

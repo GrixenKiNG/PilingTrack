@@ -1,12 +1,36 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import fs from 'fs';
+import dotenv from 'dotenv';
 import react from '@vitejs/plugin-react';
+
+/**
+ * Интеграционные спеки гейтятся на живой базе: нет URL — `describe.skipIf`
+ * молча пропускает набор. Vitest сам `.env` не читает, поэтому локально гейт
+ * не открывался никогда: прогон был зелёным, ничего не проверив (вскрылось
+ * 22.09.2026 на RLS-тесте изоляции тенантов).
+ *
+ * Сюда переносятся ТОЛЬКО адреса базы — остальное из `.env` в тесты не
+ * попадает, чтобы юнит-тесты продолжали идти в вакууме. Уже заданное
+ * окружение главнее файла: так CI задаёт свои адреса.
+ */
+const DB_ENV_KEYS = ['DATABASE_URL_POSTGRES', 'DATABASE_URL_APP_ROLE'] as const;
+
+function dbEnvFromDotenv(): Record<string, string> {
+  const envPath = path.resolve(__dirname, '.env');
+  if (!fs.existsSync(envPath)) return {};
+  const parsed = dotenv.parse(fs.readFileSync(envPath));
+  return Object.fromEntries(
+    DB_ENV_KEYS.filter((k) => !process.env[k] && parsed[k]).map((k) => [k, parsed[k]])
+  );
+}
 
 export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
     environment: 'happy-dom',
+    env: dbEnvFromDotenv(),
     setupFiles: ['./src/test/setup.ts'],
     include: [
       'src/**/*.test.{ts,tsx}',

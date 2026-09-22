@@ -7,8 +7,11 @@ const mocks = vi.hoisted(() => ({
   lagMetrics: vi.fn().mockReturnValue(null),
   startLagMonitor: vi.fn(),
   redisPing: vi.fn().mockResolvedValue('PONG'),
+  statePing: vi.fn().mockResolvedValue('PONG'),
   redisGet: vi.fn(),
   redisSmembers: vi.fn().mockResolvedValue(['outbox']),
+  stateGet: vi.fn(),
+  stateSmembers: vi.fn().mockResolvedValue(['outbox']),
   readdir: vi.fn(),
   stat: vi.fn(),
 }));
@@ -20,11 +23,22 @@ vi.mock('@/lib/db', () => ({
   getDatabaseProvider: vi.fn(() => 'postgresql'),
 }));
 
+/*
+  Два инстанса, а не один: кэш (allkeys-lru) и состояние (noeviction). Пульс
+  служб живёт на втором — см. getStateRedisClient. Разные шпионы здесь нужны
+  именно затем, чтобы промах мимо инстанса было видно тестом, а не только на
+  проде: там ws писал пульс в состояние, а app искал его в кэше.
+*/
 vi.mock('@/lib/redis-cache', () => ({
   getRedisClient: vi.fn(async () => ({
     ping: mocks.redisPing,
     get: mocks.redisGet,
     smembers: mocks.redisSmembers,
+  })),
+  getStateRedisClient: vi.fn(async () => ({
+    ping: mocks.statePing,
+    get: mocks.stateGet,
+    smembers: mocks.stateSmembers,
   })),
 }));
 
@@ -63,7 +77,10 @@ describe('health-tracker backup monitoring', () => {
     mocks.lagMetrics.mockReturnValue(null);
     mocks.redisPing.mockResolvedValue('PONG');
     mocks.redisSmembers.mockResolvedValue(['outbox']);
-    mocks.redisGet.mockImplementation(async (key: string) => {
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    // Кэш пульса не знает — он лежит в инстансе состояния.
+    mocks.redisGet.mockResolvedValue(null);
+    mocks.stateGet.mockImplementation(async (key: string) => {
       if (key === 'system:worker:heartbeat:outbox') {
         return String(Date.now());
       }
@@ -121,6 +138,63 @@ describe('health-tracker backup monitoring', () => {
     expect(status.status).toBe('degraded');
   });
 });
+
+/*
+  Инстанс, из которого читается пульс служб.
+
+  На проде 22.09.2026 `/api/health/deep` отдавал 503 с "websocket":"down" при
+  полностью живом ws-сервере: upgrade отвечал 101. Причина — два Redis: ws и
+  workers запущены без REDIS_URL_CACHE и писали пульс в инстанс состояния, а
+  app с этой переменной искал его в кэше. Одинаковый код, разные адреса.
+
+  Проверяем обе стороны промаха: пульс в состоянии — служба жива; тот же пульс
+  в кэше — служба мертва. Второй случай и был продом.
+*/
+describe('пульс служб: инстанс состояния, а не кэш', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mocks.outboxStats.mockResolvedValue({ unpublished: 0, failed: 0, total: 0 });
+    mocks.dlqStats.mockResolvedValue({ pending: 0 });
+    mocks.lagMetrics.mockReturnValue(null);
+    mocks.redisPing.mockResolvedValue('PONG');
+    mocks.statePing.mockResolvedValue('PONG');
+    mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
+    delete process.env.BACKUP_ENABLED;
+  });
+
+  it('читает пульс ws из инстанса состояния', async () => {
+    mocks.redisGet.mockResolvedValue(null);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    mocks.stateGet.mockImplementation(async (key: string) =>
+      key === 'system:ws:connections' ? '3'
+        : key === 'system:worker:heartbeat:outbox' ? String(Date.now())
+        : null);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:ws:connections');
+    expect(status.components.websocket.status).toBe('up');
+    expect(status.metrics.activeWsConnections).toBe(3);
+  });
+
+  it('пульс, попавший в кэш вместо состояния, службу не воскрешает', async () => {
+    // Ровно продовая картина: ключ есть, но не в том инстансе.
+    mocks.redisGet.mockImplementation(async (key: string) =>
+      key === 'system:ws:connections' ? '3' : null);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    mocks.stateGet.mockImplementation(async (key: string) =>
+      key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : null);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(status.components.websocket.status).toBe('down');
+    expect(status.status).toBe('unhealthy');
+  });
+});
+
 
 describe('shouldLogHealthSnapshot', () => {
   it('пишет первую поломку — предыдущей картины ещё нет', async () => {

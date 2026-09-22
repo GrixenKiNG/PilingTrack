@@ -1,10 +1,10 @@
-import { getRedisClient } from '@/lib/redis-cache';
+import { getStateRedisClient } from '@/lib/redis-cache';
 import { logger } from '../../logger';
 import type { WebSocketHealth } from '../types';
 
 export async function checkWebSocket(): Promise<WebSocketHealth> {
   try {
-    const client = await getRedisClient();
+    const client = await getStateRedisClient();
     if (!client) {
       return { status: 'down' };
     }
@@ -33,7 +33,7 @@ export async function checkWebSocket(): Promise<WebSocketHealth> {
  */
 export async function setWsConnectionCount(count: number): Promise<void> {
   try {
-    const client = await getRedisClient();
+    const client = await getStateRedisClient();
     if (!client) return;
 
     await client.set('system:ws:connections', String(count), 'EX', 60);

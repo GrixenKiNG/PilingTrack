@@ -366,6 +366,61 @@ describe('Report Command Service', () => {
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
     });
+
+    /*
+      Вторая линия той же проверки — организация. Владельца сверяет тест выше,
+      но у отчёта чужого тенанта владелец может совпасть (один и тот же человек
+      заведён в двух организациях), и тогда держит только это условие.
+
+      Строгое равенство требуется лишь когда организация проставлена в самой
+      записи: у отчётов, заведённых до появления тенанта, там пусто, и отказ в
+      их правке был бы поломкой, а не защитой. Оба случая ниже — чтобы
+      «ужесточение» этого послабления не прошло молча.
+    */
+    it('отказывает в правке отчёта другой организации', async () => {
+      const foreign = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        tenantId: 'tenant-b',
+        date: '2026-04-05',
+      });
+      foreign.addPileWork({ pileGradeId: 'grade-1', count: 5 }, 'user-1');
+      mockRepoFindById.mockResolvedValue(foreign);
+
+      await expect(upsertReport({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        tenantId: 'tenant-a',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 99 }],
+      })).rejects.toThrow(/другой организации/);
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    it('правку своего отчёта без организации в записи разрешает', async () => {
+      const legacy = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+      });
+      legacy.addPileWork({ pileGradeId: 'grade-1', count: 5 }, 'user-1');
+      mockRepoFindById.mockResolvedValue(legacy);
+
+      await upsertReport({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        tenantId: 'tenant-a',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 7 }],
+      });
+
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('tenant + concurrency wiring', () => {

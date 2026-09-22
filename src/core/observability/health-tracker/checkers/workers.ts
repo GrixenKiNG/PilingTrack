@@ -1,11 +1,11 @@
-import { getRedisClient } from '@/lib/redis-cache';
+import { getStateRedisClient } from '@/lib/redis-cache';
 import { logger } from '../../logger';
 import { WORKER_STALE_MS } from '../thresholds';
 import type { WorkerHealth } from '../types';
 
 export async function checkWorkers(): Promise<WorkerHealth> {
   try {
-    const client = await getRedisClient();
+    const client = await getStateRedisClient();
     if (!client) {
       return { status: 'stopped' };
     }
@@ -51,7 +51,7 @@ export async function checkWorkers(): Promise<WorkerHealth> {
  */
 export async function recordWorkerHeartbeat(workerName: string): Promise<void> {
   try {
-    const client = await getRedisClient();
+    const client = await getStateRedisClient();
     if (!client) return;
 
     const now = Date.now();
