@@ -289,18 +289,19 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
       // Длина хранится в миллиметрах, а читают её в метрах — по ней считается м.п.
       const mm = num(m, 'after.lengthMm');
       const length = mm === null ? 'не указана' : `${Number((mm / 1000).toFixed(2))} м`;
-      return withSubject(`Длина ${length}, марка сваи`, subject(m));
+      const name = subject(m);
+      return name ? `Марка сваи «${name}»: длина ${length}.` : `Длина марки сваи: ${length}.`;
     },
   },
   'dictionary.section_updated': {
     level: 'audit',
     title: 'Изменено сечение марки сваи',
     message: (m) => {
-      const section = str(m, 'after.sectionOrDiameter');
-      return withSubject(
-        section ? `Сечение (диаметр) ${section}, марка сваи` : 'Сечение (диаметр) очищено, марка сваи',
-        subject(m),
-      );
+      const section = str(m, 'after.sectionOrDiameter') ?? 'не указано';
+      const name = subject(m);
+      return name
+        ? `Марка сваи «${name}»: сечение (диаметр) ${section}.`
+        : `Сечение (диаметр) марки сваи: ${section}.`;
     },
   },
 
@@ -378,7 +379,12 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
   },
 };
 
-function describeAuditEvent(event: AuditEvent) {
+/**
+ * Экспортируется ради разового пересчёта старых строк ленты
+ * (`scripts/backfill-audit-feed-text.ts`): тексты должны считаться той же
+ * функцией, что пишет новые события, иначе история разойдётся с текущей лентой.
+ */
+export function describeAuditEvent(event: AuditEvent) {
   const description = AUDIT_DESCRIPTIONS[event.action];
   if (!description) {
     return {
