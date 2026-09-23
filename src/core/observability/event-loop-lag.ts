@@ -11,7 +11,11 @@
  * Singleton, enabled once at module load — same pattern as the redis
  * client / circuit breaker singletons elsewhere in core/.
  */
-import { monitorEventLoopDelay, type IntervalHistogram } from 'node:perf_hooks';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
+
+// Имя типа @types/node меняет от версии к версии (IntervalHistogram →
+// ELDHistogram в 26.6); тип из возвращаемого значения переживает оба.
+type IntervalHistogram = ReturnType<typeof monitorEventLoopDelay>;
 
 let histogram: IntervalHistogram | null = null;
 
