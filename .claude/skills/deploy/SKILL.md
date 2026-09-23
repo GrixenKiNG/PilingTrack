@@ -5,6 +5,10 @@ description: Generate a ready-to-paste deploy command block for orionpiling.ru, 
 
 # Deploy to orionpiling.ru
 
+**Default path since 2026-09-23: `bash scripts/deploy-prod.sh [services...]`** (default `app workers`; add `ws` when ws-server changed). It builds images on the developer machine and ships them via `docker save | ssh docker load`, so the 30 GB VPS never hosts a build (a server-side workers build filled the disk to 100% on 2026-09-23). The script does the pre-flight (main, clean tree, HEAD in origin), auto-adds `migrate` for new migrations, keeps ONE rollback tag set, verifies health and prints the rollback command. A transient `Segmentation fault` in `prisma generate` inside the local Docker build is flaky — just re-run.
+
+The server-side block below is the fallback (e.g. no local Docker). Before using it, check `df -h /` — need ≥ 8 GB free.
+
 Generate a copy-paste deploy block for the production VPS.
 
 ## Steps
