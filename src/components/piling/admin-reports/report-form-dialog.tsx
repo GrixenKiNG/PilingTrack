@@ -55,8 +55,8 @@ export function ReportFormDialog({
   const [formUserId, setFormUserId] = useState(editReport?.userId || '');
   const [formSiteId, setFormSiteId] = useState(editReport?.siteId || '');
   const [formDate, setFormDate] = useState(editReport?.date || new Date().toISOString().split('T')[0]);
-  const [formShiftStart, setFormShiftStart] = useState(editReport?.shiftStart || '08:00');
-  const [formShiftEnd, setFormShiftEnd] = useState(editReport?.shiftEnd || '20:00');
+  const [formShiftStart, setFormShiftStart] = useState(editReport?.shiftStart || '07:00');
+  const [formShiftEnd, setFormShiftEnd] = useState(editReport?.shiftEnd || '19:00');
   const [formEquipmentId, setFormEquipmentId] = useState(editReport?.equipment?.id || '');
 
   const [formPiles, setFormPiles] = useState<PileEntry[]>(

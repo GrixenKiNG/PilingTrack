@@ -37,16 +37,16 @@ type ShiftType = 'DAY' | 'NIGHT';
 // Ночная смена скрыта, пока организация работает в одну (SELECTABLE_SHIFT_TYPES).
 // Окно ниже остаётся описанным для обеих: старые ночные смены рисуются по нему.
 const ALL_SHIFT_TYPES: TileOption<ShiftType>[] = [
-  { value: 'DAY', label: 'Дневная', hint: '08:00 – 20:00' },
-  { value: 'NIGHT', label: 'Ночная', hint: '20:00 – 08:00' },
+  { value: 'DAY', label: 'Дневная', hint: '07:00 – 19:00' },
+  { value: 'NIGHT', label: 'Ночная', hint: '19:00 – 07:00' },
 ];
 
 const SHIFT_TYPES = ALL_SHIFT_TYPES.filter((option) => isShiftTypeSelectable(option.value));
 
 /** Плановое окно по типу смены — то же правило, что рисует график смен. */
 const DEFAULT_WINDOW: Record<ShiftType, { start: string; end: string }> = {
-  DAY: { start: '08:00', end: '20:00' },
-  NIGHT: { start: '20:00', end: '08:00' },
+  DAY: { start: '07:00', end: '19:00' },
+  NIGHT: { start: '19:00', end: '07:00' },
 };
 
 interface EquipmentOption { id: string; name: string; model: string | null }

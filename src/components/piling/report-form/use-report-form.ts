@@ -96,8 +96,8 @@ export function useReportForm(): UseReportFormReturn {
   // is submitted; loadReport replaces this with the persisted id when editing.
   const [reportId, setReportId] = useState(() => crypto.randomUUID());
   const [date, setDate] = useState('');
-  const [shiftStart, setShiftStart] = useState('08:00');
-  const [shiftEnd, setShiftEnd] = useState('20:00');
+  const [shiftStart, setShiftStart] = useState('07:00');
+  const [shiftEnd, setShiftEnd] = useState('19:00');
   const [sites, setSites] = useState<{ id: string; name: string }[]>([]);
   const [siteTree, setSiteTree] = useState<SiteWithTreeDTO | null>(null);
   const [pileGrades, setPileGrades] = useState<PileGradeDTO[]>([]);
@@ -280,7 +280,7 @@ export function useReportForm(): UseReportFormReturn {
       const hasWork = s.piles.length > 0 || s.drillings.length > 0 || s.downtimes.length > 0
         || hasTypedValues || s.engineHours.trim() !== '' || s.selectedEquipmentId !== ''
         || s.selectedFieldId !== '' || s.selectedClusterId !== '' || s.selectedPicketId !== ''
-        || s.shiftStart !== '08:00' || s.shiftEnd !== '20:00' || s.showDowntime || !s.quickMode;
+        || s.shiftStart !== '07:00' || s.shiftEnd !== '19:00' || s.showDowntime || !s.quickMode;
       if (!hasWork) return;
       const savedAt = new Date().toISOString();
       localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt, schemaVersion: 2 }));
