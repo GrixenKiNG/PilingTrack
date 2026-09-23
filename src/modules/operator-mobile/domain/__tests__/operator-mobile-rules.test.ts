@@ -14,6 +14,7 @@ import {admissionAccepted, derivePhase, missingPrerequisites} from '../shift-pha
 import {classifyObservedHazard, validateIncident} from '../incidents';
 import {buildSlingerAttempt} from '../knowledge-bank';
 import {shiftWindow} from '../shift-window';
+import {findDowntimeConflict} from '../downtime-interval';
 import {collectWarnings, weatherStop} from '../work-warnings';
 
 /**
@@ -306,13 +307,13 @@ describe('плановое окно смены', () => {
   // Производственные сутки хранятся как полночь UTC — так их пишет продукт.
   const day = new Date('2026-09-01T00:00:00.000Z');
 
-  it('дневная смена — 08:00–20:00 по поясу организации', () => {
+  it('дневная смена — 07:00–19:00 по поясу организации', () => {
     const window = shiftWindow(day, 'DAY', 'Europe/Moscow');
     const hour = (at: Date) => new Intl.DateTimeFormat('ru-RU', {
       timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(at);
-    expect(hour(window.plannedStartAt)).toBe('08:00');
-    expect(hour(window.plannedEndAt)).toBe('20:00');
+    expect(hour(window.plannedStartAt)).toBe('07:00');
+    expect(hour(window.plannedEndAt)).toBe('19:00');
   });
 
   it('ночная смена заканчивается утром следующих суток', () => {
@@ -320,15 +321,15 @@ describe('плановое окно смены', () => {
     const local = (at: Date) => new Intl.DateTimeFormat('ru-RU', {
       timeZone: 'Europe/Moscow', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(at);
-    expect(local(window.plannedStartAt)).toContain('20:00');
-    expect(local(window.plannedEndAt)).toContain('08:00');
+    expect(local(window.plannedStartAt)).toContain('19:00');
+    expect(local(window.plannedEndAt)).toContain('07:00');
     expect(window.plannedEndAt.getTime() - window.plannedStartAt.getTime()).toBe(12 * 3600 * 1000);
   });
 
   it('окно считается в поясе организации, а не сервера', () => {
     const moscow = shiftWindow(day, 'DAY', 'Europe/Moscow');
     const krasnoyarsk = shiftWindow(day, 'DAY', 'Asia/Krasnoyarsk');
-    // Красноярск на четыре часа восточнее: его 08:00 наступают раньше.
+    // Красноярск на четыре часа восточнее: его 07:00 наступают раньше.
     expect(moscow.plannedStartAt.getTime() - krasnoyarsk.plannedStartAt.getTime())
       .toBe(4 * 3600 * 1000);
   });
@@ -480,5 +481,36 @@ describe('период журнала инструктажей', () => {
     await expect(listBriefingJournal({
       tenantId: 'orion', mayReadAllDocuments: false,
     })).rejects.toMatchObject({status: 403});
+  });
+});
+
+describe('интервал простоя', () => {
+  const at = (hhmm: string, day = '2026-09-20') => new Date(`${day}T${hhmm}:00.000Z`);
+  const shiftStart = at('16:00'); // 19:00 МСК
+  const recorded = [{startedAt: at('18:00'), endedAt: at('19:00')}];
+
+  it('пересекающийся с записанным простой отвергается — иначе часы считаются дважды', () => {
+    expect(findDowntimeConflict({startedAt: at('18:30'), endedAt: at('19:30')}, shiftStart, recorded))
+      .toMatchObject({kind: 'OVERLAP'});
+  });
+
+  it('простой встык с записанным — законно', () => {
+    expect(findDowntimeConflict({startedAt: at('19:00'), endedAt: at('19:30')}, shiftStart, recorded))
+      .toBeNull();
+  });
+
+  it('простой, начатый до смены, отвергается, но минутный рассинхрон часов прощается', () => {
+    expect(findDowntimeConflict({startedAt: at('15:00'), endedAt: at('16:30')}, shiftStart, []))
+      .toMatchObject({kind: 'BEFORE_SHIFT'});
+    expect(findDowntimeConflict({startedAt: at('15:57'), endedAt: at('16:30')}, shiftStart, []))
+      .toBeNull();
+  });
+
+  it('ночной простой через полночь сравнивается по настоящему концу', () => {
+    // 23:30–00:30 записан; 00:00–00:15 следующих суток внутри него.
+    const overnight = [{startedAt: at('23:30'), endedAt: at('00:30')}];
+    expect(findDowntimeConflict(
+      {startedAt: at('00:00', '2026-09-21'), endedAt: at('00:15', '2026-09-21')}, shiftStart, overnight,
+    )).toMatchObject({kind: 'OVERLAP'});
   });
 });

@@ -52,6 +52,19 @@ export async function correctProduction(input: {
     const duplicate = await findByCommand(tx, input.tenantId, input.kind, input.clientCommandId);
     if (duplicate) return {correctionId: duplicate};
 
+    // Поправка меняет итоги так же, как запись, — и в сданный отчёт не идёт
+    // по той же причине (см. logProduction).
+    const report = await tx.report.findFirst({
+      where: {tenantId: input.tenantId, shiftId: input.shiftId},
+      select: {status: true},
+    });
+    if (report?.status === 'submitted') {
+      throw new OperatorCommandError(
+        409,
+        'Отчёт по смене уже сдан — поправку в него не внести. Исправление вносит мастер в журнале забивки.',
+      );
+    }
+
     const scope = {tenantId: input.tenantId, shiftId: input.shiftId, id: input.entryId};
     if (input.kind === 'PILES') {
       const original = await tx.pileWork.findFirst({

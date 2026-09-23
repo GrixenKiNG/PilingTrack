@@ -10,6 +10,7 @@ import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/lib/downtime-hours';
 import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
+import {findDowntimeConflict} from '../../domain/downtime-interval';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {
   OperatorCommandError, requireCrew, requireOpenShift, ensureReport,
@@ -204,6 +205,19 @@ export async function logProduction(input: {
       shiftType: shift.type,
     });
 
+    // Сданный отчёт — закрытый документ. В контуре готовности смена после
+    // сдачи живёт до передачи машины, и записи продолжали ложиться в уже
+    // сданный отчёт: событие «сдан» ушло с одними итогами, а в отчёте — другие.
+    // Простой тоже: сданный отчёт уже сказал, сколько машина стояла.
+    const report = await tx.report.findUnique({where: {id: reportId}, select: {status: true}});
+    if (report?.status === 'submitted') {
+      throw new OperatorCommandError(
+        409,
+        'Отчёт по смене уже сдан — новые записи в него не попадут. '
+          + 'Если запись пропущена, её вносит мастер в журнале забивки.',
+      );
+    }
+
     const {entry} = input;
 
     /*
@@ -394,6 +408,36 @@ export async function logProduction(input: {
       */
       if (endedAt.getTime() > now.getTime() + 5 * 60_000) {
         throw new OperatorCommandError(400, 'Простой не может заканчиваться в будущем');
+      }
+
+      // Простой принадлежит смене: не раньше её начала и не поверх уже
+      // записанного (см. domain/downtime-interval).
+      const [shiftClock, recorded] = await Promise.all([
+        tx.shift.findFirst({
+          where: {tenantId: input.tenantId, id: input.shiftId},
+          select: {startedAt: true, timezone: true},
+        }),
+        tx.reportDowntime.findMany({
+          where: {
+            tenantId: input.tenantId, shiftId: input.shiftId,
+            startedAt: {not: null}, endedAt: {not: null},
+          },
+          select: {startedAt: true, endedAt: true},
+        }),
+      ]);
+      const conflict = findDowntimeConflict(
+        {startedAt, endedAt},
+        shiftClock?.startedAt ?? null,
+        recorded as {startedAt: Date; endedAt: Date}[],
+      );
+      if (conflict) {
+        const clock = (at: Date) => new Intl.DateTimeFormat('ru-RU', {
+          timeZone: shiftClock?.timezone ?? 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hour12: false,
+        }).format(at);
+        throw new OperatorCommandError(400, conflict.kind === 'BEFORE_SHIFT'
+          ? `Простой не может начаться раньше смены — смена начата в ${clock(conflict.shiftStartedAt)}.`
+          : `Простой пересекается с уже записанным (${clock(conflict.other.startedAt)}–${clock(conflict.other.endedAt)}). `
+            + 'Если записанный неверен — поправьте его, а не добавляйте второй.');
       }
 
       await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
