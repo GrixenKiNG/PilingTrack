@@ -117,6 +117,7 @@ export function OperatorMobileApp() {
       setLoadError(null);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
         return;
       }

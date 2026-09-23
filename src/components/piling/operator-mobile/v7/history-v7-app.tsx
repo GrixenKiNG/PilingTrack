@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useState} from 'react';
+import {useRouter} from 'next/navigation';
 import type {ReportListItemDTO, ReportStatus} from '@/lib/types';
 import {formatHours, formatNumber, formatRuDate} from '@/lib/format';
 import {Button, Card, Chip, Empty, PhoneShell, Pick, Row, Title, type Tone} from './v7-ui';
@@ -51,6 +52,7 @@ async function readPage(cursor: string | null): Promise<Page> {
 }
 
 export function HistoryV7App() {
+  const router = useRouter();
   const [reports, setReports] = useState<ReportListItemDTO[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +72,7 @@ export function HistoryV7App() {
       setSyncedAt(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
     } catch (cause) {
       if ((cause as Error & {status?: number}).status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
         return;
       }
@@ -119,7 +122,7 @@ export function HistoryV7App() {
       syncedAt={syncedAt}
       pending={0}
       back="Смена"
-      onBack={() => { window.location.href = '/operator/v7'; }}
+      onBack={() => router.push('/operator/v7')}
     >
       <Title note="Ваши смены, свежие сверху">История смен</Title>
       <div className="body">

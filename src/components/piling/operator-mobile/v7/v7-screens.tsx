@@ -1,5 +1,6 @@
 'use client';
 
+import {useRouter} from 'next/navigation';
 import {OperatorWorkOverview} from '../operator-work-overview';
 import type {
   ChecklistStage, DefectView, DocumentVerdict, IncidentView, OperatorMobileState, ProductionPermit, WorkWarning,
@@ -489,6 +490,7 @@ export function IncidentsScreen({incidents}: {incidents: IncidentView[]}) {
 }
 
 export function MoreScreen({state, onResult}: {state: OperatorMobileState; onResult: () => void}) {
+  const router = useRouter();
   return (
     <>
       <Card title="Оператор">
@@ -523,16 +525,16 @@ export function MoreScreen({state, onResult}: {state: OperatorMobileState; onRes
         <Row
           title="История смен"
           note="Ваши отчёты за прошлые дни"
-          onClick={() => { window.location.href = '/operator/v7/history'; }}
+          onClick={() => router.push('/operator/v7/history')}
         />
         <Row
           title="ТБ и допуски"
           note="Инструктажи и документы — настольный раздел"
-          onClick={() => { window.location.href = '/admin/safety'; }}
+          onClick={() => router.push('/admin/safety')}
         />
       </Card>
 
-      <Button tone="ghost" onClick={() => { window.location.href = '/operator'; }}>
+      <Button tone="ghost" onClick={() => router.push('/operator')}>
         Рабочий экран машиниста
       </Button>
     </>

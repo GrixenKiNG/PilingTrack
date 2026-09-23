@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useState} from 'react';
+import {useRouter} from 'next/navigation';
 import type {AssistantState, DocumentVerdict} from '@/modules/operator-mobile/contracts';
 import {SLINGER_BRIEFING} from '@/modules/operator-mobile/contracts';
 import {
@@ -81,6 +82,7 @@ async function sendCommand(command: unknown): Promise<void> {
 }
 
 export function AssistantV7App() {
+  const router = useRouter();
   const [state, setState] = useState<AssistantState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -98,6 +100,7 @@ export function AssistantV7App() {
     } catch (cause) {
       const status = (cause as Error & {status?: number}).status;
       if (status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
         return;
       }
@@ -269,7 +272,7 @@ export function AssistantV7App() {
                   />
                 ))}
             </Card>
-            <Button tone="ghost" onClick={() => { window.location.href = '/assistant'; }}>
+            <Button tone="ghost" onClick={() => router.push('/assistant')}>
               Рабочий экран помощника
             </Button>
           </>

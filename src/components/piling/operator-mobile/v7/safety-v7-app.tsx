@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useState} from 'react';
+import {useRouter} from 'next/navigation';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
 import {DOCUMENT_EXPIRY_LABELS, type DocumentExpiryStatus} from '@/lib/document-expiry';
 import {formatRuDate} from '@/lib/format';
@@ -71,6 +72,7 @@ async function readView(): Promise<SelfSafetyView> {
 }
 
 export function SafetyV7App() {
+  const router = useRouter();
   const [view, setView] = useState<SelfSafetyView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
@@ -84,6 +86,7 @@ export function SafetyV7App() {
       setSyncedAt(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
     } catch (cause) {
       if ((cause as Error & {status?: number}).status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
         return;
       }
@@ -106,7 +109,7 @@ export function SafetyV7App() {
     };
   }, []);
 
-  const back = () => { window.location.href = '/operator/v7'; };
+  const back = () => router.push('/operator/v7');
 
   if (error) {
     return (
@@ -277,7 +280,7 @@ export function SafetyV7App() {
           </Card>
         ) : null}
 
-        <Button tone="ghost" onClick={() => { window.location.href = '/admin/safety'; }}>
+        <Button tone="ghost" onClick={() => router.push('/admin/safety')}>
           Полный раздел «ТБ и допуски»
         </Button>
       </div>

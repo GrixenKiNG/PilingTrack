@@ -84,6 +84,7 @@ export function OperatorV7App() {
       setSyncedAt(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
         return;
       }
@@ -158,6 +159,7 @@ export function OperatorV7App() {
         setCommandId(newCommandId());
         if (options.close !== false) setDetour(null);
       } else if (cause instanceof ApiError && cause.status === 401) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
       } else {
         setActionError(cause instanceof Error ? cause.message : 'Команда не прошла');
