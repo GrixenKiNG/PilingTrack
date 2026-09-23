@@ -1,16 +1,21 @@
 /**
- * Суточный тик техготовности: истечение нарядов-допусков и автозакрытие
- * несданных смен. Раз в сутки и вскоре после запуска, как PM-планировщик.
+ * Тик техготовности: истечение нарядов-допусков и автозакрытие несданных
+ * смен. Раз в час и вскоре после запуска.
+ *
+ * Раз в час, а не в сутки: суточный тик срабатывал в час, заданный моментом
+ * запуска контейнера, и правило «закрывать смену с полудня следующих суток»
+ * исполнялось когда придётся — вплоть до суток опоздания.
  *
  * Идемпотентен по построению (см. runReadinessScheduler), поэтому выбора
- * лидера не требует: двойной прогон ничего не задваивает.
+ * лидера не требует: двойной прогон ничего не задваивает, а суточный пересчёт
+ * готовности дедуплицируется по дате.
  */
 
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';
 
-const INTERVAL = parseInt(process.env.READINESS_SCHEDULER_INTERVAL_MS || String(24 * 60 * 60 * 1000), 10);
+const INTERVAL = parseInt(process.env.READINESS_SCHEDULER_INTERVAL_MS || String(60 * 60 * 1000), 10);
 const STARTUP_DELAY = parseInt(process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS || '90000', 10);
 
 async function runOnce(): Promise<void> {

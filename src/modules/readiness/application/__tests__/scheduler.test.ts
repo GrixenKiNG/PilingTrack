@@ -3,7 +3,11 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 const {
   permitFindMany, permitUpdateMany, shiftFindMany, shiftUpdateMany,
   equipmentFindMany, outboxCreateMany, auditCreate, chainUpdateMany,
+  reportFindMany, reportUpdateMany, outboxCreate,
 } = vi.hoisted(() => ({
+  reportFindMany: vi.fn(),
+  reportUpdateMany: vi.fn(),
+  outboxCreate: vi.fn(),
   permitFindMany: vi.fn(),
   permitUpdateMany: vi.fn(),
   shiftFindMany: vi.fn(),
@@ -26,7 +30,8 @@ vi.mock('@/lib/db', () => {
     workPermit: {findMany: permitFindMany, updateMany: permitUpdateMany},
     shift: {findMany: shiftFindMany, updateMany: shiftUpdateMany},
     equipment: {findMany: equipmentFindMany},
-    outboxEvent: {createMany: outboxCreateMany},
+    outboxEvent: {createMany: outboxCreateMany, create: outboxCreate},
+    report: {findMany: reportFindMany, updateMany: reportUpdateMany},
     auditLog: {create: auditCreate},
     tenantAuditChain: {updateMany: chainUpdateMany},
   };
@@ -59,6 +64,12 @@ describe('суточный сброс техготовности', () => {
     chainUpdateMany.mockReset();
     auditCreate.mockResolvedValue({});
     chainUpdateMany.mockResolvedValue({count: 1});
+    reportFindMany.mockReset();
+    reportUpdateMany.mockReset();
+    outboxCreate.mockReset();
+    reportFindMany.mockResolvedValue([]);
+    reportUpdateMany.mockResolvedValue({count: 0});
+    outboxCreate.mockResolvedValue({});
   });
 
   it('истекают только согласованные наряды с прошедшим сроком', async () => {
@@ -127,6 +138,53 @@ describe('суточный сброс техготовности', () => {
     expect(event.entityId).toBe('yesterday');
     expect(event.userRole).toBe('SYSTEM');
     expect(auditCreate).toHaveBeenCalledTimes(1); // только просроченная, не сегодняшняя
+  });
+
+  // Ночная смена 19:00–07:00 после полуночи уже «вчерашняя» по дате, но ещё
+  // идёт. Раньше её обрывал первый же прогон после полуночи.
+  it('ночная смена после полуночи не закрывается — только с полудня следующих суток', async () => {
+    const lastNight = {id: 'night', productionDate: new Date('2026-08-14T00:00:00.000Z'), timezone: MSK, version: 2, state: 'STARTED'};
+    shiftFindMany.mockResolvedValue([lastNight]);
+
+    // 00:30 и 11:59 по Москве 15-го — смена за 14-е ещё может идти.
+    await runReadinessScheduler('orion', new Date('2026-08-14T21:30:00.000Z'));
+    await runReadinessScheduler('orion', new Date('2026-08-15T08:59:00.000Z'));
+    expect(shiftUpdateMany).not.toHaveBeenCalled();
+
+    // 12:00 по Москве 15-го — закрываем.
+    shiftUpdateMany.mockResolvedValue({count: 1});
+    const result = await runReadinessScheduler('orion', NOW);
+    expect(shiftUpdateMany.mock.calls[0][0].where.id).toEqual({in: ['night']});
+    expect(result.shiftsAutoClosed).toBe(1);
+  });
+
+  // Выработка автозакрытой смены иначе навсегда оставалась черновиком без
+  // события «сдан» — и мимо аналитики.
+  it('черновик отчёта автозакрытой смены сдаётся с событием и пометкой автозакрытия', async () => {
+    shiftFindMany.mockResolvedValue([
+      {id: 'yesterday', productionDate: new Date('2026-08-14T00:00:00.000Z'), timezone: MSK, version: 5, state: 'STARTED'},
+    ]);
+    shiftUpdateMany.mockResolvedValue({count: 1});
+    reportFindMany.mockResolvedValue([{
+      id: 'r-internal', reportId: 'RM-yesterday', siteId: 'site-1', userId: 'op-1',
+      piles: [{count: 2}, {count: 1}], drillings: [{meters: 12.5}], downtimes: [{duration: 1.5}],
+    }]);
+
+    await runReadinessScheduler('orion', NOW);
+
+    expect(reportFindMany.mock.calls[0][0].where).toMatchObject({
+      tenantId: 'orion', shiftId: {in: ['yesterday']}, status: 'draft',
+    });
+    const update = reportUpdateMany.mock.calls[0][0];
+    expect(update.where).toMatchObject({id: {in: ['r-internal']}, status: 'draft'});
+    expect(update.data).toMatchObject({status: 'submitted', submittedAt: NOW});
+
+    const event = outboxCreate.mock.calls[0][0].data;
+    expect(event.type).toBe('ReportSubmitted');
+    expect(event.aggregateId).toBe('RM-yesterday');
+    expect(event.payload).toMatchObject({
+      siteId: 'site-1', totalPiles: 3, totalDrilling: 12.5, totalDowntime: 1.5, autoClosed: true,
+    });
   });
 
   // Закрывать автоматически можно только идущую смену. Смена, ждущая приёмки,

@@ -25,7 +25,7 @@
 import {randomUUID} from 'node:crypto';
 import type {db} from '@/lib/db';
 import {withReadinessTenantTransaction} from '../infrastructure/tenant-transaction';
-import {tenantProductionDate} from '../domain/shifts/tenant-production-date';
+import {normalizeTenantTimezone, tenantProductionDate} from '../domain/shifts/tenant-production-date';
 import {requestReadinessSnapshot} from './projection/request-snapshot';
 import {recordChainedReadinessAudit} from '../infrastructure/audit/record-audit';
 
@@ -62,6 +62,26 @@ export interface ReadinessSchedulerResult {
  * Ждущая приёмки смена — это незакрытое решение, а не забытая работа.
  */
 const UNFINISHED_SHIFT_STATES = ['STARTED'] as const;
+
+/**
+ * Час следующих суток, с которого смена прошлых суток считается брошенной.
+ *
+ * Не полночь: ночная смена 19:00–07:00 после полуночи уже «вчерашняя» по
+ * дате, но ещё идёт, и прогон в 00:30 обрывал её посреди работы. Полдень
+ * оставляет ночной смене пять часов запаса. Забытую дневную смену до полудня
+ * никто не теряет: утром оператор видит её на экране и закрывает сам.
+ */
+const AUTO_CLOSE_HOUR_NEXT_DAY = 12;
+
+function isAutoCloseDue(productionDate: Date, timezone: string | null, now: Date): boolean {
+  const today = tenantProductionDate(now, timezone).getTime();
+  const nextDay = productionDate.getTime() + 24 * 60 * 60 * 1000;
+  if (today !== nextDay) return today > nextDay;
+  const hour = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: normalizeTenantTimezone(timezone), hour: '2-digit', hourCycle: 'h23',
+  }).format(now));
+  return hour >= AUTO_CLOSE_HOUR_NEXT_DAY;
+}
 
 export async function runReadinessScheduler(
   tenantId: string,
@@ -107,15 +127,15 @@ export async function runReadinessScheduler(
       });
     }
 
-    // 2. Незакрытые смены прошедших производственных суток. Сравнение идёт по
-    //    поясу самой смены, а не сервера: в 03:00 по Москве вчерашняя смена
-    //    другого пояса может ещё продолжаться.
+    // 2. Незакрытые смены прошедших производственных суток — с полудня
+    //    следующих (см. AUTO_CLOSE_HOUR_NEXT_DAY). Сравнение идёт по поясу
+    //    самой смены, а не сервера.
     const unfinished = await tx.shift.findMany({
       where: {tenantId, state: {in: [...UNFINISHED_SHIFT_STATES]}},
       select: {id: true, productionDate: true, timezone: true, version: true, state: true},
     });
     const stale = unfinished
-      .filter((shift) => shift.productionDate < tenantProductionDate(now, shift.timezone));
+      .filter((shift) => isAutoCloseDue(shift.productionDate, shift.timezone, now));
     const staleIds = stale.map((shift) => shift.id);
 
     const closed = staleIds.length === 0 ? {count: 0} : await tx.shift.updateMany({
@@ -141,6 +161,52 @@ export async function runReadinessScheduler(
           productionDate: shift.productionDate.toISOString().slice(0, 10)},
         after: {state: 'CLOSED', version: shift.version + 1, autoClosedAt: now.toISOString()},
         metadata: {trigger: 'SCHEDULER', reason: 'PRODUCTION_DAY_ELAPSED', timezone: shift.timezone},
+      });
+    }
+
+    // Выработка автозакрытой смены — такая же выработка. Черновик без события
+    // «сдан» навсегда оставался мимо аналитики (проекции строит воркер по
+    // ReportSubmitted), поэтому сдаём его здесь, в той же транзакции. Пометка
+    // `autoClosed` в событии нужна уведомлению: оператор отчёт не сдавал, и
+    // писать диспетчеру «отчёт отправлен» от его имени было бы неправдой.
+    //
+    // Полезная нагрузка — та же, что у publishReportSubmitted в
+    // operator-mobile/shift-close: импортировать оттуда нельзя, тот модуль
+    // сам зависит от техготовности.
+    const drafts = staleIds.length === 0 ? [] : await tx.report.findMany({
+      where: {tenantId, shiftId: {in: staleIds}, status: 'draft'},
+      select: {
+        id: true, reportId: true, siteId: true, userId: true,
+        piles: {select: {count: true}},
+        drillings: {select: {meters: true}},
+        downtimes: {select: {duration: true}},
+      },
+    });
+    if (drafts.length > 0) {
+      await tx.report.updateMany({
+        where: {tenantId, id: {in: drafts.map((report) => report.id)}, status: 'draft'},
+        data: {status: 'submitted', submittedAt: now},
+      });
+    }
+    for (const report of drafts) {
+      await tx.outboxEvent.create({
+        data: {
+          type: 'ReportSubmitted',
+          aggregateId: report.reportId,
+          aggregateType: 'Report',
+          tenantId,
+          published: false,
+          attempts: 0,
+          payload: {
+            siteId: report.siteId,
+            userId: report.userId,
+            tenantId,
+            totalPiles: report.piles.reduce((sum, pile) => sum + pile.count, 0),
+            totalDrilling: report.drillings.reduce((sum, drill) => sum + drill.meters, 0),
+            totalDowntime: report.downtimes.reduce((sum, downtime) => sum + downtime.duration, 0),
+            autoClosed: true,
+          },
+        },
       });
     }
 

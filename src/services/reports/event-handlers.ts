@@ -339,10 +339,16 @@ async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
     const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
     const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
 
+    // Смену закрыл планировщик, а не оператор: «отчёт отправлен» от его имени
+    // было бы неправдой (см. readiness/application/scheduler).
+    const autoClosed = event.data?.autoClosed === true;
+
     const lines = [
-      isCorrection
-        ? `✏️ <b>Корректировка отчёта</b> (ред. №${reportVersion})`
-        : '📋 <b>Отчёт отправлен</b>',
+      autoClosed
+        ? '⚠️ <b>Смена закрыта автоматически</b> — оператор её не закрыл'
+        : isCorrection
+          ? `✏️ <b>Корректировка отчёта</b> (ред. №${reportVersion})`
+          : '📋 <b>Отчёт отправлен</b>',
       '',
       `📍 Объект: <b>${escapeHtml(d.site?.name || '—')}</b>`,
       `📅 Дата: <b>${escapeHtml(d.date)}</b>`,
