@@ -421,6 +421,37 @@ describe('Report Command Service', () => {
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
     });
+
+    /*
+      Номер отчёта приходит с формы, а дату и объект найденная запись держит
+      свои. Форма, не сбросившая номер при смене даты, отправляла «отчёт за
+      вчера», сервер отвечал 200 и переписывал сегодняшний. Воспроизведено
+      вживую 23.09.2026.
+    */
+    it.each([
+      ['дата', { date: '2026-04-04' }],
+      ['объект', { siteId: 'site-2' }],
+    ])('отказывает, когда %s не совпадает с найденным отчётом', async (_label, change) => {
+      const stored = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+      });
+      stored.addPileWork({ pileGradeId: 'grade-1', count: 1 }, 'user-1');
+      mockRepoFindById.mockResolvedValue(stored);
+
+      await expect(upsertReport({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 3 }],
+        ...change,
+      })).rejects.toThrow(/другую дату или другой объект/);
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
   });
 
   describe('tenant + concurrency wiring', () => {

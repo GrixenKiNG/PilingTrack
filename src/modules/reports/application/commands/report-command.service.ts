@@ -146,6 +146,15 @@ export async function upsertReport(
     ) {
       throw new ServiceError('Отчёт принадлежит другой организации', 403);
     }
+    // Дату и объект запись держит свои: правка их не меняет. Расхождение с
+    // присланными значит, что форма отправила чужой номер — раньше сервер
+    // отвечал 200 и молча переписывал отчёт за другой день.
+    if (existingState.date !== input.date || existingState.siteId !== input.siteId) {
+      throw new ServiceError(
+        'Этот отчёт заведён на другую дату или другой объект. Обновите форму и отправьте заново.',
+        409
+      );
+    }
   }
 
   let aggregate: ReportAggregate;

@@ -214,6 +214,23 @@ export function useReportForm(): UseReportFormReturn {
     } finally { setLoading(false); }
   }, [user, selectedSiteId, date]);
 
+  // Другая дата или объект — другой отчёт. Номер и строки прежнего отчёта
+  // сбрасываем, иначе отправка «за вчера» уходила с номером сегодняшнего и
+  // переписывала его. Стоит до загрузки и восстановления черновика: они
+  // заполнят форму заново, если для нового ключа есть что заполнить.
+  const reportKeyRef = useRef(`${selectedSiteId}|${date}`);
+  useEffect(() => {
+    const key = `${selectedSiteId}|${date}`;
+    if (reportKeyRef.current === key) return;
+    reportKeyRef.current = key;
+     
+    setReportId(crypto.randomUUID());
+    setBaseVersion(undefined);
+    setPiles([]);
+    setDrillings([]);
+    setDowntimes([]);
+  }, [selectedSiteId, date]);
+
   // Init date
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
   useEffect(() => { if (!date) setDate(getTodayInTimezone()); }, [date]);
