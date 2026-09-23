@@ -160,21 +160,44 @@ export async function upsertReport(
   let aggregate: ReportAggregate;
 
   if (existing) {
-    // Edit window check
+    const existingState = existing.getState();
+    const stored = await db.report.findUnique({
+      where: { reportId: existingState.reportId },
+      select: { submittedAt: true },
+    });
+
+    // Отчёт идущей смены пишется с экрана смены. Сдача его здесь закрыла бы
+    // запись выработки до конца смены (сданный отчёт новых записей не берёт).
+    // Связи Report→Shift в схеме нет, только shiftId, — отсюда второй запрос.
+    const shiftState = existingState.shiftId
+      ? (await db.shift.findFirst({
+          where: { id: existingState.shiftId },
+          select: { state: true },
+        }))?.state
+      : null;
+    if (shiftState === 'STARTED' || shiftState === 'HANDOVER_PENDING') {
+      throw new ServiceError(
+        'Смена ещё идёт — выработку записывайте на экране смены, отчёт сдаётся при её закрытии.',
+        409
+      );
+    }
+
+    // Окно отсчитывается от сдачи, а не от последней правки: иначе каждое
+    // сохранение продлевало его ещё на сутки, и отчёт правился бессрочно.
+    // У отчёта из формы сдача совпадает с созданием, поэтому без отметки
+    // сдачи берём время создания.
     if (options.enforceEditWindow) {
-      const existingState = existing.getState();
-      const elapsedHours =
-        (Date.now() - new Date(existingState.updatedAt).getTime()) / (1000 * 60 * 60);
+      const windowStart = stored?.submittedAt ?? new Date(existingState.createdAt);
+      const elapsedHours = (Date.now() - windowStart.getTime()) / (1000 * 60 * 60);
       if (elapsedHours > EDIT_WINDOW_HOURS) {
         throw new ServiceError(
-          `Окно редактирования истекло (${Math.floor(elapsedHours)}ч назад)`,
+          `Окно редактирования истекло: отчёт сдан ${Math.floor(elapsedHours)} ч назад, правка — через администратора`,
           403
         );
       }
     }
 
     // Reconstitute as draft with cleared child entries (they will be re-added)
-    const existingState = existing.getState();
     aggregate = ReportAggregate.reconstitute({
       ...existingState,
       status: 'draft',

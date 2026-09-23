@@ -195,9 +195,10 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-03',
       });
-      // Manually set old updatedAt
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-        (existingAggregate as any).state.updatedAt = oldDate.toISOString();
+      // Сдан двое суток назад, а правили только что. Раньше окно считалось от
+      // последней правки и продлевалось с каждым сохранением — отчёт правился
+      // бессрочно. Теперь оно отсчитывается от сдачи.
+      mockDb.report.findUnique.mockResolvedValueOnce({ submittedAt: oldDate, shift: null });
 
       mockRepoFindById.mockResolvedValue(existingAggregate);
 
