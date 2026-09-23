@@ -121,6 +121,11 @@ jobs:
       DATABASE_PROVIDER: postgres
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/pilingtrack_ci?schema=public'
       DATABASE_URL_POSTGRES: 'postgresql://postgres:postgres@localhost:5432/pilingtrack_ci?schema=public'
+      # Непривилегированная роль приложения. Без неё набор про изоляцию
+      # тенантов пропускается молча — под суперпользователем RLS не работает
+      # вовсе, и проверять было бы нечего. Пароль здесь одноразовый, база
+      # живёт только внутри job.
+      DATABASE_URL_APP_ROLE: 'postgresql://pilingtrack_app:ci_app_role_pw@localhost:5432/pilingtrack_ci?schema=public'
       REDIS_URL: 'redis://localhost:6379'
       SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
       ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
@@ -156,8 +161,32 @@ jobs:
             -tAc "select count(*) from information_schema.tables where table_schema='public'" \
             | awk '{ if ($1 < 30) { print "FAIL: only " $1 " tables, expected >= 30"; exit 1 } else { print "OK: " $1 " tables" } }'
 
+      # Роль приложения без BYPASSRLS — та же, что на проде (ранбук 011).
+      # Заводится ПОСЛЕ миграций: гранты выдаются на уже существующие таблицы.
+      - name: Create unprivileged app role
+        run: |
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -U postgres             -d pilingtrack_ci -f scripts/app-role-grants.sql
+          PGPASSWORD=postgres psql -v ON_ERROR_STOP=1 -h localhost -U postgres             -d pilingtrack_ci -c "ALTER ROLE pilingtrack_app WITH PASSWORD 'ci_app_role_pw';"
+
       - name: Database integration tests
         run: npx vitest run tests/integration
+
+      # Набор про изоляцию тенантов гейтится на DATABASE_URL_APP_ROLE и при
+      # её отсутствии пропускается МОЛЧА — прогон остаётся зелёным, ничего не
+      # проверив. Так и было до 22.09.2026. Здесь пропуск объявляется падением.
+      - name: RLS isolation suite must actually run
+        run: |
+          if npx vitest run tests/integration/rls-tenant-enforcement.spec.ts > rls.log 2>&1; then
+            EXIT=0
+          else
+            EXIT=$?
+          fi
+          cat rls.log
+          if [ "$EXIT" -ne 0 ]; then exit "$EXIT"; fi
+          if grep -qE '[0-9]+ skipped' rls.log; then
+            echo "FAIL: набор про изоляцию тенантов пропущен, а не выполнен"
+            exit 1
+          fi
 
   # Golden-path browser tests so the operator/admin core flows don't
   # silently break between releases. We don't run the full Playwright

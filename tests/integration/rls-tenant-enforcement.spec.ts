@@ -7,27 +7,44 @@ import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant
 /**
  * Действительно ли RLS отделяет тенантов — проверка на живой базе.
  *
- * Почему нельзя проверить обычным подключением: и локально (`postgres`), и на
- * проде (`piling`) приложение ходит ролью-суперпользователем, а суперпользователь
- * обходит RLS ВСЕГДА — `FORCE ROW LEVEL SECURITY` на него не распространяется.
- * Под такой ролью тест «чужой тенант не видит строк» проходил бы, ничего не
- * проверяя. Поэтому здесь заводится отдельное подключение ролью
- * `pilingtrack_app` — не владелец, без BYPASSRLS (scripts/app-role-grants.sql).
+ * Почему нужно отдельное подключение: суперпользователь обходит RLS ВСЕГДА,
+ * `FORCE ROW LEVEL SECURITY` на него не распространяется. Под такой ролью тест
+ * «чужой тенант не видит строк» проходил бы, ничего не проверяя. Поэтому здесь
+ * подключаются ролью `pilingtrack_app` — не владелец, без BYPASSRLS
+ * (scripts/app-role-grants.sql).
+ *
+ * Где какая роль сейчас: прод переведён на `pilingtrack_app` 13.08.2026
+ * (ранбук 011, проверено 22.09.2026: rolsuper=f, rolbypassrls=f), локальная
+ * разработка — тоже, с 22.09.2026. Роль-владелец (`piling` на проде,
+ * `postgres` локально) осталась только за миграциями и сидами.
  *
  * Тест проверяет всю цепочку целиком: контекст запроса (шаг 1) -> расширение,
  * доставляющее тенанта в `app.current_tenant` (шаг 2) -> политики RLS в базе.
  *
- * Если роли или базы нет, набор пропускается: это единственный тест в проекте,
- * которому нужна настоящая база, и он не должен ронять прогон на машине, где
- * она не поднята. Как завести роль — docs/runbooks/011-app-db-role.md.
+ * Если роли или базы нет, набор пропускается — иначе прогон падал бы на машине
+ * без поднятой базы. Пропуск, однако, не должен проходить незамеченным: на CI
+ * шаг «RLS isolation suite must actually run» объявляет его падением, а
+ * vitest.config.ts подставляет адреса из `.env`, чтобы гейт открывался и
+ * локально. До 22.09.2026 не было ни того, ни другого, и набор молчал.
+ * Как завести роль — docs/runbooks/011-app-db-role.md.
  */
 const APP_ROLE_URL = process.env.DATABASE_URL_APP_ROLE;
+// Привилегированное подключение — только чтобы завести и убрать собственную
+// строку. Тест не должен зависеть от того, что в базе уже что-то лежит:
+// локально данные приезжают из прода, в CI база пустая, и «видно свои строки»
+// молча превращалось бы в «строк нет вообще».
+const OWNER_URL = process.env.DATABASE_URL_POSTGRES;
+const OWN_TENANT = 'orion';
+const FIXTURE_SITE_ID = 'rls-spec-site';
 // An explicitly configured database must work; missing configuration is SKIP,
 // never a successful test that ran no assertions.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let db: any;
 
 describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-настоящему', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let owner: any;
+
   beforeAll(async () => {
     const clientPath = path.join(process.cwd(), 'src', 'generated', 'postgres-client', 'client.js');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -35,8 +52,32 @@ describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-на�
     const raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: APP_ROLE_URL! }) });
     db = applyTenantGuc(raw);
     await raw.$queryRaw`SELECT 1`;
+
+    // Набор гейтится на роли приложения, а владелец задаётся отдельно: если
+    // его нет, сеять нечем — падаем вслух, а не тихо проверяем пустую базу.
+    if (!OWNER_URL) {
+      throw new Error('DATABASE_URL_POSTGRES обязателен: без владельца тест не может завести фикстуру');
+    }
+    owner = new PrismaClient({ adapter: new PrismaPg({ connectionString: OWNER_URL }) });
+    await owner.$executeRaw`
+      INSERT INTO "Tenant" ("id", "slug", "name", "updatedAt")
+      VALUES (${OWN_TENANT}, ${OWN_TENANT}, 'RLS spec tenant', now())
+      ON CONFLICT ("id") DO NOTHING
+    `;
+    await owner.$executeRaw`
+      INSERT INTO "Site" ("id", "tenantId", "name", "updatedAt")
+      VALUES (${FIXTURE_SITE_ID}, ${OWN_TENANT}, 'RLS spec site', now())
+      ON CONFLICT ("id") DO NOTHING
+    `;
   });
-  afterAll(async () => { await db?.$disconnect?.(); });
+
+  afterAll(async () => {
+    if (owner) {
+      await owner.$executeRaw`DELETE FROM "Site" WHERE "id" = ${FIXTURE_SITE_ID}`;
+      await owner.$disconnect();
+    }
+    await db?.$disconnect?.();
+  });
   it('подключение непривилегированной ролью действительно без обхода RLS', async () => {
 
     const [role] = await db.$queryRaw<Array<{ rolsuper: boolean; rolbypassrls: boolean }>>`
@@ -50,12 +91,12 @@ describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-на�
   it('под своим тенантом объекты видны', async () => {
 
     const sites = await runWithTenantContext(async () => {
-      setRequestTenantId('orion');
+      setRequestTenantId(OWN_TENANT);
       return db.site.findMany({ select: { id: true, tenantId: true } });
     });
 
     expect(sites.length).toBeGreaterThan(0);
-    expect(sites.every((s: { tenantId: string | null }) => s.tenantId === 'orion')).toBe(true);
+    expect(sites.every((s: { tenantId: string | null }) => s.tenantId === OWN_TENANT)).toBe(true);
   });
 
   /**
@@ -76,7 +117,7 @@ describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-на�
   it('разделение держится и внутри транзакции', async () => {
 
     const own = await runWithTenantContext(async () => {
-      setRequestTenantId('orion');
+      setRequestTenantId(OWN_TENANT);
       return db.$transaction(async (tx: { site: { findMany: () => Promise<unknown[]> } }) =>
         tx.site.findMany()
       );
