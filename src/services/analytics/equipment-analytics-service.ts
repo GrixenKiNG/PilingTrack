@@ -82,6 +82,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
+        AND r.status = 'submitted'
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
@@ -137,6 +138,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
+        AND r.status = 'submitted'
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )

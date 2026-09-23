@@ -110,8 +110,10 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
  */
 export async function recomputeSiteDailySummary(siteId: string, date: string) {
   const { db } = await import('@/lib/db');
+  // Только сданные: черновик идущей смены попадал в итог дня лишь тогда, когда
+  // кто-то другой сдавал отчёт по тому же объекту, — и цифры дня плавали.
   const reports = await db.report.findMany({
-    where: { siteId, date },
+    where: { siteId, date, status: 'submitted' },
     select: {
       piles: { select: { count: true } },
       drillings: { select: { meters: true } },

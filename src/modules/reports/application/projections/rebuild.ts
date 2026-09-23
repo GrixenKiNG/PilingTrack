@@ -38,8 +38,11 @@ export async function rebuildSiteDailySummary(): Promise<RebuildResult> {
 }
 
 async function rebuildSiteDailySummaryForTenant(tenantId: string): Promise<number> {
+  // Только сданные — то же правило, что у событийного пересчёта
+  // (recomputeSiteDailySummary): иначе полная перестройка давала бы другие
+  // цифры, чем пересчёт по событиям.
   const reports = await db.report.findMany({
-    where: { tenantId },
+    where: { tenantId, status: 'submitted' },
     select: {
       siteId: true, date: true,
       piles: { select: { count: true } },
