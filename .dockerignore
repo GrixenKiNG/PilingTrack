@@ -46,6 +46,7 @@ scripts
 !scripts/validate-env.ts
 !scripts/copy-standalone-assets.js
 !scripts/patch-postgres-client.js
+!scripts/trace-runtime-deps.cjs
 # Нужен не рантайму, а проверке типов на сборке: src/test/module-boundaries.test.ts
 # импортирует отсюда два предиката. Без него `npm run build` в образе падает с
 # TS2307, хотя локально собирается — локально папка scripts/ на месте.

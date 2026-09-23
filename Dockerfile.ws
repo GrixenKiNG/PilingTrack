@@ -1,6 +1,14 @@
 # ============================================================
 # Dockerfile — WebSocket Real-Time Server (Compiled)
 # ============================================================
+#
+# ПОЧЕМУ БЕЗ СБОРКИ NEXT И ПОЛНОГО node_modules (23.09.2026). Сервер — один
+# esbuild-бандл в ~300 КБ, а образ весил 1.86 ГБ: в него клался весь
+# production node_modules (~1.1 ГБ) и .next/standalone, откуда бандл брал
+# единственное — сгенерированный клиент Prisma (src/lib/db.ts грузит его по
+# пути через eval('require'), поэтому esbuild его не видит). Теперь рантайм
+# собирается трассировкой: бандл + клиент + ровно их зависимости.
+# ============================================================
 
 # Stage 1: Dependencies
 FROM node:22-alpine AS deps
@@ -9,24 +17,20 @@ RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline --no-audit --ignore-scripts
 
-# Stage 2: Build — Bundle TypeScript to JavaScript with esbuild
+# Stage 2: Build — Prisma client, esbuild bundle, runtime trace
 FROM node:22-alpine AS builder
 WORKDIR /app
-ENV NODE_ENV=production
-ENV DATABASE_PROVIDER=postgres
-ENV SESSION_SECRET=build-time-secret-for-validation-32chars-min
-ENV DEVICE_KEY_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars
-ENV PIN_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars-xxx
 ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY package.json package-lock.json tsconfig.json prisma.config.ts ./
+COPY prisma ./prisma
+COPY scripts/patch-postgres-client.js scripts/trace-runtime-deps.cjs ./scripts/
+COPY src ./src
 
-# Generate Prisma client
-RUN npx prisma generate || true
-
-# Build Next.js (needed for shared modules)
-RUN npm run build
+# Тот же генератор, что у app (db:generate = prisma generate + патч клиента):
+# в бою ws годами работал с пропатченным клиентом из сборки Next.
+RUN npm run db:generate
 
 # Bundle WebSocket server with esbuild (fast, single-file output)
 RUN npx esbuild src/core/realtime/server/index.ts \
@@ -44,10 +48,14 @@ RUN npx esbuild src/core/realtime/server/index.ts \
     --format=cjs \
     --minify
 
-# Drop dev dependencies (esbuild/next/typescript/etc. were only needed for the
-# build above). The compiled bundle requires only the --external prod packages
-# at runtime, so the runner can ship the pruned tree instead of the full one.
-RUN npm prune --omit=dev
+# Рантайм — трассировкой от бандла и клиента Prisma (его бандл грузит по пути,
+# а не импортом). Клиент кладём целиком: движок и wasm он открывает по путям.
+RUN node scripts/trace-runtime-deps.cjs /out \
+      dist/ws/index.js src/generated/postgres-client/index.js && \
+    rm -rf /out/src/generated/postgres-client && \
+    mkdir -p /out/src/generated && \
+    cp -r src/generated/postgres-client /out/src/generated/ && \
+    rm -f /out/src/generated/postgres-client/query_engine-windows.dll.node
 
 # Stage 3: Production — Minimal image with compiled JS
 FROM node:22-alpine AS runner
@@ -63,11 +71,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 ENV NODE_ENV=production
 ENV WS_PORT=3001
 
-# Copy only compiled output and dependencies (pruned to production in builder)
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist/ws ./dist/ws
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /out ./
 
 USER nextjs
 EXPOSE 3001

@@ -39,10 +39,13 @@ ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json tsconfig.json prisma.config.ts ./
 COPY prisma ./prisma
+COPY scripts/patch-postgres-client.js ./scripts/
 COPY src ./src
 
 # Клиент генерируется в src/generated — вместе с исходниками он и уедет.
-RUN npx prisma generate --schema prisma/schema.prisma
+# db:generate = prisma generate + патч клиента: прежний образ получал патч
+# через `npm run build`, и в бою воркеры работали именно с таким клиентом.
+RUN npm run db:generate
 
 # tsx — production-зависимость (package.json), поэтому переживает prune.
 # next/@next/sharp остаются в дереве как зависимости сайта, но воркерам не
