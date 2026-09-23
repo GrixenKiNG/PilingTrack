@@ -7,10 +7,18 @@
 # - Independent scaling (scale workers without scaling API)
 # - Resource limits (CPU/memory per worker group)
 # - Health check endpoint (port 3002)
+#
+# ПОЧЕМУ БЕЗ СБОРКИ NEXT (23.09.2026). Воркеры запускаются из исходников через
+# tsx; ни сборка сайта, ни пакеты next/@next/sharp им не нужны — граф импортов
+# unified-worker (143 файла) не содержит ни одного обращения к ним. Прежний
+# образ весил 2.46 ГБ против 0.76 ГБ у app: полная сборка Next (157 МБ),
+# неиспользуемый next с бинарниками (~430 МБ) и слой `npm install tsx`
+# (438 МБ), который доустанавливал dev-зависимости поверх очищенного дерева.
+# На 30-гигабайтном VPS сборка такого образа доводила диск до 100%.
 # ============================================================
 
 # ============================================================
-# Stage 1: Dependencies
+# Stage 1: Dependencies (full — prisma CLI нужен для generate)
 # ============================================================
 FROM node:22-alpine AS deps
 WORKDIR /app
@@ -21,30 +29,26 @@ COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline --no-audit --ignore-scripts
 
 # ============================================================
-# Stage 2: Build
+# Stage 2: Prisma client + production-only node_modules
 # ============================================================
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_PROVIDER=postgres
-ENV SESSION_SECRET=build-time-secret-for-validation-32chars-min
-ENV DEVICE_KEY_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars
-ENV PIN_LOOKUP_SECRET=build-time-stub-for-validation-only-32chars-xxx
 ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY package.json package-lock.json tsconfig.json prisma.config.ts ./
+COPY prisma ./prisma
+COPY src ./src
 
-# Generate Prisma client for PostgreSQL
+# Клиент генерируется в src/generated — вместе с исходниками он и уедет.
 RUN npx prisma generate --schema prisma/schema.prisma
 
-# Build Next.js standalone (needed for path resolution)
-RUN npm run build
-
-# Prune dev dependencies
-RUN npm prune --omit=dev
+# tsx — production-зависимость (package.json), поэтому переживает prune.
+# next/@next/sharp остаются в дереве как зависимости сайта, но воркерам не
+# нужны: удаляем, а не держим ~430 МБ ради ничего.
+RUN npm prune --omit=dev && \
+    rm -rf node_modules/next node_modules/@next node_modules/@img node_modules/sharp
 
 # ============================================================
 # Stage 3: Worker Runner
@@ -59,27 +63,15 @@ RUN apk add --no-cache curl tini openssl
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy standalone output (for shared modules)
 # --chown sets ownership inline; a separate `RUN chown -R /app` would rewrite
-# every file's metadata into a duplicate overlay layer (~3 GB), doubling the
-# image on disk — the cause of the VPS "no space left" build failures.
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-
-# Workers need full node_modules (standalone only traces Next.js code)
+# every file's metadata into a duplicate overlay layer, doubling the image.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Copy worker source (tsx will resolve @/ paths via tsconfig)
 COPY --from=builder --chown=nextjs:nodejs /app/src ./src
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
-
-# tsx is a devDependency, pruned out of node_modules above. Reinstall it
-# locally (not -g — a global install isn't tracked by package-lock.json or
-# `npm audit`) so `npx tsx` below resolves the project's pinned version.
-COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
-RUN npm install --no-save --prefer-offline --no-audit tsx
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/tsconfig.json ./
+# PDF-генератор читает шрифты из public/fonts (lib/pdf-generator/fonts.ts);
+# остальное из public — картинки сайта, воркерам не нужны.
+COPY --chown=nextjs:nodejs public/fonts ./public/fonts
 
 # Own the /app dir itself (its contents are already nextjs-owned via COPY --chown).
 # Without this, the local-fallback PDF path (savePdfBuffer → cwd/storage when S3
