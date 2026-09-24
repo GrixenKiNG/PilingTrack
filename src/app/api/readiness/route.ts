@@ -11,16 +11,31 @@ import { getReadiness } from '@/core/observability/health-checks';
 
 export const runtime = 'nodejs';
 
+/**
+ * Public probe — never expose internal `details` (DB error message, missing
+ * env var names). The authenticated system status keeps the full diagnostics.
+ */
+function sanitizeChecks(checks: Record<string, { name: string; status: string; latencyMs?: number }>) {
+  return Object.fromEntries(
+    Object.values(checks).map(({ name, status, latencyMs }) =>
+      latencyMs === undefined ? [name, { name, status }] : [name, { name, status, latencyMs }]
+    )
+  );
+}
+
 export async function GET(_request: NextRequest) {
   const readiness = await getReadiness();
   const status = readiness.status === 'ready' ? 200 : 503;
-  return NextResponse.json(readiness, {
-    status,
-    headers: {
-      Deprecation: 'true',
-      Sunset: 'Wed, 30 Sep 2026 21:00:00 GMT',
-      Link: '</api/ready>; rel="successor-version"',
-      Warning: '299 PilingTrack "Deprecated health probe; use /api/ready"',
-    },
-  });
+  return NextResponse.json(
+    { status: readiness.status, checks: sanitizeChecks(readiness.checks) },
+    {
+      status,
+      headers: {
+        Deprecation: 'true',
+        Sunset: 'Wed, 30 Sep 2026 21:00:00 GMT',
+        Link: '</api/ready>; rel="successor-version"',
+        Warning: '299 PilingTrack "Deprecated health probe; use /api/ready"',
+      },
+    }
+  );
 }
