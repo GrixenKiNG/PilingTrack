@@ -1,23 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { evaluateOperatorClearance } from '../operator-clearance';
 
-const { findFirstUserMock, findFirstTypeMock, findManyDocMock, createDocMock, findFirstDocMock } = vi.hoisted(() => ({
+const { findFirstUserMock, findFirstTypeMock, findManyDocMock, createDocMock, findFirstDocMock, mediaFindUniqueMock, updateDocMock } = vi.hoisted(() => ({
   findFirstUserMock: vi.fn(),
   findFirstTypeMock: vi.fn(),
   findManyDocMock: vi.fn(),
   createDocMock: vi.fn(),
   findFirstDocMock: vi.fn(),
+  mediaFindUniqueMock: vi.fn(),
+  updateDocMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     user: { findFirst: findFirstUserMock },
     userDocumentType: { findFirst: findFirstTypeMock },
+    media: { findUnique: mediaFindUniqueMock },
     userDocument: {
       findMany: findManyDocMock,
       findFirst: findFirstDocMock,
       create: createDocMock,
-      update: vi.fn(),
+      update: updateDocMock,
       delete: vi.fn(),
     },
   },
@@ -25,7 +28,7 @@ vi.mock('@/lib/db', () => ({
 
 // Права НЕ подменяем: смысл этих проверок — что маршрут документов подключён к
 // настоящей матрице ролей, а не к её представлению в тесте.
-import { listUserDocuments, createUserDocument } from '../user-documents';
+import { listUserDocuments, createUserDocument, updateUserDocument } from '../user-documents';
 import { documentExpiry } from '@/lib/document-expiry';
 
 const OPERATOR = { id: 'usr_op', role: 'OPERATOR' };
@@ -38,6 +41,7 @@ describe('документы работника — доступ', () => {
     findFirstTypeMock.mockReset();
     findManyDocMock.mockReset();
     createDocMock.mockReset();
+    mediaFindUniqueMock.mockReset();
     findFirstUserMock.mockResolvedValue({ id: 'usr_other', name: 'Машинист' });
     findFirstTypeMock.mockResolvedValue({ id: 'type_1', requiresExpiry: true, name: 'Медосмотр' });
     findManyDocMock.mockResolvedValue([]);
@@ -84,6 +88,66 @@ describe('документы работника — доступ', () => {
     await expect(
       createUserDocument('usr_other', { typeId: 'type_1' }, ctx({ id: 'usr_admin', role: 'ADMIN' })),
     ).rejects.toThrow(/нужно указать срок действия/);
+  });
+});
+
+describe('прикрепление файла к документу', () => {
+  const ADMIN = { id: 'usr_admin', role: 'ADMIN' };
+  const validMedia = { id: 'media_ok', tenantId: 'orion', userId: 'usr_other', uploadStatus: 'completed', isDeleted: false };
+
+  beforeEach(() => {
+    createDocMock.mockResolvedValue({ id: 'doc_1', typeId: 'type_1' });
+    updateDocMock.mockResolvedValue({ id: 'doc_1', typeId: 'type_1' });
+  });
+
+  it('чужой файл (загрузил не владелец и не админ) к документу не подшивается', async () => {
+    mediaFindUniqueMock.mockResolvedValue({ ...validMedia, userId: 'usr_intruder' });
+    await expect(
+      createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01', mediaId: 'media_ok' }, ctx(ADMIN)),
+    ).rejects.toThrow(/недоступен для прикрепления/);
+    expect(createDocMock).not.toHaveBeenCalled();
+  });
+
+  it('файл чужого тенанта не подшивается', async () => {
+    mediaFindUniqueMock.mockResolvedValue({ ...validMedia, tenantId: 'tenant_2' });
+    await expect(
+      createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01', mediaId: 'media_ok' }, ctx(ADMIN)),
+    ).rejects.toThrow(/недоступен для прикрепления/);
+  });
+
+  it('файл с незавершённой загрузкой не подшивается', async () => {
+    mediaFindUniqueMock.mockResolvedValue({ ...validMedia, uploadStatus: 'pending' });
+    await expect(
+      createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01', mediaId: 'media_ok' }, ctx(ADMIN)),
+    ).rejects.toThrow(/недоступен для прикрепления/);
+  });
+
+  it('удалённый файл не подшивается', async () => {
+    mediaFindUniqueMock.mockResolvedValue({ ...validMedia, isDeleted: true });
+    await expect(
+      createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01', mediaId: 'media_ok' }, ctx(ADMIN)),
+    ).rejects.toThrow(/недоступен для прикрепления/);
+  });
+
+  it('файл, загруженный самим владельцем документа, подшивается', async () => {
+    mediaFindUniqueMock.mockResolvedValue(validMedia);
+    await createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01', mediaId: 'media_ok' }, ctx(ADMIN));
+    expect(createDocMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('файл, загруженный админом за работника, подшивается (users.manage)', async () => {
+    mediaFindUniqueMock.mockResolvedValue({ ...validMedia, userId: ADMIN.id });
+    await createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01', mediaId: 'media_ok' }, ctx(ADMIN));
+    expect(createDocMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('при правке документа чужой файл не подшивается', async () => {
+    mediaFindUniqueMock.mockResolvedValue({ ...validMedia, userId: 'usr_intruder' });
+    findFirstDocMock.mockResolvedValue({ id: 'doc_1', typeId: 'type_1', issuedAt: null, expiresAt: null });
+    await expect(
+      updateUserDocument('usr_other', 'doc_1', { mediaId: 'media_ok' }, ctx(ADMIN)),
+    ).rejects.toThrow(/недоступен для прикрепления/);
+    expect(updateDocMock).not.toHaveBeenCalled();
   });
 });
 

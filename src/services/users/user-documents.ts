@@ -82,6 +82,37 @@ async function requireTenantDocumentType(typeId: string, tenantId: string) {
 }
 
 /**
+ * Файл можно подшить к документу только если он реально принадлежит этому
+ * документу (или его владелец — действующий админ). Иначе запись `mediaId`
+ * превращала бы чужой загруженный файл в «свой»: работник выучил id чужого
+ * удостоверения, подшил его к своему документу и скачивал через этот маршрут.
+ *
+ * Разрешаем два пути, оба строго:
+ *   — файл загрузил сам владелец документа (`media.userId === ownerUserId`);
+ *   — файл загрузил действующий пользователь `users.manage` (админ ведёт
+ *     документы работников и загружает сканы за них).
+ * Тенант, статус загрузки и флаг удаления сверяем всегда.
+ */
+async function requireAttachableMedia(mediaId: string, ownerUserId: string, ctx: UserDocumentContext) {
+  const media = await db.media.findUnique({
+    where: { id: mediaId },
+    select: { id: true, tenantId: true, userId: true, uploadStatus: true, isDeleted: true },
+  });
+  const isOwnedByDocumentOwner = media?.userId === ownerUserId;
+  const isUploadedByActingManager =
+    media?.userId === ctx.actor.id && can(ctx.actor, 'users.manage');
+  if (
+    !media ||
+    media.tenantId !== ctx.tenantId ||
+    media.uploadStatus !== 'completed' ||
+    media.isDeleted ||
+    (!isOwnedByDocumentOwner && !isUploadedByActingManager)
+  ) {
+    throw new ServiceError('Файл недоступен для прикрепления к документу', 403);
+  }
+}
+
+/**
  * Виды документов для формы. Отключённые не отдаём: ими нельзя заводить новые
  * документы, а старые продолжают жить со своим видом.
  */
@@ -334,6 +365,8 @@ export async function createUserDocument(
   const issuedAt = toDate(input.issuedAt);
   assertDocumentDatesOrdered(issuedAt, expiresAt);
 
+  if (input.mediaId) await requireAttachableMedia(input.mediaId, user.id, ctx);
+
   const created = await db.userDocument.create({
     data: {
       tenantId: ctx.tenantId,
@@ -430,7 +463,11 @@ export async function updateUserDocument(
   if (input.issuedAt !== undefined) data.issuedAt = toDate(input.issuedAt);
   if (input.expiresAt !== undefined) data.expiresAt = toDate(input.expiresAt);
   if (input.notes !== undefined) data.notes = input.notes?.trim() ?? '';
-  if (input.mediaId !== undefined) data.mediaId = input.mediaId || null;
+  if (input.mediaId !== undefined) {
+    const mediaId = input.mediaId || null;
+    if (mediaId) await requireAttachableMedia(mediaId, userId, ctx);
+    data.mediaId = mediaId;
+  }
 
   if (input.expiresAt !== undefined && data.expiresAt == null) {
     const typeId = (data.typeId as string | undefined) ?? existing.typeId;
