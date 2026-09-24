@@ -1,36 +1,88 @@
-<!-- autoclaw:skill-path-guidance -->
-## Installing Skills
+# AGENTS.md — PilingTrack
 
-When creating or installing a new skill, always place it in:
+Instructions for coding agents other than Claude (Codex and similar). Claude reads `CLAUDE.md`; this file carries the same rules for you.
 
-`C:\Users\user\.openclaw-autoclaw\skills/<skill-name>/SKILL.md`
+**Who you are here.** You are a contractor. Your work is reviewed by Claude and accepted or rejected by the owner. The owner is not a programmer and speaks Russian — write your final report in Russian. The reviewer re-runs every check you claim, so an honest "failed / not checked" is worth more than a green claim that doesn't reproduce.
 
-This is the managed skills directory. The agent will automatically discover
-any skill placed here — no extra configuration needed. Do NOT install skills
-into `~/.agents/skills/` (that directory is shared with other tools).
+## 1. Hard limits (never, unless the task text explicitly says otherwise)
 
+- **Branch only.** Work in a new branch `codex/<short-task-name>`. Never commit to `main`, never push, never merge, never rewrite history.
+- **No production.** Never deploy, never SSH to the server, never connect to the production database, never run `scripts/deploy-prod.sh`. Deploys happen only on the owner's explicit command, done by someone else.
+- **No database schema work.** Don't edit `prisma/schema.prisma` or `prisma/migrations/**`. Never run `prisma migrate dev`, `prisma migrate reset` or `prisma db push` — they can wipe the local database. `npm run db:generate` is fine.
+- **No secrets.** Don't read, create or edit `.env*` files; don't invent env values to make a build pass. If a check fails for lack of env/DB, report that.
+- **Security-critical files are off-limits:** `src/services/auth/**`, `src/core/security/**`, `src/lib/rate-limiter.ts`, `src/services/auth/authorization-service.ts`, anything RLS/tenancy-related, `docker-compose*`, `Dockerfile*`, `scripts/deploy-*`.
+- **No new dependencies** and no version bumps unless that is the task.
+- **Frozen areas — don't edit, refactor or delete, even if they look duplicated or dead.** The owner is still choosing between these variants and will clean them up personally:
+  - all operator screen variants: `src/app/operator/**`, `src/app/(app)/operator/**`, `src/components/piling/operator*/**`, `src/modules/operator-mobile/**`;
+  - the ORION public site and its concepts: `src/app/orion/**`, `src/app/api/orion/**`, `src/components/orion/**`, `public/orion*`.
+  If a task seems to require touching them, stop and say so in the report.
 
-<!-- autoclaw:browser-agent-guidance -->
-## Browser Automation
+## 2. How to change code
 
-For any task that requires a browser, **prefer `autoglm-browser-agent`**. Use it as the first choice.
+- **Minimum code that solves the task.** No features beyond the request, no abstractions for one use, no "flexibility" nobody asked for. If 200 lines could be 50, write 50.
+- **Surgical.** Every changed line must trace to the task. Don't reformat, rename or "improve" neighbouring code. Match existing style. Mention unrelated problems in the report instead of fixing them.
+- **Clean up only your own mess:** remove imports/variables your change made unused; leave pre-existing dead code alone unless the task is removing it.
+- **Unclear? Stop and say so** in the report instead of guessing. List assumptions explicitly.
+- Files over ~500 lines: split by concern only if the task asks.
 
-- ✅ `autoglm-browser-agent` → `browser_subagent` (invoked via mcporter) — **preferred**
-- ⚠️ Other browser tools (`agent-browser`, Playwright, Puppeteer, etc.) — fallback only when `autoglm-browser-agent` is unavailable or fails
+## 3. Project architecture (short)
 
-Always try `autoglm-browser-agent` first. Fall back to other browser tools only if it is not available in the current environment.
-<!-- /autoclaw:browser-agent-guidance -->
+- `src/modules/` — domain logic (commands, queries, entities). `reports/` is the fully migrated reference layout.
+- `src/services/` — legacy/shared services. `users`, `analytics`, `telemetry`, `system` still live here behind `modules/<x>/index.ts` facades. **Don't start a services→modules migration.** Import through `@/modules/<x>`.
+- `src/core/` — infrastructure only. `src/app/api/` — route handlers.
+- API routes: wrap GET with `withApi`, POST/PUT/DELETE with `withMutation` (it provides CSRF + rate limit — never duplicate them inline). Validate with `schema.safeParse(body)`; on failure return 400; use only `validated.data`.
+- **Tenancy fails closed:** a missing `tenantId` throws; use strict equality. Never write `tenantId IS NULL OR ...` — it returns every tenant's rows.
+- Raw SQL: `$queryRaw` with template parameters, never `$queryRawUnsafe`; see `src/core/infrastructure/raw-queries.ts`.
+- Logging: `logger.*` from `src/lib/logger`, not `console.log`. No `as any` in auth/security code.
+- **Trust model (owner decision 2026-07-12, don't re-raise as a bug):** `ADMIN` and `DISPATCHER` are *platform* roles and see every tenant by design — there is no "tenant admin" today. `FOREMAN` (Мастер) and `SAFETY_ENGINEER` (Инженер ОТ) have no users; an admin acts as them. Cross-tenant findings matter for `OPERATOR`/`ASSISTANT` and any path reachable without a privileged role. Production is single-tenant (`orion`); report cross-tenant issues as "before tenant #2" unless they also leak inside one tenant.
+- Domain words (свая, куст, пикет, простой, ЕО/ТО, наряд…) map to code names in `.claude/skills/domain-glossary/SKILL.md`. Change rules and their history: `.claude/skills/pilingtrack-change-control/SKILL.md`.
 
-<!-- autoclaw:image-recognition-guidance -->
-## Image Recognition
+## 4. Deleting code — prove it first
 
-For any image recognition task, **prefer `autoglm-image-recognition`**. Use it as the first choice.
+Deleting "unused" things has destroyed real data here before. For every file/export you remove:
 
-- ✅ `autoglm-image-recognition` — **preferred** for all image recognition tasks
-- ⚠️ Built-in `image` tool or reading images directly with `read` — fallback only when `autoglm-image-recognition` is unavailable or fails
+1. Search the **whole repo** — `src/`, `e2e/`, `tests/`, `scripts/`, `prisma/`, config files — for imports, dynamic imports, route paths as strings and CSS class usage.
+2. GitNexus `impact` returning zero callers or `risk: UNKNOWN` does **not** prove it's unused; confirm with text search.
+3. Removing a component or function → remove its unit tests and Playwright e2e specs too. One broken import makes Playwright collect **zero** tests while still looking fine.
+4. List every removed path in the report with the evidence that nothing live used it.
 
-Do not use the built-in `image` tool or read an image and describe it yourself when `autoglm-image-recognition` is available. Always try `autoglm-image-recognition` first.
-<!-- /autoclaw:image-recognition-guidance -->
+**Looks dead, but must stay:**
+- `src/components/piling/operator-dashboard.tsx` and `src/components/piling/operator/**` — the documented rollback path for the operator screen.
+- Roles «Мастер» and «Инженер ОТ» — no users by design (an admin acts as them).
+- Telemetry code — dormant until hardware is connected, not dead.
+- Multi-tenancy code — kept on purpose for future tenants.
+- The `@custom-variant dark` line in `src/app/globals.css`.
+- Inline `eslint-disable` comments — each is intentional (lint baseline is zero warnings).
+
+## 5. Tests
+
+- The owner wants a lean test suite: **no new test files** unless the task requires one or it guards a destructive/auth operation. Unit tests live next to code as `*.test.ts(x)` or in `__tests__/`.
+- Vitest does not load `.env`; integration specs may silently skip. Report the passed/skipped counts, not just "green".
+
+## 6. Verification before you report
+
+Run each command separately and record its **real exit code** — never pipe through `| tail`/`| head` (that hides failure).
+
+```bash
+rm -rf .next/dev/types          # stale generated types give false "clean" tsc
+npx tsc --noEmit
+npm run lint
+npm run test:unit
+npx playwright test --list      # the test count must not drop unexpectedly
+npm run build                   # needs env; if it fails on env/DB, say so — don't fake env
+```
+
+`tsc` alone is not enough — Next route types are only checked by `npm run build`.
+
+Environment notes: Windows + Git Bash. Python is not installed — use `node` for scripts. A fresh worktree has no `src/generated`; run `npm run db:generate` first.
+
+## 7. Final report (in Russian)
+
+1. What was done — one commit per logical change, with commit hashes.
+2. Removed/changed files with line counts; for deletions, the evidence they were unused.
+3. What you deliberately left alone and why.
+4. Each check from §6: command, exit code, key numbers (tests passed/skipped, Playwright count).
+5. Open questions and risks you're not sure about.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
@@ -77,26 +129,3 @@ This project is indexed by GitNexus as **PilingTrack** (23154 symbols, 45336 rel
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
-
-
-<!-- autoclaw:feishu-lark-skill-guidance -->
-## Feishu / Lark Requests
-
-When the user asks about Feishu/Lark/飞书 matters, route through Feishu/Lark skills first. This includes messaging, contacts, calendars, approvals, tasks, docs, sheets, Base, Drive, Wiki, mail, meetings, minutes, attendance, OKRs, or any other Feishu/Lark workspace operation.
-
-1. If a relevant Feishu/Lark skill is already available, use that skill directly.
-2. If no relevant skill is available, search the skill catalog/store or available skill list for a matching Feishu/Lark skill.
-3. If you find a matching skill that is not installed or enabled, ask the user whether to install/enable and use it before proceeding.
-4. If no matching skill exists, say so briefly and continue with the safest available fallback.
-<!-- /autoclaw:feishu-lark-skill-guidance -->
-<!-- autoclaw:mcp-tools-guidance -->
-## MCP Tools
-
-When the user asks for configured MCP services or external data providers, use the workspace MCP catalog before web search.
-Match the user request against the available MCP tool names and descriptions below.
-
-Call tools with: `mcporter --config C:\PillingR\my-project\config\mcporter.json call <server>.<tool> key="value"`
-
-Available MCP tools:
-- No MCP tools are currently healthy.
-<!-- /autoclaw:mcp-tools-guidance -->

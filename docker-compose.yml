@@ -118,6 +118,13 @@ services:
       # fail-closed pattern as above: unset means the token path never
       # matches, and /api/metrics falls back to session auth only.
       - METRICS_SCRAPE_TOKEN=${METRICS_SCRAPE_TOKEN:-}
+      # Доверять X-Forwarded-For от Caddy. Без этого все посетители делят
+      # один счётчик попыток входа (host-<домен>): 21-й вход за 15 минут по
+      # всей компании блокирует вход всем на 30 минут. На бою в .env стояло
+      # true, но в контейнер не попадало — env_file не объявлен (аудит
+      # SEC-10, 24.09.2026). Включать только когда порт 3000 закрыт снаружи,
+      # иначе заголовок подделывается в обход Caddy. Пусто = как раньше.
+      - TRUST_PROXY=${TRUST_PROXY:-}
     depends_on:
       postgres:
         condition: service_healthy
