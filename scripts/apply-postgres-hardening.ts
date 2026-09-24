@@ -57,7 +57,7 @@ async function applyHardening(prisma: any) {
     END $$;`;
 
   const checkConstraints: { name: string; sql: string }[] = [
-    { name: 'chk_user_role_valid', sql: idempotentAdd('User', 'chk_user_role_valid', `"role" IN ('ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT')`) },
+    { name: 'chk_user_role_valid', sql: idempotentAdd('User', 'chk_user_role_valid', `"role" IN ('ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT', 'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER')`) },
     { name: 'chk_report_status_valid', sql: idempotentAdd('Report', 'chk_report_status_valid', `"status" IN ('draft', 'submitted')`) },
     { name: 'chk_report_shift_valid', sql: idempotentAdd('Report', 'chk_report_shift_valid', `"shiftType" IN ('DAY', 'NIGHT')`) },
     // Report.date is TEXT (clean 'YYYY-MM-DD', no time component) by design — cast for comparison.

@@ -87,7 +87,7 @@ model TenantInvoice {
 // ============================================================
 // USERS — 7 roles: ADMIN, DISPATCHER, OPERATOR, ASSISTANT, MECHANIC, FOREMAN,
 // SAFETY_ENGINEER. Список держит CHECK chk_user_role_valid в базе; при
-// добавлении роли правьте и его, и scripts/postgres-production-hardening.sql.
+// добавлении роли правьте и его, и scripts/apply-postgres-hardening.ts.
 // ============================================================
 
 model User {

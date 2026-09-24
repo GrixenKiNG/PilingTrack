@@ -203,7 +203,7 @@ async function main() {
       console.log('  1. Add indexes for queries with sequential scans');
       console.log('  2. Run VACUUM ANALYZE to update statistics');
       console.log('  3. Consider partial indexes for filtered queries');
-      console.log('  4. Check postgres-production-hardening.sql for missing indexes');
+      console.log('  4. Check prisma/migrations and scripts/apply-postgres-hardening.ts for missing indexes');
     } else {
       console.log('\n✅ All queries are performing well!');
     }

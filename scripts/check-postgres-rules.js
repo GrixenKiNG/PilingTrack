@@ -195,10 +195,18 @@ check('24. JSONB storage', 'normal', hasJsonFields.length > 0,
   hasJsonFields.length > 0 ? `Prisma Json → JSONB in PostgreSQL: ${hasJsonFields.map(m => m.name).join(', ')}` : 'No JSON fields');
 
 // Rule 25: RLS
-const hasRLSScript = fs.existsSync(path.join(process.cwd(), 'scripts', 'init-rls.sql'));
-const hasHardeningScript = fs.existsSync(path.join(process.cwd(), 'scripts', 'postgres-production-hardening.sql'));
-check('25. Row-Level Security', 'normal', hasRLSScript || hasHardeningScript,
-  hasHardeningScript ? 'postgres-production-hardening.sql with RLS + CHECK + partial indexes' : hasRLSScript ? 'init-rls.sql exists' : 'No RLS scripts');
+// RLS принадлежит миграциям (включение, политики, FORCE, fail-closed). Старый
+// scripts/postgres-production-hardening.sql удалён 24.09.2026: его политики
+// пропускали строки с пустым tenantId (IDOR-шаблон "tenantId" IS NULL OR).
+const migrationsDir = path.join(process.cwd(), 'prisma', 'migrations');
+const rlsMigrations = fs.existsSync(migrationsDir)
+  ? fs.readdirSync(migrationsDir).filter((dir) => {
+      const file = path.join(migrationsDir, dir, 'migration.sql');
+      return fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('ENABLE ROW LEVEL SECURITY');
+    })
+  : [];
+check('25. Row-Level Security', 'normal', rlsMigrations.length > 0,
+  rlsMigrations.length > 0 ? `RLS in ${rlsMigrations.length} Prisma migrations` : 'No RLS migrations');
 
 // Summary
 console.log('\n' + '='.repeat(60));
