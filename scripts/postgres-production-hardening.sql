@@ -75,10 +75,6 @@ ALTER TABLE "OutboxEvent" ADD CONSTRAINT chk_outbox_published
 ALTER TABLE "IdempotencyKey" ADD CONSTRAINT chk_idempotency_status_valid
   CHECK ("status" IN ('pending', 'processing', 'completed', 'failed'));
 
--- RefreshToken constraint
-ALTER TABLE "RefreshToken" ADD CONSTRAINT chk_refresh_token_not_revoked_or_has_reason
-  CHECK (NOT "revoked" OR "revokedReason" IS NOT NULL OR "revokedAt" IS NOT NULL);
-
 -- TelemetryRecord value constraint
 ALTER TABLE "TelemetryRecord" ADD CONSTRAINT chk_telemetry_value_finite
   CHECK ("value" = "value" AND "value" != 'Infinity' AND "value" != '-Infinity');
@@ -133,34 +129,10 @@ CREATE INDEX idx_reports_draft ON "Report"("userId", "date")
 CREATE INDEX idx_idempotency_failed ON "IdempotencyKey"("expiresAt")
   WHERE "status" = 'failed';
 
--- Expired refresh tokens (for cleanup)
-CREATE INDEX idx_refresh_tokens_expired ON "RefreshToken"("expiresAt")
-  WHERE "expiresAt" < NOW();
-
 -- ============================================================
--- 3. SOFT DELETE COLUMNS (правило #10)
+-- 3. SOFT DELETE COLUMNS — убрано 24.09.2026: колонок "deletedAt" нет ни в
+-- schema.prisma, ни в миграциях; код удаляет через isActive.
 -- ============================================================
-
--- Note: These columns are OPTIONAL — application layer handles filtering.
--- Partial indexes above only index active rows.
-
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE "Equipment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE "Crew" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE "PileGrade" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE "DrillingType" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-ALTER TABLE "DowntimeReason" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL;
-
--- Partial indexes for soft-delete
-CREATE INDEX idx_users_not_deleted ON "User"("email")
-  WHERE "deletedAt" IS NULL;
-
-CREATE INDEX idx_sites_not_deleted ON "Site"("name")
-  WHERE "deletedAt" IS NULL;
-
-CREATE INDEX idx_equipment_not_deleted ON "Equipment"("name")
-  WHERE "deletedAt" IS NULL;
 
 -- ============================================================
 -- 4. ROW-LEVEL SECURITY (правило #25)
@@ -255,10 +227,6 @@ CREATE POLICY tenant_isolation_telemetry ON "TelemetryRecord"
 -- ============================================================
 --
 -- After running this script:
---
--- 1. Update application code to use "deletedAt" instead of "isActive":
---    - Replace `isActive = true` with `deletedAt IS NULL`
---    - Replace `isActive = false` with `deletedAt IS NOT NULL`
 --
 -- 2. Set tenant context before queries:
 --    SET app.current_tenant = 'tenant-id-here';

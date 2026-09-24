@@ -2139,7 +2139,7 @@ model SiteDailySummary {
 model SiteWeeklyTrend {
   id        String  @id @default(cuid())
   siteId    String
-  tenantId  String?
+  tenantId  String
   weekStart String // YYYY-MM-DD (Monday)
   weekEnd   String // YYYY-MM-DD (Sunday)
 
@@ -2762,31 +2762,6 @@ model ConflictAudit {
   @@index([deviceId, createdAt])
   @@index([resolutionStrategy])
   @@index([conflictType])
-}
-
-// ============================================================
-// REFRESH TOKENS — Session management with rotation
-// ============================================================
-
-model RefreshToken {
-  id              String    @id @default(cuid())
-  userId          String
-  token           String    @unique // Hashed token
-  family          String // Token family for rotation detection
-  familyCreatedAt DateTime  @default(now()) @db.Timestamptz(3) // Family birth time; carried forward on rotation to cap total family lifetime (REFRESH_TOKEN_FAMILY_TTL_DAYS)
-  expiresAt       DateTime  @db.Timestamptz(3)
-  revoked         Boolean   @default(false)
-  revokedAt       DateTime? @db.Timestamptz(3)
-  revokedReason   String?
-  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
-  lastUsedAt      DateTime? @db.Timestamptz(3)
-  ipAddress       String?
-  userAgent       String?
-
-  @@index([userId])
-  @@index([token])
-  @@index([family])
-  @@index([revoked, expiresAt])
 }
 
 // ============================================================

@@ -41,12 +41,17 @@ export async function projectWeeklyTrend(siteId: string, refDate?: string | null
   const weekStart = monday.toISOString().split('T')[0];
   const weekEnd = sunday.toISOString().split('T')[0];
 
-  // SiteWeeklyTrend.tenantId is NOT NULL in the DB (schema.prisma marks it
-  // optional, hence the silent omission). Source it from the site.
+  // SiteWeeklyTrend.tenantId is NOT NULL (schema and DB agree since
+  // 20260924120100). Source it from the site and fail closed without one —
+  // before, a null went to the insert and died on the constraint anyway.
   const site = await db.site.findUnique({
     where: { id: siteId },
     select: { tenantId: true },
   });
+  if (!site?.tenantId) {
+    throw new Error(`projectWeeklyTrend: site ${siteId} has no tenantId`);
+  }
+  const tenantId = site.tenantId;
 
   const dailySummaries = await db.siteDailySummary.findMany({
     where: {
@@ -101,7 +106,7 @@ export async function projectWeeklyTrend(siteId: string, refDate?: string | null
     where: { siteId_weekStart: { siteId, weekStart } },
     create: {
       siteId,
-      tenantId: site?.tenantId ?? null,
+      tenantId,
       weekStart,
       weekEnd,
       dailyMetrics: dailyMetrics as never,

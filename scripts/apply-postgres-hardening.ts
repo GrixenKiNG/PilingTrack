@@ -80,7 +80,6 @@ async function applyHardening(prisma: any) {
     { name: 'chk_feedback_audience_valid', sql: idempotentAdd('FeedbackEvent', 'chk_feedback_audience_valid', `"audience" IN ('ALL', 'OPERATIONS', 'USER')`) },
     { name: 'chk_idempotency_status_valid', sql: idempotentAdd('IdempotencyKey', 'chk_idempotency_status_valid', `"status" IN ('pending', 'processing', 'completed', 'failed')`) },
     { name: 'chk_outbox_published', sql: idempotentAdd('OutboxEvent', 'chk_outbox_published', `"published" IN (true, false)`) },
-    { name: 'chk_refresh_token_valid', sql: idempotentAdd('RefreshToken', 'chk_refresh_token_valid', `NOT "revoked" OR "revokedReason" IS NOT NULL`) },
   ];
 
   let appliedChecks = 0;
@@ -149,10 +148,6 @@ async function applyHardening(prisma: any) {
     // Failed idempotency keys
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_idempotency_failed ON "IdempotencyKey"("expiresAt")
       WHERE "status" = 'failed'`,
-
-    // Expired refresh tokens
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_refresh_tokens_expired ON "RefreshToken"("expiresAt")
-      WHERE "expiresAt" < NOW()`,
   ];
 
   let appliedIdx = 0;
@@ -181,52 +176,11 @@ async function applyHardening(prisma: any) {
 
   console.log(`  ✅ ${appliedIdx} partial indexes applied (${skippedIdx} already exist)\n`);
 
-  // ============================================================
-  // 3. SOFT DELETE COLUMNS (правило #10)
-  // ============================================================
-  console.log('🗑️  Step 3: Soft delete columns...');
-
-  const softDeleteColumns = [
-    'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-    'ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-    'ALTER TABLE "Equipment" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-    'ALTER TABLE "Crew" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-    'ALTER TABLE "PileGrade" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-    'ALTER TABLE "DrillingType" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-    'ALTER TABLE "DowntimeReason" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ DEFAULT NULL',
-  ];
-
-  let appliedSoft = 0;
-  for (const sql of softDeleteColumns) {
-    try {
-      await prisma.$executeRawUnsafe(sql);
-      appliedSoft++;
-    } catch {
-      // Already exists
-    }
-  }
-
-  // Partial indexes for soft-delete
-  const softDeleteIndexes = [
-    `CREATE INDEX IF NOT EXISTS idx_users_not_deleted ON "User"("email")
-      WHERE "deletedAt" IS NULL`,
-    `CREATE INDEX IF NOT EXISTS idx_sites_not_deleted ON "Site"("name")
-      WHERE "deletedAt" IS NULL`,
-    `CREATE INDEX IF NOT EXISTS idx_equipment_not_deleted ON "Equipment"("name")
-      WHERE "deletedAt" IS NULL`,
-  ];
-
-  let appliedSoftIdx = 0;
-  for (const sql of softDeleteIndexes) {
-    try {
-      await prisma.$executeRawUnsafe(sql);
-      appliedSoftIdx++;
-    } catch {
-      // Already exists
-    }
-  }
-
-  console.log(`  ✅ ${appliedSoft} soft delete columns, ${appliedSoftIdx} partial indexes added\n`);
+  // 3. SOFT DELETE COLUMNS — убрано 24.09.2026.
+  //
+  // Шаг добавлял "deletedAt" в семь таблиц, которых нет ни в schema.prisma, ни в
+  // миграциях: код удаляет через isActive, колонки оставались пустыми и висели
+  // расхождением в каждом `prisma migrate diff`. На проде их не было никогда.
 
   // ============================================================
   // 4. ROW-LEVEL SECURITY (правило #25) — verification only.
@@ -285,7 +239,6 @@ async function applyHardening(prisma: any) {
   console.log('\nApplied:');
   console.log(`  ✅ ${appliedChecks} CHECK constraints`);
   console.log(`  ✅ ${appliedIdx} partial indexes`);
-  console.log(`  ✅ ${appliedSoft} soft delete columns + ${appliedSoftIdx} partial indexes`);
   console.log(`  ✅ RLS verified: ${rlsState.length} tables, ${rlsProblems} warnings (RLS itself is managed by migrations)`);
   console.log('\nTo set tenant context before queries:');
   console.log("  SET app.current_tenant = 'tenant-id-here';");
