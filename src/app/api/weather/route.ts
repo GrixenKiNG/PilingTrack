@@ -42,9 +42,14 @@ export const GET = withApi(
     const { error } = await requireAuth(request);
     if (error) return error;
 
-    const latitude = Number(request.nextUrl.searchParams.get('lat'));
-    const longitude = Number(request.nextUrl.searchParams.get('lon'));
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+    const latParam = request.nextUrl.searchParams.get('lat');
+    const lonParam = request.nextUrl.searchParams.get('lon');
+    const latitude = Number(latParam);
+    const longitude = Number(lonParam);
+    // Отсутствующие или пустые параметры Number() превращает в 0 — это валидные
+    // координаты, а не точка в Гвинейском заливе. Проверяется сам параметр.
+    if (latParam == null || lonParam == null || latParam === '' || lonParam === ''
+      || !Number.isFinite(latitude) || !Number.isFinite(longitude)
       || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
       return NextResponse.json({ error: 'Некорректные координаты' }, { status: 400 });
     }
