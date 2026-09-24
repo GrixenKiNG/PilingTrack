@@ -14,7 +14,10 @@ type Params = {params: Promise<{id: string}>};
 async function handleGet(request: NextRequest, route: {params: Promise<{id: string}>}) {
   const resolved = await resolveReadinessRequestContext(request); if (resolved.response) return resolved.response;
   const context = resolved.context;
-  try { const {id} = await route.params; const data = await withReadinessRequestTransaction(context.tenantId,
+  try { if (!context.capabilities.has('readiness.read')) {
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
+    }
+    const {id} = await route.params; const data = await withReadinessRequestTransaction(context.tenantId,
       (tx) => queryShift(tx, context.tenantId, id));
     return readinessResponse({body: {data}, status: 200, headers: {ETag: `"shift-${id}-v${data.version}"`},
       correlationId: context.correlationId, requestId: context.requestId});

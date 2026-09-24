@@ -17,7 +17,10 @@ const json = async (request: NextRequest) => { try { return await request.json()
 async function handleGet(request: NextRequest) {
   const resolved = await resolveReadinessRequestContext(request); if (resolved.response) return resolved.response;
   const context = resolved.context;
-  try { const p = request.nextUrl.searchParams; const allowed = new Set(['equipmentId', 'state', 'type', 'limit', 'status', 'from', 'to', 'shiftType']);
+  try { if (!context.capabilities.has('readiness.read')) {
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
+    }
+    const p = request.nextUrl.searchParams; const allowed = new Set(['equipmentId', 'state', 'type', 'limit', 'status', 'from', 'to', 'shiftType']);
     if ([...p.keys()].some((key) => !allowed.has(key))) throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный фильтр смен');
     const limit = p.has('limit') ? Number(p.get('limit')) : 50;
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Некорректный размер страницы');

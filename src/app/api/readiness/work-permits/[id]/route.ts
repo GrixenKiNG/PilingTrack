@@ -16,6 +16,9 @@ async function handleGet(request: NextRequest, {params}: Params) {
   if (resolved.response) return resolved.response;
   const context = resolved.context;
   try {
+    if (!context.capabilities.has('readiness.read')) {
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
+    }
     const {id} = await params;
     const data = await withReadinessRequestTransaction(context.tenantId,
       (tx) => queryWorkPermit(tx, context.tenantId, id));

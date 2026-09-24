@@ -8,7 +8,10 @@ import {withApi} from '@/core/api-wrapper';
 export const runtime = 'nodejs';
 async function handleGet(request: NextRequest, route: {params: Promise<{id: string}>}) { const resolved = await resolveReadinessRequestContext(request);
   if (resolved.response) return resolved.response; const context = resolved.context;
-  try { const {id} = await route.params; const data = await withReadinessRequestTransaction(context.tenantId, (tx) => queryHandover(tx, context.tenantId, id));
+  try { if (!context.capabilities.has('readiness.read')) {
+      throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет доступа к контуру технической готовности');
+    }
+    const {id} = await route.params; const data = await withReadinessRequestTransaction(context.tenantId, (tx) => queryHandover(tx, context.tenantId, id));
     return readinessResponse({body: {data}, status: 200, headers: {ETag: `"handover-${id}-v${data.version}"`}, correlationId: context.correlationId, requestId: context.requestId});
   } catch (error) { if (error instanceof ReadinessCommandError) return readinessErrorResponse(error, context.correlationId, context.requestId); throw error; }}
 
