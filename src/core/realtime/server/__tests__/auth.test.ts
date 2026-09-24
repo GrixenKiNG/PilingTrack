@@ -48,7 +48,7 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { authenticateWS, validateWSOrigin } from '@/core/realtime/server/auth';
+import { authenticateWS, validateWSOrigin, recheckSession } from '@/core/realtime/server/auth';
 
 // ============================================================
 // Helpers
@@ -92,6 +92,7 @@ describe('WebSocket Authentication', () => {
         type: 'session',
         v: 1,
         sv: 0,
+        exp: 9999999999,
       });
 
       mocks.dbUserFindUnique.mockResolvedValue({
@@ -120,6 +121,9 @@ describe('WebSocket Authentication', () => {
         role: 'OPERATOR',
         tenantId: 'tenant-1',
         siteIds: ['site-1', 'site-2'],
+        // SEC-04: the session expiry (`exp` claim, seconds) is exposed in ms.
+        expiresAt: 9999999999000,
+        sessionVersion: 0,
       });
 
       expect(mocks.verifySessionToken).toHaveBeenCalledWith('valid-token-123');
@@ -259,6 +263,80 @@ describe('WebSocket Authentication', () => {
       const result = await authenticateWS(req);
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ============================================================
+  // recheckSession (SEC-04) — periodic re-validation of a live session
+  // ============================================================
+
+  describe('recheckSession', () => {
+    it('returns true while the user is still active and sessionVersion matches', async () => {
+      mocks.dbUserFindUnique.mockResolvedValue({
+        id: 'user-1',
+        isActive: true,
+        tenantId: 'tenant-1',
+        sessionVersion: 1,
+      });
+
+      expect(
+        await recheckSession('user-1', { sessionVersion: 1, tenantId: 'tenant-1' })
+      ).toBe(true);
+    });
+
+    it('returns false when the user was deactivated', async () => {
+      mocks.dbUserFindUnique.mockResolvedValue({
+        id: 'user-1',
+        isActive: false,
+        tenantId: 'tenant-1',
+        sessionVersion: 1,
+      });
+
+      expect(
+        await recheckSession('user-1', { sessionVersion: 1, tenantId: 'tenant-1' })
+      ).toBe(false);
+    });
+
+    it('returns false when sessionVersion was bumped (session revoked)', async () => {
+      mocks.dbUserFindUnique.mockResolvedValue({
+        id: 'user-1',
+        isActive: true,
+        tenantId: 'tenant-1',
+        sessionVersion: 2,
+      });
+
+      expect(
+        await recheckSession('user-1', { sessionVersion: 1, tenantId: 'tenant-1' })
+      ).toBe(false);
+    });
+
+    it('returns false when the user no longer exists', async () => {
+      mocks.dbUserFindUnique.mockResolvedValue(null);
+
+      expect(
+        await recheckSession('ghost', { sessionVersion: 1, tenantId: 'tenant-1' })
+      ).toBe(false);
+    });
+
+    it('returns false when the user moved to another tenant', async () => {
+      mocks.dbUserFindUnique.mockResolvedValue({
+        id: 'user-1',
+        isActive: true,
+        tenantId: 'tenant-2',
+        sessionVersion: 1,
+      });
+
+      expect(
+        await recheckSession('user-1', { sessionVersion: 1, tenantId: 'tenant-1' })
+      ).toBe(false);
+    });
+
+    it('propagates a database error instead of reporting the session valid', async () => {
+      mocks.dbUserFindUnique.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        recheckSession('user-1', { sessionVersion: 1, tenantId: 'tenant-1' })
+      ).rejects.toThrow('db down');
     });
   });
 

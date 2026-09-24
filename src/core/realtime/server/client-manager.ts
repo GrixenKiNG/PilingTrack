@@ -10,6 +10,9 @@ import { ChannelType } from '../types/events';
 import { canReceiveEvent } from './channel-router';
 import { logger } from '@/lib/logger';
 
+/** How often a client's session is re-validated against the database (SEC-04). */
+const SESSION_RECHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
 // ============================================================
 // Client Interface
 // ============================================================
@@ -20,6 +23,12 @@ export interface WSClient {
   userId: string | null;
   tenantId: string | null;
   role: string | null;
+  /** Session expiry (ms epoch) from the verified token; null when unset. */
+  expiresAt: number | null;
+  /** sessionVersion the session was authenticated under (SEC-04 re-check). */
+  sessionVersion: number;
+  /** Last time the session was re-validated against the DB (SEC-04). */
+  lastAuthCheck: number;
   subscriptions: Set<ChannelType>;
   connectedAt: number;
   lastPingAt: number;
@@ -40,6 +49,8 @@ export class ClientManager {
     userId: string | null;
     tenantId: string | null;
     role: string | null;
+    expiresAt?: number | null;
+    sessionVersion?: number;
   }): string {
     const id = crypto.randomUUID();
 
@@ -49,6 +60,9 @@ export class ClientManager {
       userId: context.userId,
       tenantId: context.tenantId,
       role: context.role,
+      expiresAt: context.expiresAt ?? null,
+      sessionVersion: context.sessionVersion ?? 0,
+      lastAuthCheck: Date.now(),
       subscriptions: new Set(),
       connectedAt: Date.now(),
       lastPingAt: Date.now(),
@@ -226,6 +240,64 @@ export class ClientManager {
     }
 
     return removed;
+  }
+
+  /**
+   * Enforce session liveness (SEC-04). Called from the server heartbeat:
+   * - closes (4001, "session expired") clients whose JWT expiry has passed;
+   * - every SESSION_RECHECK_INTERVAL_MS re-validates the session against the
+   *   database via the supplied callback (user still active, sessionVersion
+   *   unchanged), closing (4001, "session revoked") those that are not.
+   *
+   * A database error raised by the callback must NOT drop a healthy socket:
+   * we log it and retry at the next interval (lastAuthCheck already advanced).
+   *
+   * Returns the number of clients closed.
+   */
+  async checkSessionLiveness(
+    recheck: (client: WSClient) => Promise<boolean>
+  ): Promise<number> {
+    const now = Date.now();
+    let closed = 0;
+
+    for (const client of this.clients.values()) {
+      if (client.ws.readyState !== WebSocket.OPEN) continue;
+
+      // JWT TTL passed: even an otherwise-healthy socket must stop.
+      if (client.expiresAt !== null && now >= client.expiresAt) {
+        try {
+          client.ws.close(4001, 'session expired');
+        } catch {
+          // Already closed
+        }
+        closed++;
+        continue;
+      }
+
+      // Periodic re-validation (deactivation / sessionVersion bump / tenant move).
+      if (now - client.lastAuthCheck >= SESSION_RECHECK_INTERVAL_MS) {
+        client.lastAuthCheck = now;
+        try {
+          const valid = await recheck(client);
+          if (!valid) {
+            try {
+              client.ws.close(4001, 'session revoked');
+            } catch {
+              // Already closed
+            }
+            closed++;
+          }
+        } catch (error) {
+          logger.warn('WS session re-check failed', {
+            clientId: client.id,
+            userId: client.userId,
+            error,
+          });
+        }
+      }
+    }
+
+    return closed;
   }
 
   /**

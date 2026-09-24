@@ -21,7 +21,7 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { ClientManager } from './client-manager';
 import { canReceiveEvent, canSubscribe, getDefaultChannels } from './channel-router';
-import { authenticateWS, validateWSOrigin, sendAuthError } from './auth';
+import { authenticateWS, validateWSOrigin, sendAuthError, recheckSession } from './auth';
 import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
 import { logger } from '@/lib/logger';
 import { setWsConnectionCount, recordWorkerHeartbeat } from '@/core/observability/health-tracker';
@@ -98,6 +98,8 @@ export async function startWSServer(): Promise<ServerHandle> {
       userId: auth.userId,
       tenantId: auth.tenantId,
       role: auth.role,
+      expiresAt: auth.expiresAt,
+      sessionVersion: auth.sessionVersion,
     });
 
     // Initialize reliability buffers
@@ -354,6 +356,28 @@ export async function startWSServer(): Promise<ServerHandle> {
     if (removed > 0) {
       logger.info('Cleaned up dead WS connections', { removed });
     }
+
+    // Close sockets whose session expired or was revoked (deactivated user /
+    // sessionVersion bump). A DB error during a re-check must not drop the
+    // socket — ClientManager logs and retries next interval (SEC-04).
+    clients
+      .checkSessionLiveness((client) =>
+        recheckSession(client.userId as string, {
+          sessionVersion: client.sessionVersion,
+          tenantId: client.tenantId,
+        })
+      )
+      .then((sessionClosed) => {
+        if (sessionClosed > 0) {
+          logger.info('Closed WS clients with expired/revoked sessions', {
+            sessionClosed,
+            removed,
+          });
+        }
+      })
+      .catch((error) => {
+        logger.error('WS session liveness check failed', error);
+      });
 
     // Prune old acked messages from reliability layer
     messageTracker.pruneAckedMessages();

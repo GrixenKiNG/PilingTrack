@@ -517,4 +517,134 @@ describe('ClientManager', () => {
       expect(() => manager.closeAll()).not.toThrow();
     });
   });
+
+  // ============================================================
+  // Session liveness (SEC-04)
+  // ============================================================
+
+  describe('session expiry storage', () => {
+    it('should store expiresAt and sessionVersion on the client', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, {
+        userId: 'u1',
+        tenantId: 't1',
+        role: 'OPERATOR',
+        expiresAt: 1234567890000,
+        sessionVersion: 3,
+      });
+
+      const client = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      expect(client!.expiresAt).toBe(1234567890000);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      expect(client!.sessionVersion).toBe(3);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      expect(client!.lastAuthCheck).toBeDefined();
+    });
+
+    it('should default to null expiry and zero sessionVersion when not given', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
+
+      const client = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      expect(client!.expiresAt).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      expect(client!.sessionVersion).toBe(0);
+    });
+  });
+
+  describe('checkSessionLiveness', () => {
+    it('closes a client whose session expiry has passed with 4001 "session expired"', async () => {
+      const ws = createMockWs();
+      manager.addClient(ws, {
+        userId: 'u1',
+        tenantId: 't1',
+        role: 'OPERATOR',
+        expiresAt: Date.now() - 1000,
+        sessionVersion: 1,
+      });
+
+      await manager.checkSessionLiveness(async () => true);
+
+      expect(ws.close).toHaveBeenCalledWith(4001, 'session expired');
+    });
+
+    it('keeps a client whose session has not expired', async () => {
+      const ws = createMockWs();
+      manager.addClient(ws, {
+        userId: 'u1',
+        tenantId: 't1',
+        role: 'OPERATOR',
+        expiresAt: Date.now() + 60_000,
+        sessionVersion: 1,
+      });
+
+      await manager.checkSessionLiveness(async () => true);
+
+      expect(ws.close).not.toHaveBeenCalled();
+    });
+
+    it('closes a client whose session was revoked with 4001 "session revoked"', async () => {
+      const ws = createMockWs();
+      manager.addClient(ws, {
+        userId: 'u2',
+        tenantId: 't1',
+        role: 'OPERATOR',
+        expiresAt: null,
+        sessionVersion: 1,
+      });
+      // Force the 10-minute re-check interval to fire.
+      const client = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      client!.lastAuthCheck = 0;
+
+      await manager.checkSessionLiveness(async () => false);
+
+      expect(ws.close).toHaveBeenCalledWith(4001, 'session revoked');
+    });
+
+    it('does not re-check a client before the 10-minute window', async () => {
+      let calls = 0;
+      const ws = createMockWs();
+      manager.addClient(ws, {
+        userId: 'u3',
+        tenantId: 't1',
+        role: 'OPERATOR',
+        expiresAt: null,
+        sessionVersion: 1,
+      });
+
+      await manager.checkSessionLiveness(async () => {
+        calls++;
+        return true;
+      });
+
+      expect(calls).toBe(0);
+      expect(ws.close).not.toHaveBeenCalled();
+    });
+
+    it('does not close a client when the re-check throws (DB error) and retries next interval', async () => {
+      const ws = createMockWs();
+      manager.addClient(ws, {
+        userId: 'u4',
+        tenantId: 't1',
+        role: 'OPERATOR',
+        expiresAt: null,
+        sessionVersion: 1,
+      });
+      const client = manager.getClient(ws);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      client!.lastAuthCheck = 0;
+
+      await manager.checkSessionLiveness(async () => {
+        throw new Error('db down');
+      });
+
+      expect(ws.close).not.toHaveBeenCalled();
+      // lastAuthCheck advanced so the next interval retries, not the next tick.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup above
+      expect(client!.lastAuthCheck).toBeGreaterThan(0);
+    });
+  });
 });

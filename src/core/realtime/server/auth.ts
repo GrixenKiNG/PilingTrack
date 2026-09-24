@@ -21,6 +21,10 @@ export interface WSAuthResult {
   role: string;
   tenantId: string | null;
   siteIds: string[];
+  /** Session expiry (the verified token's `exp` claim), in milliseconds epoch. */
+  expiresAt: number | null;
+  /** sessionVersion the token was issued under — used for the periodic re-check. */
+  sessionVersion: number;
 }
 
 /**
@@ -121,11 +125,54 @@ async function authenticateWSScoped(req: IncomingMessage): Promise<WSAuthResult 
       role: user.role,
       tenantId: user.tenantId,
       siteIds: assignments.map(a => a.siteId),
+      expiresAt: payload.exp ? payload.exp * 1000 : null,
+      // At this point payload.sv === user.sessionVersion (checked above).
+      sessionVersion: user.sessionVersion,
     };
   } catch (error) {
     logger.error('WS authentication failed', error);
     return null;
   }
+}
+
+/**
+ * Re-validate an already-authenticated session against the database, without
+ * re-reading the JWT. Reuses the same lookup `authenticateWSScoped` performs
+ * at connect: a deactivation, a password/PIN change (sessionVersion bump) or a
+ * tenant move must kill a live WebSocket too, not just future HTTP requests
+ * (SEC-04).
+ *
+ * Throws on a database error — the caller decides it must NOT drop the socket
+ * and retries at the next interval.
+ */
+export interface WSSessionExpectation {
+  sessionVersion: number;
+  tenantId: string | null;
+}
+
+export async function recheckSession(
+  userId: string,
+  expected: WSSessionExpectation
+): Promise<boolean> {
+  return runWithTenantContext(async () => {
+    if (expected.tenantId !== null) {
+      setRequestTenantId(expected.tenantId);
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        tenantId: true,
+        isActive: true,
+        sessionVersion: true,
+      },
+    });
+
+    if (!user || !user.isActive) return false;
+    if (expected.tenantId !== null && user.tenantId !== expected.tenantId) return false;
+    return expected.sessionVersion === user.sessionVersion;
+  });
 }
 
 /**
