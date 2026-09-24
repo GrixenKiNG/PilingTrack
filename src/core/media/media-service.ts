@@ -101,10 +101,21 @@ export class MediaService {
       );
     }
 
-    // Validate file size if provided
-    if (request.fileSize && request.fileSize > this.config.maxFileSize) {
+    // Validate file size: SEC-02 — a missing, NaN, zero or negative value
+    // is falsy and used to skip the limit check entirely, letting a caller
+    // request a presigned URL with no enforceable ContentLength and then
+    // upload an arbitrary-size object. fileSize must be a finite positive
+    // integer within the limit, otherwise we fail closed with 400.
+    const { fileSize } = request;
+    if (
+      typeof fileSize !== 'number' ||
+      !Number.isFinite(fileSize) ||
+      !Number.isInteger(fileSize) ||
+      fileSize <= 0 ||
+      fileSize > this.config.maxFileSize
+    ) {
       throw new ServiceError(
-        `File size ${request.fileSize} exceeds maximum ${this.config.maxFileSize}`,
+        `File size ${fileSize} is invalid: must be a positive integer not exceeding ${this.config.maxFileSize}`,
         400
       );
     }
@@ -178,6 +189,25 @@ export class MediaService {
       return this.s3Client.send(command);
     });
 
+    // SEC-02: enforce the size limit on the REAL uploaded object, before
+    // reading its body into memory. ContentLength arrives in the GetObject
+    // response headers, so an oversized payload is rejected without an
+    // unbounded download. A missing/unreadable size fails closed too.
+    const realSize = fetched.ContentLength;
+    if (
+      typeof realSize !== 'number' ||
+      !Number.isFinite(realSize) ||
+      realSize > this.config.maxFileSize
+    ) {
+      await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
+      throw new ServiceError(
+        realSize
+          ? `Uploaded object size ${realSize} exceeds maximum ${this.config.maxFileSize}`
+          : 'Uploaded object size is unreadable',
+        413,
+      );
+    }
+
     if (!fetched.Body) {
       await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
       throw new ServiceError('Uploaded object is empty or unreadable', 422);
@@ -232,6 +262,7 @@ export class MediaService {
       where: { id: mediaId },
       data: {
         uploadStatus: 'completed',
+        fileSize: realSize,
         thumbnailKey,
         cdnUrl: this.config.cdnBaseUrl
           ? `${this.config.cdnBaseUrl}/${media.key}`
