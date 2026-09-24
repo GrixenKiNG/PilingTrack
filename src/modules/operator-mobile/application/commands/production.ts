@@ -294,6 +294,17 @@ export async function logProduction(input: {
         }
       }
 
+      // Пикет — только с объекта смены. Форма отчёта проверяет то же самое
+      // (validatePicketsBelongToSite): иначе свая чужого объекта попадает в
+      // журнал забивки и в выработку по пикетам этого.
+      if (entry.passport.picketId) {
+        const picket = await tx.picket.findFirst({
+          where: {id: entry.passport.picketId, cluster: {field: {siteId: crew.siteId}}},
+          select: {id: true},
+        });
+        if (!picket) throw new OperatorCommandError(400, 'Пикет не относится к объекту смены');
+      }
+
       // Молот снимаем с карточки установки: позднейшая замена молота не должна
       // переписывать журнал уже забитых свай.
       const equipment = await tx.equipment.findFirst({

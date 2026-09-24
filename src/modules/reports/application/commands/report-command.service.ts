@@ -89,13 +89,7 @@ export async function upsertReport(
   validateReportInput(input);
   await assertUserAssignedToSite(input.userId, input.siteId);
 
-  // Phase 1.5: Validate against site plans
-  await validateAgainstSitePlans(
-    input.siteId,
-    input.reportId,
-    input.piles || [],
-    (input.drillings || []).map(d => ({ typeId: d.typeId, count: d.count || 1, meters: d.meters }))
-  );
+  // Site plans are checked inside the save transaction (see Phase 5).
 
   // Pickets referenced by piles/drillings must belong to this site.
   await validatePicketsBelongToSite(input.siteId, [
@@ -158,6 +152,10 @@ export async function upsertReport(
   }
 
   let aggregate: ReportAggregate;
+  const previousCountByGrade = new Map<string, number>();
+  for (const pile of existing?.getState().piles ?? []) {
+    previousCountByGrade.set(pile.pileGradeId, (previousCountByGrade.get(pile.pileGradeId) ?? 0) + pile.count);
+  }
 
   if (existing) {
     const existingState = existing.getState();
@@ -298,6 +296,7 @@ export async function upsertReport(
 
   await repo.save(aggregate, {
     onBeforeCommit: async (tx) => {
+      await validateAgainstSitePlans(tx, input.siteId, input.piles || [], previousCountByGrade);
       await writeReportAuditRow(auditRecord, tx);
     },
     expectedVersion: input.expectedVersion ?? existing?.getState().version,

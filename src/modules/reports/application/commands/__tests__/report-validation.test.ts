@@ -16,6 +16,7 @@ import {
   validateDrillingEntries,
   validateDowntimeEntries,
   validateReportInput,
+  validateAgainstSitePlans,
 } from '../report-validation.service';
 
 describe('Report Validation', () => {
@@ -226,6 +227,40 @@ describe('Report Validation', () => {
 
     it('should throw for missing required fields', () => {
       expect(() => validateReportInput({})).toThrow('Missing required fields');
+    });
+  });
+
+  describe('validateAgainstSitePlans', () => {
+    // Итог по марке приходит из базы уже со сваями проверяемого отчёта.
+    function planClient(planCount: number, totalOnSite: number) {
+      return {
+        sitePilePlan: {
+          findMany: vi.fn().mockResolvedValue([
+            { pileGradeId: 'g1', count: planCount, pileGrade: { name: 'С-10' } },
+          ]),
+        },
+        pileGrade: { findUnique: vi.fn() },
+        pileWork: {
+          groupBy: vi.fn().mockResolvedValue([{ pileGradeId: 'g1', _sum: { count: totalOnSite } }]),
+        },
+        $executeRaw: vi.fn().mockResolvedValue(1),
+      } as unknown as Parameters<typeof validateAgainstSitePlans>[0];
+    }
+
+    it('отвергает превышение, разложенное по нескольким строкам одной марки', async () => {
+      // План 100, забито 95, в отчёте две строки по 5 на разных пикетах.
+      await expect(
+        validateAgainstSitePlans(planClient(100, 105), 's1', [
+          { pileGradeId: 'g1', count: 5 },
+          { pileGradeId: 'g1', count: 5 },
+        ]),
+      ).rejects.toThrow('уже забито 95 шт., будет 105 шт.');
+    });
+
+    it('не отвергает правку, которая не добавляет свай марки', async () => {
+      await expect(
+        validateAgainstSitePlans(planClient(100, 105), 's1', [{ pileGradeId: 'g1', count: 10 }], new Map([['g1', 10]])),
+      ).resolves.toBeUndefined();
     });
   });
 });

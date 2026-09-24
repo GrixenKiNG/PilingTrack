@@ -30,7 +30,8 @@ export type WarningCode =
   | 'OPEN_ALERT_DEFECT'
   | 'OPEN_DEFECT'
   | 'MAINTENANCE_OVERDUE'
-  | 'MAINTENANCE_SOON';
+  | 'MAINTENANCE_SOON'
+  | 'PLAN_EXCEEDED';
 
 export type WarningLevel =
   | 'STOP' // работы прекращают — только погода
@@ -65,6 +66,12 @@ export interface WarningInput {
   temperatureC: number | null;
   /** Плановое ТО просрочено / подходит. Из общего расчёта продукта. */
   maintenance: {overdue: boolean; soon: boolean; daysLeft: number | null};
+  /**
+   * Марки, забитые на объекте сверх плана. Только предупреждение (решение
+   * владельца 24.09.2026): план считают в конторе, а свая уже в земле, и
+   * отказ записать её исказил бы учёт, а не остановил забивку.
+   */
+  planOverrun?: {gradeName: string; planned: number; driven: number}[];
 }
 
 /**
@@ -231,6 +238,20 @@ export function collectWarnings(input: WarningInput): WorkWarning[] {
         ? `Через ${input.maintenance.daysLeft} дн.`
         : 'Подходит по наработке.',
       resolution: 'Планируйте окно вместе с диспетчером.',
+    });
+  }
+
+  // --- объект ---
+  const overrun = input.planOverrun ?? [];
+  if (overrun.length > 0) {
+    warnings.push({
+      code: 'PLAN_EXCEEDED',
+      level: 'NOTE',
+      title: 'План по сваям превышен',
+      detail: overrun
+        .map((row) => `${row.gradeName}: забито ${row.driven} из ${row.planned}`)
+        .join('; '),
+      resolution: 'Сообщите диспетчеру: сваи сверх плана надо согласовать.',
     });
   }
 

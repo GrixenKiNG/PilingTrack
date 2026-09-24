@@ -147,16 +147,34 @@ export async function validatePicketsBelongToSite(
   }
 }
 
+type PlanCheckClient = Pick<typeof db, 'sitePilePlan' | 'pileGrade' | 'pileWork' | '$executeRaw'>;
+
+/**
+ * План объекта по маркам свай.
+ *
+ * ВЫЗЫВАЕТСЯ ВНУТРИ ТРАНЗАКЦИИ СОХРАНЕНИЯ, ПОСЛЕ ЗАПИСИ СВАЙ ОТЧЁТА. Итог по
+ * марке берётся из базы вместе со строками этого же отчёта, поэтому не нужно
+ * ни складывать присланное с «уже забитым», ни угадывать, какой отчёт
+ * исключить. Прежняя проверка шла до транзакции и ошибалась трижды: брала
+ * только первую строку марки (сваи по разным пикетам проходили мимо плана),
+ * считала отчёт дважды, когда сервер находил его по дате под другим номером,
+ * и пропускала два одновременных отчёта, каждый из которых укладывался в план
+ * сам по себе. От последнего защищает блокировка на объект до конца транзакции.
+ *
+ * Правка, не добавляющая свай марки (`previousCountByGrade`), не отвергается:
+ * иначе объект, где план уже превышен (машинист получает об этом только
+ * предупреждение), стал бы нередактируемым целиком.
+ */
 export async function validateAgainstSitePlans(
+  client: PlanCheckClient,
   siteId: string,
-  currentReportId: string | undefined,
   piles: Array<{ pileGradeId: string; count: number }>,
-  _drillings: Array<{ typeId: string; count: number; meters: number }>
+  previousCountByGrade: Map<string, number> = new Map(),
 ): Promise<void> {
   if (!piles || piles.length === 0) return;
 
   // Load site pile plans
-  const plans = await db.sitePilePlan.findMany({
+  const plans = await client.sitePilePlan.findMany({
     where: { siteId },
     include: { pileGrade: true },
   });
@@ -170,7 +188,7 @@ export async function validateAgainstSitePlans(
   for (const pile of piles) {
     if (!plannedGradeIds.has(pile.pileGradeId)) {
       // Look up grade name for a useful error message.
-      const grade = await db.pileGrade.findUnique({
+      const grade = await client.pileGrade.findUnique({
         where: { id: pile.pileGradeId },
         select: { name: true },
       });
@@ -182,34 +200,29 @@ export async function validateAgainstSitePlans(
     }
   }
 
-  // Rule 2: total piles for each planned grade (existing + new) must not exceed plan.
-  // Load all existing reports for this site (excluding current report if updating)
-  const existingReports = await db.report.findMany({
-    where: {
-      siteId,
-      ...(currentReportId ? { NOT: { reportId: currentReportId } } : {}),
-    },
-    include: { piles: true },
-  });
-
-  const actualByGrade = new Map<string, number>();
-  for (const report of existingReports) {
-    for (const pile of report.piles) {
-      actualByGrade.set(
-        pile.pileGradeId,
-        (actualByGrade.get(pile.pileGradeId) || 0) + pile.count
-      );
-    }
+  // Rule 2: the grade total on the site, this report included, must not exceed plan.
+  const submittedByGrade = new Map<string, number>();
+  for (const pile of piles) {
+    submittedByGrade.set(pile.pileGradeId, (submittedByGrade.get(pile.pileGradeId) ?? 0) + pile.count);
   }
 
-  for (const plan of plans) {
-    const actual = actualByGrade.get(plan.pileGradeId) || 0;
-    const newPiles = piles.find(p => p.pileGradeId === plan.pileGradeId)?.count || 0;
-    const total = actual + newPiles;
+  await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`site-pile-plan:${siteId}`}))`;
+  const totals = await client.pileWork.groupBy({
+    by: ['pileGradeId'],
+    where: { report: { siteId }, pileGradeId: { in: [...submittedByGrade.keys()] } },
+    _sum: { count: true },
+  });
+  const totalByGrade = new Map(totals.map((row) => [row.pileGradeId, row._sum.count ?? 0]));
 
+  for (const plan of plans) {
+    const submitted = submittedByGrade.get(plan.pileGradeId);
+    if (submitted === undefined) continue;
+    if (submitted <= (previousCountByGrade.get(plan.pileGradeId) ?? 0)) continue;
+
+    const total = totalByGrade.get(plan.pileGradeId) ?? 0;
     if (total > plan.count) {
       throw new ServiceError(
-        `Превышение плана по марке "${plan.pileGrade.name}": план ${plan.count} шт., уже забито ${actual} шт., будет ${total} шт.`,
+        `Превышение плана по марке "${plan.pileGrade.name}": план ${plan.count} шт., уже забито ${total - submitted} шт., будет ${total} шт.`,
         400
       );
     }

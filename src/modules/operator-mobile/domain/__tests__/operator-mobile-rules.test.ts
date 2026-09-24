@@ -110,6 +110,13 @@ describe('предупреждения смены', () => {
     expect(withDefect.some((warning) => warning.code === 'OPEN_ALERT_DEFECT')).toBe(true);
     expect(withoutDefect.some((warning) => warning.code === 'OPEN_ALERT_DEFECT')).toBe(false);
   });
+
+  it('превышение плана по сваям только предупреждает', () => {
+    const warnings = collectWarnings({...base, planOverrun: [{gradeName: 'С-10', planned: 100, driven: 104}]});
+    const overrun = warnings.find((warning) => warning.code === 'PLAN_EXCEEDED');
+    expect(overrun?.level).toBe('NOTE');
+    expect(overrun?.detail).toBe('С-10: забито 104 из 100');
+  });
 });
 
 describe('фазы смены', () => {

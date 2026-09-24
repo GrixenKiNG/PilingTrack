@@ -8,9 +8,9 @@ export {
   validatePileEntries,
   validateDrillingEntries,
   validateDowntimeEntries,
+  validateAgainstSitePlans,
 } from './report-validation.service';
 export {
-  validateAgainstSitePlans,
   calculateReportSummary,
   calculatePeriodSummary,
   getPileMetersPerUnit,

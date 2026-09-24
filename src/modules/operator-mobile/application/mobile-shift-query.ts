@@ -319,14 +319,14 @@ export async function queryOperatorMobileState(input: {
    */
   const sitePlan = await db.sitePilePlan.findMany({
     where: {siteId},
-    select: {pileGradeId: true},
+    select: {pileGradeId: true, count: true},
   });
   const plannedGradeIds = new Set(sitePlan.map((row) => row.pileGradeId));
   const offeredGrades = plannedGradeIds.size > 0
     ? dictionaries.pileGrades.filter((grade) => plannedGradeIds.has(grade.id))
     : dictionaries.pileGrades;
 
-  const [sitePiles, siteDrilling, siteDowntime, lastFuel, lastMeter, shift, openDefects] = await Promise.all([
+  const [{countByGrade: sitePilesByGrade, ...sitePiles}, siteDrilling, siteDowntime, lastFuel, lastMeter, shift, openDefects] = await Promise.all([
     sitePileVolume(tenantId, siteId, dictionaries.pileGrades),
     db.leaderDrilling.aggregate({
       _sum: {count: true, meters: true},
@@ -553,6 +553,13 @@ export async function queryOperatorMobileState(input: {
     windMs: weather?.windMs ?? null,
     temperatureC: weather?.temperatureC ?? null,
     maintenance,
+    planOverrun: sitePlan
+      .map((plan) => ({
+        gradeName: dictionaries.pileGrades.find((grade) => grade.id === plan.pileGradeId)?.name ?? 'Марка',
+        planned: plan.count,
+        driven: sitePilesByGrade.get(plan.pileGradeId) ?? 0,
+      }))
+      .filter((row) => row.driven > row.planned),
   });
 
   const permit = productionPermit({
@@ -696,7 +703,7 @@ async function sitePileVolume(
   tenantId: string,
   siteId: string,
   grades: {id: string; lengthMm: number | null}[],
-): Promise<WorkVolume> {
+): Promise<WorkVolume & {countByGrade: Map<string, number>}> {
   const groups = await db.pileWork.groupBy({
     by: ['pileGradeId'],
     _sum: {count: true},
@@ -706,12 +713,14 @@ async function sitePileVolume(
 
   let count = 0;
   let meters = 0;
+  const countByGrade = new Map<string, number>();
   for (const group of groups) {
     const piles = group._sum.count ?? 0;
     count += piles;
     meters += piles * pileLengthMeters({gradeLengthMm: length.get(group.pileGradeId) ?? null});
+    countByGrade.set(group.pileGradeId, piles);
   }
-  return {count, meters: round1(meters)};
+  return {count, meters: round1(meters), countByGrade};
 }
 
 /**

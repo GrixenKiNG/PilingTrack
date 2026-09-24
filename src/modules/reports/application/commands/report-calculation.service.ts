@@ -1,83 +1,9 @@
 /**
  * Report Calculation Service — Application Layer
  *
- * Business calculations: plan validation, metrics, summaries.
+ * Business calculations: metrics, summaries. Plan validation lives in
+ * report-validation.service.ts (it runs inside the save transaction).
  */
-
-import { db } from '@/lib/db';
-import { ServiceError } from '@/lib/service-error';
-
-export async function validateAgainstSitePlans(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
-  tx: ReturnType<typeof db.$transaction> extends (cb: (tx: infer T) => any) => any ? T : any,
-  siteId: string,
-  piles: Array<{ pileGradeId: string; count: number }>,
-  drillings: Array<{ typeId: string; meters: number }>
-) {
-  if (piles.length > 0) {
-    const pilePlans = await tx.sitePilePlan.findMany({
-      where: { siteId },
-      select: { pileGradeId: true, count: true },
-    });
-
-    if (pilePlans.length > 0) {
-      const existingPiles = await tx.pileWork.groupBy({
-        by: ['pileGradeId'],
-        where: { report: { siteId } },
-        _sum: { count: true },
-      });
-
-      const existingByGrade = new Map<string, number>();
-      for (const ep of existingPiles) {
-        existingByGrade.set(ep.pileGradeId, ep._sum.count || 0);
-      }
-
-      for (const plan of pilePlans) {
-        const existing = existingByGrade.get(plan.pileGradeId) || 0;
-        const newPile = piles.find(p => p.pileGradeId === plan.pileGradeId);
-        const newCount = newPile?.count || 0;
-        const total = existing + newCount;
-
-        if (total > plan.count) {
-          throw new ServiceError(
-            `Превышение плана по марке свай: план ${plan.count}, факт будет ${total} (+${newCount})`,
-            400
-          );
-        }
-      }
-    }
-  }
-
-  if (drillings.length > 0) {
-    const drillingPlans = await tx.siteDrillingPlan.findMany({
-      where: { siteId },
-      select: { diameter: true, count: true, metersPerUnit: true },
-    });
-
-    if (drillingPlans.length > 0) {
-      const existingDrilling = await tx.leaderDrilling.aggregate({
-        where: { report: { siteId } },
-        _sum: { meters: true },
-      });
-
-      const existingMeters = existingDrilling._sum.meters || 0;
-      const newMeters = drillings.reduce((sum, d) => sum + d.meters, 0);
-      const totalMeters = existingMeters + newMeters;
-
-      const plannedMeters = drillingPlans.reduce(
-        (sum: number, plan: { count: number; metersPerUnit: number }) => sum + plan.count * plan.metersPerUnit,
-        0
-      );
-
-      if (plannedMeters > 0 && totalMeters > plannedMeters) {
-        throw new ServiceError(
-          `Превышение плана по бурению: план ${plannedMeters}м, факт будет ${totalMeters.toFixed(1)}м (+${newMeters}м)`,
-          400
-        );
-      }
-    }
-  }
-}
 
 export function calculateReportSummary(report: {
   piles: Array<{ count: number }>;
