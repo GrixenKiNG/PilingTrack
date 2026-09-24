@@ -39,16 +39,39 @@ export async function requireCrew(tx: Tx, tenantId: string, operatorId: string, 
   return crew;
 }
 
-export async function requireOpenShift(tx: Tx, tenantId: string, shiftId: string) {
+/**
+ * Открытая смена ЭТОГО машиниста.
+ *
+ * СМЕНЩИКОВ НЕТ (решение владельца 24.09.2026): смену от приёмки до сдачи
+ * ведёт один человек. Закрепление бригады (requireCrew) это не гарантирует —
+ * установку переназначают, и новый машинист дописывал бы сваи в чужую смену,
+ * а они ложились бы в отчёт прежнего. Смена чужая, если её запустил другой
+ * машинист или по ней уже ведётся отчёт другого человека. Смену, запущенную
+ * диспетчером или администратором, машинист ведёт сам — это не чужая.
+ */
+export async function requireOpenShift(tx: Tx, tenantId: string, shiftId: string, operatorId: string) {
   const shift = await tx.shift.findFirst({
     where: {tenantId, id: shiftId},
-    select: {id: true, state: true, equipmentId: true, productionDate: true, type: true},
+    select: {
+      id: true, state: true, equipmentId: true, productionDate: true, type: true,
+      starter: {select: {id: true, role: true}},
+    },
   });
   if (!shift) throw new OperatorCommandError(404, 'Смена не найдена');
   if (shift.state === 'CLOSED' || shift.state === 'CANCELLED') {
     throw new OperatorCommandError(409, 'Смена уже закрыта');
   }
-  return shift;
+
+  const startedByOtherOperator = shift.starter?.role === 'OPERATOR' && shift.starter.id !== operatorId;
+  const report = startedByOtherOperator
+    ? null
+    : await tx.report.findFirst({where: {tenantId, shiftId}, select: {userId: true}});
+  if (startedByOtherOperator || (report && report.userId !== operatorId)) {
+    throw new OperatorCommandError(403, 'Эту смену ведёт другой машинист');
+  }
+
+  const {starter: _starter, ...rest} = shift;
+  return rest;
 }
 
 /** Производственные сутки в поясе оператора. */

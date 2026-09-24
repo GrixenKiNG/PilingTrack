@@ -109,7 +109,7 @@ export async function logProduction(input: {
     );
     if (duplicate) return {reportId: ''};
 
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
     // Работа кончилась — выработка больше не пишется. Это тоже сервер, а не

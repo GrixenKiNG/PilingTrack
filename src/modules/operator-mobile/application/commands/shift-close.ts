@@ -13,7 +13,7 @@ import type {Tx} from './shared';
 /** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
 export async function finishWork(input: {tenantId: string; operatorId: string; shiftId: string}) {
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     // Единственная команда, где проверки закрепления не было: чужую смену
     // можно было перевести в «сдаётся» одним идентификатором. Остальные
     // команды спрашивали бригаду, эта — нет.
@@ -46,7 +46,7 @@ export async function closeShift(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
     const started = await tx.shift.findFirst({
       where: {tenantId: input.tenantId, id: input.shiftId},
@@ -203,7 +203,7 @@ export async function submitReport(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
     const started = await tx.shift.findFirst({
       where: {tenantId: input.tenantId, id: input.shiftId},

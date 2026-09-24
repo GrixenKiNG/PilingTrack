@@ -16,6 +16,7 @@ import {buildSlingerAttempt} from '../knowledge-bank';
 import {shiftWindow} from '../shift-window';
 import {findDowntimeConflict} from '../downtime-interval';
 import {collectWarnings, weatherStop} from '../work-warnings';
+import {requireOpenShift} from '../../application/commands/shared';
 
 /**
  * Правила, от которых зависит безопасность и учёт. Проверяется только то, чья
@@ -519,5 +520,32 @@ describe('интервал простоя', () => {
     expect(findDowntimeConflict(
       {startedAt: at('00:00', '2026-09-21'), endedAt: at('00:15', '2026-09-21')}, shiftStart, overnight,
     )).toMatchObject({kind: 'OVERLAP'});
+  });
+});
+
+describe('смена одного машиниста (сменщиков нет)', () => {
+  function fakeTx(starter: {id: string; role: string} | null, reportUserId: string | null) {
+    return {
+      shift: {findFirst: async () => ({
+        id: 's1', state: 'STARTED', equipmentId: 'eq1', productionDate: NOW, type: 'DAY', starter,
+      })},
+      report: {findFirst: async () => (reportUserId ? {userId: reportUserId} : null)},
+    } as unknown as Parameters<typeof requireOpenShift>[0];
+  }
+
+  it('не пускает в смену, запущенную другим машинистом', async () => {
+    await expect(requireOpenShift(fakeTx({id: 'op-a', role: 'OPERATOR'}, null), 't', 's1', 'op-b'))
+      .rejects.toMatchObject({status: 403});
+  });
+
+  it('не пускает в смену, по которой ведётся отчёт другого машиниста', async () => {
+    await expect(requireOpenShift(fakeTx({id: 'disp', role: 'DISPATCHER'}, 'op-a'), 't', 's1', 'op-b'))
+      .rejects.toMatchObject({status: 403});
+  });
+
+  it('смену, запущенную диспетчером, машинист ведёт сам', async () => {
+    const shift = await requireOpenShift(fakeTx({id: 'disp', role: 'DISPATCHER'}, null), 't', 's1', 'op-b');
+    expect(shift).not.toHaveProperty('starter');
+    expect(shift.equipmentId).toBe('eq1');
   });
 });

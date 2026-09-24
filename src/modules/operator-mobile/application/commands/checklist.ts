@@ -78,7 +78,7 @@ export async function submitChecklist(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     // Установка смены и установка из запроса обязаны совпадать. Раньше
     // закрепление проверялось за присланным `equipmentId`, а смена бралась по
     // `shiftId` отдельно: машинист, закреплённый за своей машиной, мог

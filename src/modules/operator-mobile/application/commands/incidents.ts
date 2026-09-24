@@ -55,7 +55,7 @@ export async function reportIncident(input: {
   });
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
     const duplicate = await tx.safetyIncident.findUnique({

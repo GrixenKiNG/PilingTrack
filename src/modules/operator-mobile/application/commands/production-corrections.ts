@@ -46,7 +46,7 @@ export async function correctProduction(input: {
   }
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId);
+    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
     const duplicate = await findByCommand(tx, input.tenantId, input.kind, input.clientCommandId);
