@@ -5,6 +5,7 @@ import { deleteEquipmentPermit } from '@/modules/safety';
 import { can } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,13 @@ export const DELETE = withMutation(
         tenantId,
         permitId: id,
         mayManage: can(actor, 'users.manage'),
+      });
+      await recordAuditEvent({
+        action: 'user.equipment_permit.deleted',
+        scope: 'users',
+        actorId: actor.id,
+        targetId: id,
+        tenantId,
       });
       return NextResponse.json({ data: { id } });
     } catch (err) {

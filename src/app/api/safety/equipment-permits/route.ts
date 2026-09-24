@@ -6,6 +6,7 @@ import { listEquipmentPermits, upsertEquipmentPermit } from '@/modules/safety';
 import { can } from '@/services/auth/authorization-service';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -85,6 +86,14 @@ export const POST = withMutation(
         actor: { id: actor.id, name: actor.name },
         mayManage: can(actor, 'users.manage'),
         payload: { ...rest, validUntil: validUntil ? new Date(validUntil) : null },
+      });
+      await recordAuditEvent({
+        action: 'user.equipment_permit.saved',
+        scope: 'users',
+        actorId: actor.id,
+        targetId: userId,
+        tenantId,
+        metadata: { permitId: saved.id, ...rest, validUntil: validUntil ?? null },
       });
       return NextResponse.json({ data: saved }, { status: 201 });
     } catch (err) {

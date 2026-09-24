@@ -377,6 +377,18 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
     message: (m) =>
       m.selfService ? 'Работник удалил собственный документ.' : 'Документ работника удалён администратором.',
   },
+  // Строка матрицы перезаписывается и удаляется целиком (см. modules/safety/
+  // equipment-permits): кто и когда выдал или снял допуск, помнит только лента.
+  'user.equipment_permit.saved': {
+    level: 'audit',
+    title: 'Допуск к технике выдан или изменён',
+    message: (m) => `Допуск работника к технике: ${str(m, 'equipmentKind') ?? '—'}, ${str(m, 'status') ?? '—'}.`,
+  },
+  'user.equipment_permit.deleted': {
+    level: 'warn',
+    title: 'Допуск к технике удалён',
+    message: 'Строка матрицы допусков удалена администратором.',
+  },
 };
 
 /**

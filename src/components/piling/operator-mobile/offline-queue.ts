@@ -24,12 +24,21 @@
  * хранилище бросает, и падать из-за этого нельзя.
  */
 
+import {usePilingStore} from '@/lib/store';
+
 const STORAGE_KEY = 'pilingtrack.operator.queue.v1';
 
 /** `FAILED` — сервер отказал по существу: нужно решение человека, не повтор. */
 export type QueuedCommandState = 'PENDING' | 'FAILED';
 
 export interface QueuedCommand {
+  /**
+   * Кто записал. Планшет на установке общий на сменщиков, а хранилище одно на
+   * устройство: без владельца записи прежнего машиниста уходили бы под сессией
+   * вошедшего следом. Чужие записи ждут, пока войдёт их хозяин. У записей,
+   * положенных до появления поля, владельца нет — их считаем своими.
+   */
+  ownerId?: string | null;
   clientCommandId: string;
   /** Подпись для человека: что именно лежит на устройстве. */
   label: string;
@@ -99,6 +108,14 @@ function read(strict = false): QueuedCommand[] {
   }
 }
 
+function currentOwnerId(): string | null {
+  return usePilingStore.getState().currentUser?.id ?? null;
+}
+
+function isMine(item: QueuedCommand): boolean {
+  return !item.ownerId || item.ownerId === currentOwnerId();
+}
+
 function write(queue: QueuedCommand[]): void {
   try {
     const storage = globalThis.localStorage;
@@ -126,11 +143,11 @@ export function subscribeQueue(listener: () => void): () => void {
 }
 
 export function readQueue(): QueuedCommand[] {
-  return read();
+  return read().filter(isMine);
 }
 
 export function pendingCount(): number {
-  return read().length;
+  return readQueue().length;
 }
 
 // --- Операции ---
@@ -140,6 +157,7 @@ export function enqueue(command: {clientCommandId: string}): void {
   const queue = read(true);
   if (queue.some((item) => item.clientCommandId === command.clientCommandId)) return;
   queue.push({
+    ownerId: currentOwnerId(),
     clientCommandId: command.clientCommandId,
     label: commandLabel(command),
     command,
@@ -187,7 +205,7 @@ export async function flushQueue(
   send: (command: unknown) => Promise<unknown>,
 ): Promise<{sent: number; left: number}> {
   let sent = 0;
-  for (const item of read()) {
+  for (const item of readQueue()) {
     if (item.state === 'FAILED') continue;
     try {
       await send(item.command);
@@ -203,5 +221,5 @@ export async function flushQueue(
       if (!permanent) break; // сеть всё ещё лежит — остальные ждут
     }
   }
-  return {sent, left: read().length};
+  return {sent, left: readQueue().length};
 }

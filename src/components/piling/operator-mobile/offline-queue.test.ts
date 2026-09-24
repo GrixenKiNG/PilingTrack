@@ -2,6 +2,7 @@ import {beforeEach, describe, expect, it} from 'vitest';
 import {
   enqueue, flushQueue, isQueueable, readQueue, retry,
 } from './offline-queue';
+import {usePilingStore} from '@/lib/store';
 
 /*
   Очередь держит введённое машинистом до подтверждения сервером. Ошибка здесь
@@ -91,5 +92,23 @@ describe('очередь команд на устройстве', () => {
     expect(readQueue()[0].state).toBe('PENDING');
     const result = await flushQueue(async () => ({}));
     expect(result).toEqual({sent: 1, left: 0});
+  });
+
+  it('записи прежнего машиниста не уходят под сессией сменщика', async () => {
+    // Планшет на установке общий: без владельца записи первого ушли бы под
+    // сессией второго.
+    usePilingStore.setState({currentUser: {id: 'op-day'} as never});
+    enqueue(piles);
+
+    usePilingStore.setState({currentUser: {id: 'op-night'} as never});
+    const sent: unknown[] = [];
+    expect(readQueue()).toHaveLength(0);
+    expect(await flushQueue(async (command) => { sent.push(command); })).toEqual({sent: 0, left: 0});
+    expect(sent).toHaveLength(0);
+
+    // Вернулся хозяин — записи на месте и уходят.
+    usePilingStore.setState({currentUser: {id: 'op-day'} as never});
+    expect(readQueue()).toHaveLength(1);
+    usePilingStore.setState({currentUser: null});
   });
 });

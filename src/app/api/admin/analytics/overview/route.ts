@@ -142,6 +142,7 @@ function deltaPct(current: number, previous: number): number | null {
 }
 
 const DAY_MS = 86_400_000;
+const MAX_PERIOD_DAYS = 366;
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 
 export const GET = withApi(async (request: NextRequest) => {
@@ -163,6 +164,11 @@ export const GET = withApi(async (request: NextRequest) => {
   const fromDate = new Date(`${from}T00:00:00Z`);
   const toDate = new Date(`${to}T00:00:00Z`);
   const days = Math.round((toDate.getTime() - fromDate.getTime()) / DAY_MS) + 1;
+  // Период грузится целиком дважды (текущий и прошлый) и разворачивается в
+  // посуточный ряд: без потолка запрос «за сто лет» поднимал все отчёты базы.
+  if (!Number.isFinite(days) || days > MAX_PERIOD_DAYS) {
+    return NextResponse.json({ error: `Период не длиннее ${MAX_PERIOD_DAYS} дней` }, { status: 400 });
+  }
   const prevTo = isoDay(new Date(fromDate.getTime() - DAY_MS));
   const prevFrom = isoDay(new Date(fromDate.getTime() - days * DAY_MS));
 

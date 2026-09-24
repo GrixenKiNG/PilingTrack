@@ -158,10 +158,12 @@ export async function querySafetyClearanceOverview(input: {
     }),
   ]);
 
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(startOfToday);
-  endOfToday.setDate(endOfToday.getDate() + 1);
+  // Сутки — московские, а не часов сервера: контейнеры живут в UTC, и с
+  // полуночи до трёх ночи «сегодня» показывало вчерашние инструктажи. У Москвы
+  // нет перехода на летнее время, смещение постоянное.
+  const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  const startOfToday = new Date(`${today}T00:00:00+03:00`);
+  const endOfToday = new Date(startOfToday.getTime() + 24 * 3600 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
   const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 3600 * 1000);
 
