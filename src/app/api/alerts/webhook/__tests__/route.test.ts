@@ -116,15 +116,15 @@ describe('POST /api/alerts/webhook — payload validation', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rejects more than 100 alerts', async () => {
+  it('accepts a batch over 100 alerts but forwards only the first 100', async () => {
     const alerts = Array.from({ length: 101 }, () => ({
       status: 'firing',
       labels: {},
       annotations: {},
     }));
     const res = await POST(reqWithBody({ alerts }));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'Invalid payload' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, forwarded: 100 });
   });
 
   it('accepts a valid firing alert and forwards it', async () => {

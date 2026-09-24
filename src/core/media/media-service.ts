@@ -199,6 +199,9 @@ export class MediaService {
       !Number.isFinite(realSize) ||
       realSize > this.config.maxFileSize
     ) {
+      // Тело не читаем — закрываем поток, иначе соединение с хранилищем
+      // висит до сборки мусора.
+      (fetched.Body as { destroy?: () => void } | undefined)?.destroy?.();
       await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
       throw new ServiceError(
         realSize

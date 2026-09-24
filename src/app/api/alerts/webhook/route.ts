@@ -48,8 +48,13 @@ const alertSchema = z.object({
 }).passthrough();
 
 const webhookSchema = z.object({
-  alerts: z.array(alertSchema).max(100),
+  alerts: z.array(alertSchema),
 }).passthrough();
+
+// Большую пачку не отклоняем: на 400 Alertmanager повторяет ту же пачку
+// бесконечно и тревоги теряются именно в крупную аварию. Пересылаем первые
+// MAX_FORWARDED, чтобы не завалить Telegram.
+const MAX_FORWARDED = 100;
 
 const SEVERITY_MAP: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
   info: 'low',
@@ -92,7 +97,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const alerts = payload.alerts ?? [];
+  const alerts = (payload.alerts ?? []).slice(0, MAX_FORWARDED);
   if (alerts.length === 0) {
     return NextResponse.json({ ok: true, forwarded: 0 });
   }

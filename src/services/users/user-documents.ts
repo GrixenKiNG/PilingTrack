@@ -439,7 +439,7 @@ async function requireOwnDocument(userId: string, documentId: string, tenantId: 
     where: { id: documentId, userId, tenantId },
     // Даты нужны целиком: правка одной из них проверяется против второй,
     // которая осталась в записи.
-    select: { id: true, typeId: true, issuedAt: true, expiresAt: true },
+    select: { id: true, typeId: true, issuedAt: true, expiresAt: true, mediaId: true },
   });
   if (!document) throw new ServiceError('Документ не найден', 404);
   return document;
@@ -465,7 +465,9 @@ export async function updateUserDocument(
   if (input.notes !== undefined) data.notes = input.notes?.trim() ?? '';
   if (input.mediaId !== undefined) {
     const mediaId = input.mediaId || null;
-    if (mediaId) await requireAttachableMedia(mediaId, userId, ctx);
+    // Тот же файл, что уже подшит, не перепроверяем: скан мог загрузить
+    // администратор, и без этого работник не сохранил бы правку своего документа.
+    if (mediaId && mediaId !== existing.mediaId) await requireAttachableMedia(mediaId, userId, ctx);
     data.mediaId = mediaId;
   }
 
