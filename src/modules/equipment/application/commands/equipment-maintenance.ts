@@ -44,6 +44,17 @@ const toDate = (v: string | Date | null | undefined): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
+/**
+ * Запись не нашлась по условию «ещё не принят, статус прежний» — значит, её
+ * изменили между чтением и записью. Это 409 «обновите», а не 500.
+ */
+function rethrowConcurrentChange(error: unknown): never {
+  if ((error as { code?: string } | null)?.code === 'P2025') {
+    throw new ServiceError('Наряд уже изменён или принят — обновите страницу', 409);
+  }
+  throw error;
+}
+
 export async function createMaintenance(
   equipmentId: string,
   input: MaintenanceInput,
@@ -233,7 +244,14 @@ export async function updateMaintenance(
 
   const statusChanged = input.status !== undefined && input.status !== existing.status;
   return db.$transaction(async (tx) => {
-    const record = await tx.maintenanceRecord.update({ where: { id: recordId }, data });
+    // Проверка выше читает запись до транзакции. Условие здесь повторяет её в
+    // самой записи: приёмка, прошедшая между чтением и записью, или второй
+    // такой же переход (двойное нажатие) дали бы правку принятого наряда и
+    // второе показание счётчика.
+    const record = await tx.maintenanceRecord.update({
+      where: { id: recordId, acceptedById: null, ...(statusChanged ? { status: existing.status } : {}) },
+      data,
+    }).catch(rethrowConcurrentChange);
     // Закрытый наряд двигает регламент — иначе моточасы растут, порог стоит,
     // и «ТО просрочено» в готовности не гаснет никогда.
     if (data.status === 'DONE') {
@@ -280,7 +298,8 @@ export async function acceptMaintenance(
 
   return db.$transaction(async (tx) => {
     const record = await tx.maintenanceRecord.update({
-      where: { id: recordId },
+      // Повтор проверок в самой записи — см. updateMaintenance.
+      where: { id: recordId, acceptedById: null, status: existing.status },
       data: {
         acceptedById: ctx.userId,
         acceptedAt: new Date(),
@@ -288,7 +307,7 @@ export async function acceptMaintenance(
         closedById: ctx.userId,
         completedAt: existing.completedAt ?? new Date(),
       },
-    });
+    }).catch(rethrowConcurrentChange);
     // Приёмка — второй проход по тому же наряду. Сдвиг регламента идемпотентен
     // (порог считается из записи, а не приращением), поэтому повтор безопасен и
     // страхует случай, когда наряд принят без явного перехода в DONE.
@@ -312,14 +331,21 @@ export async function deleteMaintenance(
 ) {
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, equipmentId: true, tenantId: true, status: true },
+    select: { id: true, equipmentId: true, tenantId: true, status: true, acceptedById: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Maintenance record not found', 404);
   }
+  // Принятый наряд закрыт приёмкой администратора, и правка его запрещена.
+  // Удаление было открыто тому же исполнителю, от которого приёмка отделяет:
+  // механик убирал принятый наряд целиком, не оставляя следа.
+  if (existing.acceptedById) {
+    throw new ServiceError('Наряд принят, удалить его нельзя', 409);
+  }
   const wasOpen = OPEN_MAINTENANCE_STATUSES.has(existing.status);
   await db.$transaction(async (tx) => {
-    await tx.maintenanceRecord.delete({ where: { id: recordId } });
+    await tx.maintenanceRecord.delete({ where: { id: recordId, acceptedById: null } })
+      .catch(rethrowConcurrentChange);
     // Удаление закрытого наряда на готовность не влияет — она смотрит только
     // на открытые. Удаление открытого снимает нагрузку, снимок нужен.
     if (wasOpen) {

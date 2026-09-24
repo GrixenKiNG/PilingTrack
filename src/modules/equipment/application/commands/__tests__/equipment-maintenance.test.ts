@@ -47,7 +47,7 @@ vi.mock('@/lib/db', () => {
   return { db: client };
 });
 
-import { createMaintenance, updateMaintenance, acceptMaintenance } from '../equipment-maintenance';
+import { createMaintenance, updateMaintenance, acceptMaintenance, deleteMaintenance } from '../equipment-maintenance';
 import { projectNextMaintenance } from '../maintenance-regulation';
 
 // Безопасные значения по умолчанию: у техники без регламентов закрытие наряда
@@ -255,6 +255,30 @@ describe('acceptMaintenance — приёмка', () => {
     await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' }))
       .rejects.toThrow(/выполненные работы/i);
     expect(updateRecMock).not.toHaveBeenCalled();
+  });
+
+  it('приёмка, опоздавшая к чужой, отвечает 409, а не 500', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: null, completedAt: null, workDone: 'x', status: 'DONE' });
+    updateRecMock.mockRejectedValue(Object.assign(new Error('Record not found'), { code: 'P2025' }));
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' }))
+      .rejects.toMatchObject({ status: 409 });
+    // Условие записи повторяет проверку: второй проход не найдёт строку.
+    expect(updateRecMock.mock.calls[0][0].where).toMatchObject({ acceptedById: null, status: 'DONE' });
+  });
+});
+
+describe('deleteMaintenance — удаление', () => {
+  beforeEach(() => {
+    findUniqueRecMock.mockReset();
+    deleteRecMock.mockReset();
+    deleteRecMock.mockResolvedValue({});
+  });
+
+  it('не даёт удалить принятый наряд — приёмку не стереть', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', tenantId: 'orion', status: 'DONE', acceptedById: 'admin_1' });
+    await expect(deleteMaintenance('eq_1', 'rec_1', { tenantId: 'orion' }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(deleteRecMock).not.toHaveBeenCalled();
   });
 });
 
