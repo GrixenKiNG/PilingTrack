@@ -21,7 +21,9 @@ export const GET = withApi(
     assertCan(user!, 'dlq.manage');
 
     const status = request.nextUrl.searchParams.get('status') ?? 'pending';
-    const limit = Math.min(Number(request.nextUrl.searchParams.get('limit') ?? '100'), 500);
+    // Нечисло давало NaN и 500 от Prisma, отрицательное — выборку с конца.
+    const requestedLimit = Number(request.nextUrl.searchParams.get('limit') ?? '100');
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : 100;
 
     const stats = await getDlqStats();
 

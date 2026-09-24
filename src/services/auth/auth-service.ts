@@ -15,6 +15,12 @@ import { withIdentityRole } from '@/core/security/identity-role';
 const BCRYPT_ROUNDS = 12;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 const PIN_HASH_PREFIX = '$2';
+/**
+ * bcrypt-хеш случайной строки, которой никто не знает. Сверка с ним занимает
+ * столько же, сколько сверка с настоящим паролем: без неё ответ «нет такого
+ * адреса» приходил мгновенно, и по секундомеру перебирались все e-mail.
+ */
+const TIMING_EQUALIZER_HASH = '$2b$12$NgCt4i.5lgeRdr5zSX6/aOm6xxgGEOFfKmpvQy9k9QU3fEiPFiKE2';
 
 /**
  * Compute a deterministic lookup key for a PIN.
@@ -204,6 +210,7 @@ export async function authenticateUserByEmailPassword(
   );
 
   if (!user || !user.isActive) {
+    await bcryptCompare(password, TIMING_EQUALIZER_HASH);
     return { user: null, rateLimited: false };
   }
 
@@ -241,99 +248,41 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
 
   const pinLookup = computePinLookup(pin);
 
-  // Fast path: O(1) index lookup by deterministic HMAC of the PIN.
-  // Falls back to a full scan only for legacy users whose pinLookup column
-  // has not been backfilled yet.
-  let matchedUser: {
-    id: string;
-    email: string;
-    password: string;
-    pin: string | null;
-    pinLookup: string | null;
-    name: string;
-    role: string;
-    isActive: boolean;
-    tenantId: string | null;
-    sessionVersion: number;
-  } | null = null;
-
-  const indexedCandidate = await withIdentityRole((client) => client.user.findUnique({
+  // O(1) index lookup by deterministic HMAC of the PIN. There is no fallback
+  // scan any more: it bcrypt-compared every user lacking pinLookup on every
+  // attempt, and prod had none of them (checked 24.09.2026). A database error
+  // propagates instead of reading as "Invalid PIN".
+  const matchedUser = await withIdentityRole((client) => client.user.findUnique({
     where: { pinLookup },
     select: {
       id: true,
       email: true,
-      password: true,
-      pin: true,
-      pinLookup: true,
       name: true,
       role: true,
       isActive: true,
+      pin: true,
       tenantId: true,
       sessionVersion: true,
     },
-  })).catch(() => null);
+  }));
 
-  if (indexedCandidate && indexedCandidate.isActive && indexedCandidate.pin) {
-    const isBcrypt = indexedCandidate.pin.startsWith(PIN_HASH_PREFIX);
-    const matches = isBcrypt
-      ? await bcryptCompare(pin, indexedCandidate.pin)
-      : constantTimeEquals(pin, indexedCandidate.pin);
-    if (matches) matchedUser = indexedCandidate;
-  }
-
-  // Legacy fallback: pinLookup column not yet backfilled for this user.
-  // Scans only users whose pinLookup is null (backfilled users are excluded
-  // from the scan path so repeated PIN logins never re-hit it).
-  if (!matchedUser) {
-    const unindexedUsers = await withIdentityRole((client) => client.user.findMany({
-      where: {
-        isActive: true,
-        pinLookup: null,
-        NOT: { pin: null },
-      },
-      select: {
-        id: true,
-        email: true,
-        password: true,
-        pin: true,
-        pinLookup: true,
-        name: true,
-        role: true,
-        isActive: true,
-        tenantId: true,
-        sessionVersion: true,
-      },
-    }));
-
-    for (const u of unindexedUsers) {
-      if (!u.pin) continue;
-      const isBcrypt = u.pin.startsWith(PIN_HASH_PREFIX);
-      const matches = isBcrypt
-        ? await bcryptCompare(pin, u.pin)
-        : constantTimeEquals(pin, u.pin);
-      if (matches) {
-        matchedUser = u;
-        break;
-      }
-    }
-  }
-
-  if (!matchedUser) {
+  if (!matchedUser || !matchedUser.isActive || !matchedUser.pin) {
     return { user: null, rateLimited: false };
   }
 
-  // Opportunistic upgrade: ensure stored values use bcrypt + have pinLookup
-  // backfilled so the next login takes the O(1) fast path.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
-  const needsBcryptUpgrade = !matchedUser.pin!.startsWith(PIN_HASH_PREFIX);
-  const needsLookupBackfill = !matchedUser.pinLookup;
-  if (needsBcryptUpgrade || needsLookupBackfill) {
-    const updateData: Record<string, unknown> = {};
-    if (needsBcryptUpgrade) updateData.pin = await hashPin(pin);
-    if (needsLookupBackfill) updateData.pinLookup = pinLookup;
+  const storedPin = matchedUser.pin;
+  const isBcrypt = storedPin.startsWith(PIN_HASH_PREFIX);
+  const matches = isBcrypt ? await bcryptCompare(pin, storedPin) : constantTimeEquals(pin, storedPin);
+  if (!matches) {
+    return { user: null, rateLimited: false };
+  }
+
+  // Opportunistic upgrade: a plaintext PIN must not stay in the database.
+  if (!isBcrypt) {
+    const hashedPin = await hashPin(pin);
     await withIdentityRole((client) => client.user.update({
       where: { id: matchedUser.id },
-      data: updateData,
+      data: { pin: hashedPin },
     })).catch(() => {
       // Best-effort upgrade — retry on next login if it fails.
     });

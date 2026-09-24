@@ -9,12 +9,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { getFreshStatusMock } = vi.hoisted(() => ({
+const { getFreshStatusMock, getCurrentStatusMock } = vi.hoisted(() => ({
   getFreshStatusMock: vi.fn(),
+  getCurrentStatusMock: vi.fn(),
 }));
 
 vi.mock('@/core/observability/health-tracker', () => ({
   getFreshStatus: getFreshStatusMock,
+  getCurrentStatus: getCurrentStatusMock,
 }));
 
 import { GET } from '../route';
@@ -51,6 +53,15 @@ function makeStatus(overrides: Record<string, unknown> = {}) {
 describe('GET /api/health/deep', () => {
   beforeEach(() => {
     getFreshStatusMock.mockReset();
+    getCurrentStatusMock.mockReset();
+    getCurrentStatusMock.mockReturnValue(null);
+  });
+
+  it('отдаёт недавний результат фонового трекера, не опрашивая всё заново', async () => {
+    getCurrentStatusMock.mockReturnValue(makeStatus({ timestamp: new Date().toISOString() }));
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(getFreshStatusMock).not.toHaveBeenCalled();
   });
 
   it('returns 200 when overall status is healthy', async () => {

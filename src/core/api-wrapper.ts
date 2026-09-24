@@ -117,8 +117,11 @@ export function withApi<T extends any[]>(
           { status: 503, headers: { 'Retry-After': String(retryAfterSec) } }
         );
       } else if (isPrismaKnownError(error) && PRISMA_STATUS[error.code]) {
+        // Текст ошибки Prisma называет таблицы и поля схемы: клиенту — общая
+        // фраза, подробность — в лог.
+        logger.warn('API handler hit a Prisma constraint', { domain, code: error.code, message: error.message });
         response = NextResponse.json(
-          { error: error.code === 'P2025' ? 'Not found' : error.message },
+          { error: error.code === 'P2025' ? 'Not found' : 'Запись с такими данными уже существует' },
           { status: PRISMA_STATUS[error.code] }
         );
       } else {
@@ -183,10 +186,17 @@ export function withMutation<T extends any[]>(
     // shared `host-…` bucket for EVERY user and EVERY mutation route when
     // TRUST_PROXY is unset (or users sit behind one NAT): 100 requests/min
     // of anyone's normal activity then 429s the whole plant (audit H1).
-    // The session component is a sha256 prefix (getSessionCacheScope), never
-    // the raw token; unauthenticated callers share a per-route IP bucket.
+    // The session component is a sha256 prefix, never the raw token;
+    // unauthenticated callers share a per-route IP bucket.
+    //
+    // Only the token, never x-acting-as: the cache scope hashes that header
+    // in, and any caller can send a fresh value per request — each one was a
+    // new, empty bucket, so the limit did not apply at all.
     const ip = getRateLimitIdentifier(request);
-    const sessionScope = getSessionCacheScope(request) ?? 'anon';
+    const sessionToken = readSessionToken(request);
+    const sessionScope = sessionToken
+      ? createHash('sha256').update(sessionToken).digest('hex').slice(0, 24)
+      : 'anon';
     const identifier = `mut:${request.nextUrl.pathname}:${sessionScope}:${ip}`;
     const rl = await rateLimiter.check(identifier, _opts?.rateLimit ?? MUTATION_RATE_LIMIT);
     if (!rl.allowed) {

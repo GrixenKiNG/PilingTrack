@@ -3,7 +3,6 @@
  *
  * - tenant-enforcement: Multi-tenant isolation
  * - idempotency: Prevent duplicate API requests
- * - refresh-tokens: Secure session management with rotation
  */
 
 // Tenant Enforcement
@@ -35,15 +34,3 @@ export {
   failIdempotencyKey,
   cleanupExpiredKeys,
 } from './idempotency';
-
-// Refresh Tokens
-export {
-  createRefreshToken,
-  rotateRefreshToken,
-  revokeRefreshToken,
-  revokeAllUserTokens,
-  revokeTokenFamily,
-  cleanupExpiredRefreshTokens,
-  getUserActiveSessions,
-} from './refresh-tokens';
-export type { TokenPair } from './refresh-tokens';

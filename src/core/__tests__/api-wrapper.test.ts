@@ -225,7 +225,7 @@ describe('withApi', () => {
   it('should map Prisma P2002 to 409', async () => {
     const handler = withApi(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      const err = new Error('Unique constraint failed') as any;
+      const err = new Error('Unique constraint failed on the fields: (`pinLookup`)') as any;
       err.code = 'P2002';
       throw err;
     });
@@ -233,7 +233,8 @@ describe('withApi', () => {
     const body = await res.json();
 
     expect(res.status).toBe(409);
-    expect(body.error).toBe('Unique constraint failed');
+    // Текст Prisma называет таблицы и поля — наружу он не уходит.
+    expect(body.error).toBe('Запись с такими данными уже существует');
   });
 
   it('should return 500 for unknown Prisma codes', async () => {
@@ -337,6 +338,20 @@ describe('withMutation', () => {
     expect(res.status).toBe(429);
     expect(body.error).toBe('Too many requests');
     expect(res.headers.get('Retry-After')).toBe('30');
+  });
+
+  it('заголовок x-acting-as не открывает новую корзину лимита', async () => {
+    mockReadSessionToken.mockReturnValue('session-token');
+    const handler = withMutation(async () => NextResponse.json({ ok: true }));
+
+    await handler(mockRequest('POST'));
+    await handler(new NextRequest('http://localhost/api/test', {
+      method: 'POST', headers: { 'x-acting-as': 'random-1' },
+    }));
+
+    const [first, second] = vi.mocked(rateLimiter.check).mock.calls.slice(-2).map(([id]) => id);
+    expect(second).toBe(first);
+    mockReadSessionToken.mockReturnValue(null);
   });
 
   it('should still catch ServiceError from handler', async () => {

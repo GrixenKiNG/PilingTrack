@@ -121,6 +121,18 @@ describe('authenticateUserByEmailPassword — кого пускать', () => {
     expect(resetMock).toHaveBeenCalledWith('login:operator@piling.ru:10.0.0.1');
   });
 
+  it('на неизвестном адресе тратит время на bcrypt, как на известном', async () => {
+    // Без этого ответ «нет такого адреса» приходил мгновенно, а «неверный
+    // пароль» — через ~250 мс: по секундомеру перебирались все e-mail.
+    findUniqueMock.mockResolvedValue(null);
+
+    const startedAt = performance.now();
+    const result = await authenticateUserByEmailPassword('nobody@piling.ru', PASSWORD, '10.0.0.1');
+
+    expect(result.user).toBeNull();
+    expect(performance.now() - startedAt).toBeGreaterThan(50);
+  });
+
   it('ищет по адресу в нижнем регистре — вход не зависит от регистра', async () => {
     findUniqueMock.mockResolvedValue(userRow());
 
@@ -216,21 +228,16 @@ describe('authenticateUserByPin — вход оператора', () => {
     expect(result.user).not.toHaveProperty('password');
   });
 
-  it('не пускает отключённого пользователя и не срывается в полный перебор ради него', async () => {
+  it('не пускает отключённого пользователя', async () => {
     findUniqueMock.mockResolvedValue(pinRow({ isActive: false }));
 
     const result = await authenticateUserByPin('1234', '198.51.100.9');
 
     expect(result.user).toBeNull();
-    // Перебор ищет только среди активных, так что отключённый не всплывёт и там.
-    expect(findManyMock).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ isActive: true }) }),
-    );
   });
 
   it('не пускает по неверному ПИНу', async () => {
     findUniqueMock.mockResolvedValue(null);
-    findManyMock.mockResolvedValue([pinRow({ pin: '9999', pinLookup: null })]);
 
     const result = await authenticateUserByPin('1234', '198.51.100.9');
 
@@ -238,26 +245,30 @@ describe('authenticateUserByPin — вход оператора', () => {
     expect(resetMock).not.toHaveBeenCalled();
   });
 
-  it('находит по устаревшему пути и достраивает ключ поиска на будущее', async () => {
-    findUniqueMock.mockResolvedValue(null);
-    findManyMock.mockResolvedValue([pinRow({ pinLookup: null })]);
+  it('открытый ПИН переводит в bcrypt при первом входе', async () => {
+    findUniqueMock.mockResolvedValue(pinRow());
 
     const result = await authenticateUserByPin('1234', '198.51.100.9');
 
     expect(result.user).toMatchObject({ id: 'u1' });
-    const written = updateMock.mock.calls[0][0].data;
-    expect(written.pinLookup).toBeTruthy();
-    // Открытый ПИН заодно переводится в bcrypt, чтобы не остался в базе как есть.
-    expect(String(written.pin).startsWith('$2')).toBe(true);
+    // Открытый ПИН не должен остаться в базе как есть.
+    expect(String(updateMock.mock.calls[0][0].data.pin).startsWith('$2')).toBe(true);
   });
 
-  it('сбой поиска по индексу не роняет вход — остаётся запасной путь', async () => {
-    findUniqueMock.mockRejectedValue(new Error('колонки pinLookup ещё нет'));
-    findManyMock.mockResolvedValue([pinRow({ pinLookup: null })]);
+  it('никогда не перебирает пользователей, даже если индекс не нашёл никого', async () => {
+    // Перебор гонял bcrypt по каждому пользователю без ключа поиска на
+    // каждую попытку входа. На проде таких нет (проверено 24.09.2026).
+    findUniqueMock.mockResolvedValue(null);
 
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
+    await authenticateUserByPin('1234', '198.51.100.9');
 
-    expect(result.user).toMatchObject({ id: 'u1' });
+    expect(findManyMock).not.toHaveBeenCalled();
+  });
+
+  it('сбой базы не выдаёт за неверный ПИН', async () => {
+    findUniqueMock.mockRejectedValue(new Error('connection refused'));
+
+    await expect(authenticateUserByPin('1234', '198.51.100.9')).rejects.toThrow('connection refused');
   });
 });
 

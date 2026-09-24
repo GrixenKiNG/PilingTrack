@@ -19,12 +19,23 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFreshStatus } from '@/core/observability/health-tracker';
+import { getCurrentStatus, getFreshStatus } from '@/core/observability/health-tracker';
 
 export const runtime = 'nodejs';
 
+/**
+ * Маршрут открыт без входа, а свежая проверка — восемь обращений к базе,
+ * Redis, хранилищу и прочему. Отвечая на каждый запрос свежей, он давал
+ * любому способ нагрузить машину. Фоновый трекер и так пересчитывает
+ * состояние каждые 15 с — его результат и отдаём, пока он не старше этого.
+ */
+const MAX_STATUS_AGE_MS = 30_000;
+
 export async function GET(_request: NextRequest) {
-  const status = await getFreshStatus();
+  const cached = getCurrentStatus();
+  const status = cached && Date.now() - Date.parse(cached.timestamp) < MAX_STATUS_AGE_MS
+    ? cached
+    : await getFreshStatus();
 
   const summary = {
     status: status.status,

@@ -185,9 +185,8 @@ const WRAPPERS = ['withApi', 'withMutation', 'withReadinessCommand', 'withOperat
 const PUBLIC_ROUTES: Record<string, string> = {
   'auth/login/route.ts': 'выдаёт сессию — требовать сессию здесь было бы замкнутым кругом',
   'auth/pin/route.ts': 'то же самое для входа по ПИН-коду',
-  'auth/refresh/route.ts': 'учётные данные здесь — сама refresh-кука, её проверяет обработчик',
   'health/route.ts': 'проба живости для балансировщика; отдаёт только статус и версию',
-  'health/deep/route.ts': 'проба зависимостей; поднимается изнутри контура, наружу закрыта Caddy',
+  'health/deep/route.ts': 'проба зависимостей для внешнего мониторинга; только ok/down, из кеша фонового трекера',
   'liveness/route.ts': 'проба живости контейнера',
   'ready/route.ts': 'проба готовности к приёму трафика',
   'readiness/route.ts': 'устаревший синоним /api/ready, отдаёт заголовок Sunset',
