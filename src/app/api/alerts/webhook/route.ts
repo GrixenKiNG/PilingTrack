@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { timingSafeEqual } from 'node:crypto';
 import { telegramNotifier } from '@/core/notifications/telegram';
 import { logger } from '@/lib/logger';
@@ -27,6 +28,28 @@ interface AlertmanagerPayload {
   alerts?: AlertmanagerAlert[];
   groupLabels?: Record<string, string>;
 }
+
+/**
+ * Runtime schema for the Alertmanager webhook payload. The compile-time
+ * interface above is erased at runtime, so without this a malformed body
+ * (`null`, alert missing labels/annotations) throws rather than returning 400.
+ * Unknown keys are passed through — Alertmanager bundles extras we ignore.
+ */
+const alertSchema = z.object({
+  status: z.string(),
+  labels: z.object({
+    severity: z.string().optional(),
+    alertname: z.string().optional(),
+  }).passthrough(),
+  annotations: z.object({
+    summary: z.string().optional(),
+    description: z.string().optional(),
+  }).passthrough(),
+}).passthrough();
+
+const webhookSchema = z.object({
+  alerts: z.array(alertSchema).max(100),
+}).passthrough();
 
 const SEVERITY_MAP: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
   info: 'low',
@@ -60,7 +83,11 @@ export async function POST(request: NextRequest) {
 
   let payload: AlertmanagerPayload;
   try {
-    payload = await request.json();
+    const parsed = webhookSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+    payload = parsed.data as AlertmanagerPayload;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }

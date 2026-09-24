@@ -37,6 +37,14 @@ function reqWithQuery(token: string): NextRequest {
   });
 }
 
+function reqWithBody(body: unknown): NextRequest {
+  return new NextRequest('http://localhost/api/alerts/webhook', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify(body),
+  });
+}
+
 describe('POST /api/alerts/webhook — auth', () => {
   const originalEnv = process.env.ALERTMANAGER_WEBHOOK_TOKEN;
 
@@ -76,5 +84,54 @@ describe('POST /api/alerts/webhook — auth', () => {
     delete process.env.ALERTMANAGER_WEBHOOK_TOKEN;
     const res = await POST(reqWithHeader(TOKEN));
     expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/alerts/webhook — payload validation', () => {
+  const originalEnv = process.env.ALERTMANAGER_WEBHOOK_TOKEN;
+
+  beforeEach(() => {
+    process.env.ALERTMANAGER_WEBHOOK_TOKEN = TOKEN;
+  });
+  afterEach(() => {
+    process.env.ALERTMANAGER_WEBHOOK_TOKEN = originalEnv;
+  });
+
+  it('rejects a null body with 400 Invalid payload', async () => {
+    const res = await POST(reqWithBody(null));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid payload' });
+  });
+
+  it('rejects an alert missing labels/annotations with 400', async () => {
+    const res = await POST(reqWithBody({ alerts: [{ status: 'firing' }] }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid payload' });
+  });
+
+  it('rejects a non-string labels.severity with 400', async () => {
+    const res = await POST(reqWithBody({
+      alerts: [{ status: 'firing', labels: { severity: 5 }, annotations: {} }],
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects more than 100 alerts', async () => {
+    const alerts = Array.from({ length: 101 }, () => ({
+      status: 'firing',
+      labels: {},
+      annotations: {},
+    }));
+    const res = await POST(reqWithBody({ alerts }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid payload' });
+  });
+
+  it('accepts a valid firing alert and forwards it', async () => {
+    const res = await POST(reqWithBody({
+      alerts: [{ status: 'firing', labels: { severity: 'high', alertname: 'rule-1' }, annotations: { summary: 'High CPU' } }],
+    }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, forwarded: 1 });
   });
 });
