@@ -245,8 +245,9 @@ async function handleJobStatus(jobId: string) {
     const status = await getPdfJobStatus(jobId);
     return NextResponse.json(status);
   } catch (err) {
+    logger.error('single-pdf: job status failed', err);
     return NextResponse.json(
-      { error: 'Failed to get job status', message: (err as Error).message },
+      { error: 'Failed to get job status' },
       { status: 500 }
     );
   }
@@ -272,8 +273,9 @@ async function handleJobDownload(jobId: string, request: NextRequest) {
     if (message.includes('not ready') || message.includes('not-found')) {
       return NextResponse.json({ error: 'PDF not ready yet', jobId }, { status: 202 });
     }
+    logger.error('single-pdf: download failed', err);
     return NextResponse.json(
-      { error: 'Failed to download PDF', message },
+      { error: 'Failed to download PDF' },
       { status: 500 }
     );
   }

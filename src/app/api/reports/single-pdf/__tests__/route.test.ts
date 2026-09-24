@@ -48,6 +48,10 @@ function statusReq(): NextRequest {
   return new NextRequest(`http://localhost/api/reports/single-pdf?jobId=${JOB_ID}&action=status`);
 }
 
+function downloadReq(): NextRequest {
+  return new NextRequest(`http://localhost/api/reports/single-pdf?jobId=${JOB_ID}&action=download`);
+}
+
 describe('GET /api/reports/single-pdf — ownership fail-closed', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -83,5 +87,31 @@ describe('GET /api/reports/single-pdf — ownership fail-closed', () => {
     expect(assertCanAccessReportOwnerMock).toHaveBeenCalledWith(OPERATOR, 'owner-1', 'reports.read_cross_user');
     expect(assertCanMock).not.toHaveBeenCalled();
     expect(res.status).toBe(200);
+  });
+
+  it('does not leak the internal error message on job status failure', async () => {
+    getPdfJobOwnerIdMock.mockResolvedValue(null);
+    getPdfJobStatusMock.mockRejectedValue(new Error('Redis connection refused at 10.0.0.5:6379'));
+
+    const res = await GET(statusReq());
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).not.toHaveProperty('message');
+    expect(JSON.stringify(body)).not.toContain('redis');
+    expect(JSON.stringify(body)).not.toContain('10.0.0.5');
+  });
+
+  it('does not leak the internal error message on job download failure', async () => {
+    getPdfJobOwnerIdMock.mockResolvedValue(null);
+    downloadPdfMock.mockRejectedValue(new Error('No such key: pdfs/11111111-1111-1111-1111-111111111111.pdf'));
+
+    const res = await GET(downloadReq());
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).not.toHaveProperty('message');
+    expect(JSON.stringify(body)).not.toContain('pdfs/');
+    expect(JSON.stringify(body)).not.toContain('11111111-1111-1111-1111-111111111111');
   });
 });

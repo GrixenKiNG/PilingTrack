@@ -207,9 +207,10 @@ export async function getPdfJobStatus(
   }
 
   if (state === 'failed') {
+    logger.error(`PDF Queue: job ${jobId} failed`, job.failedReason || 'Unknown error');
     return {
       status: 'failed',
-      failedReason: job.failedReason || 'Unknown error',
+      failedReason: 'Не удалось сформировать PDF',
     };
   }
 
