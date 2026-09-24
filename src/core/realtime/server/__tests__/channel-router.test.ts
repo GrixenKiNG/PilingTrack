@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { canSubscribe, getDefaultChannels, getEventChannels } from '@/core/realtime/server/channel-router';
+import { canReceiveEvent, canSubscribe, getDefaultChannels, getEventChannels } from '@/core/realtime/server/channel-router';
 
 describe('Channel Router — ACL', () => {
   const adminCtx = { userId: 'admin-1', tenantId: 'tenant-1', role: 'ADMIN', siteIds: [] };
@@ -57,6 +57,28 @@ describe('Channel Router — ACL', () => {
 
     it('should allow operator to see own reports', () => {
       expect(canSubscribe(operatorCtx, 'report:report-1')).toBe(true);
+    });
+  });
+
+  describe('wildcard channels (SEC-01)', () => {
+    it('should allow ADMIN to subscribe to report wildcard', () => {
+      expect(canSubscribe(adminCtx, 'report:*')).toBe(true);
+    });
+
+    it('should allow DISPATCHER to subscribe to report wildcard', () => {
+      expect(canSubscribe(dispatcherCtx, 'report:*')).toBe(true);
+    });
+
+    it('should NOT allow OPERATOR to subscribe to report wildcard', () => {
+      expect(canSubscribe(operatorCtx, 'report:*')).toBe(false);
+    });
+
+    it('should NOT allow ASSISTANT to subscribe to report wildcard', () => {
+      expect(canSubscribe(assistantCtx, 'report:*')).toBe(false);
+    });
+
+    it('should keep DISPATCHER site wildcard access', () => {
+      expect(canSubscribe(dispatcherCtx, 'site:*')).toBe(true);
     });
   });
 
@@ -114,5 +136,29 @@ describe('Event Channel Routing', () => {
 
     expect(channels).toContain('system:global');
     expect(channels).not.toContain(expect.stringContaining('tenant:'));
+  });
+});
+
+describe('canReceiveEvent (tenant gate) — SEC-01 / SEC-06', () => {
+  it('should allow ADMIN any event tenant', () => {
+    expect(canReceiveEvent('ADMIN', 't-a', 't-b')).toBe(true);
+    expect(canReceiveEvent('ADMIN', null, null)).toBe(true);
+  });
+
+  it('should allow DISPATCHER any event tenant', () => {
+    expect(canReceiveEvent('DISPATCHER', 't-a', 't-b')).toBe(true);
+    expect(canReceiveEvent('DISPATCHER', null, null)).toBe(true);
+  });
+
+  it('should allow a non-privileged role only its own tenant', () => {
+    expect(canReceiveEvent('OPERATOR', 't-a', 't-a')).toBe(true);
+    expect(canReceiveEvent('OPERATOR', 't-a', 't-b')).toBe(false);
+    expect(canReceiveEvent('ASSISTANT', 't-a', 't-a')).toBe(true);
+    expect(canReceiveEvent('ASSISTANT', 't-a', 't-b')).toBe(false);
+  });
+
+  it('should NOT allow a non-privileged role a null-tenant event', () => {
+    expect(canReceiveEvent('OPERATOR', 't-a', null)).toBe(false);
+    expect(canReceiveEvent('OPERATOR', null, null)).toBe(false);
   });
 });

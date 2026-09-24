@@ -7,6 +7,7 @@
 
 import WebSocket from 'ws';
 import { ChannelType } from '../types/events';
+import { canReceiveEvent } from './channel-router';
 import { logger } from '@/lib/logger';
 
 // ============================================================
@@ -146,13 +147,20 @@ export class ClientManager {
 
   /**
    * Broadcast to all clients subscribed to channels.
+   * Delivery is additionally gated by the event's tenant: a client receives
+   * the event only if it is a platform role (ADMIN/DISPATCHER) or belongs to
+   * the same tenant as the event (SEC-01). An event with null tenantId goes
+   * only to platform roles.
    * Returns count of successfully sent messages.
    */
-  broadcast(data: string, channels: string[]): number {
+  broadcast(data: string, channels: string[], tenantId: string | null): number {
     let sent = 0;
 
     for (const client of this.clients.values()) {
       if (client.ws.readyState !== WebSocket.OPEN) continue;
+
+      // Tenant gate before any channel-based delivery (SEC-01)
+      if (!canReceiveEvent(client.role, client.tenantId, tenantId)) continue;
 
       // Check if client is subscribed to any of the channels
       const hasSubscription = channels.some(ch => {

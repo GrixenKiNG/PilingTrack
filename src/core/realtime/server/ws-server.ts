@@ -20,7 +20,7 @@
 import http from 'http';
 import { WebSocketServer } from 'ws';
 import { ClientManager } from './client-manager';
-import { canSubscribe, getDefaultChannels } from './channel-router';
+import { canReceiveEvent, canSubscribe, getDefaultChannels } from './channel-router';
 import { authenticateWS, validateWSOrigin, sendAuthError } from './auth';
 import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
 import { logger } from '@/lib/logger';
@@ -207,13 +207,21 @@ export async function startWSServer(): Promise<ServerHandle> {
             const reason = msg.reason as string;
             const trackedMsg = messageTracker.nack(messageId, reason);
             if (trackedMsg) {
-              // Re-send the message
-              clients.sendToClient(ws, JSON.stringify({
-                type: 'event',
-                id: trackedMsg.id,
-                seq: trackedMsg.seq,
-                event: trackedMsg.event,
-              }));
+              // Re-send the message only to a client that could legitimately
+              // receive it: platform role, or same tenant as the event.
+              // Otherwise ignore the nack silently (SEC-06).
+              const client = clients.getClient(ws);
+              if (
+                client &&
+                canReceiveEvent(client.role, client.tenantId, trackedMsg.event.tenantId)
+              ) {
+                clients.sendToClient(ws, JSON.stringify({
+                  type: 'event',
+                  id: trackedMsg.id,
+                  seq: trackedMsg.seq,
+                  event: trackedMsg.event,
+                }));
+              }
             }
             break;
           }
@@ -300,12 +308,14 @@ export async function startWSServer(): Promise<ServerHandle> {
         event,
       });
 
-      const sent = clients.broadcast(messageWithSeq, channels);
+      const sent = clients.broadcast(messageWithSeq, channels, event.tenantId);
 
       // Add to replay buffers for each client
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
       for (const client of (clients as any).clients?.values?.() || []) {
-        if (client.subscriptions) {
+        // Tenant gate: only add to a client's buffer when that client could
+        // legitimately receive the event (platform roles + same tenant; SEC-01)
+        if (client.subscriptions && canReceiveEvent(client.role, client.tenantId, event.tenantId)) {
           const hasSubscription = channels.some((ch: string) => {
             if (client.subscriptions.has(ch)) return true;
             for (const sub of client.subscriptions) {

@@ -21,6 +21,13 @@ export function canSubscribe(user: UserContext, channel: ChannelType): boolean {
   // Admin can subscribe to everything
   if (user.role === 'ADMIN') return true;
 
+  // Wildcard channels (*) match any entity of their kind and can therefore
+  // span tenants; only platform roles (ADMIN/DISPATCHER) may hold them
+  // (SEC-01). The explicit sets below already gate the concrete channels.
+  if (channel.endsWith(':*')) {
+    return user.role === 'DISPATCHER';
+  }
+
   // Tenant-level access
   if (channel.startsWith('tenant:')) {
     const tenantId = channel.replace('tenant:', '');
@@ -113,4 +120,20 @@ export function getEventChannels(event: {
   }
 
   return channels;
+}
+
+/**
+ * Tenant gate applied at delivery time (broadcast, replay, nack) in addition
+ * to channel matching. Platform roles (ADMIN/DISPATCHER) see every tenant by
+ * design; any other role only receives events of its own tenant. An event
+ * with a null tenantId (no tenant context) reaches platform roles only
+ * (SEC-01, SEC-06).
+ */
+export function canReceiveEvent(
+  role: string | null,
+  clientTenantId: string | null,
+  eventTenantId: string | null
+): boolean {
+  if (role === 'ADMIN' || role === 'DISPATCHER') return true;
+  return !!eventTenantId && eventTenantId === clientTenantId;
 }

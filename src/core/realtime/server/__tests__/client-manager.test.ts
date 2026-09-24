@@ -172,7 +172,7 @@ describe('ClientManager', () => {
       manager.addClient(ws1, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
       manager.addClient(ws2, { userId: 'u2', tenantId: 't1', role: 'OPERATOR' });
 
-      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:t1']);
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:t1'], 't1');
 
       expect(sent).toBe(2);
       expect(ws1.send).toHaveBeenCalledTimes(1);
@@ -186,7 +186,7 @@ describe('ClientManager', () => {
       manager.addClient(ws1, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
       manager.addClient(ws2, { userId: 'u2', tenantId: 't2', role: 'OPERATOR' });
 
-      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:t1']);
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:t1'], 't1');
 
       expect(sent).toBe(1);
       expect(ws1.send).toHaveBeenCalledTimes(1);
@@ -201,7 +201,7 @@ describe('ClientManager', () => {
       manager.addClient(ws1, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
       manager.addClient(ws2, { userId: 'u2', tenantId: 't1', role: 'OPERATOR' });
 
-      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:t1']);
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:t1'], 't1');
 
       expect(sent).toBe(1);
     });
@@ -210,7 +210,7 @@ describe('ClientManager', () => {
       const ws = createMockWs();
       manager.addClient(ws, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
 
-      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:nonexistent']);
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['tenant:nonexistent'], 't1');
 
       expect(sent).toBe(0);
     });
@@ -221,9 +221,82 @@ describe('ClientManager', () => {
       // DISPATCHER gets site:* by default
       manager.subscribe(ws, 'site:*');
 
-      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['site:abc']);
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['site:abc'], null);
 
       expect(sent).toBe(1);
+    });
+
+    // ============================================================
+    // Tenant isolation (SEC-01)
+    // ============================================================
+
+    it('should NOT deliver an event of another tenant to a non-privileged client', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'u1', tenantId: 'tenant-a', role: 'OPERATOR' });
+      // Client subscribes to a channel that matches the cross-tenant event
+      manager.subscribe(ws, 'report:*');
+      manager.subscribe(ws, 'tenant:tenant-b');
+
+      // Event of tenant B over a channel the tenant-A client is subscribed to
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['report:r1'], 'tenant-b');
+
+      expect(sent).toBe(0);
+      expect(ws.send).not.toHaveBeenCalled();
+    });
+
+    it('should deliver an event to a non-privileged client of the same tenant', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'u1', tenantId: 'tenant-a', role: 'OPERATOR' });
+      manager.subscribe(ws, 'report:r1');
+
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['report:r1'], 'tenant-a');
+
+      expect(sent).toBe(1);
+      expect(ws.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should deliver cross-tenant events to ADMIN', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'a1', tenantId: 'tenant-a', role: 'ADMIN' });
+      manager.subscribe(ws, 'report:r1');
+
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['report:r1'], 'tenant-b');
+
+      expect(sent).toBe(1);
+      expect(ws.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should deliver cross-tenant events to DISPATCHER', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'd1', tenantId: 'tenant-a', role: 'DISPATCHER' });
+      manager.subscribe(ws, 'report:r1');
+
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['report:r1'], 'tenant-b');
+
+      expect(sent).toBe(1);
+      expect(ws.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT deliver a null-tenant event to a non-privileged client', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'u1', tenantId: null, role: 'OPERATOR' });
+      manager.subscribe(ws, 'system:global');
+
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['system:global'], null);
+
+      expect(sent).toBe(0);
+      expect(ws.send).not.toHaveBeenCalled();
+    });
+
+    it('should deliver a null-tenant event to a platform role', () => {
+      const ws = createMockWs();
+      manager.addClient(ws, { userId: 'a1', tenantId: null, role: 'ADMIN' });
+      manager.subscribe(ws, 'system:global');
+
+      const sent = manager.broadcast(JSON.stringify({ type: 'event' }), ['system:global'], null);
+
+      expect(sent).toBe(1);
+      expect(ws.send).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -272,13 +345,13 @@ describe('ClientManager', () => {
       const ws1 = createMockWs();
       const ws2 = createMockWs();
 
-      manager.addClient(ws1, { userId: 'u1', tenantId: null, role: 'OPERATOR' });
-      manager.addClient(ws2, { userId: 'u2', tenantId: null, role: 'OPERATOR' });
+      manager.addClient(ws1, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
+      manager.addClient(ws2, { userId: 'u2', tenantId: 't1', role: 'OPERATOR' });
 
       manager.subscribe(ws1, 'alert:high');
       // ws2 NOT subscribed to alert:high
 
-      const sent = manager.broadcast(JSON.stringify({ type: 'alert' }), ['alert:high']);
+      const sent = manager.broadcast(JSON.stringify({ type: 'alert' }), ['alert:high'], 't1');
 
       expect(sent).toBe(1);
       expect(ws1.send).toHaveBeenCalledTimes(1);
