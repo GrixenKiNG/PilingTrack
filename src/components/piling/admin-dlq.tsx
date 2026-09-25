@@ -43,9 +43,9 @@ interface DlqStats {
 }
 
 const STATUS_FILTERS: Array<{ key: DlqStatus; label: string; color: string }> = [
-  { key: 'pending', label: 'В очереди', color: 'bg-warning/10 text-warning-strong border-warning/30' },
-  { key: 'resolved', label: 'Решено', color: 'bg-success/10 text-success-strong border-success/30' },
-  { key: 'discarded', label: 'Отброшено', color: 'bg-muted text-muted-foreground border-border' },
+  { key: 'pending', label: 'Ожидают', color: 'bg-warning/10 text-warning-strong border-warning/30' },
+  { key: 'resolved', label: 'Отправлены повторно', color: 'bg-success/10 text-success-strong border-success/30' },
+  { key: 'discarded', label: 'Отброшены', color: 'bg-muted text-muted-foreground border-border' },
   { key: 'all', label: 'Все', color: 'bg-info/10 text-info-strong border-info/30' },
 ];
 
@@ -119,7 +119,7 @@ export function AdminDlq() {
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-warning-strong" />
-            Dead Letter Queue
+            Очередь недоставленных событий
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             События, упавшие после исчерпания попыток. Можно отправить повторно или отбросить.
@@ -133,9 +133,9 @@ export function AdminDlq() {
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard icon={Clock} label="В очереди" value={stats.pending} color="text-warning-strong" bg="bg-warning/10" />
-          <StatCard icon={CheckCircle2} label="Решено" value={stats.resolved} color="text-success-strong" bg="bg-success/10" />
-          <StatCard icon={XCircle} label="Отброшено" value={stats.discarded} color="text-muted-foreground" bg="bg-muted" />
+          <StatCard icon={Clock} label="Ожидают" value={stats.pending} color="text-warning-strong" bg="bg-warning/10" />
+          <StatCard icon={CheckCircle2} label="Отправлены повторно" value={stats.resolved} color="text-success-strong" bg="bg-success/10" />
+          <StatCard icon={XCircle} label="Отброшены" value={stats.discarded} color="text-muted-foreground" bg="bg-muted" />
           <StatCard icon={AlertTriangle} label="Всего" value={stats.total} color="text-info-strong" bg="bg-info/10" />
         </div>
       )}
@@ -172,7 +172,7 @@ export function AdminDlq() {
       ) : entries.length === 0 ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-success/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">DLQ пуст</p>
+          <p className="text-sm text-muted-foreground">Недоставленных событий нет</p>
           <p className="text-xs text-muted-foreground mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
         </div>
       ) : (
