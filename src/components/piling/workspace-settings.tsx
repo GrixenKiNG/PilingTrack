@@ -7,6 +7,7 @@ import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePilingStore } from '@/lib/store';
+import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
   NOTIFICATION_KEYS,
@@ -20,12 +21,6 @@ import { EquipmentTileTemplateSettings } from '@/components/piling/monitoring/eq
 
 type Tab = 'workspace' | 'roles' | 'notifications' | 'template' | 'telegram' | 'dlq';
 
-const ROLE_LABELS: Record<string, string> = {
-  ADMIN: 'Администратор',
-  DISPATCHER: 'Диспетчер',
-  OPERATOR: 'Оператор',
-  ASSISTANT: 'Помощник',
-};
 const ROLE_ORDER = ['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'];
 
 function Toggle({ checked, label, disabled, onClick }: { checked: boolean; label: string; disabled?: boolean; onClick: () => void }) {
@@ -212,7 +207,7 @@ export function WorkspaceSettings() {
               <div className="flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground"><span>Роль</span><span>Пользователей</span></div>
               {ROLE_ORDER.map((role) => (
                 <div key={role} className="flex items-center justify-between border-b border-border py-2.5 text-sm">
-                  <span className="text-foreground">{ROLE_LABELS[role] ?? role}</span>
+                  <span className="text-foreground">{ROLE_LABELS[role as UserRole] ?? role}</span>
                   <span className="font-medium text-foreground">{roleCountLabel(role)}</span>
                 </div>
               ))}
@@ -267,7 +262,7 @@ export function WorkspaceSettings() {
           <CardContent className="space-y-3">
             {ROLE_ORDER.map((role) => (
               <div key={role} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
-                <span className="font-medium text-foreground">{ROLE_LABELS[role] ?? role}</span>
+                <span className="font-medium text-foreground">{ROLE_LABELS[role as UserRole] ?? role}</span>
                 <span className="text-muted-foreground">{roleCountLabel(role)}</span>
               </div>
             ))}

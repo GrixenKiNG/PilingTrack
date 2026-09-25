@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import type { ReportListItemDTO, ReportDTO } from '@/lib/types';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
@@ -158,13 +159,7 @@ export function ReportHistory() {
     }
 
     const roleLabel =
-      report.lastEditedByRole === 'ADMIN'
-        ? 'Администратор'
-        : report.lastEditedByRole === 'DISPATCHER'
-          ? 'Диспетчер'
-          : report.lastEditedByRole === 'ASSISTANT'
-            ? 'Помощник'
-            : 'Оператор';
+      ROLE_LABELS[report.lastEditedByRole as UserRole] ?? report.lastEditedByRole ?? 'Нет данных';
 
     return `${roleLabel}: ${report.lastEditedByName}`;
   };
