@@ -69,3 +69,30 @@ pnpm-debug.log*
 # build fails with "permission denied" without this entry.
 wal-archive
 basebackups
+
+# Локальные папки инструментов и проверок — в образ не нужны. output/ держит
+# ссылку-junction на node_modules (qa-full-20260909/app/node_modules): без этой
+# строки контекст сборки 25.09.2026 разросся за 6 ГБ и выкладка встала.
+output
+backups
+backups-local
+.claude
+.gitnexus
+.mimocode
+.tmp
+.tmp-check
+.worktrees
+.codex
+.agents
+.opencode
+.openclaw
+.openclaw-attachments
+.playwright-cli
+.playwright-mcp
+.superpowers
+.impeccable
+.obsidian
+graphify-out
+release-audit
+design-previews
+playwright-report
