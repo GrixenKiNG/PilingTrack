@@ -55,11 +55,14 @@ export function OperatorStatusStrip({online, items}: {online: boolean; items: Qu
       <div
         role="status"
         aria-live="polite"
-        className="operator-status-strip mx-4 mt-1 flex items-center gap-1.5 text-3xs font-semibold text-success-strong"
+        className="operator-status-strip mx-4 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-3xs font-semibold text-success-strong"
       >
+        {/* Переносится, а не обрезается: с крупной шкалой (operator-type.css)
+            «на устройстве нет очереди» уходило в многоточие — а это и есть
+            ответ на вопрос «всё ли отправилось». */}
         <Icon className="size-3.5 shrink-0" aria-hidden />
-        <span className="truncate">{view.title}</span>
-        <span className="truncate font-normal text-muted-foreground">· {view.detail}</span>
+        <span>{view.title}</span>
+        <span className="min-w-0 font-normal text-muted-foreground">· {view.detail}</span>
       </div>
     );
   }
