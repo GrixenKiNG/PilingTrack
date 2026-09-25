@@ -88,7 +88,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
   const context = { tenantId: user.tenantId, actorId: user.id };
   const validated = createSchema.safeParse(await readJsonBody(request));
-  if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
+  if (!validated.success) return NextResponse.json({ error: 'Некорректные данные', details: validated.error.flatten() }, { status: 400 });
   const { type, ...input } = validated.data;
   const item = await createDictionaryItem(context, type, input);
   await invalidateDictionaries(context.tenantId);
@@ -103,11 +103,11 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
   const context = { tenantId: user.tenantId, actorId: user.id };
   const validated = patchSchema.safeParse(await readJsonBody(request));
-  if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
+  if (!validated.success) return NextResponse.json({ error: 'Некорректные данные', details: validated.error.flatten() }, { status: 400 });
 
   const { type, id, name, isActive, lengthMm, sectionOrDiameter } = validated.data;
   if ((lengthMm !== undefined || sectionOrDiameter !== undefined) && type !== 'pileGrade') {
-    return NextResponse.json({ error: 'lengthMm and sectionOrDiameter valid only for pileGrade' }, { status: 400 });
+    return NextResponse.json({ error: 'lengthMm и sectionOrDiameter применимы только для типа сваи pileGrade' }, { status: 400 });
   }
   if (name !== undefined) await renameDictionaryItem(context, type, id, name);
   if (isActive === true) await restoreDictionaryItem(context, type, id);
@@ -126,7 +126,7 @@ export const DELETE = withMutation(async (request: NextRequest) => {
   if (!user?.tenantId) return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
   const context = { tenantId: user.tenantId, actorId: user.id };
   const validated = deleteSchema.safeParse(await readJsonBody(request));
-  if (!validated.success) return NextResponse.json({ error: 'Validation error', details: validated.error.flatten() }, { status: 400 });
+  if (!validated.success) return NextResponse.json({ error: 'Некорректные данные', details: validated.error.flatten() }, { status: 400 });
   const result = await deleteDictionaryItem(context, validated.data.type, validated.data.id);
   await invalidateDictionaries(context.tenantId);
   return NextResponse.json(result);
