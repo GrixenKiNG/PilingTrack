@@ -35,7 +35,7 @@ export interface WorkspaceSettings {
  *
  * - `downtime30`, `newReports` — `services/reports/event-handlers.ts`
  * - `maintenanceOverdue` — `workers/unified-worker/pm-scheduler.ts`
- * - `criticalDefect` — `modules/readiness/application/defects/notify-critical.ts`
+ * - `criticalDefect` — `core/notifications/durable-alert.ts` (enqueueCriticalDefects)
  *
  * Без отправителя остаётся только `planDeviation`, и экран настроек об этом
  * говорит прямо.
