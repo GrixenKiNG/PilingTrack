@@ -1971,6 +1971,7 @@ model Report {
 
   @@index([tenantId])
   @@index([tenantId, updatedAt])
+  @@index([tenantId, date])
   @@index([userId, date])
   @@index([siteId, date])
   @@index([status])
@@ -2533,6 +2534,7 @@ model FeedbackEvent {
 
   @@index([createdAt])
   @@index([scope, createdAt])
+  @@index([scope, targetId, createdAt])
   @@index([actorId, createdAt])
   @@index([audience, createdAt])
   @@index([level, createdAt])
