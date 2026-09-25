@@ -77,11 +77,14 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
     let active = true;
     void authFetch('/api/telegram/configs')
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (active) toast.error('Не удалось сохранить настройку');
+          return;
+        }
         const body = await response.json() as { configs?: unknown[] };
         if (active) setTelegramCount(Array.isArray(body.configs) ? body.configs.length : 0);
       })
-      .catch(() => undefined);
+      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
     return () => { active = false; };
   }, []);
 

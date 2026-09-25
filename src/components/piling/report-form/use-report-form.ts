@@ -178,8 +178,12 @@ export function useReportForm(): UseReportFormReturn {
         if (eqRes.ok) {
           const data = await eqRes.json();
           setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
+        } else {
+          toast.error('Не удалось загрузить список установок');
         }
-      } catch { /* ignore */ }
+      } catch {
+        toast.error('Не удалось загрузить список установок');
+      }
       // Load existing report
       if (selectedSiteId) {
         setLoadingReport(true);

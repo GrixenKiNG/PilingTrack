@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
 
 const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
 
@@ -64,5 +65,26 @@ describe('useReportForm — pile metres come from lengthMm, not the name', () =>
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.getPileMetersPerUnit('does-not-exist')).toBe(0);
+  });
+});
+
+describe('useReportForm — equipment list load failure is surfaced, not swallowed', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('shows a toast when the equipment request fails (network error)', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/equipment')) return Promise.reject(new Error('network'));
+      if (url.startsWith('/api/dictionary/all')) return Promise.resolve(okJson({ pileGrades: [GRADE], drillingTypes: [], downtimeReasons: [] }));
+      if (url.startsWith('/api/sites')) return Promise.resolve(okJson({ data: [] }));
+      return Promise.resolve(okJson({}));
+    });
+
+    renderHook(() => useReportForm());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Не удалось загрузить список установок'));
+    // The form must still work with the empty list — loading settles without a loadError.
+    await waitFor(() => expect(vi.mocked(authFetchMock)).toHaveBeenCalledWith('/api/equipment'));
   });
 });

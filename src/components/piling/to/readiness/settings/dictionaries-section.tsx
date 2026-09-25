@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { AlertTriangle, CheckCircle2, ChevronRight, Search } from '@/components/piling/icons/unified-icons';
@@ -60,7 +61,10 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
     let active = true;
     void authFetch('/api/dictionary/all')
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (active) toast.error('Не удалось сохранить настройку');
+          return;
+        }
         const body = await response.json() as { pileGrades?: DictionaryEntry[]; drillingTypes?: DictionaryEntry[]; downtimeReasons?: DictionaryEntry[] };
         if (!active) return;
         setDictionaries({
@@ -69,7 +73,7 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
           downtimeReasons: body.downtimeReasons ?? [],
         });
       })
-      .catch(() => undefined);
+      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
     return () => { active = false; };
   }, []);
 

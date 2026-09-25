@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock, Link2, Radio, Send } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
@@ -37,11 +38,14 @@ export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSetting
     let active = true;
     void authFetch('/api/telegram/configs')
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (active) toast.error('Не удалось сохранить настройку');
+          return;
+        }
         const body = await response.json() as { configs?: unknown[] };
         if (active) setTelegramCount(Array.isArray(body.configs) ? body.configs.length : 0);
       })
-      .catch(() => undefined);
+      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
     return () => { active = false; };
   }, []);
 

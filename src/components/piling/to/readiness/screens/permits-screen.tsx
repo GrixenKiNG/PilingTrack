@@ -67,13 +67,16 @@ export function PermitsScreen(props: ReferenceUiProps) {
     let cancelled = false;
     void authFetch('/api/user-documents/control')
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (!cancelled) toast.error('Не удалось обновить счётчик документов');
+          return;
+        }
         const body = await response.json() as {expired?: number; expiring?: number};
         // Право на этот список есть не у всех, кому открыт экран нарядов —
         // отказ оставляет плитку в состоянии «не загружено», а не врёт «в порядке».
         if (!cancelled) setDocuments({actorKey: documentActorKey, expired: body.expired ?? 0, expiring: body.expiring ?? 0});
       })
-      .catch(() => undefined);
+      .catch(() => { if (!cancelled) toast.error('Не удалось обновить счётчик документов'); });
     return () => { cancelled = true; };
   }, [canReadDocuments, documentActorKey]);
 
