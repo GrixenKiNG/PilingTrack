@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCanAccessReportOwner, ensureTenantAccess } from '@/services/auth/resource-access-service';
@@ -15,6 +16,11 @@ export const runtime = 'nodejs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// POST body — reportId reaches a Prisma findUnique; keep it a bounded string.
+const singlePdfBodySchema = z.object({
+  reportId: z.string().min(1).max(100),
+});
+
 // ============================================================
 // POST — Enqueue async single PDF generation (default)
 // ============================================================
@@ -26,11 +32,26 @@ export const POST = withMutation(async (request: NextRequest) => {
 
   try {
     const body = await request.json();
-    const { reportId } = body;
+    const parsed = singlePdfBodySchema.safeParse(body);
 
-    if (!reportId) {
-      return NextResponse.json({ error: 'Не указан reportId' }, { status: 400 });
+    if (!parsed.success) {
+      // Preserve the original message when reportId is simply absent.
+      if (!body?.reportId) {
+        return NextResponse.json({ error: 'Не указан reportId' }, { status: 400 });
+      }
+      return NextResponse.json(
+        {
+          error: 'Некорректные параметры запроса',
+          details: parsed.error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
+        { status: 400 }
+      );
     }
+
+    const { reportId } = parsed.data;
 
     const context = await loadSingleReportPdfContext(reportId);
     if (!context) {

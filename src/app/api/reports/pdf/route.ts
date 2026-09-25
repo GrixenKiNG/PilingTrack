@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -13,6 +14,23 @@ import { withApi, withMutation } from '@/core/api-wrapper';
 export const runtime = 'nodejs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// POST body — dateFrom/dateTo flow into the Content-Disposition filename,
+// so they must be strictly YYYY-MM-DD (no CRLF/quotes → no header injection)
+// before anything else runs.
+const periodPdfBodySchema = z
+  .object({
+    dateFrom: z.string().regex(DATE_RE),
+    dateTo: z.string().regex(DATE_RE),
+    siteId: z.string().min(1).max(100).optional(),
+    filterUserId: z.string().min(1).max(100).optional(),
+    equipmentId: z.string().min(1).max(100).optional(),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'Дата начала позже даты окончания',
+    path: ['dateTo'],
+  });
 
 // ============================================================
 // POST — Enqueue async PDF generation (default)
@@ -28,14 +46,29 @@ export const POST = withMutation(async (request: NextRequest) => {
     assertCan(user!, 'reports.read_all');
 
     const body = await request.json();
-    const { dateFrom, dateTo, siteId, filterUserId, equipmentId } = body;
+    const parsed = periodPdfBodySchema.safeParse(body);
 
-    if (!dateFrom || !dateTo) {
+    if (!parsed.success) {
+      // Preserve the original message when the dates are simply absent.
+      if (!body?.dateFrom || !body?.dateTo) {
+        return NextResponse.json(
+          { error: 'Укажите период: даты начала и окончания' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: 'Укажите период: даты начала и окончания' },
+        {
+          error: 'Некорректные параметры запроса',
+          details: parsed.error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
         { status: 400 }
       );
     }
+
+    const { dateFrom, dateTo, siteId, filterUserId, equipmentId } = parsed.data;
 
     const pdfData = await buildPeriodPdfData({
       dateFrom,
