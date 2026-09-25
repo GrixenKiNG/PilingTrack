@@ -250,6 +250,24 @@ async function readAuthoritativeCollection<T>(
   }
 }
 
+/**
+ * При сбое чтения признаков готовности (смены, наряды, дефекты, аудит)
+ * возвращает запасное значение и помечает проблему — страница продолжает
+ * работать с частичными данными, но не выдаёт «всё чисто» за отсутствие данных.
+ * Отменённый запрос пере-бросает: им занимается внешний обработчик загрузки.
+ */
+async function readReadinessPartial<T>(
+  request: Promise<T>,
+  fallback: T,
+): Promise<{ data: T; failed: boolean }> {
+  try {
+    return { data: await request, failed: false };
+  } catch (error) {
+    if (isReadinessRequestCancelled(error)) throw error;
+    return { data: fallback, failed: true };
+  }
+}
+
 export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } = {}) {
   const workspaceRequest = useRef<AbortController | null>(null);
   // Раздел назван в адресе — значит выбран человеком, и подменять его нельзя.
@@ -415,14 +433,14 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
           '/api/readiness-rules',
           'Правила готовности',
         ),
-        fetchReadinessShifts(controller.signal, readinessFilters).catch(() => []),
-        fetchWorkPermits(controller.signal, readinessFilters).catch(() => []),
-        fetchReadinessDefects(controller.signal, readinessFilters).catch(() => []),
+        readReadinessPartial(fetchReadinessShifts(controller.signal, readinessFilters), []),
+        readReadinessPartial(fetchWorkPermits(controller.signal, readinessFilters), []),
+        readReadinessPartial(fetchReadinessDefects(controller.signal, readinessFilters), []),
         readAuthoritativeCollection(fetchCurrentReadiness(controller.signal, readinessFilters)),
         readAuthoritativeCollection(fetchReadinessHistory(controller.signal, readinessFilters)),
         readinessBootstrap.capabilities.entities.audit.read
-          ? fetchReadinessAudit(controller.signal, readinessFilters).catch(() => null)
-          : Promise.resolve(null),
+          ? readReadinessPartial(fetchReadinessAudit(controller.signal, readinessFilters), null)
+          : Promise.resolve({ data: null, failed: false }),
       ]);
       if (equipmentResponse && !equipmentResponse.ok) {
         const message = equipmentResponse.status === 403
@@ -459,18 +477,24 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       const fleetSnapshot = fleetResult.data;
       const readinessRules = readinessRulesResult.data;
       setRulesAvailable(readinessRules !== null);
-      setShifts(shiftsResult);
-      setPermits(permitsResult);
-      setDefects(defectsResult);
+      setShifts(shiftsResult.data);
+      setPermits(permitsResult.data);
+      setDefects(defectsResult.data);
       setCurrentReadiness(currentResult.data);
       setReadinessHistory(historyResult.data);
       setAuthoritativeReadinessError(currentResult.error ?? historyResult.error);
-      setAudit(auditResult);
+      setAudit(auditResult.data);
+      const readinessPartialFailure =
+        shiftsResult.failed || permitsResult.failed || defectsResult.failed || auditResult.failed;
       const initialIssues = [
         crewResult.issue,
         maintenanceResult.issue,
         fleetResult.issue,
         readinessRulesResult.issue,
+        ...(readinessPartialFailure ? [{
+          source: 'Техготовность',
+          message: 'Не удалось загрузить часть данных техготовности. Обновите страницу.',
+        } satisfies WorkspaceIssue] : []),
       ].filter((issue): issue is WorkspaceIssue => issue !== null);
       if (initialIssues.length > 0) setWorkspaceIssues(initialIssues);
       const requestedId = new URLSearchParams(window.location.search).get('equipmentId');
