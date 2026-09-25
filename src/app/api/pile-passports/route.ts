@@ -45,7 +45,7 @@ export const GET = withApi(
       return NextResponse.json({ error: 'Даты периода задаются как ГГГГ-ММ-ДД' }, { status: 400 });
     }
 
-    const rows = await listPilePassports({
+    const { rows, truncated } = await listPilePassports({
       tenantId,
       siteId: params.get('siteId') || undefined,
       pendingOnly: params.get('pendingOnly') === 'true',
@@ -54,7 +54,7 @@ export const GET = withApi(
       dateTo,
       pileNumber: params.get('pileNumber')?.trim() || undefined,
     });
-    return NextResponse.json({ data: rows, header: pileJournalHeader(rows) });
+    return NextResponse.json({ data: rows, header: pileJournalHeader(rows), truncated });
   },
   { domain: 'piles' },
 );

@@ -124,6 +124,21 @@ export interface PileJournalFilters {
 }
 
 /**
+ * Предел строк журнала — один на экран и на выгрузку.
+ *
+ * ПОЧЕМУ ОДИН. Титул («Свай в журнале», «Принято», «На добивку») считается из
+ * загруженных строк. Разные пределы на экране и в .xlsx дали бы подшитый
+ * документ, противоречащий экрану, на котором его собирали.
+ */
+export const PILE_JOURNAL_LIMIT = 500;
+
+export interface PileJournalPage {
+  rows: PilePassportRow[];
+  /** Строк в выборке больше лимита: показаны первые `PILE_JOURNAL_LIMIT`. */
+  truncated: boolean;
+}
+
+/**
  * Конец дня по границе периода.
  *
  * Дата без времени означает «весь этот день»: `dateTo = 2026-09-14` обязан
@@ -135,9 +150,10 @@ function endOfDay(date: string): Date {
   return new Date(parsed.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
 
-export async function listPilePassports(input: PileJournalFilters): Promise<PilePassportRow[]> {
+export async function listPilePassports(input: PileJournalFilters): Promise<PileJournalPage> {
   if (!input.tenantId) throw new ServiceError('tenantId is required', 400);
 
+  const limit = Math.min(input.limit ?? PILE_JOURNAL_LIMIT, PILE_JOURNAL_LIMIT);
   const acceptance = input.acceptance ?? (input.pendingOnly ? 'PENDING' : undefined);
   const rows = await db.pilePassport.findMany({
     where: {
@@ -157,7 +173,8 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       ...(input.siteId ? { pileWork: { report: { siteId: input.siteId } } } : {}),
     },
     orderBy: { drivenAt: 'desc' },
-    take: Math.min(input.limit ?? 100, 500),
+    // Лишняя строка — только признак среза: в ответ уйдёт ровно `limit` строк.
+    take: limit + 1,
     include: {
       sets: { orderBy: { ordinal: 'asc' } },
       pileWork: {
@@ -177,8 +194,11 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     },
   });
 
+  const truncated = rows.length > limit;
+  const page = truncated ? rows.slice(0, limit) : rows;
+
   // Кто принял сваю — одним запросом на всю страницу, а не по строке.
-  const deciderIds = [...new Set(rows.map((row) => row.acceptedById).filter((id): id is string => !!id))];
+  const deciderIds = [...new Set(page.map((row) => row.acceptedById).filter((id): id is string => !!id))];
   const deciders = deciderIds.length > 0
     ? await db.user.findMany({
       where: { tenantId: input.tenantId, id: { in: deciderIds } },
@@ -187,7 +207,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     : [];
   const deciderById = new Map(deciders.map((user) => [user.id, user.name]));
 
-  return rows.map((row) => {
+  const items = page.map((row) => {
     const sets: DrivingSet[] = row.sets.map((set) => ({
       ordinal: set.ordinal,
       blows: set.blows,
@@ -260,6 +280,8 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       suggestion: suggestAcceptance({ actualRefusalMm: refusalMm, designRefusalMm: row.designRefusalMm }),
     };
   });
+
+  return { rows: items, truncated };
 }
 
 /**
@@ -349,7 +371,7 @@ const ACCEPTANCE_TEXT: Record<PileAcceptanceValue, string> = {
  */
 export async function exportPileJournalXlsx(filters: PileJournalFilters): Promise<Buffer> {
   const { buildXlsx } = await import('@/lib/xlsx-writer');
-  const rows = await listPilePassports({ ...filters, limit: 500 });
+  const { rows, truncated } = await listPilePassports({ ...filters, limit: PILE_JOURNAL_LIMIT });
   const header = pileJournalHeader(rows);
 
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : '—');
@@ -371,6 +393,8 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     [],
     ['Отказ считается как среднее по трём последним залогам (СП 45.13330).'],
     ['Журнал выгружен', new Date().toISOString().slice(0, 16).replace('T', ' ')],
+    // Не молчим о срезе: иначе подшитый документ выглядел бы как полный.
+    ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_LIMIT} свай — сузьте период или объект`]] : []),
   ];
 
   const piles: (string | number | null)[][] = [[
