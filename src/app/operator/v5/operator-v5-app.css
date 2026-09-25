@@ -24,7 +24,7 @@
   max-width: 560px;
   min-height: 100dvh;
   background: var(--surface);
-  font-size: 14px;
+  font-size: 16px;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -82,7 +82,7 @@
   background: var(--surface);
   color: var(--ink-muted);
   font-family: var(--f-mono);
-  font-size: 0.64rem;
+  font-size: 0.8125rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   box-shadow: var(--shadow);
@@ -101,7 +101,7 @@
 .v5 .v5-index-title {
   margin: 0 0 1rem;
   font-family: var(--f-mono);
-  font-size: 0.68rem;
+  font-size: 0.8125rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-faint);
@@ -112,7 +112,7 @@
   gap: 0.5rem;
   margin: 1.25rem 0 0.4rem;
   font-family: var(--f-display);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-muted);
@@ -148,19 +148,19 @@
 
 .v5 .v5-index-item .l {
   font-family: var(--f-mono);
-  font-size: 0.7rem;
+  font-size: 0.8125rem;
   color: var(--signal);
   letter-spacing: 0.08em;
 }
 
 .v5 .v5-index-item .n {
   font-family: var(--f-display);
-  font-size: 0.92rem;
+  font-size: 1rem;
   text-transform: uppercase;
 }
 
 .v5 .v5-index-item .c {
   font-family: var(--f-mono);
-  font-size: 0.62rem;
+  font-size: 0.8125rem;
   color: var(--ink-faint);
 }
