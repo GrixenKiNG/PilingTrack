@@ -31,7 +31,8 @@ interface CrewSummary {
 export interface SiteOverviewRow extends SiteAnalytics {
   isActive: boolean;
   completionDate?: string | null;
-  crewCount: number;
+  /** null — бригады не загрузились, число неизвестно (не 0). */
+  crewCount: number | null;
   rigNames: string[];
 }
 
@@ -39,6 +40,8 @@ export interface SitesOverview {
   rows: SiteOverviewRow[];
   loading: boolean;
   error: string | null;
+  /** /api/crews/all не ответил — счётчики бригад неизвестны. */
+  crewsError: boolean;
   reload: () => void;
 }
 
@@ -46,6 +49,7 @@ export function useSitesOverview(): SitesOverview {
   const [rows, setRows] = useState<SiteOverviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [crewsError, setCrewsError] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -54,6 +58,7 @@ export function useSitesOverview(): SitesOverview {
     void (async () => {
       setLoading(true);
       setError(null);
+      setCrewsError(false);
       try {
         const [analyticsRes, crewsRes] = await Promise.all([
           authFetch('/api/analytics/sites'),
@@ -63,6 +68,8 @@ export function useSitesOverview(): SitesOverview {
         const analytics: SiteAnalytics[] = (await analyticsRes.json()).analytics ?? [];
         // The endpoint responds { crews: [...] } — reading .data here used to
         // zero out every site's crew count ("Без бригад: 2" with 7 active crews).
+        // Сбой этого запроса — не «бригад нет»: число остаётся неизвестным.
+        const crewsLoaded = crewsRes.ok;
         const crews: CrewSummary[] = crewsRes.ok ? ((await crewsRes.json()).crews ?? []) : [];
 
         const bySite = new Map<string, { count: number; rigs: Set<string> }>();
@@ -76,10 +83,18 @@ export function useSitesOverview(): SitesOverview {
 
         const combined: SiteOverviewRow[] = analytics.map((a) => {
           const crew = bySite.get(a.siteId);
-          return { ...a, isActive: true, crewCount: crew?.count ?? 0, rigNames: crew ? [...crew.rigs] : [] };
+          return {
+            ...a,
+            isActive: true,
+            crewCount: crew ? crew.count : crewsLoaded ? 0 : null,
+            rigNames: crew ? [...crew.rigs] : [],
+          };
         });
 
-        if (!cancelled) setRows(combined);
+        if (!cancelled) {
+          setRows(combined);
+          setCrewsError(!crewsLoaded);
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Не удалось загрузить объекты');
       } finally {
@@ -92,5 +107,5 @@ export function useSitesOverview(): SitesOverview {
     };
   }, [tick]);
 
-  return { rows, loading, error, reload: () => setTick((t) => t + 1) };
+  return { rows, loading, error, crewsError, reload: () => setTick((t) => t + 1) };
 }

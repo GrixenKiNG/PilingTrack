@@ -70,6 +70,9 @@ export function DocumentsScreen(props: ReferenceUiProps) {
 
   const expired = rows?.filter((row) => row.expiry.status === 'expired') ?? [];
   const expiring = rows?.filter((row) => row.expiry.status === 'expiring') ?? [];
+  // Список не загружен (ещё грузится или запрос упал) — числа по нему
+  // неизвестны. Ноль в плитке читался бы как «просрочек нет».
+  const notLoaded = rows === null;
   const needle = query.trim().toLocaleLowerCase('ru-RU');
   const visible = (rows ?? []).filter((row) => !needle
     || row.user.name.toLocaleLowerCase('ru-RU').includes(needle)
@@ -85,11 +88,11 @@ export function DocumentsScreen(props: ReferenceUiProps) {
         )}
       />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(3)}>
-        <RefKpi icon="defect" label="Просрочено" tone="danger" value={expired.length} alert={expired.length > 0}
+        <RefKpi icon="defect" label="Просрочено" tone="danger" value={notLoaded ? '—' : expired.length} alert={expired.length > 0}
           detail="работать нельзя до продления" />
-        <RefKpi icon="history" label="Истекает" tone="warning" value={expiring.length}
+        <RefKpi icon="history" label="Истекает" tone="warning" value={notLoaded ? '—' : expiring.length}
           detail="в пределах срока предупреждения" />
-        <RefKpi icon="documents" label="Требуют внимания" tone="info" value={rows?.length ?? 0}
+        <RefKpi icon="documents" label="Требуют внимания" tone="info" value={notLoaded ? '—' : rows.length}
           detail="всего в списке" />
       </section>
 
