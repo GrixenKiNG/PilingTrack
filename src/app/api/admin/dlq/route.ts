@@ -74,7 +74,7 @@ export const POST = withMutation(
     const validation = actionSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.flatten() },
+        { error: 'Некорректные данные', details: validation.error.flatten() },
         { status: 400 }
       );
     }

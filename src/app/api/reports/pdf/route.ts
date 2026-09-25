@@ -32,7 +32,7 @@ export const POST = withMutation(async (request: NextRequest) => {
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
-        { error: 'dateFrom and dateTo are required' },
+        { error: 'Укажите период: даты начала и окончания' },
         { status: 400 }
       );
     }
@@ -103,7 +103,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
     });
-    return NextResponse.json({ error: 'PDF enqueue failed', requestId }, { status: 500 });
+    return NextResponse.json({ error: 'Не удалось поставить задачу генерации PDF в очередь', requestId }, { status: 500 });
   }
 }, { domain: 'reports' });
 
@@ -138,7 +138,7 @@ export const GET = withApi(async (request: NextRequest) => {
 
   if (!jobId) {
     return NextResponse.json(
-      { error: 'Provide dateFrom+dateTo for PDF generation or jobId for async status' },
+      { error: 'Укажите dateFrom и dateTo для генерации PDF или jobId для асинхронного статуса' },
       { status: 400 }
     );
   }
@@ -148,7 +148,7 @@ export const GET = withApi(async (request: NextRequest) => {
   // a small sequential int) and path traversal (jobId flows into a file
   // path / S3 key in pdf-generator/storage.ts).
   if (!UUID_RE.test(jobId)) {
-    return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректный jobId' }, { status: 400 });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
@@ -162,7 +162,7 @@ export const GET = withApi(async (request: NextRequest) => {
     return handleJobDownload(jobId, request);
   }
 
-  return NextResponse.json({ error: 'Invalid action. Use action=status or action=download' }, { status: 400 });
+  return NextResponse.json({ error: 'Некорректное действие. Используйте action=status или action=download' }, { status: 400 });
 }, { domain: 'reports' });
 
 // ============================================================
@@ -183,7 +183,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
-        { error: 'dateFrom and dateTo are required for sync mode' },
+        { error: 'Укажите период: даты начала и окончания' },
         { status: 400 }
       );
     }
@@ -221,7 +221,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
     });
-    return NextResponse.json({ error: 'PDF generation failed', requestId }, { status: 500 });
+    return NextResponse.json({ error: 'Не удалось сформировать PDF-файл', requestId }, { status: 500 });
   }
 }
 
@@ -236,7 +236,7 @@ async function handleJobStatus(jobId: string) {
   } catch (err) {
     logger.error('pdf: job status failed', err);
     return NextResponse.json(
-      { error: 'Failed to get job status' },
+      { error: 'Не удалось получить статус задачи' },
       { status: 500 }
     );
   }
@@ -260,11 +260,11 @@ async function handleJobDownload(jobId: string, request: NextRequest) {
   } catch (err) {
     const message = (err as Error).message;
     if (message.includes('not ready') || message.includes('not-found')) {
-      return NextResponse.json({ error: 'PDF not ready yet', jobId }, { status: 202 });
+      return NextResponse.json({ error: 'Отчёт ещё не готов', jobId }, { status: 202 });
     }
     logger.error('pdf: download failed', err);
     return NextResponse.json(
-      { error: 'Failed to download PDF' },
+      { error: 'Не удалось загрузить PDF-файл' },
       { status: 500 }
     );
   }

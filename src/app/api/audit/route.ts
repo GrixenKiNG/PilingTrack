@@ -19,7 +19,7 @@ export const GET = withApi(
     const scope = request.nextUrl.searchParams.get('scope');
     const targetId = request.nextUrl.searchParams.get('targetId');
     if (!scope || !targetId) {
-      return NextResponse.json({ error: 'scope and targetId are required' }, { status: 400 });
+      return NextResponse.json({ error: 'Требуются scope и targetId' }, { status: 400 });
     }
 
     const limitRaw = Number(request.nextUrl.searchParams.get('limit'));

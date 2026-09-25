@@ -43,7 +43,7 @@ export const POST = withMutation(
       });
 
       return createJsonResponse(
-        { error: 'Validation failed', requestId, details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
+        { error: 'Некорректные данные', requestId, details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 },
         requestId
       );

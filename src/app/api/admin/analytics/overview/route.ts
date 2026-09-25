@@ -158,7 +158,7 @@ export const GET = withApi(async (request: NextRequest) => {
   const siteParam = request.nextUrl.searchParams.get('siteId');
   const siteId = siteParam && siteParam !== 'all' ? siteParam : null;
   if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) {
-    return NextResponse.json({ error: 'dateFrom и dateTo обязательны (YYYY-MM-DD)' }, { status: 400 });
+    return NextResponse.json({ error: 'Укажите период: даты начала и окончания' }, { status: 400 });
   }
 
   const fromDate = new Date(`${from}T00:00:00Z`);

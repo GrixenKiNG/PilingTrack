@@ -29,12 +29,12 @@ export const POST = withMutation(async (request: NextRequest) => {
     const { reportId } = body;
 
     if (!reportId) {
-      return NextResponse.json({ error: 'reportId required' }, { status: 400 });
+      return NextResponse.json({ error: 'Не указан reportId' }, { status: 400 });
     }
 
     const context = await loadSingleReportPdfContext(reportId);
     if (!context) {
-      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Отчёт не найден' }, { status: 404 });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
@@ -100,7 +100,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
     });
-    return NextResponse.json({ error: 'PDF enqueue failed', requestId }, { status: 500 });
+    return NextResponse.json({ error: 'Не удалось поставить задачу генерации PDF в очередь', requestId }, { status: 500 });
   }
 }, { domain: 'reports' });
 
@@ -134,13 +134,13 @@ export const GET = withApi(async (request: NextRequest) => {
 
   if (!jobId) {
     return NextResponse.json(
-      { error: 'jobId required for async mode. Use POST to enqueue.' },
+      { error: 'Для асинхронного режима требуется jobId. Поставьте задачу через POST' },
       { status: 400 }
     );
   }
 
   if (!UUID_RE.test(jobId)) {
-    return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректный jobId' }, { status: 400 });
   }
 
   // A single-report PDF belongs to the operator who triggered it — only
@@ -165,7 +165,7 @@ export const GET = withApi(async (request: NextRequest) => {
     return handleJobDownload(jobId, request);
   }
 
-  return NextResponse.json({ error: 'Invalid action. Use action=status or action=download' }, { status: 400 });
+  return NextResponse.json({ error: 'Некорректное действие. Используйте action=status или action=download' }, { status: 400 });
 }, { domain: 'reports' });
 
 // ============================================================
@@ -179,12 +179,12 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
     const reportId = request.nextUrl.searchParams.get('reportId');
 
     if (!reportId) {
-      return NextResponse.json({ error: 'reportId required' }, { status: 400 });
+      return NextResponse.json({ error: 'Не указан reportId' }, { status: 400 });
     }
 
     const context = await loadSingleReportPdfContext(reportId);
     if (!context) {
-      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Отчёт не найден' }, { status: 404 });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
@@ -232,7 +232,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
     });
-    return NextResponse.json({ error: 'PDF generation failed', requestId }, { status: 500 });
+    return NextResponse.json({ error: 'Не удалось сформировать PDF-файл', requestId }, { status: 500 });
   }
 }
 
@@ -247,7 +247,7 @@ async function handleJobStatus(jobId: string) {
   } catch (err) {
     logger.error('single-pdf: job status failed', err);
     return NextResponse.json(
-      { error: 'Failed to get job status' },
+      { error: 'Не удалось получить статус задачи' },
       { status: 500 }
     );
   }
@@ -271,11 +271,11 @@ async function handleJobDownload(jobId: string, request: NextRequest) {
   } catch (err) {
     const message = (err as Error).message;
     if (message.includes('not ready') || message.includes('not-found')) {
-      return NextResponse.json({ error: 'PDF not ready yet', jobId }, { status: 202 });
+      return NextResponse.json({ error: 'Отчёт ещё не готов', jobId }, { status: 202 });
     }
     logger.error('single-pdf: download failed', err);
     return NextResponse.json(
-      { error: 'Failed to download PDF' },
+      { error: 'Не удалось загрузить PDF-файл' },
       { status: 500 }
     );
   }

@@ -64,7 +64,7 @@ export const GET = withApi(
     const to = toParam ? new Date(toParam) : new Date();
     const from = fromParam ? new Date(fromParam) : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-      return NextResponse.json({ error: 'Invalid from/to' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректный период' }, { status: 400 });
     }
 
     const [entries, summary] = await Promise.all([
@@ -88,7 +88,7 @@ export const POST = withMutation(
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
+        { error: 'Некорректные данные', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }

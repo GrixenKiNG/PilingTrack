@@ -65,7 +65,7 @@ export const GET = withApi(
     const limit = Number.isFinite(limitParam) ? Math.max(1, Math.min(100, limitParam)) : 25;
 
     if (!sessionUser) {
-      return createJsonResponse({ error: 'Unauthorized', requestId }, { status: 401 }, requestId);
+      return createJsonResponse({ error: 'Войдите в систему', requestId }, { status: 401 }, requestId);
     }
 
     const result = await listFeedbackEventsForUser(sessionUser, limit);
@@ -82,7 +82,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   // user is guaranteed after error check above
   const sessionUser = user;
   if (!sessionUser) {
-    return createJsonResponse({ error: 'Unauthorized', requestId }, { status: 401 }, requestId);
+    return createJsonResponse({ error: 'Войдите в систему', requestId }, { status: 401 }, requestId);
   }
 
   try {
@@ -99,7 +99,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       const validated = feedbackOperationSchema.safeParse(body);
       if (!validated.success) {
         return createJsonResponse(
-          { error: 'Validation error', details: validated.error.flatten(), requestId },
+          { error: 'Некорректные данные', details: validated.error.flatten(), requestId },
           { status: 400 },
           requestId
         );
@@ -107,7 +107,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       const eventId = validated.data.eventId || '';
       if (!eventId) {
         return createJsonResponse(
-          { error: 'eventId is required', requestId },
+          { error: 'Не указан eventId', requestId },
           { status: 400 },
           requestId
         );
@@ -115,7 +115,7 @@ export const POST = withMutation(async (request: NextRequest) => {
 
       if (operation === 'acknowledge' && user?.role !== 'ADMIN' && user?.role !== 'DISPATCHER') {
         return createJsonResponse(
-          { error: 'Only privileged roles can acknowledge events', requestId },
+          { error: 'Подтверждать события могут только пользователи с особыми правами', requestId },
           { status: 403 },
           requestId
         );
@@ -124,7 +124,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       const event = await markFeedbackEventState(sessionUser, eventId, operation);
       if (!event) {
         return createJsonResponse(
-          { error: 'Event not found', requestId },
+          { error: 'Событие не найдено', requestId },
           { status: 404 },
           requestId
         );
@@ -138,7 +138,7 @@ export const POST = withMutation(async (request: NextRequest) => {
     const validated = feedbackCreateSchema.safeParse(body);
     if (!validated.success) {
       return createJsonResponse(
-        { error: 'Validation error', details: validated.error.flatten(), requestId },
+        { error: 'Некорректные данные', details: validated.error.flatten(), requestId },
         { status: 400 },
         requestId
       );
@@ -189,7 +189,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       requestId
     );
   } catch {
-    return createJsonResponse({ error: 'Internal error', requestId }, { status: 500 }, requestId);
+    return createJsonResponse({ error: 'Внутренняя ошибка сервера', requestId }, { status: 500 }, requestId);
   }
 }, { domain: 'feedback' });
 

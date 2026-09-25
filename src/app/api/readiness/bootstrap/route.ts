@@ -21,7 +21,7 @@ async function handleGet(request: NextRequest) {
     return attachRequestIdHeader(error, requestId);
   }
   if (!user?.tenantId) {
-    return response({ error: 'Tenant context is required' }, 403, requestId);
+    return response({ error: 'Требуется контекст организации' }, 403, requestId);
   }
   // Проверка выше сужает тип, но сужение свойства не переживает вход в
   // замыкание ниже — там стояло `user.tenantId!`. Константа сужается честно.
@@ -32,7 +32,7 @@ async function handleGet(request: NextRequest) {
     searchParams.size > (actingAs === null ? 0 : 1)
     || (actingAs !== null && !isActingRole(actingAs))
   ) {
-    return response({ error: 'Client-controlled readiness context is not accepted' }, 400, requestId);
+    return response({ error: 'Контекст, заданный клиентом, не принимается' }, 400, requestId);
   }
   if (!canActAs(user.role, actingAs)) {
     return response({ error: 'Нет доступа к контуру технической готовности' }, 403, requestId);
@@ -57,7 +57,7 @@ async function handleGet(request: NextRequest) {
     if (caught instanceof ServiceError) {
       return response({ error: caught.message }, caught.status, requestId);
     }
-    return response({ error: 'Readiness bootstrap failed' }, 500, requestId);
+    return response({ error: 'Внутренняя ошибка сервера' }, 500, requestId);
   }
 }
 

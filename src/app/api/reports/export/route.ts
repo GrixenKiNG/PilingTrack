@@ -36,7 +36,7 @@ export const GET = withApi(
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
-        { error: 'dateFrom and dateTo are required (max 92 days)' },
+        { error: 'Укажите период: даты начала и окончания' },
         { status: 400 },
       );
     }
@@ -45,7 +45,7 @@ export const GET = withApi(
     const toTs = Date.parse(dateTo);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo) || Number.isNaN(fromTs) || Number.isNaN(toTs) || new Date(fromTs).toISOString().slice(0, 10) !== dateFrom || new Date(toTs).toISOString().slice(0, 10) !== dateTo || toTs < fromTs) {
       return NextResponse.json(
-        { error: 'Invalid dateFrom/dateTo' },
+        { error: 'Некорректные даты начала и окончания' },
         { status: 400 },
       );
     }
@@ -53,7 +53,7 @@ export const GET = withApi(
     const windowDays = (toTs - fromTs) / (1000 * 60 * 60 * 24);
     if (windowDays > MAX_EXPORT_WINDOW_DAYS) {
       return NextResponse.json(
-        { error: `Date range must be at most ${MAX_EXPORT_WINDOW_DAYS} days` },
+        { error: `Диапазон не длиннее ${MAX_EXPORT_WINDOW_DAYS} дней` },
         { status: 400 },
       );
     }

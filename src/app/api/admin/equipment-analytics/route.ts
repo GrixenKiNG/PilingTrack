@@ -21,7 +21,7 @@ export const GET = withApi(
     // Формат проверяем здесь: кривая дата доходила до Postgres и возвращалась 500.
     const isoDay = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateFrom || !dateTo || !isoDay.test(dateFrom) || !isoDay.test(dateTo)) {
-      return NextResponse.json({ error: 'dateFrom и dateTo обязательны (YYYY-MM-DD)' }, { status: 400 });
+      return NextResponse.json({ error: 'Укажите период: даты начала и окончания' }, { status: 400 });
     }
     if (!user?.tenantId) {
       return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });

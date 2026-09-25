@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     if (error) return error;
   } catch (caughtError) {
     logger.error('feedback/stream: auth failed', caughtError, { requestId });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 
   let intervalId: ReturnType<typeof setInterval> | null = null;

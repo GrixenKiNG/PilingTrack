@@ -24,7 +24,7 @@ export const DELETE = withMutation(
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Validation error', details: parsed.error.flatten() },
+        { error: 'Некорректные данные', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
@@ -38,7 +38,7 @@ export const DELETE = withMutation(
       select: { id: true, siteId: true, userId: true, date: true },
     });
     if (!report) {
-      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Отчёт не найден' }, { status: 404 });
     }
 
     try {
@@ -46,7 +46,7 @@ export const DELETE = withMutation(
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
       if (message.includes('Record to delete') || message.includes('not found')) {
-        return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Отчёт не найден' }, { status: 404 });
       }
       throw err;
     }
