@@ -315,7 +315,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {tab === 'checklists' && <EquipmentInspections equipmentId={equipmentId} />}
 
           {tab === 'documents' && (
-            <EquipmentDocuments equipmentId={equipmentId} documents={details.documents} onChanged={refresh} />
+            <EquipmentDocuments equipmentId={equipmentId} documents={details.documents} canManage={canManage} onChanged={refresh} />
           )}
 
           {tab === 'history' &&
@@ -464,6 +464,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
         <EquipmentDocuments
           equipmentId={equipmentId}
           documents={details.documents}
+          canManage={canManage}
           onChanged={refresh}
         />
       </Section>

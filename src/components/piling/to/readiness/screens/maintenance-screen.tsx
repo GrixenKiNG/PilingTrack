@@ -8,6 +8,7 @@ import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAbility } from '@/lib/use-ability';
 import { formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { PRIORITY_LABEL, STATUS_LABEL, type MaintenancePriority, type MaintenanceStatus } from '@/components/piling/maintenance/maintenance-labels';
@@ -26,6 +27,18 @@ import type { ReferenceUiProps } from './types';
 const MAINTENANCE_SOON_HOURS = 250;
 
 export function MaintenanceScreen(props: ReferenceUiProps) {
+  /**
+   * Раздел обслуживания целиком закрыт правом `maintenance.manage`
+   * (`api/maintenance/route.ts:15`, `api/maintenance/[id]/route.ts:16`,
+   * `api/equipment/[id]/maintenance/route.ts:42,58`). Вкладку «Обслуживание ТО»
+   * при этом видит всякий с `readiness.read` — мастер, инженер ОТ, — поэтому
+   * ссылки в раздел проверяем сами: без права человек набирал заявку и получал
+   * 403 на сохранении. Считаем по той же таблице, что и сервер (`useAbility`
+   * читает исполняемую роль из store), а не по `bootstrap.capabilities.entities
+   * .maintenance.manage`: то `readiness.maintenance.manage` — другое право,
+   * и у диспетчера оно снято, хотя раздел ему положен.
+   */
+  const canManageMaintenance = useAbility('maintenance.manage');
   const [maintenanceFilter, setMaintenanceFilter] = useState<'ALL' | 'CRITICAL' | 'ACTIVE' | 'PLANNED'>('ALL');
   const [maintenanceQuery, setMaintenanceQuery] = useState('');
   const open = props.maintenance.filter((record) => !['DONE', 'CANCELLED'].includes(record.status));
@@ -91,7 +104,9 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
           появлялось, и заявка не создавалась — отсюда «создать заявку ничего
           не делает». Сама заявка заводилась кнопкой «Задача ТО» на той доске,
           найти которую по подписи было нельзя. */}
-      <ScreenTitle heading="Обслуживание ТО" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2"><Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance/new">+ Создать заявку</Link></Button></div>} />
+      <ScreenTitle heading="Обслуживание ТО" subtitle="Техническое состояние и план работ" actions={<div className="flex flex-wrap gap-2">{canManageMaintenance
+        ? <Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance/new">+ Создать заявку</Link></Button>
+        : <Button disabled className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать заявку</Button>}</div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={blockingDefects.length} detail={`открытых замечаний: ${openDefects.length}`} alert={blockingDefects.length > 0} />
         <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={todayWork.length} />
@@ -114,7 +129,9 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
                   <EquipmentPhoto cardData={fleet} name={record.equipment?.name || record.title} className="h-14 w-14 shrink-0" />
                   <span className={cn('grid h-9 w-9 place-items-center rounded-full', criticalRecord ? 'bg-destructive/10 text-destructive-strong' : 'bg-card text-signal-strong')}>{criticalRecord ? <AlertTriangle className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}</span>
                   <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-bold">{record.title}</h3><div className="mt-0.5 text-2xs text-muted-foreground">{record.equipment?.name || 'Установка не указана'}</div><div className="mt-0.5 line-clamp-1 text-2xs text-muted-foreground">{record.description || 'Описание не заполнено'}</div><div className="mt-1 text-3xs text-muted-foreground">▣ {record.scheduledAt ? formatDateTimeInTimezone(record.scheduledAt, props.bootstrap?.tenant.timezone) : 'Срок не задан'}</div></div>
-                  <div className="w-full text-left text-2xs sm:w-36 sm:text-right"><div className={cn('font-semibold', criticalRecord ? 'text-destructive-strong' : 'text-info-strong')}>{criticalRecord ? 'Критическое' : STATUS_LABEL[record.status as MaintenanceStatus] ?? record.status}</div><div className="mt-1 text-muted-foreground">Приоритет · <b className="text-muted-foreground">{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</b></div><Button asChild className="mt-2 h-8 bg-signal-strong text-2xs hover:bg-signal-strong"><Link href={`/admin/maintenance/${record.id}`}>Открыть заявку</Link></Button></div>
+                  <div className="w-full text-left text-2xs sm:w-36 sm:text-right"><div className={cn('font-semibold', criticalRecord ? 'text-destructive-strong' : 'text-info-strong')}>{criticalRecord ? 'Критическое' : STATUS_LABEL[record.status as MaintenanceStatus] ?? record.status}</div><div className="mt-1 text-muted-foreground">Приоритет · <b className="text-muted-foreground">{PRIORITY_LABEL[record.priority as MaintenancePriority] ?? record.priority}</b></div>{canManageMaintenance
+                    ? <Button asChild className="mt-2 h-8 bg-signal-strong text-2xs hover:bg-signal-strong"><Link href={`/admin/maintenance/${record.id}`}>Открыть заявку</Link></Button>
+                    : <Button disabled className="mt-2 h-8 bg-signal-strong text-2xs hover:bg-signal-strong">Открыть заявку</Button>}</div>
                 </article>
               );
             }) : <div className="py-20 text-center text-sm text-muted-foreground">Заявки обслуживания отсутствуют.</div>}
@@ -163,7 +180,9 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
                   );
                 })}
             </div>
-            <Button asChild variant="outline" className="mt-2 h-8 w-full text-2xs"><Link href="/admin/maintenance"><CalendarClock className="mr-2 h-4 w-4" />Открыть календарь</Link></Button>
+            {canManageMaintenance
+              ? <Button asChild variant="outline" className="mt-2 h-8 w-full text-2xs"><Link href="/admin/maintenance"><CalendarClock className="mr-2 h-4 w-4" />Открыть календарь</Link></Button>
+              : <Button disabled variant="outline" className="mt-2 h-8 w-full text-2xs"><CalendarClock className="mr-2 h-4 w-4" />Открыть календарь</Button>}
           </section>
           {/*
             Список запчастей был захардкожен четырьмя названиями с подписью
