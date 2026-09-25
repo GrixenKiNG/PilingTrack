@@ -23,7 +23,8 @@ export const GET = withApi(
     }
 
     const limitRaw = Number(request.nextUrl.searchParams.get('limit'));
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 20;
+    // Верхняя граница: без неё limit=100000 тянул всю историю сущности.
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 200) : 20;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const entries = await getEntityHistory(scope, targetId, user!.tenantId, limit);

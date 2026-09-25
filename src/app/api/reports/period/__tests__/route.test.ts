@@ -66,4 +66,23 @@ describe('GET /api/reports/period', () => {
     // Metres from the grade length (2 piles × 5 m), no plan lookup.
     expect(body.summary).toMatchObject({ totalPiles: 2, totalPileMeters: 10, reportCount: 1 });
   });
+
+  it('returns 400 for a malformed or inverted period instead of querying', async () => {
+    requireAuthMock.mockResolvedValue({
+      user: { id: 'admin', role: 'ADMIN', tenantId: 'orion' },
+      error: null,
+    });
+
+    const malformed = await GET(req('dateFrom=01.04.2026&dateTo=2026-04-30'));
+    expect(malformed.status).toBe(400);
+    expect((await malformed.json()).error).toMatch(/Некорректный период/);
+
+    const inverted = await GET(req('dateFrom=2026-04-30&dateTo=2026-04-01'));
+    expect(inverted.status).toBe(400);
+
+    const impossible = await GET(req('dateFrom=2026-02-31&dateTo=2026-04-30'));
+    expect(impossible.status).toBe(400);
+
+    expect(getByPeriodMock).not.toHaveBeenCalled();
+  });
 });
