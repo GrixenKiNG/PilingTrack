@@ -59,6 +59,20 @@ describe('work permit state machine', () => {
     }], 1)).toBe(true);
   });
 
+  // R18-2: флаги «может согласовывать» в «Роли и доступы» сервер не читал —
+  // снятый у диспетчера флаг не мешал ему подписать.
+  it('refuses a signature when the published matrix revoked the approve flag', () => {
+    const record = permit();
+    expect(() => assertCanApprovePermit({
+      permit: record, actorId: 'dispatcher-1', role: 'DISPATCHER', approvals: [],
+      abilities: new Set(['readiness.read']),
+    })).toThrow(/нет полномочий/);
+    expect(assertCanApprovePermit({
+      permit: record, actorId: 'dispatcher-1', role: 'DISPATCHER', approvals: [],
+      abilities: new Set(['readiness.permit.approve_dispatcher']),
+    })).toBe('DISPATCHER');
+  });
+
   it('requires distinct people when two signatures are configured', () => {
     const record = permit({requiredApprovals: ['DISPATCHER', 'ADMIN'], allowAuthorApproval: false});
     const first = {

@@ -69,6 +69,31 @@ export function effectiveReadinessCapabilities(
   return abilitiesForRole(matrix, actingAs);
 }
 
+/** Кто действует: своя роль, исполняемая роль и опубликованная матрица организации. */
+export interface ReadinessActorRights {
+  actorRole: string;
+  actingAs: string | null;
+  /** Не задана — значения по умолчанию из кода. */
+  accessMatrix?: ReadinessAccessMatrix;
+}
+
+/**
+ * Права команд над дефектами — тем же расчётом, что экран получает в bootstrap
+ * (`effectiveReadinessCapabilities`). Раньше команды сверялись со встроенной
+ * матрицей и собственной ролью плюс зашитым «админ за механика»: после первой
+ * публикации прав кнопки «Взять в работу / Отклонить» и сервер расходились, а
+ * администратор в роли инженера ОТ видел кнопку и получал отказ (аудит R18-1).
+ */
+export function canReportDefects(rights: ReadinessActorRights): boolean {
+  return effectiveReadinessCapabilities(rights.actorRole, rights.actingAs, rights.accessMatrix)
+    .has('readiness.defect.report');
+}
+
+export function canManageDefects(rights: ReadinessActorRights): boolean {
+  return effectiveReadinessCapabilities(rights.actorRole, rights.actingAs, rights.accessMatrix)
+    .has('readiness.defect.manage');
+}
+
 export async function resolveAuditedReadinessCapabilities(
   actor: ReadinessActor,
   actingAs: ActingRole | null,

@@ -253,7 +253,8 @@ async function versionedAction(input: {
         // теперь это правило настраивается на виде работ, и подпись уходит в
         // журнал вместе с actingAs.
         const role = assertCanApprovePermit({permit, actorId: input.context.actorId,
-          role: input.context.actingAs ?? input.context.actorRole, approvals: permit.approvals});
+          role: input.context.actingAs ?? input.context.actorRole, approvals: permit.approvals,
+          abilities: effectiveReadinessCapabilities(input.context.actorRole, input.context.actingAs, input.context.accessMatrix)});
         await repository.addApproval({tenantId: input.context.tenantId,
           permitId: input.id, permitVersion: expected, role,
           actorId: input.context.actorId});

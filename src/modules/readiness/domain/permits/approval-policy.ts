@@ -4,6 +4,13 @@ import type {
   WorkPermitApprovalRole,
   WorkPermitRecord,
 } from './types';
+import type {ReadinessAbility} from '../capability-defaults';
+
+/** Какой флаг матрицы разрешает подпись в этой графе («Роли и доступы»). */
+const APPROVE_FLAG: Record<WorkPermitApprovalRole, ReadinessAbility> = {
+  DISPATCHER: 'readiness.permit.approve_dispatcher',
+  ADMIN: 'readiness.permit.approve_admin',
+};
 
 /**
  * НЕ РЕАЛИЗОВАНО. Решение владельца 07.09.2026: подписывать наряд должен
@@ -47,6 +54,13 @@ export function assertCanApprovePermit(input: {
   actorId: string;
   role: string;
   approvals: WorkPermitApprovalRecord[];
+  /**
+   * Права по опубликованной матрице (исполняемая роль). Подпись в графе
+   * требует и роли, и флага «может согласовывать» — раньше флаг сервер не
+   * читал, и снятое в «Роли и доступы» право ничего не запрещало (аудит R18-2).
+   * Не задано — проверка только по роли, как прежде.
+   */
+  abilities?: ReadonlySet<ReadinessAbility>;
 }): WorkPermitApprovalRole {
   const {roles, allowAuthorApproval} = effectiveApprovalRule(input.permit);
   if (roles.length === 0) {
@@ -56,7 +70,7 @@ export function assertCanApprovePermit(input: {
     );
   }
   const role = input.role === 'DISPATCHER' || input.role === 'ADMIN' ? input.role : null;
-  if (!role || !roles.includes(role)) {
+  if (!role || !roles.includes(role) || (input.abilities && !input.abilities.has(APPROVE_FLAG[role]))) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'У вас нет полномочий согласовать этот наряд');
   }
   // Может ли автор подписать собственный наряд — решает админ на виде работ.

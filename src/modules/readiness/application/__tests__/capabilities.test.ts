@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  canManageDefects,
+  canReportDefects,
   resolveAuditedReadinessCapabilities,
   resolveReadinessCapabilities,
 } from '../capabilities';
+import {DEFAULT_ACCESS_MATRIX} from '../../domain/access-matrix';
 
 describe('readiness capabilities', () => {
   // Механик выполняет работы и возвращает технику, но смену не планирует и
@@ -132,4 +135,31 @@ describe('readiness capabilities', () => {
       expect([...abilities]).toEqual([]);
     }
   );
+});
+
+// R18-1: разбор дефектов проверялся по встроенной матрице и собственной роли,
+// а экран — по опубликованной матрице и исполняемой роли. После первой
+// публикации прав кнопки и сервер расходились.
+describe('defect command rights follow the published matrix and acting role', () => {
+  const base = {actorRole: 'DISPATCHER', actingAs: null};
+
+  it('revoking defect.manage in the published matrix revokes it on the server', () => {
+    const published = {
+      ...DEFAULT_ACCESS_MATRIX,
+      grants: {
+        ...DEFAULT_ACCESS_MATRIX.grants,
+        DISPATCHER: DEFAULT_ACCESS_MATRIX.grants.DISPATCHER.filter((a) => a !== 'readiness.defect.manage'),
+      },
+    };
+    expect(canManageDefects(base)).toBe(true);
+    expect(canManageDefects({...base, accessMatrix: published})).toBe(false);
+  });
+
+  it('an admin acting as engineer ОТ gets the acting role rights, like the screen shows', () => {
+    expect(canManageDefects({actorRole: 'ADMIN', actingAs: 'SAFETY_ENGINEER'})).toBe(true);
+    expect(canManageDefects({actorRole: 'ADMIN', actingAs: 'MECHANIC'})).toBe(true);
+    // Замещение — исполнение роли: в роли мастера разбирать дефекты нельзя.
+    expect(canManageDefects({actorRole: 'ADMIN', actingAs: 'FOREMAN'})).toBe(false);
+    expect(canReportDefects({actorRole: 'ADMIN', actingAs: 'FOREMAN'})).toBe(true);
+  });
 });
