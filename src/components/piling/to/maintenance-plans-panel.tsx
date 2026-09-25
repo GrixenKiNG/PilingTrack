@@ -52,9 +52,23 @@ function dueDetail(p: Plan): string {
   return p.due.daysRemaining >= 0 ? `через ${p.due.daysRemaining} дн.` : `просрочка ${Math.abs(p.due.daysRemaining)} дн.`;
 }
 
+/**
+ * Отказ загрузки словами. 403 — прав нет (повтор не поможет), null — запрос не
+ * дошёл. Пустой список об отказе не говорит: «регламентов нет» и «не загрузилось» —
+ * разные утверждения, и на экране ТО они должны читаться по-разному.
+ */
+const loadFailureText = (status: number | null) => {
+  if (status === 403) return 'Нет доступа';
+  if (status !== null) return `Не удалось загрузить: сервер вернул ${status}`;
+  return navigator.onLine
+    ? 'Не удалось загрузить: сервер не ответил'
+    : 'Не удалось загрузить: нет подключения к сети';
+};
+
 export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -66,10 +80,19 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance-plans?equipmentId=${encodeURIComponent(eqId)}`);
-      if (!res.ok) throw new Error('plans');
-      setPlans(((await res.json()).plans ?? []) as Plan[]);
+      // 404 — регламентов по этой установке нет: это «данных нет», а не сбой.
+      if (!res.ok && res.status !== 404) {
+        setPlans([]);
+        setLoadError(loadFailureText(res.status));
+        toast.error('Не удалось загрузить регламенты');
+        return;
+      }
+      const body = res.ok ? await res.json() as { plans?: Plan[] } : {};
+      setPlans(body.plans ?? []);
+      setLoadError(null);
     } catch {
       setPlans([]);
+      setLoadError(loadFailureText(null));
       toast.error('Не удалось загрузить регламенты');
     } finally {
       setLoading(false);
@@ -203,6 +226,22 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
+        </div>
+      ) : loadError !== null ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="min-w-0 break-words">{loadError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => void load(equipmentId)}
+          >
+            Повторить
+          </Button>
         </div>
       ) : plans.length === 0 ? (
         <div className="grid min-h-16 place-items-center rounded-md bg-muted px-3 py-3 text-center text-sm text-muted-foreground">

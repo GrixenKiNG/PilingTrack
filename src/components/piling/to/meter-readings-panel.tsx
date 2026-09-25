@@ -34,6 +34,19 @@ const todayInput = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+/**
+ * Отказ загрузки словами. 403 — прав нет (повтор не поможет), null — запрос не
+ * дошёл. Пустой список об отказе не говорит: «показаний нет» и «не загрузилось» —
+ * разные утверждения, и на экране ТО они должны читаться по-разному.
+ */
+const loadFailureText = (status: number | null) => {
+  if (status === 403) return 'Нет доступа';
+  if (status !== null) return `Не удалось загрузить: сервер вернул ${status}`;
+  return navigator.onLine
+    ? 'Не удалось загрузить: сервер не ответил'
+    : 'Не удалось загрузить: нет подключения к сети';
+};
+
 export function MeterReadingsPanel({
   equipmentId,
   onChanged,
@@ -45,6 +58,7 @@ export function MeterReadingsPanel({
 }) {
   const [readings, setReadings] = useState<MeterReading[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [hours, setHours] = useState('');
   const [recordedAt, setRecordedAt] = useState(todayInput());
@@ -56,12 +70,23 @@ export function MeterReadingsPanel({
     setLoading(true);
     try {
       const res = await authFetch(`/api/equipment/${eqId}/meter-readings`);
-      if (!res.ok) throw new Error('readings');
-      const list = ((await res.json()).readings ?? []) as MeterReading[];
+      // 404 — журнала по этой установке нет: это «данных нет», а не сбой.
+      if (!res.ok && res.status !== 404) {
+        setReadings([]);
+        setLoadError(loadFailureText(res.status));
+        toast.error('Не удалось загрузить показания');
+        return [];
+      }
+      const body = res.ok
+        ? await res.json() as { readings?: MeterReading[] }
+        : {};
+      const list = body.readings ?? [];
       setReadings(list);
+      setLoadError(null);
       return list;
     } catch {
       setReadings([]);
+      setLoadError(loadFailureText(null));
       toast.error('Не удалось загрузить показания');
       return [];
     } finally {
@@ -179,6 +204,22 @@ export function MeterReadingsPanel({
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
+        </div>
+      ) : loadError !== null ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="min-w-0 break-words">{loadError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => void load(equipmentId)}
+          >
+            Повторить
+          </Button>
         </div>
       ) : readings.length === 0 ? (
         <div className="grid min-h-20 place-items-center rounded-md bg-muted px-3 py-4 text-center text-sm text-muted-foreground">

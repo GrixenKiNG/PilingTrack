@@ -48,10 +48,24 @@ const todayInput = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+/**
+ * Отказ загрузки словами. 403 — прав нет (повтор не поможет), null — запрос не
+ * дошёл. Пустой список об отказе не говорит: «записей нет» и «не загрузилось» —
+ * разные утверждения, и на экране ТО они должны читаться по-разному.
+ */
+const loadFailureText = (status: number | null) => {
+  if (status === 403) return 'Нет доступа';
+  if (status !== null) return `Не удалось загрузить: сервер вернул ${status}`;
+  return navigator.onLine
+    ? 'Не удалось загрузить: сервер не ответил'
+    : 'Не удалось загрузить: нет подключения к сети';
+};
+
 export function FuelPanel({ equipmentId }: { equipmentId: string }) {
   const [entries, setEntries] = useState<FuelEntry[]>([]);
   const [summary, setSummary] = useState<FuelSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [liters, setLiters] = useState('');
   const [percent, setPercent] = useState('');
@@ -63,13 +77,24 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
     setLoading(true);
     try {
       const res = await authFetch(`/api/equipment/${eqId}/fuel`);
-      if (!res.ok) throw new Error('fuel');
-      const data = await res.json();
-      setEntries((data.entries ?? []) as FuelEntry[]);
-      setSummary((data.summary ?? null) as FuelSummary | null);
+      // 404 — журнала по этой установке нет: это «данных нет», а не сбой.
+      if (!res.ok && res.status !== 404) {
+        setEntries([]);
+        setSummary(null);
+        setLoadError(loadFailureText(res.status));
+        toast.error('Не удалось загрузить журнал топлива');
+        return;
+      }
+      const data = res.ok
+        ? await res.json() as { entries?: FuelEntry[]; summary?: FuelSummary | null }
+        : {};
+      setEntries(data.entries ?? []);
+      setSummary(data.summary ?? null);
+      setLoadError(null);
     } catch {
       setEntries([]);
       setSummary(null);
+      setLoadError(loadFailureText(null));
       toast.error('Не удалось загрузить журнал топлива');
     } finally {
       setLoading(false);
@@ -218,6 +243,22 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
+        </div>
+      ) : loadError !== null ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="min-w-0 break-words">{loadError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => void load(equipmentId)}
+          >
+            Повторить
+          </Button>
         </div>
       ) : entries.length === 0 ? (
         <div className="grid min-h-20 place-items-center rounded-md bg-muted px-3 py-4 text-center text-sm text-muted-foreground">
