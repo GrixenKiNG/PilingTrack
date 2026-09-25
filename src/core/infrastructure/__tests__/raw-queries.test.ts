@@ -39,6 +39,7 @@ import {
   getReportsByPeriodRaw,
   upsertReportRaw,
   bulkDeleteReportsRaw,
+  PERIOD_REPORTS_LIMIT,
 } from '../raw-queries';
 
 describe('getReportsByPeriodRaw', () => {
@@ -58,7 +59,7 @@ describe('getReportsByPeriodRaw', () => {
       siteId: 'site-1',
     });
     expect(args.orderBy).toEqual({ date: 'desc' });
-    expect(args.take).toBe(500);
+    expect(args.take).toBe(PERIOD_REPORTS_LIMIT + 1);
   });
 
   it('omits siteId filter when not provided', async () => {
@@ -90,6 +91,19 @@ describe('getReportsByPeriodRaw', () => {
       piles: expect.any(Object),
       drillings: expect.any(Object),
       downtimes: expect.any(Object),
+    });
+  });
+
+  it('throws 422 instead of silently truncating a period over the limit', async () => {
+    findManyMock.mockResolvedValue(
+      Array.from({ length: PERIOD_REPORTS_LIMIT + 1 }, (_, index) => ({ id: `report-${index}` }))
+    );
+
+    await expect(
+      getReportsByPeriodRaw('tenant-1', '2026-04-01', '2026-04-30')
+    ).rejects.toMatchObject({
+      status: 422,
+      message: 'За выбранный период больше 2000 отчётов — сузьте период или выберите объект',
     });
   });
 });
