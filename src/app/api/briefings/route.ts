@@ -39,7 +39,7 @@ export const POST = withMutation(
     const validated = conductSchema.safeParse(await request.json().catch(() => null));
     if (!validated.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validated.error.flatten() },
+        { error: 'Некорректные данные', details: validated.error.flatten() },
         { status: 400 },
       );
     }

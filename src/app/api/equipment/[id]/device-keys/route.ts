@@ -58,7 +58,7 @@ async function requireTenantEquipment(
     select: { id: true },
   });
   if (!equipment) {
-    return NextResponse.json({ error: 'Equipment not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Техника не найдена' }, { status: 404 });
   }
   return { tenantId: resolvedTenantId, db };
 }
@@ -75,7 +75,7 @@ export const POST = withMutation(async (request: NextRequest, ctx: RouteCtx) => 
   const parsed = provisionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten() },
+      { error: 'Некорректные данные', details: parsed.error.flatten() },
       { status: 400 }
     );
   }
@@ -137,7 +137,7 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: RouteCtx) =
   const parsed = revokeSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten() },
+      { error: 'Некорректные данные', details: parsed.error.flatten() },
       { status: 400 }
     );
   }
@@ -154,7 +154,7 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: RouteCtx) =
     select: { equipmentId: true },
   });
   if (!key || key.equipmentId !== equipmentId) {
-    return NextResponse.json({ error: 'Key not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Ключ не найден' }, { status: 404 });
   }
 
   await revokeDeviceKey(parsed.data.keyId);
