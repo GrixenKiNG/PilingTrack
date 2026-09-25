@@ -31,13 +31,13 @@ export const PUT = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const ctx = actorContext(user!);
-    if (!ctx) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    if (!ctx) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
 
     const { id, docId } = await params;
     const parsed = updateSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
+        { error: 'Некорректные данные', details: parsed.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }
@@ -60,7 +60,7 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const ctx = actorContext(user!);
-    if (!ctx) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+    if (!ctx) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
 
     const { id, docId } = await params;
     try {

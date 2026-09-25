@@ -57,7 +57,7 @@ describe('POST /api/sites/create', () => {
     requireAuthMock.mockResolvedValue({ user: { id: 'a', role: 'ADMIN', tenantId: 'tenant-a' }, error: null });
     const res = await POST(req({}));
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe('Validation failed');
+    expect((await res.json()).error).toBe('Некорректные данные');
     expect(createSiteMock).not.toHaveBeenCalled();
   });
 

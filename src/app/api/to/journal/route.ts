@@ -17,7 +17,7 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
     const equipmentId = request.nextUrl.searchParams.get('equipmentId');
-    if (!equipmentId) return NextResponse.json({ error: 'equipmentId required' }, { status: 400 });
+    if (!equipmentId) return NextResponse.json({ error: 'Не указан equipmentId' }, { status: 400 });
     const records = await listToJournal(tenantId, equipmentId);
     return NextResponse.json({ records });
   },

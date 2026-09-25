@@ -25,7 +25,7 @@ export const GET = withApi(
     assertCan(user!, 'users.read');
     const tenantId = user?.tenantId;
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+      return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
     }
     const role = request.nextUrl.searchParams.get('role');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
@@ -46,19 +46,19 @@ export const POST = withMutation(
     assertCan(user!, 'users.manage');
     const tenantId = user?.tenantId;
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+      return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
     }
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
     }
 
     const validation = createUserSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
+        { error: 'Некорректные данные', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }
@@ -68,7 +68,7 @@ export const POST = withMutation(
     const { pin, password, isActive: _isActive, ...rest } = validation.data;
     if (!password?.trim() && !pin?.trim()) {
       return NextResponse.json(
-        { error: 'password or pin is required' },
+        { error: 'Укажите пароль или PIN-код' },
         { status: 400 }
       );
     }
@@ -96,19 +96,19 @@ export const PUT = withMutation(
     assertCan(user!, 'users.manage');
     const tenantId = user?.tenantId;
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+      return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
     }
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
     }
 
     const validation = updateUserSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
+        { error: 'Некорректные данные', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }
@@ -130,19 +130,19 @@ export const DELETE = withMutation(
     assertCan(user!, 'users.manage');
     const tenantId = user?.tenantId;
     if (!tenantId) {
-      return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+      return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
     }
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
     }
 
     const validation = deleteIdSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
+        { error: 'Некорректные данные', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
         { status: 400 }
       );
     }

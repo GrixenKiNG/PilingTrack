@@ -23,7 +23,7 @@ export const POST = withMutation(
     const body = await readJsonBody(request);
     const validated = siteAssignSchema.safeParse(body);
     if (!validated.success) {
-      return NextResponse.json({ error: 'Validation failed', details: validated.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректные данные', details: validated.error.flatten() }, { status: 400 });
     }
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const assignment = await assignUserToSite(id, validated.data.userId, { tenantId, actorId: user!.id });

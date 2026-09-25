@@ -44,7 +44,7 @@ export const PUT = withMutation(
     const validated = updateSiteSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
-        { error: 'Validation error', details: validated.error.flatten() },
+        { error: 'Некорректные данные', details: validated.error.flatten() },
         { status: 400 }
       );
     }

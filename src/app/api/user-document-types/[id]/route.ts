@@ -19,7 +19,7 @@ export const PATCH = withMutation(
     const tenantId = requireTenantId(user!);
     const parsed = patchSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
     }
     const { id } = await params;
     try {

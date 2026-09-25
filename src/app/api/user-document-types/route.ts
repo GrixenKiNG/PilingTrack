@@ -46,7 +46,7 @@ export const POST = withMutation(
     const tenantId = requireTenantId(user!);
     const parsed = documentTypeSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation failed', details: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })) }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректные данные', details: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })) }, { status: 400 });
     }
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
