@@ -12,6 +12,7 @@ import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
 } from '@/modules/operator-mobile/domain/defect-labels';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, Sign} from './ui';
+import './operator-type.css';
 
 /**
  * Рабочее место помощника машиниста.

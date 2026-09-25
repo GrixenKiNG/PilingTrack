@@ -1,0 +1,55 @@
+/*
+ * Полевая шкала шрифта машиниста и помощника (решение владельца 25.09.2026:
+ * «текст не виден, очень мелкий»).
+ *
+ * Экран читают с вытянутой руки, на солнце, в перчатке. Шкала продукта
+ * (12 px подписи, 11 и 10 px метаданные) рассчитана на стол диспетчера — здесь
+ * она поднята на ступень, а нижний порог — 13 px вместо 10. Классы в разметке
+ * не трогаем: переопределяем токены Tailwind внутри корня экрана, поэтому
+ * иерархия (заголовок > значение > подпись > метаданные) сохраняется как была,
+ * только крупнее.
+ *
+ * Действует только внутри живого контура (/operator и помощник): корень
+ * `.operator-mobile-theme` и экран `.operator-screen` из ui.tsx. Варианты
+ * v2–v10 и прототипы эти классы не носят.
+ */
+:is(.operator-mobile-theme, .operator-screen) {
+  --text-xs: 0.9375rem;            /* 12 → 15 */
+  --text-xs--line-height: 1.35;
+  --text-sm: 1.0625rem;            /* 14 → 17 */
+  --text-sm--line-height: 1.45;
+  --text-base: 1.125rem;           /* 16 → 18 */
+  --text-base--line-height: 1.5;
+  --text-lg: 1.25rem;              /* 18 → 20 */
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.4375rem;            /* 20 → 23 */
+  --text-2xl: 1.6875rem;           /* 24 → 27 */
+  /* Вторичный текст темнее: серый 0.5 на светлом фоне на солнце пропадает.
+     0.4 даёт ~7:1 на карточке и ~6.5:1 на сером фоне экрана. */
+  --muted-foreground: oklch(0.4 0 0);
+}
+
+/* 2xs и 3xs объявлены в @theme inline — у них в утилите число, а не токен,
+   поэтому их поднимаем селектором. */
+:is(.operator-mobile-theme, .operator-screen) .text-2xs { font-size: 0.875rem; line-height: 1.25rem; }  /* 11 → 14 */
+:is(.operator-mobile-theme, .operator-screen) .text-3xs { font-size: 0.8125rem; line-height: 1.125rem; } /* 10 → 13 */
+
+/* Заголовок экрана: 22 → 26 px. */
+.operator-screen-header h1 { font-size: 1.625rem; }
+
+/* Обзор смены (operator-concept.css) задан в пикселях — поднимаем те же роли. */
+.operator-mobile-theme .operator-concept { font-size: 16px; }
+.operator-mobile-theme .operator-concept h2 { font-size: 19px; }
+.operator-mobile-theme .oc-machine strong { font-size: 20px; }
+.operator-mobile-theme .oc-machine :is(span, small),
+.operator-mobile-theme .oc-caption { font-size: 15px; }
+.operator-mobile-theme .oc-status strong { font-size: 17px; }
+.operator-mobile-theme .oc-status span,
+.operator-mobile-theme .oc-stat :is(span, small),
+.operator-mobile-theme .oc-entry :is(time, span, small) { font-size: 14px; }
+.operator-mobile-theme .oc-entry strong { font-size: 17px; }
+.operator-mobile-theme .oc-stages li { font-size: 13px; }
+.operator-mobile-theme .oc-stages li > span { font-size: 16px; }
+.operator-mobile-theme :is(.oc-additional button, .oc-recent header button) { font-size: 15px; }
+.operator-mobile-theme .oc-action { font-size: 17px; }
+.operator-mobile-theme .oc-finish { font-size: 16px; }

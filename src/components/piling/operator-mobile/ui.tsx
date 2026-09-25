@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect, useRef, type ReactNode} from 'react';
+import {type ReactNode} from 'react';
 import {cn} from '@/lib/utils';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 
@@ -22,7 +22,6 @@ export function Screen({title, subtitle, children, footer, tabs}: {
   /** Нижние вкладки. Появляются только после начала работы — см. TabBar. */
   tabs?: ReactNode;
 }) {
-  const main = useDensityFit([title, subtitle, children, footer, tabs]);
   return (
     <div className="operator-screen flex min-h-dvh flex-col bg-background text-foreground">
       <header className="operator-screen-header border-b px-4 pb-2.5 pt-3">
@@ -38,8 +37,7 @@ export function Screen({title, subtitle, children, footer, tabs}: {
         панели была посчитана дважды. Эти 224 px и были главной причиной
         прокрутки там, где всё помещалось (жалоба 17.09.2026).
       */}
-      <main className="operator-screen-main flex-1 space-y-2.5 px-4 pb-3 pt-2.5"
-        ref={main}>{children}</main>
+      <main className="operator-screen-main flex-1 space-y-2.5 px-4 pb-3 pt-2.5">{children}</main>
       {/*
         Пустую панель не рисуем вовсе: с рамкой и тенью она выглядела как
         оборванный низ экрана.
@@ -54,60 +52,11 @@ export function Screen({title, subtitle, children, footer, tabs}: {
   );
 }
 
-/**
- * Поджать содержимое вместо прокрутки.
- *
- * Экран из трёх карточек, который приходится листать, раздражает сильнее, чем
- * шрифт на десятую меньше: в рукавице прокрутка — это отдельное действие, а
- * половину смены человек смотрит на экран одной рукой. Поэтому при небольшом
- * перехлёсте содержимое сжимается — но не ниже 0,8: дальше страдает
- * читаемость на морозе, а осмотр с нечитаемым пунктом опаснее прокрутки.
- *
- * Сжимается ТОЛЬКО содержимое. Шапка и нижняя панель остаются в полный
- * размер: цель нажатия во вкладках не должна уезжать ниже 44 точек, ради чего
- * вкладок и оставлено четыре.
- *
- * `zoom`, а не `transform: scale` — масштаб должен менять занимаемое место, а
- * не рисовать уменьшенную картинку поверх прежнего. Коэффициент ставится прямо
- * на узел: это подгонка вида, перерисовка ради неё не нужна.
+/*
+ * Содержимое экрана больше не ужимается под высоту (было zoom до 0,8, 17.09.2026).
+ * Подпись 11 px после сжатия становилась 8,8 px и на улице не читалась —
+ * владелец 25.09.2026 выбрал крупный текст ценой короткой прокрутки.
  */
-function useDensityFit(deps: unknown[]) {
-  const ref = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return undefined;
-
-    const fit = () => {
-      /*
-        Считаем по фактическому перехлёсту страницы, а не по сумме высот
-        окружения. Складывать шапку приложения, полосу фаз, строку связи и
-        нижнюю панель значит повторять в коде вёрстку — и ошибаться на
-        десяток точек при любой её правке. Вопрос у нас ровно один: «страница
-        сейчас листается?», и браузер отвечает на него сам.
-      */
-      node.style.removeProperty('zoom');
-      const page = document.documentElement;
-      const overflow = page.scrollHeight - page.clientHeight;
-      if (overflow <= 0) return;
-
-      const height = node.getBoundingClientRect().height;
-      const target = height - overflow;
-      if (height <= 0 || target <= 0) return;
-
-      // Округляем ВНИЗ: лишняя сотая сжатия незаметна, недостающая оставляет
-      // прокрутку — ровно то, ради чего всё и затевалось.
-      node.style.zoom = String(Math.max(0.8, Math.floor((target / height) * 100) / 100));
-    };
-
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- пересчёт при любой смене содержимого экрана
-  }, deps);
-
-  return ref;
-}
 
 export interface TabDefinition<T extends string> {
   id: T;

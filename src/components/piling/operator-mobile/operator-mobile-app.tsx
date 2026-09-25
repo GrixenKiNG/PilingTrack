@@ -28,6 +28,7 @@ import {ProfileTab} from './screens/profile-tab';
 import {SafetyTab} from './screens/safety-tab';
 import {admissionBlockers, admissionSteps} from './safety/admission-steps';
 import {knownAnswers} from './safety/known-answers';
+import './operator-type.css';
 
 /** Чек-лист, закрывающий фазу. Тот же порядок, что на сервере. */
 const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>> = {
