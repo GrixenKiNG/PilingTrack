@@ -70,6 +70,7 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.retryAfter).toBe(42);
+    expect(body.error).toBe('Слишком много попыток входа. Попробуйте позже.');
     expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'auth.login.rate_limited',
     }));
@@ -80,6 +81,7 @@ describe('POST /api/auth/login', () => {
     const res = await POST(jsonRequest({ email: 'a@b.ru', password: 'password123' }));
 
     expect(res.status).toBe(401);
+    expect((await res.json()).error).toBe('Неверный email или пароль');
     expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'auth.login.failed',
     }));

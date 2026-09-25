@@ -50,7 +50,11 @@ export const POST = withApi(async (request: NextRequest) => {
     });
 
     return createJsonResponse(
-      { error: result.error || 'Too many PIN attempts', requestId, retryAfter: result.retryAfter },
+      {
+        error: 'Слишком много попыток ввода PIN-кода. Попробуйте позже.',
+        requestId,
+        retryAfter: result.retryAfter,
+      },
       { status: 429 },
       requestId
     );
@@ -64,7 +68,7 @@ export const POST = withApi(async (request: NextRequest) => {
       requestId,
     });
 
-    return createJsonResponse({ error: 'Invalid PIN', requestId }, { status: 401 }, requestId);
+    return createJsonResponse({ error: 'Неверный PIN-код', requestId }, { status: 401 }, requestId);
   }
 
   await recordAuditEvent({

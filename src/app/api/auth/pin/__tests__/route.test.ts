@@ -95,6 +95,8 @@ describe('POST /api/auth/pin', () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.retryAfter).toBe(30);
+    // The route must NOT leak the auth-service English error; return Russian.
+    expect(body.error).toBe('Слишком много попыток ввода PIN-кода. Попробуйте позже.');
     expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'auth.pin.rate_limited',
     }));
@@ -106,7 +108,7 @@ describe('POST /api/auth/pin', () => {
     const res = await POST(pinRequest({ pin: '9999' }));
     expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toBe('Invalid PIN');
+    expect(body.error).toBe('Неверный PIN-код');
     expect(body).not.toHaveProperty('user');
     expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'auth.pin.failed',

@@ -53,7 +53,7 @@ export const POST = withApi(
       });
 
       return createJsonResponse(
-        { error: 'Too many login attempts', requestId, retryAfter: result.retryAfter },
+        { error: 'Слишком много попыток входа. Попробуйте позже.', requestId, retryAfter: result.retryAfter },
         { status: 429 },
         requestId
       );
@@ -68,7 +68,7 @@ export const POST = withApi(
         metadata: { email },
       });
 
-      return createJsonResponse({ error: 'Invalid credentials', requestId }, { status: 401 }, requestId);
+      return createJsonResponse({ error: 'Неверный email или пароль', requestId }, { status: 401 }, requestId);
     }
 
     await recordAuditEvent({
