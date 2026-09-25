@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { PmDueStatus } from '@/lib/pm-due';
+import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
 
 interface PlanDue {
   status: PmDueStatus;
@@ -51,19 +52,6 @@ function dueDetail(p: Plan): string {
   if (p.due.daysRemaining == null) return `каждые ${p.intervalDays ?? '—'} дн.`;
   return p.due.daysRemaining >= 0 ? `через ${p.due.daysRemaining} дн.` : `просрочка ${Math.abs(p.due.daysRemaining)} дн.`;
 }
-
-/**
- * Отказ загрузки словами. 403 — прав нет (повтор не поможет), null — запрос не
- * дошёл. Пустой список об отказе не говорит: «регламентов нет» и «не загрузилось» —
- * разные утверждения, и на экране ТО они должны читаться по-разному.
- */
-const loadFailureText = (status: number | null) => {
-  if (status === 403) return 'Нет доступа';
-  if (status !== null) return `Не удалось загрузить: сервер вернул ${status}`;
-  return navigator.onLine
-    ? 'Не удалось загрузить: сервер не ответил'
-    : 'Не удалось загрузить: нет подключения к сети';
-};
 
 export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -228,21 +216,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
           </span>
         </div>
       ) : loadError !== null ? (
-        <div
-          role="alert"
-          className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between"
-        >
-          <p className="min-w-0 break-words">{loadError}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={() => void load(equipmentId)}
-          >
-            Повторить
-          </Button>
-        </div>
+        <LoadFailure message={loadError} onRetry={() => void load(equipmentId)} />
       ) : plans.length === 0 ? (
         <div className="grid min-h-16 place-items-center rounded-md bg-muted px-3 py-3 text-center text-sm text-muted-foreground">
           Регламентов пока нет

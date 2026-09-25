@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
 
 interface MeterReading {
   id: string;
@@ -32,19 +33,6 @@ const fmtDate = (value: string) => {
 const todayInput = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-/**
- * Отказ загрузки словами. 403 — прав нет (повтор не поможет), null — запрос не
- * дошёл. Пустой список об отказе не говорит: «показаний нет» и «не загрузилось» —
- * разные утверждения, и на экране ТО они должны читаться по-разному.
- */
-const loadFailureText = (status: number | null) => {
-  if (status === 403) return 'Нет доступа';
-  if (status !== null) return `Не удалось загрузить: сервер вернул ${status}`;
-  return navigator.onLine
-    ? 'Не удалось загрузить: сервер не ответил'
-    : 'Не удалось загрузить: нет подключения к сети';
 };
 
 export function MeterReadingsPanel({
@@ -206,21 +194,7 @@ export function MeterReadingsPanel({
           </span>
         </div>
       ) : loadError !== null ? (
-        <div
-          role="alert"
-          className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between"
-        >
-          <p className="min-w-0 break-words">{loadError}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={() => void load(equipmentId)}
-          >
-            Повторить
-          </Button>
-        </div>
+        <LoadFailure message={loadError} onRetry={() => void load(equipmentId)} />
       ) : readings.length === 0 ? (
         <div className="grid min-h-20 place-items-center rounded-md bg-muted px-3 py-4 text-center text-sm text-muted-foreground">
           Показаний пока нет
