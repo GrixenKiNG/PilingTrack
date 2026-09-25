@@ -84,7 +84,7 @@ export const EMPTY_EQUIPMENT_FORM: EquipmentFormState = {
 };
 
 const KIND_LABELS: Record<EquipmentKindDTO, string> = {
-  PILE_DRIVER: 'Забивной копёр',
+  PILE_DRIVER: 'Забивная установка',
   DRILLING_RIG: 'Буровая установка',
   VIBRO_HAMMER: 'Вибропогружатель',
   HYBRID: 'Гибрид (забивка + бурение)',
@@ -114,7 +114,7 @@ export function EquipmentForm({ state, onChange, compact = false, equipmentId }:
       <TabsList className={cn('grid w-full', showTo ? 'grid-cols-4' : 'grid-cols-3')}>
         <TabsTrigger value="basic" className="gap-1.5"><Info className="h-4 w-4" />Основное</TabsTrigger>
         <TabsTrigger value="tech" disabled={compact} className="gap-1.5"><Gauge className="h-4 w-4" />Тех. характеристики</TabsTrigger>
-        {showTo && <TabsTrigger value="to" className="gap-1.5"><Wrench className="h-4 w-4" />ТО</TabsTrigger>}
+        {showTo && <TabsTrigger value="to" className="gap-1.5"><Wrench className="h-4 w-4" />Обслуживание ТО</TabsTrigger>}
         <TabsTrigger value="ops" disabled={compact} className="gap-1.5"><Activity className="h-4 w-4" />Эксплуатация</TabsTrigger>
       </TabsList>
 

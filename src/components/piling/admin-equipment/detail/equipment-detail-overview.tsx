@@ -68,7 +68,7 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: 'work', label: 'Работа' },
   { key: 'passport', label: 'Паспорт' },
   { key: 'assignment', label: 'Закрепление' },
-  { key: 'maintenance', label: 'ТО' },
+  { key: 'maintenance', label: 'Обслуживание ТО' },
   { key: 'documents', label: 'Документы' },
   { key: 'photos', label: 'Фото' },
   { key: 'history', label: 'История' },
