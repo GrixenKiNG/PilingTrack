@@ -285,10 +285,18 @@ function fmtNum(n: number): string {
   return new Intl.NumberFormat('ru-RU').format(n);
 }
 
-async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
-  try {
-    const { db } = await import('@/lib/db');
+/**
+ * Тип события доставки PDF отчёта. Отправка идёт через outbox, как тревоги
+ * (core/notifications/durable-alert): раньше PDF слался прямо из обработчика,
+ * и сбой Telegram только писался в журнал — отчёт в чат больше не приходил.
+ * Теперь сбой бросает исключение, outbox повторяет с паузами, а после
+ * исчерпания попыток событие видно в DLQ.
+ */
+export const REPORT_PDF_DELIVERY_EVENT = 'ReportPdfDeliveryRequested';
 
+async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
+  const { db } = await import('@/lib/db');
+  try {
     // Признак «Новые отчёты и сводки» из настроек организации. Раньше PDF
     // уходил независимо от переключателя.
     const { isNotificationEnabled } = await import('@/modules/settings');
@@ -319,60 +327,97 @@ async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
       return;
     }
 
-    const { loadSingleReportPdfContext } = await import('@/lib/pdf-data');
-    const { generateSinglePdf } = await import('@/lib/pdf-generator');
-    const { telegramNotifier } = await import('@/core/notifications/telegram');
-
-    const ctx = await loadSingleReportPdfContext(event.aggregateId);
-    if (!ctx) {
-      logger.warn('Telegram: report not found for submitted event', { reportId: event.aggregateId });
-      return;
+    // Одна доставка на одно событие ReportSubmitted: ключ не даёт поставить
+    // её дважды, если это событие повторяется из-за сбоя соседнего обработчика.
+    try {
+      await db.outboxEvent.create({
+        data: {
+          type: REPORT_PDF_DELIVERY_EVENT,
+          aggregateType: 'Notification',
+          aggregateId: event.aggregateId,
+          tenantId: event.tenantId ?? null,
+          dedupeKey: `report-pdf:${event.id}`,
+          payload: { autoClosed: event.data?.autoClosed === true },
+          // Проекциям это событие не нужно.
+          projected: true,
+        },
+      });
+    } catch (error) {
+      if ((error as { code?: string })?.code === 'P2002') return;
+      throw error;
     }
-
-    const d = ctx.pdfData;
-    // Resubmit detection: every save bumps Report.version. version === 1 means
-    // first time the report transitions draft→submitted; > 1 means an admin
-    // (or anyone with edit-window access) changed an already-submitted report.
-    const reportVersion = (ctx.report as { version?: number } | null)?.version ?? 1;
-    const isCorrection = reportVersion > 1;
-    const operatorName = (ctx.report?.lastEditedByName) || d.user?.name || '—';
-
-    const totalPiles = d.piles.reduce((s, p) => s + (p.count || 0), 0);
-    const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
-    const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
-
-    // Смену закрыл планировщик, а не оператор: «отчёт отправлен» от его имени
-    // было бы неправдой (см. readiness/application/scheduler).
-    const autoClosed = event.data?.autoClosed === true;
-
-    const lines = [
-      autoClosed
-        ? '⚠️ <b>Смена закрыта автоматически</b> — оператор её не закрыл'
-        : isCorrection
-          ? `✏️ <b>Корректировка отчёта</b> (ред. №${reportVersion})`
-          : '📋 <b>Отчёт отправлен</b>',
-      '',
-      `📍 Объект: <b>${escapeHtml(d.site?.name || '—')}</b>`,
-      `📅 Дата: <b>${escapeHtml(d.date)}</b>`,
-      `👷 Оператор: <b>${escapeHtml(d.user?.name || '—')}</b>`,
-      ...(isCorrection ? [`🖊 Изменил: <b>${escapeHtml(operatorName)}</b>`] : []),
-      `🛠 Оборудование: ${escapeHtml(d.equipmentName || '—')}`,
-      '',
-      `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
-      `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
-      `⏸ Простои: <b>${fmtNum(totalDowntime)}</b> ч`,
-    ];
-    const caption = lines.join('\n');
-
-    const pdfBuffer = await generateSinglePdf(d);
-    const filename = `report-${d.date}-${d.user?.name || 'unknown'}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
-
-    await telegramNotifier.sendDocument(filename, pdfBuffer, caption);
   } catch (error) {
-    logger.error('Telegram report notification failed', error, {
+    // Постановку в очередь не глотаем: иначе отчёт снова тихо не дойдёт.
+    logger.error('Telegram report PDF: failed to enqueue delivery', error, {
       reportId: event.aggregateId,
     });
+    throw error;
   }
+}
+
+/** Доставка PDF отчёта в Telegram. Бросает при сбое — outbox повторит. */
+export async function deliverReportPdf(event: { id?: string; aggregateId: string; data?: unknown }) {
+  if (!event.id) throw new Error('Report PDF delivery requires the outbox event id');
+  const { db } = await import('@/lib/db');
+  const { loadSingleReportPdfContext } = await import('@/lib/pdf-data');
+  const { generateSinglePdf } = await import('@/lib/pdf-generator');
+  const { telegramNotifier } = await import('@/core/notifications/telegram');
+
+  const ctx = await loadSingleReportPdfContext(event.aggregateId);
+  if (!ctx) {
+    logger.warn('Telegram: report not found for submitted event', { reportId: event.aggregateId });
+    return;
+  }
+
+  const d = ctx.pdfData;
+  // Resubmit detection: every save bumps Report.version. version === 1 means
+  // first time the report transitions draft→submitted; > 1 means an admin
+  // (or anyone with edit-window access) changed an already-submitted report.
+  const reportVersion = (ctx.report as { version?: number } | null)?.version ?? 1;
+  const isCorrection = reportVersion > 1;
+  const operatorName = (ctx.report?.lastEditedByName) || d.user?.name || '—';
+
+  const totalPiles = d.piles.reduce((s, p) => s + (p.count || 0), 0);
+  const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
+  const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
+
+  // Смену закрыл планировщик, а не оператор: «отчёт отправлен» от его имени
+  // было бы неправдой (см. readiness/application/scheduler).
+  const autoClosed = (event.data as { autoClosed?: unknown } | undefined)?.autoClosed === true;
+
+  const lines = [
+    autoClosed
+      ? '⚠️ <b>Смена закрыта автоматически</b> — оператор её не закрыл'
+      : isCorrection
+        ? `✏️ <b>Корректировка отчёта</b> (ред. №${reportVersion})`
+        : '📋 <b>Отчёт отправлен</b>',
+    '',
+    `📍 Объект: <b>${escapeHtml(d.site?.name || '—')}</b>`,
+    `📅 Дата: <b>${escapeHtml(d.date)}</b>`,
+    `👷 Оператор: <b>${escapeHtml(d.user?.name || '—')}</b>`,
+    ...(isCorrection ? [`🖊 Изменил: <b>${escapeHtml(operatorName)}</b>`] : []),
+    `🛠 Оборудование: ${escapeHtml(d.equipmentName || '—')}`,
+    '',
+    `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
+    `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
+    `⏸ Простои: <b>${fmtNum(totalDowntime)}</b> ч`,
+  ];
+  const caption = lines.join('\n');
+
+  const pdfBuffer = await generateSinglePdf(d);
+  const filename = `report-${d.date}-${d.user?.name || 'unknown'}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
+
+  // Строку события блокируем на время отправки: outbox-публикатор крутится и в
+  // app, и в workers, а Telegram ключей идемпотентности не знает. Кто пришёл
+  // вторым, видит published=true и выходит.
+  await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} FOR UPDATE`;
+    const row = await tx.outboxEvent.findUnique({ where: { id: event.id }, select: { published: true } });
+    if (!row || row.published) return;
+    const sent = await telegramNotifier.sendDocument(filename, pdfBuffer, caption);
+    if (!sent) throw new Error('Telegram не принял PDF отчёта; событие останется на повтор');
+    await tx.outboxEvent.update({ where: { id: event.id }, data: { published: true, publishedAt: new Date(), lastError: null } });
+  }, { timeout: 60_000 });
 }
 
 // ============================================================

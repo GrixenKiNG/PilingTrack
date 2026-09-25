@@ -13,24 +13,65 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock, upsertMock, deleteManyMock } = vi.hoisted(() => ({
+const { findManyMock, upsertMock, deleteManyMock, outboxFindUnique, outboxUpdate, sendDocument } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
   deleteManyMock: vi.fn(),
+  outboxFindUnique: vi.fn(),
+  outboxUpdate: vi.fn(),
+  sendDocument: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const client = {
     report: { findMany: findManyMock },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
-  },
+    outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate },
+    $queryRaw: vi.fn(),
+    $transaction: (fn: (tx: unknown) => unknown) => fn(client),
+  };
+  return { db: client };
+});
+
+vi.mock('@/lib/pdf-data', () => ({
+  loadSingleReportPdfContext: vi.fn().mockResolvedValue({
+    report: { version: 1 },
+    pdfData: { date: '2026-09-25', user: { name: 'Иванов' }, site: { name: 'Объект' }, piles: [], drillings: [], downtimes: [] },
+  }),
 }));
+vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn().mockResolvedValue(Buffer.from('pdf')) }));
+vi.mock('@/core/notifications/telegram', () => ({ telegramNotifier: { sendDocument } }));
 
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { recomputeSiteDailySummary } from '../event-handlers';
+import { recomputeSiteDailySummary, deliverReportPdf } from '../event-handlers';
+
+// Доставка PDF отчёта в Telegram (R9-1): сбой должен оставлять событие на
+// повтор, а не теряться в журнале, и повтор не должен слать PDF второй раз.
+describe('deliverReportPdf', () => {
+  beforeEach(() => {
+    outboxFindUnique.mockReset();
+    outboxUpdate.mockReset();
+    sendDocument.mockReset();
+  });
+
+  it('Telegram не принял — бросает и не отмечает событие доставленным', async () => {
+    outboxFindUnique.mockResolvedValue({ published: false });
+    sendDocument.mockResolvedValue(false);
+
+    await expect(deliverReportPdf({ id: 'ev-1', aggregateId: 'r-1' })).rejects.toThrow();
+    expect(outboxUpdate).not.toHaveBeenCalled();
+  });
+
+  it('уже доставленное событие повторно не отправляется', async () => {
+    outboxFindUnique.mockResolvedValue({ published: true });
+
+    await deliverReportPdf({ id: 'ev-1', aggregateId: 'r-1' });
+    expect(sendDocument).not.toHaveBeenCalled();
+  });
+});
 
 describe('recomputeSiteDailySummary', () => {
   beforeEach(() => {
