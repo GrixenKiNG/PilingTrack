@@ -125,7 +125,7 @@ export function MeterReadingDialog({ open, onOpenChange, equipmentId, equipmentN
 
         <div className="space-y-4">
           <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
-            <div className="text-xs text-muted-foreground">Последнее известное показание</div>
+            <div className="text-sm text-[#555]">Последнее известное показание</div>
             <div className="font-mono text-2xl font-semibold tabular-nums text-foreground">
               {loading ? '…' : current != null ? `${formatNumber(current)} м/ч` : 'нет данных'}
             </div>
@@ -144,7 +144,7 @@ export function MeterReadingDialog({ open, onOpenChange, equipmentId, equipmentN
               aria-describedby={goesBackwards ? 'meter-backwards' : undefined}
             />
             {goesBackwards && (
-              <p id="meter-backwards" className="text-xs text-warning-strong">
+              <p id="meter-backwards" className="text-sm text-warning-strong">
                 Показание меньше предыдущего ({formatNumber(current ?? 0)} м/ч). Так бывает после
                 замены счётчика — если это не он, проверьте цифру.
               </p>
@@ -162,7 +162,7 @@ export function MeterReadingDialog({ open, onOpenChange, equipmentId, equipmentN
             />
           </div>
 
-          {error && <p className="text-sm text-destructive-strong">{error}</p>}
+          {error && <p className="text-base text-destructive-strong">{error}</p>}
         </div>
 
         <DialogFooter>

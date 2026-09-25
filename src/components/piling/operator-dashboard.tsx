@@ -403,8 +403,8 @@ export function OperatorDashboard() {
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Операторская смена</h1>
-          <p className="text-sm text-muted-foreground">{displayName}</p>
+          <h1 className="text-2xl font-bold text-foreground">Операторская смена</h1>
+          <p className="text-base text-[#555]">{displayName}</p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card">
           <PilingIcon name="operator" size={34} decorative />
@@ -420,7 +420,7 @@ export function OperatorDashboard() {
                 : 'border-border bg-card'
             }`}
           >
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-base font-medium text-foreground">
               {shiftFacts?.equipment?.name
                 ?? (shiftFacts?.assignments.length ? 'Установка не выбрана' : 'Установка не закреплена')}
             </span>
@@ -429,8 +429,8 @@ export function OperatorDashboard() {
                 утверждением ни о чём. */}
             {shiftFacts?.equipment && (
               <span
-                className={`text-xs font-semibold uppercase tracking-wider ${
-                  phase.blockers.length > 0 ? 'text-destructive-strong' : 'text-muted-foreground'
+                className={`text-sm font-semibold uppercase tracking-wider ${
+                  phase.blockers.length > 0 ? 'text-destructive-strong' : 'text-[#555]'
                 }`}
               >
                 {phase.blockers.length > 0 ? `не допущена · ${phase.blockers.length}` : 'допущена'}
@@ -443,7 +443,7 @@ export function OperatorDashboard() {
 
           {pickerOpen && phase.target === 'open-shift' && (
             <section aria-label="Выбор установки" className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[#555]">
                 На какой установке работаете
               </h2>
               {(shiftFacts?.assignments ?? []).map((assignment) => (
@@ -455,10 +455,10 @@ export function OperatorDashboard() {
                   className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm transition hover:border-signal/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-base font-semibold text-foreground">
+                    <span className="block truncate text-lg font-semibold text-foreground">
                       {assignment.equipmentName}
                     </span>
-                    <span className="block truncate text-xs text-muted-foreground">
+                    <span className="block truncate text-sm text-[#555]">
                       {assignment.model} · {assignment.siteName}
                     </span>
                   </span>
@@ -478,10 +478,10 @@ export function OperatorDashboard() {
           className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-signal/30 bg-card px-6 py-5 text-center shadow-sm transition hover:bg-signal/10/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-border disabled:opacity-60"
         >
           <PilingIcon name={active ? 'reports' : 'shift-start'} size={126} decorative />
-          <span className="mt-1 text-xl font-semibold text-foreground">
+          <span className="mt-1 text-2xl font-semibold text-foreground">
             {active ? 'Редактировать отчёт' : 'Начало смены'}
           </span>
-          <span className="mt-1 text-xs text-muted-foreground">
+          <span className="mt-1 text-sm text-[#555]">
             {currentSite?.name || 'Нет назначенного объекта'}
           </span>
         </motion.button>
@@ -526,9 +526,9 @@ export function OperatorDashboard() {
               } disabled:cursor-not-allowed ${index === 3 ? 'col-start-2' : ''} ${index === 4 ? 'col-start-4' : ''}`}
             >
               <PilingIcon name={action.icon} size={82} decorative />
-              <span className="mt-1 text-base font-semibold text-foreground">{action.label}</span>
+              <span className="mt-1 text-lg font-semibold text-foreground">{action.label}</span>
               {locked && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm text-[#555]">
                   {notCleared ? 'нет допуска' : 'позже'}
                 </span>
               )}
@@ -538,7 +538,7 @@ export function OperatorDashboard() {
       </section>
 
       <div className="space-y-1.5">
-        <label id="operator-site-label" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <label id="operator-site-label" className="flex items-center gap-2 text-sm font-medium text-[#555]">
           <PilingIcon name="site" size={24} decorative />
           Объект
         </label>
@@ -550,7 +550,7 @@ export function OperatorDashboard() {
             </SelectContent>
           </Select>
         ) : (
-          <div className="flex h-12 items-center justify-center rounded-md border border-dashed border-border bg-card text-sm text-muted-foreground">
+          <div className="flex h-12 items-center justify-center rounded-md border border-dashed border-border bg-card text-base text-[#555]">
             Нет назначенных объектов
           </div>
         )}
@@ -559,18 +559,18 @@ export function OperatorDashboard() {
       {reports.length > 0 && (
         <section className="rounded-xl border border-border bg-card p-3">
           <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Последние отчёты</h2>
-            <button type="button" onClick={() => router.push('/history')} className="hit-target text-xs font-medium text-info-strong">История</button>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[#555]">Последние отчёты</h2>
+            <button type="button" onClick={() => router.push('/history')} className="hit-target text-sm font-medium text-info-strong">История</button>
           </div>
           <ul className="divide-y divide-border">
             {reports.slice(0, 3).map((report) => (
               <li key={report.id}>
                 <button type="button" onClick={() => router.push(`/history?reportId=${report.id}`)} className="flex w-full items-center justify-between py-3 text-left">
                   <span>
-                    <span className="block text-sm font-medium text-foreground">{report.siteName}</span>
-                    <span className="block text-xs text-muted-foreground">{new Date(report.date).toLocaleDateString('ru-RU')}</span>
+                    <span className="block text-base font-medium text-foreground">{report.siteName}</span>
+                    <span className="block text-sm text-[#555]">{new Date(report.date).toLocaleDateString('ru-RU')}</span>
                   </span>
-                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-2 text-sm text-[#555]">
                     {report.totalPiles} св. · {report.totalDrilling} м
                     <PilingIcon name="external" size={16} decorative />
                   </span>

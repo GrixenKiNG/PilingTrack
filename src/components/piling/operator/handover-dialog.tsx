@@ -58,8 +58,8 @@ export function HandoverDialog({ open, onOpenChange, equipmentName, busy = false
             type="button"
             onClick={() => setHasIssues(false)}
             aria-pressed={!hasIssues}
-            className={`min-h-14 rounded-xl border-2 px-3 text-sm font-semibold transition ${
-              hasIssues ? 'border-border bg-card text-muted-foreground' : 'border-success bg-success/10 text-success-strong'
+            className={`min-h-14 rounded-xl border-2 px-3 text-base font-semibold transition ${
+              hasIssues ? 'border-border bg-card text-[#555]' : 'border-success bg-success/10 text-success-strong'
             }`}
           >
             Замечаний нет
@@ -68,8 +68,8 @@ export function HandoverDialog({ open, onOpenChange, equipmentName, busy = false
             type="button"
             onClick={() => setHasIssues(true)}
             aria-pressed={hasIssues}
-            className={`min-h-14 rounded-xl border-2 px-3 text-sm font-semibold transition ${
-              hasIssues ? 'border-destructive bg-destructive/10 text-destructive-strong' : 'border-border bg-card text-muted-foreground'
+            className={`min-h-14 rounded-xl border-2 px-3 text-base font-semibold transition ${
+              hasIssues ? 'border-destructive bg-destructive/10 text-destructive-strong' : 'border-border bg-card text-[#555]'
             }`}
           >
             Есть замечания

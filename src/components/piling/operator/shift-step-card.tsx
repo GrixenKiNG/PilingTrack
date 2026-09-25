@@ -38,16 +38,16 @@ export function ShiftStepCard({ phase, onAction, busy = false }: ShiftStepCardPr
       aria-label="Текущий шаг смены"
       className="rounded-2xl border-2 border-signal/30 bg-card p-5 shadow-sm"
     >
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <p className="text-sm font-medium uppercase tracking-wider text-[#555]">
         Шаг {phase.phase} из {PHASE_COUNT}
       </p>
 
       <div className="mt-2 flex items-center gap-3">
         <PilingIcon name={PHASE_ICONS[phase.phase] ?? 'shift-start'} size={52} decorative />
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-foreground">{phase.title}</h2>
+          <h2 className="text-xl font-semibold text-foreground">{phase.title}</h2>
           {phase.progress && (
-            <p className="truncate text-sm text-muted-foreground">{phase.progress}</p>
+            <p className="truncate text-base text-[#555]">{phase.progress}</p>
           )}
         </div>
       </div>
@@ -55,7 +55,7 @@ export function ShiftStepCard({ phase, onAction, busy = false }: ShiftStepCardPr
       {phase.blockers.length > 0 && (
         <ul className="mt-4 space-y-1 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
           {phase.blockers.map((blocker) => (
-            <li key={blocker} className="text-sm text-destructive-strong">
+            <li key={blocker} className="text-base text-destructive-strong">
               {blocker}
             </li>
           ))}
@@ -66,7 +66,7 @@ export function ShiftStepCard({ phase, onAction, busy = false }: ShiftStepCardPr
         type="button"
         onClick={onAction}
         disabled={blocked || busy}
-        className="mt-4 flex min-h-14 w-full items-center justify-center rounded-xl bg-signal px-4 text-base font-semibold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+        className="mt-4 flex min-h-14 w-full items-center justify-center rounded-xl bg-signal px-4 text-lg font-semibold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-muted disabled:text-[#555]"
       >
         {busy ? 'Секунду…' : phase.action}
       </button>
