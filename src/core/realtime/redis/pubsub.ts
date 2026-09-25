@@ -13,7 +13,6 @@ import Redis from 'ioredis';
 import { logger } from '@/lib/logger';
 
 export const CHANNEL_EVENTS = 'realtime:events';
-export const CHANNEL_ALERTS = 'realtime:alerts';
 
 // Publisher connection
 let _pub: Redis | null = null;
