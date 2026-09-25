@@ -48,8 +48,8 @@ export function EquipmentTable({
             <th className={staticTh}><StackedHeader words={['Оператор']} /></th>
             <th className={th} onClick={() => toggle('equipmentStatus')}>Статус техники ↕</th>
             <th className={th} onClick={() => toggle('reportStatus')}><StackedHeader words={['Статус', 'отчёта', '↕']} /></th>
-            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Сваи', 'шт./м.п.']} align="right" /></th>
-            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Бурение', 'шт./м']} align="right" /></th>
+            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Сваи', 'шт/м.п.']} align="right" /></th>
+            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Бурение', 'шт/м.п.']} align="right" /></th>
             <th className="px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Простой', 'ч', 'причина']} /></th>
             <th className={th} onClick={() => toggle('engineHoursTotal')}>Моточасы ↕</th>
             <th className={staticTh}>ТО</th>

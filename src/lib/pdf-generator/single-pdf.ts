@@ -47,8 +47,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     }
 
     addMetricStrip(doc, [
-      ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт / м.п.'],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт / м.п.'],
+      ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.'],
+      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт/м.п.'],
       ['Простои', formatNumber(totalDowntime), 'ч'],
     ]);
 

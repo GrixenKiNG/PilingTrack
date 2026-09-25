@@ -78,13 +78,13 @@ export function MaintenanceDetailPanel({
 
           <PanelSection title="Наработка">
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м.ч.` : '—'} />
-              <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м.ч.` : '—'} />
+              <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м/ч` : '—'} />
+              <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м/ч` : '—'} />
               <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                 <div className="h-full rounded-full bg-signal" style={{ width: `${progress}%` }} />
               </div>
-              <MetricLine label="Порог ТО" value={interval != null ? `${interval} м.ч.` : 'не задан'} />
-              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м.ч.)` : 'не закрывалось'} />
+              <MetricLine label="Порог ТО" value={interval != null ? `${interval} м/ч` : 'не задан'} />
+              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
             </div>
           </PanelSection>
 

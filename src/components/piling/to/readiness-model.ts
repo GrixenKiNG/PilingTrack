@@ -112,7 +112,7 @@ export function deriveEquipmentReadiness(
     key: 'meter',
     label: 'Наработка',
     value: meterKnown
-      ? `${Number(equipment.engineHoursTotal).toLocaleString('ru-RU')} м.ч.`
+      ? `${Number(equipment.engineHoursTotal).toLocaleString('ru-RU')} м/ч`
       : 'нет показания',
     state: meterKnown ? 'pass' : 'missing',
   };
@@ -129,7 +129,7 @@ export function deriveEquipmentReadiness(
       ? overdue.reason === 'both'
         ? 'просрочено по дате и наработке'
         : overdue.reason === 'hours'
-          ? `перебег ${overdue.overdueHours ?? 0} м.ч.`
+          ? `перебег ${overdue.overdueHours ?? 0} м/ч`
           : `просрочено на ${overdue.overdueDays ?? 0} дн.`
       : maintenanceConfigured
         ? 'срок не нарушен'

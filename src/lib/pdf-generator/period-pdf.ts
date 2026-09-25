@@ -32,8 +32,8 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
     addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`);
     addMetricStrip(doc, [
       ['Отчётов', String(reports.length), 'шт'],
-      ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт / м.п.'],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт / м.п.'],
+      ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.'],
+      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт/м.п.'],
       ['Простои', formatNumber(data.totalDowntime), 'ч'],
     ]);
 

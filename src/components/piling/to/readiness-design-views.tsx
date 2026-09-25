@@ -238,7 +238,7 @@ export function ReadinessFleetView({
                     <div className="mt-1 font-mono text-2xl font-bold text-foreground">{state?.score ?? '—'}</div>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
-                    {item.engineHoursTotal != null ? `${item.engineHoursTotal.toLocaleString('ru-RU')} м.ч.` : 'Нет моточасов'}
+                    {item.engineHoursTotal != null ? `${item.engineHoursTotal.toLocaleString('ru-RU')} м/ч` : 'Нет моточасов'}
                     <br />
                     {item.crewCount > 0 ? `Бригад: ${item.crewCount}` : 'Бригада не назначена'}
                   </div>
@@ -409,7 +409,7 @@ export function ReadinessMaintenanceView({
         <KpiTile icon="defect" label="Критические дефекты" value={critical.length} detail="в открытых нарядах" alert={critical.length > 0} />
         <KpiTile icon={ClipboardList} label="Открытые работы" value={openOrders.length} detail={selected?.name ?? 'Выберите установку'} />
         <KpiTile icon={History} label="Записи журнала" value={records.length} detail={`${stats.open} незакрытых`} />
-        <KpiTile icon={Gauge} label="Наработка" value={selected?.engineHoursTotal != null ? `${selected.engineHoursTotal.toLocaleString('ru-RU')} м.ч.` : '—'} detail="последнее показание" />
+        <KpiTile icon={Gauge} label="Наработка" value={selected?.engineHoursTotal != null ? `${selected.engineHoursTotal.toLocaleString('ru-RU')} м/ч` : '—'} detail="последнее показание" />
       </section>
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="flex gap-1 overflow-x-auto border-b border-border p-2">

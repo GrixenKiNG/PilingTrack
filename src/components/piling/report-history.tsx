@@ -332,7 +332,7 @@ export function ReportHistory() {
                       <span className="text-sm font-mono font-semibold text-foreground">
                         {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
                       </span>
-                      <span className="text-xs text-muted-foreground">шт/м</span>
+                      <span className="text-xs text-muted-foreground">шт/м.п.</span>
                     </div>
                     {report.totalDowntime > 0 && (
                       <div className="flex items-center gap-1.5">
