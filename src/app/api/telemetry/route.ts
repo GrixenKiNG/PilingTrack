@@ -298,7 +298,9 @@ export const GET = withApi(async (request: NextRequest) => {
     // take=NaN (500), а большой вытягивал всю телеметрию одним запросом.
     const limitParam = searchParams.get('limit');
     const parsedLimit = Number(limitParam);
-    const limit = limitParam !== null && Number.isInteger(parsedLimit)
+    // Пустая строка (?limit=) — как отсутствие параметра: Number('') === 0
+    // молча давал предел в одну запись вместо 100 по умолчанию.
+    const limit = limitParam !== null && limitParam !== '' && Number.isInteger(parsedLimit)
       ? Math.min(Math.max(parsedLimit, 1), 1000)
       : 100;
 

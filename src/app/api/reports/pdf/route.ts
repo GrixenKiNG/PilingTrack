@@ -32,6 +32,22 @@ const periodPdfBodySchema = z
     path: ['dateTo'],
   });
 
+// GET query params — the same rule as the POST body above: dateFrom/dateTo
+// flow into the Content-Disposition filename, so they must be strictly
+// YYYY-MM-DD (no CRLF/quotes → no header injection) before anything else runs.
+const periodPdfQuerySchema = z
+  .object({
+    dateFrom: z.string().regex(DATE_RE),
+    dateTo: z.string().regex(DATE_RE),
+    siteId: z.string().max(100).optional(),
+    userId: z.string().max(100).optional(),
+    equipmentId: z.string().max(100).optional(),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'Дата начала позже даты окончания',
+    path: ['dateTo'],
+  });
+
 // ============================================================
 // POST — Enqueue async PDF generation (default)
 // ============================================================
@@ -207,19 +223,34 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
 
   try {
     assertCan(user, 'reports.read_all');
-    const dateFrom = request.nextUrl.searchParams.get('dateFrom');
-    const dateTo = request.nextUrl.searchParams.get('dateTo');
-    const siteId = request.nextUrl.searchParams.get('siteId');
-    const filterUserId = request.nextUrl.searchParams.get('userId');
-    const equipmentId = request.nextUrl.searchParams.get('equipmentId');
-    const inline = request.nextUrl.searchParams.get('inline') === '1';
+    const searchParams = request.nextUrl.searchParams;
+    const dateFromParam = searchParams.get('dateFrom');
+    const dateToParam = searchParams.get('dateTo');
 
-    if (!dateFrom || !dateTo) {
+    if (!dateFromParam || !dateToParam) {
       return NextResponse.json(
         { error: 'Укажите период: даты начала и окончания' },
         { status: 400 }
       );
     }
+
+    const parsed = periodPdfQuerySchema.safeParse({
+      dateFrom: dateFromParam,
+      dateTo: dateToParam,
+      siteId: searchParams.get('siteId') ?? undefined,
+      userId: searchParams.get('userId') ?? undefined,
+      equipmentId: searchParams.get('equipmentId') ?? undefined,
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Некорректный период: даты в формате ГГГГ-ММ-ДД, начало не позже окончания' },
+        { status: 400 }
+      );
+    }
+
+    const { dateFrom, dateTo, siteId, userId: filterUserId, equipmentId } = parsed.data;
+    const inline = searchParams.get('inline') === '1';
 
     const pdfData = await buildPeriodPdfData({
       dateFrom,
