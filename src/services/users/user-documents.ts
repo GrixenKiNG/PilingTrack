@@ -49,6 +49,23 @@ const toDate = (value: string | Date | null | undefined): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Самое дальнее окно предупреждения среди видов документов тенанта (в днях).
+ * Нужно, чтобы отсечь в SQL документы, которые заведомо не пройдут фильтр
+ * «просрочен / истекает» (см. `document-expiry.ts`): если документ истекает
+ * позже, чем `now + maxLeadTime`, он не «истекает» для вида ни с каким
+ * `leadTimeDays`.
+ */
+async function maxDocumentTypeLeadTimeDays(tenantId: string): Promise<number> {
+  const types = await db.userDocumentType.findMany({
+    where: { tenantId },
+    select: { leadTimeDays: true },
+  });
+  return Math.max(0, ...types.map((type) => type.leadTimeDays ?? 0));
+}
+
 /** Работник существует и принадлежит тенанту действующего пользователя. */
 async function requireTenantUser(userId: string, tenantId: string) {
   const user = await db.user.findFirst({
@@ -298,8 +315,22 @@ export async function listDocumentsNeedingAttention(ctx: UserDocumentContext, no
     throw new ServiceError('Недостаточно прав для контроля документов', 403);
   }
 
+  // Отсекаем в SQL всё, что заведомо не пройдёт JS-фильтр ниже: документ не
+  // «истекает» ни для одного вида, если истекает позже now + maxLeadTime.
+  // Фильтр по дате использует индекс (tenantId, expiresAt), а `user.isActive`
+  // тоже переносим в `where`, чтобы не материализовать документы
+  // уволенных/отключённых работников.
+  const maxLeadTimeDays = await maxDocumentTypeLeadTimeDays(ctx.tenantId);
+
   const rows = await db.userDocument.findMany({
-    where: { tenantId: ctx.tenantId, expiresAt: { not: null } },
+    where: {
+      tenantId: ctx.tenantId,
+      expiresAt: {
+        not: null,
+        lte: new Date(now.getTime() + maxLeadTimeDays * DAY_MS),
+      },
+      user: { is: { isActive: true } },
+    },
     include: {
       type: { select: { id: true, name: true, leadTimeDays: true } },
       user: { select: { id: true, name: true, role: true, isActive: true } },
@@ -308,7 +339,6 @@ export async function listDocumentsNeedingAttention(ctx: UserDocumentContext, no
   });
 
   return rows
-    .filter((row) => row.user.isActive)
     .map((row) => ({ ...row, expiry: documentExpiry(row.expiresAt, row.type.leadTimeDays, now) }))
     .filter((row) => row.expiry.status === 'expired' || row.expiry.status === 'expiring');
 }

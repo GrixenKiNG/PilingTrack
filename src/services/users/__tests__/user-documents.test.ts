@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { evaluateOperatorClearance } from '../operator-clearance';
 
-const { findFirstUserMock, findFirstTypeMock, findManyDocMock, createDocMock, findFirstDocMock, mediaFindUniqueMock, updateDocMock } = vi.hoisted(() => ({
+const { findFirstUserMock, findFirstTypeMock, findManyTypeMock, findManyDocMock, createDocMock, findFirstDocMock, mediaFindUniqueMock, updateDocMock } = vi.hoisted(() => ({
   findFirstUserMock: vi.fn(),
   findFirstTypeMock: vi.fn(),
+  findManyTypeMock: vi.fn(),
   findManyDocMock: vi.fn(),
   createDocMock: vi.fn(),
   findFirstDocMock: vi.fn(),
@@ -14,7 +15,7 @@ const { findFirstUserMock, findFirstTypeMock, findManyDocMock, createDocMock, fi
 vi.mock('@/lib/db', () => ({
   db: {
     user: { findFirst: findFirstUserMock },
-    userDocumentType: { findFirst: findFirstTypeMock },
+    userDocumentType: { findFirst: findFirstTypeMock, findMany: findManyTypeMock },
     media: { findUnique: mediaFindUniqueMock },
     userDocument: {
       findMany: findManyDocMock,
@@ -28,7 +29,7 @@ vi.mock('@/lib/db', () => ({
 
 // Права НЕ подменяем: смысл этих проверок — что маршрут документов подключён к
 // настоящей матрице ролей, а не к её представлению в тесте.
-import { listUserDocuments, createUserDocument, updateUserDocument } from '../user-documents';
+import { listUserDocuments, createUserDocument, updateUserDocument, listDocumentsNeedingAttention } from '../user-documents';
 import { documentExpiry } from '@/lib/document-expiry';
 
 const OPERATOR = { id: 'usr_op', role: 'OPERATOR' };
@@ -162,6 +163,54 @@ describe('срок годности документа', () => {
 
   it('бессрочный документ никогда не просрочен', () => {
     expect(documentExpiry(null, 30, now)).toEqual({ status: 'perpetual', daysLeft: null });
+  });
+});
+
+describe('listDocumentsNeedingAttention — фильтр перенесён в where', () => {
+  const now = new Date('2026-08-15T00:00:00Z');
+  const DAY_MS = 86_400_000;
+
+  beforeEach(() => {
+    findManyTypeMock.mockReset();
+    findManyDocMock.mockReset();
+    // Виды документов тенанта: максимум leadTimeDays = 60.
+    findManyTypeMock.mockResolvedValue([
+      { leadTimeDays: 30 },
+      { leadTimeDays: 60 },
+      { leadTimeDays: 45 },
+    ]);
+    findManyDocMock.mockResolvedValue([]);
+  });
+
+  it('where содержит нижнюю границу expiresAt.lte = now + maxLeadTimeDays', async () => {
+    const documents = await listDocumentsNeedingAttention(ctx(DISPATCHER), now);
+
+    expect(documents).toEqual([]);
+    expect(findManyTypeMock).toHaveBeenCalledWith({
+      where: { tenantId: 'orion' },
+      select: { leadTimeDays: true },
+    });
+
+    const callArgs = findManyDocMock.mock.calls[0][0];
+    const lte = callArgs.where.expiresAt.lte;
+    expect(lte).toBeInstanceOf(Date);
+    expect(lte.getTime()).toBe(now.getTime() + 60 * DAY_MS);
+    // С устаревшим документом и неактивным пользователем JS-часть всё ещё
+    // работает, но isActive пользователя отсекается на стороне БД.
+    expect(callArgs.where.user).toEqual({ is: { isActive: true } });
+  });
+
+  it('сохраняет прежний результат: отбирает просроченные и истекающие', async () => {
+    const type = { id: 'type-1', name: 'Удостоверение', leadTimeDays: 30 };
+    findManyDocMock.mockResolvedValue([
+      { id: 'd1', expiresAt: new Date('2026-08-01T00:00:00Z'), type, user: { id: 'u1', name: 'Машинист', role: 'OPERATOR', isActive: true } },
+      { id: 'd2', expiresAt: new Date('2026-09-01T00:00:00Z'), type, user: { id: 'u2', name: 'Водитель', role: 'OPERATOR', isActive: true } },
+      { id: 'd3', expiresAt: new Date('2027-09-01T00:00:00Z'), type, user: { id: 'u3', name: 'Крановщик', role: 'OPERATOR', isActive: true } },
+    ]);
+
+    const documents = await listDocumentsNeedingAttention(ctx(DISPATCHER), now);
+
+    expect(documents.map((d) => d.id)).toEqual(['d1', 'd2']);
   });
 });
 
