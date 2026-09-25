@@ -304,9 +304,17 @@ export function StartInspectionForm() {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" asChild disabled={busy}>
-              <Link href="/inspections">Отмена</Link>
-            </Button>
+            {/* `disabled` у `Button asChild` не выключает ссылку: псевдокласс
+                `:disabled` у `<a>` не срабатывает, и уйти по «Отмене» можно
+                прямо во время сохранения. Пока идёт запрос, рендерим
+                отключённую кнопку без ссылки. */}
+            {busy ? (
+              <Button type="button" variant="outline" disabled>Отмена</Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <Link href="/inspections">Отмена</Link>
+              </Button>
+            )}
             <Button onClick={submit} disabled={busy || loading || (!!selected && !hasBase)} className="bg-signal hover:bg-signal-strong text-white flex-1">
               {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Начать осмотр
