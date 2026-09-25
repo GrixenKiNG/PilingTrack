@@ -44,7 +44,7 @@ export async function publishPendingEvents(): Promise<number> {
       const eventPayload = outboxEvent.payload as Record<string, unknown>;
 
       // Normalize event for realtime
-      const realtimeEvent = normalizeEvent(outboxEvent.type, outboxEvent.aggregateId, eventPayload);
+      const realtimeEvent = normalizeEvent(outboxEvent.type, outboxEvent.aggregateId, eventPayload, outboxEvent.tenantId);
 
       if (realtimeEvent) {
         await publishToRedis(CHANNEL_EVENTS, realtimeEvent);
@@ -85,7 +85,8 @@ export async function publishPendingEvents(): Promise<number> {
 function normalizeEvent(
   type: string,
   aggregateId: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  outboxTenantId: string | null,
 ): Record<string, unknown> | null {
   // Map domain event types to realtime event types
   const typeMap: Record<string, string> = {
@@ -116,7 +117,9 @@ function normalizeEvent(
     entity,
     entityId: aggregateId,
     payload: extractPayload(type, payload),
-    tenantId: (payload.tenantId as string) || null,
+    // Организация — из колонки OutboxEvent: в payload её почти никогда нет
+    // (на бою 6 из 296 событий), а доставка по WebSocket фильтруется по ней.
+    tenantId: outboxTenantId || (payload.tenantId as string) || null,
     siteId: (payload.siteId as string) || null,
     userId: (payload.userId as string) || null,
     ts: Date.now(),

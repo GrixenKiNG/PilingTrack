@@ -7,7 +7,29 @@
  * - Null handling
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+const { findMany, publishToRedis } = vi.hoisted(() => ({
+  findMany: vi.fn(),
+  publishToRedis: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/db', () => ({ db: { outboxEvent: { findMany, update: vi.fn().mockResolvedValue({}) } } }));
+vi.mock('../../redis/pubsub', () => ({ publishToRedis, CHANNEL_EVENTS: 'events' }));
+vi.mock('../../alerts/engine', () => ({ evaluateAlert: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), debug: vi.fn() } }));
+
+import { publishPendingEvents } from '../ws-publisher';
+
+describe('WS Publisher — tenant of the realtime event', () => {
+  it('takes tenantId from the OutboxEvent column when the payload has none', async () => {
+    findMany.mockResolvedValueOnce([{
+      id: 'o1', type: 'ReportCreated', aggregateId: 'r1', tenantId: 'orion',
+      payload: { userId: 'u1', siteId: 's1' },
+    }]);
+    await publishPendingEvents();
+    expect(publishToRedis).toHaveBeenCalledWith('events', expect.objectContaining({ tenantId: 'orion' }));
+  });
+});
 
 // Test the normalization logic in isolation
 function normalizeEventType(type: string): string | null {
