@@ -21,8 +21,8 @@ export const GET = withApi(
       where: { id },
       select: { key: true, thumbnailKey: true, entityType: true, entityId: true, isDeleted: true, uploadStatus: true, userId: true, tenantId: true },
     });
-    if (!media || media.isDeleted) return NextResponse.json({ error: 'Media not found' }, { status: 404 });
-    if (media.uploadStatus !== 'completed') return NextResponse.json({ error: 'Upload not completed' }, { status: 409 });
+    if (!media || media.isDeleted) return NextResponse.json({ error: 'Файл не найден' }, { status: 404 });
+    if (media.uploadStatus !== 'completed') return NextResponse.json({ error: 'Загрузка не завершена' }, { status: 409 });
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

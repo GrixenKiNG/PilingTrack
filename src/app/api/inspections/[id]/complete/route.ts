@@ -21,7 +21,7 @@ export const POST = withMutation(
     const tenantId = requireTenantId(user!);
     const { id } = await params;
     const parsed = schema.safeParse(await readJsonBody(request));
-    if (!parsed.success) return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const inspection = await completeInspection(id, { tenantId, signedByName: parsed.data.signedByName, performerId: user!.role === 'OPERATOR' ? user!.id : null });

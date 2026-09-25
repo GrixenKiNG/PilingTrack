@@ -33,7 +33,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   }>(request);
 
   if (!body.fileName || !body.contentType) {
-    return NextResponse.json({ error: 'fileName and contentType are required' }, { status: 400 });
+    return NextResponse.json({ error: 'Требуются fileName и contentType' }, { status: 400 });
   }
 
   try {
@@ -70,7 +70,7 @@ export const GET = withApi(async (request: NextRequest) => {
   const entityId = searchParams.get('entityId');
 
   if (!entityType || !entityId) {
-    return NextResponse.json({ error: 'entityType and entityId are required' }, { status: 400 });
+    return NextResponse.json({ error: 'Требуются entityType и entityId' }, { status: 400 });
   }
 
   try {

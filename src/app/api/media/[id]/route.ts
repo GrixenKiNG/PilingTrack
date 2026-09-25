@@ -16,7 +16,7 @@ export const DELETE = withMutation(
       where: { id },
       select: { entityType: true, entityId: true, isDeleted: true, userId: true },
     });
-    if (!media) return NextResponse.json({ error: 'Media not found' }, { status: 404 });
+    if (!media) return NextResponse.json({ error: 'Файл не найден' }, { status: 404 });
     if (media.isDeleted) return NextResponse.json({ ok: true });
 
     try {

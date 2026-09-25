@@ -26,20 +26,20 @@ export const PUT = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = requireTenantId(user!);
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const saved = await saveTemplate(tenantId, body, user!.id);
     return NextResponse.json(saved);
   } catch {
-    return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
   }
 }, { domain: 'monitoring' });

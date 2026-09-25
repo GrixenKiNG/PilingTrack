@@ -16,7 +16,7 @@ export const POST = withMutation(
       where: { id },
       select: { entityType: true, entityId: true, userId: true },
     });
-    if (!media) return NextResponse.json({ error: 'Media not found' }, { status: 404 });
+    if (!media) return NextResponse.json({ error: 'Файл не найден' }, { status: 404 });
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

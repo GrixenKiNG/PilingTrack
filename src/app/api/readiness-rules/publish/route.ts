@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return NextResponse.json({ error: 'Войдите в систему' }, { status: 401 });
   assertRole(user, 'ADMIN');
   const tenantId = requireTenantId(user);
   return NextResponse.json(await publishReadinessRules(tenantId, {

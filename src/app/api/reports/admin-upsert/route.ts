@@ -24,7 +24,7 @@ export const POST = withMutation(
     const validated = reportAdminUpsertSchema.safeParse(dto);
     if (!validated.success) {
       return NextResponse.json(
-        { error: 'Validation error', details: validated.error.flatten() },
+        { error: 'Некорректные данные', details: validated.error.flatten() },
         { status: 400 }
       );
     }

@@ -34,7 +34,7 @@ export const GET = withApi(async (request: NextRequest, ctx: Ctx) => {
   const { surfaceId } = await ctx.params;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = tenantOf(user!);
-  if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+  if (!tenantId) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
   const { searchParams } = new URL(request.url);
   try {
     if (searchParams.get('scope') === 'set') {
@@ -43,7 +43,7 @@ export const GET = withApi(async (request: NextRequest, ctx: Ctx) => {
     const entityId = searchParams.get('entityId') ?? BASE_ENTITY;
     return NextResponse.json(await getLayout(tenantId, surfaceId, entityId));
   } catch (err) {
-    if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Unknown surface' }, { status: 404 });
+    if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Неизвестная поверхность' }, { status: 404 });
     throw err;
   }
 }, { domain: 'layout' });
@@ -52,25 +52,25 @@ export const PUT = withMutation(async (request: NextRequest, ctx: Ctx) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
   const { surfaceId } = await ctx.params;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = tenantOf(user!);
-  if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+  if (!tenantId) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
   const entityId = new URL(request.url).searchParams.get('entityId') ?? BASE_ENTITY;
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const saved = await saveLayout(tenantId, surfaceId, body, user!.id, entityId);
     return NextResponse.json(saved);
   } catch (err) {
-    if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Unknown surface' }, { status: 404 });
-    if (err instanceof TypeError) return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
+    if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Неизвестная поверхность' }, { status: 404 });
+    if (err instanceof TypeError) return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
     throw err;
   }
 }, { domain: 'layout' });
@@ -79,17 +79,17 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: Ctx) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
   const { surfaceId } = await ctx.params;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = tenantOf(user!);
-  if (!tenantId) return NextResponse.json({ error: 'Tenant context missing' }, { status: 400 });
+  if (!tenantId) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
   const entityId = new URL(request.url).searchParams.get('entityId') ?? BASE_ENTITY;
   try {
     await deleteLayout(tenantId, surfaceId, entityId);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Unknown surface' }, { status: 404 });
+    if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Неизвестная поверхность' }, { status: 404 });
     throw err;
   }
 }, { domain: 'layout' });
