@@ -164,7 +164,7 @@ export function StartInspectionForm() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 py-6">
+    <div className="mx-auto w-full max-w-lg px-4 py-6 field-type">
       <div className="mb-5 flex items-center gap-2">
         <Link href="/inspections" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> Осмотры

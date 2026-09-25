@@ -330,17 +330,20 @@
 
 /* Technical-readiness adaptation: the desktop information architecture stays
    intact, while field tablets and phones receive reliable touch targets and a
-   readable metadata floor. */
+   readable metadata floor. The floor below covers `.tech-readiness-module` and
+   the field-screen roots marked `.field-type` (report form, inspections,
+   maintenance), so 3xs/2xs metadata is lifted to 13px on tablets and coarse
+   pointers, not only on phones. */
 @media (max-width: 767px), (pointer: coarse) {
   .tech-readiness-module :where(button, select, input, a.inline-flex) {
     min-height: 44px;
   }
 }
 
-@media (max-width: 639px) {
-  .tech-readiness-module :where(.text-3xs, .text-2xs) {
-    font-size: 0.75rem;
-    line-height: 1rem;
+@media (max-width: 1023px), (pointer: coarse) {
+  :is(.tech-readiness-module, .field-type) :where(.text-3xs, .text-2xs) {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
   }
 }
 

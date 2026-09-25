@@ -305,7 +305,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-28">
+    <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-28 field-type">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
         {onExit ? (

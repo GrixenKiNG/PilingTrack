@@ -230,7 +230,7 @@ export function ReportForm({ onExit, anchor }: { onExit?: () => void; anchor?: s
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted">
+    <div className="flex flex-col min-h-screen bg-muted field-type">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card border-b px-4 py-3 pt-safe flex items-center gap-3">
         <button onClick={() => (onExit ? onExit() : router.push('/operator'))}
