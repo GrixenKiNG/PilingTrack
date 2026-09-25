@@ -78,6 +78,10 @@ describe('formatDowntimeHours', () => {
     expect(formatDowntimeHours(2)).toBe('2 ч');
   });
 
+  it('минуты округляются до ближайшей, а не вниз: 0,999 ч — это «1 ч»', () => {
+    expect(formatDowntimeHours(0.999)).toBe('1 ч');
+  });
+
   it('крупное значение (выше суток) форматируется, а не обрезается', () => {
     expect(formatDowntimeHours(24.5)).toBe('24 ч 30 мин');
   });

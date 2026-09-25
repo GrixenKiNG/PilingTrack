@@ -60,6 +60,13 @@ describe('computeFuelConsumption — расход топлива', () => {
     expect(r.perEngineHour).toBeNull();
   });
 
+  it('бак объёмом 0 л — тоже неизвестен, а не «расход = долив»', () => {
+    const r = computeFuelConsumption({
+      tankLiters: 0, startPercent: 80, endPercent: 50, litersAdded: 100, engineHoursDelta: 5,
+    });
+    expect(r.consumedLiters).toBeNull();
+  });
+
   it('проценты нельзя вывести без одного из замеров остатка', () => {
     const noStart = computeFuelConsumption({
       tankLiters: 400, startPercent: null, endPercent: 50, litersAdded: 100, engineHoursDelta: 5,
