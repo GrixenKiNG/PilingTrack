@@ -112,4 +112,26 @@ describe('telegramNotifier — botToken decryption', () => {
     expect(res).toEqual({ ok: false, error: 'Not configured' });
     expect(findManyMock).not.toHaveBeenCalled();
   });
+
+  it('builds the alert header and field labels in Russian', async () => {
+    findManyMock.mockResolvedValue([
+      { botToken: '999:plain-token', chatId: '-100123', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+
+    await telegramNotifier.sendAlert({
+      severity: 'medium',
+      message: 'Простой 3 ч зафиксирован в отчёте',
+      siteId: 'site-1',
+      reportId: 'report-1',
+      ruleId: 'downtime30',
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { text: string };
+    expect(body.text).toContain('⚠️ <b>Предупреждение</b>');
+    expect(body.text).toContain('📍 Объект: <code>site-1</code>');
+    expect(body.text).toContain('📄 Отчёт: <code>report-1</code>');
+    expect(body.text).toContain('📏 Правило: <code>downtime30</code>');
+    expect(body.text).not.toContain('Alert');
+  });
 });

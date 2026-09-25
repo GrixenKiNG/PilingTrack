@@ -105,21 +105,21 @@ function buildAlertMessage(alert: AlertPayload): { text: string; parse_mode: str
   };
 
   const severityLabel: Record<string, string> = {
-    low: 'Info',
-    medium: 'Warning',
-    high: 'High',
-    critical: 'CRITICAL',
+    low: 'Информация',
+    medium: 'Предупреждение',
+    high: 'Важно',
+    critical: 'КРИТИЧНО',
   };
 
   const emoji = severityEmoji[alert.severity] || '📋';
   const label = severityLabel[alert.severity] || alert.severity;
 
-  let text = `${emoji} <b>${label} Alert</b>\n\n`;
+  let text = `${emoji} <b>${label}</b>\n\n`;
   text += `<code>${escapeHtml(alert.message)}</code>\n\n`;
 
-  if (alert.siteId) text += `📍 Site: <code>${escapeHtml(alert.siteId)}</code>\n`;
-  if (alert.reportId) text += `📄 Report: <code>${escapeHtml(alert.reportId)}</code>\n`;
-  if (alert.ruleId) text += `📏 Rule: <code>${escapeHtml(alert.ruleId)}</code>\n`;
+  if (alert.siteId) text += `📍 Объект: <code>${escapeHtml(alert.siteId)}</code>\n`;
+  if (alert.reportId) text += `📄 Отчёт: <code>${escapeHtml(alert.reportId)}</code>\n`;
+  if (alert.ruleId) text += `📏 Правило: <code>${escapeHtml(alert.ruleId)}</code>\n`;
 
   text += `\n⏰ ${new Date().toLocaleString('ru-RU')}`;
 
