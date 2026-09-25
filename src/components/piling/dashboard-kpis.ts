@@ -68,11 +68,12 @@ export interface DashboardKpis {
   downtime: number;
   sitesActive: number;
   sitesTotal: number;
-  /** Машин с открытой сменой прямо сейчас — не «сдали отчёт». */
-  rigsWorking: number;
-  rigsTotal: number;
-  toRisk: number;
-  crews: number;
+  /** Машин с открытой сменой прямо сейчас — не «сдали отчёт». null — парк не загрузился. */
+  rigsWorking: number | null;
+  rigsTotal: number | null;
+  /** Установок с риском ТО. null — список ТО не загрузился (не «рисков нет»). */
+  toRisk: number | null;
+  crews: number | null;
 }
 
 const sumBy = <T>(rows: T[], pick: (row: T) => number): number =>
@@ -83,6 +84,11 @@ export function computeDashboardKpis(
   fleetTotals: DashboardFleetTotals | null,
   maintByRig: Map<string, DashboardMaintFlag>,
   rigs: DashboardRigHours[],
+  /**
+   * Список ТО не загрузился (сбой `/api/maintenance`). Пустой `maintByRig` тогда
+   * означает «не знаем», а не «рисков нет», поэтому `toRisk` = null.
+   */
+  maintFailed = false,
 ): DashboardKpis {
   const activeToday = fleetTotals?.activeToday ?? 0;
   const expected = fleetTotals?.expected ?? 0;
@@ -95,7 +101,7 @@ export function computeDashboardKpis(
   for (const rig of rigs) {
     if (hoursOverrun(rig)) atRisk.add(rig.id);
   }
-  const toRisk = atRisk.size;
+  const toRisk = maintFailed ? null : atRisk.size;
   return {
     shiftsDone: activeToday,
     reportsExpected: activeToday + expected,
@@ -113,9 +119,10 @@ export function computeDashboardKpis(
     sitesTotal: analytics.length,
     // Раньше сюда шло activeToday («сдан отчёт за сегодня»), и плитка
     // «N в работе» показывала ноль, пока смена шла, но отчёт ещё не сдан.
-    rigsWorking: fleetTotals?.workingNow ?? 0,
-    rigsTotal: fleetTotals?.totalEquipment ?? 0,
+    // Парк не загрузился — null, а не 0: «0 в работе из 0» читается как факт.
+    rigsWorking: fleetTotals ? fleetTotals.workingNow ?? 0 : null,
+    rigsTotal: fleetTotals ? fleetTotals.totalEquipment : null,
     toRisk,
-    crews: fleetTotals?.crewsOnShiftToday ?? 0,
+    crews: fleetTotals ? fleetTotals.crewsOnShiftToday : null,
   };
 }

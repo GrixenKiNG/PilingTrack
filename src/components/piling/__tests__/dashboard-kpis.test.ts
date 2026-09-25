@@ -58,9 +58,16 @@ describe('computeDashboardKpis', () => {
     expect(k.crews).toBe(4);
   });
 
-  it('defaults fleet-derived KPIs to zero when fleet is null', () => {
+  it('returns null rig/crew KPIs when fleet is null (парк не загрузился, не «0 в работе»)', () => {
     const k = computeDashboardKpis([], null, new Map(), []);
-    expect(k).toMatchObject({ shiftsDone: 0, reportsExpected: 0, rigsWorking: 0, rigsTotal: 0, crews: 0 });
+    expect(k).toMatchObject({ shiftsDone: 0, reportsExpected: 0, rigsWorking: null, rigsTotal: null, crews: null });
+  });
+
+  it('returns null toRisk when the maintenance list failed to load (не «рисков нет»)', () => {
+    const maint = new Map([['a', { repair: true, overdue: false }]]);
+    expect(computeDashboardKpis([], fleet, maint, [], true).toRisk).toBeNull();
+    // Данные загрузились — риск считается как раньше.
+    expect(computeDashboardKpis([], fleet, maint, [], false).toRisk).toBe(1);
   });
 
   it('counts rigs at maintenance risk (repair OR overdue)', () => {

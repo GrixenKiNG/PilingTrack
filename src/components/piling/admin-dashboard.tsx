@@ -180,8 +180,8 @@ export function AdminDashboard() {
   // Production numbers come from analytics (period-aware). Operational numbers
   // come from fleet/maintenance and are always "now".
   const kpis = useMemo(
-    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig, fleet?.equipment ?? []),
-    [analytics, fleet, maintByRig],
+    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig, fleet?.equipment ?? [], stale.maint),
+    [analytics, fleet, maintByRig, stale.maint],
   );
 
   // ── План-факт по объектам, отстающие сверху ─────────────────────────────────
@@ -264,7 +264,9 @@ export function AdminDashboard() {
   const fleetRows = useMemo(() => visibleFleet.slice(0, 6), [visibleFleet]);
   const pileProgress = kpis.plannedPileMeters > 0 ? (kpis.actualPileMeters / kpis.plannedPileMeters) * 100 : 0;
   const drillingProgress = kpis.plannedDrilling > 0 ? (kpis.actualDrilling / kpis.plannedDrilling) * 100 : 0;
-  const fleetProgress = kpis.rigsTotal > 0 ? (kpis.rigsWorking / kpis.rigsTotal) * 100 : 0;
+  const fleetProgress = kpis.rigsWorking != null && kpis.rigsTotal != null && kpis.rigsTotal > 0
+    ? (kpis.rigsWorking / kpis.rigsTotal) * 100
+    : null;
   const staleSourceNames = [
     stale.fleet && 'парк установок',
     stale.maint && 'техническое обслуживание',
@@ -299,8 +301,8 @@ export function AdminDashboard() {
     'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={`${formatNumber(kpis.actualPiles)} шт / ${formatNumber(kpis.actualPileMeters)} м.п.`} sub={`план ${formatNumber(kpis.plannedPiles)} шт / ${formatNumber(kpis.plannedPileMeters)} м.п.`} progress={pileProgress} /> },
     'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`} sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`} progress={drillingProgress} /> },
     'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={formatDowntimeHours(kpis.downtime)} sub="за период" /> },
-    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={`${kpis.rigsWorking} в работе`} sub={`из ${kpis.rigsTotal}`} progress={fleetProgress} /> },
-    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={canReadMaintenance ? `${formatNumber(kpis.toRisk)} риска` : '—'} sub={canReadMaintenance ? `из ${kpis.rigsTotal} установок` : 'Недоступно вашей роли'} /> },
+    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={kpis.rigsWorking == null ? '—' : `${kpis.rigsWorking} в работе`} sub={kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal}`} progress={fleetProgress ?? undefined} /> },
+    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={canReadMaintenance ? (kpis.toRisk == null ? '—' : `${formatNumber(kpis.toRisk)} риска`) : '—'} sub={canReadMaintenance ? (kpis.toRisk == null || kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal} установок`) : 'Недоступно вашей роли'} /> },
   };
 
   return (
