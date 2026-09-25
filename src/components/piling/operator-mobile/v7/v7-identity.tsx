@@ -104,7 +104,7 @@ export function BriefingFlow({busy, version, text = SAFETY_BRIEFING, onAcknowled
           <Card key={section.id} title={section.title}>
             <CardBody>
               {section.rules.map((rule) => (
-                <div key={rule} className="note" style={{color: 'var(--ink)', fontSize: 12.5}}>{rule}</div>
+                <div key={rule} className="note" style={{color: 'var(--ink)', fontSize: 16}}>{rule}</div>
               ))}
             </CardBody>
           </Card>
@@ -254,7 +254,7 @@ function KnowledgeRun({attempt, busy, onDone, onBack}: {
 
         <Card>
           <CardBody>
-            <div style={{fontSize: 14.5, fontWeight: 700, lineHeight: 1.3}}>{question.text}</div>
+            <div style={{fontSize: 16, fontWeight: 700, lineHeight: 1.3}}>{question.text}</div>
             <div className="picks">
               {question.options.map((option, index) => (
                 <Pick
