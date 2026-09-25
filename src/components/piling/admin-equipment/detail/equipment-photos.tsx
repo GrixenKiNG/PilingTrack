@@ -186,14 +186,21 @@ export function EquipmentPhotos({ equipmentId }: Props) {
           {photos.map((p) => (
             <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg bg-muted border">
               {p.thumbUrl ? (
-                <Image
-                  src={p.thumbUrl}
-                  alt={p.fileName}
-                  fill
-                  unoptimized
-                  className="object-cover cursor-zoom-in"
+                <button
+                  type="button"
                   onClick={() => handleOpen(p)}
-                />
+                  aria-label="Открыть фото"
+                  title="Открыть фото"
+                  className="absolute inset-0"
+                >
+                  <Image
+                    src={p.thumbUrl}
+                    alt={p.fileName}
+                    fill
+                    unoptimized
+                    className="object-cover cursor-zoom-in"
+                  />
+                </button>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                   <Camera className="w-8 h-8" />
