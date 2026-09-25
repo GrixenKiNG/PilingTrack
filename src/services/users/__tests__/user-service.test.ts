@@ -6,6 +6,7 @@ const {
   findFirstUserMock,
   findManyUserMock,
   findManyFeedbackEventMock,
+  groupByFeedbackEventMock,
   updateUserMock,
   countUserMock,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   findFirstUserMock: vi.fn(),
   findManyUserMock: vi.fn(),
   findManyFeedbackEventMock: vi.fn(),
+  groupByFeedbackEventMock: vi.fn(),
   updateUserMock: vi.fn(),
   countUserMock: vi.fn(),
 }));
@@ -22,6 +24,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     feedbackEvent: {
       findMany: findManyFeedbackEventMock,
+      groupBy: groupByFeedbackEventMock,
     },
     user: {
       create: createUserMock,
@@ -84,6 +87,8 @@ describe('listUsers', () => {
     findManyUserMock.mockResolvedValue([]);
     findManyFeedbackEventMock.mockReset();
     findManyFeedbackEventMock.mockResolvedValue([]);
+    groupByFeedbackEventMock.mockReset();
+    groupByFeedbackEventMock.mockResolvedValue([]);
   });
 
   it('lists only users in the requested tenant', async () => {
@@ -119,9 +124,8 @@ describe('listUsers', () => {
       _count: { reports: 4, sites: 1 },
       reports: [{ updatedAt: new Date('2026-06-20T10:00:00.000Z') }],
     }]);
-    findManyFeedbackEventMock.mockResolvedValue([
-      { actorId: 'user-a', createdAt: new Date('2026-06-21T11:00:00.000Z') },
-      { actorId: 'user-a', createdAt: new Date('2026-06-19T11:00:00.000Z') },
+    groupByFeedbackEventMock.mockResolvedValue([
+      { actorId: 'user-a', _max: { createdAt: new Date('2026-06-21T11:00:00.000Z') } },
     ]);
 
     const result = await listUsers('tenant-a', null);
@@ -142,14 +146,15 @@ describe('listUsers', () => {
       lastActivityAt: '2026-06-21T11:00:00.000Z',
       lastActivitySource: 'login',
     })]);
-    expect(findManyFeedbackEventMock).toHaveBeenCalledTimes(1);
-    expect(findManyFeedbackEventMock).toHaveBeenCalledWith({
+    expect(findManyFeedbackEventMock).not.toHaveBeenCalled();
+    expect(groupByFeedbackEventMock).toHaveBeenCalledTimes(1);
+    expect(groupByFeedbackEventMock).toHaveBeenCalledWith({
+      by: ['actorId'],
       where: {
         action: 'auth.login.succeeded',
         actorId: { in: ['user-a'] },
       },
-      select: { actorId: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
+      _max: { createdAt: true },
     });
   });
 });

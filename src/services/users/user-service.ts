@@ -83,21 +83,22 @@ export async function listUsers(
   });
 
   const userIds = users.map((user) => user.id);
-  const loginEvents = userIds.length > 0
-    ? await db.feedbackEvent.findMany({
+  const loginGroups = userIds.length > 0
+    ? await db.feedbackEvent.groupBy({
+        by: ['actorId'],
         where: {
           action: 'auth.login.succeeded',
           actorId: { in: userIds },
         },
-        select: { actorId: true, createdAt: true },
-        orderBy: { createdAt: 'desc' },
+        _max: { createdAt: true },
       })
     : [];
 
   const lastLoginByUserId = new Map<string, Date>();
-  for (const event of loginEvents) {
-    if (event.actorId && !lastLoginByUserId.has(event.actorId)) {
-      lastLoginByUserId.set(event.actorId, event.createdAt);
+  for (const group of loginGroups) {
+    if (group.actorId && !lastLoginByUserId.has(group.actorId)) {
+      const lastLogin = group._max.createdAt;
+      if (lastLogin) lastLoginByUserId.set(group.actorId, lastLogin);
     }
   }
 
