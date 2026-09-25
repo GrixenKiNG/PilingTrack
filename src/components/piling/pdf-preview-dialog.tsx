@@ -61,7 +61,7 @@ export function PdfPreviewDialog({
               ref={iframeRef}
               src={previewUrl}
               className="h-full w-full border-0 bg-white"
-              title="PDF Preview"
+              title="Предпросмотр PDF"
               onLoad={() => setLoading(false)}
             />
           )}

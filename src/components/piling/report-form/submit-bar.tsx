@@ -66,7 +66,7 @@ export function SubmitBar({
               : (!selectedSiteId || !hasEntries) ? 'bg-slate-200 text-muted-foreground cursor-not-allowed'
               : 'bg-signal hover:bg-signal-strong text-white active:scale-[0.98]'
           )}>
-          {submitting ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Отправка...</>
+          {submitting ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Отправка…</>
             : <><Send className="w-5 h-5 mr-2" />Отправить отчёт</>}
         </button>
       </div>

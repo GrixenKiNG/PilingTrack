@@ -347,7 +347,7 @@ export function AdminTelegram() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Bot Token</Label>
+              <Label>Токен бота</Label>
               <Input
                 type="password"
                 value={newBotToken}
@@ -358,7 +358,7 @@ export function AdminTelegram() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Chat ID</Label>
+              <Label>ID чата</Label>
               <Input
                 value={newChatId}
                 onChange={(e) => setNewChatId(e.target.value)}
