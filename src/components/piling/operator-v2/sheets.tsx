@@ -34,7 +34,7 @@ function Sheet({ title, onClose, children, footer }: {
           className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
           ✕<span className="sr-only">Закрыть</span>
         </button>
-        <p className="text-base font-semibold">{title}</p>
+        <p className="text-2xl font-semibold">{title}</p>
       </header>
       <div className="flex-1 space-y-4 overflow-y-auto p-4">{children}</div>
       <div className="border-t border-border bg-card p-3">{footer}</div>
@@ -45,13 +45,13 @@ function Sheet({ title, onClose, children, footer }: {
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</label>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
   );
 }
 
-const control = 'h-11 w-full rounded-lg border border-border bg-card px-3 text-sm';
+const control = 'h-11 w-full rounded-lg border border-border bg-card px-3 text-base';
 
 /** Добавить сваи: марка и количество. */
 export function PileSheet({ open, grades, busy, onClose, onAdd }: {
@@ -84,7 +84,7 @@ export function PileSheet({ open, grades, busy, onClose, onAdd }: {
           // Пустой список — не поломка формы. Марки берутся из плана объекта, а
           // если плана нет — из общего справочника; пусто здесь означает, что
           // марок нет нигде, и это заводит администратор, а не оператор.
-          <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-strong">
+          <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-base text-warning-strong">
             Марки свай не заведены — обратитесь к диспетчеру
           </p>
         ) : (
@@ -97,7 +97,7 @@ export function PileSheet({ open, grades, busy, onClose, onAdd }: {
         {/* Длина берётся из справочника, а не из названия: разбор «м.п.» из
             имени марки уже расходился в семи местах и его свели к этому полю. */}
         {grade?.lengthMm != null && (
-          <p className="mt-1.5 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Длина по справочнику: {(grade.lengthMm / 1000).toFixed(1)} м
           </p>
         )}
@@ -162,7 +162,7 @@ export function DrillingSheet({ open, types, busy, onClose, onAdd }: {
     >
       <Field label="Тип бурения" htmlFor="drilling-type">
         {types.length === 0 ? (
-          <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-strong">
+          <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-base text-warning-strong">
             Типы бурения не заведены — обратитесь к диспетчеру
           </p>
         ) : (
@@ -258,14 +258,14 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
             onChange={(event) => setEndedHm(event.target.value)}
             className={`${control} tabular-nums`} />
           <button type="button" onClick={() => setEndedHm(hhmm(new Date()))}
-            className="h-14 shrink-0 rounded-lg border border-border bg-card px-4 text-sm font-semibold">
+            className="h-14 shrink-0 rounded-lg border border-border bg-card px-4 text-base font-semibold">
             Сейчас
           </button>
         </div>
       </Field>
 
       {interval ? (
-        <p className="rounded-lg bg-info/10 px-3 py-2 text-sm font-semibold text-info-strong">
+        <p className="rounded-lg bg-info/10 px-3 py-2 text-base font-semibold text-info-strong">
           Простой: {formatIntervalMinutes(interval.minutes)}
         </p>
       ) : null}
@@ -274,7 +274,7 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
         <textarea id="downtime-comment" rows={3} value={comment} maxLength={1000}
           onChange={(event) => setComment(event.target.value)}
           placeholder="Что именно случилось"
-          className="w-full rounded-lg border border-border bg-card p-3 text-sm" />
+          className="w-full rounded-lg border border-border bg-card p-3 text-base" />
       </Field>
     </Sheet>
   );
@@ -301,7 +301,7 @@ export function HandoverSheet({ open, equipmentName, busy, onClose, onSubmit }: 
           disabled={tooShort} busy={busy} />
       }
     >
-      <p className="text-sm text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         {equipmentName ?? 'Установка'} — что важно знать следующей смене
       </p>
       <textarea
@@ -310,12 +310,12 @@ export function HandoverSheet({ open, equipmentName, busy, onClose, onSubmit }: 
         maxLength={4000}
         onChange={(event) => setSummary(event.target.value)}
         placeholder="Состояние машины, незавершённые работы, на что обратить внимание"
-        className="w-full rounded-lg border border-border bg-card p-3 text-sm"
+        className="w-full rounded-lg border border-border bg-card p-3 text-base"
       />
       {/* Пустая передача — это «всё нормально», сказанное молчанием. Следующий
           оператор из неё ничего не узнаёт, поэтому три знака минимум требует и
           сервер, и эта форма. */}
-      <p className={cn('text-xs', tooShort ? 'text-muted-foreground' : 'text-success-strong')}>
+      <p className={cn('text-sm', tooShort ? 'text-muted-foreground' : 'text-success-strong')}>
         {tooShort ? 'Опишите состояние машины — хотя бы коротко' : 'Готово к передаче'}
       </p>
     </Sheet>

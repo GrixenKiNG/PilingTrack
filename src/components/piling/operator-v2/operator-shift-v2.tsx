@@ -120,10 +120,10 @@ function ClearanceRow({ cleared, operatorName, documents }: {
           {cleared ? '✓' : '!'}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-foreground">
+          <span className="block text-base font-medium text-foreground">
             {cleared ? 'Допуск подтверждён' : 'К работе не допущен'}
           </span>
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className="block truncate text-sm text-muted-foreground">
             {operatorName} · документов: {documents.length}
             {attention.length > 0
               ? ' · требуют внимания: ' + attention.length
@@ -148,7 +148,7 @@ function ClearanceRow({ cleared, operatorName, documents }: {
             ))}
           </RowList>
         ) : (
-          <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+          <p className="border-t border-border px-3 py-2 text-sm text-muted-foreground">
             Обязательные документы администратором не заданы — проверять нечего
           </p>
         )
@@ -161,7 +161,7 @@ function Blockers({ items }: { items: string[] }) {
   if (items.length === 0) return null;
   return (
     <ul className="space-y-1 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
-      {items.map((item) => <li key={item} className="text-sm text-destructive-strong">{item}</li>)}
+      {items.map((item) => <li key={item} className="text-base text-destructive-strong">{item}</li>)}
     </ul>
   );
 }
@@ -656,7 +656,7 @@ export function OperatorShiftV2() {
     );
   }
   if (!facts || !state) {
-    return <p className="p-8 text-center text-sm text-muted-foreground">Смена недоступна</p>;
+    return <p className="p-8 text-center text-base text-muted-foreground">Смена недоступна</p>;
   }
 
   const { step } = state;
@@ -707,10 +707,10 @@ export function OperatorShiftV2() {
             ? (
               mobile
                 ? <SafetyTab state={mobile} onOpen={setSafetyStep} />
-                : <p className="text-sm text-muted-foreground">{mobileError ?? 'Читаем ваш допуск…'}</p>
+                : <p className="text-base text-muted-foreground">{mobileError ?? 'Читаем ваш допуск…'}</p>
             )
             : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 Техника, журнал и прочие разделы открываются после начала работы:
                 до приёмки установки показывать там нечего.
               </p>
@@ -728,14 +728,14 @@ export function OperatorShiftV2() {
         {facts.clearance.warnings.length > 0 && (
           <ul className="space-y-1 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2">
             {facts.clearance.warnings.map((item) => (
-              <li key={item} className="text-sm text-warning-strong">{item}</li>
+              <li key={item} className="text-base text-warning-strong">{item}</li>
             ))}
           </ul>
         )}
 
         {equipment ? (
           <>
-            <p className="text-lg font-semibold text-foreground">{equipment.name}</p>
+            <p className="text-xl font-semibold text-foreground">{equipment.name}</p>
             {photo && (
                
               <img src={photo} alt={equipment.name} className="h-40 w-full rounded-xl object-cover" />
@@ -766,13 +766,13 @@ export function OperatorShiftV2() {
             </RowList>
             {facts.incomingHandover?.summary && (
               <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Что передали</p>
-                <p className="mt-1 text-sm text-foreground">{facts.incomingHandover.summary}</p>
+                <p className="text-sm text-muted-foreground">Что передали</p>
+                <p className="mt-1 text-base text-foreground">{facts.incomingHandover.summary}</p>
               </div>
             )}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             {facts.assignments.length > 0 ? 'Выберите установку' : 'Установка не закреплена'}
           </p>
         )}
@@ -782,7 +782,7 @@ export function OperatorShiftV2() {
             подставить, границу держит команда на сервере. */}
         {!facts.shift && facts.assignments.length > 0 && (
           <>
-            <p className="text-sm font-medium text-foreground">На какой установке работаете</p>
+            <p className="text-base font-medium text-foreground">На какой установке работаете</p>
             <RowList>
               {facts.assignments.map((assignment) => (
                 <li key={assignment.equipmentId}>
@@ -827,13 +827,13 @@ export function OperatorShiftV2() {
     if (!mobile || !list) {
       return (
         <StepShell title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             {mobileError ?? 'Читаем список осмотра…'}
           </p>
           <button
             type="button"
             onClick={() => void loadMobile()}
-            className="min-h-12 w-full rounded-lg border border-border bg-card text-sm font-semibold text-foreground"
+            className="min-h-12 w-full rounded-lg border border-border bg-card text-base font-semibold text-foreground"
           >
             Обновить
           </button>
@@ -889,7 +889,7 @@ export function OperatorShiftV2() {
                 </>
               )
               : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-base text-muted-foreground">
                   {mobileError ?? 'Читаем ваш допуск…'}
                 </p>
               )
@@ -922,7 +922,7 @@ export function OperatorShiftV2() {
               следов правок непроверяем. */}
           {tab === 'more' && (
             entries.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">За смену пока ничего не записано</p>
+              <p className="py-8 text-center text-base text-muted-foreground">За смену пока ничего не записано</p>
             ) : (
               <RowList>
                 {entries.map((row) => (
@@ -936,7 +936,7 @@ export function OperatorShiftV2() {
                       tone={row.kind === 'DOWNTIME' ? 'warn' : undefined}
                     />
                     {row.corrections.map((fix, index) => (
-                      <p key={index} className="px-3 pb-1.5 text-xs text-muted-foreground">
+                      <p key={index} className="px-3 pb-1.5 text-sm text-muted-foreground">
                         поправка {fix.delta > 0 ? `+${fix.delta}` : fix.delta}: {fix.note}
                       </p>
                     ))}
@@ -985,7 +985,7 @@ export function OperatorShiftV2() {
                 className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
                 ✕<span className="sr-only">Закрыть</span>
               </button>
-              <p className="text-base font-semibold">Свая с паспортом</p>
+              <p className="text-2xl font-semibold">Свая с паспортом</p>
             </header>
             <div className="flex-1 overflow-y-auto p-4">
               <PilePassportForm
@@ -1089,7 +1089,7 @@ export function OperatorShiftV2() {
             </li>
           </RowList>
           {!submitted && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Сначала отчёт, потом передача: сдать смену с неотправленным отчётом нельзя
             </p>
           )}
@@ -1131,9 +1131,9 @@ export function OperatorShiftV2() {
     >
       <div className="pt-8 text-center">
         <BigCheck tone="purple" />
-        <p className="mt-4 text-lg font-bold text-foreground">Спасибо!</p>
-        <p className="mt-1 text-sm text-muted-foreground">Смена успешно завершена</p>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-4 text-xl font-bold text-foreground">Спасибо!</p>
+        <p className="mt-1 text-base text-muted-foreground">Смена успешно завершена</p>
+        <p className="mt-2 text-sm text-muted-foreground">
           Экран останется здесь, пока следующий оператор или диспетчер не примет машину
         </p>
       </div>

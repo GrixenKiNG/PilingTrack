@@ -124,7 +124,7 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
 
   if (state.kind === 'working') {
     return (
-      <div className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-card px-3 py-2.5 text-base text-muted-foreground">
         {state.note}
       </div>
     );
@@ -133,11 +133,11 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
   if (state.kind === 'nowhere') {
     return (
       <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Погоды нет: телефон не дал геопозицию
           {siteName ? `, а у объекта «${siteName}» не заданы координаты` : ''}
         </p>
-        <button type="button" onClick={load} className="mt-1 text-sm font-medium text-signal-strong">
+        <button type="button" onClick={load} className="mt-1 text-base font-medium text-signal-strong">
           Разрешить геопозицию и обновить
         </button>
       </div>
@@ -147,8 +147,8 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
   if (state.kind === 'failed') {
     return (
       <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-        <p className="text-sm text-muted-foreground">{state.message}</p>
-        <button type="button" onClick={load} className="mt-1 text-sm font-medium text-signal-strong">
+        <p className="text-base text-muted-foreground">{state.message}</p>
+        <button type="button" onClick={load} className="mt-1 text-base font-medium text-signal-strong">
           Повторить
         </button>
       </div>
@@ -169,20 +169,20 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
           Погода{siteName ? <> · <span className="text-foreground">{siteName}</span></> : ' на площадке'}
         </span>
         {weather.temperature != null && (
-          <span className="text-lg font-bold tabular-nums text-foreground">
+          <span className="text-2xl font-bold tabular-nums text-foreground">
             {Math.round(weather.temperature)} °C
           </span>
         )}
       </div>
       {weather.windSpeed != null && (
-        <p className="mt-0.5 text-sm text-foreground">
+        <p className="mt-0.5 text-base text-foreground">
           Ветер {weather.windSpeed} м/с
         </p>
       )}
       {/* Источник точки называем вслух: «по объекту» может отличаться от места
           работы на десятки километров, и человек должен знать, насколько
           цифре верить. */}
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         {/* Источник точки называем вслух: по телефону это место, где человек
             стоит на самом деле, по объекту — точка из карточки, которая может
             отличаться от куста на десятки километров. */}
@@ -191,12 +191,12 @@ export function WeatherCard({ siteId, siteName, onReading }: Props) {
       {/* Формулировки — из руководств машин, а не «сильный ветер». Оператор
           должен понять, что именно от него требуется, а не оценивать погоду. */}
       {weather.windCritical ? (
-        <p className="mt-1.5 text-sm font-semibold text-destructive-strong">
+        <p className="mt-1.5 text-base font-semibold text-destructive-strong">
           Ветер 36 м/с и выше — стрелу переводят в транспортное положение.
           Решение принимает мастер на месте
         </p>
       ) : weather.windWarning ? (
-        <p className="mt-1.5 text-sm font-semibold text-warning-strong">
+        <p className="mt-1.5 text-base font-semibold text-warning-strong">
           Ветер 15 м/с и выше — работы прекращают, груз опускают, машину на стоянку.
           Решение принимает мастер на месте
         </p>

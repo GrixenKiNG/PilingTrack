@@ -84,26 +84,26 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
         <button type="button" onClick={onClose} className="-ml-1 h-11 w-11 rounded-lg text-signal-strong hover:bg-secondary">
           ✕<span className="sr-only">Закрыть</span>
         </button>
-        <p className="text-base font-semibold">Дефект</p>
+        <p className="text-2xl font-semibold">Дефект</p>
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div>
-          <label htmlFor="defect-category" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+          <label htmlFor="defect-category" className="mb-1.5 block text-sm font-medium text-muted-foreground">
             Категория
           </label>
           <select
             id="defect-category"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
-            className="h-11 w-full rounded-lg border border-border bg-card px-3 text-sm"
+            className="h-11 w-full rounded-lg border border-border bg-card px-3 text-base"
           >
             {CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </div>
 
         <div>
-          <label htmlFor="defect-description" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+          <label htmlFor="defect-description" className="mb-1.5 block text-sm font-medium text-muted-foreground">
             Описание
           </label>
           <textarea
@@ -113,7 +113,7 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
             maxLength={4000}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Например: утечка масла на соединении шланга"
-            className="w-full rounded-lg border border-border bg-card p-3 text-sm"
+            className="w-full rounded-lg border border-border bg-card p-3 text-base"
           />
         </div>
 
@@ -122,12 +122,12 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
           записи: до неё нет идентификатора, к которому его привязать. Обещать
           загрузку здесь и потерять файл — хуже, чем сказать правду.
         */}
-        <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
           Фото прикладывается к дефекту после создания — из карточки в журнале
         </p>
 
         <div>
-          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+          <p className="mb-1.5 text-sm font-medium text-muted-foreground">
             Работать на машине нельзя?
           </p>
           <div className="flex gap-2">
@@ -135,7 +135,7 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
               type="button"
               aria-pressed={blocking === false}
               onClick={() => setBlocking(false)}
-              className={cn('min-h-12 flex-1 rounded-lg border text-sm font-semibold',
+              className={cn('min-h-12 flex-1 rounded-lg border text-base font-semibold',
                 blocking === false
                   ? 'border-success bg-success/12 text-success-strong'
                   : 'border-border text-muted-foreground')}
@@ -146,7 +146,7 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
               type="button"
               aria-pressed={blocking === true}
               onClick={() => setBlocking(true)}
-              className={cn('min-h-12 flex-1 rounded-lg border text-sm font-semibold',
+              className={cn('min-h-12 flex-1 rounded-lg border text-base font-semibold',
                 blocking === true
                   ? 'border-destructive bg-destructive/10 text-destructive-strong'
                   : 'border-border text-muted-foreground')}
@@ -155,7 +155,7 @@ export function DefectSheet({ open, equipmentId, onClose, onCreated }: Props) {
             </button>
           </div>
           {blocking === true && (
-            <p className="mt-2 text-xs text-destructive-strong">
+            <p className="mt-2 text-sm text-destructive-strong">
               Машина будет закрыта для пуска, пока механик не разберёт дефект
             </p>
           )}
