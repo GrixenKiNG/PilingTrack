@@ -57,7 +57,20 @@ export function LubricationMap({ model }: { model: string | null | undefined }) 
             {map.points.map((p) => {
               const on = p.n === sel;
               return (
-                <g key={p.n} onClick={() => setSel(p.n)} className="cursor-pointer">
+                <g
+                  key={p.n}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Точка смазки ${p.n} — ${p.label}`}
+                  onClick={() => setSel(p.n)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSel(p.n);
+                    }
+                  }}
+                  className="cursor-pointer outline-none"
+                >
                   <circle
                     cx={p.x}
                     cy={p.y}

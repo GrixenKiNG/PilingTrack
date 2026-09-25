@@ -183,8 +183,22 @@ export function DictionaryTable({
               </tr>
             ) : sortedItems.map((item) => {
               const used = item.reportCount > 0 || item.planCount > 0;
+              const onRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(item);
+                }
+              };
               return (
-                <tr key={item.id} onClick={() => onSelect(item)} className={`cursor-pointer border-b last:border-0 hover:bg-info/10/70 ${selectedId === item.id ? 'bg-info/10/70 ring-1 ring-inset ring-info/30' : ''}`}>
+                <tr
+                  key={item.id}
+                  tabIndex={0}
+                  aria-selected={selectedId === item.id}
+                  onClick={() => onSelect(item)}
+                  onKeyDown={onRowKeyDown}
+                  className={`cursor-pointer border-b last:border-0 hover:bg-info/10/70 focus-visible:outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${selectedId === item.id ? 'bg-info/10/70 ring-1 ring-inset ring-info/30' : ''}`}
+                >
                   <td className="px-3 py-2"><Checkbox aria-label={`Выбрать ${item.name}`} checked={checkedIds.includes(item.id)} onClick={(event) => event.stopPropagation()} onCheckedChange={(checked) => toggleItem(item.id, checked === true)} /></td>
                   <td className={`px-3 py-2 font-medium ${item.isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {item.name}

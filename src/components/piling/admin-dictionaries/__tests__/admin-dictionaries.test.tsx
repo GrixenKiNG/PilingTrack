@@ -52,6 +52,24 @@ describe('AdminDictionaries', () => {
     expect(nameInput).toBeDisabled();
   });
 
+  it('selects a row with the keyboard (Enter and Space)', async () => {
+    render(<AdminDictionaries />);
+    const row = await screen.findByRole('row', { name: /СВ 120-35/ });
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(screen.getByDisplayValue('350×350 мм')).toBeInTheDocument();
+    expect(row).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('selects a row with the Space key and prevents page scroll', async () => {
+    render(<AdminDictionaries />);
+    const row = await screen.findByRole('row', { name: /СВ 120-35/ });
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(screen.getByDisplayValue('350×350 мм')).toBeInTheDocument();
+  });
+
   it('renders the reference table heading and selection controls', async () => {
     render(<AdminDictionaries />);
 
