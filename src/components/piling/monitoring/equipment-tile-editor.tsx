@@ -66,7 +66,7 @@ export function EquipmentTileEditor({
             <span className="hidden sm:inline">Установка для фото</span>
             <select
               aria-label="Установка для фото"
-              className="max-w-48 bg-transparent font-semibold text-foreground focus:outline-none"
+              className="max-w-48 bg-transparent font-semibold text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15"
               value={selectedCard.id}
               onChange={(event) => setSelectedCardId(event.target.value)}
             >

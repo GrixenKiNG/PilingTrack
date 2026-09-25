@@ -157,16 +157,22 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           <Loader2 className="w-5 h-5 animate-spin" />
         </div>
       ) : photo && thumbUrl ? (
-        <a href={thumbUrl} target="_blank" rel="noreferrer" className="block">
+        <button
+          type="button"
+          onClick={() => window.open(thumbUrl, '_blank', 'noopener,noreferrer')}
+          aria-label="Открыть фото"
+          title="Открыть фото"
+          className="block w-full cursor-pointer rounded-lg border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30/15"
+        >
           <Image
             src={thumbUrl}
-            alt={photo.fileName}
+            alt="Фото отчёта"
             width={400}
             height={300}
             unoptimized
             className="w-full max-h-64 object-contain rounded-lg bg-muted"
           />
-        </a>
+        </button>
       ) : canEdit ? (
         <button
           type="button"

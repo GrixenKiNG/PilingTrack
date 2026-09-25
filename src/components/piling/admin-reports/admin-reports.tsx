@@ -281,6 +281,7 @@ export function AdminReports() {
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <input
                     type="date"
+                    aria-label="Период с"
                     value={periodFrom}
                     onChange={(event) => setPeriodFrom(event.target.value)}
                     className="h-9 rounded-md border border-border bg-card px-2 text-xs font-mono text-foreground outline-none focus:border-slate-400"
@@ -288,6 +289,7 @@ export function AdminReports() {
                   <span className="text-xs text-muted-foreground">-</span>
                   <input
                     type="date"
+                    aria-label="Период по"
                     value={periodTo}
                     onChange={(event) => setPeriodTo(event.target.value)}
                     className="h-9 rounded-md border border-border bg-card px-2 text-xs font-mono text-foreground outline-none focus:border-slate-400"
