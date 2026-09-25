@@ -144,7 +144,7 @@ export function MeterReadingsPanel({
         <div className="mb-3 space-y-2 rounded-md border border-border bg-muted p-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Новое показание</span>
-            <button type="button" onClick={resetForm} className="text-muted-foreground hover:text-muted-foreground">
+            <button type="button" onClick={resetForm} aria-label="Закрыть форму" title="Закрыть" className="flex min-h-11 min-w-11 items-center justify-center text-muted-foreground hover:text-muted-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>

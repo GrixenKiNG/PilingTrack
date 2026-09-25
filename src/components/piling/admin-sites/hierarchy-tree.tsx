@@ -37,14 +37,16 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
               <div className="flex items-center gap-1">
                 {!readOnly && <button
                   onClick={() => onAdd('cluster', siteId, field.id)}
-                  className="w-6 h-6 rounded flex items-center justify-center hover:bg-signal/10 text-muted-foreground hover:text-signal-strong"
+                  className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-signal/10 text-muted-foreground hover:text-signal-strong"
+                  aria-label="Добавить куст"
                   title="Добавить куст"
                 >
                   <Plus className="w-3 h-3" />
                 </button>}
                 {!readOnly && <button
                   onClick={() => onDelete(siteId, 'field', field.id)}
-                  className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
+                  className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
+                  aria-label="Удалить поле"
                   title="Удалить поле"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -63,13 +65,17 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
                       <div className="flex items-center gap-1">
                         {!readOnly && <button
                           onClick={() => onAdd('picket', siteId, cluster.id)}
-                          className="w-5 h-5 rounded flex items-center justify-center hover:bg-signal/10 text-muted-foreground hover:text-signal-strong"
+                          className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-signal/10 text-muted-foreground hover:text-signal-strong"
+                          aria-label="Добавить пикет"
+                          title="Добавить пикет"
                         >
                           <Plus className="w-2.5 h-2.5" />
                         </button>}
                         {!readOnly && <button
                           onClick={() => onDelete(siteId, 'cluster', cluster.id)}
-                          className="w-5 h-5 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
+                          className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
+                          aria-label="Удалить куст"
+                          title="Удалить куст"
                         >
                           <Trash2 className="w-2.5 h-2.5" />
                         </button>}
@@ -90,7 +96,9 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
                             </span>
                             {!readOnly && <button
                               onClick={() => onDelete(siteId, 'picket', picket.id)}
-                              className="w-5 h-5 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
+                              className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
+                              aria-label="Удалить пикет"
+                              title="Удалить пикет"
                             >
                               <Trash2 className="w-2.5 h-2.5" />
                             </button>}

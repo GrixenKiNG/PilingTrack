@@ -32,7 +32,8 @@ export function ActionIcon({ href, label, icon: Icon }: { href: string; label: s
     <Link
       href={href}
       onClick={(event) => event.stopPropagation()}
-      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal-strong"
+      className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal-strong"
+      aria-label={label}
       title={label}
     >
       <Icon className="h-3.5 w-3.5" />

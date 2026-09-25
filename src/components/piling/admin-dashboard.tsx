@@ -321,6 +321,7 @@ export function AdminDashboard() {
           <div className="inline-flex overflow-hidden rounded-md border border-border">
             {([['all', 'Весь период'], ['today', 'Сегодня'], ['7d', '7 дней'], ['custom', 'Период']] as const).map(([m, label]) => (
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
+                aria-pressed={periodMode === m}
                 className={cn(
                   'px-2.5 py-1 text-xs font-medium',
                   periodMode === m ? 'bg-info/10 text-info-strong' : 'bg-card text-muted-foreground hover:bg-muted',

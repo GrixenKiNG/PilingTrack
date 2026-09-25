@@ -124,7 +124,8 @@ export function WorkOrderTable({
                     <button
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onEdit(record); }}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal-strong"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-muted-foreground hover:bg-signal/10 hover:text-signal-strong"
+                      aria-label="Редактировать"
                       title="Редактировать"
                     >
                       <PenLine className="h-3.5 w-3.5" />
@@ -133,7 +134,8 @@ export function WorkOrderTable({
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onDone(record); }}
                       disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE'}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-success-strong hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-success-strong hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Закрыть ТО"
                       title="Закрыть ТО"
                     >
                       {busyAction === `${record.id}:DONE` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -142,7 +144,8 @@ export function WorkOrderTable({
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onDelete(record); }}
                       disabled={busyAction === `${record.id}:delete`}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded border border-border text-destructive-strong hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-destructive-strong hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Удалить ТО"
                       title="Удалить ТО"
                     >
                       {busyAction === `${record.id}:delete` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}

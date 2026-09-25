@@ -422,7 +422,9 @@ function AssistantSelectorModal({
                   <button
                     type="button"
                     onClick={() => onRemoveId(id)}
-                    className="rounded p-0.5 text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong"
+                    aria-label={`Удалить ассистента ${assistantUsers.find(user => user.id === id)?.name ?? id}`}
+                    title="Удалить ассистента"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

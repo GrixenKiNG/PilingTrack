@@ -280,7 +280,19 @@ export function ReportHistory() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index < 20 ? index * 0.03 : 0 }}
             >
-              <Card className="cursor-pointer card-hover" onClick={() => handleOpenDetail(report)}>
+              <Card
+                className="cursor-pointer card-hover"
+                onClick={() => handleOpenDetail(report)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Открыть отчёт по объекту ${report.siteName} за ${formatDate(report.date)}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOpenDetail(report);
+                  }
+                }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>

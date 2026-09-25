@@ -382,7 +382,9 @@ export function MaintenanceBoard() {
               type="button"
               disabled={safePage <= 1}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
-              className="h-8 w-8 rounded-md border border-border bg-card text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-11 w-11 rounded-md border border-border bg-card text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Предыдущая страница"
+              title="Предыдущая страница"
             >
               ‹
             </button>
@@ -405,7 +407,9 @@ export function MaintenanceBoard() {
               type="button"
               disabled={safePage >= pageCount}
               onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-              className="h-8 w-8 rounded-md border border-border bg-card text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-11 w-11 rounded-md border border-border bg-card text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Следующая страница"
+              title="Следующая страница"
             >
               ›
             </button>

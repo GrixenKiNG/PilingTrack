@@ -78,7 +78,9 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
               <button
                 type="button"
                 onClick={() => setPlans(plans.filter((p) => p.tempId !== row.tempId))}
-                className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong flex-shrink-0"
+                aria-label="Удалить строку плана бурения"
+                title="Удалить строку"
+                className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong flex-shrink-0"
               >
                 <X className="w-3 h-3" />
               </button>

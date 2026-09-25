@@ -291,7 +291,9 @@ export function ReportFormDialog({
                         <span className="block text-xs text-muted-foreground">{getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.</span>
                       </span>
                       <button onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        aria-label={`Удалить сваю ${getPileGradeName(pile.pileGradeId)}`}
+                        title="Удалить сваю"
+                        className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -329,7 +331,9 @@ export function ReportFormDialog({
                         <span className="block text-xs text-muted-foreground">{d.meters} м</span>
                       </span>
                       <button onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
+                        aria-label={`Удалить бурение ${getDrillTypeName(d.typeId)}`}
+                        title="Удалить бурение"
+                        className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -370,7 +374,9 @@ export function ReportFormDialog({
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-semibold text-warning-strong">{dt.duration} ч</span>
                           <button onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
-                            className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
+                            aria-label={`Удалить простой ${getDtReasonName(dt.reasonId)}`}
+                            title="Удалить простой"
+                            className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       </div>
                     ))}

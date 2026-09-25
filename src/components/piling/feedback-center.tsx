@@ -320,7 +320,9 @@ export function FeedbackCenter() {
                       {event.source === 'client' && (
                         <button
                           onClick={() => dismissLocalFeedbackEvent(event.id)}
-                          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
+                          aria-label="Закрыть уведомление"
+                          title="Закрыть"
+                          className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
                         >
                           <X className="h-4 w-4" />
                         </button>
