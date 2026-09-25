@@ -135,8 +135,8 @@ export function WorkOrderTable({
                       onClick={(event) => { event.stopPropagation(); onDone(record); }}
                       disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE'}
                       className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-success-strong hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label="Закрыть ТО"
-                      title="Закрыть ТО"
+                      aria-label="Закрыть наряд ТО"
+                      title="Закрыть наряд ТО"
                     >
                       {busyAction === `${record.id}:DONE` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                     </button>

@@ -348,7 +348,7 @@ export function PersonField({
               const person = people.find((entry) => entry.id === next);
               onChange({ userId: next, name: person?.name ?? '' });
             }}
-            className="w-full bg-transparent text-xs font-semibold text-foreground outline-none"
+            className="w-full bg-transparent text-xs font-semibold text-foreground outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
           >
             <option value="">Не назначен</option>
             {people.map((person) => (

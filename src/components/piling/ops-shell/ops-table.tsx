@@ -65,7 +65,7 @@ export function OpsTable<T>({
                     if (event.key === 'Enter' || event.key === ' ') onRowSelect?.(row);
                   }}
                   className={cn(
-                    'grid cursor-pointer gap-3 px-3 py-3 text-sm outline-none transition-colors hover:bg-signal/10/30 lg:items-center lg:[grid-template-columns:var(--ops-cols)]',
+                    'grid cursor-pointer gap-3 px-3 py-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] hover:bg-signal/10/30 lg:items-center lg:[grid-template-columns:var(--ops-cols)]',
                     active && 'bg-signal/10/70 ring-1 ring-inset ring-signal/30',
                   )}
                   style={colsVar}

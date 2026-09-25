@@ -347,7 +347,7 @@ function RulesSettings(props: ReferenceUiProps) {
                           aria-label={`Вес критерия ${meta.title}`}
                           // h-full: поле тянется на всю высоту рамки (32px).
                           // Само по себе оно было 16px — ниже минимальной цели.
-                          className="h-full w-full min-w-0 border-none bg-transparent text-right font-mono text-xs font-bold outline-none disabled:text-muted-foreground"
+                          className="h-full w-full min-w-0 border-none bg-transparent text-right font-mono text-xs font-bold outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:text-muted-foreground"
                         />
                         <span className="text-3xs text-muted-foreground">%</span>
                       </label>
