@@ -518,6 +518,21 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
     title: 'Канал оповещений удалён',
     message: (m) => channelLine('Удалён канал оповещений', m),
   },
+
+  // ── Техника: моточасы ──
+  // Удаление показания меняет наработку (Equipment.engineHoursTotal) и сроки
+  // ТО, а самой строки показания после этого уже нет: кто и какую цифру стёр,
+  // видно только здесь. Название установки и снятое значение — без внутренних
+  // id (F-R34-13).
+  'meter.reading.deleted': {
+    level: 'warn',
+    title: 'Показание моточасов удалено',
+    message: (m) => {
+      const hours = num(m, 'before.engineHours');
+      const value = hours === null ? '' : ` ${hours} м/ч`;
+      return withSubject(`Удалено показание моточасов${value}`, subject(m));
+    },
+  },
 };
 
 /**

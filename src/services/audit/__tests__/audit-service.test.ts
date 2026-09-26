@@ -462,3 +462,39 @@ describe('recordAuditEvent — решение мастера по свае', () 
     );
   });
 });
+
+/**
+ * Удаление показания моточасов меняет наработку и сроки ТО, а строки показания
+ * после этого уже нет (F-R34-13). В ленте должно быть видно, у какой установки
+ * и какую цифру стёрли — без внутренних id.
+ */
+describe('recordAuditEvent — удаление показания моточасов', () => {
+  it('называет установку и снятое значение', async () => {
+    await recordAuditEvent({
+      action: 'meter.reading.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: { name: 'ЭО-5111', before: { engineHours: 1234, recordedById: 'operator-1' } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Показание моточасов удалено',
+        message: 'Удалено показание моточасов 1234 м/ч: «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и снимка', async () => {
+    await recordAuditEvent({ action: 'meter.reading.deleted', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Показание моточасов удалено',
+        message: 'Удалено показание моточасов.',
+      }),
+    );
+  });
+});
