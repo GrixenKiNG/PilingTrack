@@ -8,7 +8,7 @@
  * never re-parse the name. This guard fails if name-parsing is reintroduced.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { toast } from 'sonner';
 
 const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
@@ -86,5 +86,43 @@ describe('useReportForm — equipment list load failure is surfaced, not swallow
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Не удалось загрузить список установок'));
     // The form must still work with the empty list — loading settles without a loadError.
     await waitFor(() => expect(vi.mocked(authFetchMock)).toHaveBeenCalledWith('/api/equipment'));
+  });
+});
+
+describe('useReportForm — нецелые моточасы не теряются молча', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+    authFetchMock.mockReset();
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/dictionary/all')) {
+        return Promise.resolve(okJson({ pileGrades: [GRADE], drillingTypes: [], downtimeReasons: [] }));
+      }
+      if (url.startsWith('/api/sites')) return Promise.resolve(okJson({ data: [] }));
+      if (url.startsWith('/api/equipment')) return Promise.resolve(okJson({ data: [] }));
+      return Promise.resolve(okJson({}));
+    });
+  });
+
+  it('блокирует отправку и называет причину, если показание не целое', async () => {
+    storeState.selectedSiteId = 'site-1';
+    try {
+      const { result } = renderHook(() => useReportForm());
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => { result.current.setEngineHours('5701.5'); });
+      await waitFor(() => expect(result.current.engineHours).toBe('5701.5'));
+
+      authFetchMock.mockClear();
+      await act(async () => {
+        await result.current.handleSubmit({ pile: { gradeId: 'g1', count: 2 } });
+      });
+
+      // Ни «успеха», ни тишины: говорим, что именно не так, и отчёт не отправляем.
+      expect(toast.error).toHaveBeenCalledWith('Моточасы — целое число, не меньше 0');
+      expect(authFetchMock).not.toHaveBeenCalledWith('/api/reports/upsert', expect.anything());
+    } finally {
+      storeState.selectedSiteId = '';
+    }
   });
 });

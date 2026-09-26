@@ -26,22 +26,25 @@ function useTempState() {
   const [tempDowntimeDuration, setTempDowntimeDuration] = useState('');
   const [tempDowntimeComment, setTempDowntimeComment] = useState('');
 
-  const addPile = (onAdd: (g: string, c: number) => void) => {
-    if (!tempPileGrade || !tempPileCount || Number(tempPileCount) <= 0) return;
-    onAdd(tempPileGrade, Number(tempPileCount));
-    setTempPileGrade(''); setTempPileCount('');
+  // Значения строки уходят в хук: он единственный знает причину отказа и
+  // показывает её тостом. Поля ввода очищаем только при успешном добавлении,
+  // иначе оператор теряет уже набранное.
+  const addPile = (onAdd: (g: string, c: number) => boolean) => {
+    if (onAdd(tempPileGrade, Number(tempPileCount))) {
+      setTempPileGrade(''); setTempPileCount('');
+    }
   };
 
-  const addDrilling = (onAdd: (t: string, c: number, m: number) => void) => {
-    if (!tempDrillType || !tempDrillCount || !tempDrillMetersPerUnit || Number(tempDrillCount) <= 0 || Number(tempDrillMetersPerUnit) <= 0) return;
-    onAdd(tempDrillType, Number(tempDrillCount), Number(tempDrillMetersPerUnit));
-    setTempDrillType(''); setTempDrillCount(''); setTempDrillMetersPerUnit('');
+  const addDrilling = (onAdd: (t: string, c: number, m: number) => boolean) => {
+    if (onAdd(tempDrillType, Number(tempDrillCount), Number(tempDrillMetersPerUnit))) {
+      setTempDrillType(''); setTempDrillCount(''); setTempDrillMetersPerUnit('');
+    }
   };
 
-  const addDowntime = (onAdd: (r: string, d: number, c: string) => void) => {
-    if (!tempDowntimeReason || !tempDowntimeDuration || Number(tempDowntimeDuration) <= 0) return;
-    onAdd(tempDowntimeReason, Number(tempDowntimeDuration), tempDowntimeComment);
-    setTempDowntimeReason(''); setTempDowntimeDuration(''); setTempDowntimeComment('');
+  const addDowntime = (onAdd: (r: string, d: number, c: string) => boolean) => {
+    if (onAdd(tempDowntimeReason, Number(tempDowntimeDuration), tempDowntimeComment)) {
+      setTempDowntimeReason(''); setTempDowntimeDuration(''); setTempDowntimeComment('');
+    }
   };
 
   return {

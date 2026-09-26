@@ -57,9 +57,11 @@ export interface UseReportFormReturn {
   draftSavedAt: string | null;
   restoredDraftTemp: ReportDraftTempState | null;
   setDraftTempState: (value: ReportDraftTempState) => void;
-  addPile: (gradeId: string, count: number) => void;
-  addDrilling: (typeId: string, count: number, metersPerUnit: number) => void;
-  addDowntime: (reasonId: string, duration: number, comment: string) => void;
+  // Возвращают true только когда строка действительно добавлена: вызывающий
+  // сбрасывает поля ввода по этому признаку, а отказ обязан быть озвучен.
+  addPile: (gradeId: string, count: number) => boolean;
+  addDrilling: (typeId: string, count: number, metersPerUnit: number) => boolean;
+  addDowntime: (reasonId: string, duration: number, comment: string) => boolean;
   removePile: (id: string) => void;
   removeDrilling: (id: string) => void;
   removeDowntime: (id: string) => void;
@@ -354,21 +356,25 @@ export function useReportForm(): UseReportFormReturn {
   const getDowntimeReasonName = (id: string) => downtimeReasons.find((r) => r.id === id)?.name || id;
 
   const addPile = (gradeId: string, count: number) => {
-    if (!gradeId || count <= 0) { toast.error('Заполните марку и количество'); return; }
+    // `!(count > 0)` вместо `count <= 0`: нечисловой ввод даёт NaN, а NaN <= 0 — ложь.
+    if (!gradeId || !(count > 0)) { toast.error('Заполните марку и количество'); return false; }
     setPiles((prev) => [...prev, { id: crypto.randomUUID(), picketId: selectedPicketId, pileGradeId: gradeId, count }]);
     setSelectedPicketId(''); hapticClick(); toast.success('Свая добавлена');
+    return true;
   };
 
   const addDrilling = (typeId: string, count: number, metersPerUnit: number) => {
-    if (!typeId || count <= 0 || metersPerUnit <= 0) { toast.error('Заполните тип бурения, количество и метры'); return; }
+    if (!typeId || !(count > 0) || !(metersPerUnit > 0)) { toast.error('Заполните тип бурения, количество и метры'); return false; }
     setDrillings((prev) => [...prev, { id: crypto.randomUUID(), picketId: selectedPicketId, typeId, count, metersPerUnit, meters: Number((count * metersPerUnit).toFixed(1)) }]);
     setSelectedPicketId(''); toast.success('Бурение добавлено');
+    return true;
   };
 
   const addDowntime = (reasonId: string, duration: number, comment: string) => {
-    if (!reasonId || duration <= 0) { toast.error('Заполните причину и длительность'); return; }
+    if (!reasonId || !(duration > 0)) { toast.error('Заполните причину и длительность'); return false; }
     setDowntimes((prev) => [...prev, { id: crypto.randomUUID(), reasonId, duration, comment }]);
     toast.success('Простой добавлен');
+    return true;
   };
 
   const removePile = (id: string) => setPiles((prev) => prev.filter((p) => p.id !== id));
@@ -394,6 +400,17 @@ export function useReportForm(): UseReportFormReturn {
       : downtimes;
     if (effectivePiles.length === 0 && effectiveDrillings.length === 0 && effectiveDowntimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
     if (equipment.length > 0 && !selectedEquipmentId) { toast.error('Выберите установку'); return; }
+    // Моточасы: сервер принимает только целое ≥ 0 (reportUpsertSchema:
+    // `z.number().int().min(0).max(500_000)`). Раньше нецелое значение молча
+    // выпадало из payload, а отчёт рапортовал успех — показание счётчика
+    // терялось без единого слова.
+    const engineHoursProvided = engineHours.trim() !== '';
+    const parsedEngineHours = Number(engineHours);
+    if (engineHoursProvided && !(Number.isInteger(parsedEngineHours) && parsedEngineHours >= 0)) {
+      toast.error('Моточасы — целое число, не меньше 0');
+      hapticError();
+      return;
+    }
     // Reflect auto-committed rows in the UI so a failed submit doesn't lose them.
     if (pending?.pile) setPiles(effectivePiles);
     if (pending?.drilling) setDrillings(effectiveDrillings);
@@ -406,10 +423,7 @@ export function useReportForm(): UseReportFormReturn {
         reportId: finalReportId, userId: user.id, siteId: selectedSiteId, date, shiftStart, shiftEnd,
         version: baseVersion,
         equipmentId: selectedEquipmentId || undefined,
-        engineHours:
-          engineHours.trim() !== '' && Number.isInteger(parsedEngineHours) && parsedEngineHours >= 0
-            ? parsedEngineHours
-            : undefined,
+        engineHours: engineHoursProvided ? parsedEngineHours : undefined,
         piles: effectivePiles.map((p) => ({ picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
         drillings: effectiveDrillings.map((d) => ({ picketId: d.picketId || undefined, typeId: d.typeId, count: d.count, metersPerUnit: d.metersPerUnit, meters: d.meters })),
         downtimes: effectiveDowntimes.map((dt) => ({ reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || undefined })),
