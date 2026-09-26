@@ -33,7 +33,7 @@ interface DictDelegate {
   findFirst(args: { where: { id: string; tenantId: string } }): Promise<{ id: string; name: string; isActive: boolean } | null>;
   update(args: {
     where: { id: string; tenantId: string };
-    data: { name?: string; normalizedName?: string; isActive?: boolean };
+    data: { name?: string; normalizedName?: string; isActive?: boolean; archivedAt?: Date | null };
   }): Promise<{ id: string }>;
   delete(args: { where: { id: string; tenantId: string } }): Promise<{ id: string }>;
 }
@@ -263,7 +263,10 @@ async function setActive(
   if (!model) throw new ServiceError('Invalid type', 400);
   const item = await model.findFirst({ where: { id, tenantId } });
   if (!item) throw new ServiceError('Элемент не найден', 404);
-  const updated = await model.update({ where: { id, tenantId }, data: { isActive } });
+  // Время архивации хранит только марка сваи: по нему принимаются сваи,
+  // отправленные с телефона после архивации (см. requirePileGrade).
+  const data = type === 'pileGrade' ? { isActive, archivedAt: isActive ? null : new Date() } : { isActive };
+  const updated = await model.update({ where: { id, tenantId }, data });
   await recordAuditEvent({
     action: isActive ? 'dictionary.restored' : 'dictionary.archived',
     scope: 'dictionaries', actorId, targetId: id, tenantId,

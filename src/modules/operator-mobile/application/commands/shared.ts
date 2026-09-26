@@ -54,6 +54,7 @@ export async function requireOpenShift(tx: Tx, tenantId: string, shiftId: string
     where: {tenantId, id: shiftId},
     select: {
       id: true, state: true, equipmentId: true, productionDate: true, type: true,
+      startedAt: true, createdAt: true,
       starter: {select: {id: true, role: true}},
     },
   });
@@ -111,14 +112,25 @@ async function requireDictionaryRow<T>(
   return row;
 }
 
-export function requirePileGrade(tx: Tx, tenantId: string, id: string) {
-  return requireDictionaryRow(
+/**
+ * Марка сваи своей организации. Архивная принимается, если её убрали в архив
+ * уже после начала смены (решение владельца 26.09.2026): машинист выбрал её,
+ * пока она была действующей, а телефон отправил запись позже, без связи. Иначе
+ * реальные сваи не попали бы ни в отчёт, ни в журнал забивки, а вручную
+ * архивную марку в отчёте не выбрать.
+ */
+export async function requirePileGrade(tx: Tx, tenantId: string, id: string, shiftStartedAt: Date) {
+  const grade = await requireDictionaryRow(
     () => tx.pileGrade.findFirst({
-      where: {tenantId, id, isActive: true},
-      select: {id: true, lengthMm: true},
+      where: {tenantId, id},
+      select: {id: true, lengthMm: true, isActive: true, archivedAt: true},
     }),
     'Марка сваи не найдена в справочнике вашей организации',
   );
+  if (!grade.isActive && !(grade.archivedAt && grade.archivedAt > shiftStartedAt)) {
+    throw new OperatorCommandError(400, 'Марка сваи убрана в архив — выберите действующую марку');
+  }
+  return {id: grade.id, lengthMm: grade.lengthMm};
 }
 
 export function requireDrillingType(tx: Tx, tenantId: string, id: string) {

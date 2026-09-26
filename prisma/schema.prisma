@@ -2446,6 +2446,10 @@ model PileGrade {
   // parsing the length out of `name`. null = unknown (counts as 0 m), matching
   // the old behaviour for names with no parseable length.
   lengthMm          Int?
+  // Когда марку убрали в архив (null — действующая или архивирована до
+  // 26.09.2026). Решение владельца 26.09.2026: сваи по марке, отправленные с
+  // телефона после архивации, принимаются, если смена началась раньше неё.
+  archivedAt        DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)

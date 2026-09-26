@@ -112,7 +112,7 @@ describe('archive/restore/rename', () => {
     dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', isActive: true });
     dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', isActive: false });
     await archiveDictionaryItem(mutation, 'pileGrade', 'g1');
-    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { isActive: false } });
+    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { isActive: false, archivedAt: expect.any(Date) } });
     expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'dictionary.archived', targetId: 'g1', tenantId, actorId: 'admin-a',
     }));
