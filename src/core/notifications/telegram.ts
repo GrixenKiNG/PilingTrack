@@ -35,29 +35,29 @@ async function getDbClient() {
   return db;
 }
 
-async function getConfig(): Promise<TelegramBotConfig | null> {
+async function getConfigs(): Promise<TelegramBotConfig[]> {
   try {
     // Callers (webhook, DLQ, alert engine, report event handlers) run without
     // a user session, so there's no per-request tenant — fall back to the
     // deployment's default tenant, same as every other background path.
     const tenantId = getRequestTenantId() ?? process.env.DEFAULT_TENANT_ID;
-    if (!tenantId) return null;
+    if (!tenantId) return [];
 
     // Контекст открывается здесь, а не у вызывающего: половина вызовов идёт
     // из мест без обёртки маршрута (webhook Alertmanager, публичная форма
     // заявки, очередь недоставленных). Без него под строгими политиками RLS
     // настройка бота не читается и уведомления молча пропадают.
-    return runWithTenantContext(async () => {
+    return await runWithTenantContext(async () => {
       setRequestTenantId(tenantId);
-      return loadConfigForTenant(tenantId);
+      return loadConfigsForTenant(tenantId);
     });
   } catch (err) {
     logger.error('Failed to load Telegram config', err);
-    return null;
+    return [];
   }
 }
 
-async function loadConfigForTenant(tenantId: string): Promise<TelegramBotConfig | null> {
+async function loadConfigsForTenant(tenantId: string): Promise<TelegramBotConfig[]> {
   try {
     const db = await getDbClient();
     const { decrypt, isEncrypted } = await import('@/core/security/encryption');
@@ -66,22 +66,42 @@ async function loadConfigForTenant(tenantId: string): Promise<TelegramBotConfig 
       orderBy: { createdAt: 'asc' },
     });
 
-    if (configs.length === 0) return null;
-
-    const raw = configs[0];
-    const botToken = raw.botToken && isEncrypted(raw.botToken)
-      ? decrypt(raw.botToken)
-      : raw.botToken;
-
-    return {
-      botToken,
-      chatId: raw.chatId,
-      enabled: raw.enabled,
-    };
+    // Дедупликация по chatId: админ может завести один и тот же чат дважды
+    // (разные боты/подписи) — писать в него два раза нельзя.
+    const seenChatIds = new Set<string>();
+    const unique: TelegramBotConfig[] = [];
+    for (const raw of configs) {
+      if (seenChatIds.has(raw.chatId)) continue;
+      seenChatIds.add(raw.chatId);
+      const botToken = raw.botToken && isEncrypted(raw.botToken)
+        ? decrypt(raw.botToken)
+        : raw.botToken;
+      unique.push({ botToken, chatId: raw.chatId, enabled: raw.enabled });
+    }
+    return unique;
   } catch (err) {
     logger.error('Failed to load Telegram config', err);
-    return null;
+    return [];
   }
+}
+
+/**
+ * Доставка во все чаты тенанта. Отказ по одному чату не должен срывать
+ * отправку в остальные: общий результат — `false` только если не дошло ни до
+ * одного чата.
+ */
+async function deliverToAll(
+  configs: TelegramBotConfig[],
+  send: (config: TelegramBotConfig) => Promise<boolean>,
+): Promise<boolean> {
+  if (configs.length === 0) return false;
+
+  let anySuccess = false;
+  for (const config of configs) {
+    const ok = await send(config);
+    if (ok) anySuccess = true;
+  }
+  return anySuccess;
 }
 
 // ============================================================
@@ -170,6 +190,36 @@ async function sendTelegramMessage(
   }
 }
 
+async function sendTelegramDocument(
+  config: TelegramBotConfig,
+  filename: string,
+  data: Buffer,
+  caption?: string,
+): Promise<boolean> {
+  try {
+    const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendDocument`;
+    const form = new FormData();
+    form.append('chat_id', config.chatId);
+    if (caption) {
+      form.append('caption', caption.slice(0, 1024));
+      form.append('parse_mode', 'HTML');
+    }
+    const arr = new Uint8Array(data);
+    form.append('document', new Blob([arr], { type: 'application/pdf' }), filename);
+
+    const response = await fetch(url, { method: 'POST', body: form });
+    if (!response.ok) {
+      const err = await response.text();
+      logger.error('Telegram sendDocument error', new Error(err), { status: response.status });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logger.error('Failed to send Telegram document', error);
+    return false;
+  }
+}
+
 // ============================================================
 // Notifier Service
 // ============================================================
@@ -179,14 +229,16 @@ export class TelegramNotifier {
    * Send an alert notification.
    */
   async sendAlert(alert: AlertPayload): Promise<boolean> {
-    const config = await getConfig();
-    if (!config) {
+    const configs = await getConfigs();
+    if (configs.length === 0) {
       logger.warn('Telegram not configured — skipping alert');
       return false;
     }
 
     const { text, parse_mode } = buildAlertMessage(alert);
-    const success = await sendTelegramMessage(config, text, parse_mode);
+    const success = await deliverToAll(configs, (config) =>
+      sendTelegramMessage(config, text, parse_mode),
+    );
 
     if (success) {
       logger.info('Telegram alert sent', {
@@ -202,10 +254,10 @@ export class TelegramNotifier {
    * Send a plain text message (not an alert).
    */
   async sendMessage(text: string): Promise<boolean> {
-    const config = await getConfig();
-    if (!config) return false;
+    const configs = await getConfigs();
+    if (configs.length === 0) return false;
 
-    return sendTelegramMessage(config, text, 'HTML');
+    return deliverToAll(configs, (config) => sendTelegramMessage(config, text, 'HTML'));
   }
 
   /**
@@ -216,41 +268,20 @@ export class TelegramNotifier {
     data: Buffer,
     caption?: string,
   ): Promise<boolean> {
-    const config = await getConfig();
-    if (!config) {
+    const configs = await getConfigs();
+    if (configs.length === 0) {
       logger.warn('Telegram not configured — skipping document');
       return false;
     }
 
-    try {
-      const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendDocument`;
-      const form = new FormData();
-      form.append('chat_id', config.chatId);
-      if (caption) {
-        form.append('caption', caption.slice(0, 1024));
-        form.append('parse_mode', 'HTML');
-      }
-      const arr = new Uint8Array(data);
-      form.append('document', new Blob([arr], { type: 'application/pdf' }), filename);
-
-      const response = await fetch(url, { method: 'POST', body: form });
-      if (!response.ok) {
-        const err = await response.text();
-        logger.error('Telegram sendDocument error', new Error(err), { status: response.status });
-        return false;
-      }
-      return true;
-    } catch (error) {
-      logger.error('Failed to send Telegram document', error);
-      return false;
-    }
+    return deliverToAll(configs, (config) => sendTelegramDocument(config, filename, data, caption));
   }
 
   /**
    * Test connectivity with Telegram API.
    */
   async testConnection(): Promise<{ ok: boolean; chatTitle?: string; error?: string }> {
-    const config = await getConfig();
+    const config = (await getConfigs())[0];
     if (!config) return { ok: false, error: 'Not configured' };
 
     try {
