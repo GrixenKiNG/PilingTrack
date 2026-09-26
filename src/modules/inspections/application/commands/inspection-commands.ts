@@ -262,20 +262,47 @@ export async function saveAnswers(
   // Оператор правит только свой осмотр (см. getInspection про 404).
   if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Inspection not found', 404);
   if (ins.status === 'COMPLETED') throw new ServiceError('Осмотр уже завершён', 409);
-  await db.inspectionAnswer.deleteMany({ where: { inspectionId: id } });
-  if (answers.length) {
-    // Присланный photoCount игнорируем: в базу идёт число реально
-    // приложенных файлов.
-    const photos = await countInspectionPhotos(ctx.tenantId, id, answers.map((a) => a.itemId));
-    await db.inspectionAnswer.createMany({
-      data: answers.map((a) => ({
-        tenantId: ctx.tenantId, inspectionId: id, itemId: a.itemId,
-        result: a.result, value: a.value ?? null, note: a.note ?? null,
-        photoCount: photos.get(a.itemId) ?? 0,
-      })),
+  // Присланный photoCount игнорируем: в базу идёт число реально
+  // приложенных файлов. Считаем до транзакции: снимки она не защищает.
+  const photos = answers.length
+    ? await countInspectionPhotos(ctx.tenantId, id, answers.map((a) => a.itemId))
+    : new Map<string, number>();
+  const now = new Date();
+  return db.$transaction(async (tx) => {
+    // Захват строки осмотра условием на статус — это не проверка ради ответа,
+    // а блокировка: `UPDATE` держит блокировку строки до конца транзакции.
+    //
+    // ПОЧЕМУ. Статус читается до транзакции, а «стереть и вставить заново»
+    // (у `InspectionAnswer` нет уникального ключа `(inspectionId, itemId)`)
+    // само по себе не атомарно: переплетение `T1.delete → T2.delete →
+    // T1.insert → T2.insert` оставляло обе порции ответов — каждый пункт
+    // лежал в базе дважды, а по этому массиву считались и балл здоровья, и
+    // дефекты. Здесь повтор (обрыв связи, двойное нажатие, ретрай телефона)
+    // встаёт на блокировке строки осмотра, а после коммита первого удаляет
+    // его ответы и пишет свои: в базе остаётся ровно один набор.
+    const claimed = await tx.inspection.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: { not: 'COMPLETED' } },
+      data: { updatedAt: now },
     });
-  }
-  return db.inspection.findUnique({ where: { id }, include: { answers: true } });
+    if (claimed.count === 0) {
+      // Осмотр завершили, пока писали ответы. По завершённым ответам уже
+      // посчитаны и подпись, и решение о допуске машины — переписывать их
+      // нельзя, иначе в базе окажется завершённый осмотр, чьё содержимое
+      // расходится с принятым по нему решением.
+      throw new ServiceError('Осмотр уже завершён', 409);
+    }
+    await tx.inspectionAnswer.deleteMany({ where: { inspectionId: id } });
+    if (answers.length) {
+      await tx.inspectionAnswer.createMany({
+        data: answers.map((a) => ({
+          tenantId: ctx.tenantId, inspectionId: id, itemId: a.itemId,
+          result: a.result, value: a.value ?? null, note: a.note ?? null,
+          photoCount: photos.get(a.itemId) ?? 0,
+        })),
+      });
+    }
+    return tx.inspection.findUnique({ where: { id }, include: { answers: true } });
+  });
 }
 
 export async function completeInspection(

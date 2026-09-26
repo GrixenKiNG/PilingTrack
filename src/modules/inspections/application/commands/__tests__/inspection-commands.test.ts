@@ -8,6 +8,8 @@ const m = vi.hoisted(() => ({
   crewFindFirst: vi.fn(),
   // Снимки к пунктам осмотра считаются по Media, а не по числу из запроса.
   mediaGroupBy: vi.fn(),
+  // Счётчик открытых транзакций: фиксируем, что запись идёт одной.
+  transaction: vi.fn(),
 }));
 vi.mock('@/lib/db', () => {
   const client = {
@@ -22,7 +24,10 @@ vi.mock('@/lib/db', () => {
     crew: { findFirst: m.crewFindFirst },
     outboxEvent: { createMany: m.outboxCreate },
     media: { groupBy: m.mediaGroupBy },
-    $transaction: (run: (tx: unknown) => unknown) => run(client),
+    $transaction: (run: (tx: unknown) => unknown) => {
+      m.transaction();
+      return run(client);
+    },
   };
   return { db: client };
 });
@@ -32,6 +37,8 @@ beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
   // По умолчанию снимков нет — их наличие тест задаёт явно там, где проверяет.
   m.mediaGroupBy.mockResolvedValue([]);
+  // Захват строки по умолчанию удался: строка найдена и ещё не завершена.
+  m.insUpdateMany.mockResolvedValue({ count: 1 });
 });
 
 describe('startInspection', () => {
@@ -123,6 +130,44 @@ describe('saveAnswers', () => {
     expect(m.ansDeleteMany.mock.calls[0][0]).toEqual({ where: { inspectionId: 'ins1' } });
     const rows = m.ansCreateMany.mock.calls[0][0].data;
     expect(rows[0]).toMatchObject({ tenantId: 'orion', inspectionId: 'ins1', itemId: 'i1', result: 'OK', photoCount: 2 });
+  });
+
+  /**
+   * Раньше удаление и вставка ответов шли вне транзакции и без статуса в
+   * `WHERE`: переплетение двух запросов (обрыв связи, двойное нажатие,
+   * ретрай телефона) оставляло обе порции ответов — каждый пункт лежал
+   * дважды, а по этому массиву считались и балл здоровья, и дефекты.
+   * Теперь запись одна транзакция, а первым шагом строка осмотра
+   * захватывается условием на статус: второй запрос встаёт на её блокировке.
+   */
+  it('пишет ответы одной транзакцией, захватив строку осмотра условием на статус', async () => {
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT' });
+    m.ansDeleteMany.mockResolvedValue({ count: 0 });
+    m.ansCreateMany.mockResolvedValue({ count: 1 });
+    await saveAnswers('ins1', [{ itemId: 'i1', result: 'OK' }], { tenantId: 'orion' });
+
+    expect(m.transaction).toHaveBeenCalledTimes(1);
+    expect(m.insUpdateMany.mock.calls[0][0].where).toEqual({
+      id: 'ins1', tenantId: 'orion', status: { not: 'COMPLETED' },
+    });
+    // Стирание и вставка — по одной транзакции каждая, вне её ничего не пишется.
+    expect(m.ansDeleteMany).toHaveBeenCalledTimes(1);
+    expect(m.ansCreateMany).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Второй сценарий находки: мастер завершает осмотр, пока телефон ещё
+   * пишет ответы. Завершение считает балл и дефекты по прежним ответам, а
+   * допоздняя запись переписывала их — в базе оставался завершённый осмотр,
+   * чьё содержимое не соответствует принятому по нему решению о допуске.
+   */
+  it('завершённый осмотр не переписывается: захват не состоялся — 409, ответы целы', async () => {
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT' });
+    m.insUpdateMany.mockResolvedValue({ count: 0 }); // статус уже COMPLETED
+    await expect(saveAnswers('ins1', [{ itemId: 'i1', result: 'OK' }], { tenantId: 'orion' }))
+      .rejects.toThrow(/уже завершён/i);
+    expect(m.ansDeleteMany).not.toHaveBeenCalled();
+    expect(m.ansCreateMany).not.toHaveBeenCalled();
   });
 
   /**
