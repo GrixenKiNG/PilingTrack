@@ -36,15 +36,17 @@ describe('settings sanitizer', () => {
     expect(sanitizeSettings({ companyName: 'ООО «Орион»' }, stored).notifications.planDeviation).toBe(true);
   });
 
-  it('exposes the four owner-requested switches, all on by default', () => {
+  it('exposes the three owner-requested switches, all on by default', () => {
     // Решение владельца 26.09.2026: «добавь выключатели для всех уведомлений».
-    // У всех четырёх отправитель был и раньше — умолчание «включено» значит,
+    // Заявки с сайта ОРИОН выключателя не имеют (решение владельца 26.09.2026 21:40).
+    // У всех трёх отправитель был и раньше — умолчание «включено» значит,
     // что до первого выключения ничего не меняется.
-    for (const key of ['incidents', 'systemAlerts', 'deliveryFailures', 'orionLeads']) {
+    for (const key of ['incidents', 'systemAlerts', 'deliveryFailures']) {
       expect(NOTIFICATION_KEYS.find((k) => k.key === key)?.implemented).toBe(true);
       expect(DEFAULT_NOTIFICATIONS[key]).toBe(true);
       expect(sanitizeSettings({}).notifications[key]).toBe(true);
     }
+    expect(NOTIFICATION_KEYS.some((k) => (k.key as string) === 'orionLeads')).toBe(false);
   });
 
   it('rejects an unknown units value and over-long strings', () => {

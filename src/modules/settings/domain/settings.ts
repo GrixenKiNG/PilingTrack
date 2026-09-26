@@ -38,7 +38,10 @@ export interface WorkspaceSettings {
  * - `criticalDefect`, `incidents` — `services/notifications/durable-alert-delivery.ts`
  * - `systemAlerts` — `app/api/alerts/webhook/route.ts` (тревоги Alertmanager)
  * - `deliveryFailures` — `core/outbox/dead-letter-queue.ts`
- * - `orionLeads` — `app/api/orion/lead/route.ts`
+ *
+ * Заявки с сайта ОРИОН выключателя не имеют (решение владельца 26.09.2026):
+ * экрана заявок в приложении нет, и выключенное уведомление значило бы, что
+ * заявку никто не увидит.
  *
  * Без отправителя остаётся только `planDeviation`, и экран настроек об этом
  * говорит прямо.
@@ -52,10 +55,9 @@ export const NOTIFICATION_KEYS = [
   { key: 'maintenanceOverdue', label: 'Просроченные ТО', implemented: true },
   { key: 'criticalDefect', label: 'Опасный дефект установки (срочный или запрет работы)', implemented: true },
   { key: 'newReports', label: 'Новые отчёты и сводки', implemented: true },
-  { key: 'incidents', label: 'Происшествия на площадке', implemented: true },
+  { key: 'incidents', label: 'Мелкие происшествия на площадке (пострадавший и «прекратить работы» приходят всегда)', implemented: true },
   { key: 'systemAlerts', label: 'Сбои сервера (мониторинг)', implemented: true },
   { key: 'deliveryFailures', label: 'Недоставленные события', implemented: true },
-  { key: 'orionLeads', label: 'Заявки с сайта ОРИОН', implemented: true },
 ] as const;
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]['key'];
@@ -72,13 +74,12 @@ export const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
   criticalDefect: true,
   newReports: false,
   // Решение владельца 26.09.2026: «добавь выключатели для всех уведомлений».
-  // У всех четырёх отправители были и раньше, но выключателя у них не было —
+  // У всех трёх отправители были и раньше, но выключателя у них не было —
   // тумблеры заведены включёнными, чтобы поведение не менялось, пока админ
   // сам не выключит.
   incidents: true,
   systemAlerts: true,
   deliveryFailures: true,
-  orionLeads: true,
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
