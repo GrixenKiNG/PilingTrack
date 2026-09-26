@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { formatRuDate } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { ROLE_LABELS, type FeedbackEventLevel } from '@/lib/types';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
@@ -48,6 +49,15 @@ function str(meta: Meta, path: string): string | null {
 function num(meta: Meta, path: string): number | null {
   const value = pick(meta, path);
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** Дата из metadata (Date или ISO-строка) → «ДД.ММ.ГГГГ»; иначе null. */
+function dateAt(meta: Meta, path: string): string | null {
+  const value = pick(meta, path);
+  const iso = value instanceof Date ? value.toISOString() : typeof value === 'string' ? value : null;
+  if (!iso) return null;
+  const formatted = formatRuDate(iso);
+  return formatted === '—' ? null : formatted;
 }
 
 /**
@@ -531,6 +541,44 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
       const hours = num(m, 'before.engineHours');
       const value = hours === null ? '' : ` ${hours} м/ч`;
       return withSubject(`Удалено показание моточасов${value}`, subject(m));
+    },
+  },
+
+  // ── Техника: удаление записи топлива, регламента ТО и документа ──
+  // Самих строк после удаления не остаётся, а по ним считают расход топлива,
+  // сроки обслуживания и допуск машины к работе: в ленте должно быть видно, у
+  // какой установки что именно убрали (F-R39-3). Внутренних id в тексте нет.
+  'equipment.fuel.deleted': {
+    level: 'warn',
+    title: 'Запись о топливе удалена',
+    message: (m) => {
+      const liters = num(m, 'before.litersAdded');
+      const date = dateAt(m, 'before.recordedAt');
+      const volume = liters === null ? '' : ` ${liters} л`;
+      const when = date ? ` от ${date}` : '';
+      return withSubject(`Удалена запись о топливе${volume}${when}`, subject(m));
+    },
+  },
+  'maintenance.plan.deleted': {
+    level: 'warn',
+    title: 'Регламент ТО удалён',
+    message: (m) => {
+      const plan = str(m, 'before.title');
+      const hours = num(m, 'before.intervalHours');
+      const days = num(m, 'before.intervalDays');
+      const interval = hours !== null ? `каждые ${hours} м/ч` : days !== null ? `каждые ${days} дн.` : null;
+      const what = plan ? `Удалён регламент «${plan}»` : 'Удалён регламент ТО';
+      return withSubject(interval ? `${what}, ${interval}` : what, subject(m));
+    },
+  },
+  'equipment.document.deleted': {
+    level: 'warn',
+    title: 'Документ установки удалён',
+    message: (m) => {
+      const title = str(m, 'before.title');
+      const expires = dateAt(m, 'before.expiresAt');
+      const what = title ? `Удалён документ «${title}»` : 'Удалён документ установки';
+      return withSubject(expires ? `${what} (срок до ${expires})` : what, subject(m));
     },
   },
 };

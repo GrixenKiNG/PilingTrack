@@ -6,6 +6,9 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { updateEquipmentDocument, deleteEquipmentDocument } from '@/modules/equipment';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -64,14 +67,54 @@ export const DELETE = withMutation(
 
     const { id, docId } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = requireTenantId(user!);
+    const actor = user!;
+    const tenantId = requireTenantId(actor);
+
+    // Снимок документа читается ДО удаления (F-R39-3): для проверок ОТ и
+    // страхования важен сам факт, что документ прикладывали и до какого срока
+    // он действовал, — после `delete` этого не восстановить. Строго по тенанту.
+    const snapshot = await db.equipmentDocument.findFirst({
+      where: { id: docId, equipmentId: id, tenantId },
+      select: {
+        type: true,
+        title: true,
+        expiresAt: true,
+        equipment: { select: { name: true } },
+      },
+    });
+
     try {
       await deleteEquipmentDocument(id, docId, { tenantId });
-      return NextResponse.json({ ok: true });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Best-effort (F-R39-3): документ уже удалён — сбой записи следа не должен
+    // превращать успешное удаление в 500 (как в reports/delete).
+    try {
+      await recordAuditEvent({
+        action: 'equipment.document.deleted',
+        scope: 'equipment',
+        actorId: actor.id,
+        targetId: docId,
+        tenantId,
+        metadata: snapshot
+          ? {
+              name: snapshot.equipment.name,
+              before: {
+                type: snapshot.type,
+                title: snapshot.title,
+                expiresAt: snapshot.expiresAt,
+              },
+            }
+          : undefined,
+      });
+    } catch (err) {
+      logger.error('Equipment document delete: audit write failed', err, { docId });
+    }
+
+    return NextResponse.json({ ok: true });
   },
   { domain: 'equipment.documents' }
 );

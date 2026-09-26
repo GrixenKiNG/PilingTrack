@@ -498,3 +498,97 @@ describe('recordAuditEvent — удаление показания моточа�
     );
   });
 });
+
+/**
+ * Удаления записи топлива, регламента ТО и документа установки не оставляли
+ * следа (F-R39-3). Самих строк после удаления нет, а по ним считают расход,
+ * сроки ТО и допуск машины к работе — в ленте должно быть видно, у какой
+ * установки что убрали, без внутренних id.
+ */
+describe('recordAuditEvent — удаления по технике', () => {
+  it('называет литраж, дату и установку у удалённой записи о топливе', async () => {
+    await recordAuditEvent({
+      action: 'equipment.fuel.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: {
+        name: 'ЭО-5111',
+        before: { litersAdded: 120, recordedAt: new Date('2026-09-26T08:00:00.000Z') },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Запись о топливе удалена',
+        message: 'Удалена запись о топливе 120 л от 26.09.2026: «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без снимка записи о топливе', async () => {
+    await recordAuditEvent({ action: 'equipment.fuel.deleted', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Удалена запись о топливе.' }),
+    );
+  });
+
+  it('называет регламент ТО и его интервал', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.plan.deleted',
+      scope: 'equipment',
+      metadata: { name: 'ЭО-5111', before: { title: 'ТО-2', intervalHours: 250 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        title: 'Регламент ТО удалён',
+        message: 'Удалён регламент «ТО-2», каждые 250 м/ч: «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('показывает календарный интервал, когда регламент не по моточасам', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.plan.deleted',
+      scope: 'equipment',
+      metadata: { name: 'ЭО-5111', before: { title: 'Сезонное ТО', intervalDays: 180 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Удалён регламент «Сезонное ТО», каждые 180 дн.: «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('называет документ установки и его срок действия', async () => {
+    await recordAuditEvent({
+      action: 'equipment.document.deleted',
+      scope: 'equipment',
+      metadata: {
+        name: 'ЭО-5111',
+        before: { type: 'INSURANCE', title: 'Полис ОСАГО', expiresAt: new Date('2027-01-01T00:00:00.000Z') },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        title: 'Документ установки удалён',
+        message: 'Удалён документ «Полис ОСАГО» (срок до 01.01.2027): «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда документа и срока в metadata нет', async () => {
+    await recordAuditEvent({ action: 'equipment.document.deleted', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Удалён документ установки.' }),
+    );
+  });
+});

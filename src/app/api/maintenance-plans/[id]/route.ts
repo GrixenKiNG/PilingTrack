@@ -6,6 +6,9 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { updateMaintenancePlan, deleteMaintenancePlan } from '@/modules/equipment';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -62,14 +65,58 @@ export const DELETE = withMutation(
 
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = requireTenantId(user!);
+    const actor = user!;
+    const tenantId = requireTenantId(actor);
+
+    // Снимок регламента читается ДО удаления (F-R39-3): по исчезнувшему
+    // регламенту потом разбирают, почему ТО не было запланировано, а самой
+    // строки с названием и интервалом к тому моменту уже нет.
+    const snapshot = await db.maintenancePlan.findFirst({
+      where: { id, tenantId },
+      select: {
+        title: true,
+        type: true,
+        triggerType: true,
+        intervalHours: true,
+        intervalDays: true,
+        equipment: { select: { name: true } },
+      },
+    });
+
     try {
       await deleteMaintenancePlan(id, { tenantId });
-      return NextResponse.json({ success: true });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Best-effort (F-R39-3): регламент уже удалён — сбой записи следа не должен
+    // превращать успешное удаление в 500 (как в reports/delete).
+    try {
+      await recordAuditEvent({
+        action: 'maintenance.plan.deleted',
+        scope: 'equipment',
+        actorId: actor.id,
+        targetId: id,
+        tenantId,
+        metadata: snapshot
+          ? {
+              name: snapshot.equipment.name,
+              before: {
+                title: snapshot.title,
+                type: snapshot.type,
+                triggerType: snapshot.triggerType,
+                intervalHours: snapshot.intervalHours,
+                intervalDays: snapshot.intervalDays,
+              },
+            }
+          : undefined,
+      });
+    } catch (err) {
+      logger.error('Maintenance plan delete: audit write failed', err, { planId: id });
+    }
+
+    return NextResponse.json({ success: true });
   },
   { domain: 'equipment.maintenance' }
 );
