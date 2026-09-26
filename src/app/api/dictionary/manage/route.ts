@@ -47,6 +47,12 @@ const patchSchema = z.object({
   lengthMm: z.number().int().min(1).max(1_000_000).nullable().optional(),
   // Section/diameter label; null clears it. Only valid for pileGrade.
   sectionOrDiameter: z.string().max(100).nullable().optional(),
+  /*
+    Явное «да» диалога о пересчёте прошлых отчётов. Длина у марки одна и метры
+    считаются живьём, поэтому смена длины используемой марки применяется только
+    с этим флагом — см. setPileGradeLength.
+  */
+  confirmRecalculate: z.boolean().optional(),
 }).refine(
   (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined || v.sectionOrDiameter !== undefined,
   { message: 'name, isActive, lengthMm or sectionOrDiameter required' },
@@ -105,14 +111,14 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   const validated = patchSchema.safeParse(await readJsonBody(request));
   if (!validated.success) return NextResponse.json({ error: 'Некорректные данные', details: validated.error.flatten() }, { status: 400 });
 
-  const { type, id, name, isActive, lengthMm, sectionOrDiameter } = validated.data;
+  const { type, id, name, isActive, lengthMm, sectionOrDiameter, confirmRecalculate } = validated.data;
   if ((lengthMm !== undefined || sectionOrDiameter !== undefined) && type !== 'pileGrade') {
     return NextResponse.json({ error: 'lengthMm и sectionOrDiameter применимы только для типа сваи pileGrade' }, { status: 400 });
   }
   if (name !== undefined) await renameDictionaryItem(context, type, id, name);
   if (isActive === true) await restoreDictionaryItem(context, type, id);
   if (isActive === false) await archiveDictionaryItem(context, type, id);
-  if (lengthMm !== undefined) await setPileGradeLength(context, id, lengthMm);
+  if (lengthMm !== undefined) await setPileGradeLength(context, id, lengthMm, confirmRecalculate === true);
   if (sectionOrDiameter !== undefined) await setPileGradeSection(context, id, sectionOrDiameter);
   await invalidateDictionaries(context.tenantId);
   return NextResponse.json({ success: true });

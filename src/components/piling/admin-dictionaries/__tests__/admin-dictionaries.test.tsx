@@ -101,4 +101,22 @@ describe('AdminDictionaries', () => {
 
     await waitFor(() => expect(screen.getByText('СВ 120-35')).toBeInTheDocument());
   });
+
+  it('confirms the recalculation before changing the length of a used grade', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить длину СВ 120-35' }));
+    fireEvent.change(screen.getByLabelText('Длина сваи, м'), { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    // The dialog asks first; nothing is sent until the user confirms.
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить длину' }));
+
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith('/api/dictionary/manage', expect.objectContaining({ method: 'PATCH' })));
+    const patch = authFetch.mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(JSON.parse(patch?.[1]?.body as string)).toMatchObject({
+      type: 'pileGrade', id: 'g1', lengthMm: 15000, confirmRecalculate: true,
+    });
+  });
 });

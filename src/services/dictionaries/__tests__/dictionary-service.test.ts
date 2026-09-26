@@ -204,16 +204,53 @@ describe('getItemUsage (counts computed by the database)', () => {
 describe('setPileGradeLength', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('rejects a zero length before touching the database', async () => {
+  it('rejects a zero length for an unused grade', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', lengthMm: 12000 });
+    dbMock.report.groupBy.mockResolvedValue([]);
+    dbMock.sitePilePlan.count.mockResolvedValue(0);
+
     await expect(setPileGradeLength(mutation, 'g1', 0)).rejects.toMatchObject({ status: 400 });
     expect(dbMock.pileGrade.update).not.toHaveBeenCalled();
   });
 
-  it('keeps null as an unset length', async () => {
+  it('keeps null as an unset length for an unused grade', async () => {
     dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', lengthMm: 12000 });
+    dbMock.report.groupBy.mockResolvedValue([]);
+    dbMock.sitePilePlan.count.mockResolvedValue(0);
     dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', lengthMm: null });
     await setPileGradeLength(mutation, 'g1', null);
     expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { lengthMm: null } });
+  });
+
+  it('refuses to change the length of a used grade without confirmation', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', lengthMm: 12000 });
+    dbMock.report.groupBy.mockResolvedValue([{ siteId: 's1', _count: { _all: 3 } }]);
+    dbMock.sitePilePlan.count.mockResolvedValue(0);
+
+    await expect(setPileGradeLength(mutation, 'g1', 15000)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('используется в 3 отчётах'),
+    });
+    expect(dbMock.pileGrade.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to clear the length of a used grade', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', lengthMm: 12000 });
+    dbMock.report.groupBy.mockResolvedValue([{ siteId: 's1', _count: { _all: 2 } }]);
+    dbMock.sitePilePlan.count.mockResolvedValue(0);
+
+    await expect(setPileGradeLength(mutation, 'g1', null)).rejects.toMatchObject({ status: 422 });
+    expect(dbMock.pileGrade.update).not.toHaveBeenCalled();
+  });
+
+  it('applies the change of a used grade when recalculate is confirmed', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', lengthMm: 12000 });
+    dbMock.report.groupBy.mockResolvedValue([{ siteId: 's1', _count: { _all: 2 } }]);
+    dbMock.sitePilePlan.count.mockResolvedValue(0);
+    dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', lengthMm: 15000 });
+
+    await setPileGradeLength(mutation, 'g1', 15000, true);
+    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { lengthMm: 15000 } });
   });
 });
 
