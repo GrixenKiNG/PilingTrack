@@ -110,6 +110,44 @@ describe('addMeterReading', () => {
     const result = await addMeterReading('eq_1', { engineHours: 5008 }, { tenantId: 'orion' });
     expect(result.warning).toBeNull();
   });
+
+  it('повторная отправка отчёта с тем же значением не создаёт второе показание', async () => {
+    // Первый findFirst — поиск уже записанного показания с той же пометкой.
+    const existing = { id: 'mr_dup', engineHours: 5670, recordedAt: new Date() };
+    findFirstMock.mockResolvedValueOnce(existing);
+    const result = await addMeterReading(
+      'eq_1',
+      { engineHours: 5670, note: 'Показание из сменного отчёта за 2025-09-20' },
+      { tenantId: 'orion', dedupeByNote: true },
+    );
+    expect(createReadingMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ reading: existing, warning: null });
+  });
+
+  it('исправленное значение за ту же дату пишется новым показанием', async () => {
+    findFirstMock
+      .mockResolvedValueOnce(null) // дубля с новым значением нет — это правка
+      .mockResolvedValueOnce({ engineHours: 5000 }) // предыдущее показание
+      .mockResolvedValueOnce({ engineHours: 5678 }); // последнее после вставки
+    const result = await addMeterReading(
+      'eq_1',
+      { engineHours: 5678, note: 'Показание из сменного отчёта за 2025-09-20' },
+      { tenantId: 'orion', dedupeByNote: true },
+    );
+    expect(createReadingMock).toHaveBeenCalledTimes(1);
+    expect(createReadingMock.mock.calls[0][0].data.note).toBe('Показание из сменного отчёта за 2025-09-20');
+    expect(result.reading.id).toBe('mr_1');
+  });
+
+  it('без флага дедупликации та же цифра пишется повторно (осмотр, карточка)', async () => {
+    findFirstMock.mockResolvedValueOnce({ engineHours: 5670 }).mockResolvedValueOnce({ engineHours: 5670 });
+    await addMeterReading(
+      'eq_1',
+      { engineHours: 5670, note: 'Снято при осмотре DAILY' },
+      { tenantId: 'orion' },
+    );
+    expect(createReadingMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('checkMeterReading', () => {

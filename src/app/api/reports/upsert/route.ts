@@ -105,8 +105,10 @@ export const POST = withMutation(
             note: `Показание из сменного отчёта за ${validatedDto.date}`,
           },
           // Отчёт заполняет оператор — снижение счётчика ему недоступно.
+          // Пометки отчёта — идентификатор события: повтор отправки формы
+          // (потерян ответ, перепосылка) не создаёт второе показание.
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-          { tenantId, recordedById: user!.id, allowDecrease: false },
+          { tenantId, recordedById: user!.id, allowDecrease: false, dedupeByNote: true },
         );
         meterWarning = meterResult.warning;
       } catch (err) {

@@ -46,6 +46,18 @@ export interface MeterReadingContext {
   recordedById?: string | null;
   /** Снижение разрешено (замена счётчика). Для оператора — никогда. */
   allowDecrease?: boolean;
+  /**
+   * Пометка `note` — идентификатор события, а не свободный текст.
+   *
+   * Так пишет сменный отчёт: пометка «Показание из сменного отчёта за <дату>»
+   * одна и та же при повторной отправке формы. Второе показание с тем же
+   * значением и той же пометкой — это повтор запроса, а не новое событие.
+   * Другое значение за ту же дату — правка, её пишем.
+   *
+   * Остальным вызывающим (осмотр, карточка установки) флаг не ставят: там та
+   * же цифра во второй раз — законное показание (машина могла не работать).
+   */
+  dedupeByNote?: boolean;
 }
 
 /**
@@ -128,6 +140,20 @@ export async function recordMeterReadingInTx(
   ctx: MeterReadingContext,
 ): Promise<AddMeterReadingResult> {
   const recordedAt = toDate(input.recordedAt) ?? new Date();
+  const note = input.note?.trim() ?? '';
+
+  // Повтор запроса не должен плодить показания: если у машины уже есть
+  // показание с тем же значением и той же пометкой-идентификатором события
+  // (сменный отчёт за дату), вторую запись не создаём. Значение другое —
+  // это правка, её пишем ниже обычным путём.
+  if (ctx.dedupeByNote && note) {
+    const duplicate = await tx.meterReading.findFirst({
+      where: { tenantId: ctx.tenantId, equipmentId, engineHours: input.engineHours, note },
+      select: { id: true, engineHours: true, recordedAt: true },
+    });
+    if (duplicate) return { reading: duplicate, warning: null };
+  }
+
   const prev = await latestReading(tx, equipmentId);
   const verdict = checkMeterReading(input.engineHours, prev?.engineHours ?? null, {
     allowDecrease: ctx.allowDecrease,
@@ -144,7 +170,7 @@ export async function recordMeterReadingInTx(
       recordedAt,
       source: input.source ?? 'MANUAL',
       recordedById: ctx.recordedById ?? null,
-      note: input.note?.trim() ?? '',
+      note,
     },
     select: { id: true, engineHours: true, recordedAt: true },
   });
