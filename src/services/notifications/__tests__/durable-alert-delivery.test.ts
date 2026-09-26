@@ -20,6 +20,13 @@ describe('durable alert delivery',()=>{
   expect(m.send).not.toHaveBeenCalled();
   expect(m.update).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({published:true})}));
  });
+ it('sends a stop-work incident even when incidents are switched off',async()=>{
+  m.enabled.mockResolvedValue(false);
+  const urgent={id:'event-4',tenantId:'tenant-a',data:{severity:'critical',message:'Происшествие: требуется прекратить работы',ruleId:'incidentStopWork'}};
+  await deliverQueuedAlert(urgent);
+  expect(m.enabled).not.toHaveBeenCalled();
+  expect(m.send).toHaveBeenCalled();
+ });
  it('sends an alert whose rule has no switch of its own',async()=>{
   const other={id:'event-3',tenantId:'tenant-a',data:{severity:'low',message:'Прочее',ruleId:'unknownRule'}};
   await deliverQueuedAlert(other);

@@ -8,6 +8,9 @@ import {alertSchema} from '@/core/notifications/durable-alert';
  *
  * Ключи перечислены здесь литералами, а не типом каталога настроек: `services/`
  * по правилам проекта не зависит от `modules/` (eslint no-restricted-imports).
+ *
+ * `incidentStopWork` (пострадавший или «прекратить работы») сюда НЕ вписан
+ * намеренно: по решению владельца 26.09.2026 оно не выключается.
  */
 const RULE_NOTIFICATION_KEYS: Record<string, 'criticalDefect' | 'incidents'> = {
   criticalDefect: 'criticalDefect',
