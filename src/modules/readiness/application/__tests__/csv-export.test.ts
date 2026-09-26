@@ -7,6 +7,12 @@ describe('readiness CSV export', () => {
     (value) => expect(safeCsvCell(value)).toContain("'"),
   );
 
+  it('does not quote plain numbers, so negative columns still sum in Excel', () => {
+    expect(safeCsvCell('-5')).toBe('"-5"');
+    expect(safeCsvCell('1,5')).toBe('"1,5"');
+    expect(safeCsvCell('-5+A1')).toBe(`"'-5+A1"`);
+  });
+
   it('embeds timezone and deterministic data hash', () => {
     const result = buildReadinessCsv({
       dataset: 'audit',

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { zonedDayStartUtc } from '@/lib/timezone';
+import { pileLengthMeters } from '@/lib/pile-length';
 import { getSettings } from '@/modules/settings';
 import {
   actualRefusalMm,
@@ -263,7 +264,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       pileGradeName: row.pileWork.pileGrade?.name ?? '—',
       pileSection: row.pileWork.pileGrade?.sectionOrDiameter ?? null,
       pileLengthM: row.pileWork.pileGrade?.lengthMm != null
-        ? row.pileWork.pileGrade.lengthMm / 1000
+        ? pileLengthMeters({ gradeLengthMm: row.pileWork.pileGrade.lengthMm })
         : null,
       designHeadLevelM: row.designHeadLevelM,
       actualHeadLevelM: row.actualHeadLevelM,

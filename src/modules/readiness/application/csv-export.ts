@@ -3,6 +3,10 @@ import {formatRuDate} from '@/lib/format';
 import {formatDateInTimezone} from '@/lib/timezone';
 
 const FORMULA_PREFIX = /^(?:[\t\r]|\s*[=+\-@])/;
+// То же исключение, что в CSV отчётов (report-query.service.ts): обычные числа
+// не трогаем, иначе «-5» уехало бы в файл текстом и колонка перестала бы
+// суммироваться, а «-5+A1» апостроф получит.
+const PLAIN_NUMBER = /^-?\d+([.,]\d+)?$/;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const DATE_FORMAT: Intl.DateTimeFormatOptions = {year: 'numeric', month: '2-digit', day: '2-digit'};
@@ -32,7 +36,7 @@ function csvCellText(value: unknown, timezone: string): string {
 
 export function safeCsvCell(value: unknown, timezone: string = DEFAULT_TIMEZONE): string {
   let text = csvCellText(value, timezone);
-  if (FORMULA_PREFIX.test(text)) text = "'" + text;
+  if (!PLAIN_NUMBER.test(text.trimStart()) && FORMULA_PREFIX.test(text)) text = "'" + text;
   return '"' + text.replaceAll('"', '""') + '"';
 }
 
