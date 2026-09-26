@@ -2,8 +2,9 @@
  * MeterReading — журнал показаний наработки (моточасы).
  *
  * Источник истины наработки — история показаний. Equipment.engineHoursTotal
- * остаётся денормализованным кэшем «последнего показания» (по recordedAt),
- * который синхронизируется здесь на каждое добавление/удаление.
+ * остаётся денормализованным кэшем наработки и синхронизируется здесь на каждое
+ * добавление/удаление запросом самой базы: кэш монотонно растёт (GREATEST), а
+ * при удалении показания пересчитывается как максимум оставшихся.
  *
  * Монотонность форсируется для тех, кто снимает показание с машины: счётчик
  * назад не идёт, и цифра меньше предыдущей — это опечатка, а не событие.
@@ -76,7 +77,7 @@ const toDate = (v: string | Date | null | undefined): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/** Latest reading by recordedAt — the value Equipment.engineHoursTotal mirrors. */
+/** Последнее показание по recordedAt — с ним сверяется новое (правило «назад не идёт»). */
 async function latestReading(
   tx: typeof db,
   equipmentId: string,
@@ -86,6 +87,47 @@ async function latestReading(
     orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
     select: { engineHours: true },
   });
+}
+
+/**
+ * Кэш наработки двигает сама база, одним оператором: GREATEST(текущее, новое).
+ *
+ * Считанное в JS значение здесь не годится: между чтением и записью чужая
+ * транзакция успевает закоммитить большее показание, и кэш получает старое —
+ * наработка «идёт назад» вместе с порогами ТО (аудит F-R38-4). Tenant в
+ * условии — строгим равенством (IDOR guard).
+ */
+async function bumpEngineHoursTotal(
+  tx: typeof db,
+  equipmentId: string,
+  tenantId: string,
+  engineHours: number,
+): Promise<void> {
+  await tx.$executeRaw`
+    UPDATE "Equipment"
+    SET "engineHoursTotal" = GREATEST(COALESCE("engineHoursTotal", 0), ${engineHours})
+    WHERE id = ${equipmentId} AND "tenantId" = ${tenantId}
+  `;
+}
+
+/**
+ * Кэш после удаления показания — максимум оставшихся, посчитанный базой в той
+ * же транзакции. Чтение в JS взяло бы снимок, снятый до удаления (аудит F-R38-4);
+ * нет ни одного показания — кэш пуст, как и раньше.
+ */
+async function recomputeEngineHoursTotal(
+  tx: typeof db,
+  equipmentId: string,
+  tenantId: string,
+): Promise<void> {
+  await tx.$executeRaw`
+    UPDATE "Equipment"
+    SET "engineHoursTotal" = (
+      SELECT MAX("engineHours") FROM "MeterReading"
+      WHERE "equipmentId" = ${equipmentId} AND "tenantId" = ${tenantId}
+    )
+    WHERE id = ${equipmentId} AND "tenantId" = ${tenantId}
+  `;
 }
 
 export interface AddMeterReadingResult {
@@ -175,15 +217,10 @@ export async function recordMeterReadingInTx(
     select: { id: true, engineHours: true, recordedAt: true },
   });
 
-  // Sync the engineHoursTotal cache to the latest reading (which may be this
-  // one, or an earlier one if this reading was backdated).
-  const latest = await latestReading(tx, equipmentId);
-  if (latest) {
-    await tx.equipment.update({
-      where: { id: equipmentId },
-      data: { engineHoursTotal: latest.engineHours },
-    });
-  }
+  // Sync the engineHoursTotal cache. The write goes to the database itself
+  // (GREATEST), so a concurrent reading that commits a larger value cannot be
+  // overwritten by an older one read in JS before this transaction committed.
+  await bumpEngineHoursTotal(tx, equipmentId, ctx.tenantId, input.engineHours);
 
   // Наработка — 15 баллов готовности и вход в расчёт просрочки ТО, поэтому
   // новое показание обязано пересчитать снимок. Заказываем в этой же
@@ -236,11 +273,8 @@ export async function deleteMeterReading(
 
   await db.$transaction(async (tx) => {
     await tx.meterReading.delete({ where: { id: readingId } });
-    const latest = await latestReading(tx as typeof db, equipmentId);
-    await tx.equipment.update({
-      where: { id: equipmentId },
-      data: { engineHoursTotal: latest?.engineHours ?? null },
-    });
+    // Кэш пересчитывает база в той же транзакции: максимум оставшихся показаний.
+    await recomputeEngineHoursTotal(tx as typeof db, equipmentId, ctx.tenantId);
     // Удаление ошибочного показания меняет наработку так же, как ввод нового.
     await requestReadinessSnapshot(tx as typeof db, {
       tenantId: ctx.tenantId,
