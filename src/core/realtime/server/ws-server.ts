@@ -21,6 +21,7 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { ClientManager } from './client-manager';
 import { canReceiveEvent, canSubscribe, getDefaultChannels } from './channel-router';
+import { ChannelType } from '../types/events';
 import { authenticateWS, validateWSOrigin, sendAuthError, recheckSession } from './auth';
 import { onChannel, CHANNEL_EVENTS } from '../redis/pubsub';
 import { logger } from '@/lib/logger';
@@ -313,13 +314,12 @@ export async function startWSServer(): Promise<ServerHandle> {
       const sent = clients.broadcast(messageWithSeq, channels, event.tenantId);
 
       // Add to replay buffers for each client
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-      for (const client of (clients as any).clients?.values?.() || []) {
+      for (const client of clients.allClients()) {
         // Tenant gate: only add to a client's buffer when that client could
         // legitimately receive the event (platform roles + same tenant; SEC-01)
         if (client.subscriptions && canReceiveEvent(client.role, client.tenantId, event.tenantId)) {
           const hasSubscription = channels.some((ch: string) => {
-            if (client.subscriptions.has(ch)) return true;
+            if (client.subscriptions.has(ch as ChannelType)) return true;
             for (const sub of client.subscriptions) {
               if (sub.endsWith(':*') && ch.startsWith(sub.replace(':*', ':'))) return true;
             }

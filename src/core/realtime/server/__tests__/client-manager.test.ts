@@ -121,6 +121,27 @@ describe('ClientManager', () => {
   });
 
   // ============================================================
+  // allClients
+  // ============================================================
+
+  describe('allClients', () => {
+    it('should iterate over every connected client', () => {
+      const ws1 = createMockWs();
+      const ws2 = createMockWs();
+      manager.addClient(ws1, { userId: 'u1', tenantId: 't1', role: 'OPERATOR' });
+      manager.addClient(ws2, { userId: 'u2', tenantId: 't1', role: 'OPERATOR' });
+
+      const clients = Array.from(manager.allClients());
+      expect(clients).toHaveLength(2);
+      expect(clients.map(c => c.userId).sort()).toEqual(['u1', 'u2']);
+    });
+
+    it('should be empty when no clients are connected', () => {
+      expect(Array.from(manager.allClients())).toHaveLength(0);
+    });
+  });
+
+  // ============================================================
   // sendToClient
   // ============================================================
 
