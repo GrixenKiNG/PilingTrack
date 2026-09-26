@@ -83,6 +83,52 @@ function dictionaryLine(meta: Meta, verb: string, name: string | null): string {
   return name ? `${where}: ${verb} «${name}».` : `${where}: ${verb}.`;
 }
 
+// Поля настроек так, как они называются на экране («Настройки организации»).
+// Список переключателей уведомлений живёт в modules/settings, а services/ не
+// может зависеть от modules/ (CLAUDE.md §1): уведомления подписаны общим словом,
+// но направление переключателя показываем — «выключили оповещения об опасных
+// дефектах» читается иначе, чем «включили сводки».
+const SETTINGS_FIELD_LABELS: ReadonlyArray<readonly [string, string]> = [
+  ['companyName', 'название компании'],
+  ['inn', 'ИНН'],
+  ['timezone', 'часовой пояс'],
+  ['dateFormat', 'формат даты'],
+  ['units', 'единицы'],
+  ['currency', 'валюта'],
+];
+
+/** Поля настроек, которые в этом событии действительно изменились. */
+function changedSettingsFields(meta: Meta): string[] {
+  const fields = SETTINGS_FIELD_LABELS
+    .filter(([key]) => pick(meta, `before.${key}`) !== pick(meta, `after.${key}`))
+    .map(([, label]) => label);
+  const toggles = notificationChangeLabel(meta);
+  if (toggles) fields.push(toggles);
+  return fields;
+}
+
+/** «уведомления (включено: 1, выключено: 2)» — либо null, если переключатели не трогали. */
+function notificationChangeLabel(meta: Meta): string | null {
+  const before = pick(meta, 'before.notifications');
+  const after = pick(meta, 'after.notifications');
+  if (typeof before !== 'object' || before === null || typeof after !== 'object' || after === null) return null;
+
+  const prev = before as Record<string, unknown>;
+  const next = after as Record<string, unknown>;
+  let on = 0;
+  let off = 0;
+  for (const key of new Set([...Object.keys(prev), ...Object.keys(next)])) {
+    if (prev[key] === next[key]) continue;
+    if (next[key] === true) on += 1;
+    else if (next[key] === false) off += 1;
+  }
+
+  const parts: string[] = [];
+  if (on) parts.push(`включено: ${on}`);
+  if (off) parts.push(`выключено: ${off}`);
+  return parts.length ? `уведомления (${parts.join(', ')})` : null;
+}
+
 // ────────────────────────────────────────────
 // Действие → человеческий текст
 // ────────────────────────────────────────────
@@ -389,6 +435,21 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
     level: 'warn',
     title: 'Допуск к технике удалён',
     message: 'Строка матрицы допусков удалена администратором.',
+  },
+
+  // ── Настройки организации ──
+  // Часовой пояс задаёт границы производственных суток и периоды отчётов,
+  // переключатель уведомления — объём оповещений: без строки в ленте смена
+  // настроек неотличима от «никто не менял».
+  'settings.updated': {
+    level: 'audit',
+    title: 'Настройки изменены',
+    message: (m) => {
+      const fields = changedSettingsFields(m);
+      return fields.length
+        ? `Изменены настройки: ${fields.join(', ')}.`
+        : 'Настройки организации сохранены.';
+    },
   },
 };
 

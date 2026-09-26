@@ -263,3 +263,59 @@ describe('recordAuditEvent — человеческий текст вместо 
     }
   });
 });
+
+/**
+ * Настройки меняют границы производственных суток (часовой пояс) и объём
+ * оповещений (переключатели) — в ленте должно быть видно, что именно меняли.
+ */
+describe('recordAuditEvent — изменения настроек', () => {
+  it('перечисляет изменённые поля по-русски', async () => {
+    await recordAuditEvent({
+      action: 'settings.updated',
+      scope: 'settings',
+      actorId: 'admin-a',
+      tenantId: 'orion',
+      metadata: {
+        before: { companyName: 'Ромашка', timezone: 'Europe/Moscow' },
+        after: { companyName: 'Ромашка', timezone: 'Asia/Krasnoyarsk' },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Настройки изменены',
+        message: 'Изменены настройки: часовой пояс.',
+      }),
+    );
+  });
+
+  it('показывает направление переключателей уведомлений', async () => {
+    await recordAuditEvent({
+      action: 'settings.updated',
+      scope: 'settings',
+      metadata: {
+        before: { notifications: { downtime30: true, newReports: false } },
+        after: { notifications: { downtime30: false, newReports: true } },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Изменены настройки: уведомления (включено: 1, выключено: 1).',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без снимков before/after', async () => {
+    await recordAuditEvent({ action: 'settings.updated', scope: 'settings' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Настройки изменены',
+        message: 'Настройки организации сохранены.',
+        level: 'audit',
+        priority: 'MEDIUM',
+      }),
+    );
+  });
+});
