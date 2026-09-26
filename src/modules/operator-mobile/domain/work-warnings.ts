@@ -11,8 +11,8 @@ import type {DocumentCheck} from './operator-admission';
  * человек, который стоит рядом с машиной.
  *
  * ЧТО ЗАПРЕЩАЕТ ВСЁ-ТАКИ. Погода: её измеряет внешний сервис, а не человек, и
- * пороги выписаны из руководств. Ветер выше 15 м/с и мороз ниже −25 °C — работы
- * прекращают.
+ * пороги выписаны из руководств. Ветер 15 м/с и выше, мороз ниже −25 °C —
+ * работы прекращают.
  *
  * КАК СНИМАЕТСЯ. Само. Предупреждения не хранятся: они вычисляются из открытых
  * дефектов и текущей погоды при каждом чтении экрана. Механик закрыл дефект —
@@ -47,7 +47,17 @@ export interface WorkWarning {
   resolution: string;
 }
 
-/** Порог прекращения работ по ветру. */
+/**
+ * Порог прекращения работ по ветру: 15 м/с и выше.
+ *
+ * ЕДИНОЕ ПРОЧТЕНИЕ ПОРОГА (решение владельца 26.09.2026). Карточка погоды
+ * держит то же число своей константой `WIND_STOP_WORK_MS`
+ * (`src/services/weather/weather-client.ts`) и сравнивает его так же — `>=`.
+ * Общей константы на два модуля нет: `services/` не имеет права зависеть от
+ * `modules/` (eslint no-restricted-imports, CLAUDE.md §1). Меняя порог, правьте
+ * оба места — иначе при ровно 15 м/с экран оператора и карточка погоды снова
+ * разойдутся.
+ */
 export const WIND_STOP_MS = 15;
 /** Порог прекращения работ по морозу. */
 export const COLD_STOP_C = -25;
@@ -89,7 +99,7 @@ export interface WarningInput {
 export function weatherStop(windMs: number | null, temperatureC: number | null): WorkWarning[] {
   const stops: WorkWarning[] = [];
 
-  if (windMs !== null && windMs > WIND_STOP_MS) {
+  if (windMs !== null && windMs >= WIND_STOP_MS) {
     stops.push({
       code: 'WIND_STOP',
       level: 'STOP',

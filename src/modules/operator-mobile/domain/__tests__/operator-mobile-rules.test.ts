@@ -91,9 +91,13 @@ describe('предупреждения смены', () => {
     expect(warnings.find((warning) => warning.code === 'DOCUMENT_INVALID')?.level).toBe('ALERT');
   });
 
-  it('ветер выше 15 м/с даёт красное предупреждение, но не блокирует учёт', () => {
+  it('ветер 15 м/с и выше даёт красное предупреждение, но не блокирует учёт', () => {
     const warnings = collectWarnings({...base, windMs: 17});
     expect(warnings.find((warning) => warning.code === 'WIND_STOP')?.level).toBe('STOP');
+    // Решение владельца 26.09.2026: порог читается «15 и выше» — ровно 15,0 м/с
+    // карточка погоды и правила смены должны понимать одинаково.
+    expect(collectWarnings({...base, windMs: 15}).find((w) => w.code === 'WIND_STOP')?.level)
+      .toBe('STOP');
     // Граница: 14 м/с ниже порога и предупреждения не даёт.
     expect(collectWarnings({...base, windMs: 14}).find((w) => w.code === 'WIND_STOP')).toBeUndefined();
   });
@@ -349,14 +353,16 @@ describe('плановое окно смены', () => {
  * единственное, что стоит между «работать нельзя» и записью в отчёте.
  */
 describe('запреты, которые обязан держать сервер', () => {
-  it('ветер выше порога и мороз ниже порога прекращают работы', () => {
+  it('ветер на пороге и выше и мороз ниже порога прекращают работы', () => {
     expect(weatherStop(16, -5).map((stop) => stop.code)).toEqual(['WIND_STOP']);
     expect(weatherStop(3, -30).map((stop) => stop.code)).toEqual(['COLD_STOP']);
     expect(weatherStop(20, -30)).toHaveLength(2);
   });
 
-  it('погода на самом пороге работать не запрещает', () => {
-    expect(weatherStop(15, -25)).toEqual([]);
+  it('ровно 15 м/с — порог: работы прекращают, как и на карточке погоды', () => {
+    // Та же граница, что и в `app/api/weather`: `windMs >= WIND_STOP_WORK_MS`.
+    expect(weatherStop(15, -5).map((stop) => stop.code)).toEqual(['WIND_STOP']);
+    expect(weatherStop(14.9, -25)).toEqual([]);
   });
 
   it('молчащий сервис погоды не останавливает объект', () => {
