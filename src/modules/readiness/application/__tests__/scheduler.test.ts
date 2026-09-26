@@ -158,6 +158,42 @@ describe('суточный сброс техготовности', () => {
     expect(result.shiftsAutoClosed).toBe(1);
   });
 
+  // Дневная смена 07:00–19:00 кончается в 19:00 D, и с запасом 5 ч брошена
+  // уже с 00:00 D+1 — терять её до полудня незачем, работа в те же сутки кончилась.
+  it('дневная смена закрывается с начала суток после производственных', async () => {
+    shiftFindMany.mockResolvedValue([
+      {id: 'day', productionDate: new Date('2026-09-26T00:00:00.000Z'), timezone: MSK, type: 'DAY', version: 1, state: 'STARTED'},
+    ]);
+    // Тип смены обязан быть в выборке: от него зависит срок автозакрытия.
+    await runReadinessScheduler('orion', new Date('2026-09-26T20:59:00.000Z'));
+    expect(shiftFindMany.mock.calls[0][0].select.type).toBe(true);
+    // 23:59 МСК 26-го (20:59 UTC) — смена ещё не брошена.
+    expect(shiftUpdateMany).not.toHaveBeenCalled();
+
+    // 00:00 МСК 27-го (21:00 UTC) — 19:00 + 5 ч истекли, закрываем.
+    shiftUpdateMany.mockResolvedValue({count: 1});
+    const result = await runReadinessScheduler('orion', new Date('2026-09-26T21:00:00.000Z'));
+    expect(shiftUpdateMany.mock.calls[0][0].where.id).toEqual({in: ['day']});
+    expect(result.shiftsAutoClosed).toBe(1);
+  });
+
+  // Ночная смена 19:00 D – 07:00 D+1 кончается уже в D+1, поэтому брошена
+  // только с полудня D+1 (07:00 + 5 ч).
+  it('ночная смена закрывается с полудня суток после производственных', async () => {
+    shiftFindMany.mockResolvedValue([
+      {id: 'night', productionDate: new Date('2026-09-26T00:00:00.000Z'), timezone: MSK, type: 'NIGHT', version: 1, state: 'STARTED'},
+    ]);
+    // 11:59 МСК 27-го (08:59 UTC) — ночная смена ещё может идти.
+    await runReadinessScheduler('orion', new Date('2026-09-27T08:59:00.000Z'));
+    expect(shiftUpdateMany).not.toHaveBeenCalled();
+
+    // 12:00 МСК 27-го (09:00 UTC) — закрываем.
+    shiftUpdateMany.mockResolvedValue({count: 1});
+    const result = await runReadinessScheduler('orion', new Date('2026-09-27T09:00:00.000Z'));
+    expect(shiftUpdateMany.mock.calls[0][0].where.id).toEqual({in: ['night']});
+    expect(result.shiftsAutoClosed).toBe(1);
+  });
+
   // Выработка автозакрытой смены иначе навсегда оставалась черновиком без
   // события «сдан» — и мимо аналитики.
   it('черновик отчёта автозакрытой смены сдаётся с событием и пометкой автозакрытия', async () => {
