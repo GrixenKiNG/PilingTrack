@@ -14,7 +14,6 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { Prisma } from '@/generated/postgres-client';
 import { logger } from '@/lib/logger';
-import { ServiceError } from '@/lib/service-error';
 
 /**
  * Потолок выборки периода.
