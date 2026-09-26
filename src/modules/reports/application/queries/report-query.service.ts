@@ -301,6 +301,16 @@ function csvCell(value: string): string {
   return FORMULA_START.has(trimmed.charAt(0)) ? `"'${escaped}"` : `"${escaped}"`;
 }
 
+/** Метраж сваи неизвестен: у марки не задана длина (PileGrade.lengthMm = null). */
+const PILE_LENGTH_UNKNOWN_LABEL = 'длина марки не задана';
+/** Пометка к итогу м.п., когда хотя бы у одной марки не задана длина. */
+const PILE_METERS_INCOMPLETE_NOTE = '(неполный: у марки не задана длина)';
+
+/** Метраж по строке свай: count × длина сваи из единственного источника (lib/pile-length). */
+function pileRowMeters(pile: { count?: number | null; pileGrade?: { lengthMm?: number | null } | null }): number {
+  return (pile.count ?? 0) * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm });
+}
+
 export interface ReportExportFilters {
   tenantId: string;
   userId?: string | null;
@@ -362,7 +372,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
 
   const BOM = '\uFEFF';
   const header =
-    'ID отчёта;Дата;Смена;Объект;Оператор;Экипаж;Установка;Марка сваи;Кол-во свай;Тип бурения;Метры бурения;Причина простоя;Часы простоя;Комментарий';
+    'ID отчёта;Дата;Смена;Объект;Оператор;Экипаж;Установка;Марка сваи;Кол-во свай;Свай, м.п.;Тип бурения;Метры бурения;Причина простоя;Часы простоя;Комментарий';
 
   const rows = reports.flatMap((report) => {
     const base = {
@@ -376,22 +386,29 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const pileRows = report.piles.map((pile: any) => ({
-      ...base,
-      pileGrade: pile.pileGrade?.name ?? '',
-      pileCount: String(pile.count),
-      drillType: '',
-      drillMeters: '',
-      dtReason: '',
-      dtHours: '',
-      dtComment: '',
-    }));
+    const pileRows = report.piles.map((pile: any) => {
+      const meters = pileRowMeters(pile);
+      return {
+        ...base,
+        pileGrade: pile.pileGrade?.name ?? '',
+        pileCount: String(pile.count),
+        // Без длины марки метраж не считается: печатаем пояснение, а не «0.0» —
+        // иначе пустая длина выглядит как реальный ноль погонных метров.
+        pileMeters: meters > 0 ? meters.toFixed(1) : PILE_LENGTH_UNKNOWN_LABEL,
+        drillType: '',
+        drillMeters: '',
+        dtReason: '',
+        dtHours: '',
+        dtComment: '',
+      };
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const drillingRows = report.drillings.map((drilling: any) => ({
       ...base,
       pileGrade: '',
       pileCount: '',
+      pileMeters: '',
       drillType: drilling.type?.name ?? '',
       drillMeters: String(drilling.meters),
       dtReason: '',
@@ -404,6 +421,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       ...base,
       pileGrade: '',
       pileCount: '',
+      pileMeters: '',
       drillType: '',
       drillMeters: '',
       dtReason: downtime.reason?.name ?? '',
@@ -417,6 +435,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
           ...base,
           pileGrade: '',
           pileCount: '',
+          pileMeters: '',
           drillType: '',
           drillMeters: '',
           dtReason: '',
@@ -451,7 +470,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   // --- Лист 1: детализация (числа — числами). ---
   const detail: (string | number | null)[][] = [[
     'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Экипаж', 'Установка',
-    'Марка сваи', 'Кол-во свай', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
+    'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
   ]];
   for (const r of reports) {
     const base = [
@@ -462,24 +481,32 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // словарь может не разрешиться (дрейф после переноса базы), и без защиты
     // весь экспорт падает из-за одной такой строки.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const p of r.piles as any[]) detail.push([...base, p.pileGrade?.name ?? '', p.count, '', null, '', null, '']);
+    for (const p of r.piles as any[]) {
+      const meters = pileRowMeters(p);
+      detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : PILE_LENGTH_UNKNOWN_LABEL, '', null, '', null, '']);
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.drillings as any[]) detail.push([...base, '', null, d.type?.name ?? '', d.meters, '', null, '']);
+    for (const d of r.drillings as any[]) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '']);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', null, d.reason?.name ?? '', d.duration, d.comment || '']);
+    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '']);
     if (!r.piles.length && !r.drillings.length && !r.downtimes.length) {
-      detail.push([...base, '', null, '', null, '', null, '']);
+      detail.push([...base, '', null, '', '', null, '', null, '']);
     }
   }
 
   // --- Лист 2: итоги по отчёту. ---
   const totals: (string | number | null)[][] = [[
     'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Установка',
-    'Свай, всего', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %',
+    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание',
   ]];
   for (const r of reports) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const piles = (r.piles as any[]).reduce((s, p) => s + p.count, 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    const pileMeters = (r.piles as any[]).reduce((s, p) => s + pileRowMeters(p), 0);
+    // Марка без длины: м.п. неполные, и по файлу это должно быть видно.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    const pilesWithoutLength = (r.piles as any[]).some((p) => pileRowMeters(p) === 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const wells = (r.drillings as any[]).reduce((s, d) => s + d.count, 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
@@ -488,7 +515,8 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
     totals.push([
       r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
-      piles, wells, meters, downtime, r.endingFuelPercent ?? null,
+      piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
+      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '',
     ]);
   }
 

@@ -84,3 +84,33 @@ describe('exportReportsCsv — защита от формул', () => {
     expect(csv).not.toContain(`"'Замена троса"`);
   });
 });
+
+/**
+ * Метраж свай (F-R32-2). Экран «Отчёты» показывает «шт/м.п.», а выгрузка
+ * раньше содержала только штуки — по файлу экранный итог было не сверить.
+ * Длина берётся из PileGrade.lengthMm через lib/pile-length (единственный
+ * источник), имя марки не парсится, а пустая длина даёт пояснение, не «0.0».
+ */
+describe('exportReportsCsv — метраж свай', () => {
+  beforeEach(() => { findManyMock.mockReset(); });
+
+  it('печатает «Свай, м.п.» и метраж марки без длины (F-R32-2)', async () => {
+    findManyMock.mockResolvedValue([{
+      reportId: 'R-1', date: '2026-08-17', shiftType: 'DAY',
+      site: { name: 'Объект' }, user: { name: 'Иванов' },
+      crew: null, equipment: { name: 'Banut 655' },
+      piles: [
+        { count: 3, pileGrade: { name: 'С300', lengthMm: 12000 } },
+        { count: 2, pileGrade: { name: 'С90.30', lengthMm: null } },
+      ],
+      drillings: [], downtimes: [],
+    }]);
+
+    const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+
+    expect(csv).toContain('Кол-во свай;Свай, м.п.;');
+    // 3 × 12.0 м = 36.0 м.п. у марки с длиной; у марки без длины — пояснение.
+    expect(csv).toContain('"36.0"');
+    expect(csv).toContain('"длина марки не задана"');
+  });
+});
