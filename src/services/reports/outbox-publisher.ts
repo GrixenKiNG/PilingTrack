@@ -179,7 +179,15 @@ async function consumeOutboxEvents(
           outboxEvent.payload,
           error,
           attempts,
-          { tenantId: outboxEvent.tenantId ?? null, aggregateType: outboxEvent.aggregateType, consumer: consumerColumn },
+          {
+            tenantId: outboxEvent.tenantId ?? null,
+            aggregateType: outboxEvent.aggregateType,
+            consumer: consumerColumn,
+            alertEnabled: async (tenantId) => {
+              const { isNotificationEnabled } = await import('@/modules/settings');
+              return isNotificationEnabled(tenantId, 'deliveryFailures');
+            },
+          },
         );
         // Claim this consumer's column so the row is not re-fetched on the
         // next tick. moveToDlq only writes to DeadLetterQueue; without this

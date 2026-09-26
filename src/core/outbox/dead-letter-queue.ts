@@ -35,6 +35,12 @@ export interface DlqOrigin {
   tenantId: string | null;
   aggregateType: string;
   consumer: 'published' | 'projected';
+  /**
+   * Выключатель «Недоставленные события» из настроек организации. core/ не
+   * знает модуля настроек (правило слоёв), поэтому решение передаёт
+   * вызывающий из services/. Не передан — алерт шлём, как раньше.
+   */
+  alertEnabled?: (tenantId: string | null | undefined) => Promise<boolean>;
 }
 
 export async function moveToDlq(
@@ -82,15 +88,12 @@ export async function moveToDlq(
 
     // Best-effort Telegram alert — never blocks the DLQ write.
     //
-    // Выключатель спрашиваем здесь, а не у вызывающего: тумблер «Недоставленные
-    // события» должен гасить именно этот алерт. Контекста запроса у DLQ нет
-    // (moveToDlq зовётся из воркера), поэтому тенант — ambient или тенант
-    // развёртывания, как в core/notifications/telegram.ts:getConfigs.
-    import('@/modules/settings').then(async ({ isNotificationEnabled }) => {
-      // Организация события известна (origin, миграция 20260925180000); ambient
-      // и тенант развёртывания — только для строк без неё.
+    // Тумблер «Недоставленные события» гасит именно этот алерт. Организация
+    // события известна (origin); ambient и тенант развёртывания — только для
+    // строк без неё, как в core/notifications/telegram.ts:getConfigs.
+    void (async () => {
       const tenantId = origin.tenantId ?? getRequestTenantId() ?? process.env.DEFAULT_TENANT_ID;
-      if (!(await isNotificationEnabled(tenantId, 'deliveryFailures'))) {
+      if (origin.alertEnabled && !(await origin.alertEnabled(tenantId))) {
         logger.info('DLQ alert suppressed by notification settings', { eventType, outboxId });
         return;
       }
@@ -100,7 +103,7 @@ export async function moveToDlq(
         (aggregateId ? `aggregateId: <code>${aggregateId}</code>\n` : '') +
         `Ошибка: <code>${errorMessage.substring(0, 200)}</code>`
       );
-    }).catch(() => {/* ignore */});
+    })().catch(() => {/* ignore */});
   } catch (dlqError) {
     // Last resort — log to console
     logger.error('DLQ: failed to move event to DLQ', dlqError);
