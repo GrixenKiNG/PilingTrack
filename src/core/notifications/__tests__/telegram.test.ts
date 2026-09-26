@@ -208,3 +208,94 @@ describe('telegramNotifier — доставка во все конфигурац
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+/*
+  F-R33-1: в алерт уходили внутренние cuid («📍 Объект: clx…», «📄 Отчёт: …») и
+  время сервера без зоны (в контейнере UTC — на 3 часа раньше московского).
+  Теперь вызывающий передаёт название объекта, номер отчёта и зону
+  организации; строки с id остаются фолбэком для остальных отправителей.
+*/
+describe('telegramNotifier — человекочитаемые поля и зона (F-R33-1)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
+
+  beforeEach(() => {
+    findManyMock.mockReset();
+    decryptMock.mockReset();
+    isEncryptedMock.mockReset();
+    process.env.DEFAULT_TENANT_ID = 'test-tenant';
+    findManyMock.mockResolvedValue([
+      { botToken: '999:plain-token', chatId: '-100123', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '' });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
+  });
+
+  function sentText(): string {
+    return JSON.parse(fetchMock.mock.calls[0][1].body as string).text as string;
+  }
+
+  it('показывает название объекта и номер отчёта вместо cuid', async () => {
+    await telegramNotifier.sendAlert({
+      severity: 'medium',
+      message: 'Простой 2 ч 20 мин зафиксирован в отчёте',
+      siteId: 'clx1234sitecuid',
+      siteName: 'Объект «Северный»',
+      reportId: 'RM-abcd1234-2026-09-26',
+      reportNumber: 'RM-abcd1234-2026-09-26',
+    });
+
+    const text = sentText();
+    expect(text).toContain('📍 Объект: <b>Объект «Северный»</b>');
+    expect(text).toContain('📄 Отчёт: <b>RM-abcd1234-2026-09-26</b>');
+    expect(text).not.toContain('clx1234sitecuid');
+  });
+
+  it('экранирует HTML в названии объекта и номере отчёта', async () => {
+    await telegramNotifier.sendAlert({
+      severity: 'high',
+      message: 'тревога',
+      siteName: 'Объект <b>«Север»</b> & Co',
+      reportNumber: 'RM-1 <script>',
+    });
+
+    const text = sentText();
+    expect(text).toContain('📍 Объект: <b>Объект &lt;b&gt;«Север»&lt;/b&gt; &amp; Co</b>');
+    expect(text).toContain('📄 Отчёт: <b>RM-1 &lt;script&gt;</b>');
+    expect(text).not.toContain('<script>');
+  });
+
+  it('печатает время в зоне организации в формате ДД.ММ.ГГГГ, ЧЧ:ММ', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-26T21:30:00Z'));
+
+    await telegramNotifier.sendAlert({
+      severity: 'medium',
+      message: 'тревога',
+      timeZone: 'Europe/Moscow',
+    });
+
+    expect(sentText()).toContain('⏰ 27.09.2026, 00:30');
+  });
+
+  it('уважает зону тенанта, а не серверную', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-26T21:30:00Z'));
+
+    fetchMock.mockResolvedValue({ ok: true, text: async () => '' });
+    await telegramNotifier.sendAlert({
+      severity: 'medium',
+      message: 'тревога',
+      timeZone: 'Asia/Krasnoyarsk',
+    });
+
+    expect(sentText()).toContain('⏰ 27.09.2026, 04:30');
+  });
+});

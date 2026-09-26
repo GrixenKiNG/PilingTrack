@@ -11,6 +11,7 @@
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 // Статически (в отличие от обработчиков ниже): динамический import этого
 // модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
 // уходил бы в живую базу из теста. Прод-поведение то же — db это ленивый прокси.
@@ -269,13 +270,51 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
     reasonId: event.data.reasonId,
   });
 
+  // Человекочитаемые название объекта и номер отчёта вместо внутренних id
+  // (cuid), которые диспетчеру ничего не говорят. Один тенантный запрос,
+  // строгое равенство по организации события; при неудаче оставляем прежние
+  // строки с id — фолбэк в telegram.ts.
+  let siteName: string | undefined;
+  let reportNumber: string | undefined;
+  if (event.tenantId) {
+    try {
+      const report = await db.report.findFirst({
+        where: { reportId: event.aggregateId, tenantId: event.tenantId },
+        select: { reportId: true, site: { select: { name: true } } },
+      });
+      siteName = report?.site?.name || undefined;
+      reportNumber = report?.reportId || undefined;
+    } catch (err) {
+      logger.warn('Downtime alert: cannot resolve site name/report number', {
+        reportId: event.aggregateId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Часовой пояс организации для строки времени: серверное время в алерте
+  // отставало от московского на 3 часа (F-R33-1). Незнание зоны — не повод
+  // молчать, поэтому при ошибке оставляем "Europe/Moscow".
+  let timeZone = 'Europe/Moscow';
+  if (event.tenantId) {
+    try {
+      const { getSettings } = await import('@/modules/settings');
+      timeZone = (await getSettings(event.tenantId)).timezone || 'Europe/Moscow';
+    } catch {
+      // Настройки не прочитались — шлём в зоне по умолчанию.
+    }
+  }
+
   try {
     const { telegramNotifier } = await import('@/core/notifications/telegram');
     await telegramNotifier.sendAlert({
       severity: duration > 4 ? 'high' : 'medium',
-      message: `Простой ${duration} ч зафиксирован в отчёте`,
+      message: `Простой ${formatDowntimeHours(duration)} зафиксирован в отчёте`,
       siteId: event.siteId,
+      siteName,
       reportId: event.aggregateId,
+      reportNumber,
+      timeZone,
     });
   } catch (err) {
     // Notification must never fail the event — log and continue.
@@ -456,7 +495,7 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
     '',
     `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
     `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
-    `⏸ Простои: <b>${fmtNum(totalDowntime)}</b> ч`,
+    `⏸ Простои: <b>${formatDowntimeHours(totalDowntime)}</b>`,
   ];
   const caption = lines.join('\n');
 

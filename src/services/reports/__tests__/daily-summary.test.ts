@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
-  outboxFindUnique, outboxUpdate, sendDocument,
+  outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
 } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
@@ -26,11 +26,15 @@ const {
   outboxFindUnique: vi.fn(),
   outboxUpdate: vi.fn(),
   sendDocument: vi.fn(),
+  findFirstMock: vi.fn(),
+  isNotifMock: vi.fn(),
+  getSettingsMock: vi.fn(),
+  sendAlertMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
   const client = {
-    report: { findMany: findManyMock, findUnique: findUniqueMock },
+    report: { findMany: findManyMock, findUnique: findUniqueMock, findFirst: findFirstMock },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
     reportAnalytics: { upsert: analyticsUpsertMock },
     outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate },
@@ -47,7 +51,14 @@ vi.mock('@/lib/pdf-data', () => ({
   }),
 }));
 vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn().mockResolvedValue(Buffer.from('pdf')) }));
-vi.mock('@/core/notifications/telegram', () => ({ telegramNotifier: { sendDocument } }));
+vi.mock('@/core/notifications/telegram', () => ({
+  telegramNotifier: { sendDocument, sendAlert: sendAlertMock },
+}));
+
+vi.mock('@/modules/settings', () => ({
+  isNotificationEnabled: isNotifMock,
+  getSettings: getSettingsMock,
+}));
 
 vi.mock('@/lib/cached-queries', () => ({
   invalidateSiteAnalytics: invalidateAnalyticsMock,
@@ -57,7 +68,9 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler } from '../event-handlers';
+import {
+  recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler, registerAlertEventHandler,
+} from '../event-handlers';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 
@@ -289,5 +302,68 @@ describe('сброс кэша сводки по объектам (F-R35-2)', () 
       tenantId: 'tenant-a',
       data: { date: '2026-04-30' },
     })).resolves.toBeUndefined();
+  });
+});
+
+/*
+  F-R33-1: алерт о простое уходил диспетчеру сырым числом часов
+  («Простой 2.3333333333333335 ч») и внутренними id вместо названия объекта и
+  номера отчёта. Обработчик обязан подтянуть их одним тенантным запросом
+  (строгое равенство по организации события) и передать зону из настроек.
+*/
+describe('алерт о простое (F-R33-1)', () => {
+  beforeEach(() => {
+    findFirstMock.mockReset();
+    sendAlertMock.mockReset();
+    isNotifMock.mockReset();
+    getSettingsMock.mockReset();
+    findFirstMock.mockResolvedValue(null);
+    isNotifMock.mockResolvedValue(true);
+    getSettingsMock.mockResolvedValue({ timezone: 'Asia/Krasnoyarsk' });
+    registerAlertEventHandler();
+  });
+
+  function downtimeEvent() {
+    return {
+      id: 'evt-dt-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
+      aggregateId: 'RM-abcd1234-2026-09-26',
+      aggregateType: 'Report' as const,
+      occurredAt: new Date().toISOString(),
+      siteId: 'clx-site-cuid',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { duration: 2.3333333333333335 },
+    };
+  }
+
+  it('передаёт название объекта, номер отчёта и зону тенанта', async () => {
+    findFirstMock.mockResolvedValue({
+      reportId: 'RM-abcd1234-2026-09-26',
+      site: { name: 'Северный' },
+    });
+
+    await emitDomainEvent(downtimeEvent());
+
+    expect(findFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { reportId: 'RM-abcd1234-2026-09-26', tenantId: 'tenant-a' },
+    }));
+    expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Простой 2 ч 20 мин зафиксирован в отчёте',
+      siteName: 'Северный',
+      reportNumber: 'RM-abcd1234-2026-09-26',
+      timeZone: 'Asia/Krasnoyarsk',
+    }));
+  });
+
+  it('падает обратно на строки с id, если отчёт не нашёлся', async () => {
+    findFirstMock.mockResolvedValue(null);
+
+    await emitDomainEvent(downtimeEvent());
+
+    expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({
+      siteName: undefined,
+      reportNumber: undefined,
+    }));
   });
 });
