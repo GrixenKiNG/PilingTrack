@@ -17,7 +17,7 @@ describe('apiErrorMessage — массив { field, message }', () => {
     };
 
     expect(apiErrorMessage(body, 'Ошибка отправки отчёта')).toBe(
-      'Некорректные данные\nПоле piles.2.count: Too small: expected number to be >0\nПоле date: Invalid input',
+      'Некорректные данные\nСваи, строка 3: количество: Too small: expected number to be >0\nДата: некорректное значение',
     );
   });
 
@@ -49,7 +49,7 @@ describe('apiErrorMessage — zod fieldErrors', () => {
     };
 
     expect(apiErrorMessage(body, 'Ошибка сохранения')).toBe(
-      'Некорректные данные\nПоле count: Ожидалось число\nПоле date: Неверная дата',
+      'Некорректные данные\nПоле count: Ожидалось число\nДата: Неверная дата',
     );
   });
 
@@ -57,6 +57,51 @@ describe('apiErrorMessage — zod fieldErrors', () => {
     const body = { error: 'Некорректные данные', details: { fieldErrors: { count: ['', 'Второе'], empty: [] } } };
 
     expect(apiErrorMessage(body, 'Ошибка')).toBe('Некорректные данные\nПоле count: Второе');
+  });
+});
+
+describe('apiErrorMessage — читаемые русские подписи', () => {
+  it('переводит пути полей отчёта и английские тексты zod', () => {
+    const body = {
+      error: 'Некорректные данные',
+      details: [
+        { field: 'siteId', message: 'Required' },
+        { field: 'date', message: 'Invalid input' },
+        { field: 'shiftEnd', message: 'String must contain at least 1 character(s)' },
+      ],
+    };
+
+    expect(apiErrorMessage(body, 'Ошибка')).toBe(
+      'Некорректные данные\nОбъект: обязательное поле\nДата: некорректное значение\nКонец смены: не заполнено',
+    );
+  });
+
+  it('нумерует строки разделов начиная с единицы', () => {
+    const body = {
+      error: 'Некорректные данные',
+      details: {
+        fieldErrors: {
+          'piles.1.count': ['Number must be greater than or equal to 0'],
+          'drillings.0.meters': ['Expected number, received string'],
+          'downtimes.3.reasonId': ['Required'],
+        },
+      },
+    };
+
+    expect(apiErrorMessage(body, 'Ошибка')).toBe(
+      'Некорректные данные\nСваи, строка 2: количество: должно быть не меньше 0\nБурение, строка 1: метры: ожидается число\nПростой, строка 4: причина: обязательное поле',
+    );
+  });
+
+  it('оставляет незнакомый путь и незнакомый текст как есть', () => {
+    const body = {
+      error: 'Некорректные данные',
+      details: [{ field: 'mlModel.weights', message: 'Something went wrong' }],
+    };
+
+    expect(apiErrorMessage(body, 'Ошибка')).toBe(
+      'Некорректные данные\nПоле mlModel.weights: Something went wrong',
+    );
   });
 });
 

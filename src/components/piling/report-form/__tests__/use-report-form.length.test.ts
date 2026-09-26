@@ -201,7 +201,7 @@ describe('useReportForm — построчные ошибки сервера д�
       });
 
       expect(toast.error).toHaveBeenCalledWith(
-        'Некорректные данные\nПоле piles.0.count: Количество должно быть больше 0',
+        'Некорректные данные\nСваи, строка 1: количество: Количество должно быть больше 0',
       );
       expect(toast.success).not.toHaveBeenCalledWith('Отчёт успешно отправлен!');
     } finally {
