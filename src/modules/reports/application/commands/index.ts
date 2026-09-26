@@ -10,9 +10,3 @@ export {
   validateDowntimeEntries,
   validateAgainstSitePlans,
 } from './report-validation.service';
-export {
-  calculateReportSummary,
-  calculatePeriodSummary,
-  getPileMetersPerUnit,
-  calculateDrillingVolume,
-} from './report-calculation.service';
