@@ -13,6 +13,7 @@ import { Pencil, Trash2, Plus, FileText, Loader2 } from '@/components/piling/ico
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
+import { documentExpiry } from '@/lib/document-expiry';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -312,10 +313,18 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
   );
 }
 
+/**
+ * Срок действия документа установки.
+ *
+ * Правило — общее с документами работников (`documentExpiry`): своим `Math.round`
+ * с зашитым порогом 30 он давал другие слова для той же даты (25.09 23:00 и
+ * истечение 26.10 — здесь «истекает через 30 дн.», в карточке работника
+ * «действует»). Своего срока предупреждения у видов документов техники нет,
+ * поэтому порог тот же, что и был, — 30 дней.
+ */
 function ExpiresIndicator({ iso }: { iso: string }) {
-  const d = new Date(iso);
-  const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return <span className={cn('rounded px-1.5 py-0.5 text-destructive-strong bg-destructive/10')}>Истёк {Math.abs(days)} дн. назад</span>;
-  if (days <= 30) return <span className={cn('rounded px-1.5 py-0.5 text-warning-strong bg-warning/10')}>истекает через {days} дн.</span>;
+  const { status, daysLeft } = documentExpiry(iso, 30);
+  if (status === 'expired') return <span className={cn('rounded px-1.5 py-0.5 text-destructive-strong bg-destructive/10')}>Истёк {Math.abs(daysLeft ?? 0)} дн. назад</span>;
+  if (status === 'expiring') return <span className={cn('rounded px-1.5 py-0.5 text-warning-strong bg-warning/10')}>истекает через {daysLeft} дн.</span>;
   return <span>до {formatRuDate(iso.slice(0, 10))}</span>;
 }
