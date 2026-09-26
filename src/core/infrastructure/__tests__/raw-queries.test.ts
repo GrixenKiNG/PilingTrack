@@ -75,11 +75,13 @@ describe('getReportsByPeriodRaw', () => {
     expect(args.where).not.toHaveProperty('siteId');
   });
 
-  it('coerces empty tenantId to null (global scope)', async () => {
-    await getReportsByPeriodRaw('', '2026-04-01', '2026-04-30');
-
-    const args = findManyMock.mock.calls[0][0];
-    expect(args.where.tenantId).toBeNull();
+  // R26-1: пустая организация раньше превращалась в `tenantId IS NULL` —
+  // вместо отказа запрос отдавал строки без организации. Правило проекта
+  // (CLAUDE.md): отказ, а не «общая область».
+  it('refuses an empty tenantId instead of querying (fail closed)', async () => {
+    await expect(getReportsByPeriodRaw('', '2026-04-01', '2026-04-30')).rejects.toThrow();
+    await expect(getReportsByPeriodRaw('   ', '2026-04-01', '2026-04-30')).rejects.toThrow();
+    expect(findManyMock).not.toHaveBeenCalled();
   });
 
   it('includes child aggregations (piles, drillings, downtimes)', async () => {

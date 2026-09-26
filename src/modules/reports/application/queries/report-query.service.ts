@@ -55,7 +55,8 @@ export async function getEditableReport(
     siteId,
     date,
   };
-  if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'DISPATCHER' && sessionUser.tenantId) {
+  if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'DISPATCHER') {
+    if (!sessionUser.tenantId) throw new ServiceError('Пользователь не привязан к организации', 403);
     where.tenantId = sessionUser.tenantId;
   }
 
@@ -89,9 +90,12 @@ export async function listReportsForReview(
 ) {
   const { paginateQuery } = await import('@/lib/pagination');
 
-  // Tenant isolation: non-privileged users can only access their tenant's reports
+  // Tenant isolation: non-privileged users can only access their tenant's reports.
+  // Без организации — отказ: раньше фильтр молча не ставился, и оператор без
+  // организации получил бы отчёты всех организаций (аудит R26-2).
   const where: Record<string, unknown> = {};
-  if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'DISPATCHER' && sessionUser.tenantId) {
+  if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'DISPATCHER') {
+    if (!sessionUser.tenantId) throw new ServiceError('Пользователь не привязан к организации', 403);
     where.tenantId = sessionUser.tenantId;
   }
   if (siteId) {
