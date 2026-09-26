@@ -147,7 +147,9 @@ export function AdminAnalytics() {
     setKpiLoading(true);
     setKpiError(null);
     try {
-      const params = new URLSearchParams({ from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` });
+      // Производственный день строкой: границы суток считает сервер по поясу
+      // организации, а не по UTC процесса (F-R37-3).
+      const params = new URLSearchParams({ from: dateFrom, to: dateTo });
       const res = await authFetch(`/api/maintenance/kpi?${params}`);
       if (res.ok) {
         setKpi((await res.json()).kpi as FleetKpiData);
