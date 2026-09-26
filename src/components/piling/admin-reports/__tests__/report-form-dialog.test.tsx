@@ -69,6 +69,7 @@ describe('ReportFormDialog — pile meters total', () => {
         onClose={vi.fn()}
         editReport={editReport}
         loadingReferenceData={false}
+        dictionaryError={null}
         operators={[]}
         sites={[]}
         pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
@@ -98,6 +99,7 @@ describe('ReportFormDialog — дата по умолчанию', () => {
           onClose={vi.fn()}
           editReport={null}
           loadingReferenceData={false}
+          dictionaryError={null}
           operators={[]}
           sites={[]}
           pileGrades={[]}
@@ -138,6 +140,7 @@ describe('ReportFormDialog — построчные ошибки сервера'
         onClose={vi.fn()}
         editReport={editReport}
         loadingReferenceData={false}
+        dictionaryError={null}
         operators={[]}
         sites={[]}
         pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
@@ -151,5 +154,29 @@ describe('ReportFormDialog — построчные ошибки сервера'
     fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Некорректные данные\nПоле count: Ожидалось число'));
+  });
+});
+
+describe('ReportFormDialog — непрочитанные справочники', () => {
+  it('показывает причину над полями, а не пустые списки без объяснения', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={null}
+        loadingReferenceData={false}
+        dictionaryError="Справочники не загрузились — списки в форме пустые"
+        operators={[]}
+        sites={[]}
+        pileGrades={[]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe('Справочники не загрузились — списки в форме пустые');
   });
 });

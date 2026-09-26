@@ -39,6 +39,9 @@ interface ReportFormDialogProps {
   onClose: () => void;
   editReport: ReportDTO | null;
   loadingReferenceData: boolean;
+  /** Справочники формы не прочитаны (403/500/сеть): списки ниже пустые не потому,
+   *  что данных нет. Показывается плашкой над полями. */
+  dictionaryError: string | null;
   operators: OperatorUser[];
   sites: SiteFlatDTO[];
   pileGrades: PileGradeDTO[];
@@ -50,7 +53,7 @@ interface ReportFormDialogProps {
 
 export function ReportFormDialog({
   open, onClose, editReport,
-  loadingReferenceData,
+  loadingReferenceData, dictionaryError,
   operators, sites, pileGrades, drillingTypes, downtimeReasons, equipment,
   onSuccess,
 }: ReportFormDialogProps) {
@@ -210,6 +213,13 @@ export function ReportFormDialog({
           </div>
         ) : (
         <div className="space-y-4 mt-2">
+          {/* Пустые «Марка сваи / Тип скважины / Причина простоя» — это отказ чтения
+              справочников, а не «в системе нет данных». */}
+          {dictionaryError ? (
+            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong">
+              {dictionaryError}
+            </p>
+          ) : null}
           {/* Operator, Site, Date, Shift, Equipment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">

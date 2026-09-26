@@ -47,7 +47,7 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, filterError,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, filterError, dictionaryError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports,
   } = useReportsData();
 
@@ -444,6 +444,7 @@ export function AdminReports() {
         open={showCreateDialog} onClose={() => { setShowCreateDialog(false); setEditReport(null); }}
         editReport={editReport}
         loadingReferenceData={loadingReferenceData}
+        dictionaryError={dictionaryError}
         operators={operators} sites={sites} pileGrades={pileGrades}
         drillingTypes={drillingTypes} downtimeReasons={downtimeReasons} equipment={equipment}
         onSuccess={loadReports} />
