@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { zonedDayStartUtc } from '@/lib/timezone';
 import { getSettings } from '@/modules/settings';
 import {
   actualRefusalMm,
@@ -119,6 +120,8 @@ export interface PileJournalFilters {
   /** Границы по дате забивки, YYYY-MM-DD включительно. */
   dateFrom?: string;
   dateTo?: string;
+  /** Пояс, в котором считается день периода. Без него — из настроек тенанта. */
+  timezone?: string;
   /** Поиск по номеру сваи. */
   pileNumber?: string;
   limit?: number;
@@ -140,15 +143,32 @@ export interface PileJournalPage {
 }
 
 /**
- * Конец дня по границе периода.
+ * Границы периода забивки в UTC — по календарным дням пояса тенанта.
  *
- * Дата без времени означает «весь этот день»: `dateTo = 2026-09-14` обязан
- * включать сваю, забитую в 18:40. Сравнение с полуночью выкинуло бы весь
- * последний день выборки — и молча, что хуже всего.
+ * ПОЧЕМУ НЕ UTC-ПОЛНОЧЬ. Дата без времени означает «весь этот день» в поясе
+ * организации — том же, в котором печатается день забивки (F-R17-1). Для МСК
+ * окно дня сдвинуто на +3 ч: свая, забитая 26.09 в 00:30 МСК (25.09T21:30Z),
+ * обязана быть в журнале «26.09», а не «25.09».
+ *
+ * ПОЧЕМУ ВЕРХНЯЯ ГРАНИЦА ИСКЛЮЧАЮЩАЯ. `lt` полуночи следующего дня не теряет
+ * сваю, забитую 26.09 в 23:59, и не затягивает в выборку сваю 27.09 в 00:00.
  */
-function endOfDay(date: string): Date {
-  const parsed = new Date(`${date}T00:00:00.000Z`);
-  return new Date(parsed.getTime() + 24 * 60 * 60 * 1000 - 1);
+function periodBounds(
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  timezone: string,
+): { gte?: Date; lt?: Date } | null {
+  if (!dateFrom && !dateTo) return null;
+  return {
+    ...(dateFrom ? { gte: zonedDayStartUtc(dateFrom, timezone) } : {}),
+    ...(dateTo ? { lt: zonedDayStartUtc(addDays(dateTo, 1), timezone) } : {}),
+  };
+}
+
+/** Следующий календарный день ГГГГ-ММ-ДД. */
+function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 export async function listPilePassports(input: PileJournalFilters): Promise<PileJournalPage> {
@@ -156,6 +176,14 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
 
   const limit = Math.min(input.limit ?? PILE_JOURNAL_LIMIT, PILE_JOURNAL_LIMIT);
   const acceptance = input.acceptance ?? (input.pendingOnly ? 'PENDING' : undefined);
+  // Пояс нужен только для периода: день фильтра — день тенанта, а не UTC.
+  const bounds = input.dateFrom || input.dateTo
+    ? periodBounds(
+      input.dateFrom,
+      input.dateTo,
+      input.timezone ?? (await getSettings(input.tenantId)).timezone,
+    )
+    : null;
   const rows = await db.pilePassport.findMany({
     where: {
       tenantId: input.tenantId,
@@ -163,14 +191,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       ...(input.pileNumber
         ? { pileNumber: { contains: input.pileNumber, mode: 'insensitive' as const } }
         : {}),
-      ...(input.dateFrom || input.dateTo
-        ? {
-          drivenAt: {
-            ...(input.dateFrom ? { gte: new Date(`${input.dateFrom}T00:00:00.000Z`) } : {}),
-            ...(input.dateTo ? { lte: endOfDay(input.dateTo) } : {}),
-          },
-        }
-        : {}),
+      ...(bounds ? { drivenAt: bounds } : {}),
       ...(input.siteId ? { pileWork: { report: { siteId: input.siteId } } } : {}),
     },
     orderBy: { drivenAt: 'desc' },
@@ -412,7 +433,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
   // День документа — день тенанта, а не UTC (F-R17-1): свая, забитая в 00:30
   // МСК, в UTC ещё вчерашняя, и подшитый журнал датировал бы её соседним днём.
   const { timezone } = await getSettings(filters.tenantId);
-  const { rows, truncated } = await listPilePassports({ ...filters, limit: PILE_JOURNAL_LIMIT });
+  const { rows, truncated } = await listPilePassports({ ...filters, limit: PILE_JOURNAL_LIMIT, timezone });
   const header = pileJournalHeader(rows, timezone);
 
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : '—');
