@@ -27,6 +27,13 @@ describe('durable alert delivery',()=>{
   expect(m.enabled).not.toHaveBeenCalled();
   expect(m.send).toHaveBeenCalled();
  });
+ it('sends an old-format critical incident even when incidents are switched off',async()=>{
+  m.enabled.mockResolvedValue(false);
+  const queued={id:'event-5',tenantId:'tenant-a',data:{severity:'critical',message:'Происшествие: требуется прекратить работы',ruleId:'incident'}};
+  await deliverQueuedAlert(queued);
+  expect(m.enabled).not.toHaveBeenCalled();
+  expect(m.send).toHaveBeenCalled();
+ });
  it('sends an alert whose rule has no switch of its own',async()=>{
   const other={id:'event-3',tenantId:'tenant-a',data:{severity:'low',message:'Прочее',ruleId:'unknownRule'}};
   await deliverQueuedAlert(other);

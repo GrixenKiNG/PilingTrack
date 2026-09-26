@@ -264,8 +264,13 @@ async function setActive(
   const item = await model.findFirst({ where: { id, tenantId } });
   if (!item) throw new ServiceError('Элемент не найден', 404);
   // Время архивации хранит только марка сваи: по нему принимаются сваи,
-  // отправленные с телефона после архивации (см. requirePileGrade).
-  const data = type === 'pileGrade' ? { isActive, archivedAt: isActive ? null : new Date() } : { isActive };
+  // отправленные с телефона после архивации (см. requirePileGrade). Ставится
+  // только при переходе из действующей: повторная архивация сдвинула бы дату
+  // и открыла бы приём для смен, начавшихся уже после настоящей архивации.
+  const data = type !== 'pileGrade' ? { isActive }
+    : isActive ? { isActive, archivedAt: null }
+    : item.isActive ? { isActive, archivedAt: new Date() }
+    : { isActive };
   const updated = await model.update({ where: { id, tenantId }, data });
   await recordAuditEvent({
     action: isActive ? 'dictionary.restored' : 'dictionary.archived',

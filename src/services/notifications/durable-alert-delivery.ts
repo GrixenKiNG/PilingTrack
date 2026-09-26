@@ -32,7 +32,11 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
     await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} AND "tenantId" = ${event.tenantId} FOR UPDATE`;
     const row = await tx.outboxEvent.findFirst({where: {id: event.id, tenantId: event.tenantId}});
     if (!row || row.published) return;
-    const key = alert.ruleId ? RULE_NOTIFICATION_KEYS[alert.ruleId] : undefined;
+    // Срочное происшествие (critical = пострадавший или «прекратить работы»)
+    // не глушится, даже если записано до появления правила incidentStopWork
+    // со старым ruleId 'incident' (решение владельца 26.09.2026).
+    const urgentIncident = alert.ruleId === 'incident' && alert.severity === 'critical';
+    const key = alert.ruleId && !urgentIncident ? RULE_NOTIFICATION_KEYS[alert.ruleId] : undefined;
     const suppressed = key ? !await isNotificationEnabled(tenantId, key) : false;
     if (!suppressed) {
       const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id});

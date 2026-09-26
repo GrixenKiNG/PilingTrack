@@ -118,6 +118,13 @@ describe('archive/restore/rename', () => {
     }));
   });
 
+  it('re-archiving an archived grade keeps its archive time', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', isActive: false });
+    dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', isActive: false });
+    await archiveDictionaryItem(mutation, 'pileGrade', 'g1');
+    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { isActive: false } });
+  });
+
   it('restore sets isActive true', async () => {
     dbMock.downtimeReason.findFirst.mockResolvedValue({ id: 'd1', isActive: false });
     dbMock.downtimeReason.update.mockResolvedValue({ id: 'd1', isActive: true });
