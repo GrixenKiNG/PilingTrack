@@ -96,10 +96,10 @@ export function ReportEvidencePreview({
           <HeaderFact label="Изменено" value={formatIsoDateTime(report.updatedAt)} sub={report.lastEditedByName || '-'} />
         </div>
 
-        <div className="grid grid-cols-3 divide-x rounded-md border border-border">
-          <HeaderFact label="Объект" value={report.site?.name || '-'} sub="-" />
-          <HeaderFact label="Установка" value={report.equipment?.name || '-'} sub="-" />
-          <HeaderFact label="Оператор" value={report.user?.name || '-'} sub="-" />
+        <div className="grid grid-cols-1 divide-x rounded-md border border-border sm:grid-cols-3">
+          <HeaderFact label="Объект" value={report.site?.name || '-'} sub="-" wrap />
+          <HeaderFact label="Установка" value={report.equipment?.name || '-'} sub="-" wrap />
+          <HeaderFact label="Оператор" value={report.user?.name || '-'} sub="-" wrap />
         </div>
 
         <div>
@@ -218,11 +218,11 @@ export function ReportEvidencePreview({
   );
 }
 
-function HeaderFact({ label, value, sub }: { label: string; value: ReactNode; sub: string }) {
+function HeaderFact({ label, value, sub, wrap = false }: { label: string; value: ReactNode; sub: string; wrap?: boolean }) {
   return (
     <div className="min-w-0 p-2">
       <p className="mb-0.5 text-3xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <div className="truncate text-xs font-semibold text-foreground">{value}</div>
+      <div className={cn('text-xs font-semibold text-foreground', wrap ? 'break-words sm:truncate' : 'truncate')}>{value}</div>
       <p className="mt-0.5 truncate text-3xs text-muted-foreground">{sub}</p>
     </div>
   );
