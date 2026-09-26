@@ -84,4 +84,24 @@ describe('acknowledgeBriefing — одна отметка в сутки на р�
     expect(tx.briefingRecord.create).toHaveBeenCalledTimes(2);
     expect(history).toHaveLength(2);
   });
+
+  /*
+    СУТКИ СЧИТАЮТСЯ ПО МЕСТНОЙ ПОЛУНОЧИ, А НЕ ПО UTC.
+
+    Отметка «00:10 МСК» — это 21:10 UTC предыдущего числа. Окно, построенное
+    как «00:00 UTC + 24 ч», уже на этом числе заканчивалось, и повтор в
+    00:30 МСК (21:30 UTC) второй записи не находил — в журнале ОТ появлялась
+    вторая строка (находка F-O11b). Границы окна берём местные.
+  */
+  it('отметка в 00:10 МСК находится повтором в 00:30 МСК, а следующими сутками — нет', async () => {
+    await call(new Date('2026-09-25T21:10:00.000Z')); // 26.09, 00:10 МСК
+    await call(new Date('2026-09-25T21:30:00.000Z')); // те же сутки, 00:30 МСК
+
+    expect(tx.briefingRecord.create).toHaveBeenCalledTimes(1);
+
+    await call(new Date('2026-09-26T21:10:00.000Z')); // 27.09, 00:10 МСК — другие сутки
+
+    expect(tx.briefingRecord.create).toHaveBeenCalledTimes(2);
+    expect(history).toHaveLength(2);
+  });
 });

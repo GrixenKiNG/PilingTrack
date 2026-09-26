@@ -11,6 +11,7 @@ import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../../domain/knowledge-bank';
 import {SAFETY_BRIEFING} from '../../domain/safety-briefing';
 import {PPE_ITEMS} from '../../domain/ppe';
 import {SLINGER_BRIEFING} from '../../domain/slinger-briefing';
+import {zonedDayStartUtc} from '@/lib/timezone';
 import {OperatorCommandError, DAY_MS, productionDateOf} from './shared';
 import type {Tx} from './shared';
 
@@ -145,8 +146,18 @@ async function recordBriefingHistory(tx: Tx, input: {
  */
 async function briefingRecordedOnDay(tx: Tx, input: {
   tenantId: string; operatorId: string; kind: 'INSTRUCTION' | 'KNOWLEDGE';
-  briefing: {code: string; version: string}; day: Date;
+  briefing: {code: string; version: string}; localDate: string; timezone: string;
 }) {
+  // Сутки — это местные сутки, а не 24 часа от полуночи UTC: `productionDateOf`
+  // отдаёт календарный день работника, а границы окна считает `zonedDayStartUtc`
+  // (смещение пояса разрешается на самом переходе). Прежняя пара
+  // «00:00 UTC + 24 ч» для Москвы была сдвинута на +3 ч: отметка в 00:10 МСК
+  // оставалась вне окна повтора в 00:30 МСК — и повтор всё-таки писал вторую
+  // строку (находка F-O11b).
+  const [year, month, day] = input.localDate.split('-').map(Number);
+  const nextLocalDate = new Date(Date.UTC(year, month - 1, day) + DAY_MS).toISOString().slice(0, 10);
+  const from = zonedDayStartUtc(input.localDate, input.timezone);
+  const to = zonedDayStartUtc(nextLocalDate, input.timezone);
   const existing = await tx.briefingRecord.findFirst({
     where: {
       tenantId: input.tenantId,
@@ -154,7 +165,7 @@ async function briefingRecordedOnDay(tx: Tx, input: {
       kind: input.kind,
       documentCode: input.briefing.code,
       documentVersion: input.briefing.version,
-      recordedAt: {gte: input.day, lt: new Date(input.day.getTime() + DAY_MS)},
+      recordedAt: {gte: from, lt: to},
     },
     select: {id: true},
   });
@@ -261,12 +272,14 @@ export async function acknowledgeBriefing(input: {
       where: {tenantId: input.tenantId, id: input.operatorId},
       select: {timezone: true},
     });
+    const timezone = profile?.timezone ?? 'Europe/Moscow';
     const alreadyRecorded = await briefingRecordedOnDay(tx, {
       tenantId: input.tenantId,
       operatorId: input.operatorId,
       kind: 'INSTRUCTION',
       briefing: kind.briefing,
-      day: productionDateOf(profile?.timezone ?? 'Europe/Moscow', now),
+      localDate: productionDateOf(timezone, now).toISOString().slice(0, 10),
+      timezone,
     });
     if (!alreadyRecorded) {
       await recordBriefingHistory(tx, {
