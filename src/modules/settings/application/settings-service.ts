@@ -33,20 +33,22 @@ export async function getSettings(tenantId: string): Promise<WorkspaceSettings> 
  *
  * Вызывается из обработчиков доменных событий, где tenantId приходит из
  * конверта события и может отсутствовать (в outbox он писался не всегда).
- * Отсутствие организации — отказ, а не подстановка: `DEFAULT_TENANT_ID`
- * подменил бы организацию получателя чужой (и отправил бы уведомление не
- * туда), поэтому такого адресата просто не обслуживаем.
+ * Если tenantId нет — отправляем и пишем предупреждение: молчащее оповещение
+ * о простое хуже лишнего, а организации, чей явный «off» мы могли бы
+ * соблюсти, в этом случае просто нет. `DEFAULT_TENANT_ID` не подставляем —
+ * он подменил бы организацию получателя чужой (и отправил бы уведомление не
+ * туда).
  *
- * При ошибке чтения настроек отправляем: молчащее оповещение о простое хуже
- * лишнего. Явное `false` в настройках при этом соблюдается строго.
+ * При ошибке чтения настроек тоже отправляем: молчащее оповещение о простое
+ * хуже лишнего. Явное `false` в настройках при этом соблюдается строго.
  */
 export async function isNotificationEnabled(
   tenantId: string | null | undefined,
   key: NotificationKey,
 ): Promise<boolean> {
   if (!tenantId) {
-    logger.warn('isNotificationEnabled: tenantId is required', { key });
-    return false;
+    logger.warn('isNotificationEnabled: tenantId is missing, sending notification', { key });
+    return true;
   }
   try {
     const settings = await getSettings(tenantId);
