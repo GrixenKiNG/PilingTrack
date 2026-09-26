@@ -402,3 +402,63 @@ describe('recordAuditEvent — каналы оповещений Telegram', () =
     );
   });
 });
+
+/**
+ * Решение мастера по свае перетирает прежнее: acceptance/acceptedById — те же
+ * колонки, и повторное решение стирает первое (F-R34-16). В ленте важно видеть
+ * и прежнее решение, и новое — иначе «отправил на добивку» выглядит как первое
+ * решение, а кто и когда принял сваю до этого, не восстановить.
+ */
+describe('recordAuditEvent — решение мастера по свае', () => {
+  it('показывает смену решения «принята → на добивку»', async () => {
+    await recordAuditEvent({
+      action: 'pile.passport.decided',
+      scope: 'reports',
+      actorId: 'foreman-1',
+      metadata: {
+        pileNumber: 'С-130',
+        before: { acceptance: 'ACCEPTED', acceptedById: 'foreman-1' },
+        after: { acceptance: 'NEEDS_REDRIVE', acceptedById: 'foreman-1' },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Решение по свае',
+        message: 'Свая «С-130»: решение изменено — принята → на добивку.',
+      }),
+    );
+  });
+
+  it('называет сваю и решение, когда решают впервые', async () => {
+    await recordAuditEvent({
+      action: 'pile.passport.decided',
+      scope: 'reports',
+      metadata: {
+        pileNumber: 'С-131',
+        before: { acceptance: 'PENDING' },
+        after: { acceptance: 'ACCEPTED' },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Решение по свае',
+        message: 'Свая «С-131»: принята.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без номера сваи и снимков', async () => {
+    await recordAuditEvent({ action: 'pile.passport.decided', scope: 'reports' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Решение по свае',
+        message: 'Свая: решение мастера записано.',
+        level: 'audit',
+        priority: 'MEDIUM',
+      }),
+    );
+  });
+});

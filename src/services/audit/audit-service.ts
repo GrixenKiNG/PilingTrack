@@ -83,6 +83,18 @@ function dictionaryLine(meta: Meta, verb: string, name: string | null): string {
   return name ? `${where}: ${verb} «${name}».` : `${where}: ${verb}.`;
 }
 
+// Решение по свае в ленте читают словами, а не значением перечисления
+// («NEEDS_REDRIVE» владельцу не говорит ничего).
+const PILE_ACCEPTANCE_LABELS: Record<string, string> = {
+  PENDING: 'не разобрана',
+  ACCEPTED: 'принята',
+  NEEDS_REDRIVE: 'на добивку',
+};
+
+function pileAcceptanceLabel(value: string | null): string | null {
+  return value ? (PILE_ACCEPTANCE_LABELS[value] ?? value) : null;
+}
+
 // Поля настроек так, как они называются на экране («Настройки организации»).
 // Список переключателей уведомлений живёт в modules/settings, а services/ не
 // может зависеть от modules/ (CLAUDE.md §1): уведомления подписаны общим словом,
@@ -241,6 +253,29 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
       return version === null
         ? 'Сохранена новая версия отчёта.'
         : `Сохранена версия отчёта № ${version}.`;
+    },
+  },
+
+  // ── Сваи ──
+  // Решение мастера перетирает прежнее: acceptance/acceptedById/acceptedAt —
+  // те же колонки, и второе решение стирает первое (F-R34-16). Снимок «before»
+  // в metadata — единственное место, где видно, что сваю сперва приняли, а
+  // потом отправили на добивку.
+  'pile.passport.decided': {
+    level: 'audit',
+    title: 'Решение по свае',
+    message: (m) => {
+      const pile = str(m, 'pileNumber');
+      const where = pile ? `Свая «${pile}»` : 'Свая';
+      const beforeRaw = str(m, 'before.acceptance');
+      const afterRaw = str(m, 'after.acceptance');
+      const after = pileAcceptanceLabel(afterRaw);
+      // Переход показываем только когда прежнее решение уже было: «PENDING» —
+      // это «ещё не решали», а не предыдущее решение мастера.
+      if (beforeRaw && beforeRaw !== 'PENDING' && afterRaw && beforeRaw !== afterRaw) {
+        return `${where}: решение изменено — ${pileAcceptanceLabel(beforeRaw)} → ${after}.`;
+      }
+      return after ? `${where}: ${after}.` : `${where}: решение мастера записано.`;
     },
   },
 
