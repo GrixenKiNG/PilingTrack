@@ -47,9 +47,9 @@ describe('computeDashboardKpis', () => {
     expect(k.downtime).toBe(4);
   });
 
-  it('reads shift/rig/crew counts from fleet totals', () => {
+  it('reads today/rig/crew counts from fleet totals', () => {
     const k = computeDashboardKpis([], fleet, new Map(), []);
-    expect(k.shiftsDone).toBe(3); // сдали отчёт за сегодня
+    expect(k.shiftsDone).toBe(3); // машин с отчётом за сегодня — не смен (F-R35-3)
     // «В работе» — открытая смена, а не сданный отчёт. Раньше сюда шло
     // activeToday, и плитка показывала ноль, пока смена шла без отчёта.
     expect(k.rigsWorking).toBe(2);
@@ -58,9 +58,16 @@ describe('computeDashboardKpis', () => {
     expect(k.crews).toBe(4);
   });
 
-  it('defaults fleet-derived KPIs to zero when fleet is null', () => {
+  it('returns null rig/crew KPIs when fleet is null (парк не загрузился, не «0 в работе»)', () => {
     const k = computeDashboardKpis([], null, new Map(), []);
-    expect(k).toMatchObject({ shiftsDone: 0, reportsExpected: 0, rigsWorking: 0, rigsTotal: 0, crews: 0 });
+    expect(k).toMatchObject({ shiftsDone: 0, reportsExpected: 0, rigsWorking: null, rigsTotal: null, crews: null });
+  });
+
+  it('returns null toRisk when the maintenance list failed to load (не «рисков нет»)', () => {
+    const maint = new Map([['a', { repair: true, overdue: false }]]);
+    expect(computeDashboardKpis([], fleet, maint, [], true).toRisk).toBeNull();
+    // Данные загрузились — риск считается как раньше.
+    expect(computeDashboardKpis([], fleet, maint, [], false).toRisk).toBe(1);
   });
 
   it('counts rigs at maintenance risk (repair OR overdue)', () => {

@@ -1,4 +1,5 @@
 import {
+  PILE_METERS_INCOMPLETE_NOTE,
   addEmptyState,
   addHeader,
   addMetricStrip,
@@ -9,6 +10,7 @@ import {
 import { formatMeters, formatNumber, formatRuDate } from './format';
 import { toPeriodReportRow } from './period-row';
 import { renderPdf } from './render';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { PeriodPdfData } from './types';
 
@@ -28,13 +30,16 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
         ),
       0,
     );
+    const hasPilesWithoutLength = reports.some((report) =>
+      (report.piles || []).some((pile) => pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }) === 0),
+    );
 
     addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`);
     addMetricStrip(doc, [
       ['Отчётов', String(reports.length), 'шт'],
-      ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт / м.п.'],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт / м.п.'],
-      ['Простои', formatNumber(data.totalDowntime), 'ч'],
+      ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],
+      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт/м.п.'],
+      ['Простои', formatDowntimeHours(data.totalDowntime), ''],
     ]);
 
     if (reports.length === 0) {

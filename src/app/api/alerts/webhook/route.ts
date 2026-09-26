@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { timingSafeEqual } from 'node:crypto';
 import { telegramNotifier } from '@/core/notifications/telegram';
+import { isNotificationEnabled } from '@/modules/settings';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -99,6 +100,18 @@ export async function POST(request: NextRequest) {
 
   const alerts = (payload.alerts ?? []).slice(0, MAX_FORWARDED);
   if (alerts.length === 0) {
+    return NextResponse.json({ ok: true, forwarded: 0 });
+  }
+
+  // Выключатель «Сбои сервера (мониторинг)». У вебхука нет сессии: тенант —
+  // только тенант развёртывания, тот же, в чьи чаты уходит отправка
+  // (core/notifications/telegram.ts:getConfigs).
+  const notifyEnabled = await isNotificationEnabled(
+    process.env.DEFAULT_TENANT_ID ?? null,
+    'systemAlerts',
+  );
+  if (!notifyEnabled) {
+    logger.info('Alertmanager webhook suppressed by notification settings', { total: alerts.length });
     return NextResponse.json({ ok: true, forwarded: 0 });
   }
 

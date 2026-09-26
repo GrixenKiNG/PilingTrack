@@ -249,8 +249,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Metric label="Отчётов (30д)" value={details.stats30d.reportCount} />
-                <Metric label="Сваи шт./м.п." value={`${formatFixed(details.stats30d.piles, 0)} / ${formatFixed(details.stats30d.pileMeters, 1)}`} />
-                <Metric label="Бурение шт./м" value={`${formatFixed(details.stats30d.drillingCount, 0)} / ${formatFixed(details.stats30d.drillingMeters, 1)}`} />
+                <Metric label="Сваи шт/м.п." value={`${formatFixed(details.stats30d.piles, 0)} / ${formatFixed(details.stats30d.pileMeters, 1)}`} />
+                <Metric label="Бурение шт/м.п." value={`${formatFixed(details.stats30d.drillingCount, 0)} / ${formatFixed(details.stats30d.drillingMeters, 1)}`} />
                 <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
               </div>
             </div>
@@ -315,7 +315,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {tab === 'checklists' && <EquipmentInspections equipmentId={equipmentId} />}
 
           {tab === 'documents' && (
-            <EquipmentDocuments equipmentId={equipmentId} documents={details.documents} onChanged={refresh} />
+            <EquipmentDocuments equipmentId={equipmentId} documents={details.documents} canManage={canManage} onChanged={refresh} />
           )}
 
           {tab === 'history' &&
@@ -464,6 +464,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
         <EquipmentDocuments
           equipmentId={equipmentId}
           documents={details.documents}
+          canManage={canManage}
           onChanged={refresh}
         />
       </Section>

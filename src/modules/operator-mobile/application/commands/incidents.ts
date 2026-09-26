@@ -118,6 +118,9 @@ export async function reportIncident(input: {
 
     await enqueueAlert(tx, {tenantId: input.tenantId, aggregateId: incident.id, alert: {
       severity: classification.severity === 'CRITICAL' ? 'critical' : classification.severity === 'HIGH' ? 'high' : 'medium',
+      // Правило алерта: без него у происшествия нет выключателя в настройках
+      // (durable-доставка гасит по `ruleId`, см. durable-alert-delivery.ts).
+      ruleId: 'incident',
       message: (classification.stopRequired ? 'Происшествие: требуется прекратить работы. ' : 'Происшествие: ') + input.description,
     }});
     return {

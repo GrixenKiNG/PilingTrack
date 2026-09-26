@@ -1,7 +1,7 @@
 'use client';
 
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
   ChecklistStage, ChecklistView, DocumentVerdict, IncidentCategory, IncidentSign,
@@ -1527,35 +1527,6 @@ export function OperatorV10App() {
   const current = SCREENS.find((screen) => screen.id === active) ?? SCREENS[0];
   const activeTab = TABS.find((tab) => tab.screen === current.id)?.key ?? current.tab;
 
-  /**
-   * Поджать содержимое вместо прокрутки.
-   *
-   * Экран из шести строк, который приходится листать, раздражает сильнее, чем
-   * шрифт на десятую меньше. Поэтому при небольшом перехлёсте плотность
-   * подтягивается коэффициентом `--k` — до 0,82, дальше поджимать нельзя:
-   * начинает страдать читаемость на морозе и в перчатке. Если и после этого не
-   * помещается (осмотр на два десятка пунктов), остаётся прокрутка: прятать
-   * пункты осмотра нельзя ни при каких обстоятельствах.
-   *
-   * Коэффициент ставится прямо на узел, а не в состояние: это подгонка вида, и
-   * перерисовка ради неё не нужна.
-   */
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const node = contentRef.current;
-    if (!node) return undefined;
-    const fit = () => {
-      node.style.removeProperty('--k');
-      const overflow = node.scrollHeight - node.clientHeight;
-      if (overflow <= 1) return;
-      const ratio = node.clientHeight / node.scrollHeight;
-      node.style.setProperty('--k', Math.max(0.82, ratio).toFixed(3));
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, [active, state, safety, safetyError, answers, loading, notice, loadError]);
-
   const body = (() => {
     if (loading) {
       return <><div className="ov10-skel" /><div className="ov10-skel short" /><div className="ov10-skel" /></>;
@@ -1638,7 +1609,7 @@ export function OperatorV10App() {
           )}
         />
       </div>
-      <div className="ov10-content" ref={contentRef}>
+      <div className="ov10-content">
         {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} className="space-y-1" />

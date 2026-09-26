@@ -10,9 +10,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-vi.mock('@/core/notifications/telegram', () => ({
-  telegramNotifier: { sendAlert: vi.fn().mockResolvedValue(true) },
+const mocks = vi.hoisted(() => ({
+  sendAlert: vi.fn().mockResolvedValue(true),
+  enabled: vi.fn().mockResolvedValue(true),
 }));
+
+vi.mock('@/core/notifications/telegram', () => ({
+  telegramNotifier: { sendAlert: mocks.sendAlert },
+}));
+vi.mock('@/modules/settings', () => ({ isNotificationEnabled: mocks.enabled }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { POST } from '../route';
@@ -133,5 +139,36 @@ describe('POST /api/alerts/webhook — payload validation', () => {
     }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, forwarded: 1 });
+  });
+});
+
+describe('POST /api/alerts/webhook — notification switch', () => {
+  const originalEnv = process.env.ALERTMANAGER_WEBHOOK_TOKEN;
+
+  beforeEach(() => {
+    process.env.ALERTMANAGER_WEBHOOK_TOKEN = TOKEN;
+    mocks.enabled.mockResolvedValue(true);
+    mocks.sendAlert.mockClear();
+  });
+  afterEach(() => {
+    process.env.ALERTMANAGER_WEBHOOK_TOKEN = originalEnv;
+  });
+
+  const firing = {
+    alerts: [{ status: 'firing', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: { summary: 'Disk full' } }],
+  };
+
+  it('forwards nothing while the systemAlerts switch is off, still answering 200', async () => {
+    mocks.enabled.mockResolvedValueOnce(false);
+    const res = await POST(reqWithBody(firing));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, forwarded: 0 });
+    expect(mocks.sendAlert).not.toHaveBeenCalled();
+  });
+
+  it('forwards again once the switch is back on', async () => {
+    const res = await POST(reqWithBody(firing));
+    expect(await res.json()).toEqual({ ok: true, forwarded: 1 });
+    expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
   });
 });

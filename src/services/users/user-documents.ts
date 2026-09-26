@@ -72,7 +72,7 @@ async function requireTenantUser(userId: string, tenantId: string) {
     where: { id: userId, tenantId },
     select: { id: true, name: true },
   });
-  if (!user) throw new ServiceError('User not found', 404);
+  if (!user) throw new ServiceError('Пользователь не найден', 404);
   return user;
 }
 
@@ -360,7 +360,7 @@ export async function getOperatorClearance(
   now: Date = new Date(),
   client: DocumentReader = db,
 ): Promise<OperatorClearance> {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400);
 
   const required = await client.userDocumentType.findMany({
     where: { tenantId, isActive: true, requiredForOperator: true },

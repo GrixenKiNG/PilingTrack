@@ -56,7 +56,7 @@ const VIEW_ITEMS: Array<{
   { id: 'readiness', label: 'Центр готовности', icon: ShieldCheck },
   { id: 'fleet', label: 'Готовность парка', icon: HardHat },
   { id: 'shifts', label: 'Смены', icon: CalendarClock },
-  { id: 'maintenance', label: 'Обслуживание', icon: Wrench },
+  { id: 'maintenance', label: 'Обслуживание ТО', icon: Wrench },
   { id: 'reports', label: 'Отчёты', icon: BarChart3 },
   // Порядок тот же, что в полосе вкладок модуля (`module-tab-list.tsx`):
   // наряды — редкий реестр, а не шаг смены.

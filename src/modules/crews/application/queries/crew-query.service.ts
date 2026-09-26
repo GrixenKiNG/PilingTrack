@@ -11,7 +11,7 @@ import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 export async function getAccessibleCrews(tenantId: string, siteId?: string, pagination?: CursorPaginationResult) {
   // Fail-closed (IDOR guard): Crew has no tenantId column; its tenant is the
   // owning site's. Scope every list to the caller's tenant via site.tenantId.
-  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   const take = pagination?.take ?? 50;
   const cursor = pagination?.cursor ?? undefined;
 
@@ -42,7 +42,7 @@ export async function getCrewById(crewId: string) {
   });
 
   if (!crew) {
-    throw new ServiceError('Crew not found', 404);
+    throw new ServiceError('Бригада не найдена', 404);
   }
 
   return crew;
@@ -60,7 +60,7 @@ export async function getCrewForOperator(
     : sessionUser.id;
 
   if (!lookupUserId) {
-    throw new ServiceError('operatorId required', 400);
+    throw new ServiceError('Не указан машинист', 400);
   }
 
   // A user reaches "their" crew either as the operator or as a linked

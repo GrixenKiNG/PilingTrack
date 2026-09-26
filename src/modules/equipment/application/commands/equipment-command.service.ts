@@ -19,7 +19,7 @@ export async function createEquipment(cmd: CreateEquipmentCommand) {
 export async function updateEquipment(cmd: UpdateEquipmentCommand) {
   const repo = getEquipmentRepository();
   const agg = await repo.findById(cmd.equipmentId, cmd.tenantId);
-  if (!agg) throw new ServiceError('Equipment not found', 404);
+  if (!agg) throw new ServiceError('Установка не найдена', 404);
   agg.update({ name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description, isActive: cmd.isActive }, cmd.userId);
   await repo.save(agg);
 }
@@ -27,7 +27,7 @@ export async function updateEquipment(cmd: UpdateEquipmentCommand) {
 export async function retireEquipment(equipmentId: string, tenantId: string, userId?: string) {
   const repo = getEquipmentRepository();
   const agg = await repo.findById(equipmentId, tenantId);
-  if (!agg) throw new ServiceError('Equipment not found', 404);
+  if (!agg) throw new ServiceError('Установка не найдена', 404);
   agg.retire(userId);
   await repo.save(agg);
 }
@@ -37,9 +37,9 @@ export async function deleteEquipment(equipmentId: string, tenantId: string) {
     where: { id: equipmentId, tenantId },
     include: { crews: { where: { isActive: true } } },
   });
-  if (!existing) throw new ServiceError('Equipment not found', 404);
+  if (!existing) throw new ServiceError('Установка не найдена', 404);
   if (existing.crews.length > 0) {
-    throw new ServiceError('Cannot delete equipment with linked active crews', 409);
+    throw new ServiceError('Нельзя удалить установку: за ней закреплены активные бригады', 409);
   }
   await db.equipment.delete({ where: { id: equipmentId } });
   return { success: true };

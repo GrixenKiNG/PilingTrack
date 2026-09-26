@@ -63,10 +63,10 @@ export function OperatorDocumentReminder() {
         <AlertTriangle className={cn('mt-0.5 h-5 w-5 shrink-0',
           critical ? 'text-destructive-strong' : 'text-warning-strong')} />
         <div className="min-w-0 flex-1">
-          <h2 className={cn('text-sm font-bold', critical ? 'text-destructive-strong' : 'text-warning-strong')}>
+          <h2 className={cn('text-base font-bold', critical ? 'text-destructive-strong' : 'text-warning-strong')}>
             {critical ? 'Документы просрочены' : 'Скоро истекают документы'}
           </h2>
-          <ul className="mt-1 space-y-0.5 text-xs text-foreground">
+          <ul className="mt-1 space-y-0.5 text-sm text-foreground">
             {rows.slice(0, 3).map((row) => (
               <li key={row.id}>
                 {row.type.name} — {row.expiry.status === 'expired'
@@ -74,14 +74,14 @@ export function OperatorDocumentReminder() {
                   : `истекает через ${row.expiry.daysLeft ?? 0} дн.`}
               </li>
             ))}
-            {rows.length > 3 && <li className="text-muted-foreground">и ещё {rows.length - 3}</li>}
+            {rows.length > 3 && <li className="text-[#555]">и ещё {rows.length - 3}</li>}
           </ul>
           {/*
             Кнопки «мои документы» здесь намеренно нет: экрана самообслуживания
             в приложении пока не существует (правило доступа его допускает,
             интерфейс — нет). Ссылка в никуда хуже её отсутствия.
           */}
-          <p className="mt-1.5 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-sm text-[#555]">
             {critical
               ? 'С просроченным документом к работе не допускают. Обратитесь к диспетчеру или инженеру ОТ.'
               : 'Продлите документ заранее — оформление занимает недели. Скан передайте диспетчеру.'}

@@ -294,11 +294,28 @@ export const GET = withApi(async (request: NextRequest) => {
     const type = searchParams.get('type') || undefined;
     const from = searchParams.get('from');
     const to = searchParams.get('to');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    // Предел без границ уходил в Prisma как есть: нечисловой limit давал
+    // take=NaN (500), а большой вытягивал всю телеметрию одним запросом.
+    const limitParam = searchParams.get('limit');
+    const parsedLimit = Number(limitParam);
+    // Пустая строка (?limit=) — как отсутствие параметра: Number('') === 0
+    // молча давал предел в одну запись вместо 100 по умолчанию.
+    const limit = limitParam !== null && limitParam !== '' && Number.isInteger(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 1000)
+      : 100;
 
     if (!from || !to) {
       return NextResponse.json(
         { error: 'from and to parameters required (ISO date)' },
+        { status: 400 }
+      );
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return NextResponse.json(
+        { error: 'Некорректные даты from/to' },
         { status: 400 }
       );
     }
@@ -318,8 +335,8 @@ export const GET = withApi(async (request: NextRequest) => {
       const analysis = await getTelemetryAnalysis({
         tenantId,
         equipmentId,
-        from: new Date(from),
-        to: new Date(to),
+        from: fromDate,
+        to: toDate,
       });
       return NextResponse.json({ analysis });
     }
@@ -333,8 +350,8 @@ export const GET = withApi(async (request: NextRequest) => {
       siteId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
       type: type as any,
-      from: new Date(from),
-      to: new Date(to),
+      from: fromDate,
+      to: toDate,
       limit,
       ...(allowedEquipmentIds && !equipmentId ? { equipmentIds: allowedEquipmentIds } : {}),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary

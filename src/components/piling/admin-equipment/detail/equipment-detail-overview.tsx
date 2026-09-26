@@ -68,7 +68,7 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: 'work', label: 'Работа' },
   { key: 'passport', label: 'Паспорт' },
   { key: 'assignment', label: 'Закрепление' },
-  { key: 'maintenance', label: 'ТО' },
+  { key: 'maintenance', label: 'Обслуживание ТО' },
   { key: 'documents', label: 'Документы' },
   { key: 'photos', label: 'Фото' },
   { key: 'history', label: 'История' },
@@ -187,7 +187,7 @@ function OverviewTile({ title, rows }: { title: string; rows: Array<[string, Rea
         {rows.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-2 text-xs">
             <dt className="truncate text-muted-foreground">{label}</dt>
-            <dd className="truncate text-right font-medium text-foreground">{value}</dd>
+            <dd className="break-words text-right font-medium text-foreground sm:truncate">{value}</dd>
           </div>
         ))}
       </dl>

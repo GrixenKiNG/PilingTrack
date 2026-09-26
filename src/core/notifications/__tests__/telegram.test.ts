@@ -112,4 +112,99 @@ describe('telegramNotifier — botToken decryption', () => {
     expect(res).toEqual({ ok: false, error: 'Not configured' });
     expect(findManyMock).not.toHaveBeenCalled();
   });
+
+  it('builds the alert header and field labels in Russian', async () => {
+    findManyMock.mockResolvedValue([
+      { botToken: '999:plain-token', chatId: '-100123', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+
+    await telegramNotifier.sendAlert({
+      severity: 'medium',
+      message: 'Простой 3 ч зафиксирован в отчёте',
+      siteId: 'site-1',
+      reportId: 'report-1',
+      ruleId: 'downtime30',
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { text: string };
+    expect(body.text).toContain('⚠️ <b>Предупреждение</b>');
+    expect(body.text).toContain('📍 Объект: <code>site-1</code>');
+    expect(body.text).toContain('📄 Отчёт: <code>report-1</code>');
+    expect(body.text).toContain('📏 Правило: <code>downtime30</code>');
+    expect(body.text).not.toContain('Alert');
+  });
+});
+
+describe('telegramNotifier — доставка во все конфигурации', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
+
+  beforeEach(() => {
+    findManyMock.mockReset();
+    decryptMock.mockReset();
+    isEncryptedMock.mockReset();
+    process.env.DEFAULT_TENANT_ID = 'test-tenant';
+    fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: {} }),
+      text: async () => '',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
+  });
+
+  function sentChatIds() {
+    return fetchMock.mock.calls.map(
+      (call) => JSON.parse(call[1].body as string).chat_id as string,
+    );
+  }
+
+  it('шлёт алерт в каждую включённую конфигурацию, дедупликация по chatId', async () => {
+    findManyMock.mockResolvedValue([
+      { botToken: '999:token-a', chatId: '-100A', enabled: true },
+      { botToken: '999:token-b', chatId: '-100B', enabled: true },
+      { botToken: '999:token-c', chatId: '-100A', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+
+    const res = await telegramNotifier.sendAlert({ severity: 'high', message: 'тревога' });
+
+    expect(res).toBe(true);
+    expect(sentChatIds()).toEqual(['-100A', '-100B']);
+  });
+
+  it('отказ по одному чату не срывает отправку в остальные', async () => {
+    findManyMock.mockResolvedValue([
+      { botToken: '999:token-a', chatId: '-100A', enabled: true },
+      { botToken: '999:token-b', chatId: '-100B', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => 'bad chat' })
+      .mockResolvedValueOnce({ ok: true, text: async () => '' });
+
+    const res = await telegramNotifier.sendAlert({ severity: 'critical', message: 'тревога' });
+
+    expect(res).toBe(true);
+    expect(sentChatIds()).toEqual(['-100A', '-100B']);
+  });
+
+  it('считает доставку неуспешной, только если упали все чаты', async () => {
+    findManyMock.mockResolvedValue([
+      { botToken: '999:token-a', chatId: '-100A', enabled: true },
+      { botToken: '999:token-b', chatId: '-100B', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' });
+
+    const res = await telegramNotifier.sendAlert({ severity: 'low', message: 'тревога' });
+
+    expect(res).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

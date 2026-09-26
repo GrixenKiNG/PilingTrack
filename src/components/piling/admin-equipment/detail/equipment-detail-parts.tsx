@@ -136,7 +136,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
   const visible = open ? rows : rows.slice(0, 1);
 
   return (
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-x-auto rounded-lg border">
       <div className={cn(open && 'max-h-64 overflow-y-auto')}>
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-muted text-xs uppercase text-muted-foreground">
@@ -206,7 +206,7 @@ export function OperatorRotationCard({ rows }: { rows: TimelineRow[] }) {
     return <p className="text-sm text-muted-foreground">Нет данных о ротации машинистов.</p>;
   }
   return (
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
           <tr>

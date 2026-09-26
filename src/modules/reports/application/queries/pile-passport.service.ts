@@ -1,5 +1,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { zonedDayStartUtc } from '@/lib/timezone';
+import { getSettings } from '@/modules/settings';
 import {
   actualRefusalMm,
   drivingComplete,
@@ -118,27 +120,70 @@ export interface PileJournalFilters {
   /** Границы по дате забивки, YYYY-MM-DD включительно. */
   dateFrom?: string;
   dateTo?: string;
+  /** Пояс, в котором считается день периода. Без него — из настроек тенанта. */
+  timezone?: string;
   /** Поиск по номеру сваи. */
   pileNumber?: string;
   limit?: number;
 }
 
 /**
- * Конец дня по границе периода.
+ * Предел строк журнала — один на экран и на выгрузку.
  *
- * Дата без времени означает «весь этот день»: `dateTo = 2026-09-14` обязан
- * включать сваю, забитую в 18:40. Сравнение с полуночью выкинуло бы весь
- * последний день выборки — и молча, что хуже всего.
+ * ПОЧЕМУ ОДИН. Титул («Свай в журнале», «Принято», «На добивку») считается из
+ * загруженных строк. Разные пределы на экране и в .xlsx дали бы подшитый
+ * документ, противоречащий экрану, на котором его собирали.
  */
-function endOfDay(date: string): Date {
-  const parsed = new Date(`${date}T00:00:00.000Z`);
-  return new Date(parsed.getTime() + 24 * 60 * 60 * 1000 - 1);
+export const PILE_JOURNAL_LIMIT = 500;
+
+export interface PileJournalPage {
+  rows: PilePassportRow[];
+  /** Строк в выборке больше лимита: показаны первые `PILE_JOURNAL_LIMIT`. */
+  truncated: boolean;
 }
 
-export async function listPilePassports(input: PileJournalFilters): Promise<PilePassportRow[]> {
+/**
+ * Границы периода забивки в UTC — по календарным дням пояса тенанта.
+ *
+ * ПОЧЕМУ НЕ UTC-ПОЛНОЧЬ. Дата без времени означает «весь этот день» в поясе
+ * организации — том же, в котором печатается день забивки (F-R17-1). Для МСК
+ * окно дня сдвинуто на +3 ч: свая, забитая 26.09 в 00:30 МСК (25.09T21:30Z),
+ * обязана быть в журнале «26.09», а не «25.09».
+ *
+ * ПОЧЕМУ ВЕРХНЯЯ ГРАНИЦА ИСКЛЮЧАЮЩАЯ. `lt` полуночи следующего дня не теряет
+ * сваю, забитую 26.09 в 23:59, и не затягивает в выборку сваю 27.09 в 00:00.
+ */
+function periodBounds(
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  timezone: string,
+): { gte?: Date; lt?: Date } | null {
+  if (!dateFrom && !dateTo) return null;
+  return {
+    ...(dateFrom ? { gte: zonedDayStartUtc(dateFrom, timezone) } : {}),
+    ...(dateTo ? { lt: zonedDayStartUtc(addDays(dateTo, 1), timezone) } : {}),
+  };
+}
+
+/** Следующий календарный день ГГГГ-ММ-ДД. */
+function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+export async function listPilePassports(input: PileJournalFilters): Promise<PileJournalPage> {
   if (!input.tenantId) throw new ServiceError('tenantId is required', 400);
 
+  const limit = Math.min(input.limit ?? PILE_JOURNAL_LIMIT, PILE_JOURNAL_LIMIT);
   const acceptance = input.acceptance ?? (input.pendingOnly ? 'PENDING' : undefined);
+  // Пояс нужен только для периода: день фильтра — день тенанта, а не UTC.
+  const bounds = input.dateFrom || input.dateTo
+    ? periodBounds(
+      input.dateFrom,
+      input.dateTo,
+      input.timezone ?? (await getSettings(input.tenantId)).timezone,
+    )
+    : null;
   const rows = await db.pilePassport.findMany({
     where: {
       tenantId: input.tenantId,
@@ -146,18 +191,12 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       ...(input.pileNumber
         ? { pileNumber: { contains: input.pileNumber, mode: 'insensitive' as const } }
         : {}),
-      ...(input.dateFrom || input.dateTo
-        ? {
-          drivenAt: {
-            ...(input.dateFrom ? { gte: new Date(`${input.dateFrom}T00:00:00.000Z`) } : {}),
-            ...(input.dateTo ? { lte: endOfDay(input.dateTo) } : {}),
-          },
-        }
-        : {}),
+      ...(bounds ? { drivenAt: bounds } : {}),
       ...(input.siteId ? { pileWork: { report: { siteId: input.siteId } } } : {}),
     },
     orderBy: { drivenAt: 'desc' },
-    take: Math.min(input.limit ?? 100, 500),
+    // Лишняя строка — только признак среза: в ответ уйдёт ровно `limit` строк.
+    take: limit + 1,
     include: {
       sets: { orderBy: { ordinal: 'asc' } },
       pileWork: {
@@ -177,8 +216,11 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     },
   });
 
+  const truncated = rows.length > limit;
+  const page = truncated ? rows.slice(0, limit) : rows;
+
   // Кто принял сваю — одним запросом на всю страницу, а не по строке.
-  const deciderIds = [...new Set(rows.map((row) => row.acceptedById).filter((id): id is string => !!id))];
+  const deciderIds = [...new Set(page.map((row) => row.acceptedById).filter((id): id is string => !!id))];
   const deciders = deciderIds.length > 0
     ? await db.user.findMany({
       where: { tenantId: input.tenantId, id: { in: deciderIds } },
@@ -187,7 +229,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     : [];
   const deciderById = new Map(deciders.map((user) => [user.id, user.name]));
 
-  return rows.map((row) => {
+  const items = page.map((row) => {
     const sets: DrivingSet[] = row.sets.map((set) => ({
       ordinal: set.ordinal,
       blows: set.blows,
@@ -260,6 +302,35 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       suggestion: suggestAcceptance({ actualRefusalMm: refusalMm, designRefusalMm: row.designRefusalMm }),
     };
   });
+
+  return { rows: items, truncated };
+}
+
+/**
+ * Календарный день момента в поясе тенанта, ГГГГ-ММ-ДД — по нему сортируем
+ * период забивки.
+ *
+ * ПОЧЕМУ НЕ UTC. `drivenAt` — момент времени: свая, забитая в 00:30 МСК 26.09,
+ * в UTC ещё 25.09. День документа считается по поясу тенанта (F-R17-1).
+ */
+function dayInTimezone(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: timezone });
+}
+
+/** День журнала в печатном виде — ДД.ММ.ГГГГ, как требует PRODUCT.md. */
+function printDay(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: timezone,
+  });
+}
+
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ. */
+function printYmd(ymd: string): string {
+  const [year, month, day] = ymd.split('-');
+  return `${day}.${month}.${year}`;
 }
 
 /**
@@ -269,12 +340,22 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
  * удара и проектный отказ записаны в каждом паспорте на момент забивки. Второй
  * источник тех же величин (карточка объекта) разошёлся бы с журналом на первой
  * же замене молота — и титул начал бы противоречить строкам под собой.
+ *
+ * ПОЧЕМУ ПОЯС ВХОДИТ ПАРАМЕТРОМ. Его знает только выгрузка .xlsx: там день
+ * печатается по поясу тенанта (F-R17-1). Без пояса период остаётся прежним —
+ * UTC-днём, каким его получает экран.
  */
-export function pileJournalHeader(rows: PilePassportRow[]): PileJournalHeader {
+export function pileJournalHeader(rows: PilePassportRow[], timezone?: string): PileJournalHeader {
   const uniq = <T,>(values: (T | null | undefined)[]): T[] =>
     [...new Set(values.filter((value): value is T => value !== null && value !== undefined))];
 
-  const dates = rows.map((row) => row.drivenAt.slice(0, 10)).sort();
+  const dates = rows
+    .map((row) => (timezone ? dayInTimezone(row.drivenAt, timezone) : row.drivenAt.slice(0, 10)))
+    .sort();
+  const periodEdge = (day: string | undefined): string | null => {
+    if (day === undefined) return null;
+    return timezone ? printYmd(day) : day;
+  };
 
   return {
     siteNames: uniq(rows.map((row) => row.siteName)),
@@ -282,8 +363,8 @@ export function pileJournalHeader(rows: PilePassportRow[]): PileJournalHeader {
     hammerTypes: uniq(rows.map((row) => row.hammerType)),
     hammerEnergyKj: uniq(rows.map((row) => row.hammerEnergyKj)).sort((a, b) => a - b),
     designRefusalMm: uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
-    dateFrom: dates[0] ?? null,
-    dateTo: dates[dates.length - 1] ?? null,
+    dateFrom: periodEdge(dates[0]),
+    dateTo: periodEdge(dates[dates.length - 1]),
     pilesTotal: rows.length,
     accepted: rows.filter((row) => row.acceptance === 'ACCEPTED').length,
     needsRedrive: rows.filter((row) => row.acceptance === 'NEEDS_REDRIVE').length,
@@ -349,8 +430,11 @@ const ACCEPTANCE_TEXT: Record<PileAcceptanceValue, string> = {
  */
 export async function exportPileJournalXlsx(filters: PileJournalFilters): Promise<Buffer> {
   const { buildXlsx } = await import('@/lib/xlsx-writer');
-  const rows = await listPilePassports({ ...filters, limit: 500 });
-  const header = pileJournalHeader(rows);
+  // День документа — день тенанта, а не UTC (F-R17-1): свая, забитая в 00:30
+  // МСК, в UTC ещё вчерашняя, и подшитый журнал датировал бы её соседним днём.
+  const { timezone } = await getSettings(filters.tenantId);
+  const { rows, truncated } = await listPilePassports({ ...filters, limit: PILE_JOURNAL_LIMIT, timezone });
+  const header = pileJournalHeader(rows, timezone);
 
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : '—');
 
@@ -371,6 +455,8 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     [],
     ['Отказ считается как среднее по трём последним залогам (СП 45.13330).'],
     ['Журнал выгружен', new Date().toISOString().slice(0, 16).replace('T', ' ')],
+    // Не молчим о срезе: иначе подшитый документ выглядел бы как полный.
+    ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_LIMIT} свай — сузьте период или объект`]] : []),
   ];
 
   const piles: (string | number | null)[][] = [[
@@ -394,7 +480,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
   rows.forEach((row, index) => {
     piles.push([
       index + 1,
-      row.drivenAt.slice(0, 10),
+      printDay(row.drivenAt, timezone),
       row.pileNumber,
       row.locationName ?? '',
       row.pileGradeName,
@@ -421,7 +507,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
       row.equipmentName ?? '',
       ACCEPTANCE_TEXT[row.acceptance],
       row.acceptedByName ?? '',
-      row.acceptedAt ? row.acceptedAt.slice(0, 10) : '',
+      row.acceptedAt ? printDay(row.acceptedAt, timezone) : '',
       row.acceptanceNote ?? '',
       row.note ?? '',
     ]);
@@ -429,7 +515,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     for (const set of row.sets) {
       setsSheet.push([
         row.pileNumber,
-        row.drivenAt.slice(0, 10),
+        printDay(row.drivenAt, timezone),
         set.ordinal,
         set.blows,
         set.penetrationMm,

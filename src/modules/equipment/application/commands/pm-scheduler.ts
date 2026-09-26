@@ -42,7 +42,7 @@ export interface PmSchedulerResult {
  * summary. Tenant-scoped; safe to run repeatedly (idempotent via the dedup).
  */
 export async function runPmScheduler(tenantId: string, now: Date = new Date()): Promise<PmSchedulerResult> {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400);
 
   // Планировщик запускается без запроса, поэтому контекст, который открывает
   // withApi, здесь не заведён — тенант известен только из параметра. Без этого

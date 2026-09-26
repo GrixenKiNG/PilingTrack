@@ -14,6 +14,16 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { Prisma } from '@/generated/postgres-client';
 import { logger } from '@/lib/logger';
+import { ServiceError } from '@/lib/service-error';
+
+/**
+ * Потолок выборки периода.
+ *
+ * Запрос читает до LIMIT+1 строк, чтобы отличить «ровно потолок» от «больше
+ * потолка»: тихий срез раньше давал неполные итоги на экране периода и в PDF
+ * (CSV/Excel лимита не имеют), и подрядчик не мог сойтись в цифрах.
+ */
+export const PERIOD_REPORTS_LIMIT = 2000;
 
 // ============================================================
 // DTOs for raw SQL results (not Prisma models — SQL returns different shape)
@@ -70,7 +80,7 @@ export async function getReportsByPeriodRaw(
   const rows = await db.report.findMany({
     where,
     orderBy: { date: 'desc' },
-    take: 500,
+    take: PERIOD_REPORTS_LIMIT + 1,
     include: {
       user: { select: { id: true, name: true } },
       site: { select: { id: true, name: true } },
@@ -89,6 +99,15 @@ export async function getReportsByPeriodRaw(
   });
 
   const reports = rows as unknown as RawReportRow[];
+
+  // Больше потолка — отдаём явную ошибку вместо молча срезанного набора:
+  // суммы периода иначе оказываются меньше, чем в CSV/Excel без лимита.
+  if (reports.length > PERIOD_REPORTS_LIMIT) {
+    throw new ServiceError(
+      'За выбранный период больше 2000 отчётов — сузьте период или выберите объект',
+      422
+    );
+  }
 
   const elapsed = Date.now() - start;
   if (elapsed > 100) {

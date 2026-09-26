@@ -6,7 +6,7 @@ vi.mock('@/lib/db', () => ({
 
 import { db } from '@/lib/db';
 import { getSettings, saveSettings } from '@/modules/settings';
-import { sanitizeSettings, DEFAULT_WORKSPACE_SETTINGS, NOTIFICATION_KEYS } from '@/modules/settings/domain/settings';
+import { sanitizeSettings, DEFAULT_NOTIFICATIONS, DEFAULT_WORKSPACE_SETTINGS, NOTIFICATION_KEYS } from '@/modules/settings/domain/settings';
 
 const anyDb = db.tenantSettings as unknown as { findUnique: ReturnType<typeof vi.fn>; upsert: ReturnType<typeof vi.fn> };
 
@@ -20,6 +20,31 @@ describe('settings sanitizer', () => {
     // роняет тест, ничего не сломав, и его чинят вписыванием строки.
     expect(Object.keys(s.notifications).sort())
       .toEqual(NOTIFICATION_KEYS.map(({ key }) => key as string).sort());
+  });
+
+  it('defaults planDeviation to off while a stored true still parses', () => {
+    // Отправителя у правила нет (`implemented: false`) — значит, умолчание
+    // «включено» обещало работу, которой не происходит. Ключ из каталога при
+    // этом не удалён: сохранённое тенантом значение по-прежнему разбирается.
+    expect(NOTIFICATION_KEYS.find(({ key }) => key === 'planDeviation')?.implemented).toBe(false);
+    expect(DEFAULT_WORKSPACE_SETTINGS.notifications.planDeviation).toBe(false);
+    expect(sanitizeSettings({}).notifications.planDeviation).toBe(false);
+
+    const stored = sanitizeSettings({ notifications: { planDeviation: true } });
+    expect(stored.notifications.planDeviation).toBe(true);
+    // Патч другого поля сохранённое правило не переворачивает.
+    expect(sanitizeSettings({ companyName: 'ООО «Орион»' }, stored).notifications.planDeviation).toBe(true);
+  });
+
+  it('exposes the four owner-requested switches, all on by default', () => {
+    // Решение владельца 26.09.2026: «добавь выключатели для всех уведомлений».
+    // У всех четырёх отправитель был и раньше — умолчание «включено» значит,
+    // что до первого выключения ничего не меняется.
+    for (const key of ['incidents', 'systemAlerts', 'deliveryFailures', 'orionLeads']) {
+      expect(NOTIFICATION_KEYS.find((k) => k.key === key)?.implemented).toBe(true);
+      expect(DEFAULT_NOTIFICATIONS[key]).toBe(true);
+      expect(sanitizeSettings({}).notifications[key]).toBe(true);
+    }
   });
 
   it('rejects an unknown units value and over-long strings', () => {

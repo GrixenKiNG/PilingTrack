@@ -11,6 +11,10 @@
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
+// Статически (в отличие от обработчиков ниже): динамический import этого
+// модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
+// уходил бы в живую базу из теста. Прод-поведение то же — db это ленивый прокси.
+import { db } from '@/lib/db';
 
 // ============================================================
 // Analytics Projection Handler
@@ -28,6 +32,12 @@ export function registerAnalyticsEventHandler() {
   // REPORT_UPDATED is idempotent and matches scripts/backfill-projections.ts.
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForDailySummary);
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,   handleReportForDailySummary);
+  // Сводка по объектам (/api/analytics/sites) кэшируется в Redis на 5 минут
+  // под ключом организации. Без этого сброса дашборд показывал прежнюю
+  // выработку, пока журнал и аналитика уже отдавали новую (F-R35-2).
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForAnalyticsCacheInvalidation);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,   handleReportForAnalyticsCacheInvalidation);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,   handleReportForAnalyticsCacheInvalidation);
 }
 
 async function handleReportForAnalytics(event: ReportDomainEvent) {
@@ -47,7 +57,7 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     let siteId = event.siteId;
     let userId = event.userId;
     let tenantId = event.tenantId;
-    if (!siteId || !userId) {
+    if (!siteId || !userId || !tenantId) {
       const report = await db.report.findUnique({
         where: { reportId: event.aggregateId },
         select: { siteId: true, userId: true, tenantId: true },
@@ -56,8 +66,12 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       userId = userId || report?.userId;
       tenantId = tenantId || report?.tenantId || undefined;
     }
-    if (!siteId || !userId) {
-      logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId', {
+    // Организация обязательна. Строка проекции без неё невидима для тенантных
+    // запросов (сломанная аналитика), а для запроса с пустым тенантом —
+    // видна всем. Раньше здесь писался `tenantId || null`; лучше пропуск
+    // проекции с записью в лог, как для siteId/userId выше.
+    if (!siteId || !userId || !tenantId) {
+      logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId/tenantId', {
         eventType: event.type, aggregateId: event.aggregateId,
       });
       return;
@@ -69,7 +83,7 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
         reportId: event.aggregateId,
         siteId,
         userId,
-        tenantId: tenantId || null,
+        tenantId,
         status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft',
         totalPiles: (event.data.totalPiles as number) || 0,
         totalDrilling: (event.data.totalDrilling as number) || 0,
@@ -96,6 +110,48 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       reportId: event.aggregateId,
     });
     throw error;
+  }
+}
+
+/**
+ * Сброс кэша сводки по объектам (`/api/analytics/sites`) после правки отчёта.
+ *
+ * До этого сводку не сбрасывала ни одна мутация отчёта: дашборд отдавал
+ * прежнюю выработку до истечения TTL (5 мин), пока журнал и `/admin/analytics`
+ * уже показывали новую, — при сверке это выглядело потерей данных (F-R35-2).
+ *
+ * Тенант берём из события, а при его отсутствии — из самого отчёта, как это
+ * делает проекция выше. Сброс кэша — побочный эффект, а не критичная
+ * проекция: и неразрешённый тенант, и недоступный Redis логируются, но
+ * событие не валят (иначе outbox ушёл бы в ретрай/DLQ из-за кэша).
+ */
+async function handleReportForAnalyticsCacheInvalidation(event: ReportDomainEvent) {
+  try {
+    let tenantId = event.tenantId;
+    if (!tenantId) {
+      const report = await db.report.findUnique({
+        where: { reportId: event.aggregateId },
+        select: { tenantId: true },
+      });
+      tenantId = report?.tenantId || undefined;
+    }
+    if (!tenantId) {
+      logger.warn('Site analytics cache not invalidated: cannot resolve tenantId', {
+        eventType: event.type, aggregateId: event.aggregateId,
+      });
+      return;
+    }
+
+    const { invalidateSiteAnalytics } = await import('@/lib/cached-queries');
+    await invalidateSiteAnalytics(tenantId);
+  } catch (error) {
+    // Сброс кэша — побочный эффект, а не критичная проекция: событие не
+    // должно уходить в ретрай/DLQ из-за недоступного Redis.
+    logger.warn('Site analytics cache invalidation failed', {
+      eventType: event.type,
+      aggregateId: event.aggregateId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

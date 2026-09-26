@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { ReadinessCommandError } from '@/modules/readiness/application/command-pipeline/errors';
 import { parseReadinessReadFilters, serializeReadinessFilters } from '@/modules/readiness/application/read-filters';
 import { PrismaAuditRepository } from '@/modules/readiness/infrastructure/audit/audit-repository';
-import { verifyTenantAuditChain } from '@/modules/readiness/infrastructure/audit/verify-chain';
+import { verifyAuditEvents } from '@/modules/readiness/infrastructure/audit/verify-chain';
 import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
 import { resolveReadinessRequestContext } from '../_shared/request-context';
 import { readinessErrorResponse, readinessResponse } from '../_shared/response';
@@ -29,10 +29,8 @@ async function handleGet(request: NextRequest) {
       const repository = new PrismaAuditRepository(tx);
       const timezone = (await tx.tenantSettings.findUnique({where: {tenantId: context.tenantId}, select: {timezone: true}}))?.timezone;
       const filters = parseReadinessReadFilters(params, timezone ?? undefined);
-      const [{ events }, verification] = await Promise.all([
-        repository.readChain(context.tenantId),
-        verifyTenantAuditChain(repository, context.tenantId),
-      ]);
+      const { events, head } = await repository.readChain(context.tenantId);
+      const verification = verifyAuditEvents(context.tenantId, events, head);
       const actor = filters.actor?.toLocaleLowerCase('ru-RU');
       const filtered = events.filter((event) => {
         const occurredAt = new Date(event.occurredAt);

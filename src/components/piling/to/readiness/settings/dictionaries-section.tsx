@@ -82,12 +82,21 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
     (status === 'ALL' || (status === 'ACTIVE' ? item.isActive : !item.isActive))
     && (!normalized || `${item.name} ${item.model ?? ''}`.toLocaleLowerCase('ru-RU').includes(normalized)));
 
+  // Записи приезжают вместе с архивными (F-R29-2), поэтому «Записей» считает
+  // только действующие — иначе число прыгало бы при архивации. Архивные
+  // показываем отдельно.
+  const archivedCounts: Partial<Record<CategoryKey, number>> = {
+    pileGrades: dictionaries?.pileGrades.filter((item) => item.isActive === false).length ?? 0,
+    drillingTypes: dictionaries?.drillingTypes.filter((item) => item.isActive === false).length ?? 0,
+    downtimeReasons: dictionaries?.downtimeReasons.filter((item) => item.isActive === false).length ?? 0,
+  };
+
   const counts: Record<CategoryKey, number | null> = {
     equipment: equipment.length,
     sites: bootstrap?.counts.sites ?? null,
-    pileGrades: dictionaries?.pileGrades.length ?? null,
-    drillingTypes: dictionaries?.drillingTypes.length ?? null,
-    downtimeReasons: dictionaries?.downtimeReasons.length ?? null,
+    pileGrades: dictionaries?.pileGrades.filter((item) => item.isActive !== false).length ?? null,
+    drillingTypes: dictionaries?.drillingTypes.filter((item) => item.isActive !== false).length ?? null,
+    downtimeReasons: dictionaries?.downtimeReasons.filter((item) => item.isActive !== false).length ?? null,
   };
   const totalRecords = Object.values(counts).reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const filledCategories = Object.values(counts).filter((value) => value != null).length;
@@ -198,7 +207,10 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
               >
                 <PilingIcon name={CATEGORY_ICON[key]} size={14} decorative />
                 <span className="min-w-0 flex-1 truncate">{CATEGORY_LABEL[key]}</span>
-                <span className="font-mono">{counts[key] ?? '…'}</span>
+                <span className="flex items-baseline gap-1">
+                  <span className="font-mono">{counts[key] ?? '…'}</span>
+                  {archivedCounts[key] ? <span className="text-3xs text-muted-foreground">в архиве: {archivedCounts[key]}</span> : null}
+                </span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </Link>
             ))}

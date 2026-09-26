@@ -1,4 +1,6 @@
 import {
+  PILE_LENGTH_UNKNOWN_LABEL,
+  PILE_METERS_INCOMPLETE_NOTE,
   addEmptyState,
   addHeader,
   addInfoGrid,
@@ -16,6 +18,7 @@ import {
   statusLabel,
 } from './format';
 import { renderPdf } from './render';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { SingleReportData } from './types';
 
@@ -31,6 +34,7 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     const totalDrillingCount = data.drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
     const totalDrilling = data.drillings.reduce((sum, drilling) => sum + (drilling.meters || 0), 0);
     const totalDowntime = data.downtimes.reduce((sum, downtime) => sum + (downtime.duration || 0), 0);
+    const hasPilesWithoutLength = data.piles.some((pile) => pileMetersOf(pile) === 0);
 
     addHeader(doc, 'РАБОЧИЙ ОТЧЁТ ПО СВАЙНЫМ РАБОТАМ', `№ ${shortId(data.reportId)} | ${formatRuDate(data.date)}`);
     addInfoGrid(doc, [
@@ -47,9 +51,9 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     }
 
     addMetricStrip(doc, [
-      ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт / м.п.'],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт / м.п.'],
-      ['Простои', formatNumber(totalDowntime), 'ч'],
+      ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],
+      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт/м.п.'],
+      ['Простои', formatDowntimeHours(totalDowntime), ''],
     ]);
 
     if (data.piles.length > 0) {
@@ -59,14 +63,15 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
         ['Марка сваи', 'Кол-во', 'Метров на сваю', 'Всего м.п.'],
         data.piles.map((pile) => {
           const mpu = pileMetersOf(pile);
+          const lengthKnown = mpu > 0;
           return [
             pile.pileGrade?.name || '—',
             formatNumber(pile.count),
-            formatMeters(mpu),
-            formatMeters((pile.count || 0) * mpu),
+            lengthKnown ? formatMeters(mpu) : '—',
+            lengthKnown ? formatMeters((pile.count || 0) * mpu) : PILE_LENGTH_UNKNOWN_LABEL,
           ];
         }),
-        [0.46, 0.16, 0.18, 0.2]
+        [0.42, 0.16, 0.18, 0.24]
       );
     }
 
@@ -92,7 +97,7 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
         ['Причина', 'Длительность', 'Комментарий'],
         data.downtimes.map((downtime) => [
           downtime.reason?.name || '—',
-          `${formatNumber(downtime.duration)} ч`,
+          formatDowntimeHours(downtime.duration),
           downtime.comment || '—',
         ]),
         [0.48, 0.18, 0.34]

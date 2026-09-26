@@ -23,6 +23,35 @@ export function getTodayInTimezone(timezone: string = 'Europe/Moscow'): string {
 }
 
 /**
+ * The UTC instant of local midnight for a `YYYY-MM-DD` day in the given timezone.
+ *
+ * Dates in the product mean whole tenant days: a pile driven 26.09 at 00:30 MSK
+ * (= 25.09T21:30Z UTC) belongs to the "26.09" journal, not "25.09". The offset
+ * is resolved through Intl for the target instant, so zones that shift on DST
+ * get the right boundary instead of a fixed offset.
+ */
+export function zonedDayStartUtc(date: string, timezone: string = 'Europe/Moscow'): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const wallClock = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  // offset(instant) = what the zone's wall clock reads at that instant, minus the instant.
+  const offsetAt = (instant: number): number => {
+    const parts = formatter.formatToParts(new Date(instant));
+    const read = (type: Intl.DateTimeFormatPartTypes): number =>
+      Number(parts.find((part) => part.type === type)?.value);
+    return Date.UTC(read('year'), read('month') - 1, read('day'), read('hour'), read('minute'), read('second')) - instant;
+  };
+  // Two passes: the first guess may fall on the other side of a DST switch.
+  let utc = wallClock - offsetAt(wallClock);
+  utc = wallClock - offsetAt(utc);
+  return new Date(utc);
+}
+
+/**
  * Format a UTC Date for display in the user's timezone.
  */
 export function formatDateInTimezone(

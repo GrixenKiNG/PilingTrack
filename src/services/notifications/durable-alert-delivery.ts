@@ -1,5 +1,19 @@
 import {alertSchema} from '@/core/notifications/durable-alert';
 
+/**
+ * Правило алерта → ключ настройки. У происшествия и дефекта осмотра — разные
+ * выключатели, поэтому по одному `criticalDefect` их не различить; правило,
+ * которого здесь нет, отправляем как раньше (новый отправитель не должен
+ * молчать из-за того, что его забыли вписать в карту).
+ *
+ * Ключи перечислены здесь литералами, а не типом каталога настроек: `services/`
+ * по правилам проекта не зависит от `modules/` (eslint no-restricted-imports).
+ */
+const RULE_NOTIFICATION_KEYS: Record<string, 'criticalDefect' | 'incidents'> = {
+  criticalDefect: 'criticalDefect',
+  incident: 'incidents',
+};
+
 /** Existing outbox backoff and DLQ handle thrown delivery errors. */
 export async function deliverQueuedAlert(event: {id?: string; tenantId?: string | null; data?: unknown}) {
   if (!event.id || !event.tenantId) throw new Error('Alert delivery requires event and tenant identity');
@@ -15,7 +29,8 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
     await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} AND "tenantId" = ${event.tenantId} FOR UPDATE`;
     const row = await tx.outboxEvent.findFirst({where: {id: event.id, tenantId: event.tenantId}});
     if (!row || row.published) return;
-    const suppressed = alert.ruleId === 'criticalDefect' && !await isNotificationEnabled(tenantId, 'criticalDefect');
+    const key = alert.ruleId ? RULE_NOTIFICATION_KEYS[alert.ruleId] : undefined;
+    const suppressed = key ? !await isNotificationEnabled(tenantId, key) : false;
     if (!suppressed) {
       const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id});
       if (!delivered) throw new Error('Telegram delivery failed; retained for retry');

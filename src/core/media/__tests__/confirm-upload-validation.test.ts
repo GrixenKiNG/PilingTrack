@@ -155,7 +155,7 @@ describe('MediaService.confirmUpload — content validation', () => {
     mockDownload(Buffer.from('<script>alert(1)</script> definitely not a photo', 'utf8'));
     const service = makeService();
 
-    await expect(service.confirmUpload('media-1')).rejects.toThrow(/does not match/i);
+    await expect(service.confirmUpload('media-1')).rejects.toThrow(/не соответствует/i);
 
     expect(mediaTable.get('media-1')?.uploadStatus).toBe('failed');
     // Sharp must never even be invoked on bytes that already fail the
@@ -168,7 +168,7 @@ describe('MediaService.confirmUpload — content validation', () => {
     mockDownload(Buffer.from('%PDF-1.7\n%…rest of a real pdf…', 'ascii'));
     const service = makeService();
 
-    await expect(service.confirmUpload('media-1')).rejects.toThrow(/does not match/i);
+    await expect(service.confirmUpload('media-1')).rejects.toThrow(/не соответствует/i);
     expect(mediaTable.get('media-1')?.uploadStatus).toBe('failed');
   });
 
@@ -211,7 +211,7 @@ describe('MediaService.confirmUpload — content validation', () => {
     mockDownload(Buffer.from([0x7f, 0x45, 0x4c, 0x46])); // ELF executable magic
     const service = makeService();
 
-    await expect(service.confirmUpload('media-1')).rejects.toThrow(/does not match/i);
+    await expect(service.confirmUpload('media-1')).rejects.toThrow(/не соответствует/i);
     expect(mediaTable.get('media-1')?.uploadStatus).toBe('failed');
   });
 

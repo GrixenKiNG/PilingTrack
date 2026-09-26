@@ -9,7 +9,7 @@
  * на страницу заполнения.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Layers, Hammer, RotateCw, ShoppingCart, Copy } from '@/components/piling/icons/unified-icons';
@@ -25,6 +25,7 @@ import {
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
 import { getConsumables } from '@/modules/inspections/domain/consumables';
 import { LubricationMap } from './lubrication-map';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 
@@ -48,21 +49,23 @@ const HAMMER_LABEL: Record<HammerKind, string> = {
   NONE: 'Нет',
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 export function StartInspectionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [templates, setTemplates] = useState<TemplateLite[]>([]);
+  // Отказ чтения шаблонов раньше выглядел как «шаблонов нет»: экран предлагал
+  // создать дубль блока «База», хотя на самом деле не ответил
+  // /api/checklist-templates.
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Preselect the установка when arriving from an equipment's ТО page
   // (/inspections/new?equipmentId=…) so the admin doesn't have to pick it again.
   const [equipmentId, setEquipmentId] = useState(() => searchParams.get('equipmentId') ?? '');
   const [level, setLevel] = useState<InspectionLevel>('EO');
-  const [inspectionDate, setInspectionDate] = useState(today());
+  const [inspectionDate, setInspectionDate] = useState(() => getTodayInTimezone());
   const [shift, setShift] = useState('');
   const [engineHours, setEngineHours] = useState('');
   const [busy, setBusy] = useState(false);
@@ -86,16 +89,31 @@ export function StartInspectionForm() {
   useEffect(() => { void load(); }, [load]);
 
   // Load templates for the chosen level to show which blocks really exist.
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await authFetch(`/api/checklist-templates?level=${level}`);
-        if (res.ok && active) setTemplates(((await res.json()).templates ?? []) as TemplateLite[]);
-      } catch { /* preview only */ }
-    })();
-    return () => { active = false; };
+  // A request id replaces the old `active` flag: a retry or a level change must
+  // win over an answer that is still in flight.
+  const templatesReqRef = useRef(0);
+  const loadTemplates = useCallback(async () => {
+    const reqId = ++templatesReqRef.current;
+    // Сбой чтения выдаём за «шаблонов нет» нельзя: механик шёл создавать дубль
+    // блока «База», хотя на самом деле не ответил /api/checklist-templates.
+    const fail = () => {
+      if (reqId !== templatesReqRef.current) return;
+      setTemplatesError('Состав блоков чек-листа неизвестен — шаблоны могут быть, просто они не прочитаны.');
+    };
+    try {
+      const res = await authFetch(`/api/checklist-templates?level=${level}`);
+      if (!res.ok) { fail(); return; }
+      const body = (await res.json()) as { templates?: TemplateLite[] };
+      if (reqId !== templatesReqRef.current) return;
+      setTemplates(body.templates ?? []);
+      setTemplatesError(null);
+    } catch {
+      fail();
+    }
   }, [level]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads templates on level change; the async loader sets state
+  useEffect(() => { void loadTemplates(); }, [loadTemplates]);
 
   const selected = equipment.find((e) => e.id === equipmentId) ?? null;
 
@@ -164,7 +182,7 @@ export function StartInspectionForm() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 py-6">
+    <div className="mx-auto w-full max-w-lg px-4 py-6 field-type">
       <div className="mb-5 flex items-center gap-2">
         <Link href="/inspections" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
@@ -212,23 +230,33 @@ export function StartInspectionForm() {
           {selected && (
             <div className="rounded-lg border bg-muted p-3">
               <div className="mb-2 text-xs font-medium text-muted-foreground">Чек-лист соберётся из блоков:</div>
-              <div className="space-y-1.5">
-                {blocks.map((b) => (
-                  <div key={b.key} className="flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-sm">
-                    <b.icon className="w-3.5 h-3.5 text-signal-strong" />
-                    <span className="flex-1">{b.label}</span>
-                    {b.ok
-                      ? <span className="text-2xs text-success-strong">✓ шаблон есть</span>
-                      : <span className="text-2xs text-destructive-strong">нет шаблона</span>}
+              {templatesError ? (
+                <QueryErrorBanner
+                  title="Шаблоны осмотра не загрузились"
+                  message={templatesError}
+                  onRetry={() => void loadTemplates()}
+                />
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    {blocks.map((b) => (
+                      <div key={b.key} className="flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-sm">
+                        <b.icon className="w-3.5 h-3.5 text-signal-strong" />
+                        <span className="flex-1">{b.label}</span>
+                        {b.ok
+                          ? <span className="text-2xs text-success-strong">✓ шаблон есть</span>
+                          : <span className="text-2xs text-destructive-strong">нет шаблона</span>}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {!hasBase && (
-                <p className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-2xs text-destructive-strong">
-                  Нет блока «База» для модели «{selected.model || '—'}». Создайте его в разделе{' '}
-                  <Link href="/admin/checklists" className="underline">Чек-листы</Link>{' '}
-                  (тип «База», применимость «{selected.model || '—'}» или без модели — общий для всех).
-                </p>
+                  {!hasBase && (
+                    <p className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-2xs text-destructive-strong">
+                      Нет блока «База» для модели «{selected.model || '—'}». Создайте его в разделе{' '}
+                      <Link href="/admin/checklists" className="underline">Чек-листы</Link>{' '}
+                      (тип «База», применимость «{selected.model || '—'}» или без модели — общий для всех).
+                    </p>
+                  )}
+                </>
               )}
               <p className="mt-2 text-2xs text-muted-foreground">
                 Молот: {HAMMER_LABEL[selected.hammerKind]} · {selected.isCombined ? 'комбинированная (есть вращатель)' : 'без вращателя'}.
@@ -248,8 +276,8 @@ export function StartInspectionForm() {
                   <Copy className="h-3 w-3" /> Скопировать
                 </Button>
               </div>
-              <div className="overflow-hidden rounded-md border border-success/30 bg-card">
-                <table className="w-full text-xs">
+              <div className="overflow-x-auto rounded-md border border-success/30 bg-card">
+                <table className="w-full min-w-[420px] text-xs">
                   <thead>
                     <tr className="text-left text-2xs uppercase tracking-wide text-muted-foreground">
                       <th className="px-2 py-1.5 font-medium">Материал</th>
@@ -304,10 +332,18 @@ export function StartInspectionForm() {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" asChild disabled={busy}>
-              <Link href="/inspections">Отмена</Link>
-            </Button>
-            <Button onClick={submit} disabled={busy || loading || (!!selected && !hasBase)} className="bg-signal hover:bg-signal-strong text-white flex-1">
+            {/* `disabled` у `Button asChild` не выключает ссылку: псевдокласс
+                `:disabled` у `<a>` не срабатывает, и уйти по «Отмене» можно
+                прямо во время сохранения. Пока идёт запрос, рендерим
+                отключённую кнопку без ссылки. */}
+            {busy ? (
+              <Button type="button" variant="outline" disabled>Отмена</Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <Link href="/inspections">Отмена</Link>
+              </Button>
+            )}
+            <Button onClick={submit} disabled={busy || loading || (!!selected && !hasBase && !templatesError)} className="bg-signal hover:bg-signal-strong text-white flex-1">
               {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Начать осмотр
             </Button>

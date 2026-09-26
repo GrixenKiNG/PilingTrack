@@ -59,7 +59,7 @@ export function InspectionsList() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 field-type">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground"><PilingIcon name="inspection" size={24} tone="success" decorative />Осмотры</h1>
         <Button asChild size="sm" className="bg-signal hover:bg-signal-strong text-white">

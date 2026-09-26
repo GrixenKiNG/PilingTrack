@@ -126,7 +126,7 @@ describe('getMaintenanceById', () => {
   it('throws 404 for cross-tenant record', async () => {
     findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'other', equipmentId: 'eq_1' });
     const { getMaintenanceById } = await import('../equipment-query.service');
-    await expect(getMaintenanceById('rec_1', 'orion')).rejects.toThrow('Maintenance record not found');
+    await expect(getMaintenanceById('rec_1', 'orion')).rejects.toThrow('Запись ТО не найдена');
   });
   it('throws when tenantId empty (fail-closed)', async () => {
     const { getMaintenanceById } = await import('../equipment-query.service');
@@ -135,6 +135,6 @@ describe('getMaintenanceById', () => {
   it('throws 404 when not found', async () => {
     findUniqueRecMock.mockResolvedValue(null);
     const { getMaintenanceById } = await import('../equipment-query.service');
-    await expect(getMaintenanceById('missing', 'orion')).rejects.toThrow('Maintenance record not found');
+    await expect(getMaintenanceById('missing', 'orion')).rejects.toThrow('Запись ТО не найдена');
   });
 });

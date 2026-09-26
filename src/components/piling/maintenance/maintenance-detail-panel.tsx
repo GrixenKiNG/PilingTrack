@@ -69,7 +69,7 @@ export function MaintenanceDetailPanel({
 
         <div className="flex-1 space-y-4 px-5 py-4">
           <PanelSection title="Назначение">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <InfoCell label="Объект" value={crew?.site?.name ?? 'Без объекта'} />
               <InfoCell label="Бригада" value={crew?.name ?? 'Без бригады'} />
               <InfoCell label="Оператор" value={crew?.operator?.name ?? '—'} />
@@ -78,13 +78,13 @@ export function MaintenanceDetailPanel({
 
           <PanelSection title="Наработка">
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м.ч.` : '—'} />
-              <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м.ч.` : '—'} />
+              <MetricLine label="Текущая наработка" value={hours != null ? `${hours} м/ч` : '—'} />
+              <MetricLine label={`До ${TYPE_LABEL[record.type]} осталось`} value={dueHours != null ? `${dueHours} м/ч` : '—'} />
               <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                 <div className="h-full rounded-full bg-signal" style={{ width: `${progress}%` }} />
               </div>
-              <MetricLine label="Порог ТО" value={interval != null ? `${interval} м.ч.` : 'не задан'} />
-              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м.ч.)` : 'не закрывалось'} />
+              <MetricLine label="Порог ТО" value={interval != null ? `${interval} м/ч` : 'не задан'} />
+              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
             </div>
           </PanelSection>
 
@@ -116,7 +116,7 @@ export function MaintenanceDetailPanel({
           </PanelSection>
 
           <PanelSection title="Влияние">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <InfoCell label="Риск простоя" value={deadlineText(record)} />
               <InfoCell label="Объект" value={crew?.site?.name ?? '—'} />
               <InfoCell label="Статус" value={statusView(record).label} />

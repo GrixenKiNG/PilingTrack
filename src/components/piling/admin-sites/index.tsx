@@ -76,7 +76,7 @@ function toListItem(row: SiteOverviewRow): SiteListItem {
 
 export function AdminSites() {
   const canManage = useAbility('sites.manage');
-  const { rows, loading, error, reload } = useSitesOverview();
+  const { rows, loading, error, crewsError, reload } = useSitesOverview();
   const { sites, sitesError, reloadSites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
 
   const [quick, setQuick] = useState<QuickKey>('all');
@@ -113,8 +113,8 @@ export function AdminSites() {
       : { siteId: site.id, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate,
           plannedPiles: site.plannedPiles, plannedPileMeters: 0, actualPiles: 0, actualPileMeters: 0,
           plannedDrilling: site.plannedDrilling, actualDrilling: 0, pileProgress: 0, drillingProgress: 0,
-          totalReports: 0, totalDowntime: 0, crewCount: 0, rigNames: [] });
-  }, [rows, sites]);
+          totalReports: 0, totalDowntime: 0, crewCount: crewsError ? null : 0, rigNames: [] });
+  }, [rows, sites, crewsError]);
 
   const filtered = useMemo(() => {
     return allRows.filter((r) => {
@@ -170,11 +170,12 @@ export function AdminSites() {
     return [
       { label: 'Объекты', value: String(allRows.length), detail: `${allRows.filter((row) => row.isActive).length} активных`, icon: MapPin, tone: 'slate' },
       { label: 'Отставание', value: String(behind), detail: '< 60% плана', icon: AlertTriangle, tone: behind > 0 ? 'amber' : 'slate' },
-      { label: 'Без бригад', value: String(noCrew), detail: 'не назначены', icon: Users, tone: noCrew > 0 ? 'red' : 'slate' },
+      // Бригады не загрузились — «Без бригад: 0» было бы утверждением о данных.
+      { label: 'Без бригад', value: crewsError ? '—' : String(noCrew), detail: 'не назначены', icon: Users, tone: crewsError ? 'slate' : noCrew > 0 ? 'red' : 'slate' },
       { label: 'Сваи факт', value: formatNumber(piles), detail: 'шт. суммарно', icon: HardHat, tone: 'orange' },
       { label: 'Метры факт', value: formatNumber(meters), detail: 'м.п. суммарно', icon: Drill, tone: 'blue' },
     ];
-  }, [rows, allRows]);
+  }, [rows, allRows, crewsError]);
 
   const columns: OpsColumn<SiteOverviewRow>[] = [
     {
@@ -190,7 +191,9 @@ export function AdminSites() {
             ) : null}
           </div>
           <div className="mt-0.5 truncate text-2xs text-muted-foreground">
-            {r.crewCount} {pluralizeRu(r.crewCount, ['бригада', 'бригады', 'бригад'])}
+            {r.crewCount === null
+              ? '—'
+              : `${r.crewCount} ${pluralizeRu(r.crewCount, ['бригада', 'бригады', 'бригад'])}`}
             {r.rigNames.length > 0 ? ` · ${r.rigNames.join(', ')}` : ''}
           </div>
         </div>
@@ -286,6 +289,11 @@ export function AdminSites() {
           : <OpsDetailEmpty message="Выберите объект, чтобы увидеть план/факт, иерархию и историю." />}
         kpi={<OpsKpiBar items={kpis} />}
       >
+        {crewsError && (
+          <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-strong">
+            Бригады не загрузились — число бригад не показано
+          </p>
+        )}
         <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${allRows.length}`} />
         <OpsTable
           columns={columns}

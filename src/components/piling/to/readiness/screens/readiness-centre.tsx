@@ -302,7 +302,7 @@ function buildReadinessMetricTiles(
     },
     {
       key: 'maintenance',
-      label: 'Обслуживание',
+      label: 'Обслуживание ТО',
       icon: Wrench,
       pill: maintenanceStage?.state === 'pass'
         ? { label: 'Актуально', cls: 'bg-success/10 text-success-strong' }

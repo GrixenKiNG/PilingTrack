@@ -35,7 +35,10 @@ export interface WorkspaceSettings {
  *
  * - `downtime30`, `newReports` — `services/reports/event-handlers.ts`
  * - `maintenanceOverdue` — `workers/unified-worker/pm-scheduler.ts`
- * - `criticalDefect` — `core/notifications/durable-alert.ts` (enqueueCriticalDefects)
+ * - `criticalDefect`, `incidents` — `services/notifications/durable-alert-delivery.ts`
+ * - `systemAlerts` — `app/api/alerts/webhook/route.ts` (тревоги Alertmanager)
+ * - `deliveryFailures` — `core/outbox/dead-letter-queue.ts`
+ * - `orionLeads` — `app/api/orion/lead/route.ts`
  *
  * Без отправителя остаётся только `planDeviation`, и экран настроек об этом
  * говорит прямо.
@@ -49,18 +52,33 @@ export const NOTIFICATION_KEYS = [
   { key: 'maintenanceOverdue', label: 'Просроченные ТО', implemented: true },
   { key: 'criticalDefect', label: 'Опасный дефект установки (срочный или запрет работы)', implemented: true },
   { key: 'newReports', label: 'Новые отчёты и сводки', implemented: true },
+  { key: 'incidents', label: 'Происшествия на площадке', implemented: true },
+  { key: 'systemAlerts', label: 'Сбои сервера (мониторинг)', implemented: true },
+  { key: 'deliveryFailures', label: 'Недоставленные события', implemented: true },
+  { key: 'orionLeads', label: 'Заявки с сайта ОРИОН', implemented: true },
 ] as const;
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]['key'];
 
 export const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
   downtime30: true,
-  planDeviation: true,
+  // Отправителя у правила нет (`implemented: false`), а умолчание было
+  // «включено»: тумблер обещал работу, которой не происходит. Ключ не удаляем —
+  // сохранённое значение тенанта продолжает читаться, меняется только умолчание.
+  planDeviation: false,
   maintenanceOverdue: true,
   // Дефект, из-за которого нельзя или опасно работать, — то немногое, о чём
   // молчать дороже, чем лишний раз написать. Умолчание «включено».
   criticalDefect: true,
   newReports: false,
+  // Решение владельца 26.09.2026: «добавь выключатели для всех уведомлений».
+  // У всех четырёх отправители были и раньше, но выключателя у них не было —
+  // тумблеры заведены включёнными, чтобы поведение не менялось, пока админ
+  // сам не выключит.
+  incidents: true,
+  systemAlerts: true,
+  deliveryFailures: true,
+  orionLeads: true,
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -81,6 +99,22 @@ function str(value: unknown, max: number, fallback: string): string {
   return typeof value === 'string' && value.length <= max ? value : fallback;
 }
 
+/**
+ * Часовой пояс принимается только как настоящая IANA-зона. Строку вроде
+ * «UTC+3» или «Мск» Intl не знает и бросает RangeError — такое значение
+ * сохранялось и показывалось как факт, хотя всё форматирование молча падало
+ * на Europe/Moscow. Проверяем тем же конструктором, которым потом пользуемся.
+ */
+function timezone(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 40) return fallback;
+  try {
+    new Intl.DateTimeFormat('ru-RU', { timeZone: value });
+    return value;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Sanitize an untrusted patch into a full, safe WorkspaceSettings value. */
 export function sanitizeSettings(input: unknown, base: WorkspaceSettings = DEFAULT_WORKSPACE_SETTINGS): WorkspaceSettings {
   const v = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
@@ -92,7 +126,7 @@ export function sanitizeSettings(input: unknown, base: WorkspaceSettings = DEFAU
   return {
     companyName: str(v.companyName, 200, base.companyName),
     inn: str(v.inn, 20, base.inn),
-    timezone: str(v.timezone, 40, base.timezone),
+    timezone: timezone(v.timezone, base.timezone),
     dateFormat: str(v.dateFormat, 40, base.dateFormat),
     units: UNITS.has(v.units as string) ? (v.units as string) : base.units,
     currency: str(v.currency, 8, base.currency),

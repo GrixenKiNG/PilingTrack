@@ -56,9 +56,13 @@ interface NotificationsSettingsProps {
 
 export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
   const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  // Пока настройки не загрузились (в том числе после отказа), под ними лежат
+  // значения по умолчанию: править их нельзя — сохранённая конфигурация чужая.
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [telegramCount, setTelegramCount] = useState<number | null>(null);
+  const [telegramFailed, setTelegramFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -66,42 +70,50 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
       .then(async (response) => {
         if (!response.ok) throw new Error('settings');
         const body = await response.json() as WorkspaceSettings;
-        if (active) setSettings(body);
+        if (active) { setSettings(body); setLoadState('ready'); }
       })
-      .catch(() => active && toast.error('Не удалось загрузить настройки уведомлений'))
-      .finally(() => active && setLoading(false));
+      .catch(() => {
+        if (!active) return;
+        setLoadState('error');
+        toast.error('Не удалось загрузить настройки');
+      });
     return () => { active = false; };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     let active = true;
     void authFetch('/api/telegram/configs')
       .then(async (response) => {
-        if (!response.ok) {
-          if (active) toast.error('Не удалось сохранить настройку');
-          return;
-        }
+        if (!response.ok) throw new Error('telegram');
         const body = await response.json() as { configs?: unknown[] };
         if (active) setTelegramCount(Array.isArray(body.configs) ? body.configs.length : 0);
       })
-      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
+      .catch(() => {
+        if (!active) return;
+        // Отказ чтения — не «сохранение не удалось»: иначе админ искал бы
+        // проблему не там. Канал при этом не «проверяем вечно».
+        setTelegramFailed(true);
+        toast.error('Не удалось загрузить настройки');
+      });
     return () => { active = false; };
   }, []);
 
   const toggleRule = async (key: string) => {
     if (!isAdmin || savingKey) return;
     const previous = settings;
-    const next = { ...settings, notifications: { ...settings.notifications, [key]: !settings.notifications[key] } };
-    setSettings(next);
+    const value = !(settings.notifications[key] ?? false);
+    setSettings({ ...settings, notifications: { ...settings.notifications, [key]: value } });
     setSavingKey(key);
+    // Патч только по изменившемуся ключу: сервер сам сольёт его с сохранённым
+    // значением. Иначе тумблер уносил бы companyName и timezone из умолчаний.
     const response = await authFetch('/api/settings', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(next),
+      body: JSON.stringify({ notifications: { [key]: value } }),
     }).catch(() => null);
     if (!response?.ok) {
       setSettings(previous);
-      toast.error('Настройка не сохранена');
+      toast.error('Не удалось сохранить настройку');
     } else {
       setSettings(await response.json() as WorkspaceSettings);
       toast.success('Правило уведомления сохранено');
@@ -116,7 +128,7 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
   // Каналы перечисляем по факту подключения, а не по макету: почта и SMS
   // в контуре не настроены, и обещать доставку по ним нельзя.
   const channels = [
-    { name: 'Telegram', icon: Send, detail: telegramCount == null ? 'проверяем' : telegramReady ? `конфигураций: ${telegramCount}` : 'бот не настроен', ready: telegramReady, href: '/admin/telegram' },
+    { name: 'Telegram', icon: Send, detail: telegramFailed ? 'не удалось проверить' : telegramCount == null ? 'проверяем' : telegramReady ? `конфигураций: ${telegramCount}` : 'бот не настроен', ready: telegramReady, href: '/admin/telegram' },
     { name: 'Электронная почта', icon: Mail, detail: 'SMTP не подключён', ready: false, href: '/admin/settings' },
     { name: 'Push в браузере', icon: Bell, detail: 'не подключено', ready: false, href: '/admin/settings' },
     { name: 'SMS', icon: MessageCircle, detail: 'не подключено', ready: false, href: '/admin/settings' },
@@ -135,11 +147,17 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
           icon: 'accepted',
           label: 'С отправителем',
           value: `${implementedRules} из ${RULES.length}`,
-          detail: loading ? undefined : `признак включён у ${activeRules}`,
+          detail: loadState !== 'ready' ? undefined : `признак включён у ${activeRules}`,
         },
         { icon: 'notifications', label: 'Каналов подключено', value: telegramCount == null ? '…' : channels.filter((channel) => channel.ready).length },
         { icon: 'risk', label: 'Каналов не настроено', value: telegramCount == null ? '…' : channels.filter((channel) => !channel.ready).length, alert: channels.some((channel) => !channel.ready) },
       ]} />
+      {loadState === 'error' && (
+        <div role="alert" className="mt-3 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words">Настройки не загрузились — изменить их сейчас нельзя</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setLoadAttempt((n) => n + 1)}>Повторить</Button>
+        </div>
+      )}
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-3">
           <section className={cn(card, 'overflow-hidden')}>
@@ -160,7 +178,13 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
                   <div key={rule.key} className="grid min-w-[720px] grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_130px_110px_50px] items-center gap-2 border-b border-border px-4 py-2 text-2xs last:border-b-0">
                     <span className="flex min-w-0 items-center gap-2">
                       <Icon className={cn('h-4 w-4 shrink-0', rule.implemented ? 'text-muted-foreground' : 'text-warning-strong')} />
-                      <span className="min-w-0 leading-snug">{rule.event}</span>
+                      <span className="min-w-0 leading-snug">
+                        {rule.event}
+                        {/* Та же пометка, что на экране настроек рабочего
+                            пространства: признак у правила есть, отправителя
+                            нет — тумблер ниже заблокирован. */}
+                        {!rule.implemented && <span className="block text-3xs text-muted-foreground">Отправитель не реализован</span>}
+                      </span>
                     </span>
                     <span className="min-w-0 truncate text-muted-foreground">{rule.threshold}</span>
                     <span>
@@ -174,7 +198,7 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
                     <span className="flex justify-end">
                       <Toggle
                         checked={settings.notifications[rule.key] ?? false}
-                        disabled={loading || !isAdmin || savingKey !== null}
+                        disabled={loadState !== 'ready' || !isAdmin || savingKey !== null || !rule.implemented}
                         label={rule.event}
                         onChange={() => void toggleRule(rule.key)}
                       />

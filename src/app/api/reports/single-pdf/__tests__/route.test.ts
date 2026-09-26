@@ -38,8 +38,12 @@ vi.mock('@/services/auth/authorization-service', () => ({ assertCan: assertCanMo
 vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn() }));
 vi.mock('@/lib/pdf-data', () => ({ loadSingleReportPdfContext: vi.fn() }));
 vi.mock('@/services/feedback/feedback-event-service', () => ({ recordFeedbackEvent: vi.fn() }));
+vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 
-import { GET } from '../route';
+import { GET, POST } from '../route';
+import { loadSingleReportPdfContext } from '@/lib/pdf-data';
+import { enqueuePdfGeneration } from '@/lib/pdf-queue';
+import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 
 const OPERATOR = { id: 'user-1', role: 'OPERATOR', tenantId: 'tenant-a' };
 const JOB_ID = '11111111-1111-1111-1111-111111111111';
@@ -50,6 +54,14 @@ function statusReq(): NextRequest {
 
 function downloadReq(): NextRequest {
   return new NextRequest(`http://localhost/api/reports/single-pdf?jobId=${JOB_ID}&action=download`);
+}
+
+function postReq(body: unknown): NextRequest {
+  return new NextRequest('http://localhost/api/reports/single-pdf', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 describe('GET /api/reports/single-pdf — ownership fail-closed', () => {
@@ -113,5 +125,52 @@ describe('GET /api/reports/single-pdf — ownership fail-closed', () => {
     expect(body).not.toHaveProperty('message');
     expect(JSON.stringify(body)).not.toContain('pdfs/');
     expect(JSON.stringify(body)).not.toContain('11111111-1111-1111-1111-111111111111');
+  });
+});
+
+describe('POST /api/reports/single-pdf — body validation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: OPERATOR, error: null });
+  });
+
+  it('rejects a non-string reportId with 400 and details', async () => {
+    const res = await POST(postReq({ reportId: { evil: true } }));
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Некорректные параметры запроса');
+    expect(Array.isArray(body.details)).toBe(true);
+  });
+
+  it('rejects an over-long reportId with 400', async () => {
+    const res = await POST(postReq({ reportId: 'r-'.repeat(60) }));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Некорректные параметры запроса');
+  });
+
+  it('keeps the original message when reportId is absent', async () => {
+    const res = await POST(postReq({}));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Не указан reportId');
+  });
+
+  it('does not leak a non-ServiceError (Prisma) message into the feedback feed', async () => {
+    vi.mocked(loadSingleReportPdfContext).mockResolvedValue({
+      report: { date: '2026-01-01', siteId: 'site-1', tenantId: 'tenant-a', userId: 'user-1' },
+      pdfData: {},
+    } as never);
+    vi.mocked(enqueuePdfGeneration).mockRejectedValue(
+      new Error('Invalid `prisma.report.findUnique()` invocation: relation "Report" does not exist')
+    );
+
+    const res = await POST(postReq({ reportId: 'report-1' }));
+
+    expect(res.status).toBe(500);
+    const feedbackMessage = vi.mocked(recordFeedbackEvent).mock.calls[0][0].message;
+    expect(feedbackMessage).toBe('Не удалось сформировать PDF — попробуйте ещё раз или сообщите администратору');
+    expect(feedbackMessage).not.toContain('prisma');
   });
 });

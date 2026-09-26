@@ -54,8 +54,8 @@ export function StepShell({
           </button>
         ) : <span className="w-7" />}
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold leading-tight">{title}</p>
-          {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+          <p className="truncate text-2xl font-semibold leading-tight">{title}</p>
+          {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
         </div>
       </header>
 
@@ -113,8 +113,8 @@ export function CheckRow({
   const content = (
     <>
       <span className="min-w-0 flex-1 text-left">
-        <span className="block truncate text-sm text-foreground">{label}</span>
-        {hint && <span className="block truncate text-xs text-muted-foreground">{hint}</span>}
+        <span className="block truncate text-base text-foreground">{label}</span>
+        {hint && <span className="block truncate text-sm text-muted-foreground">{hint}</span>}
       </span>
       {right ?? (
         <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border',
@@ -152,7 +152,7 @@ export function ValueRow({ label, value, tone }: {
   return (
     <div className="flex items-baseline justify-between gap-3 px-3 py-2.5">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className={cn('text-sm font-semibold',
+      <span className={cn('text-base font-semibold',
         tone === 'ok' ? 'text-success-strong'
           : tone === 'warn' ? 'text-warning-strong' : 'text-foreground')}>{value}</span>
     </div>
@@ -196,7 +196,7 @@ export function BottomTabs({ active, onSelect }: {
     <nav aria-label="Разделы смены" className="-m-3 flex border-t border-border bg-card">
       {tabs.map((tab) => (
         <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} aria-current={active === tab.id ? 'page' : undefined}
-          className={cn('flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-signal',
+          className={cn('flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-signal',
             active === tab.id ? 'bg-signal/5 text-signal-strong shadow-[inset_0_-3px_var(--signal)]' : 'text-muted-foreground')}>
           <PilingIcon name={tab.icon} size={24} decorative />
           {tab.label}

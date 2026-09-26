@@ -168,7 +168,7 @@ export function MaintenanceRequestForm() {
           {selected && (
             <p className="mt-1.5 text-xs text-muted-foreground">
               {selected.model ?? 'модель не указана'}
-              {selected.engineHoursTotal != null && ` · наработка ${selected.engineHoursTotal} м.ч.`}
+              {selected.engineHoursTotal != null && ` · наработка ${selected.engineHoursTotal} м/ч`}
             </p>
           )}
         </div>

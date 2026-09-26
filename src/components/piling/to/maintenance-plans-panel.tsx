@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { PmDueStatus } from '@/lib/pm-due';
+import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
 
 interface PlanDue {
   status: PmDueStatus;
@@ -43,10 +44,10 @@ const DUE_META: Record<PmDueStatus, { label: string; cls: string }> = {
 
 function dueDetail(p: Plan): string {
   if (p.triggerType === 'HOURS') {
-    if (p.due.hoursRemaining == null) return `каждые ${p.intervalHours ?? '—'} м.ч.`;
+    if (p.due.hoursRemaining == null) return `каждые ${p.intervalHours ?? '—'} м/ч`;
     return p.due.hoursRemaining >= 0
-      ? `осталось ${p.due.hoursRemaining} м.ч.`
-      : `перебег ${Math.abs(p.due.hoursRemaining)} м.ч.`;
+      ? `осталось ${p.due.hoursRemaining} м/ч`
+      : `перебег ${Math.abs(p.due.hoursRemaining)} м/ч`;
   }
   if (p.due.daysRemaining == null) return `каждые ${p.intervalDays ?? '—'} дн.`;
   return p.due.daysRemaining >= 0 ? `через ${p.due.daysRemaining} дн.` : `просрочка ${Math.abs(p.due.daysRemaining)} дн.`;
@@ -55,6 +56,7 @@ function dueDetail(p: Plan): string {
 export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -66,10 +68,19 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance-plans?equipmentId=${encodeURIComponent(eqId)}`);
-      if (!res.ok) throw new Error('plans');
-      setPlans(((await res.json()).plans ?? []) as Plan[]);
+      // 404 — регламентов по этой установке нет: это «данных нет», а не сбой.
+      if (!res.ok && res.status !== 404) {
+        setPlans([]);
+        setLoadError(loadFailureText(res.status));
+        toast.error('Не удалось загрузить регламенты');
+        return;
+      }
+      const body = res.ok ? await res.json() as { plans?: Plan[] } : {};
+      setPlans(body.plans ?? []);
+      setLoadError(null);
     } catch {
       setPlans([]);
+      setLoadError(loadFailureText(null));
       toast.error('Не удалось загрузить регламенты');
     } finally {
       setLoading(false);
@@ -188,7 +199,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             min={1}
             value={interval}
             onChange={(e) => setIntervalValue(e.target.value)}
-            placeholder={trigger === 'HOURS' ? 'интервал, м.ч. (напр. 250)' : 'интервал, дней (напр. 90)'}
+            placeholder={trigger === 'HOURS' ? 'интервал, м/ч (напр. 250)' : 'интервал, дней (напр. 90)'}
             className="h-9"
           />
           <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
@@ -204,6 +215,8 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
         </div>
+      ) : loadError !== null ? (
+        <LoadFailure message={loadError} onRetry={() => void load(equipmentId)} />
       ) : plans.length === 0 ? (
         <div className="grid min-h-16 place-items-center rounded-md bg-muted px-3 py-3 text-center text-sm text-muted-foreground">
           Регламентов пока нет

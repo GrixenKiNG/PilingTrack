@@ -185,7 +185,7 @@ export function FeedbackCenter() {
           )}
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[440px] overflow-y-auto p-0">
+      <SheetContent side="right" className="w-full max-w-full overflow-y-auto p-0 sm:w-[440px]">
         <SheetHeader className="border-b px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>

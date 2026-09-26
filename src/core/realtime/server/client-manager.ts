@@ -118,6 +118,14 @@ export class ClientManager {
   }
 
   /**
+   * Iterate over all connected clients.
+   * Public accessor so callers never reach into the private map directly.
+   */
+  allClients(): IterableIterator<WSClient> {
+    return this.clients.values();
+  }
+
+  /**
    * Subscribe client to a channel.
    */
   subscribe(ws: WebSocket, channel: ChannelType): boolean {

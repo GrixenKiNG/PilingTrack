@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 interface SiteAnalyticsRow {
   siteId: string;
   siteName: string;
+  isActive: boolean;
   plannedPiles: number;
   plannedPileMeters: number;
   plannedDrillingCount: number;
@@ -39,6 +40,12 @@ export interface SiteAnalyticsOptions {
  * Plans (`plannedPiles`/`plannedDrilling`) are the whole-site targets and are
  * never sliced by the period — only the *actuals* (work done) are. When no
  * period is given the actuals cover all time (previous behaviour preserved).
+ *
+ * Site selection: a deactivated site is still a real object of the tenant, so
+ * it must not vanish from the KPI of a past period. Rows are therefore taken
+ * for every active site plus every inactive site that submitted a report in
+ * the period; an inactive site without reports in the period is not listed at
+ * all. `isActive` is returned per row so the UI can mark «объект закрыт».
  */
 export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
   // Fail closed on a missing tenant — never return every tenant's rows.
@@ -64,6 +71,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
     SELECT
       s.id                                  AS "siteId",
       s.name                                AS "siteName",
+      s."isActive"                          AS "isActive",
       s."plannedPiles"                      AS "plannedPiles",
       s."plannedDrilling"                   AS "plannedDrilling",
       COALESCE(pp.total_pile_meters, 0)::float AS "plannedPileMeters",
@@ -128,7 +136,15 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
       GROUP BY r."siteId"
     ) dt ON dt."siteId" = s.id
-    WHERE s."isActive" = true
+    WHERE (
+        s."isActive" = true
+        OR EXISTS (
+          SELECT 1 FROM "Report" r
+          WHERE r."siteId" = s.id
+            AND r.status = 'submitted'
+            AND r.date >= ${dateFrom} AND r.date <= ${dateTo}
+        )
+      )
       AND s."tenantId" = ${tenantId}
       AND (${siteId}::text IS NULL OR s.id = ${siteId})
     ORDER BY s.name ASC
@@ -137,6 +153,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
   return rows.map((row) => ({
     siteId: row.siteId,
     siteName: row.siteName,
+    isActive: row.isActive,
     plannedPiles: row.plannedPiles,
     actualPiles: row.actualPiles,
     plannedPileMeters: parseFloat(row.plannedPileMeters.toFixed(1)),

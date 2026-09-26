@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
 
 interface MeterReading {
   id: string;
@@ -45,6 +46,7 @@ export function MeterReadingsPanel({
 }) {
   const [readings, setReadings] = useState<MeterReading[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [hours, setHours] = useState('');
   const [recordedAt, setRecordedAt] = useState(todayInput());
@@ -56,12 +58,23 @@ export function MeterReadingsPanel({
     setLoading(true);
     try {
       const res = await authFetch(`/api/equipment/${eqId}/meter-readings`);
-      if (!res.ok) throw new Error('readings');
-      const list = ((await res.json()).readings ?? []) as MeterReading[];
+      // 404 — журнала по этой установке нет: это «данных нет», а не сбой.
+      if (!res.ok && res.status !== 404) {
+        setReadings([]);
+        setLoadError(loadFailureText(res.status));
+        toast.error('Не удалось загрузить показания');
+        return [];
+      }
+      const body = res.ok
+        ? await res.json() as { readings?: MeterReading[] }
+        : {};
+      const list = body.readings ?? [];
       setReadings(list);
+      setLoadError(null);
       return list;
     } catch {
       setReadings([]);
+      setLoadError(loadFailureText(null));
       toast.error('Не удалось загрузить показания');
       return [];
     } finally {
@@ -180,6 +193,8 @@ export function MeterReadingsPanel({
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
         </div>
+      ) : loadError !== null ? (
+        <LoadFailure message={loadError} onRetry={() => void load(equipmentId)} />
       ) : readings.length === 0 ? (
         <div className="grid min-h-20 place-items-center rounded-md bg-muted px-3 py-4 text-center text-sm text-muted-foreground">
           Показаний пока нет
@@ -193,7 +208,7 @@ export function MeterReadingsPanel({
             >
               <div className="min-w-0">
                 <div className="font-mono text-sm font-semibold text-foreground">
-                  {r.engineHours.toLocaleString('ru')} м.ч.
+                  {r.engineHours.toLocaleString('ru')} м/ч
                 </div>
                 <div className="text-2xs text-muted-foreground">
                   {fmtDate(r.recordedAt)}

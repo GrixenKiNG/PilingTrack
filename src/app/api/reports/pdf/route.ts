@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
@@ -13,6 +14,44 @@ import { withApi, withMutation } from '@/core/api-wrapper';
 export const runtime = 'nodejs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// FeedbackEvent messages are rendered verbatim in the feedback feed, so a
+// non-ServiceError (Prisma/English internals) must never reach it — the real
+// text goes to the log instead.
+const PDF_FAILURE_FEEDBACK_MESSAGE = 'Не удалось сформировать PDF — попробуйте ещё раз или сообщите администратору';
+
+// POST body — dateFrom/dateTo flow into the Content-Disposition filename,
+// so they must be strictly YYYY-MM-DD (no CRLF/quotes → no header injection)
+// before anything else runs.
+const periodPdfBodySchema = z
+  .object({
+    dateFrom: z.string().regex(DATE_RE),
+    dateTo: z.string().regex(DATE_RE),
+    siteId: z.string().min(1).max(100).optional(),
+    filterUserId: z.string().min(1).max(100).optional(),
+    equipmentId: z.string().min(1).max(100).optional(),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'Дата начала позже даты окончания',
+    path: ['dateTo'],
+  });
+
+// GET query params — the same rule as the POST body above: dateFrom/dateTo
+// flow into the Content-Disposition filename, so they must be strictly
+// YYYY-MM-DD (no CRLF/quotes → no header injection) before anything else runs.
+const periodPdfQuerySchema = z
+  .object({
+    dateFrom: z.string().regex(DATE_RE),
+    dateTo: z.string().regex(DATE_RE),
+    siteId: z.string().max(100).optional(),
+    userId: z.string().max(100).optional(),
+    equipmentId: z.string().max(100).optional(),
+  })
+  .refine((data) => data.dateFrom <= data.dateTo, {
+    message: 'Дата начала позже даты окончания',
+    path: ['dateTo'],
+  });
 
 // ============================================================
 // POST — Enqueue async PDF generation (default)
@@ -28,14 +67,29 @@ export const POST = withMutation(async (request: NextRequest) => {
     assertCan(user!, 'reports.read_all');
 
     const body = await request.json();
-    const { dateFrom, dateTo, siteId, filterUserId, equipmentId } = body;
+    const parsed = periodPdfBodySchema.safeParse(body);
 
-    if (!dateFrom || !dateTo) {
+    if (!parsed.success) {
+      // Preserve the original message when the dates are simply absent.
+      if (!body?.dateFrom || !body?.dateTo) {
+        return NextResponse.json(
+          { error: 'Укажите период: даты начала и окончания' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: 'Укажите период: даты начала и окончания' },
+        {
+          error: 'Некорректные параметры запроса',
+          details: parsed.error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
         { status: 400 }
       );
     }
+
+    const { dateFrom, dateTo, siteId, filterUserId, equipmentId } = parsed.data;
 
     const pdfData = await buildPeriodPdfData({
       dateFrom,
@@ -98,7 +152,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       scope: 'pdf',
       action: 'report.pdf.enqueue.failed',
       title: 'Ошибка постановки PDF в очередь',
-      message: caughtError instanceof Error ? caughtError.message : 'PDF enqueue failed',
+      message: PDF_FAILURE_FEEDBACK_MESSAGE,
       audience: 'OPERATIONS',
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
@@ -174,19 +228,34 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
 
   try {
     assertCan(user, 'reports.read_all');
-    const dateFrom = request.nextUrl.searchParams.get('dateFrom');
-    const dateTo = request.nextUrl.searchParams.get('dateTo');
-    const siteId = request.nextUrl.searchParams.get('siteId');
-    const filterUserId = request.nextUrl.searchParams.get('userId');
-    const equipmentId = request.nextUrl.searchParams.get('equipmentId');
-    const inline = request.nextUrl.searchParams.get('inline') === '1';
+    const searchParams = request.nextUrl.searchParams;
+    const dateFromParam = searchParams.get('dateFrom');
+    const dateToParam = searchParams.get('dateTo');
 
-    if (!dateFrom || !dateTo) {
+    if (!dateFromParam || !dateToParam) {
       return NextResponse.json(
         { error: 'Укажите период: даты начала и окончания' },
         { status: 400 }
       );
     }
+
+    const parsed = periodPdfQuerySchema.safeParse({
+      dateFrom: dateFromParam,
+      dateTo: dateToParam,
+      siteId: searchParams.get('siteId') ?? undefined,
+      userId: searchParams.get('userId') ?? undefined,
+      equipmentId: searchParams.get('equipmentId') ?? undefined,
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Некорректный период: даты в формате ГГГГ-ММ-ДД, начало не позже окончания' },
+        { status: 400 }
+      );
+    }
+
+    const { dateFrom, dateTo, siteId, userId: filterUserId, equipmentId } = parsed.data;
+    const inline = searchParams.get('inline') === '1';
 
     const pdfData = await buildPeriodPdfData({
       dateFrom,
@@ -216,7 +285,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       scope: 'pdf',
       action: 'report.pdf.sync.failed',
       title: 'Ошибка формирования PDF',
-      message: caughtError instanceof Error ? caughtError.message : 'PDF generation failed',
+      message: PDF_FAILURE_FEEDBACK_MESSAGE,
       audience: 'OPERATIONS',
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,

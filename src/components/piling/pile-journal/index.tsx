@@ -11,6 +11,7 @@ import type {
   PilePassportRow,
 } from '@/modules/reports/application/queries/pile-passport.service';
 import type { SiteFlatDTO } from '@/lib/types';
+import { getTodayInTimezone } from '@/lib/timezone';
 import { JournalTitleBlock } from './journal-title-block';
 import { PileDetail } from './pile-detail';
 
@@ -76,6 +77,7 @@ export function PileJournal() {
   const [filters, setFilters] = useState<JournalFilters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<PilePassportRow[] | null>(null);
   const [header, setHeader] = useState<PileJournalHeader | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [sites, setSites] = useState<SiteFlatDTO[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export function PileJournal() {
     const response = await authFetch(`/api/pile-passports?${journalParams(filters).toString()}`);
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error(body?.error ?? 'Журнал недоступен');
-    return body as { data: PilePassportRow[]; header: PileJournalHeader };
+    return body as { data: PilePassportRow[]; header: PileJournalHeader; truncated: boolean };
   }, [filters]);
 
   // Загрузка отменяется вместе с экраном: ответ, пришедший после ухода со
@@ -118,12 +120,14 @@ export function PileJournal() {
         if (cancelled) return;
         setRows(body.data);
         setHeader(body.header);
+        setTruncated(body.truncated === true);
         setError(null);
       } catch (loadError) {
         if (cancelled) return;
         setError(loadError instanceof Error ? loadError.message : 'Журнал недоступен');
         setRows([]);
         setHeader(null);
+        setTruncated(false);
       }
     })();
     return () => { cancelled = true; };
@@ -134,6 +138,7 @@ export function PileJournal() {
       const body = await load();
       setRows(body.data);
       setHeader(body.header);
+      setTruncated(body.truncated === true);
       setError(null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Журнал недоступен');
@@ -171,7 +176,7 @@ export function PileJournal() {
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `zhurnal-zabivki-svay-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.download = `zhurnal-zabivki-svay-${getTodayInTimezone()}.xlsx`;
       link.click();
       toast.success('Журнал выгружен');
     } catch (exportError) {
@@ -265,6 +270,12 @@ export function PileJournal() {
       </section>
 
       {header ? <JournalTitleBlock header={header} /> : null}
+
+      {truncated ? (
+        <p className="text-2xs text-warning-strong">
+          Показаны первые 500 свай — сузьте период или объект
+        </p>
+      ) : null}
 
       {error ? (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-strong">{error}</p>

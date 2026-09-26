@@ -44,17 +44,17 @@ export function ShiftTaskScreen({ task, phase, equipmentName, onExit }: Props) {
       <div className="space-y-2 border-b border-border bg-card px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-sm font-medium uppercase tracking-wider text-[#555]">
               Шаг {phase} из {PHASE_COUNT} · {title}
             </p>
-            <p className="truncate text-sm font-semibold text-foreground">
+            <p className="truncate text-base font-semibold text-foreground">
               {equipmentName ?? 'Установка не выбрана'}
             </p>
           </div>
           <button
             type="button"
             onClick={onExit}
-            className="hit-target inline-flex shrink-0 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+            className="hit-target inline-flex shrink-0 items-center gap-1 text-base font-medium text-[#555] hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> К смене
           </button>

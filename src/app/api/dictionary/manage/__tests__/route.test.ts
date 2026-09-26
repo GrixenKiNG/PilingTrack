@@ -98,6 +98,21 @@ describe('dictionary/manage route', () => {
     expect(svc.archiveDictionaryItem).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'pileGrade', 'g1');
   });
 
+  it('PATCH forwards the recalculation confirmation to the service', async () => {
+    requireAuthMock.mockResolvedValue(admin);
+    svc.setPileGradeLength.mockResolvedValue({ id: 'g1' });
+    const res = await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1', lengthMm: 15000, confirmRecalculate: true }));
+    expect(res.status).toBe(200);
+    expect(svc.setPileGradeLength).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'g1', 15000, true);
+  });
+
+  it('PATCH does not confirm a length change by default', async () => {
+    requireAuthMock.mockResolvedValue(admin);
+    svc.setPileGradeLength.mockResolvedValue({ id: 'g1' });
+    await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1', lengthMm: 15000 }));
+    expect(svc.setPileGradeLength).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'g1', 15000, false);
+  });
+
   it('PATCH returns 400 with neither name nor isActive', async () => {
     requireAuthMock.mockResolvedValue(admin);
     expect((await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1' }))).status).toBe(400);

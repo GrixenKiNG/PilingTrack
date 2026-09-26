@@ -9,9 +9,14 @@
  * needing to mount Radix Select interaction, which has no test precedent in
  * this codebase yet.
  */
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
 import type { ReportDTO } from '@/lib/types';
+
+const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
+
+vi.mock('@/lib/api', () => ({ authFetch: authFetchMock }));
 
 vi.mock('lucide-react', async (importActual) => ({
   ...(await importActual<typeof import('lucide-react')>()),
@@ -64,6 +69,7 @@ describe('ReportFormDialog — pile meters total', () => {
         onClose={vi.fn()}
         editReport={editReport}
         loadingReferenceData={false}
+        dictionaryError={null}
         operators={[]}
         sites={[]}
         pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
@@ -77,5 +83,128 @@ describe('ReportFormDialog — pile meters total', () => {
     // 9000mm / 1000 = 9.0 m/pile × 5 = 45.0 м.п. The old name-regex on "С90.30"
     // finds no 3-consecutive-digit run and would render "5 шт. / 0.0 м.п." instead.
     expect(screen.getByText('5 шт. / 45.0 м.п.')).toBeTruthy();
+  });
+});
+
+describe('ReportFormDialog — дата по умолчанию', () => {
+  it('подставляет производственный день тенанта, а не UTC-день', () => {
+    // 01:30 МСК 26.09 — UTC-день в этот момент ещё 25.09: прежняя подстановка
+    // `new Date().toISOString().split('T')[0]` давала админу вчерашнюю дату.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-25T22:30:00.000Z'));
+    try {
+      const { container } = render(
+        <ReportFormDialog
+          open
+          onClose={vi.fn()}
+          editReport={null}
+          loadingReferenceData={false}
+          dictionaryError={null}
+          operators={[]}
+          sites={[]}
+          pileGrades={[]}
+          drillingTypes={[]}
+          downtimeReasons={[]}
+          equipment={[]}
+          onSuccess={vi.fn()}
+        />,
+      );
+
+      const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+      expect(dateInput.value).toBe('2026-09-26');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('ReportFormDialog — построчные ошибки сервера', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('показывает поля из details.fieldErrors, а не одно «Некорректные данные»', async () => {
+    // 400 админского маршрута: `details` — zod-`fieldErrors`.
+    authFetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: 'Некорректные данные',
+        details: { formErrors: [], fieldErrors: { count: ['Ожидалось число'] } },
+      }),
+    });
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Некорректные данные\nПоле count: Ожидалось число'));
+  });
+});
+
+describe('ReportFormDialog — непрочитанные справочники', () => {
+  it('показывает причину над полями, а не пустые списки без объяснения', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={null}
+        loadingReferenceData={false}
+        dictionaryError="Справочники не загрузились — списки в форме пустые"
+        operators={[]}
+        sites={[]}
+        pileGrades={[]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe('Справочники не загрузились — списки в форме пустые');
+  });
+});
+
+describe('ReportFormDialog — архивная марка (F-R29-2)', () => {
+  it('не предлагает архивную марку в выборе, но показывает её в строке и считает метры', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'СВ 300-80', isActive: false, lengthMm: 12000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Строка сданного отчёта: название и метры (5 × 11,999... = 60.0 м.п.),
+    // а не сырой cuid и 0 м.п.
+    expect(screen.getByText('5 шт. / 60.0 м.п.')).toBeTruthy();
+    // Название встречается ровно один раз — в строке отчёта. Второе вхождение
+    // означало бы, что архивная марка попала в список выбора новой строки.
+    expect(screen.queryAllByText('СВ 300-80')).toHaveLength(1);
   });
 });

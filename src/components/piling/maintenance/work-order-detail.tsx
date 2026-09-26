@@ -242,7 +242,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     ].filter((text): text is string => typeof text === 'string');
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6">
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 field-type">
       <BackLink />
 
       <div className="mt-4 rounded-xl border bg-card p-4">

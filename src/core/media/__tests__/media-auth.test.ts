@@ -98,7 +98,7 @@ describe('assertCanAccessMediaEntity — отчёты и осмотры', () => 
 
   it('оператор НЕ прикрепляет фото к чужому отчёту', async () => {
     reportFindFirstMock.mockResolvedValue({ userId: 'someone-else' });
-    await expect(assertCanAccessMediaEntity(operator, 'report', 'r1')).rejects.toThrow(/Forbidden/);
+    await expect(assertCanAccessMediaEntity(operator, 'report', 'r1')).rejects.toThrow(/Нет доступа/);
   });
 
   it('несохранённый отчёт разрешён — оператор снимает фото до отправки смены', async () => {
@@ -131,12 +131,12 @@ describe('assertCanAccessMediaEntity — отчёты и осмотры', () => 
 
   it('оператор НЕ ведёт фото чужого осмотра', async () => {
     inspectionFindUniqueMock.mockResolvedValue({ performedById: 'op-2' });
-    await expect(assertCanAccessMediaEntity(operator, 'inspection', 'insp-1__item-3')).rejects.toThrow(/Forbidden/);
+    await expect(assertCanAccessMediaEntity(operator, 'inspection', 'insp-1__item-3')).rejects.toThrow(/Нет доступа/);
   });
 
   it('несуществующий осмотр запрещён — в отличие от отчёта, черновиков тут нет', async () => {
     inspectionFindUniqueMock.mockResolvedValue(null);
-    await expect(assertCanAccessMediaEntity(operator, 'inspection', 'нет__item')).rejects.toThrow(/Forbidden/);
+    await expect(assertCanAccessMediaEntity(operator, 'inspection', 'нет__item')).rejects.toThrow(/Нет доступа/);
   });
 
   it('без типа или идентификатора сущности — отказ, а не молчаливый пропуск', async () => {

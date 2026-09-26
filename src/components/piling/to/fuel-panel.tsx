@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
 
 interface FuelEntry {
   id: string;
@@ -52,6 +53,7 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
   const [entries, setEntries] = useState<FuelEntry[]>([]);
   const [summary, setSummary] = useState<FuelSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [liters, setLiters] = useState('');
   const [percent, setPercent] = useState('');
@@ -63,13 +65,24 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
     setLoading(true);
     try {
       const res = await authFetch(`/api/equipment/${eqId}/fuel`);
-      if (!res.ok) throw new Error('fuel');
-      const data = await res.json();
-      setEntries((data.entries ?? []) as FuelEntry[]);
-      setSummary((data.summary ?? null) as FuelSummary | null);
+      // 404 — журнала по этой установке нет: это «данных нет», а не сбой.
+      if (!res.ok && res.status !== 404) {
+        setEntries([]);
+        setSummary(null);
+        setLoadError(loadFailureText(res.status));
+        toast.error('Не удалось загрузить журнал топлива');
+        return;
+      }
+      const data = res.ok
+        ? await res.json() as { entries?: FuelEntry[]; summary?: FuelSummary | null }
+        : {};
+      setEntries(data.entries ?? []);
+      setSummary(data.summary ?? null);
+      setLoadError(null);
     } catch {
       setEntries([]);
       setSummary(null);
+      setLoadError(loadFailureText(null));
       toast.error('Не удалось загрузить журнал топлива');
     } finally {
       setLoading(false);
@@ -219,6 +232,8 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
             <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
           </span>
         </div>
+      ) : loadError !== null ? (
+        <LoadFailure message={loadError} onRetry={() => void load(equipmentId)} />
       ) : entries.length === 0 ? (
         <div className="grid min-h-20 place-items-center rounded-md bg-muted px-3 py-4 text-center text-sm text-muted-foreground">
           Записей по топливу пока нет

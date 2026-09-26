@@ -30,7 +30,7 @@ export const MODULE_TABS = [
   { id: 'readiness', label: 'Центр готовности', icon: 'technical-readiness' },
   { id: 'fleet', label: 'Готовность парка', icon: 'equipment-rig' },
   { id: 'shifts', label: 'Смены', icon: 'shift-start' },
-  { id: 'maintenance', label: 'Обслуживание', icon: 'repair' },
+  { id: 'maintenance', label: 'Обслуживание ТО', icon: 'repair' },
   { id: 'reports', label: 'Отчёты', icon: 'reports' },
   { id: 'settings', label: 'Настройки', icon: 'settings' },
 ] as const satisfies ReadonlyArray<ModuleTab>;

@@ -110,9 +110,9 @@ export function EquipmentTile({
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Metric label="сваи шт./м.п." value={t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'} />
-          <Metric label="бурение шт./м" value={t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'} />
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Metric label="сваи шт/м.п." value={t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'} />
+          <Metric label="бурение шт/м.п." value={t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'} />
           <Metric label="простой" value={t ? formatDowntimeHours(t.downtimeHours) : '—'} />
         </div>
 

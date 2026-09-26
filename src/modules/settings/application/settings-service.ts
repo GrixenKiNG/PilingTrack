@@ -4,6 +4,7 @@
  */
 
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import {
   DEFAULT_NOTIFICATIONS,
   DEFAULT_WORKSPACE_SETTINGS,
@@ -31,20 +32,26 @@ export async function getSettings(tenantId: string): Promise<WorkspaceSettings> 
  * Проверка признака уведомления перед отправкой.
  *
  * Вызывается из обработчиков доменных событий, где tenantId приходит из
- * конверта события и может отсутствовать (в outbox он писался не всегда) —
- * тогда берём тенант по умолчанию, как и остальной код.
+ * конверта события и может отсутствовать (в outbox он писался не всегда).
+ * Если tenantId нет — отправляем и пишем предупреждение: молчащее оповещение
+ * о простое хуже лишнего, а организации, чей явный «off» мы могли бы
+ * соблюсти, в этом случае просто нет. `DEFAULT_TENANT_ID` не подставляем —
+ * он подменил бы организацию получателя чужой (и отправил бы уведомление не
+ * туда).
  *
- * При ошибке чтения настроек отправляем: молчащее оповещение о простое хуже
- * лишнего. Явное `false` в настройках при этом соблюдается строго.
+ * При ошибке чтения настроек тоже отправляем: молчащее оповещение о простое
+ * хуже лишнего. Явное `false` в настройках при этом соблюдается строго.
  */
 export async function isNotificationEnabled(
   tenantId: string | null | undefined,
   key: NotificationKey,
 ): Promise<boolean> {
-  const resolved = tenantId || process.env.DEFAULT_TENANT_ID;
-  if (!resolved) return true;
+  if (!tenantId) {
+    logger.warn('isNotificationEnabled: tenantId is missing, sending notification', { key });
+    return true;
+  }
   try {
-    const settings = await getSettings(resolved);
+    const settings = await getSettings(tenantId);
     return settings.notifications[key] ?? DEFAULT_NOTIFICATIONS[key] ?? false;
   } catch {
     return true;

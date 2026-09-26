@@ -66,7 +66,7 @@ export function TemplateList() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 field-type">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">Шаблоны чек-листов</h1>
         <Button asChild size="sm" className="bg-signal hover:bg-signal-strong text-white">

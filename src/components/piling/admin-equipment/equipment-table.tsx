@@ -38,7 +38,7 @@ export function EquipmentTable({
   const staticTh = 'break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground';
 
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-border bg-card">
+    <div className="w-full overflow-x-auto rounded-xl border border-border bg-card">
       <table className="w-full table-auto border-collapse text-xs [&_td]:border-b [&_td]:border-r [&_td]:border-border [&_td]:align-top [&_td]:overflow-hidden [&_td]:px-1.5 [&_td]:py-2 [&_td:last-child]:border-r-0 [&_th]:border-b [&_th]:border-r [&_th]:border-border [&_th:last-child]:border-r-0">
         <thead className="bg-muted">
           <tr>
@@ -48,8 +48,8 @@ export function EquipmentTable({
             <th className={staticTh}><StackedHeader words={['Оператор']} /></th>
             <th className={th} onClick={() => toggle('equipmentStatus')}>Статус техники ↕</th>
             <th className={th} onClick={() => toggle('reportStatus')}><StackedHeader words={['Статус', 'отчёта', '↕']} /></th>
-            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Сваи', 'шт./м.п.']} align="right" /></th>
-            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Бурение', 'шт./м']} align="right" /></th>
+            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Сваи', 'шт/м.п.']} align="right" /></th>
+            <th className="px-1.5 py-2 text-right text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Бурение', 'шт/м.п.']} align="right" /></th>
             <th className="px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground"><StackedHeader words={['Простой', 'ч', 'причина']} /></th>
             <th className={th} onClick={() => toggle('engineHoursTotal')}>Моточасы ↕</th>
             <th className={staticTh}>ТО</th>

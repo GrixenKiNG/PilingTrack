@@ -39,6 +39,10 @@ export function PileSection({
   getPileGradeName, getPileMetersPerUnit, getPicketPath, totalPiles, totalMeters,
 }: PileSectionProps) {
   const tempMeters = tempGrade && tempCount ? Number(tempCount) * getPileMetersPerUnit(tempGrade) : 0;
+  // Выбор для новой строки — только активные марки: архивные остаются в отчёте,
+  // но новую работу на них не заводят (F-R29-2). Разрешение уже сохранённого id
+  // идёт по полному списку в getPileGradeName/getPileMetersPerUnit.
+  const activePileGrades = pileGrades.filter((g) => g.isActive);
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -64,7 +68,7 @@ export function PileSection({
               <div className="flex gap-2">
                 <Select value={tempGrade} onValueChange={onTempGradeChange}>
                   <SelectTrigger aria-label="Марка сваи" className="flex-1 h-12 min-h-[48px]"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
-                  <SelectContent>{pileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{activePileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Input type="number" aria-label="Количество свай, шт." placeholder="Кол-во" value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
                   min="1" className="w-24 h-12 min-h-[48px] font-mono text-lg" />
@@ -84,7 +88,7 @@ export function PileSection({
             <div className="space-y-2">
               <Select value={tempGrade} onValueChange={onTempGradeChange}>
                 <SelectTrigger aria-label="Марка сваи" className="w-full h-11"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
-                <SelectContent>{pileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{activePileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex gap-2">
                 <Input type="number" aria-label="Количество свай, шт." placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
@@ -106,7 +110,7 @@ export function PileSection({
                 <div key={pile.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-semibold text-foreground">{getPileGradeName(pile.pileGradeId)}</p>
-                    {pile.picketId && <p className="text-xs font-medium text-muted-foreground truncate">{getPicketPath(pile.picketId)}</p>}
+                    {pile.picketId && <p className="text-xs font-medium text-muted-foreground break-words sm:truncate">{getPicketPath(pile.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-right text-base font-bold text-foreground">

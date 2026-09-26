@@ -13,6 +13,7 @@ import { Pencil, Trash2, Plus, FileText, Loader2 } from '@/components/piling/ico
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
+import { documentExpiry } from '@/lib/document-expiry';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -52,6 +53,13 @@ export interface DocumentRow {
 interface Props {
   equipmentId: string;
   documents: DocumentRow[];
+  /**
+   * Есть ли право `equipment.manage` (только администратор). Список документов
+   * читает всякий, кому открыта карточка установки (`equipment.read`), а её
+   * правку и удаление сервер отдаёт только админу (`api/equipment/[id]/documents`).
+   * Без права кнопки не рендерим — иначе каждая из них отвечает 403.
+   */
+  canManage: boolean;
   onChanged: () => void | Promise<void>;
 }
 
@@ -73,7 +81,7 @@ const EMPTY_FORM: FormState = {
 
 const toInputDate = (iso: string | null): string => (iso ? iso.slice(0, 10) : '');
 
-export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props) {
+export function EquipmentDocuments({ equipmentId, documents, canManage, onChanged }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DocumentRow | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -159,9 +167,11 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
           Паспорт, ОТС, страховка, акты ТО. Срок действия отслеживается отдельно
           и подсвечивается, если истекает.
         </p>
-        <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
-          <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
-        </Button>
+        {canManage && (
+          <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
+            <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
+          </Button>
+        )}
       </div>
 
       {documents.length === 0 ? (
@@ -186,25 +196,27 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
                 </div>
                 {d.notes && <p className="text-xs text-muted-foreground mt-0.5">{d.notes}</p>}
               </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <button
-                  onClick={() => openEdit(d)}
-                  aria-label={`Редактировать документ «${d.title}»`}
-                  className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-signal/10 hover:text-signal-strong"
-                  title="Редактировать"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setPendingDelete(d)}
-                  disabled={deletingId === d.id}
-                  aria-label={`Удалить документ «${d.title}»`}
-                  className="flex h-11 w-11 items-center justify-center rounded-md text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong disabled:opacity-50"
-                  title="Удалить"
-                >
-                  {deletingId === d.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+              {canManage && (
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={() => openEdit(d)}
+                    aria-label={`Редактировать документ «${d.title}»`}
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-signal-strong transition-colors hover:bg-signal/10 hover:text-signal-strong"
+                    title="Редактировать"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setPendingDelete(d)}
+                    disabled={deletingId === d.id}
+                    aria-label={`Удалить документ «${d.title}»`}
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-destructive-strong transition-colors hover:bg-destructive/10 hover:text-destructive-strong disabled:opacity-50"
+                    title="Удалить"
+                  >
+                    {deletingId === d.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -301,10 +313,18 @@ export function EquipmentDocuments({ equipmentId, documents, onChanged }: Props)
   );
 }
 
+/**
+ * Срок действия документа установки.
+ *
+ * Правило — общее с документами работников (`documentExpiry`): своим `Math.round`
+ * с зашитым порогом 30 он давал другие слова для той же даты (25.09 23:00 и
+ * истечение 26.10 — здесь «истекает через 30 дн.», в карточке работника
+ * «действует»). Своего срока предупреждения у видов документов техники нет,
+ * поэтому порог тот же, что и был, — 30 дней.
+ */
 function ExpiresIndicator({ iso }: { iso: string }) {
-  const d = new Date(iso);
-  const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return <span className={cn('rounded px-1.5 py-0.5 text-destructive-strong bg-destructive/10')}>Истёк {Math.abs(days)} дн. назад</span>;
-  if (days <= 30) return <span className={cn('rounded px-1.5 py-0.5 text-warning-strong bg-warning/10')}>истекает через {days} дн.</span>;
+  const { status, daysLeft } = documentExpiry(iso, 30);
+  if (status === 'expired') return <span className={cn('rounded px-1.5 py-0.5 text-destructive-strong bg-destructive/10')}>Истёк {Math.abs(daysLeft ?? 0)} дн. назад</span>;
+  if (status === 'expiring') return <span className={cn('rounded px-1.5 py-0.5 text-warning-strong bg-warning/10')}>истекает через {daysLeft} дн.</span>;
   return <span>до {formatRuDate(iso.slice(0, 10))}</span>;
 }

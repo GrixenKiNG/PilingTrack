@@ -13,10 +13,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock, upsertMock, deleteManyMock, outboxFindUnique, outboxUpdate, sendDocument } = vi.hoisted(() => ({
+const {
+  findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
+  outboxFindUnique, outboxUpdate, sendDocument,
+} = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
   deleteManyMock: vi.fn(),
+  findUniqueMock: vi.fn(),
+  analyticsUpsertMock: vi.fn(),
+  invalidateAnalyticsMock: vi.fn(),
   outboxFindUnique: vi.fn(),
   outboxUpdate: vi.fn(),
   sendDocument: vi.fn(),
@@ -24,8 +30,9 @@ const { findManyMock, upsertMock, deleteManyMock, outboxFindUnique, outboxUpdate
 
 vi.mock('@/lib/db', () => {
   const client = {
-    report: { findMany: findManyMock },
+    report: { findMany: findManyMock, findUnique: findUniqueMock },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
+    reportAnalytics: { upsert: analyticsUpsertMock },
     outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate },
     $queryRaw: vi.fn(),
     $transaction: (fn: (tx: unknown) => unknown) => fn(client),
@@ -42,11 +49,17 @@ vi.mock('@/lib/pdf-data', () => ({
 vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn().mockResolvedValue(Buffer.from('pdf')) }));
 vi.mock('@/core/notifications/telegram', () => ({ telegramNotifier: { sendDocument } }));
 
+vi.mock('@/lib/cached-queries', () => ({
+  invalidateSiteAnalytics: invalidateAnalyticsMock,
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { recomputeSiteDailySummary, deliverReportPdf } from '../event-handlers';
+import { recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler } from '../event-handlers';
+import { emitDomainEvent } from '@/services/reports/domain-events';
+import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 
 // Доставка PDF отчёта в Telegram (R9-1): сбой должен оставлять событие на
 // повтор, а не теряться в журнале, и повтор не должен слать PDF второй раз.
@@ -73,11 +86,65 @@ describe('deliverReportPdf', () => {
   });
 });
 
+describe('handleReportForAnalytics', () => {
+  beforeEach(() => {
+    findManyMock.mockReset();
+    upsertMock.mockReset();
+    deleteManyMock.mockReset();
+    findUniqueMock.mockReset();
+    analyticsUpsertMock.mockReset();
+    invalidateAnalyticsMock.mockReset();
+    findManyMock.mockResolvedValue([]);
+    registerAnalyticsEventHandler();
+  });
+
+  it('writes the projection with the tenant of the event', async () => {
+    await emitDomainEvent({
+      id: 'evt-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock.mock.calls[0][0].create).toMatchObject({ tenantId: 'tenant-a' });
+  });
+
+  /*
+    Проекция без организации раньше писалась с `tenantId: null`: строка
+    становилась невидимой для всех тенантных запросов (сломанная аналитика),
+    а для запроса с пустым тенантом — видна всем организациям. Запись без
+    организации не создаём и сообщаем в лог, как для siteId/userId.
+  */
+  it('пропускает проекцию, когда организацию определить нечем', async () => {
+    findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
+
+    await emitDomainEvent({
+      id: 'evt-2',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-2',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('recomputeSiteDailySummary', () => {
   beforeEach(() => {
     findManyMock.mockReset();
     upsertMock.mockReset();
     deleteManyMock.mockReset();
+    findUniqueMock.mockReset();
+    analyticsUpsertMock.mockReset();
   });
 
   it('aggregates totals across ALL reports for a (siteId, date) pair', async () => {
@@ -132,5 +199,95 @@ describe('recomputeSiteDailySummary', () => {
     expect(args.create).toMatchObject({
       totalPiles: 0, totalDrilling: 0, totalDowntime: 0, reportCount: 1,
     });
+  });
+});
+
+/*
+  Сводка по объектам (/api/analytics/sites) кэшируется в Redis на 5 минут
+  ключом организации и до этого не сбрасывалась ни одной мутацией отчёта:
+  дашборд отставал от журнала (F-R35-2). Сброс — побочный эффект, он не
+  должен валить событие (иначе outbox ушёл бы в ретрай/DLQ).
+*/
+describe('сброс кэша сводки по объектам (F-R35-2)', () => {
+  beforeEach(() => {
+    findManyMock.mockReset();
+    findUniqueMock.mockReset();
+    invalidateAnalyticsMock.mockReset();
+    findManyMock.mockResolvedValue([]);
+    registerAnalyticsEventHandler();
+  });
+
+  it('сбрасывает сводку организации из события', async () => {
+    await emitDomainEvent({
+      id: 'evt-cache-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { date: '2026-04-30' },
+    });
+
+    expect(invalidateAnalyticsMock).toHaveBeenCalledWith('tenant-a');
+  });
+
+  it('сбрасывает сводку и после правки, и после удаления отчёта', async () => {
+    for (const type of [
+      REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,
+    ]) {
+      invalidateAnalyticsMock.mockClear();
+      await emitDomainEvent({
+        id: `evt-${type}`,
+        type,
+        aggregateId: 'report-uuid-1',
+        aggregateType: 'Report',
+        occurredAt: new Date().toISOString(),
+        siteId: 'site_A',
+        userId: 'user-1',
+        tenantId: 'tenant-a',
+        data: { date: '2026-04-30' },
+      });
+
+      expect(invalidateAnalyticsMock).toHaveBeenCalledWith('tenant-a');
+    }
+  });
+
+  it('берёт организацию из отчёта, когда её нет в событии', async () => {
+    findUniqueMock.mockResolvedValue({ tenantId: 'tenant-a' });
+
+    await emitDomainEvent({
+      id: 'evt-cache-3',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-3',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      data: { date: '2026-04-30' },
+    });
+
+    expect(findUniqueMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { reportId: 'report-uuid-3' },
+    }));
+    expect(invalidateAnalyticsMock).toHaveBeenCalledWith('tenant-a');
+  });
+
+  it('не валит событие, если сброс кэша упал', async () => {
+    invalidateAnalyticsMock.mockRejectedValue(new Error('redis down'));
+
+    await expect(emitDomainEvent({
+      id: 'evt-cache-4',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-4',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { date: '2026-04-30' },
+    })).resolves.toBeUndefined();
   });
 });

@@ -273,6 +273,8 @@ export function AdminDictionaries() {
           setLengthConfirm({ item: selectedItem, lengthMm, source: 'panel' });
           return;
         }
+        // Сервер применяет смену длины используемой марки только с этим флагом.
+        if (confirmed && payload.lengthMm !== undefined) payload.confirmRecalculate = true;
       }
     }
     if (!Object.keys(payload).some((key) => key !== 'type' && key !== 'id')) return;
@@ -372,7 +374,7 @@ export function AdminDictionaries() {
     try {
       const response = await authFetch('/api/dictionary/manage', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'pileGrade', id: lengthState.item.id, lengthMm }),
+        body: JSON.stringify({ type: 'pileGrade', id: lengthState.item.id, lengthMm, ...(confirmed ? { confirmRecalculate: true } : {}) }),
       });
       if (!response.ok) throw new Error(await responseError(response, 'Не удалось сохранить длину'));
       toast.success('Длина сохранена');

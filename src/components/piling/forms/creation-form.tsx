@@ -35,7 +35,7 @@ export function CreationForm({
   title, subtitle, backHref, submitLabel, onSubmit, busy = false, children,
 }: CreationFormProps) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-28 pt-4 sm:px-6">
+    <div className="mx-auto w-full max-w-3xl px-4 pb-28 pt-4 sm:px-6 field-type">
       <header className="mb-5 flex items-start gap-3">
         <Button asChild variant="outline" size="sm" className="mt-0.5 h-9 shrink-0">
           <Link href={backHref}><ArrowLeft className="mr-1.5 h-4 w-4" />Назад</Link>

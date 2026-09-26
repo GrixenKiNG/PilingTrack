@@ -21,6 +21,7 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
 import { useAnalyticsDashboardLayout, buildAnalyticsKpiWidgets } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { PageLayoutRenderer } from '@/components/piling/layout-editor/page-layout-renderer';
+import { getTodayInTimezone } from '@/lib/timezone';
 import {
   EmptyState, MaintenanceSummaryTile,
   type FleetKpiData, type FleetSnapshotSummary, type OverviewData, type Site, type WeeklyTrendRow,
@@ -32,6 +33,10 @@ const TABS = [
   { key: 'kpi' as const, label: 'Надёжность ТО', icon: Wrench },
 ];
 
+/** Сдвиг календарного дня «ГГГГ-ММ-ДД» на N дней: полдень UTC, без перевода часов. */
+const shiftDay = (day: string, delta: number): string =>
+  new Date(new Date(`${day}T12:00:00.000Z`).getTime() + delta * 86_400_000).toISOString().slice(0, 10);
+
 export function AdminAnalytics() {
   const layout = useAnalyticsDashboardLayout();
   const [tab, setTab] = useState<'operators' | 'trends' | 'kpi'>('operators');
@@ -40,9 +45,8 @@ export function AdminAnalytics() {
   const [sites, setSites] = useState<Site[]>([]);
 
   // Default period: last 7 days (deltas then read "к пред. неделе")
-  const today = new Date();
-  const todayIso = today.toISOString().slice(0, 10);
-  const weekAgoIso = new Date(today.getTime() - 6 * 86400000).toISOString().slice(0, 10);
+  const todayIso = getTodayInTimezone();
+  const weekAgoIso = shiftDay(todayIso, -6);
   // Период фиксирован: последние 7 дней. Блок выбора периода убран, поэтому
   // границы больше не меняются — держим их простыми константами.
   const dateFrom = weekAgoIso;

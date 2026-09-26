@@ -30,14 +30,14 @@ export function SubmitBar({
         <Card className="bg-slate-900 text-white border-0">
           <CardContent className="p-4">
             <h3 className="text-base font-bold text-slate-100 mb-3">Итого за смену</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalPiles} шт. / {formatNumber(totalPileMeters)} м.п.</p>
-                <p className="text-xs font-medium text-muted-foreground">Сваи, шт. / м.п.</p>
+                <p className="text-xs font-medium text-muted-foreground">Сваи, шт/м.п.</p>
               </div>
               <div>
                 <p className="text-lg font-bold font-mono tabular-nums">{totalDrillingCount} шт. / {formatNumber(totalMeters)} м.п.</p>
-                <p className="text-xs font-medium text-muted-foreground">Бурение, шт. / м.п.</p>
+                <p className="text-xs font-medium text-muted-foreground">Бурение, шт/м.п.</p>
               </div>
               {hasDowntime && (
                 <div>

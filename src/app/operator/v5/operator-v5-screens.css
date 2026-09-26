@@ -17,8 +17,8 @@
   --surface: var(--card);
   --surface-2: var(--secondary);
   --ink: var(--foreground);
-  --ink-muted: var(--muted-foreground);
-  --ink-faint: var(--muted-foreground);
+  --ink-muted: oklch(0.4 0 0);
+  --ink-faint: oklch(0.4 0 0);
   --line: var(--border);
   --line-strong: var(--input);
   --signal-fill: var(--signal);
@@ -38,8 +38,8 @@
   box-sizing: border-box;
 }
 /* Правила `body` макета. Здесь они лежат на div внутри чужого body, поэтому
-   к ним добавлена высота: без неё на коротком экране снизу проступал фон
-   приложения, которого в макете нет. */
+  к ним добавлена высота: без неё на коротком экране снизу проступал фон
+  приложения, которого в макете нет. */
 .v5 {
   min-height: 100dvh;
   margin: 0;
@@ -65,7 +65,7 @@
   background: var(--surface-2);
   border-bottom: 1px solid var(--line);
   font-family: var(--f-mono);
-  font-size: .64rem;
+  font-size: .8125rem;
   color: var(--ink-muted);
 }
 .v5 .dot {
@@ -90,12 +90,12 @@
 .v5 .nav .back {
   font-family: var(--f-mono);
   color: var(--signal);
-  font-size: .8rem;
+  font-size: .9375rem;
 }
 .v5 .nav .ttl {
   font-family: var(--f-display);
   text-transform: uppercase;
-  font-size: .92rem;
+  font-size: 1.0625rem;
   letter-spacing: .01em;
 }
 .v5 .top {
@@ -107,10 +107,10 @@
 .v5 .top .mach {
   font-family: var(--f-display);
   text-transform: uppercase;
-  font-size: .95rem;
+  font-size: 1.1875rem;
 }
 .v5 .top .where {
-  font-size: .76rem;
+  font-size: .875rem;
   color: var(--ink-muted);
 }
 .v5 .scr {
@@ -120,28 +120,28 @@
 }
 .v5 .kicker {
   font-family: var(--f-mono);
-  font-size: .65rem;
+  font-size: .8125rem;
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--signal);
 }
 .v5 .h {
   font-family: var(--f-display);
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   line-height: 1.14;
   text-transform: uppercase;
   margin: 0;
 }
 .v5 .m {
   font-family: var(--f-mono);
-  font-size: .76rem;
+  font-size: .875rem;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
   margin: 0;
 }
 .v5 .p {
   margin: 0;
-  font-size: .86rem;
+  font-size: 1rem;
 }
 .v5 .b {
   display: block;
@@ -151,7 +151,7 @@
   background: var(--signal-fill);
   color: #fff;
   font-family: var(--f-display);
-  font-size: .98rem;
+  font-size: 1rem;
   letter-spacing: .04em;
   text-transform: uppercase;
   border: none;
@@ -174,7 +174,7 @@
 }
 .v5 .note {
   margin: 0;
-  font-size: .78rem;
+  font-size: .875rem;
   color: var(--ink-muted);
   border-left: 3px solid var(--line-strong);
   padding-left: .6rem;
@@ -200,14 +200,14 @@
 }
 .v5 .card .lbl {
   font-family: var(--f-display);
-  font-size: .62rem;
+  font-size: .8125rem;
   letter-spacing: .13em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
 .v5 .card p {
   margin: 0;
-  font-size: .82rem;
+  font-size: 1rem;
 }
 .v5 .rowline {
   display: flex;
@@ -216,20 +216,20 @@
   gap: .6rem;
   padding: .6rem 0;
   border-bottom: 1px solid var(--line);
-  font-size: .85rem;
+  font-size: 1rem;
 }
 .v5 .rowline:last-child {
   border-bottom: none;
 }
 .v5 .rowline .r {
   font-family: var(--f-mono);
-  font-size: .74rem;
+  font-size: .875rem;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
 .v5 .badge {
   font-family: var(--f-mono);
-  font-size: .64rem;
+  font-size: .8125rem;
   font-weight: 700;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -255,7 +255,7 @@
 }
 .v5 .ans span {
   font-family: var(--f-mono);
-  font-size: .64rem;
+  font-size: .9375rem;
   padding: .38rem .45rem;
   border: 1px solid var(--line-strong);
   color: var(--ink-muted);
@@ -293,12 +293,12 @@
 }
 .v5 .stop-head .t {
   font-family: var(--f-display);
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   text-transform: uppercase;
   line-height: 1.1;
 }
 .v5 .stop-head .s {
-  font-size: .8rem;
+  font-size: .875rem;
   opacity: .93;
 }
 .v5 .ok-head {
@@ -310,12 +310,12 @@
 }
 .v5 .ok-head .t {
   font-family: var(--f-display);
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   text-transform: uppercase;
   line-height: 1.1;
 }
 .v5 .ok-head .s {
-  font-size: .8rem;
+  font-size: .875rem;
   opacity: .93;
 }
 .v5 .chain {
@@ -327,14 +327,14 @@
   gap: .5rem;
   padding: .5rem .6rem;
   border-bottom: 1px solid var(--line);
-  font-size: .78rem;
+  font-size: 1rem;
 }
 .v5 .chain div:last-child {
   border-bottom: none;
 }
 .v5 .chain .k {
   font-family: var(--f-display);
-  font-size: .6rem;
+  font-size: .8125rem;
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--ink-faint);
@@ -366,7 +366,7 @@
   background: var(--surface-2);
   border-radius: 4px;
   padding: .7rem;
-  font-size: .78rem;
+  font-size: 1rem;
   color: var(--ink-muted);
   line-height: 1.5;
   max-height: 8.5rem;
@@ -391,7 +391,7 @@
   padding: .65rem .7rem;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
-  font-size: .85rem;
+  font-size: 1rem;
 }
 .v5 .qz .opt.sel {
   border-color: var(--signal-fill);
@@ -411,12 +411,12 @@
 }
 .v5 .tile .v {
   font-family: var(--f-mono);
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .v5 .tile .k {
-  font-size: .7rem;
+  font-size: .8125rem;
   color: var(--ink-muted);
 }
 .v5 .dock {
@@ -429,7 +429,7 @@
   padding: .6rem .2rem;
   text-align: center;
   font-family: var(--f-mono);
-  font-size: .6rem;
+  font-size: .875rem;
   color: var(--ink-muted);
   border-right: 1px solid var(--line);
   letter-spacing: .02em;
@@ -451,7 +451,7 @@
   padding: .55rem;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
-  font-size: .8rem;
+  font-size: .9375rem;
 }
 .v5 .seg span.on {
   background: var(--ink);
@@ -474,9 +474,9 @@
 
 /* --------------------------------------------------- живой модуль v5 --- */
 /* Макет был неинтерактивным: строки дока, сегментов и ответов рисовались
-   элементом span. В работающем модуле это кнопки — иначе их нельзя нажать с
-   клавиатуры и не видит скринридер. Вид остаётся макетным: те же правила,
-   просто адресованные button. */
+  элементом span. В работающем модуле это кнопки — иначе их нельзя нажать с
+  клавиатуры и не видит скринридер. Вид остаётся макетным: те же правила,
+  просто адресованные button. */
 .v5 .dock button,
 .v5 .seg button,
 .v5 .ans button {
@@ -488,7 +488,7 @@
   padding: .6rem .2rem;
   text-align: center;
   font-family: var(--f-mono);
-  font-size: .6rem;
+  font-size: .875rem;
   color: var(--ink-muted);
   border: 0;
   border-right: 1px solid var(--line);
@@ -503,7 +503,7 @@
   padding: .5rem .3rem;
   text-align: center;
   font-family: var(--f-mono);
-  font-size: .68rem;
+  font-size: .9375rem;
   color: var(--ink-muted);
   border: 1px solid var(--line-strong);
   border-radius: 3px;
@@ -513,7 +513,7 @@
 
 .v5 .ans button {
   font-family: var(--f-mono);
-  font-size: .64rem;
+  font-size: .9375rem;
   padding: .38rem .45rem;
   border: 1px solid var(--line-strong);
   color: var(--ink-muted);
@@ -525,14 +525,14 @@
 
 /* Плитки выработки идут по три: сваи, бурение, простой. */
 .v5 .tiles { grid-template-columns: repeat(3, 1fr); }
-.v5 .tile .m { font-size: .62rem; color: var(--ink-muted); }
+.v5 .tile .m { font-size: .8125rem; color: var(--ink-muted); }
 
 /* Поля ввода. В макете их не было вовсе — записывать было нечего. */
 .v5 .card select,
 .v5 .card input {
   width: 100%;
   font: inherit;
-  font-size: .9rem;
+  font-size: 1rem;
   padding: .55rem .5rem;
   margin-top: .2rem;
   background: var(--surface);
@@ -545,7 +545,7 @@
   font-family: var(--f-mono);
   font-variant-numeric: tabular-nums;
 }
-.v5 .rowline .r { font-size: .7rem; color: var(--ink-muted); }
+.v5 .rowline .r { font-size: .875rem; color: var(--ink-muted); }
 
 /*
   Строка-кнопка: чек-лист ТБ по сроку открывается касанием самой строки.
@@ -570,7 +570,7 @@
 .v5 .card textarea {
   width: 100%;
   font: inherit;
-  font-size: .85rem;
+  font-size: 1rem;
   padding: .55rem .5rem;
   margin-top: .2rem;
   background: var(--surface);
@@ -581,7 +581,7 @@
 }
 
 /* Пять вкладок вместо четырёх — подписи ужимаем, а не прячем. */
-.v5 .dock button { font-size: .62rem; padding-left: .2rem; padding-right: .2rem; }
+.v5 .dock button { font-size: .875rem; padding-left: .2rem; padding-right: .2rem; }
 
 /* Подсказка под полями ввода: длительность простоя и причина запрета работы. */
 .ov5-hint {
@@ -589,7 +589,7 @@
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--ov5-soft, #eef2f7);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
   font-weight: 600;
 }
@@ -602,7 +602,7 @@
   border: 1px solid var(--ov5-line, #d5dbe3);
   border-radius: 8px;
   background: #fff;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -610,20 +610,20 @@
 .v5 .h, .v5 .b { font-family: var(--font-sans); font-weight: 700; text-transform: none; letter-spacing: normal; }
 .v5 .card, .v5 .tile, .v5 .b, .v5 .banner { border-radius: var(--radius); }
 .v5 .m, .v5 .rowline, .v5 .note { font-family: var(--font-sans); }
-.v5 .b { min-height: 48px; font-size: 15px; }
+.v5 .b { min-height: 48px; font-size: 1rem; }
 .v5 .dock { background: var(--card); }
-.v5 .dock button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 60px; font-family: var(--font-sans); font-size: 12px; border-right: 0; letter-spacing: normal; }
+.v5 .dock button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 60px; font-family: var(--font-sans); font-size: .875rem; border-right: 0; letter-spacing: normal; }
 .v5 .dock button.on { color: var(--signal-strong); background: color-mix(in oklab, var(--signal) 6%, var(--card)); box-shadow: inset 0 -3px var(--signal); }
 .v5 .ans { flex-wrap: wrap; }
-.v5 .ans button, .v5 .seg button { min-height: 44px; font-family: var(--font-sans); font-size: 13px; border-radius: calc(var(--radius) - 2px); padding: 8px 10px; }
+.v5 .ans button, .v5 .seg button { min-height: 44px; font-family: var(--font-sans); font-size: .9375rem; border-radius: calc(var(--radius) - 2px); padding: 8px 10px; }
 .v5 .card input, .v5 .card select { min-height: 44px; border-radius: calc(var(--radius) - 2px); }
 .v5 button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
 .v5 .dock button .piling-icon { padding: 0; border: 0; margin: 0; background: transparent; }
-.v5 .kicker { font-family: var(--font-sans); font-size: 13px; font-weight: 600; letter-spacing: normal; text-transform: none; color: var(--foreground); }
-.v5 .scr > .kicker:first-child { font-size: 21px; font-weight: 700; }
-.v5 .rowline .m { font-family: var(--font-sans); font-size: 12px; }
+.v5 .kicker { font-family: var(--font-sans); font-size: .875rem; font-weight: 600; letter-spacing: normal; text-transform: none; color: var(--foreground); }
+.v5 .scr > .kicker:first-child { font-size: 1.5rem; font-weight: 700; }
+.v5 .rowline .m { font-family: var(--font-sans); font-size: .8125rem; }
 .v5 .rowline:has(> .ans) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 0; }
 .v5 .rowline > .ans { display: flex; gap: 8px; }
 .v5 .rowline > .ans button { flex: 1; }
 .v5 .card { background: var(--card); border: 1px solid var(--border); padding: 12px; }
-.v5 .card .lbl { font-size: 12px; letter-spacing: normal; text-transform: none; }
+.v5 .card .lbl { font-size: .8125rem; letter-spacing: normal; text-transform: none; }

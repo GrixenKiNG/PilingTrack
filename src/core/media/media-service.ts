@@ -96,7 +96,7 @@ export class MediaService {
     // Validate content type
     if (!this.config.allowedContentTypes.includes(request.contentType)) {
       throw new ServiceError(
-        `Content type ${request.contentType} is not allowed. Allowed: ${this.config.allowedContentTypes.join(', ')}`,
+        `Тип файла ${request.contentType} не поддерживается. Допустимые: ${this.config.allowedContentTypes.join(', ')}`,
         400
       );
     }
@@ -115,7 +115,7 @@ export class MediaService {
       fileSize > this.config.maxFileSize
     ) {
       throw new ServiceError(
-        `File size ${fileSize} is invalid: must be a positive integer not exceeding ${this.config.maxFileSize}`,
+        `Размер файла ${fileSize} некорректен: нужно целое положительное число не больше ${this.config.maxFileSize}`,
         400
       );
     }
@@ -175,7 +175,7 @@ export class MediaService {
     });
 
     if (!media) {
-      throw new ServiceError('Media not found', 404);
+      throw new ServiceError('Файл не найден', 404);
     }
 
     if (media.uploadStatus === 'completed') {
@@ -205,15 +205,15 @@ export class MediaService {
       await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
       throw new ServiceError(
         realSize
-          ? `Uploaded object size ${realSize} exceeds maximum ${this.config.maxFileSize}`
-          : 'Uploaded object size is unreadable',
+          ? `Размер загруженного файла ${realSize} превышает максимум ${this.config.maxFileSize}`
+          : 'Размер загруженного файла не определён',
         413,
       );
     }
 
     if (!fetched.Body) {
       await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
-      throw new ServiceError('Uploaded object is empty or unreadable', 422);
+      throw new ServiceError('Загруженный файл пуст или недоступен', 422);
     }
     const sourceBytes = Buffer.from(await fetched.Body.transformToByteArray());
 
@@ -224,7 +224,7 @@ export class MediaService {
     if (!contentMatchesMagicBytes(media.contentType, sourceBytes)) {
       await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
       throw new ServiceError(
-        `Uploaded content does not match declared type ${media.contentType}`,
+        `Содержимое файла не соответствует заявленному типу ${media.contentType}`,
         422,
       );
     }
@@ -286,7 +286,7 @@ export class MediaService {
     });
 
     if (!media || media.uploadStatus !== 'completed') {
-      throw new ServiceError('Media not found or not available', 404);
+      throw new ServiceError('Файл не найден или недоступен', 404);
     }
 
     // Check tenant access
@@ -317,7 +317,7 @@ export class MediaService {
   async softDelete(mediaId: string, deletedBy: string): Promise<void> {
     const db = await getDbClient();
     const media = await db.media.findUnique({ where: { id: mediaId } });
-    if (!media) throw new ServiceError('Media not found', 404);
+    if (!media) throw new ServiceError('Файл не найден', 404);
 
     await db.media.update({
       where: { id: mediaId },

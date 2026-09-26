@@ -176,7 +176,7 @@ describe('Crew Command Service', () => {
         operatorId: '',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('operatorId, equipmentId, and siteId are required');
+      })).rejects.toThrow('Укажите машиниста, установку и объект');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
@@ -187,7 +187,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: '',
         siteId: 'site-1',
-      })).rejects.toThrow('operatorId, equipmentId, and siteId are required');
+      })).rejects.toThrow('Укажите машиниста, установку и объект');
     });
 
     it('should reject crew with missing siteId', async () => {
@@ -196,7 +196,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
         siteId: '',
-      })).rejects.toThrow('operatorId, equipmentId, and siteId are required');
+      })).rejects.toThrow('Укажите машиниста, установку и объект');
     });
 
     it('should reject crew if operator not found', async () => {
@@ -207,7 +207,7 @@ describe('Crew Command Service', () => {
         operatorId: 'nonexistent',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('Operator not found');
+      })).rejects.toThrow('Машинист не найден');
     });
 
     it('should reject crew if user is not OPERATOR', async () => {
@@ -218,7 +218,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('User must have OPERATOR role');
+      })).rejects.toThrow('Пользователь должен иметь роль машиниста');
     });
 
     // За оператором закрепляется список установок (20.08.2026): вторая бригада
@@ -244,7 +244,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'nonexistent',
         siteId: 'site-1',
-      })).rejects.toThrow('Equipment not found');
+      })).rejects.toThrow('Установка не найдена');
     });
 
     it('should reject crew if site not found', async () => {
@@ -255,7 +255,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
         siteId: 'nonexistent',
-      })).rejects.toThrow('Site not found');
+      })).rejects.toThrow('Объект не найден');
     });
 
     it('should use default name when empty', async () => {
@@ -383,7 +383,7 @@ describe('Crew Command Service', () => {
         crewId: 'nonexistent',
         name: 'New Name',
         tenantId: 'tenant-1',
-      })).rejects.toThrow('Crew not found');
+      })).rejects.toThrow('Бригада не найдена');
     });
 
     // IDOR guard: a crew resolved by id alone says nothing about tenant
@@ -405,7 +405,7 @@ describe('Crew Command Service', () => {
         name: 'Hijacked',
         userId: 'attacker',
         tenantId: 'other-tenant',
-      })).rejects.toThrow('Crew not found');
+      })).rejects.toThrow('Бригада не найдена');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
@@ -415,7 +415,7 @@ describe('Crew Command Service', () => {
         crewId: 'crew-1',
         name: 'New Name',
         tenantId: '',
-      })).rejects.toThrow('tenantId is required');
+      })).rejects.toThrow('Не определена организация пользователя');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
@@ -450,7 +450,7 @@ describe('Crew Command Service', () => {
       mockRepoFindById.mockResolvedValue(null);
 
       await expect(deleteCrew({ crewId: 'nonexistent', tenantId: 'tenant-1' }))
-        .rejects.toThrow('Crew not found');
+        .rejects.toThrow('Бригада не найдена');
     });
 
     it('should reject delete if crew already deactivated (idempotency)', async () => {
@@ -466,7 +466,7 @@ describe('Crew Command Service', () => {
       mockDb.crew.findFirst.mockResolvedValue({ id: 'crew-1' });
 
       await expect(deleteCrew({ crewId: 'crew-1', tenantId: 'tenant-1' }))
-        .rejects.toThrow('Crew is already deactivated');
+        .rejects.toThrow('Бригада уже расформирована');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
@@ -503,14 +503,14 @@ describe('Crew Command Service', () => {
         crewId: 'crew-1',
         userId: 'attacker',
         tenantId: 'other-tenant',
-      })).rejects.toThrow('Crew not found');
+      })).rejects.toThrow('Бригада не найдена');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
 
     it('fails closed when tenantId is empty (IDOR guard)', async () => {
       await expect(deleteCrew({ crewId: 'crew-1', tenantId: '' }))
-        .rejects.toThrow('tenantId is required');
+        .rejects.toThrow('Не определена организация пользователя');
 
       expect(mockRepoSave).not.toHaveBeenCalled();
     });
@@ -545,7 +545,7 @@ describe('Crew Command Service', () => {
 
       // Second deactivate should fail
       await expect(deleteCrew({ crewId: 'crew-1', tenantId: 'tenant-1' }))
-        .rejects.toThrow('Crew is already deactivated');
+        .rejects.toThrow('Бригада уже расформирована');
     });
   });
 
@@ -561,7 +561,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('Crew with this operator already exists');
+      })).rejects.toThrow('Бригада с этим машинистом уже существует');
     });
 
     it('should convert FOREIGN KEY error to 400', async () => {
@@ -572,7 +572,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('Invalid crew dependencies');
+      })).rejects.toThrow('Некорректные связи бригады');
     });
 
     it('should wrap unknown errors as 500', async () => {
@@ -583,7 +583,7 @@ describe('Crew Command Service', () => {
         operatorId: 'operator-1',
         equipmentId: 'equip-1',
         siteId: 'site-1',
-      })).rejects.toThrow('Failed to create crew');
+      })).rejects.toThrow('Не удалось создать бригаду');
     });
   });
 });

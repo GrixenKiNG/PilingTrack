@@ -68,7 +68,7 @@ describe('PUT /api/crews/[id] — tenant scoping', () => {
   });
 
   it('surfaces the command-layer cross-tenant rejection (404, not leaked as 500)', async () => {
-    updateCrewMock.mockRejectedValue(new ServiceError('Crew not found', 404));
+    updateCrewMock.mockRejectedValue(new ServiceError('Бригада не найдена', 404));
     const res = await PUT(putReq({ name: 'Renamed' }), params());
     expect(res.status).toBe(404);
   });
@@ -97,7 +97,7 @@ describe('DELETE /api/crews/[id] — tenant scoping', () => {
   });
 
   it('surfaces the command-layer cross-tenant rejection (404, not leaked as 500)', async () => {
-    deleteCrewMock.mockRejectedValue(new ServiceError('Crew not found', 404));
+    deleteCrewMock.mockRejectedValue(new ServiceError('Бригада не найдена', 404));
     const res = await DELETE(deleteReq(), params());
     expect(res.status).toBe(404);
   });

@@ -36,6 +36,9 @@ export interface UseReportsDataReturn {
   error: string | null;
   /** Списки для отбора прочитаны не полностью — фильтр показывает не всё. */
   filterError: string | null;
+  /** Справочники формы отчёта (марки свай, типы скважин, причины простоя) не
+   *  прочитаны: пустые списки в диалоге — это «не загрузилось», а не «данных нет». */
+  dictionaryError: string | null;
   loadingReferenceData: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -54,6 +57,7 @@ export function useReportsData(): UseReportsDataReturn {
   const [reports, setReports] = useState<ReportDTO[]>([]);
   const [sites, setSites] = useState<SiteFlatDTO[]>([]);
   const [filterError, setFilterError] = useState<string | null>(null);
+  const [dictionaryError, setDictionaryError] = useState<string | null>(null);
 
   const [operators, setOperators] = useState<OperatorUser[]>([]);
   const [pileGrades, setPileGrades] = useState<PileGradeDTO[]>([]);
@@ -140,17 +144,34 @@ export function useReportsData(): UseReportsDataReturn {
       authFetch('/api/dictionary/all'),
     ])
       .then(async ([dictionaryRes]) => {
-        if (dictionaryRes.ok) {
-          const data = await dictionaryRes.json();
-          setPileGrades(data.pileGrades || []);
-          setDrillingTypes(data.drillingTypes || []);
-          setDowntimeReasons(data.downtimeReasons || []);
+        // Не-ok ответ (403/500) раньше просто игнорировался: диалог открывался
+        // с пустыми «Марка сваи / Тип скважины / Причина простоя», и это
+        // читалось как «в системе нет марок свай».
+        const failure = !dictionaryRes.ok
+          ? (dictionaryRes.status === 403
+              ? 'Нет доступа к справочникам'
+              : 'Справочники не загрузились — списки в форме пустые')
+          : null;
+        if (failure) {
+          setDictionaryError(failure);
+          toast.error(failure);
+          return;
         }
 
+        const data = await dictionaryRes.json();
+        setPileGrades(data.pileGrades || []);
+        setDrillingTypes(data.drillingTypes || []);
+        setDowntimeReasons(data.downtimeReasons || []);
+        setDictionaryError(null);
+        // Повторный запрос разрешаем только после успеха: иначе отказ залипал
+        // до перезагрузки страницы.
         referenceDataLoadedRef.current = true;
       })
       .catch(() => {
-        toast.error('Ошибка загрузки справочников для формы отчёта');
+        // Сетевой сбой текста причины не даёт — показываем общую формулировку.
+        const failure = 'Справочники не загрузились — списки в форме пустые';
+        setDictionaryError(failure);
+        toast.error(failure);
       })
       .finally(() => {
         setLoadingReferenceData(false);
@@ -283,7 +304,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error, filterError,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error, filterError, dictionaryError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

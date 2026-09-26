@@ -53,7 +53,9 @@ export function DrillingSection({
           <div className="space-y-2">
             <Select value={tempType} onValueChange={onTempTypeChange}>
               <SelectTrigger aria-label="Тип бурения" className="w-full h-11"><SelectValue placeholder="Тип бурения..." /></SelectTrigger>
-              <SelectContent>{drillingTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+              {/* Выбор для новой строки — только активные типы: архивные остаются
+                  в уже сохранённых строках и резолвятся полным списком (F-R29-2). */}
+              <SelectContent>{drillingTypes.filter((t) => t.isActive).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
             </Select>
             <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
               <Input type="number" aria-label="Количество скважин, шт." placeholder="Количество, шт." value={tempCount} onChange={(e) => onTempCountChange(e.target.value)}
@@ -75,7 +77,7 @@ export function DrillingSection({
                 <div key={drill.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-semibold text-foreground">{getDrillTypeName(drill.typeId)}</p>
-                    {drill.picketId && <p className="text-xs font-medium text-muted-foreground truncate">{getPicketPath(drill.picketId)}</p>}
+                    {drill.picketId && <p className="text-xs font-medium text-muted-foreground break-words sm:truncate">{getPicketPath(drill.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-right text-base font-bold text-foreground">

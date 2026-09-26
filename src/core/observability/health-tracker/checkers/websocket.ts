@@ -1,5 +1,5 @@
 import { getStateRedisClient } from '@/lib/redis-cache';
-import { logger } from '../../logger';
+import { logger } from '@/lib/logger';
 import type { WebSocketHealth } from '../types';
 
 export async function checkWebSocket(): Promise<WebSocketHealth> {

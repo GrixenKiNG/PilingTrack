@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from './page-objects/login.page';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 /**
  * E2E — Real Report Creation Flow
@@ -34,37 +35,53 @@ test.describe('Real Report Creation Flow', () => {
     expect(dict).toHaveProperty('pileGrades');
 
     // 5. If pile grades exist, try to create a report via API
-    if (dict.pileGrades && dict.pileGrades.length > 0) {
-      const sitesRes = await page.request.get('/api/sites');
-      if (sitesRes.ok()) {
-        const sites = await sitesRes.json();
-        if (sites.sites && sites.sites.length > 0) {
-          const reportId = `e2e-report-${Date.now()}`;
-          const today = new Date().toISOString().split('T')[0];
+    // Пустой справочник — это пропуск, а не успех: создать отчёт не из чего.
+    test.skip(
+      !dict.pileGrades?.length,
+      'Справочник марок свай пуст — сменный отчёт создать нельзя'
+    );
 
-          const createRes = await page.request.post('/api/reports/upsert', {
-            data: {
-              reportId,
-              siteId: sites.sites[0].id,
-              date: today,
-              shiftType: 'DAY',
-              shiftStart: '08:00',
-              shiftEnd: '20:00',
-              piles: [{ pileGradeId: dict.pileGrades[0].id, count: 3 }],
-              drillings: [],
-              downtimes: [],
-            },
-          });
+    const sitesRes = await page.request.get('/api/sites');
+    expect(sitesRes.ok(), 'GET /api/sites недоступен оператору').toBe(true);
+    // Список объектов приходит под ключами `data` и `sites` (src/app/api/sites/route.ts:23).
+    const sites = await sitesRes.json();
+    test.skip(
+      !sites.sites?.length,
+      'У оператора нет доступных объектов — сменный отчёт создать нельзя'
+    );
 
-          // Report creation should succeed (or fail with validation — either way endpoint works)
-          expect([200, 400, 403, 404, 500]).toContain(createRes.status());
+    const reportId = `e2e-report-${Date.now()}`;
+    // День отчёта считаем тем же правилом, что и приложение (src/lib/timezone.ts:21),
+    // а не UTC-сутками toISOString: у оператора в +10 они расходятся.
+    const today = getTodayInTimezone();
 
-          if (createRes.status() === 200) {
-            const body = await createRes.json();
-            expect(body).toHaveProperty('report');
-          }
-        }
-      }
+    const createRes = await page.request.post('/api/reports/upsert', {
+      data: {
+        reportId,
+        siteId: sites.sites[0].id,
+        date: today,
+        shiftType: 'DAY',
+        shiftStart: '08:00',
+        shiftEnd: '20:00',
+        piles: [{ pileGradeId: dict.pileGrades[0].id, count: 3 }],
+        drillings: [],
+        downtimes: [],
+      },
+    });
+
+    // Допустимы только статусы, которые этот маршрут выдаёт по своему коду:
+    // 200 — отчёт сохранён (src/app/api/reports/upsert/route.ts:147);
+    // 400 — отказ Zod-валидации (route.ts:45);
+    // 403 — нет права действовать за указанного пользователя (route.ts:58 →
+    //   resource-access-service.ts:62) или отказ CSRF (csrf-protection.ts:111);
+    // 409 — отчёт уже заведён на другую дату/объект либо конфликт версии
+    //   (report-command.service.ts:146).
+    // 404 и 500 (падение сервера) в списке нет: раньше тест был зелёным при 5xx.
+    expect([200, 400, 403, 409]).toContain(createRes.status());
+
+    if (createRes.status() === 200) {
+      const body = await createRes.json();
+      expect(body).toHaveProperty('report');
     }
 
     // 6. Verify report list is accessible

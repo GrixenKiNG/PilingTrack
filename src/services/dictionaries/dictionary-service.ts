@@ -57,7 +57,8 @@ function assertTenantId(tenantId: string): void {
  * погонные метры везде и задним числом. Форма положительное число и требовала,
  * а схема маршрута допускала `min(0)` — то есть защита стояла только на экране.
  *
- * `null` остаётся законным: это «длина не задана» у марок, где её не завели.
+ * `null` — «длина не задана» у марок, где её не завели. Для уже используемой
+ * марки `null` недопустим: его отсекает `setPileGradeLength` до этой проверки.
  */
 function assertLengthMm(lengthMm: number | null | undefined): void {
   if (lengthMm !== undefined && lengthMm !== null && (!Number.isInteger(lengthMm) || lengthMm <= 0)) {
@@ -130,43 +131,51 @@ export async function createDictionaryItem(
   throw new ServiceError('Invalid type', 400);
 }
 
+/** One row per distinct site of the reports that mention a dictionary item. */
+type SiteGroup = { _count: { _all: number } };
+
+/**
+ * Отчёты группируются по объекту в БД: у каждого отчёта ровно один объект,
+ * поэтому сумма `_count._all` — это число отчётов, а число групп — число объектов.
+ * Считать то же в JS означало читать все строки забивки/бурения/простоев тенанта
+ * за все годы ради двух DISTINCT (находка F-R20-3).
+ */
+function usageFromSiteGroups(groups: SiteGroup[], planCount: number): UsageCount {
+  return {
+    reportCount: groups.reduce((total, group) => total + group._count._all, 0),
+    planCount,
+    siteCount: groups.length,
+  };
+}
+
 /** Distinct-report + plan usage for a tenant-owned dictionary item. */
 export async function getItemUsage(tenantId: string, type: DictType, id: string): Promise<UsageCount> {
   assertTenantId(tenantId);
   if (type === 'pileGrade') {
-    const [works, planCount] = await Promise.all([
-      db.pileWork.findMany({
-        where: { pileGradeId: id, report: { tenantId } },
-        select: { reportId: true, report: { select: { siteId: true } } },
+    const [siteGroups, planCount] = await Promise.all([
+      db.report.groupBy({
+        by: ['siteId'],
+        where: { tenantId, piles: { some: { pileGradeId: id } } },
+        _count: { _all: true },
       }),
       db.sitePilePlan.count({ where: { pileGradeId: id, site: { tenantId } } }),
     ]);
-    return {
-      reportCount: new Set(works.map((w) => w.reportId)).size,
-      planCount,
-      siteCount: new Set(works.map((w) => w.report.siteId)).size,
-    };
+    return usageFromSiteGroups(siteGroups, planCount);
   }
   if (type === 'drillingType') {
-    const rows = await db.leaderDrilling.findMany({
-      where: { typeId: id, report: { tenantId } },
-      select: { reportId: true, report: { select: { siteId: true } } },
+    const siteGroups = await db.report.groupBy({
+      by: ['siteId'],
+      where: { tenantId, drillings: { some: { typeId: id } } },
+      _count: { _all: true },
     });
-    return {
-      reportCount: new Set(rows.map((r) => r.reportId)).size,
-      planCount: 0,
-      siteCount: new Set(rows.map((r) => r.report.siteId)).size,
-    };
+    return usageFromSiteGroups(siteGroups, 0);
   }
-  const rows = await db.reportDowntime.findMany({
-    where: { reasonId: id, report: { tenantId } },
-    select: { reportId: true, report: { select: { siteId: true } } },
+  const siteGroups = await db.report.groupBy({
+    by: ['siteId'],
+    where: { tenantId, downtimes: { some: { reasonId: id } } },
+    _count: { _all: true },
   });
-  return {
-    reportCount: new Set(rows.map((r) => r.reportId)).size,
-    planCount: 0,
-    siteCount: new Set(rows.map((r) => r.report.siteId)).size,
-  };
+  return usageFromSiteGroups(siteGroups, 0);
 }
 
 function aggregateUsage(
@@ -271,16 +280,34 @@ export function restoreDictionaryItem(context: DictionaryMutationContext, type: 
   return setActive(context, type, id, true);
 }
 
+/**
+ * Длина — источник погонных метров, а метры отчётов считаются живьём.
+ *
+ * Поэтому у используемой марки изменение длины пересчитывает цифры сданных
+ * документов и печатных форм за прошлые периоды. Решение владельца от 12.09.2026:
+ * менять разрешено, но только с явным подтверждением — оно обязано проверяться на
+ * сервере, а не только в диалоге браузера. Убрать длину (null) или обнулить её у
+ * используемой марки нельзя вовсе: это молча обнулило бы метраж отчётов.
+ */
 export async function setPileGradeLength(
   context: DictionaryMutationContext,
   id: string,
-  lengthMm: number | null
+  lengthMm: number | null,
+  confirmRecalculate = false
 ) {
   const { tenantId, actorId } = context;
   assertTenantId(tenantId);
-  assertLengthMm(lengthMm);
   const item = await db.pileGrade.findFirst({ where: { id, tenantId } });
   if (!item) throw new ServiceError('Элемент не найден', 404);
+  const usage = await getItemUsage(tenantId, 'pileGrade', id);
+  const used = usage.reportCount > 0;
+  if (used && (lengthMm === null || lengthMm === 0)) {
+    throw new ServiceError('У используемой марки нельзя убрать длину — метраж отчётов обнулится', 422);
+  }
+  assertLengthMm(lengthMm);
+  if (used && lengthMm !== item.lengthMm && !confirmRecalculate) {
+    throw new ServiceError(`Марка используется в ${usage.reportCount} отчётах: изменение длины пересчитает метраж в них. Подтвердите изменение.`, 409);
+  }
   const updated = await db.pileGrade.update({ where: { id, tenantId }, data: { lengthMm } });
   await recordAuditEvent({
     action: 'dictionary.length_updated', scope: 'dictionaries', actorId,

@@ -22,7 +22,7 @@ import {
 export function overdueLabel(item: OverdueMaintenance): string {
   const parts: string[] = [];
   if (item.overdueDays != null) parts.push(`просрочка ${item.overdueDays} дн.`);
-  if (item.overdueHours != null) parts.push(`+${item.overdueHours} м.ч. сверх порога`);
+  if (item.overdueHours != null) parts.push(`+${item.overdueHours} м/ч сверх порога`);
   return parts.join(' · ');
 }
 
@@ -150,7 +150,7 @@ export function JournalRow({ record }: { record: JournalRecord }) {
         </div>
       </td>
       <td className="px-3 py-3 font-mono text-sm text-foreground">
-        {record.engineHoursAtService != null ? `${record.engineHoursAtService} м.ч.` : '—'}
+        {record.engineHoursAtService != null ? `${record.engineHoursAtService} м/ч` : '—'}
       </td>
       <td className="px-3 py-3">
         <span className={cn('inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-2 font-mono text-sm font-bold', scoreTone(score))}>

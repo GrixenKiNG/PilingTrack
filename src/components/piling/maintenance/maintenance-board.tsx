@@ -241,7 +241,7 @@ export function MaintenanceBoard() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-1px)] w-full bg-muted/40">
+    <div className="min-h-[calc(100vh-1px)] w-full bg-muted/40 field-type">
       {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
           (рядом панель 420px) плиткам достаётся ~100px и они распухают. */}
       <div className="space-y-3 px-4 pt-4 lg:px-5">

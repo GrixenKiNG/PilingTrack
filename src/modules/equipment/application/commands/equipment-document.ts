@@ -36,7 +36,7 @@ export async function createEquipmentDocument(
     where: { id: equipmentId, tenantId: ctx.tenantId },
     select: { id: true },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   return db.equipmentDocument.create({
     data: {
@@ -63,7 +63,7 @@ export async function updateEquipmentDocument(
     select: { id: true, equipmentId: true, tenantId: true },
   });
   if (!doc || doc.equipmentId !== equipmentId || doc.tenantId !== ctx.tenantId) {
-    throw new ServiceError('Document not found', 404);
+    throw new ServiceError('Документ не найден', 404);
   }
 
   const data: Record<string, unknown> = {};
@@ -87,7 +87,7 @@ export async function deleteEquipmentDocument(
     select: { id: true, equipmentId: true, tenantId: true },
   });
   if (!doc || doc.equipmentId !== equipmentId || doc.tenantId !== ctx.tenantId) {
-    throw new ServiceError('Document not found', 404);
+    throw new ServiceError('Документ не найден', 404);
   }
   await db.equipmentDocument.delete({ where: { id: documentId } });
 }

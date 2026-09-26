@@ -13,6 +13,7 @@ import {
   NOTIFICATION_KEYS,
   type WorkspaceSettings as WorkspaceSettingsData,
 } from '@/modules/settings/domain/settings';
+import { COMMON_TIMEZONES } from '@/lib/timezone';
 import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';
 import { AdminTelegram } from '@/components/piling/admin-telegram';
@@ -52,6 +53,28 @@ function Field({ label, value, onChange, disabled, placeholder }: { label: strin
   );
 }
 
+function TimezoneField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
+  // Свободный ввод принимал «UTC+3» и «Мск»: Intl таких зон не знает, и пояс
+  // молча подменялся на Europe/Moscow. Выбор из готового списка убирает
+  // возможность сохранить несуществующую зону. Значение вне списка (введённое
+  // до правки) показываем отдельным пунктом, чтобы оно не потерялось.
+  const known = COMMON_TIMEZONES.some((tz) => tz.value === value);
+  return (
+    <label className="block">
+      <span className="text-xs text-muted-foreground">Часовой пояс</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:text-muted-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/20"
+      >
+        {value !== '' && !known && <option value={value}>{value}</option>}
+        {COMMON_TIMEZONES.map((tz) => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-2.5">
@@ -65,6 +88,10 @@ export function WorkspaceSettings() {
   const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
   const [activeTab, setActiveTab] = useState<Tab>('workspace');
   const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);
+  // Пока настройки не загрузились, править их нельзя: под значениями по
+  // умолчанию лежит чужая конфигурация, и любое сохранение её затирало.
+  const [settingsState, setSettingsState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
   // Отказ доступа — не факт об организации. Раньше 403 на списке работников
   // молча оставлял счётчики пустыми, и диспетчер видел «0 пользователей» во
@@ -79,9 +106,19 @@ export function WorkspaceSettings() {
     void (async () => {
       try {
         const res = await authFetch('/api/settings');
-        if (res.ok && active) setSettings(await res.json());
-      } catch { /* keep defaults */ }
+        if (!active) return;
+        if (!res.ok) { setSettingsState('error'); return; }
+        setSettings(await res.json());
+        setSettingsState('ready');
+      } catch {
+        if (active) setSettingsState('error');
+      }
     })();
+    return () => { active = false; };
+  }, [loadAttempt]);
+
+  useEffect(() => {
+    let active = true;
     void (async () => {
       const counts: Record<string, number> = {};
       let cursor: string | null = null;
@@ -108,11 +145,14 @@ export function WorkspaceSettings() {
     return rosterState === 'forbidden' ? 'нет доступа' : 'не загрузилось';
   };
 
-  const save = useCallback(async (next: WorkspaceSettingsData) => {
+  // Сервер сам сливает патч с сохранённым значением (sanitizeSettings), поэтому
+  // отправляем только изменённые поля: иначе тумблер уведомления уносил бы с
+  // собой companyName и timezone, взятые из умолчаний.
+  const save = useCallback(async (patch: Partial<WorkspaceSettingsData>) => {
     if (!isAdmin) return;
     setSaving(true);
     try {
-      const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+      const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
       if (!res.ok) {
         toast.error(res.status === 403
           ? 'Только администратор может изменять настройки рабочего пространства.'
@@ -129,10 +169,11 @@ export function WorkspaceSettings() {
   }, [isAdmin]);
 
   const setField = (patch: Partial<WorkspaceSettingsData>) => setSettings((s) => ({ ...s, ...patch }));
+  const saveWorkspace = () => save({ companyName: settings.companyName, timezone: settings.timezone });
   const toggleNotification = (key: string) => {
-    const next = { ...settings, notifications: { ...settings.notifications, [key]: !settings.notifications[key] } };
-    setSettings(next);
-    void save(next);
+    const value = !(settings.notifications[key] ?? false);
+    setSettings((s) => ({ ...s, notifications: { ...s.notifications, [key]: value } }));
+    void save({ notifications: { [key]: value } });
   };
 
   return (
@@ -143,6 +184,13 @@ export function WorkspaceSettings() {
           <p className="mt-1 text-sm text-muted-foreground">Управление рабочим пространством, доступом и правилами уведомлений.</p>
         </div>
       </header>
+
+      {settingsState === 'error' && (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words">Настройки не загрузились — изменить их сейчас нельзя</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setLoadAttempt((n) => n + 1)}>Повторить</Button>
+        </div>
+      )}
 
       <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-border text-sm font-medium">
         {/* Иконки те же, что у заголовков карточек ниже: вкладка и раздел, в
@@ -169,7 +217,7 @@ export function WorkspaceSettings() {
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-signal-strong" />Рабочее пространство</CardTitle>
               {isAdmin && !editing && (
-                <Button variant="outline" size="sm" onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
+                <Button variant="outline" size="sm" disabled={settingsState !== 'ready'} onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
               )}
             </CardHeader>
             <CardContent>
@@ -181,10 +229,10 @@ export function WorkspaceSettings() {
                       подписана «₽» в разметке. */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Название компании" value={settings.companyName} disabled={!isAdmin} placeholder="ООО «Орион»" onChange={(v) => setField({ companyName: v })} />
-                    <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} placeholder="Europe/Moscow" onChange={(v) => setField({ timezone: v })} />
+                    <TimezoneField value={settings.timezone} disabled={!isAdmin} onChange={(v) => setField({ timezone: v })} />
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={async () => { await save(settings); setEditing(false); }} disabled={saving}><Save className="mr-2 h-4 w-4" />Сохранить</Button>
+                    <Button size="sm" onClick={async () => { await saveWorkspace(); setEditing(false); }} disabled={saving || settingsState !== 'ready'}><Save className="mr-2 h-4 w-4" />Сохранить</Button>
                     <Button size="sm" variant="outline" onClick={() => { if (snapshot) setSettings(snapshot); setEditing(false); }}>Отмена</Button>
                   </div>
                 </div>
@@ -227,7 +275,7 @@ export function WorkspaceSettings() {
                         его некому. Молчать об этом — обманывать администратора. */}
                     {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                   </div>
-                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
+                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
                 </div>
               ))}
             </CardContent>
@@ -275,10 +323,16 @@ export function WorkspaceSettings() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-signal-strong" />Уведомления</CardTitle><CardDescription>События, о которых система сообщает команде.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            {NOTIFICATION_KEYS.map(({ key, label }) => (
+            {NOTIFICATION_KEYS.map(({ key, label, implemented }) => (
               <div key={key} className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">{label}</p>
-                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  {/* Тот же признак, что и на вкладке «Рабочее пространство»:
+                      список строится из общего каталога, и правило без
+                      отправителя не должно выглядеть рабочим ни здесь, ни там. */}
+                  {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
+                </div>
+                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
               </div>
             ))}
             {!isAdmin && <p className="text-xs text-muted-foreground">Только администратор может изменять правила уведомлений.</p>}

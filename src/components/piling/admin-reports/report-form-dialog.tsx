@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, HardHat, Drill, Clock, Wrench, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import { Button } from '@/components/ui/button';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 interface OperatorUser { id: string; name: string; }
 
@@ -37,6 +39,9 @@ interface ReportFormDialogProps {
   onClose: () => void;
   editReport: ReportDTO | null;
   loadingReferenceData: boolean;
+  /** Справочники формы не прочитаны (403/500/сеть): списки ниже пустые не потому,
+   *  что данных нет. Показывается плашкой над полями. */
+  dictionaryError: string | null;
   operators: OperatorUser[];
   sites: SiteFlatDTO[];
   pileGrades: PileGradeDTO[];
@@ -48,13 +53,13 @@ interface ReportFormDialogProps {
 
 export function ReportFormDialog({
   open, onClose, editReport,
-  loadingReferenceData,
+  loadingReferenceData, dictionaryError,
   operators, sites, pileGrades, drillingTypes, downtimeReasons, equipment,
   onSuccess,
 }: ReportFormDialogProps) {
   const [formUserId, setFormUserId] = useState(editReport?.userId || '');
   const [formSiteId, setFormSiteId] = useState(editReport?.siteId || '');
-  const [formDate, setFormDate] = useState(editReport?.date || new Date().toISOString().split('T')[0]);
+  const [formDate, setFormDate] = useState(editReport?.date || getTodayInTimezone());
   const [formShiftStart, setFormShiftStart] = useState(editReport?.shiftStart || '07:00');
   const [formShiftEnd, setFormShiftEnd] = useState(editReport?.shiftEnd || '19:00');
   const [formEquipmentId, setFormEquipmentId] = useState(editReport?.equipment?.id || '');
@@ -185,7 +190,7 @@ export function ReportFormDialog({
           downtimes: formDowntimes.map((d) => ({ id: editReport?.downtimes.some(row => row.id === d.id) ? d.id : undefined, reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
         }),
       });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Ошибка сохранения'); }
+      if (!res.ok) { const err = await res.json(); throw new Error(apiErrorMessage(err, 'Ошибка сохранения')); }
       toast.success(editReport ? 'Отчёт обновлён' : 'Отчёт создан');
       handleClose(); onSuccess();
     } catch (err: unknown) {
@@ -208,6 +213,13 @@ export function ReportFormDialog({
           </div>
         ) : (
         <div className="space-y-4 mt-2">
+          {/* Пустые «Марка сваи / Тип скважины / Причина простоя» — это отказ чтения
+              справочников, а не «в системе нет данных». */}
+          {dictionaryError ? (
+            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong">
+              {dictionaryError}
+            </p>
+          ) : null}
           {/* Operator, Site, Date, Shift, Equipment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -264,7 +276,7 @@ export function ReportFormDialog({
             <div className="flex gap-2 mb-2">
               <Select value={tempPileGrade} onValueChange={setTempPileGrade}>
                 <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
-                <SelectContent>{pileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{pileGrades.filter((g) => g.isActive).map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempPileCount} onChange={(e) => setTempPileCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
@@ -312,7 +324,7 @@ export function ReportFormDialog({
             <div className="flex gap-2 mb-2">
               <Select value={tempDrillType} onValueChange={setTempDrillType}>
                 <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Тип скважины..." /></SelectTrigger>
-                <SelectContent>{drillingTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{drillingTypes.filter((t) => t.isActive).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempDrillCount} onChange={(e) => setTempDrillCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
@@ -356,7 +368,7 @@ export function ReportFormDialog({
                 <div className="flex gap-2">
                   <Select value={tempDtReason} onValueChange={setTempDtReason}>
                     <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Причина..." /></SelectTrigger>
-                    <SelectContent>{downtimeReasons.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+                    <SelectContent>{downtimeReasons.filter((r) => r.isActive).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
                   </Select>
                   <Input type="number" step="0.5" placeholder="Часы" value={tempDtDuration} onChange={(e) => setTempDtDuration(e.target.value)}
                     min="0.5" className="w-20 h-9 font-mono text-sm" />

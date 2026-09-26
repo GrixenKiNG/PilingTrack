@@ -102,9 +102,9 @@ export function WorkOrderTable({
                   </div>
                 </td>
                 <td className="px-2.5 py-2.5">
-                  <div className="font-mono font-semibold text-foreground">{currentHours(record) ?? '—'} м.ч.</div>
+                  <div className="font-mono font-semibold text-foreground">{currentHours(record) ?? '—'} м/ч</div>
                   <div className={cn('mt-1 text-2xs', dueHours != null && dueHours <= 10 ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>
-                    {dueHours != null ? `${dueHours >= 0 ? '+' : ''}${dueHours} м.ч.` : '—'}
+                    {dueHours != null ? `${dueHours >= 0 ? '+' : ''}${dueHours} м/ч` : '—'}
                   </div>
                 </td>
                 <td className="px-2.5 py-2.5">

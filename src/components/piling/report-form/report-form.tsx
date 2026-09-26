@@ -26,22 +26,25 @@ function useTempState() {
   const [tempDowntimeDuration, setTempDowntimeDuration] = useState('');
   const [tempDowntimeComment, setTempDowntimeComment] = useState('');
 
-  const addPile = (onAdd: (g: string, c: number) => void) => {
-    if (!tempPileGrade || !tempPileCount || Number(tempPileCount) <= 0) return;
-    onAdd(tempPileGrade, Number(tempPileCount));
-    setTempPileGrade(''); setTempPileCount('');
+  // Значения строки уходят в хук: он единственный знает причину отказа и
+  // показывает её тостом. Поля ввода очищаем только при успешном добавлении,
+  // иначе оператор теряет уже набранное.
+  const addPile = (onAdd: (g: string, c: number) => boolean) => {
+    if (onAdd(tempPileGrade, Number(tempPileCount))) {
+      setTempPileGrade(''); setTempPileCount('');
+    }
   };
 
-  const addDrilling = (onAdd: (t: string, c: number, m: number) => void) => {
-    if (!tempDrillType || !tempDrillCount || !tempDrillMetersPerUnit || Number(tempDrillCount) <= 0 || Number(tempDrillMetersPerUnit) <= 0) return;
-    onAdd(tempDrillType, Number(tempDrillCount), Number(tempDrillMetersPerUnit));
-    setTempDrillType(''); setTempDrillCount(''); setTempDrillMetersPerUnit('');
+  const addDrilling = (onAdd: (t: string, c: number, m: number) => boolean) => {
+    if (onAdd(tempDrillType, Number(tempDrillCount), Number(tempDrillMetersPerUnit))) {
+      setTempDrillType(''); setTempDrillCount(''); setTempDrillMetersPerUnit('');
+    }
   };
 
-  const addDowntime = (onAdd: (r: string, d: number, c: string) => void) => {
-    if (!tempDowntimeReason || !tempDowntimeDuration || Number(tempDowntimeDuration) <= 0) return;
-    onAdd(tempDowntimeReason, Number(tempDowntimeDuration), tempDowntimeComment);
-    setTempDowntimeReason(''); setTempDowntimeDuration(''); setTempDowntimeComment('');
+  const addDowntime = (onAdd: (r: string, d: number, c: string) => boolean) => {
+    if (onAdd(tempDowntimeReason, Number(tempDowntimeDuration), tempDowntimeComment)) {
+      setTempDowntimeReason(''); setTempDowntimeDuration(''); setTempDowntimeComment('');
+    }
   };
 
   return {
@@ -230,7 +233,7 @@ export function ReportForm({ onExit, anchor }: { onExit?: () => void; anchor?: s
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted">
+    <div className="flex flex-col min-h-screen bg-muted field-type">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card border-b px-4 py-3 pt-safe flex items-center gap-3">
         <button onClick={() => (onExit ? onExit() : router.push('/operator'))}
@@ -240,7 +243,7 @@ export function ReportForm({ onExit, anchor }: { onExit?: () => void; anchor?: s
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold text-foreground truncate">Отчёт за смену</h1>
-          <p className="text-sm font-medium text-foreground truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
+          <p className="text-sm font-medium text-foreground break-words sm:truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
           <p className="text-xs text-muted-foreground" aria-live="polite">
             {draftSavedAt
               ? `Черновик сохранён в ${new Date(draftSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`

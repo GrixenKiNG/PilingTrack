@@ -25,6 +25,9 @@ function formatRecordCount(count: number) {
   return `${count} ${pluralizeRu(count, ['запись', 'записи', 'записей'])}`;
 }
 
+/** Метраж сваи неизвестен: у марки не задана длина (PileGrade.lengthMm = null). */
+const PILE_LENGTH_UNKNOWN_LABEL = 'длина марки не задана';
+
 export function ReportDetailDialog({
   report, onClose, onPreviewPdf, formatDate, formatLastEditor,
 }: ReportDetailDialogProps) {
@@ -67,24 +70,32 @@ export function ReportDetailDialog({
                     Забитые сваи ({formatRecordCount(report.piles.length)})
                   </h4>
                   <div className="space-y-1">
-                    {report.piles.map((p) => (
-                      <div key={p.id} className="flex justify-between text-sm p-2 bg-muted rounded">
-                        <div>
-                          <span>{p.pileGrade?.name || '—'}</span>
-                          {p.pileGrade?.name && (
-                            <p className="text-3xs text-muted-foreground">
-                              {pileLengthMeters({ gradeLengthMm: p.pileGrade.lengthMm }).toFixed(1)} м × {p.count} шт. = {(pileLengthMeters({ gradeLengthMm: p.pileGrade.lengthMm }) * p.count).toFixed(1)} м.п.
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-right font-mono font-semibold">
-                          <span className="block">{p.count} шт.</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {(pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }) * p.count).toFixed(1)} м.п.
+                    {report.piles.map((p) => {
+                      const metersPerPile = pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm });
+                      const lengthKnown = metersPerPile > 0;
+                      return (
+                        <div key={p.id} className="flex justify-between text-sm p-2 bg-muted rounded">
+                          <div>
+                            <span>{p.pileGrade?.name || '—'}</span>
+                            {p.pileGrade?.name && (
+                              <p className="text-3xs text-muted-foreground">
+                                {lengthKnown
+                                  ? `${metersPerPile.toFixed(1)} м × ${p.count} шт. = ${(metersPerPile * p.count).toFixed(1)} м.п.`
+                                  : PILE_LENGTH_UNKNOWN_LABEL}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-right font-mono font-semibold">
+                            <span className="block">{p.count} шт.</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {lengthKnown
+                                ? `${(metersPerPile * p.count).toFixed(1)} м.п.`
+                                : PILE_LENGTH_UNKNOWN_LABEL}
+                            </span>
                           </span>
-                        </span>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </>

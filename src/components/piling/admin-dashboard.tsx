@@ -58,13 +58,15 @@ const daysUntil = (iso: string | null): number | null => {
 
 // ── Period helpers ────────────────────────────────────────────────────────
 type PeriodMode = 'all' | 'today' | '7d' | 'custom';
+
+/** Сдвиг календарного дня «ГГГГ-ММ-ДД» на N дней: полдень UTC, без перевода часов. */
+const shiftDay = (day: string, delta: number): string =>
+  new Date(new Date(`${day}T12:00:00.000Z`).getTime() + delta * 86_400_000).toISOString().slice(0, 10);
+
 function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; to: string } {
   const today = getTodayInTimezone();
   if (mode === 'all') return { from: '', to: '' }; // no bounds — loadAnalytics omits dateFrom/dateTo, server defaults to all-time
-  if (mode === '7d') {
-    const d = new Date(today); d.setDate(d.getDate() - 6);
-    return { from: d.toISOString().slice(0, 10), to: today };
-  }
+  if (mode === '7d') return { from: shiftDay(today, -6), to: today };
   if (mode === 'custom') return { from: from || today, to: to || today };
   return { from: today, to: today };
 }
@@ -180,8 +182,8 @@ export function AdminDashboard() {
   // Production numbers come from analytics (period-aware). Operational numbers
   // come from fleet/maintenance and are always "now".
   const kpis = useMemo(
-    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig, fleet?.equipment ?? []),
-    [analytics, fleet, maintByRig],
+    () => computeDashboardKpis(analytics, fleet?.totals ?? null, maintByRig, fleet?.equipment ?? [], stale.maint),
+    [analytics, fleet, maintByRig, stale.maint],
   );
 
   // ── План-факт по объектам, отстающие сверху ─────────────────────────────────
@@ -264,7 +266,9 @@ export function AdminDashboard() {
   const fleetRows = useMemo(() => visibleFleet.slice(0, 6), [visibleFleet]);
   const pileProgress = kpis.plannedPileMeters > 0 ? (kpis.actualPileMeters / kpis.plannedPileMeters) * 100 : 0;
   const drillingProgress = kpis.plannedDrilling > 0 ? (kpis.actualDrilling / kpis.plannedDrilling) * 100 : 0;
-  const fleetProgress = kpis.rigsTotal > 0 ? (kpis.rigsWorking / kpis.rigsTotal) * 100 : 0;
+  const fleetProgress = kpis.rigsWorking != null && kpis.rigsTotal != null && kpis.rigsTotal > 0
+    ? (kpis.rigsWorking / kpis.rigsTotal) * 100
+    : null;
   const staleSourceNames = [
     stale.fleet && 'парк установок',
     stale.maint && 'техническое обслуживание',
@@ -295,12 +299,16 @@ export function AdminDashboard() {
   }
 
   const dashKpiWidgets: Record<string, RenderablePageWidget> = {
-    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="смен сдано сегодня" /> },
+    // Подпись называет то, что плитка считает: снимок парка отдаёт машины
+    // (`activeToday` / `expected`), а не число сданных отчётов. «Смен сдано»
+    // обещало смены: две смены одной установки дают два отчёта, но одну
+    // машину (F-R35-3).
+    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="машин с отчётом сегодня" /> },
     'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={`${formatNumber(kpis.actualPiles)} шт / ${formatNumber(kpis.actualPileMeters)} м.п.`} sub={`план ${formatNumber(kpis.plannedPiles)} шт / ${formatNumber(kpis.plannedPileMeters)} м.п.`} progress={pileProgress} /> },
     'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`} sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`} progress={drillingProgress} /> },
     'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={formatDowntimeHours(kpis.downtime)} sub="за период" /> },
-    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={`${kpis.rigsWorking} в работе`} sub={`из ${kpis.rigsTotal}`} progress={fleetProgress} /> },
-    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={canReadMaintenance ? `${formatNumber(kpis.toRisk)} риска` : '—'} sub={canReadMaintenance ? `из ${kpis.rigsTotal} установок` : 'Недоступно вашей роли'} /> },
+    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={kpis.rigsWorking == null ? '—' : `${kpis.rigsWorking} в работе`} sub={kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal}`} progress={fleetProgress ?? undefined} /> },
+    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={canReadMaintenance ? (kpis.toRisk == null ? '—' : `${formatNumber(kpis.toRisk)} риска`) : '—'} sub={canReadMaintenance ? (kpis.toRisk == null || kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal} установок`) : 'Недоступно вашей роли'} /> },
   };
 
   return (

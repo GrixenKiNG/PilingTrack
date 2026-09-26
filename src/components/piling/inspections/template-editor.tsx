@@ -171,7 +171,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-6">
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-6 field-type">
       {/* Heading */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">

@@ -424,6 +424,35 @@ describe('Report Command Service', () => {
     });
 
     /*
+      Отсутствие организации у ПРАВЯЩЕГО послаблением не было: условие
+      добавлялось только когда `input.tenantId` проставлен, поэтому запрос без
+      организации проходил мимо тенантной проверки и правил отчёт чужой
+      организации. Организация приходит из сессии (`requireTenantId` в
+      маршруте), так что её отсутствие — отказ.
+    */
+    it('отказывает в правке отчёта с организацией, когда организация не определена у правящего', async () => {
+      const foreign = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        tenantId: 'tenant-a',
+        date: '2026-04-05',
+      });
+      foreign.addPileWork({ pileGradeId: 'grade-1', count: 5 }, 'user-1');
+      mockRepoFindById.mockResolvedValue(foreign);
+
+      await expect(upsertReport({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 99 }],
+      })).rejects.toThrow(/Организация/);
+
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    /*
       Номер отчёта приходит с формы, а дату и объект найденная запись держит
       свои. Форма, не сбросившая номер при смене даты, отправляла «отчёт за
       вчера», сервер отвечал 200 и переписывал сегодняшний. Воспроизведено

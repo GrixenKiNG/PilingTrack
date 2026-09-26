@@ -35,14 +35,14 @@ export async function assertCanAccessMediaEntity(
 ): Promise<void> {
   if (entityType === 'equipment') {
     if (action === 'read' && actor.tenantId && can(actor, 'equipment.read')) return;
-    if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
+    if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Только администратор может управлять фото установок', 403);
     return;
   }
 
   if (isPrivilegedRole(resolveEffectiveRole(actor.role, actor.actingAs))) return;
 
   if (!entityType || !entityId) {
-    throw new ServiceError('entityType and entityId are required for non-admin users', 400);
+    throw new ServiceError('Не указано, к какому объекту относится файл', 400);
   }
 
   if (entityType === 'report') {
@@ -53,7 +53,7 @@ export async function assertCanAccessMediaEntity(
     });
     if (!report) return; // draft id — operator hasn't submitted yet
     if (action === 'read' && actor.tenantId && report.tenantId === actor.tenantId && can(actor, 'reports.read_cross_user')) return;
-    if (report.userId !== actor.id) throw new ServiceError('Forbidden', 403);
+    if (report.userId !== actor.id) throw new ServiceError('Нет доступа', 403);
     return;
   }
 
@@ -78,22 +78,22 @@ export async function assertCanAccessMediaEntity(
     const { db } = await import('@/lib/db');
     const record = await db.maintenanceRecord.findUnique({ where: { id: entityId }, select: { tenantId: true } });
     if (!actor.tenantId || record?.tenantId !== actor.tenantId || !can(actor, 'maintenance.manage')) {
-      throw new ServiceError('Forbidden', 403);
+      throw new ServiceError('Нет доступа', 403);
     }
     return;
   }
 
   if (entityType === 'inspection') {
     const inspectionId = entityId.split('__')[0];
-    if (!inspectionId) throw new ServiceError('Forbidden', 403);
+    if (!inspectionId) throw new ServiceError('Нет доступа', 403);
     const { db } = await import('@/lib/db');
     const inspection = await db.inspection.findUnique({
       where: { id: inspectionId },
       select: { performedById: true, tenantId: true },
     });
-    if (!inspection) throw new ServiceError('Forbidden', 403);
+    if (!inspection) throw new ServiceError('Нет доступа', 403);
     if (action === 'read' && actor.tenantId && inspection.tenantId === actor.tenantId && can(actor, 'maintenance.manage')) return;
-    if (inspection.performedById !== actor.id) throw new ServiceError('Forbidden', 403);
+    if (inspection.performedById !== actor.id) throw new ServiceError('Нет доступа', 403);
     return;
   }
 
@@ -182,11 +182,11 @@ export function assertCanAccessMedia(
   if (media.entityType === 'equipment') {
     if (action === 'read') {
       if (!actor.tenantId || !media.tenantId || actor.tenantId !== media.tenantId) {
-        throw new ServiceError('Forbidden', 403);
+        throw new ServiceError('Нет доступа', 403);
       }
       return;
     }
-    if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Only admins can manage equipment photos', 403);
+    if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Только администратор может управлять фото установок', 403);
     return;
   }
 
@@ -196,5 +196,5 @@ export function assertCanAccessMedia(
     if ((media.entityType === 'inspection' || media.entityType === 'maintenance') && can(actor, 'maintenance.manage')) return;
     if (media.entityType === 'report' && can(actor, 'reports.read_cross_user')) return;
   }
-  throw new ServiceError('Forbidden', 403);
+  throw new ServiceError('Нет доступа', 403);
 }

@@ -293,7 +293,7 @@ export function WorkOrderFormDialog({
                 placeholder="Напр. Замена масла ГСМ, ТО-2" />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="wo-scheduled">План</Label>
                 <Input id="wo-scheduled" type="date" value={form.scheduledAt}
@@ -311,7 +311,7 @@ export function WorkOrderFormDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="wo-hours">Моточасы</Label>
                 <Input id="wo-hours" type="number" min={0} value={form.engineHoursAtService}

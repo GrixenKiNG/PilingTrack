@@ -101,7 +101,7 @@ describe('createMaintenance — work order fields', () => {
     findUniqueEquipmentMock.mockResolvedValue(null);
     await expect(
       createMaintenance('missing', { type: 'FAULT', title: 'x' }, { tenantId: 'orion' }),
-    ).rejects.toThrow('Equipment not found');
+    ).rejects.toThrow('Установка не найдена');
   });
 
   it('coerces null partsUsedText to empty string', async () => {
@@ -155,7 +155,7 @@ describe('updateMaintenance — lifecycle transitions', () => {
     findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', completedAt: null, startedAt: null, tenantId: 'other', status: 'PLANNED' });
     await expect(
       updateMaintenance('eq_1', 'rec_1', { status: 'DONE' }, { tenantId: 'orion', userId: 'usr_9' }),
-    ).rejects.toThrow('Maintenance record not found');
+    ).rejects.toThrow('Запись ТО не найдена');
   });
 
   it('does not overwrite startedAt when already started', async () => {
@@ -237,7 +237,7 @@ describe('acceptMaintenance — приёмка', () => {
   it('rejects cross-tenant record; writes nothing', async () => {
     findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'other', acceptedById: null, completedAt: null });
     await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' }))
-      .rejects.toThrow('Maintenance record not found');
+      .rejects.toThrow('Запись ТО не найдена');
     expect(updateRecMock).not.toHaveBeenCalled();
   });
 

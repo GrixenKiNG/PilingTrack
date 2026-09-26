@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCanAccessReportOwner, ensureTenantAccess } from '@/services/auth/resource-access-service';
@@ -15,6 +16,16 @@ export const runtime = 'nodejs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// FeedbackEvent messages are rendered verbatim in the feedback feed, so a
+// non-ServiceError (Prisma/English internals) must never reach it — the real
+// text goes to the log instead.
+const PDF_FAILURE_FEEDBACK_MESSAGE = 'Не удалось сформировать PDF — попробуйте ещё раз или сообщите администратору';
+
+// POST body — reportId reaches a Prisma findUnique; keep it a bounded string.
+const singlePdfBodySchema = z.object({
+  reportId: z.string().min(1).max(100),
+});
+
 // ============================================================
 // POST — Enqueue async single PDF generation (default)
 // ============================================================
@@ -26,11 +37,26 @@ export const POST = withMutation(async (request: NextRequest) => {
 
   try {
     const body = await request.json();
-    const { reportId } = body;
+    const parsed = singlePdfBodySchema.safeParse(body);
 
-    if (!reportId) {
-      return NextResponse.json({ error: 'Не указан reportId' }, { status: 400 });
+    if (!parsed.success) {
+      // Preserve the original message when reportId is simply absent.
+      if (!body?.reportId) {
+        return NextResponse.json({ error: 'Не указан reportId' }, { status: 400 });
+      }
+      return NextResponse.json(
+        {
+          error: 'Некорректные параметры запроса',
+          details: parsed.error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        },
+        { status: 400 }
+      );
     }
+
+    const { reportId } = parsed.data;
 
     const context = await loadSingleReportPdfContext(reportId);
     if (!context) {
@@ -58,7 +84,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       const pdfBuffer = await Promise.race([
         generateSinglePdf(context.pdfData),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new ServiceError('PDF generation timeout (30s)', 504)), 30_000),
+          setTimeout(() => reject(new ServiceError('Превышено время подготовки PDF (30 с)', 504)), 30_000),
         ),
       ]);
       return new NextResponse(new Uint8Array(pdfBuffer), {
@@ -95,7 +121,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       scope: 'pdf',
       action: 'report.single_pdf.enqueue.failed',
       title: 'Ошибка постановки PDF в очередь',
-      message: caughtError instanceof Error ? caughtError.message : 'PDF enqueue failed',
+      message: PDF_FAILURE_FEEDBACK_MESSAGE,
       audience: 'OPERATIONS',
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
@@ -227,7 +253,7 @@ async function handleSyncGeneration(request: NextRequest, user: { id: string; na
       scope: 'pdf',
       action: 'report.single_pdf.sync.failed',
       title: 'Ошибка формирования PDF',
-      message: caughtError instanceof Error ? caughtError.message : 'PDF generation failed',
+      message: PDF_FAILURE_FEEDBACK_MESSAGE,
       audience: 'OPERATIONS',
       actor: user ? { id: user.id, name: user.name, role: user.role } : null,
       requestId,
