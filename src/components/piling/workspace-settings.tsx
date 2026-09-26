@@ -65,6 +65,10 @@ export function WorkspaceSettings() {
   const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
   const [activeTab, setActiveTab] = useState<Tab>('workspace');
   const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);
+  // Пока настройки не загрузились, править их нельзя: под значениями по
+  // умолчанию лежит чужая конфигурация, и любое сохранение её затирало.
+  const [settingsState, setSettingsState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
   // Отказ доступа — не факт об организации. Раньше 403 на списке работников
   // молча оставлял счётчики пустыми, и диспетчер видел «0 пользователей» во
@@ -79,9 +83,19 @@ export function WorkspaceSettings() {
     void (async () => {
       try {
         const res = await authFetch('/api/settings');
-        if (res.ok && active) setSettings(await res.json());
-      } catch { /* keep defaults */ }
+        if (!active) return;
+        if (!res.ok) { setSettingsState('error'); return; }
+        setSettings(await res.json());
+        setSettingsState('ready');
+      } catch {
+        if (active) setSettingsState('error');
+      }
     })();
+    return () => { active = false; };
+  }, [loadAttempt]);
+
+  useEffect(() => {
+    let active = true;
     void (async () => {
       const counts: Record<string, number> = {};
       let cursor: string | null = null;
@@ -108,11 +122,14 @@ export function WorkspaceSettings() {
     return rosterState === 'forbidden' ? 'нет доступа' : 'не загрузилось';
   };
 
-  const save = useCallback(async (next: WorkspaceSettingsData) => {
+  // Сервер сам сливает патч с сохранённым значением (sanitizeSettings), поэтому
+  // отправляем только изменённые поля: иначе тумблер уведомления уносил бы с
+  // собой companyName и timezone, взятые из умолчаний.
+  const save = useCallback(async (patch: Partial<WorkspaceSettingsData>) => {
     if (!isAdmin) return;
     setSaving(true);
     try {
-      const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+      const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
       if (!res.ok) {
         toast.error(res.status === 403
           ? 'Только администратор может изменять настройки рабочего пространства.'
@@ -129,10 +146,11 @@ export function WorkspaceSettings() {
   }, [isAdmin]);
 
   const setField = (patch: Partial<WorkspaceSettingsData>) => setSettings((s) => ({ ...s, ...patch }));
+  const saveWorkspace = () => save({ companyName: settings.companyName, timezone: settings.timezone });
   const toggleNotification = (key: string) => {
-    const next = { ...settings, notifications: { ...settings.notifications, [key]: !settings.notifications[key] } };
-    setSettings(next);
-    void save(next);
+    const value = !(settings.notifications[key] ?? false);
+    setSettings((s) => ({ ...s, notifications: { ...s.notifications, [key]: value } }));
+    void save({ notifications: { [key]: value } });
   };
 
   return (
@@ -143,6 +161,13 @@ export function WorkspaceSettings() {
           <p className="mt-1 text-sm text-muted-foreground">Управление рабочим пространством, доступом и правилами уведомлений.</p>
         </div>
       </header>
+
+      {settingsState === 'error' && (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words">Настройки не загрузились — изменить их сейчас нельзя</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setLoadAttempt((n) => n + 1)}>Повторить</Button>
+        </div>
+      )}
 
       <nav aria-label="Разделы настроек" className="flex gap-5 overflow-x-auto border-b border-border text-sm font-medium">
         {/* Иконки те же, что у заголовков карточек ниже: вкладка и раздел, в
@@ -169,7 +194,7 @@ export function WorkspaceSettings() {
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-signal-strong" />Рабочее пространство</CardTitle>
               {isAdmin && !editing && (
-                <Button variant="outline" size="sm" onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
+                <Button variant="outline" size="sm" disabled={settingsState !== 'ready'} onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
               )}
             </CardHeader>
             <CardContent>
@@ -184,7 +209,7 @@ export function WorkspaceSettings() {
                     <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} placeholder="Europe/Moscow" onChange={(v) => setField({ timezone: v })} />
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={async () => { await save(settings); setEditing(false); }} disabled={saving}><Save className="mr-2 h-4 w-4" />Сохранить</Button>
+                    <Button size="sm" onClick={async () => { await saveWorkspace(); setEditing(false); }} disabled={saving || settingsState !== 'ready'}><Save className="mr-2 h-4 w-4" />Сохранить</Button>
                     <Button size="sm" variant="outline" onClick={() => { if (snapshot) setSettings(snapshot); setEditing(false); }}>Отмена</Button>
                   </div>
                 </div>
@@ -227,7 +252,7 @@ export function WorkspaceSettings() {
                         его некому. Молчать об этом — обманывать администратора. */}
                     {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                   </div>
-                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
+                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready'} onClick={() => toggleNotification(key)} />
                 </div>
               ))}
             </CardContent>
@@ -278,7 +303,7 @@ export function WorkspaceSettings() {
             {NOTIFICATION_KEYS.map(({ key, label }) => (
               <div key={key} className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-foreground">{label}</p>
-                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin} onClick={() => toggleNotification(key)} />
+                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready'} onClick={() => toggleNotification(key)} />
               </div>
             ))}
             {!isAdmin && <p className="text-xs text-muted-foreground">Только администратор может изменять правила уведомлений.</p>}
