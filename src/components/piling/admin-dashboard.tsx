@@ -58,13 +58,15 @@ const daysUntil = (iso: string | null): number | null => {
 
 // ── Period helpers ────────────────────────────────────────────────────────
 type PeriodMode = 'all' | 'today' | '7d' | 'custom';
+
+/** Сдвиг календарного дня «ГГГГ-ММ-ДД» на N дней: полдень UTC, без перевода часов. */
+const shiftDay = (day: string, delta: number): string =>
+  new Date(new Date(`${day}T12:00:00.000Z`).getTime() + delta * 86_400_000).toISOString().slice(0, 10);
+
 function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; to: string } {
   const today = getTodayInTimezone();
   if (mode === 'all') return { from: '', to: '' }; // no bounds — loadAnalytics omits dateFrom/dateTo, server defaults to all-time
-  if (mode === '7d') {
-    const d = new Date(today); d.setDate(d.getDate() - 6);
-    return { from: d.toISOString().slice(0, 10), to: today };
-  }
+  if (mode === '7d') return { from: shiftDay(today, -6), to: today };
   if (mode === 'custom') return { from: from || today, to: to || today };
   return { from: today, to: today };
 }

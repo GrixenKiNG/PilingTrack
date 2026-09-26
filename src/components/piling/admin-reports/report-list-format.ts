@@ -4,16 +4,21 @@
  */
 
 import type { ReportDTO } from '@/lib/types';
+import { getTodayInTimezone } from '@/lib/timezone';
 
+/**
+ * Производственный день тенанта («ГГГГ-ММ-ДД»), а не UTC-день и не день браузера:
+ * `report.date` — день по поясу тенанта, и фильтры «Сегодня/Вчера/7 дней» должны
+ * мерить тем же днём.
+ */
 export function todayYmd(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return getTodayInTimezone();
 }
 
+/** Сдвиг календарного дня на N дней: полдень UTC, без перевода часов. */
 export function shiftYmd(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const day = todayYmd();
+  return new Date(new Date(`${day}T12:00:00.000Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
 export function shortDate(ymd: string): string {

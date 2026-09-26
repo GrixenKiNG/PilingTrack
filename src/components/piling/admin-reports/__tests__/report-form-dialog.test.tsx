@@ -79,3 +79,34 @@ describe('ReportFormDialog — pile meters total', () => {
     expect(screen.getByText('5 шт. / 45.0 м.п.')).toBeTruthy();
   });
 });
+
+describe('ReportFormDialog — дата по умолчанию', () => {
+  it('подставляет производственный день тенанта, а не UTC-день', () => {
+    // 01:30 МСК 26.09 — UTC-день в этот момент ещё 25.09: прежняя подстановка
+    // `new Date().toISOString().split('T')[0]` давала админу вчерашнюю дату.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-25T22:30:00.000Z'));
+    try {
+      const { container } = render(
+        <ReportFormDialog
+          open
+          onClose={vi.fn()}
+          editReport={null}
+          loadingReferenceData={false}
+          operators={[]}
+          sites={[]}
+          pileGrades={[]}
+          drillingTypes={[]}
+          downtimeReasons={[]}
+          equipment={[]}
+          onSuccess={vi.fn()}
+        />,
+      );
+
+      const dateInput = container.querySelector('input[type="date"]') as HTMLInputElement;
+      expect(dateInput.value).toBe('2026-09-26');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

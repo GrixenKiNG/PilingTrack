@@ -25,6 +25,7 @@ import {
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
 import { getConsumables } from '@/modules/inspections/domain/consumables';
 import { LubricationMap } from './lubrication-map';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 type HammerKind = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 
@@ -48,8 +49,6 @@ const HAMMER_LABEL: Record<HammerKind, string> = {
   NONE: 'Нет',
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 export function StartInspectionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,7 +61,7 @@ export function StartInspectionForm() {
   // (/inspections/new?equipmentId=…) so the admin doesn't have to pick it again.
   const [equipmentId, setEquipmentId] = useState(() => searchParams.get('equipmentId') ?? '');
   const [level, setLevel] = useState<InspectionLevel>('EO');
-  const [inspectionDate, setInspectionDate] = useState(today());
+  const [inspectionDate, setInspectionDate] = useState(() => getTodayInTimezone());
   const [shift, setShift] = useState('');
   const [engineHours, setEngineHours] = useState('');
   const [busy, setBusy] = useState(false);

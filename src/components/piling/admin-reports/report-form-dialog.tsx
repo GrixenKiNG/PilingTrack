@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 interface OperatorUser { id: string; name: string; }
 
@@ -54,7 +55,7 @@ export function ReportFormDialog({
 }: ReportFormDialogProps) {
   const [formUserId, setFormUserId] = useState(editReport?.userId || '');
   const [formSiteId, setFormSiteId] = useState(editReport?.siteId || '');
-  const [formDate, setFormDate] = useState(editReport?.date || new Date().toISOString().split('T')[0]);
+  const [formDate, setFormDate] = useState(editReport?.date || getTodayInTimezone());
   const [formShiftStart, setFormShiftStart] = useState(editReport?.shiftStart || '07:00');
   const [formShiftEnd, setFormShiftEnd] = useState(editReport?.shiftEnd || '19:00');
   const [formEquipmentId, setFormEquipmentId] = useState(editReport?.equipment?.id || '');

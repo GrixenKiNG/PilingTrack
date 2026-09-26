@@ -11,6 +11,7 @@ import type {
   PilePassportRow,
 } from '@/modules/reports/application/queries/pile-passport.service';
 import type { SiteFlatDTO } from '@/lib/types';
+import { getTodayInTimezone } from '@/lib/timezone';
 import { JournalTitleBlock } from './journal-title-block';
 import { PileDetail } from './pile-detail';
 
@@ -175,7 +176,7 @@ export function PileJournal() {
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `zhurnal-zabivki-svay-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.download = `zhurnal-zabivki-svay-${getTodayInTimezone()}.xlsx`;
       link.click();
       toast.success('Журнал выгружен');
     } catch (exportError) {
