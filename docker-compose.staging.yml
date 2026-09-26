@@ -1,0 +1,65 @@
+# ============================================================
+# PilingTrack — локальный проверочный стенд (решение владельца 26.09.2026)
+# ============================================================
+# Третий слой поверх боевой пары: те же сервисы, те же образы, что уедут на
+# сервер, но на этом компьютере, со своей копией боевой базы.
+#
+#   docker compose -p pilingtrack-staging --env-file D:/PillingR/staging/.env.staging \
+#     -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.staging.yml ...
+#
+# Запускать через scripts/staging-local.sh — он собирает образы, переносит
+# базу и проверяет результат.
+#
+# Отличия от боевого сервера:
+#   - имена контейнеров сброшены: иначе стенд столкнулся бы с локальной
+#     разработкой (pilingtrack-postgres и т.д.);
+#   - наружу открыт только 127.0.0.1:3100 (приложение) и :3102 (здоровье
+#     воркеров);
+#   - нет каталога WAL-архива сервера;
+#   - образы берутся готовыми по тегу STAGING_TAG, а не собираются compose.
+# Отправки наружу глушит сам .env.staging (TELEGRAM_API_BASE в никуда, свой
+# ENCRYPTION_KEY — токены ботов из боевой базы не расшифровываются, файлы в
+# локальный MinIO).
+# ============================================================
+
+services:
+  migrate:
+    container_name: !reset null
+    image: pilingtrack-migrate:${STAGING_TAG:?STAGING_TAG must be set}
+
+  app:
+    container_name: !reset null
+    image: pilingtrack-app:${STAGING_TAG:?STAGING_TAG must be set}
+    ports: !override
+      - "127.0.0.1:3100:3000"
+    environment:
+      - SENTRY_ENVIRONMENT=staging
+
+  workers:
+    container_name: !reset null
+    image: pilingtrack-workers:${STAGING_TAG:?STAGING_TAG must be set}
+    ports: !override
+      - "127.0.0.1:3102:3002"
+    environment:
+      - SENTRY_ENVIRONMENT=staging
+
+  postgres:
+    container_name: !reset null
+    volumes: !override
+      - postgres_data:/var/lib/postgresql
+
+  pgbouncer:
+    container_name: !reset null
+
+  redis:
+    container_name: !reset null
+
+  redis-cache:
+    container_name: !reset null
+
+  minio:
+    container_name: !reset null
+    ports: !reset []
+
+  minio-init:
+    container_name: !reset null
