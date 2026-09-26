@@ -92,9 +92,9 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
     'kpi-drilling': tile('kpi-drilling', 'Бурение',
       p ? `${fmtRu(p.drilling.value)} м` : `${Math.round(d.drillingToday)} м`,
       p ? 'за период' : 'за сегодня', pctDelta(p?.drilling.deltaPct)),
-    'kpi-downtime': tile('kpi-downtime', 'Простой',
+    'kpi-downtime': tile('kpi-downtime', p ? 'Доля простоя в смене, %' : 'Простой',
       p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : formatDowntimeHours(d.downtimeHoursToday),
-      p ? 'доля времени смен' : 'за сегодня',
+      p ? 'по отчётам с указанным временем смены' : 'за сегодня',
       // For downtime a NEGATIVE delta (less idle time) is the good direction.
       p && p.downtime.deltaPp != null ? { text: `${signed(p.downtime.deltaPp, ' п.п.')} ${p.label}`, good: p.downtime.deltaPp <= 0 } : null),
     'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене'),

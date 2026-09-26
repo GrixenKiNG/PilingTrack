@@ -80,7 +80,7 @@ export function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
     { label: 'MTTR', value: fmtHours(kpi.mttrHours) },
     { label: 'Выполнение ППР', value: kpi.pmCompliance != null ? `${(kpi.pmCompliance * 100).toFixed(0)}%` : '—' },
     { label: 'Отказы за период', value: String(kpi.failureCount), tone: kpi.failureCount > 0 ? 'text-destructive-strong' : undefined },
-    { label: 'Простой по ремонтам', value: fmtHours(kpi.downtimeHours) },
+    { label: 'Ремонт по ТО, ч', value: fmtHours(kpi.downtimeHours) },
     { label: 'Затраты на ТО', value: `${kpi.totalCost.toLocaleString('ru')} ₽` },
     { label: 'ППР закрыто', value: `${kpi.pmClosed} / ${kpi.pmPlanned}` },
   ];

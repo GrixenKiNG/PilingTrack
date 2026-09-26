@@ -349,7 +349,7 @@ export function AdminAnalytics() {
                         <th className="py-2 px-3 text-right">Отработано, ч</th>
                         <th className="py-2 px-3 text-right">Погонные метры, м</th>
                         <th className="py-2 px-3 text-right">Сваи, шт</th>
-                        <th className="py-2 px-3 text-right">Простой, %</th>
+                        <th className="py-2 px-3 text-right" title="по отчётам с указанным временем смены">Доля простоя в смене, %</th>
                         <th className="py-2 pl-3 text-right">Отчётов</th>
                       </tr>
                     </thead>
