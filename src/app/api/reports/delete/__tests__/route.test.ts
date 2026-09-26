@@ -20,16 +20,19 @@ const {
   deleteMock,
   outboxCreateMock,
   feedbackCreateMock,
+  loggerErrorMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   findFirstMock: vi.fn(),
   deleteMock: vi.fn(),
   outboxCreateMock: vi.fn(),
   feedbackCreateMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
+vi.mock('@/lib/logger', () => ({ logger: { error: loggerErrorMock } }));
 vi.mock('@/lib/db', () => {
   const tx = {
     report: { findFirst: findFirstMock, delete: deleteMock },
@@ -170,6 +173,8 @@ describe('DELETE /api/reports/delete — след удаления (F-R34-1)', (
       targetId: 'report-1',
     });
     expect(data.metadata.tenantId).toBe('tenant-a');
+    // Дата в тексте — ДД.ММ.ГГГГ, а не сырой ISO из БД (F-R34-1b).
+    expect(data.message).toContain('26.09.2026');
     expect(data.metadata.before).toMatchObject({
       reportId: 'report-1',
       date: '2026-09-26',
@@ -192,5 +197,36 @@ describe('DELETE /api/reports/delete — след удаления (F-R34-1)', (
     expect(res.status).toBe(404);
     expect(outboxCreateMock).not.toHaveBeenCalled();
     expect(feedbackCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('answers 200 and logs the failure when the audit write throws (F-R34-1b)', async () => {
+    // Отчёт уже удалён транзакцией: падение записи следа не должно
+    // оборачиваться в 500, иначе админ повторит удаление и получит 404.
+    feedbackCreateMock.mockRejectedValue(new Error('feedback write failed'));
+
+    const res = await DELETE(deleteReq('report-1'));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      'Report delete: audit write failed',
+      expect.any(Error),
+      { reportId: 'report-1' }
+    );
+  });
+
+  it('does not log an audit failure when the write succeeds', async () => {
+    feedbackCreateMock.mockResolvedValue({ id: 'feedback-1' });
+
+    const res = await DELETE(deleteReq('report-1'));
+
+    expect(res.status).toBe(200);
+    // Пересчёт проекций на этом моке падает сам по себе (db.report.findMany
+    // сброшен resetAllMocks) — проверяем именно отсутствие записи о следе.
+    const auditFailures = loggerErrorMock.mock.calls.filter(
+      ([message]) => message === 'Report delete: audit write failed'
+    );
+    expect(auditFailures).toHaveLength(0);
   });
 });

@@ -6,6 +6,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { formatRuDate } from '@/lib/format';
 import { createReportEvent } from '@/modules/reports';
 import { saveToOutbox } from '@/services/reports/outbox-publisher';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
@@ -174,18 +175,29 @@ export const DELETE = withMutation(
     // `$transaction` выше его не завести. Заголовок задаётся здесь, а не через
     // recordAuditEvent: тот берёт русский текст из AUDIT_DESCRIPTIONS, и без
     // строки для report.deleted лента показала бы владельцу машинный код.
-    await recordFeedbackEvent({
-      level: 'warn',
-      scope: 'reports',
-      action: 'report.deleted',
-      title: 'Отчёт удалён',
-      message: `Отчёт за ${deleted.date} по объекту «${deleted.siteName}» удалён без возможности восстановления.`,
-      audience: 'OPERATIONS',
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      actor: { id: user!.id, name: user!.name, role: user!.role },
-      targetId: deleted.reportId,
-      metadata: { tenantId, before: deleted },
-    });
+    //
+    // Best-effort (F-R34-1b): отчёт уже удалён и безвозвратно — падение записи
+    // следа не должно превращать успешное удаление в 500, иначе админ
+    // повторит запрос и получит 404 по уже удалённому отчёту.
+    try {
+      await recordFeedbackEvent({
+        level: 'warn',
+        scope: 'reports',
+        action: 'report.deleted',
+        title: 'Отчёт удалён',
+        message: `Отчёт за ${formatRuDate(deleted.date)} по объекту «${deleted.siteName}» удалён без возможности восстановления.`,
+        audience: 'OPERATIONS',
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        actor: { id: user!.id, name: user!.name, role: user!.role },
+        targetId: deleted.reportId,
+        metadata: { tenantId, before: deleted },
+      });
+    } catch (err) {
+      const { logger } = await import('@/lib/logger');
+      logger.error('Report delete: audit write failed', err, {
+        reportId: parsed.data.reportId,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   },
