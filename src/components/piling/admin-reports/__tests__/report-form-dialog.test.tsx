@@ -9,9 +9,14 @@
  * needing to mount Radix Select interaction, which has no test precedent in
  * this codebase yet.
  */
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
 import type { ReportDTO } from '@/lib/types';
+
+const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
+
+vi.mock('@/lib/api', () => ({ authFetch: authFetchMock }));
 
 vi.mock('lucide-react', async (importActual) => ({
   ...(await importActual<typeof import('lucide-react')>()),
@@ -108,5 +113,43 @@ describe('ReportFormDialog — дата по умолчанию', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('ReportFormDialog — построчные ошибки сервера', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('показывает поля из details.fieldErrors, а не одно «Некорректные данные»', async () => {
+    // 400 админского маршрута: `details` — zod-`fieldErrors`.
+    authFetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: 'Некорректные данные',
+        details: { formErrors: [], fieldErrors: { count: ['Ожидалось число'] } },
+      }),
+    });
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Некорректные данные\nПоле count: Ожидалось число'));
   });
 });

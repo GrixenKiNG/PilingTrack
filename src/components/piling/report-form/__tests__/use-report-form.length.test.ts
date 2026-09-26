@@ -126,3 +126,50 @@ describe('useReportForm — нецелые моточасы не теряютс�
     }
   });
 });
+
+describe('useReportForm — построчные ошибки сервера доходят до оператора', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+    authFetchMock.mockReset();
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/dictionary/all')) {
+        return Promise.resolve(okJson({ pileGrades: [GRADE], drillingTypes: [], downtimeReasons: [] }));
+      }
+      if (url.startsWith('/api/sites')) return Promise.resolve(okJson({ data: [] }));
+      if (url.startsWith('/api/equipment')) return Promise.resolve(okJson({ data: [] }));
+      if (url.startsWith('/api/reports/upsert')) {
+        // 400 операторского маршрута: `details` — массив { field, message }.
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          json: async () => ({
+            error: 'Некорректные данные',
+            details: [{ field: 'piles.0.count', message: 'Количество должно быть больше 0' }],
+          }),
+        });
+      }
+      return Promise.resolve(okJson({}));
+    });
+  });
+
+  it('называет поле из details вместо одного «Некорректные данные»', async () => {
+    storeState.selectedSiteId = 'site-1';
+    try {
+      const { result } = renderHook(() => useReportForm());
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.handleSubmit({ pile: { gradeId: 'g1', count: 2 } });
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(
+        'Некорректные данные\nПоле piles.0.count: Количество должно быть больше 0',
+      );
+      expect(toast.success).not.toHaveBeenCalledWith('Отчёт успешно отправлен!');
+    } finally {
+      storeState.selectedSiteId = '';
+    }
+  });
+});

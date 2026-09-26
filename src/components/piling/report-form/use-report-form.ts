@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import { pushClientFeedback } from '@/lib/client-feedback';
 import { hapticClick, hapticSuccess, hapticError } from '@/lib/haptic-feedback';
 import { getTodayInTimezone } from '@/lib/timezone';
@@ -438,7 +439,7 @@ export function useReportForm(): UseReportFormReturn {
         loadData();
         return;
       }
-      if (!res.ok) throw new Error(result?.error || 'Ошибка отправки отчёта');
+      if (!res.ok) throw new Error(apiErrorMessage(result, 'Ошибка отправки отчёта'));
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
       // Reading saved but looks suspicious (unusually large jump) — tell the
       // operator without failing anything.

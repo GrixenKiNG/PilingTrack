@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, HardHat, Drill, Clock, Wrench, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import { Button } from '@/components/ui/button';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { Input } from '@/components/ui/input';
@@ -186,7 +187,7 @@ export function ReportFormDialog({
           downtimes: formDowntimes.map((d) => ({ id: editReport?.downtimes.some(row => row.id === d.id) ? d.id : undefined, reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
         }),
       });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Ошибка сохранения'); }
+      if (!res.ok) { const err = await res.json(); throw new Error(apiErrorMessage(err, 'Ошибка сохранения')); }
       toast.success(editReport ? 'Отчёт обновлён' : 'Отчёт создан');
       handleClose(); onSuccess();
     } catch (err: unknown) {
