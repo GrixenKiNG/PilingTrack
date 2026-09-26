@@ -1,5 +1,5 @@
 import { getStateRedisClient } from '@/lib/redis-cache';
-import { logger } from '../../logger';
+import { logger } from '@/lib/logger';
 import { WORKER_STALE_MS } from '../thresholds';
 import type { WorkerHealth } from '../types';
 

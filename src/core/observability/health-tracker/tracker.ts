@@ -1,4 +1,4 @@
-import { logger } from '../logger';
+import { logger } from '@/lib/logger';
 import { LagAlert, startLagMonitor } from '../lag-monitor';
 import { checkSystemStatus } from './aggregate';
 import { POLL_INTERVAL_MS } from './thresholds';
@@ -38,11 +38,16 @@ function startBackgroundTracker(): void {
 
   startLagMonitor({
     onAlert: (alert: LagAlert) => {
-      logger[alert.level === 'critical' ? 'error' : 'warn'](`🚨 ${alert.message}`, {
+      const alertMeta = {
         metric: alert.metric,
         value: alert.value,
         threshold: alert.threshold,
-      });
+      };
+      if (alert.level === 'critical') {
+        logger.error(`🚨 ${alert.message}`, undefined, alertMeta);
+      } else {
+        logger.warn(`🚨 ${alert.message}`, alertMeta);
+      }
     },
   });
 
