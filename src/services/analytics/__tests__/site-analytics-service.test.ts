@@ -41,3 +41,46 @@ describe('getSiteAnalytics — actual pile meters source', () => {
     expect(actualBlock).not.toContain('SitePilePlan');
   });
 });
+
+/**
+ * Regression for F-R35-1: deactivating a finished site must not erase its
+ * production from a past period. A site is now listed when it is active *or*
+ * when it submitted a report inside the requested period — an inactive site
+ * with no reports in the period stays out of the list.
+ */
+describe('getSiteAnalytics — deactivated sites of a past period', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    queryRaw.mockResolvedValue([]);
+  });
+
+  it('lists an inactive site only through a submitted report of the period', async () => {
+    await getSiteAnalytics({ tenantId: 'orion', dateFrom: '2026-09-01', dateTo: '2026-09-30' });
+
+    const [strings, ...params] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    // Site selection is a disjunction now, not the bare `isActive = true`.
+    expect(sql).not.toMatch(/WHERE\s+s\."isActive" = true\s*\n\s*AND\s+s\."tenantId"/);
+    const existsStart = sql.indexOf('OR EXISTS (');
+    const tenantPredicate = sql.indexOf('AND s."tenantId" =');
+    expect(existsStart).toBeGreaterThan(-1);
+    expect(tenantPredicate).toBeGreaterThan(existsStart);
+    const siteFilter = sql.slice(existsStart, tenantPredicate);
+
+    expect(siteFilter).toContain('FROM "Report" r');
+    expect(siteFilter).toContain('r."siteId" = s.id');
+    expect(siteFilter).toContain("r.status = 'submitted'");
+    expect(siteFilter).toContain('r.date >= ?');
+    expect(siteFilter).toContain('r.date <= ?');
+
+    // The period bounds stay bound parameters — never interpolated as text.
+    expect(params).toContain('2026-09-01');
+    expect(params).toContain('2026-09-30');
+    expect(sql).not.toContain('2026-09-01');
+    expect(sql).toContain('s."tenantId" = ?');
+
+    // isActive travels with the row so the UI can mark «объект закрыт».
+    expect(sql).toMatch(/s\."isActive"\s+AS "isActive"/);
+  });
+});
