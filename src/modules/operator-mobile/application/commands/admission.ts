@@ -11,7 +11,7 @@ import {KNOWLEDGE_VALID_DAYS, scoreAttempt} from '../../domain/knowledge-bank';
 import {SAFETY_BRIEFING} from '../../domain/safety-briefing';
 import {PPE_ITEMS} from '../../domain/ppe';
 import {SLINGER_BRIEFING} from '../../domain/slinger-briefing';
-import {OperatorCommandError, DAY_MS} from './shared';
+import {OperatorCommandError, DAY_MS, productionDateOf} from './shared';
 import type {Tx} from './shared';
 
 /**
@@ -128,6 +128,40 @@ async function recordBriefingHistory(tx: Tx, input: {
 }
 
 /**
+ * Есть ли у работника отметка по этой редакции инструкции за эти сутки.
+ *
+ * ОДИН ДЕНЬ — ОДНА ОТМЕТКА. `acknowledge-briefing` ключ команды не спрашивает
+ * (схема маршрута его не содержит), а ответ теряется ровно тогда, когда
+ * машинист повторяет действие: обрыв связи уже после того, как транзакция
+ * прошла. Без этой проверки в журнале ОТ появлялась вторая отметка об одном
+ * действии (находка F-O11).
+ *
+ * ПОВТОРНЫЙ ИНСТРУКТАЖ ПРИ ЭТОМ НЕ ЗАПРЕЩЁН — он законен и обязателен, но
+ * идёт ДРУГИМ днём либо по ДРУГОЙ редакции инструкции; такая запись проходит,
+ * потому что сутки и версия в ключ проверки входят. Сверяем и код, и версию:
+ * у инструкций машиниста и стропальщика версии совпадают, и различает их
+ * только код. Сутки считаются тем же помощником, что и производственные сутки
+ * смены, — в поясе работника.
+ */
+async function briefingRecordedOnDay(tx: Tx, input: {
+  tenantId: string; operatorId: string; kind: 'INSTRUCTION' | 'KNOWLEDGE';
+  briefing: {code: string; version: string}; day: Date;
+}) {
+  const existing = await tx.briefingRecord.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      userId: input.operatorId,
+      kind: input.kind,
+      documentCode: input.briefing.code,
+      documentVersion: input.briefing.version,
+      recordedAt: {gte: input.day, lt: new Date(input.day.getTime() + DAY_MS)},
+    },
+    select: {id: true},
+  });
+  return existing !== null;
+}
+
+/**
  * Кто читает инструкцию: машинист или его помощник.
  *
  * Инструкции у них разные — про машину и про стропы, — и отметка о
@@ -198,7 +232,14 @@ export async function confirmPpe(input: {
   });
 }
 
-/** Работник прочитал свою инструкцию. Отметка привязана к версии текста. */
+/**
+ * Работник прочитал свою инструкцию. Отметка привязана к версии текста.
+ *
+ * ОДНА ОТМЕТКА В СУТКИ НА РЕДАКЦИЮ. Повтор команды (потерянный ответ, второй
+ * тап) возвращает тот же `{version}`, но второй строки в журнал не пишет.
+ * Повторный инструктаж другим днём или по новой редакции записывается — это
+ * разные записи, и они нужны.
+ */
 export async function acknowledgeBriefing(input: {
   tenantId: string; operatorId: string; audience?: BriefingAudience; now?: Date;
 }) {
@@ -214,13 +255,28 @@ export async function acknowledgeBriefing(input: {
       issuedAt: now,
       expiresAt: null,
     });
-    await recordBriefingHistory(tx, {
+    // Отметка за те же сутки по той же редакции уже стоит — повтор команды
+    // (потерянный ответ, второй тап) второй строки в журнал ОТ не добавляет.
+    const profile = await tx.user.findFirst({
+      where: {tenantId: input.tenantId, id: input.operatorId},
+      select: {timezone: true},
+    });
+    const alreadyRecorded = await briefingRecordedOnDay(tx, {
       tenantId: input.tenantId,
       operatorId: input.operatorId,
       kind: 'INSTRUCTION',
       briefing: kind.briefing,
-      now,
+      day: productionDateOf(profile?.timezone ?? 'Europe/Moscow', now),
     });
+    if (!alreadyRecorded) {
+      await recordBriefingHistory(tx, {
+        tenantId: input.tenantId,
+        operatorId: input.operatorId,
+        kind: 'INSTRUCTION',
+        briefing: kind.briefing,
+        now,
+      });
+    }
     return {version: kind.briefing.version};
   });
 }
