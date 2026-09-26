@@ -10,6 +10,7 @@
  * и закрытию смены. Поэтому они здесь, а не в своих модулях.
  */
 import type {Prisma} from '@/generated/postgres-client/client';
+import {ServiceError} from '@/lib/service-error';
 import {type ChecklistAnswer} from '../../domain/checklist-run';
 import {checkOperatorDocuments} from '../../domain/operator-admission';
 import {BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE} from '../../domain/operator-credentials';
@@ -352,21 +353,28 @@ export async function requireConfirmedImages(
 }
 
 
-/** Отчёт смены — один на смену. Создаётся при первой записи выработки. */
+/**
+ * Отчёт смены — один на смену. Создаётся при первой записи выработки.
+ *
+ * ЗАВОДИТСЯ ЧЕРЕЗ `upsert` ПО КЛЮЧУ ОТЧЁТА, А НЕ `findFirst`+`create`.
+ * Ключ отчёта выводится из смены и производственных суток, то есть повторный
+ * вызов — тот же ключ. Но заводит отчёт не только повтор команды: две вкладки,
+ * два устройства либо слив очереди в момент, когда машинист пишет новую сваю,
+ * вызывают его одновременно. При чтении с последующей вставкой проигравший
+ * падал на уникальности `Report.reportId` и терял запись целиком: свая не
+ * записывалась, а сервер отвечал 200 (находка F-R31-1). Конфликт разрешает
+ * база, одной операцией; `update: {}` пуст — существующий отчёт не правится.
+ */
 export async function ensureReport(tx: Tx, input: {
   tenantId: string; shiftId: string; operatorId: string; siteId: string;
   equipmentId: string; crewId: string; productionDate: string; shiftType: string;
 }) {
-  const existing = await tx.report.findFirst({
-    where: {tenantId: input.tenantId, shiftId: input.shiftId},
-    select: {id: true},
-  });
-  if (existing) return existing.id;
-
-  const created = await tx.report.create({
-    data: {
+  const reportId = `RM-${input.shiftId.slice(0, 8)}-${input.productionDate}`;
+  const report = await tx.report.upsert({
+    where: {reportId},
+    create: {
       tenantId: input.tenantId,
-      reportId: `RM-${input.shiftId.slice(0, 8)}-${input.productionDate}`,
+      reportId,
       userId: input.operatorId,
       crewId: input.crewId,
       equipmentId: input.equipmentId,
@@ -377,8 +385,16 @@ export async function ensureReport(tx: Tx, input: {
       shiftId: input.shiftId,
       lastEditedById: input.operatorId,
     },
-    select: {id: true},
+    update: {},
+    select: {id: true, tenantId: true},
   });
-  return created.id;
+
+  // Тенант сверяем ПО ЗАПИСИ, которую вернула вставка: ключ отчёта про
+  // организацию ничего не знает, и чужой отчёт с тем же ключом прошёл бы
+  // молча — выработка уехала бы в отчёт другой организации.
+  if (report.tenantId !== input.tenantId) {
+    throw new ServiceError('Отчёт этой смены заведён другой организацией', 409);
+  }
+  return report.id;
 }
 
