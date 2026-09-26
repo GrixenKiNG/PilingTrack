@@ -105,6 +105,17 @@ describe('exportPileJournalXlsx — день тенанта', () => {
     expect(nextNight < where.drivenAt.lt).toBe(false);
   });
 
+  it('дату выгрузки печатает в поясе тенанта, а не UTC (F-R37-1)', async () => {
+    // Выгрузка 26.09 в 01:00 МСК = 25.09 22:00 UTC.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-25T22:00:00.000Z') });
+    try {
+      await exportPileJournalXlsx({ tenantId: 'orion' });
+      expect(sheet('Титул').rows).toContainEqual(['Журнал выгружен', '26.09.2026 01:00']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('границы дня считает по текущему смещению пояса, а не по фиксированному', async () => {
     getSettings.mockResolvedValue({ timezone: 'America/New_York' });
 

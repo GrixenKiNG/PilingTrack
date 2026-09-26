@@ -328,6 +328,16 @@ function printDay(iso: string, timezone: string): string {
   });
 }
 
+/** Момент времени в печатном виде — ДД.ММ.ГГГГ ЧЧ:ММ в поясе тенанта. */
+function printMoment(date: Date, timezone: string): string {
+  const time = date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
+  return `${printDay(date.toISOString(), timezone)} ${time}`;
+}
+
 /** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ. */
 function printYmd(ymd: string): string {
   const [year, month, day] = ymd.split('-');
@@ -455,7 +465,9 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     ['Отказ больше проектного', header.overRefusal],
     [],
     ['Отказ считается как среднее по трём последним залогам (СП 45.13330).'],
-    ['Журнал выгружен', new Date().toISOString().slice(0, 16).replace('T', ' ')],
+    // Дата формирования — по поясу тенанта, как и весь остальной документ (F-R37-1):
+    // журнал, выгруженный 26.09 в 01:00 МСК, не должен датироваться 25.09 по UTC.
+    ['Журнал выгружен', printMoment(new Date(), timezone)],
     // Не молчим о срезе: иначе подшитый документ выглядел бы как полный.
     ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_LIMIT} свай — сузьте период или объект`]] : []),
   ];
