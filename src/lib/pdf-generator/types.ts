@@ -8,6 +8,7 @@ export interface PeriodPdfData {
   totalPiles: number;
   totalDrilling: number;
   totalDowntime: number;
+  companyName?: string;
 }
 
 export interface SingleReportData {
@@ -26,6 +27,7 @@ export interface SingleReportData {
   piles: { pileGrade: { name: string; lengthMm?: number | null }; count: number; metersPerUnit?: number }[];
   drillings: { type: { name: string }; count?: number; metersPerUnit?: number; meters: number }[];
   downtimes: { reason: { name: string }; duration: number; comment: string | null }[];
+  companyName?: string;
 }
 
 export type PdfJobData = PeriodPdfData | SingleReportData;

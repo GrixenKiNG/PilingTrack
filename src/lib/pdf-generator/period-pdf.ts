@@ -34,7 +34,7 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
       (report.piles || []).some((pile) => pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }) === 0),
     );
 
-    addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`);
+    addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`, data.companyName);
     addMetricStrip(doc, [
       ['Отчётов', String(reports.length), 'шт'],
       ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],

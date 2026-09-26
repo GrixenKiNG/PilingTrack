@@ -208,6 +208,32 @@ describe('pdf-generator', () => {
 
     expect(rendered).toContain('(неполный: у марки не задана длина)');
   });
+
+  it('печатает название компании из настроек в шапке PDF (F-R30-6)', async () => {
+    const { generateSinglePdf, generatePeriodPdf } = await import('@/lib/pdf-generator');
+
+    const single = await capturePdfText(async () => {
+      await generateSinglePdf({
+        ...singleReportWithPiles([{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }]),
+        companyName: 'ООО «Орион»',
+      });
+    });
+    expect(single).toContain('ООО «Орион»');
+
+    const period = await capturePdfText(async () => {
+      await generatePeriodPdf({
+        dateFrom: '2026-04-01',
+        dateTo: '2026-04-24',
+        siteId: 'site-1',
+        totalPiles: 3,
+        totalDrilling: 12,
+        totalDowntime: 2,
+        reports: [],
+        companyName: 'ООО «Орион»',
+      });
+    });
+    expect(period).toContain('ООО «Орион»');
+  });
 });
 
 /**
