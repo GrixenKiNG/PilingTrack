@@ -345,6 +345,45 @@ export async function unassignUserFromSite(siteId: string, userId: string, ctx: 
 // Site hierarchy (field / cluster / picket)
 // ────────────────────────────────────────────
 
+const HIERARCHY_TYPE_LABELS: Record<'field' | 'cluster' | 'picket', string> = {
+  field: 'поле',
+  cluster: 'куст',
+  picket: 'пикет',
+};
+
+/**
+ * Считает записи выработки (сваи и бурение), привязанные к узлу и всему его
+ * поддереву: пикет — сам узел, куст — его пикеты, поле — пикеты всех кустов.
+ * Привязка `PileWork.picketId`/`LeaderDrilling.picketId` — `ON DELETE SET NULL`,
+ * поэтому без этой проверки удаление узла молча теряло бы место работ.
+ */
+async function countSubtreeProductionRows(type: 'field' | 'cluster' | 'picket', itemId: string) {
+  const where =
+    type === 'picket'
+      ? { picketId: itemId }
+      : type === 'cluster'
+        ? { picket: { clusterId: itemId } }
+        : { picket: { cluster: { fieldId: itemId } } };
+
+  const [piles, drillings] = await Promise.all([
+    db.pileWork.count({ where }),
+    db.leaderDrilling.count({ where }),
+  ]);
+
+  return piles + drillings;
+}
+
+/** Отказ 409, если на узле или в его поддереве есть выработка. */
+async function assertNoSubtreeProduction(type: 'field' | 'cluster' | 'picket', itemId: string) {
+  const rows = await countSubtreeProductionRows(type, itemId);
+  if (rows > 0) {
+    throw new ServiceError(
+      `Нельзя удалить ${HIERARCHY_TYPE_LABELS[type]}: на нём ${rows} записей выработки. Сначала перенесите их.`,
+      409,
+    );
+  }
+}
+
 export async function createSiteHierarchyItem(input: {
   siteId: string;
   type: string;
@@ -397,6 +436,7 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
   if (type === 'field') {
     const item = await db.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true } });
     if (!item) throw new ServiceError('Hierarchy item not found', 404);
+    await assertNoSubtreeProduction('field', itemId);
     await db.pileField.delete({ where: { id: itemId } });
     return { success: true };
   }
@@ -404,6 +444,7 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
   if (type === 'cluster') {
     const item = await db.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true } });
     if (!item) throw new ServiceError('Hierarchy item not found', 404);
+    await assertNoSubtreeProduction('cluster', itemId);
     await db.cluster.delete({ where: { id: itemId } });
     return { success: true };
   }
@@ -411,6 +452,7 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
   if (type === 'picket') {
     const item = await db.picket.findFirst({ where: { id: itemId, cluster: { field: { siteId } } }, select: { id: true } });
     if (!item) throw new ServiceError('Hierarchy item not found', 404);
+    await assertNoSubtreeProduction('picket', itemId);
     await db.picket.delete({ where: { id: itemId } });
     return { success: true };
   }

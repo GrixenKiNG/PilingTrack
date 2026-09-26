@@ -2,7 +2,7 @@
  * Site Admin Command Service — Unit Tests
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { normalizeSitePlans } from '../site-admin-command.service';
 
 // Mock db for functions that require it
@@ -10,9 +10,11 @@ vi.mock('@/lib/db', () => ({
   db: {
     $transaction: vi.fn(),
     userSiteAssignment: { upsert: vi.fn(), deleteMany: vi.fn() },
-    pileField: { create: vi.fn(), delete: vi.fn() },
-    cluster: { create: vi.fn(), delete: vi.fn() },
-    picket: { create: vi.fn(), delete: vi.fn() },
+    pileField: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    cluster: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    picket: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    pileWork: { count: vi.fn() },
+    leaderDrilling: { count: vi.fn() },
     site: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
     sitePilePlan: { create: vi.fn() },
     siteDrillingPlan: { create: vi.fn() },
@@ -214,6 +216,14 @@ describe('hardDeleteSite — irreversible-delete safety guard', () => {
 });
 
 describe('deleteSiteHierarchyItem', () => {
+  beforeEach(() => {
+    vi.mocked(db.site.findFirst).mockResolvedValue({ id: 's1', tenantId: 't1' } as never);
+    vi.mocked(db.pileWork.count).mockResolvedValue(0);
+    vi.mocked(db.leaderDrilling.count).mockResolvedValue(0);
+    vi.mocked(db.picket.findFirst).mockResolvedValue({ id: 'p-1' } as never);
+    vi.mocked(db.picket.delete).mockResolvedValue({ id: 'p-1' } as never);
+  });
+
   it('should throw when type is empty', async () => {
     await expect(deleteSiteHierarchyItem('s1', '', 'item-1', ctx)).rejects.toThrow('Type and itemId required');
   });
@@ -224,5 +234,22 @@ describe('deleteSiteHierarchyItem', () => {
 
   it('should throw for invalid type', async () => {
     await expect(deleteSiteHierarchyItem('s1', 'unknown', 'item-1', ctx)).rejects.toThrow('Invalid type');
+  });
+
+  it('refuses (409) to delete a picket with production rows and never calls delete', async () => {
+    vi.mocked(db.pileWork.count).mockResolvedValue(12);
+
+    await expect(deleteSiteHierarchyItem('s1', 'picket', 'p-1', ctx)).rejects.toThrow(
+      'Нельзя удалить пикет: на нём 12 записей выработки. Сначала перенесите их.'
+    );
+    expect(db.picket.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes an empty picket without production rows', async () => {
+    const result = await deleteSiteHierarchyItem('s1', 'picket', 'p-1', ctx);
+
+    expect(db.pileWork.count).toHaveBeenCalledWith({ where: { picketId: 'p-1' } });
+    expect(db.picket.delete).toHaveBeenCalledWith({ where: { id: 'p-1' } });
+    expect(result).toEqual({ success: true });
   });
 });
