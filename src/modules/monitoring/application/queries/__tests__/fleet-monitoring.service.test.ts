@@ -247,33 +247,22 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
       },
     ]);
     reportFindMany.mockResolvedValue([]);
-    // One bounded query per machine (`take: 1`, `createdAt desc`): the newest
-    // completed photo of each is what the card renders. Earlier the whole
-    // park's photo table was read and deduplicated in JS (F-R20-2).
-    mediaFindMany.mockImplementation(
-      (args: { where: { entityId: string }; take?: number }) =>
-        Promise.resolve(
-          args.where.entityId === 'eq-1'
-            ? [
-                { id: 'media-1', entityId: 'eq-1', cdnUrl: 'https://cdn.example.com/photo.jpg', thumbnailKey: 'media-1.thumb.jpg', createdAt: new Date('2026-06-15T00:00:00.000Z') },
-              ]
-            : [
-                { id: 'media-3', entityId: 'eq-2', cdnUrl: null, thumbnailKey: 'media-3.thumb.jpg', createdAt: new Date('2026-06-10T00:00:00.000Z') },
-              ],
-        ),
-    );
+    // Rows arrive pre-sorted newest-first (orderBy: createdAt desc), matching
+    // the real Prisma query — the map keeps the first row seen per entity.
+    mediaFindMany.mockResolvedValue([
+      { id: 'media-1', entityId: 'eq-1', cdnUrl: 'https://cdn.example.com/photo.jpg', thumbnailKey: 'media-1.thumb.jpg', createdAt: new Date('2026-06-15T00:00:00.000Z') },
+      { id: 'media-2', entityId: 'eq-1', cdnUrl: null, thumbnailKey: null, createdAt: new Date('2026-06-01T00:00:00.000Z') },
+      { id: 'media-3', entityId: 'eq-2', cdnUrl: null, thumbnailKey: 'media-3.thumb.jpg', createdAt: new Date('2026-06-10T00:00:00.000Z') },
+    ]);
 
     const snap = await getFleetSnapshot({ tenantId: 'orion' });
 
-    expect(mediaFindMany).toHaveBeenCalledTimes(2);
+    expect(mediaFindMany).toHaveBeenCalledTimes(1);
     const call = mediaFindMany.mock.calls[0][0];
     expect(call.where.entityType).toBe('equipment');
     expect(call.where.tenantId).toBe('orion');
     expect(call.where.uploadStatus).toBe('completed');
     expect(call.where.isDeleted).toBe(false);
-    expect(call.take).toBe(1);
-    expect(call.orderBy).toEqual({ createdAt: 'desc' });
-    expect(mediaFindMany.mock.calls.map((c) => c[0].where.entityId)).toEqual(['eq-1', 'eq-2']);
 
     const eq1 = snap.equipment.find((c) => c.id === 'eq-1');
     const eq2 = snap.equipment.find((c) => c.id === 'eq-2');

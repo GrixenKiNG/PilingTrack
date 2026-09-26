@@ -166,28 +166,19 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
   const equipmentIds = equipment.map((e) => e.id);
 
   // Latest completed, non-deleted photo per equipment (entityType='equipment').
-  // One row per machine (`take: 1`, same `createdAt desc` the map below relied
-  // on): only the single newest photo is rendered, and the fleet is 5-30
-  // machines — reading every photo of every machine was needless
-  // (F-R20-2, docs/audits/hermes-night/20-query-limits.md #7).
-  const photoRows = (
-    await Promise.all(
-      equipmentIds.map((entityId) =>
-        db.media.findMany({
-          where: {
-            entityType: 'equipment',
-            entityId,
-            tenantId: opts.tenantId,
-            uploadStatus: 'completed',
-            isDeleted: false,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { id: true, entityId: true, cdnUrl: true, thumbnailKey: true },
-        }),
-      ),
-    )
-  ).flat();
+  const photoRows = equipmentIds.length
+    ? await db.media.findMany({
+        where: {
+          entityType: 'equipment',
+          entityId: { in: equipmentIds },
+          tenantId: opts.tenantId,
+          uploadStatus: 'completed',
+          isDeleted: false,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, entityId: true, cdnUrl: true, thumbnailKey: true },
+      })
+    : [];
   const photoByEquipment = new Map<string, string>();
   for (const m of photoRows) {
     if (m.entityId && !photoByEquipment.has(m.entityId)) {
