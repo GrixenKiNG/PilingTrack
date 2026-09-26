@@ -20,6 +20,8 @@ import {
   ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand,
   type ProductionEntryInput,
 } from '../operator-mobile/api';
+import {OfflineQueueBanner} from '../operator-mobile/offline-queue-banner';
+import {useOfflineQueue} from '../operator-mobile/use-offline-queue';
 import {downtimeInterval, formatIntervalMinutes, hhmm} from '../operator-mobile/downtime-interval';
 
 /**
@@ -906,6 +908,10 @@ export function OperatorV5App() {
       setNotice(done);
       await reload();
     } catch (cause) {
+      // Запись легла в очередь — это принятая запись, а не отказ: следующая
+      // обязана получить новый ключ. Со старым ключом очередь считала её
+      // повтором той же записи и молча не брала, а сервер — тем более.
+      if (cause instanceof QueuedOffline) setCommandId(newCommandId());
       setNotice(cause instanceof QueuedOffline
         ? cause.message
         : cause instanceof Error ? cause.message : 'Действие не выполнено');
@@ -913,6 +919,8 @@ export function OperatorV5App() {
       setBusy(false);
     }
   }, [reload]);
+
+  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
    * Периодический чек-лист ТБ, открытый по сроку.
@@ -1190,6 +1198,7 @@ export function OperatorV5App() {
       <Bar online={online} />
       <Top state={state} />
       {notice ? <p className="note">{notice}</p> : null}
+      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
       {body()}
       <Dock active={tab} onSelect={setTab} />
     </div>

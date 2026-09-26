@@ -1,7 +1,8 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {
-  enqueue, flushQueue, isQueueable, readQueue, retry,
+  AUTH_WAIT_MESSAGE, discard, enqueue, flushQueue, isQueueable, readQueue, resolve, retry,
 } from './offline-queue';
+import {QueuedOffline, sendCommand} from './api';
 import {usePilingStore} from '@/lib/store';
 
 /*
@@ -92,6 +93,47 @@ describe('очередь команд на устройстве', () => {
     expect(readQueue()[0].state).toBe('PENDING');
     const result = await flushQueue(async () => ({}));
     expect(result).toEqual({sent: 1, left: 0});
+  });
+
+  it('«слишком часто» и истёкший вход — не отказ: запись ждёт, а не краснеет', async () => {
+    // Хвост после суток без связи упирается в ограничитель частоты; сессия
+    // истекает посреди отправки. Раньше оба случая запирали запись в FAILED.
+    enqueue(piles);
+    await flushQueue(async () => { throw Object.assign(new Error('Too many requests'), {status: 429}); });
+    expect(readQueue()[0].state).toBe('PENDING');
+
+    await flushQueue(async () => { throw Object.assign(new Error('Войдите в систему'), {status: 401}); });
+    expect(readQueue()[0]).toMatchObject({state: 'PENDING', lastError: AUTH_WAIT_MESSAGE});
+  });
+
+  it('убрать с устройства можно только отвергнутую запись', async () => {
+    enqueue(piles);
+    discard('c1');
+    expect(readQueue()).toHaveLength(1); // ждущая ещё может уйти
+
+    await flushQueue(async () => { throw Object.assign(new Error('Смена закрыта'), {status: 409}); });
+    discard('c1');
+    expect(readQueue()).toHaveLength(0);
+  });
+
+  it('испорченное хранилище не перезаписывается пустой очередью', () => {
+    globalThis.localStorage.setItem('pilingtrack.operator.queue.v1', '{broken');
+    resolve('c1');
+    expect(globalThis.localStorage.getItem('pilingtrack.operator.queue.v1')).toBe('{broken');
+  });
+
+  it('страница входа в Wi-Fi со статусом 200 — не успех: запись остаётся', async () => {
+    // Сеть гостиницы отвечает на перехваченный запрос своей HTML-страницей.
+    // Раньше это считалось принятой записью, и она уходила из очереди.
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response('<html>Вход в сеть</html>', {status: 200})) as typeof fetch;
+    try {
+      await expect(sendCommand({command: 'log-production', clientCommandId: 'c1', shiftId: 's1',
+        entry: {kind: 'PILES', pileGradeId: 'g1', count: 3}})).rejects.toBeInstanceOf(QueuedOffline);
+      expect(readQueue()).toHaveLength(1);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
   it('записи прежнего машиниста не уходят под сессией сменщика', async () => {

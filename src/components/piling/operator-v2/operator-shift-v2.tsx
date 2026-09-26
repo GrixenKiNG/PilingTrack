@@ -54,7 +54,7 @@ import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
-  fetchState, sendCommand, type ProductionEntryInput,
+  fetchState, QueuedOffline, sendCommand, type ProductionEntryInput,
 } from '@/components/piling/operator-mobile/api';
 import { SafetyTab } from '@/components/piling/operator-mobile/screens/safety-tab';
 import { PpeScreen } from '@/components/piling/operator-mobile/screens/ppe-screen';
@@ -383,6 +383,13 @@ export function OperatorShiftV2() {
       await loadMobile();
       return true;
     } catch (cause) {
+      // Легла в очередь — запись принята устройством: форму закрываем и ключ
+      // меняем, как при успехе.
+      if (cause instanceof QueuedOffline) {
+        setIncidentCommandId(crypto.randomUUID());
+        toast.info(cause.message);
+        return true;
+      }
       toast.error(cause instanceof Error ? cause.message : 'Происшествие не записано');
       return false;
     } finally {
@@ -432,6 +439,9 @@ export function OperatorShiftV2() {
    * второй сваи не заводит, если ответ потерялся в дороге. Это же делает
    * запись пригодной для очереди на устройстве: обрыв связи её не теряет.
    */
+  // Ключ переживает нажатие: двойное касание в перчатке не должно давать две
+  // записи. Новый ключ — только после принятой записи.
+  const [productionCommandId, setProductionCommandId] = useState(() => crypto.randomUUID());
   const logProduction = useCallback(async (entry: ProductionEntryInput) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     if (!shiftId) {
@@ -442,19 +452,28 @@ export function OperatorShiftV2() {
     try {
       await sendCommand({
         command: 'log-production',
-        clientCommandId: crypto.randomUUID(),
+        clientCommandId: productionCommandId,
         shiftId,
         entry,
       });
+      setProductionCommandId(crypto.randomUUID());
       await loadMobile();
       return true;
     } catch (cause) {
+      // Легла в очередь — запись принята устройством. Раньше это показывалось
+      // ошибкой, форма оставалась открытой, машинист жал снова — и с новым
+      // ключом в очередь ложилась вторая такая же запись: сваи задваивались.
+      if (cause instanceof QueuedOffline) {
+        setProductionCommandId(crypto.randomUUID());
+        toast.info(cause.message);
+        return true;
+      }
       toast.error(cause instanceof Error ? cause.message : 'Запись не прошла');
       return false;
     } finally {
       setBusy(false);
     }
-  }, [mobile?.shift?.id, facts?.shift?.id, loadMobile]);
+  }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
 
   const command = async (path: string, version: number, body: Record<string, unknown> = {}) => {
     const shiftId = facts?.shift?.id;

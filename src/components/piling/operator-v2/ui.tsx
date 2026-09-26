@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { Check, ChevronLeft } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
+import { OfflineQueueBanner } from '@/components/piling/operator-mobile/offline-queue-banner';
+import { useOfflineQueue } from '@/components/piling/operator-mobile/use-offline-queue';
 
 /** Имена фаз сохранены для совместимости; оформление использует токены продукта. */
 export type StepTone = 'blue' | 'green' | 'purple';
@@ -33,6 +35,10 @@ export function StepShell({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  // Очередь устройства видна на каждом шаге смены: раньше v2 клал записи в
+  // очередь, но не показывал и не отправлял её — они ждали, пока человек не
+  // откроет другой экран.
+  const queue = useOfflineQueue();
   return (
     // Высота НЕ прибита к 100dvh. Оболочка приложения рисует свою шапку над
     // модулем, поэтому экран на её высоту выше окна: кнопка внизу уезжала за
@@ -53,6 +59,7 @@ export function StepShell({
         </div>
       </header>
 
+      <OfflineQueueBanner items={queue.queued} onRetry={queue.retry} onDiscard={queue.discard} className="space-y-1 px-4 pt-3" />
       <div className="space-y-3 p-4">{children}</div>
 
       {footer && (

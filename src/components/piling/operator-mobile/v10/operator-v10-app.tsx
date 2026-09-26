@@ -17,6 +17,8 @@ import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import {documentsSummary} from '../safety/documents-summary';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
 import {ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand} from '../api';
+import {OfflineQueueBanner} from '../offline-queue-banner';
+import {useOfflineQueue} from '../use-offline-queue';
 import type {ProductionEntryInput} from '../api';
 import {downtimeInterval, formatIntervalMinutes, hhmm} from '@/components/piling/operator-mobile/downtime-interval';
 import {PilePassportForm} from '../screens/pile-passport-form';
@@ -1399,6 +1401,10 @@ export function OperatorV10App() {
       setNotice(done);
       await reload();
     } catch (cause) {
+      // Запись легла в очередь — это принятая запись, а не отказ: следующая
+      // обязана получить новый ключ. Со старым ключом очередь считала её
+      // повтором той же записи и молча не брала, а сервер — тем более.
+      if (cause instanceof QueuedOffline) setCommandId(newCommandId());
       setNotice(cause instanceof QueuedOffline
         ? cause.message
         : cause instanceof Error ? cause.message : 'Действие не выполнено');
@@ -1406,6 +1412,8 @@ export function OperatorV10App() {
       setBusy(false);
     }
   }, [reload]);
+
+  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   const inspection = useMemo(
     () => state?.checklists.find((list) => list.stage === 'PRESHIFT_INSPECTION'),
@@ -1633,6 +1641,7 @@ export function OperatorV10App() {
       <div className="ov10-content" ref={contentRef}>
         {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} className="space-y-1" />
         {!loading && !state && !loadError ? <Badge tone="warn">нет данных</Badge> : null}
         {body}
       </div>

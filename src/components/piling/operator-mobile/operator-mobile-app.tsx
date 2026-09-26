@@ -7,9 +7,10 @@ import type {
 } from '@/modules/operator-mobile/contracts';
 import {
   ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
-  sendQueuedCommand, type ProductionEntryInput,
+  type ProductionEntryInput,
 } from './api';
-import {flushQueue, readQueue, retry, subscribeQueue, type QueuedCommand} from './offline-queue';
+import {OfflineQueueBanner} from './offline-queue-banner';
+import {useOfflineQueue} from './use-offline-queue';
 import {OperatorStatusStrip} from './operator-status-strip';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
@@ -69,9 +70,6 @@ export function OperatorMobileApp() {
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Что лежит на устройстве и ещё не ушло. Держим в состоянии, чтобы машинист
-  // видел это постоянно, а не узнавал по факту пропажи.
-  const [queued, setQueued] = useState<QueuedCommand[]>([]);
   const [online, setOnline] = useState(true);
   const [detour, setDetour] = useState<Detour | null>(null);
   /**
@@ -186,45 +184,20 @@ export function OperatorMobileApp() {
         return true;
       }
       setActionError(error instanceof Error ? error.message : 'Команда не выполнена');
+      // 409 — сервер уже в другом состоянии (ответ на прошлое нажатие
+      // потерялся, смена закрыта): перечитываем, чтобы экран не спорил с ним.
+      // Другие ошибки не перечитываем: без связи это сменило бы экран с
+      // введёнными цифрами на «Нет связи».
+      if (error instanceof ApiError && error.status === 409) void reload();
       return false;
     } finally {
       setBusy(false);
     }
   }, [reload]);
 
-  /**
-   * Очередь: показываем её и опустошаем при возврате связи.
-   *
-   * Ждать следующего действия машиниста нельзя — он может отложить телефон с
-   * непереданной сваей. Поэтому пробуем при событии `online` и один раз при
-   * запуске: смену часто открывают уже в сети, после ночи без неё.
-   */
-  useEffect(() => {
-    const sync = () => setQueued(readQueue());
-    sync();
-    const unsubscribe = subscribeQueue(sync);
-
-    let running = false;
-    const flush = async () => {
-      if (running) return;
-      running = true;
-      try {
-        const {sent} = await flushQueue(sendQueuedCommand);
-        // Перечитываем состояние только если что-то действительно ушло:
-        // сервер увидел новые записи, и экран должен их показать.
-        if (sent > 0) await reload();
-      } finally {
-        running = false;
-      }
-    };
-
-    void flush();
-    globalThis.addEventListener?.('online', flush);
-    return () => {
-      unsubscribe();
-      globalThis.removeEventListener?.('online', flush);
-    };
-  }, [reload]);
+  // Что лежит на устройстве и ещё не ушло: машинист видит это постоянно, а не
+  // узнаёт по факту пропажи. Когда слать — решает общий хук (use-offline-queue).
+  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   if (forbidden) {
     return (
@@ -553,7 +526,7 @@ export function OperatorMobileApp() {
         onOpen={(phase) => setDetour({kind: 'REVIEW', phase: phase as OperatorPhase})}
       />
       <OperatorStatusStrip online={online} items={queued} />
-      <QueueBanner items={queued} />
+      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
       {screen()}
     </OperatorFrame>
   );
@@ -606,46 +579,6 @@ function OperatorFrame({children}: {children: ReactNode}) {
       ].join(' ')}
     >
       {children}
-    </div>
-  );
-}
-
-/**
- * Что записано на устройстве и ещё не ушло на сервер.
- *
- * Без этой строки автономная работа неотличима от потери данных: машинист
- * ввёл сваи, экран промолчал, а в отчёте их нет. Показываем и сколько ждёт
- * связи, и что сервер отверг по существу — второе само не рассосётся.
- */
-function QueueBanner({items}: {items: QueuedCommand[]}) {
-  if (items.length === 0) return null;
-  const failed = items.filter((item) => item.state === 'FAILED');
-  const pending = items.filter((item) => item.state === 'PENDING');
-
-  return (
-    <div className="space-y-1 px-3 pt-2">
-      {pending.length > 0 && (
-        <div className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
-          На устройстве: {pending.map((item) => item.label).join(', ')}. Отправим, когда появится связь.
-        </div>
-      )}
-      {failed.map((item) => (
-        <div
-          key={item.clientCommandId}
-          className="flex items-start justify-between gap-2 rounded-xl border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong"
-        >
-          <span className="min-w-0">
-            {item.label} не принята: {item.lastError ?? 'причина неизвестна'}
-          </span>
-          <button
-            type="button"
-            onClick={() => retry(item.clientCommandId)}
-            className="shrink-0 rounded border border-destructive px-2 py-0.5 font-semibold"
-          >
-            Повторить
-          </button>
-        </div>
-      ))}
     </div>
   );
 }

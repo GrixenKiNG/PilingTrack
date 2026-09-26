@@ -9,7 +9,7 @@
  * вовсе и «записать потом на бумажке».
  *
  * ЧТО СЮДА ПОПАДАЕТ И ПОЧЕМУ ТОЛЬКО ОНО. В очередь идут только добавляющие
- * записи с ключом идемпотентности: выработка, осмотр, происшествие, поправка.
+ * записи с ключом идемпотентности: выработка, происшествие, поправка.
  * У них нет конфликтов по построению — повтор той же команды сервер узнаёт по
  * `clientCommandId` и второй записи не делает, а порядок между ними не важен.
  *
@@ -85,11 +85,71 @@ export function commandLabel(command: unknown): string {
   return LABELS[name] ?? 'Запись';
 }
 
+const CORRECTION_KINDS: Record<string, string> = {PILES: 'сваи', DRILLING: 'бурение', DOWNTIME: 'простой'};
+
+function clock(iso: unknown): string {
+  const date = typeof iso === 'string' ? new Date(iso) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})
+    : '—';
+}
+
+/**
+ * Что именно лежит в записи — цифрами, а не словом «Выработка».
+ *
+ * Отвергнутую запись машинист вносит заново руками, и без этой строки ему
+ * пришлось бы вспоминать, сколько свай он тогда записал.
+ */
+export function describeCommand(command: unknown): string {
+  const value = (command ?? {}) as Record<string, unknown>;
+  if (value.command === 'log-production') {
+    const entry = (value.entry ?? {}) as Record<string, unknown>;
+    if (entry.kind === 'PILES') return `сваи: ${entry.count} шт`;
+    if (entry.kind === 'PILE_PASSPORT') {
+      const passport = (entry.passport ?? {}) as {pileNumber?: string; sets?: unknown[]};
+      const sets = Array.isArray(passport.sets) ? `, залогов: ${passport.sets.length}` : '';
+      return `паспорт сваи № ${passport.pileNumber ?? '—'}${sets}`;
+    }
+    if (entry.kind === 'DRILLING') return `бурение: ${entry.count} шт × ${entry.metersPerUnit} м`;
+    if (entry.kind === 'DOWNTIME') return `простой ${clock(entry.startedAt)}–${clock(entry.endedAt)}`;
+  }
+  if (value.command === 'correct-production') {
+    return `поправка (${CORRECTION_KINDS[String(value.kind)] ?? 'запись'}): ${value.actual}, причина: ${value.reason}`;
+  }
+  if (value.command === 'report-incident') {
+    const text = typeof value.description === 'string' ? value.description : '';
+    return `происшествие: ${text.length > 80 ? `${text.slice(0, 80)}…` : text}`;
+  }
+  return 'состав записи не распознан';
+}
+
+/**
+ * Как понимать отказ сервера.
+ *
+ * `permanent` — отказ по существу (смена закрыта, число неверное): повтор того
+ * же самого не поможет, нужно решение человека. `auth` — сессия истекла:
+ * запись цела и уйдёт после входа. `temporary` — всё остальное, включая
+ * «слишком часто» (429): длинный хвост после суток без связи упирается в
+ * ограничитель частоты, и считать это отказом значило бы запереть записи.
+ */
+export type FailureKind = 'permanent' | 'auth' | 'temporary';
+
+export function classifyFailure(status: number | null | undefined): FailureKind {
+  if (status === 401) return 'auth';
+  if (typeof status !== 'number' || status < 400 || status >= 500) return 'temporary';
+  if (status === 408 || status === 425 || status === 429) return 'temporary';
+  return 'permanent';
+}
+
+export const AUTH_WAIT_MESSAGE = 'Войдите снова — запись отправится после входа';
+
 // --- Хранилище ---
 
 export class QueueStorageError extends Error {
-  constructor() {
-    super('Не удалось сохранить запись на устройстве. Не закрывайте форму: освободите место или восстановите связь и повторите.');
+  constructor(readonly reason: 'full' | 'unavailable' = 'full') {
+    super(reason === 'unavailable'
+      ? 'Память браузера недоступна (частный режим?) — без связи запись не сохранится. Не закрывайте форму и отправьте её при связи.'
+      : 'Не удалось сохранить запись на устройстве. Не закрывайте форму: освободите место или восстановите связь и повторите.');
     this.name = 'QueueStorageError';
   }
 }
@@ -117,9 +177,14 @@ function isMine(item: QueuedCommand): boolean {
 }
 
 function write(queue: QueuedCommand[]): void {
+  let storage: Storage | undefined;
   try {
-    const storage = globalThis.localStorage;
-    if (!storage) throw new QueueStorageError();
+    storage = globalThis.localStorage;
+  } catch {
+    storage = undefined;
+  }
+  if (!storage) throw new QueueStorageError('unavailable');
+  try {
     const value = JSON.stringify(queue);
     storage.setItem(STORAGE_KEY, value);
     if (storage.getItem(STORAGE_KEY) !== value) throw new QueueStorageError();
@@ -127,6 +192,23 @@ function write(queue: QueuedCommand[]): void {
     throw new QueueStorageError();
   }
   notify();
+}
+
+/**
+ * Изменить очередь, прочитав её строго.
+ *
+ * Нестрогое чтение превращает испорченное значение в пустой список, и запись
+ * этого списка стирала бы все неотправленные сваи разом. Если прочитать
+ * нельзя — ничего не пишем: лучше оставить как есть, чем затереть.
+ */
+function mutate(change: (queue: QueuedCommand[]) => QueuedCommand[]): void {
+  let queue: QueuedCommand[];
+  try {
+    queue = read(true);
+  } catch {
+    return;
+  }
+  write(change(queue));
 }
 
 // --- Подписка для интерфейса ---
@@ -137,9 +219,19 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
+// Вторая вкладка того же браузера пишет в то же хранилище: без этого экран
+// первой показывал бы очередь, которой уже нет.
+function onStorage(event: StorageEvent): void {
+  if (event.key === null || event.key === STORAGE_KEY) notify();
+}
+
 export function subscribeQueue(listener: () => void): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  if (listeners.size === 1) globalThis.addEventListener?.('storage', onStorage);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) globalThis.removeEventListener?.('storage', onStorage);
+  };
 }
 
 export function readQueue(): QueuedCommand[] {
@@ -170,29 +262,45 @@ export function enqueue(command: {clientCommandId: string}): void {
 }
 
 export function resolve(clientCommandId: string): void {
-  write(read().filter((item) => item.clientCommandId !== clientCommandId));
+  mutate((queue) => queue.filter((item) => item.clientCommandId !== clientCommandId));
 }
 
 /**
  * Вернуть отвергнутую запись в очередь.
  *
- * Без этого `FAILED` — тупик: запись висит вечно, и убрать её машинист не
- * может. Удаления здесь намеренно нет: стереть введённое человеком молча хуже,
- * чем оставить его на виду. Причина отказа могла и уйти — смену переоткрыли,
- * справочник поправили, — и тогда повтор пройдёт.
+ * Без этого `FAILED` — тупик: запись висит вечно. Причина отказа могла и
+ * уйти — смену переоткрыли, справочник поправили, — и тогда повтор пройдёт.
+ * Сама по себе смена состояния ничего не отправляет: отправку запускает
+ * вызывающий (`useOfflineQueue`).
  */
 export function retry(clientCommandId: string): void {
-  write(read().map((item) => item.clientCommandId === clientCommandId
+  mutate((queue) => queue.map((item) => item.clientCommandId === clientCommandId
     ? {...item, state: 'PENDING' as const, lastError: null}
     : item));
 }
 
+/**
+ * Убрать отвергнутую запись с устройства — только по явному решению человека.
+ *
+ * Молча стирать введённое нельзя, но и держать вечно то, что сервер не примет
+ * никогда (смена закрыта, отчёт сдан), тоже: красная строка, которую нечем
+ * убрать, приучает не смотреть на красные строки. Экран спрашивает
+ * подтверждение и показывает состав записи, чтобы её можно было внести заново.
+ * Ждущие отправки записи так не убрать — они ещё могут уйти.
+ */
+export function discard(clientCommandId: string): void {
+  mutate((queue) => queue.filter((item) =>
+    item.clientCommandId !== clientCommandId || item.state !== 'FAILED'));
+}
+
 export function markAttempt(clientCommandId: string, error: string | null, permanent: boolean): void {
-  write(read().map((item) => item.clientCommandId === clientCommandId
+  mutate((queue) => queue.map((item) => item.clientCommandId === clientCommandId
     ? {...item, attempts: item.attempts + 1, lastError: error,
       state: permanent ? 'FAILED' as const : 'PENDING' as const}
     : item));
 }
+
+let inFlight: Promise<{sent: number; left: number}> | null = null;
 
 /**
  * Отправить всё отложенное. Возвращает, сколько ушло и сколько осталось.
@@ -200,8 +308,19 @@ export function markAttempt(clientCommandId: string, error: string | null, perma
  * Записи с `FAILED` не трогаем: сервер отказал по существу (например, смена
  * чужая или число неверное), и повторять то же самое бессмысленно — это
  * решение человека. Они остаются видимыми, пока их не разберут.
+ *
+ * Одновременно идёт одна отправка: её зовут и таймер, и событие «связь
+ * появилась», и кнопка «Повторить» — две параллельные отправки слали бы
+ * одну запись дважды (сервер узнает её по ключу, но это лишний трафик).
  */
-export async function flushQueue(
+export function flushQueue(
+  send: (command: unknown) => Promise<unknown>,
+): Promise<{sent: number; left: number}> {
+  inFlight ??= sendAll(send).finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+async function sendAll(
   send: (command: unknown) => Promise<unknown>,
 ): Promise<{sent: number; left: number}> {
   let sent = 0;
@@ -212,13 +331,12 @@ export async function flushQueue(
       resolve(item.clientCommandId);
       sent += 1;
     } catch (error) {
-      const status = (error as {status?: number} | null)?.status;
-      // 4xx — отказ по существу, повтор не поможет. Остальное (обрыв, 5xx) —
-      // причина попробовать позже.
-      const permanent = typeof status === 'number' && status >= 400 && status < 500;
+      const kind = classifyFailure((error as {status?: number} | null)?.status);
       markAttempt(item.clientCommandId,
-        error instanceof Error ? error.message : 'Не отправлено', permanent);
-      if (!permanent) break; // сеть всё ещё лежит — остальные ждут
+        kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',
+        kind === 'permanent');
+      // Сеть лежит, сервер занят или нужен вход — остальные ждут.
+      if (kind !== 'permanent') break;
     }
   }
   return {sent, left: readQueue().length};

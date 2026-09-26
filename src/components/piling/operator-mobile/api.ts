@@ -3,12 +3,15 @@
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
-import {commandLabel, enqueue, isQueueable, markAttempt, resolve} from './offline-queue';
+import {
+  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, enqueue, isQueueable, markAttempt,
+  QueueStorageError, resolve,
+} from './offline-queue';
 
 /**
  * Клиент мобильного места.
  *
- * Добавляющие записи (выработка, осмотр, происшествие, поправка) переживают
+ * Добавляющие записи (выработка, происшествие, поправка) переживают
  * обрыв сети: они ложатся в очередь на устройстве и уходят при связи. Повтор
  * безопасен — сервер узнаёт команду по `clientCommandId` и второй записи не
  * делает.
@@ -30,7 +33,14 @@ async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new ApiError(response.status, payload?.error ?? 'Сервер не ответил', payload?.details);
   }
-  return payload?.data as T;
+  // Успех — только разобранный ответ нашего сервера. Сеть гостиницы или
+  // оператора связи отдаёт на перехваченный запрос свою страницу входа со
+  // статусом 200: раньше это считалось успехом, запись уходила из очереди, а
+  // сервер её так и не видел. Статус 0 — «не ответ сервера», повторить позже.
+  if (payload === null || typeof payload !== 'object') {
+    throw new ApiError(0, 'Ответ пришёл не от сервера приложения — возможно, сеть требует входа (Wi‑Fi). Запись осталась на устройстве.');
+  }
+  return payload.data as T;
 }
 
 export async function fetchState(input: {
@@ -106,8 +116,8 @@ type Command =
  * когда вернётся сеть. Не ошибка — форму можно закрывать, данные не потеряны.
  */
 export class QueuedOffline extends Error {
-  constructor(readonly label: string) {
-    super(`${label}: сохранено на устройстве, отправим при связи`);
+  constructor(readonly label: string, when: 'при связи' | 'после входа' = 'при связи') {
+    super(`${label}: сохранено на устройстве, отправим ${when}`);
     this.name = 'QueuedOffline';
   }
 }
@@ -137,22 +147,36 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
 
   // Сначала в очередь, потом в сеть: обрыв посреди запроса не должен терять
   // введённое. Успех снимает запись из очереди, отказ по существу — тоже
-  // (повтор не поможет), а обрыв оставляет её ждать связи.
-  enqueue(command);
+  // (повтор не поможет, а форма с цифрами ещё открыта), а обрыв, «слишком
+  // часто» и истёкший вход оставляют её ждать.
+  //
+  // Память браузера недоступна (частный режим) — это не повод не отправлять
+  // при живой связи. Тогда шлём напрямую и, если не ушло, отдаём ошибку
+  // хранилища: форма остаётся открытой, введённое не пропадает.
+  try {
+    enqueue(command);
+  } catch (storageError) {
+    if (!(storageError instanceof QueueStorageError)) throw storageError;
+    try {
+      return await postCommand<T>(command);
+    } catch (error) {
+      if (error instanceof ApiError && classifyFailure(error.status) === 'permanent') throw error;
+      throw storageError;
+    }
+  }
   try {
     const result = await postCommand<T>(command);
     resolve(command.clientCommandId);
     return result;
   } catch (error) {
-    const status = error instanceof ApiError ? error.status : null;
-    const permanent = status !== null && status >= 400 && status < 500;
-    if (permanent) {
+    const kind = classifyFailure(error instanceof ApiError ? error.status : null);
+    if (kind === 'permanent') {
       resolve(command.clientCommandId);
       throw error;
     }
     markAttempt(command.clientCommandId,
-      error instanceof Error ? error.message : 'Не отправлено', false);
-    throw new QueuedOffline(commandLabel(command));
+      kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено', false);
+    throw new QueuedOffline(commandLabel(command), kind === 'auth' ? 'после входа' : 'при связи');
   }
 }
 

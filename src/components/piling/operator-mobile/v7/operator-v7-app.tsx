@@ -8,9 +8,11 @@ import type {
 import {PHASE_LABELS, PHASE_ORDER} from '@/modules/operator-mobile/contracts';
 import {
   ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
-  sendQueuedCommand, type ProductionEntryInput,
+  type ProductionEntryInput,
 } from '../api';
-import {flushQueue, readQueue, retry, subscribeQueue, type QueuedCommand} from '../offline-queue';
+import {AUTH_WAIT_MESSAGE} from '../offline-queue';
+import {OfflineQueueBanner} from '../offline-queue-banner';
+import {useOfflineQueue} from '../use-offline-queue';
 import {Banner, Button, Dock, OPERATOR_DOCK, PhoneShell as Shell, Title, type DockTab} from './v7-ui';
 import {admissionSteps} from '../safety/admission-steps';
 import {AdmissionResult, BriefingFlow, KnowledgeFlow, PpeFlow} from './v7-identity';
@@ -61,7 +63,6 @@ export function OperatorV7App() {
   const [busy, setBusy] = useState(false);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
-  const [queued, setQueued] = useState<QueuedCommand[]>([]);
   const [tab, setTab] = useState<DockTab>('HOME');
   const [detour, setDetour] = useState<Detour | null>(null);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
@@ -112,28 +113,9 @@ export function OperatorV7App() {
     };
   }, []);
 
-  useEffect(() => {
-    const sync = () => setQueued(readQueue());
-    sync();
-    const unsubscribe = subscribeQueue(sync);
-    let running = false;
-    const flush = async () => {
-      if (running) return;
-      running = true;
-      try {
-        const {sent} = await flushQueue(sendQueuedCommand);
-        if (sent > 0) await reload();
-      } finally {
-        running = false;
-      }
-    };
-    globalThis.addEventListener?.('online', () => void flush());
-    const timer = setInterval(() => { if (globalThis.navigator?.onLine !== false) void flush(); }, 30_000);
-    return () => {
-      unsubscribe();
-      clearInterval(timer);
-    };
-  }, [reload]);
+  // Когда слать очередь — решает общий хук. Свой набор поводов здесь не
+  // отправлял при запуске, а слушатель online не снимался при уходе с экрана.
+  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
    * Выполнить команду и вернуться к обзору.
@@ -198,26 +180,20 @@ export function OperatorV7App() {
     <>
       {actionError ? <Banner tone="bad" title="Не отправлено" note={actionError} /> : null}
       {notice ? <Banner tone="info" title="Сохранено на устройстве" note={notice} /> : null}
-      {queued.length > 0 ? (
+      {pending > 0 ? (
         <Banner
-          tone={pending > 0 ? 'warn' : 'bad'}
-          title={`В очереди: ${queued.length}`}
-          note={queued.map((item) => item.label).join(', ')}
-          action={queued.some((item) => item.state === 'FAILED')
-            ? 'Часть записей не ушла — нажмите «Повторить» ниже'
-            : 'Уйдут при связи'}
+          tone="warn"
+          title={`В очереди: ${pending}`}
+          note={queued.filter((item) => item.state === 'PENDING').map((item) => item.label).join(', ')}
+          action={queued.some((item) => item.lastError === AUTH_WAIT_MESSAGE) ? AUTH_WAIT_MESSAGE : 'Уйдут при связи'}
         />
       ) : null}
-      {queued.some((item) => item.state === 'FAILED') ? (
-        <Button
-          tone="soft"
-          onClick={() => {
-            queued.filter((item) => item.state === 'FAILED').forEach((item) => retry(item.clientCommandId));
-          }}
-        >
-          Повторить отправку
-        </Button>
-      ) : null}
+      <OfflineQueueBanner
+        items={queued.filter((item) => item.state === 'FAILED')}
+        onRetry={retryQueued}
+        onDiscard={discardQueued}
+        className="space-y-1"
+      />
     </>
   );
 
