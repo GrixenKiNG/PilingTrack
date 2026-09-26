@@ -23,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import { cn } from '@/lib/utils';
-import { formatNumber, formatHours } from '@/lib/format';
+import { formatNumber, formatHours, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals, shiftDurationHours } from './report-totals';
 import { statusLabel, type ReportHistory } from '@/services/reports/report-history';
@@ -32,7 +32,6 @@ import {
   formatPercentValue,
   roleLabel,
   shiftLabel,
-  shortDate,
 } from './report-list-format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 
@@ -92,7 +91,7 @@ export function ReportEvidencePreview({
 
       <div className="space-y-2 p-3">
         <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
-          <HeaderFact label="Смена" value={shiftLabel(report)} sub={report.date} />
+          <HeaderFact label="Смена" value={shiftLabel(report)} sub={formatRuDate(report.date)} />
           <HeaderFact label="Изменено" value={formatIsoDateTime(report.updatedAt)} sub={report.lastEditedByName || '-'} />
         </div>
 
@@ -163,7 +162,7 @@ export function ReportEvidencePreview({
           <PlainFact label="Начало смены" value={report.shiftStart || '-'} />
           <PlainFact label="Окончание" value={report.shiftEnd || '-'} />
           <PlainFact label="Отработано" value={duration == null ? '-' : formatHours(duration)} />
-          <PlainFact label="Дата" value={shortDate(report.date)} />
+          <PlainFact label="Дата" value={formatRuDate(report.date)} />
         </div>
 
         <div className="grid gap-2 md:grid-cols-2">

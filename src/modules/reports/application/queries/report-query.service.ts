@@ -8,6 +8,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { formatRuDate } from '@/lib/format';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveUserScope } from '@/services/auth/authorization-service';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
@@ -393,7 +394,8 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
   const rows = reports.flatMap((report) => {
     const base = {
       reportId: report.reportId,
-      date: report.date,
+      // Выгрузку открывает человек: дата — ДД.ММ.ГГГГ, а не ISO-строка из БД.
+      date: formatRuDate(report.date),
       shift: report.shiftType === 'NIGHT' ? 'Ночная' : 'Дневная',
       status: reportStatusExportLabel(report.status),
       site: report.site.name,
@@ -491,7 +493,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   ]];
   for (const r of reports) {
     const base = [
-      r.reportId, r.date, shift(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
+      r.reportId, formatRuDate(r.date), shift(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
       r.crew?.name || '', r.equipment?.name || r.crew?.equipment?.name || '',
     ];
     // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
@@ -531,7 +533,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
     totals.push([
-      r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
+      r.reportId, formatRuDate(r.date), shift(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
       pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '',
     ]);

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { formatFixed, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
 
 interface OperatorUser { id: string; name: string; }
@@ -269,7 +270,7 @@ export function ReportFormDialog({
               <h4 className="text-sm font-semibold flex items-center gap-2"><HardHat className="w-4 h-4 text-signal-strong" />Забитые сваи</h4>
               {formTotalPiles > 0 && (
                 <span className="text-xs font-mono font-bold text-signal-strong bg-signal/10 px-2 py-0.5 rounded-full">
-                  {formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п.
+                  {formTotalPiles} шт. / {formatFixed(formTotalPileMeters, 1)} м.п.
                 </span>
               )}
             </div>
@@ -284,7 +285,7 @@ export function ReportFormDialog({
             </div>
             {tempPileGrade && Number(tempPileCount) > 0 && (
               <p className="mb-2 rounded-md border border-signal/30 bg-signal/10 px-3 py-2 text-xs text-signal-strong">
-                Автоподсчёт: {getPileGradeName(tempPileGrade)} → {getPileLengthMeters(tempPileGrade).toFixed(1)} м × {Number(tempPileCount)} шт. = {tempPileMeters.toFixed(1)} м.п.
+                Автоподсчёт: {getPileGradeName(tempPileGrade)} → {formatFixed(getPileLengthMeters(tempPileGrade), 1)} м × {Number(tempPileCount)} шт. = {formatFixed(tempPileMeters, 1)} м.п.
               </p>
             )}
             {formPiles.length > 0 && (
@@ -294,13 +295,13 @@ export function ReportFormDialog({
                     <div className="min-w-0">
                       <span className="font-medium">{getPileGradeName(pile.pileGradeId)}</span>
                       <p className="text-3xs text-muted-foreground">
-                        {getPileLengthMeters(pile.pileGradeId).toFixed(1)} м × {pile.count} шт. = {getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.
+                        {formatFixed(getPileLengthMeters(pile.pileGradeId), 1)} м × {pile.count} шт. = {formatFixed(getPileMeters(pile.pileGradeId, pile.count), 1)} м.п.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-right font-mono font-semibold">
                         <span className="block">{pile.count} шт.</span>
-                        <span className="block text-xs text-muted-foreground">{getPileMeters(pile.pileGradeId, pile.count).toFixed(1)} м.п.</span>
+                        <span className="block text-xs text-muted-foreground">{formatFixed(getPileMeters(pile.pileGradeId, pile.count), 1)} м.п.</span>
                       </span>
                       <button onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
                         aria-label={`Удалить сваю ${getPileGradeName(pile.pileGradeId)}`}
@@ -319,7 +320,7 @@ export function ReportFormDialog({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold flex items-center gap-2"><Drill className="w-4 h-4 text-info-strong" />Лидерное бурение</h4>
-              {formTotalMeters > 0 && <span className="text-xs font-mono font-bold text-info-strong bg-info/10 px-2 py-0.5 rounded-full">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м</span>}
+              {formTotalMeters > 0 && <span className="text-xs font-mono font-bold text-info-strong bg-info/10 px-2 py-0.5 rounded-full">{formTotalDrillingCount} шт. / {formatFixed(formTotalMeters, 1)} м</span>}
             </div>
             <div className="flex gap-2 mb-2">
               <Select value={tempDrillType} onValueChange={setTempDrillType}>
@@ -339,8 +340,8 @@ export function ReportFormDialog({
                     <span className="font-medium">{getDrillTypeName(d.typeId)}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-right font-mono font-semibold">
-                        <span className="block">{d.count} шт. x {d.metersPerUnit} м</span>
-                        <span className="block text-xs text-muted-foreground">{d.meters} м</span>
+                        <span className="block">{d.count} шт. x {formatNumber(d.metersPerUnit)} м</span>
+                        <span className="block text-xs text-muted-foreground">{formatNumber(d.meters)} м</span>
                       </span>
                       <button onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
                         aria-label={`Удалить бурение ${getDrillTypeName(d.typeId)}`}
@@ -384,7 +385,7 @@ export function ReportFormDialog({
                           {dt.comment && <p className="text-3xs text-muted-foreground truncate">{dt.comment}</p>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-warning-strong">{dt.duration} ч</span>
+                          <span className="font-mono font-semibold text-warning-strong">{formatNumber(dt.duration)} ч</span>
                           <button onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
                             aria-label={`Удалить простой ${getDtReasonName(dt.reasonId)}`}
                             title="Удалить простой"
@@ -405,9 +406,9 @@ export function ReportFormDialog({
             <div className="bg-slate-900 rounded-lg p-3 text-white">
               <p className="text-3xs font-medium text-muted-foreground mb-2">Итого</p>
               <div className="flex items-center gap-4 text-sm">
-                <span className="font-mono font-bold">{formTotalPiles} шт. / {formTotalPileMeters.toFixed(1)} м.п. сваи</span>
-                <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formTotalMeters.toFixed(1)} м.п. бурение</span>
-                {formDowntimes.length > 0 && <span className="font-mono font-bold text-warning-strong">{formTotalDowntime} ч</span>}
+                <span className="font-mono font-bold">{formTotalPiles} шт. / {formatFixed(formTotalPileMeters, 1)} м.п. сваи</span>
+                <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formatFixed(formTotalMeters, 1)} м.п. бурение</span>
+                {formDowntimes.length > 0 && <span className="font-mono font-bold text-warning-strong">{formatNumber(formTotalDowntime)} ч</span>}
               </div>
             </div>
           )}

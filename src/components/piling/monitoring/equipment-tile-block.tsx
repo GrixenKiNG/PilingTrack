@@ -153,7 +153,7 @@ export function EquipmentTileBlockContent({
     case 'operator':
       return <Value label="Оператор" value={card.assignedOperatorName ?? '—'} icon={<User className="h-4 w-4" />} />;
     case 'engineHours':
-      return <Value label="Моточасы" value={card.engineHoursTotal != null ? `${card.engineHoursTotal.toLocaleString('ru')} ч` : '—'} icon={<Timer className="h-4 w-4" />} />;
+      return <Value label="Моточасы" value={card.engineHoursTotal != null ? `${formatFixed(card.engineHoursTotal, 0)} ч` : '—'} icon={<Timer className="h-4 w-4" />} />;
     case 'maintenance':
       return <Value label="Ближайшее ТО" value={hoursLeft != null ? `${Math.max(0, Math.round(hoursLeft))} ч` : '—'} icon={<Wrench className="h-4 w-4" />} />;
     case 'todayPiles':

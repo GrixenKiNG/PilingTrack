@@ -82,7 +82,8 @@ describe('ReportFormDialog — pile meters total', () => {
 
     // 9000mm / 1000 = 9.0 m/pile × 5 = 45.0 м.п. The old name-regex on "С90.30"
     // finds no 3-consecutive-digit run and would render "5 шт. / 0.0 м.п." instead.
-    expect(screen.getByText('5 шт. / 45.0 м.п.')).toBeTruthy();
+    // Разделитель дробной части — запятая (Аудит 17, находка 9).
+    expect(screen.getByText('5 шт. / 45,0 м.п.')).toBeTruthy();
   });
 });
 
@@ -201,8 +202,8 @@ describe('ReportFormDialog — архивная марка (F-R29-2)', () => {
     );
 
     // Строка сданного отчёта: название и метры (5 × 11,999... = 60.0 м.п.),
-    // а не сырой cuid и 0 м.п.
-    expect(screen.getByText('5 шт. / 60.0 м.п.')).toBeTruthy();
+    // а не сырой cuid и 0 м.п. Дробная часть — с запятой (Аудит 17, находка 9).
+    expect(screen.getByText('5 шт. / 60,0 м.п.')).toBeTruthy();
     // Название встречается ровно один раз — в строке отчёта. Второе вхождение
     // означало бы, что архивная марка попала в список выбора новой строки.
     expect(screen.queryAllByText('СВ 300-80')).toHaveLength(1);

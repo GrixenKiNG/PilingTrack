@@ -9,6 +9,7 @@ import { Clock, Drill, Eye, HardHat, Loader2 } from '@/components/piling/icons/u
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { formatFixed, formatNumber } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 
 export function ReportHistoryDetailDialog({
@@ -134,7 +135,7 @@ export function ReportHistoryDetailDialog({
                           <span>{drilling.type?.name || '-'}</span>
                           <span className="text-right font-mono font-semibold">
                             <span className="block">{drilling.count || 1} шт.</span>
-                            <span className="block text-xs text-muted-foreground">{drilling.meters} м.п.</span>
+                            <span className="block text-xs text-muted-foreground">{formatFixed(drilling.meters, 1)} м.п.</span>
                           </span>
                         </div>
                       ))}
@@ -164,7 +165,7 @@ export function ReportHistoryDetailDialog({
                             )}
                           </div>
                           <span className="font-mono font-semibold text-warning-strong">
-                            {downtime.duration} ч
+                            {formatNumber(downtime.duration)} ч
                           </span>
                         </div>
                       ))}

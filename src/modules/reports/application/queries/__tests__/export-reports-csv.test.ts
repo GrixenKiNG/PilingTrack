@@ -150,3 +150,28 @@ describe('exportReportsCsv — метраж свай', () => {
     expect(csv).toContain('"длина марки не задана"');
   });
 });
+
+/**
+ * Формат даты. `Report.date` — строка БД `ГГГГ-ММ-ДД`, но выгрузку открывает
+ * человек: в колонке «Дата» должно стоять `ДД.ММ.ГГГГ` (Аудит 17, находка 5).
+ */
+describe('exportReportsCsv — формат даты', () => {
+  const reportOn = (date: string) => ({
+    reportId: 'R-1', date, shiftType: 'DAY',
+    site: { name: 'Объект' }, user: { name: 'Иванов' },
+    crew: { name: 'Экипаж', equipment: { name: 'Banut 655' } },
+    piles: [], drillings: [],
+    downtimes: [{ duration: 2, comment: '', reason: { name: 'Ремонт' } }],
+  });
+
+  beforeEach(() => { findManyMock.mockReset(); });
+
+  it('пишет дату как ДД.ММ.ГГГГ, а не ISO-строкой из БД', async () => {
+    findManyMock.mockResolvedValue([reportOn('2026-08-17')]);
+
+    const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+
+    expect(csv).toContain('"17.08.2026"');
+    expect(csv).not.toContain('2026-08-17');
+  });
+});
