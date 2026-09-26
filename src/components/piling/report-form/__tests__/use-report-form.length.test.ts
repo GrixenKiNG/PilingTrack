@@ -7,7 +7,7 @@
  * `getPileMetersPerUnit` must read `PileGrade.lengthMm` via lib/pile-length and
  * never re-parse the name. This guard fails if name-parsing is reintroduced.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { toast } from 'sonner';
 
@@ -65,6 +65,42 @@ describe('useReportForm — pile metres come from lengthMm, not the name', () =>
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.getPileMetersPerUnit('does-not-exist')).toBe(0);
+  });
+});
+
+describe('useReportForm — архивная марка строки старого отчёта (F-R29-2)', () => {
+  // Марка снята с активных (админ архивировал), но закреплена за сданным
+  // отчётом. Выбор её не предлагает, однако строка отчёта обязана показать
+  // название и метры, а не сырой cuid и 0 м.п.
+  const ARCHIVED_GRADE = { id: 'g-arch', name: 'СВ 300-80', isActive: false, lengthMm: 12000 };
+
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    storeState.selectedSiteId = 'site-1';
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/dictionary/all')) {
+        return Promise.resolve(okJson({ pileGrades: [GRADE, ARCHIVED_GRADE], drillingTypes: [], downtimeReasons: [] }));
+      }
+      if (url.startsWith('/api/sites')) return Promise.resolve(okJson({ data: [] }));
+      if (url.startsWith('/api/equipment')) return Promise.resolve(okJson({ data: [] }));
+      if (url.startsWith('/api/reports/edit')) {
+        return Promise.resolve(okJson({ report: { reportId: 'r1', piles: [{ id: 'p1', pileGradeId: 'g-arch', count: 4 }] } }));
+      }
+      return Promise.resolve(okJson({}));
+    });
+  });
+
+  afterEach(() => { storeState.selectedSiteId = ''; });
+
+  it('резолвит название и длину архивной марки, а не cuid и 0 м.п.', async () => {
+    const { result } = renderHook(() => useReportForm());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.piles).toHaveLength(1));
+
+    expect(result.current.piles[0].pileGradeId).toBe('g-arch');
+    expect(result.current.getPileGradeName('g-arch')).toBe('СВ 300-80');
+    expect(result.current.getPileMetersPerUnit('g-arch')).toBe(12);
   });
 });
 

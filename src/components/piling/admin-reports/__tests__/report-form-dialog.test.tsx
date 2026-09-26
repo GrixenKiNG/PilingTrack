@@ -180,3 +180,31 @@ describe('ReportFormDialog — непрочитанные справочники
     expect(alert.textContent).toBe('Справочники не загрузились — списки в форме пустые');
   });
 });
+
+describe('ReportFormDialog — архивная марка (F-R29-2)', () => {
+  it('не предлагает архивную марку в выборе, но показывает её в строке и считает метры', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'СВ 300-80', isActive: false, lengthMm: 12000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Строка сданного отчёта: название и метры (5 × 11,999... = 60.0 м.п.),
+    // а не сырой cuid и 0 м.п.
+    expect(screen.getByText('5 шт. / 60.0 м.п.')).toBeTruthy();
+    // Название встречается ровно один раз — в строке отчёта. Второе вхождение
+    // означало бы, что архивная марка попала в список выбора новой строки.
+    expect(screen.queryAllByText('СВ 300-80')).toHaveLength(1);
+  });
+});

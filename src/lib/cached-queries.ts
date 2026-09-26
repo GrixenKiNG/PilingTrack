@@ -50,14 +50,24 @@ export async function getCachedCrewsAll() {
   );
 }
 
+/**
+ * Справочники организации — активные И архивные, с полем `isActive` у каждой записи.
+ *
+ * Архивированная запись (марка/тип/причина) может быть закреплена за уже сданным
+ * отчётом. Если отдавать только активные, форма старого отчёта резолвит её
+ * `id` мимо списка и показывает сырой `cuid` вместо названия и 0 м.п. вместо
+ * метров (F-R29-2). Поэтому архивные записи тоже отдаются, а фильтр по
+ * `isActive` ставят те, кому он нужен: выпадающие списки выбора для новых
+ * строк. Разрешение уже сохранённого `id` идёт по полному списку.
+ */
 export async function getCachedAllDictionaries(tenantId: string) {
   return cacheAside(
     `dictionary:${tenantId}:all`,
     async () => {
       const [pileGrades, drillingTypes, downtimeReasons] = await Promise.all([
-        db.pileGrade.findMany({ where: { tenantId, isActive: true }, orderBy: { name: 'asc' } }),
-        db.drillingType.findMany({ where: { tenantId, isActive: true }, orderBy: { name: 'asc' } }),
-        db.downtimeReason.findMany({ where: { tenantId, isActive: true }, orderBy: { name: 'asc' } }),
+        db.pileGrade.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
+        db.drillingType.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
+        db.downtimeReason.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
       ]);
       return { pileGrades, drillingTypes, downtimeReasons };
     },

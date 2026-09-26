@@ -41,8 +41,24 @@ describe('tenant dictionary cache', () => {
       'dictionary:tenant-a:all', expect.any(Function), expect.any(Object)
     );
     expect(mocks.pileGradeFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId: 'tenant-a', isActive: true },
+      where: { tenantId: 'tenant-a' },
     }));
+  });
+
+  it('returns archived items too, so an old report can resolve its grade (F-R29-2)', async () => {
+    const archived = { id: 'g-arch', name: 'СВ 300-80', isActive: false, lengthMm: 12000 };
+    const active = { id: 'g-act', name: 'СВ 350-100', isActive: true, lengthMm: 15000 };
+    mocks.pileGradeFindMany.mockResolvedValue([active, archived]);
+
+    const result = await getCachedAllDictionaries('tenant-a');
+
+    // Архивная марка обязана доехать до формы: по ней резолвится строка уже
+    // сданного отчёта (иначе — сырой cuid и 0 м.п.). Выбор её прячут списки.
+    expect(result.pileGrades).toEqual([active, archived]);
+    // Фильтр по активности теперь только у потребителя — здесь его нет.
+    expect(mocks.pileGradeFindMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 'tenant-a', isActive: true } }),
+    );
   });
 
   it('invalidates only the selected tenant key', async () => {

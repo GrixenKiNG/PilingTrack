@@ -276,7 +276,7 @@ export function ReportFormDialog({
             <div className="flex gap-2 mb-2">
               <Select value={tempPileGrade} onValueChange={setTempPileGrade}>
                 <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Марка сваи..." /></SelectTrigger>
-                <SelectContent>{pileGrades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{pileGrades.filter((g) => g.isActive).map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempPileCount} onChange={(e) => setTempPileCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
@@ -324,7 +324,7 @@ export function ReportFormDialog({
             <div className="flex gap-2 mb-2">
               <Select value={tempDrillType} onValueChange={setTempDrillType}>
                 <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Тип скважины..." /></SelectTrigger>
-                <SelectContent>{drillingTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{drillingTypes.filter((t) => t.isActive).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempDrillCount} onChange={(e) => setTempDrillCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
@@ -368,7 +368,7 @@ export function ReportFormDialog({
                 <div className="flex gap-2">
                   <Select value={tempDtReason} onValueChange={setTempDtReason}>
                     <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Причина..." /></SelectTrigger>
-                    <SelectContent>{downtimeReasons.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+                    <SelectContent>{downtimeReasons.filter((r) => r.isActive).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
                   </Select>
                   <Input type="number" step="0.5" placeholder="Часы" value={tempDtDuration} onChange={(e) => setTempDtDuration(e.target.value)}
                     min="0.5" className="w-20 h-9 font-mono text-sm" />

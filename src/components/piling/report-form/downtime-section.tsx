@@ -52,7 +52,9 @@ export function DowntimeSection({
             <div className="space-y-2">
               <Select value={tempReason} onValueChange={onTempReasonChange}>
                 <SelectTrigger aria-label="Причина простоя" className="w-full h-11"><SelectValue placeholder="Причина простоя..." /></SelectTrigger>
-                <SelectContent>{downtimeReasons.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+                {/* Выбор для новой строки — только активные причины: архивные
+                    остаются в уже сохранённых строках и резолвятся полным списком (F-R29-2). */}
+                <SelectContent>{downtimeReasons.filter((r) => r.isActive).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex gap-2">
                 <Input type="number" aria-label="Продолжительность простоя, ч" step="1" placeholder="Полных часов" value={tempDuration} onChange={(e) => onTempDurationChange(e.target.value)}
