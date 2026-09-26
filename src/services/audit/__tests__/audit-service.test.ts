@@ -8,6 +8,9 @@
  *     recordFeedbackEvent, with severity mapped from the action
  *   - feedback-write failure MUST NOT propagate (audit is best-effort
  *     persistence; the main action that triggered it already happened)
+ *   - when actorId is given, the actor's name/role are read from the user
+ *     table so the /admin feed can show «Инициатор»; that lookup failing is
+ *     NOT allowed to lose the event
  *
  * If the action→(title, level) map ever changes, this file is the
  * checklist. UI badges / Telegram alerts depend on these levels.
@@ -19,10 +22,15 @@ const mocks = vi.hoisted(() => ({
   recordFeedbackEvent: vi.fn().mockResolvedValue(undefined),
   loggerInfo: vi.fn(),
   loggerWarn: vi.fn(),
+  userFindUnique: vi.fn(),
 }));
 
 vi.mock('@/services/feedback/feedback-event-service', () => ({
   recordFeedbackEvent: mocks.recordFeedbackEvent,
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: { user: { findUnique: mocks.userFindUnique } },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -34,6 +42,7 @@ import { recordAuditEvent } from '../audit-service';
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.recordFeedbackEvent.mockResolvedValue(undefined);
+  mocks.userFindUnique.mockResolvedValue(null);
 });
 
 describe('recordAuditEvent — logging', () => {
@@ -119,6 +128,46 @@ describe('recordAuditEvent — context propagation', () => {
 
     expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
       expect.objectContaining({ actor: null }),
+    );
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+  });
+
+  // Лента /admin рисует «Инициатора» только при заполненном actorName —
+  // раньше им не был никто, и в строке события не было видно, кто это сделал.
+  it('подставляет имя и роль актора из справочника пользователей', async () => {
+    mocks.userFindUnique.mockResolvedValue({ name: 'Петров И.И.', role: 'OPERATOR' });
+
+    await recordAuditEvent({ action: 'site.updated', scope: 'sites', actorId: 'op-1' });
+
+    expect(mocks.userFindUnique).toHaveBeenCalledWith({
+      where: { id: 'op-1' },
+      select: { name: true, role: true },
+    });
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: { id: 'op-1', name: 'Петров И.И.', role: 'OPERATOR' },
+      }),
+    );
+  });
+
+  // Имя — украшение записи: сбой этого чтения не повод терять само событие.
+  it('пишет событие без имени, когда чтение пользователя упало', async () => {
+    mocks.userFindUnique.mockRejectedValue(new Error('db down'));
+
+    await recordAuditEvent({ action: 'site.updated', scope: 'sites', actorId: 'op-1' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actor: { id: 'op-1' } }),
+    );
+  });
+
+  it('пишет событие без имени, когда пользователь не найден', async () => {
+    mocks.userFindUnique.mockResolvedValue(null);
+
+    await recordAuditEvent({ action: 'site.updated', scope: 'sites', actorId: 'op-1' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actor: { id: 'op-1' } }),
     );
   });
 

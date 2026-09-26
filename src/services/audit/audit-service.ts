@@ -1,3 +1,4 @@
+import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { ROLE_LABELS, type FeedbackEventLevel } from '@/lib/types';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
@@ -414,6 +415,30 @@ export function describeAuditEvent(event: AuditEvent) {
   };
 }
 
+/**
+ * Лента `/admin` рисует «Инициатора» только при заполненном `actorName`
+ * (feedback-center.tsx), поэтому одного `id` для читаемого следа мало.
+ * Имя и роль — украшение записи: сбой их чтения не повод терять событие,
+ * поэтому здесь глушится только он, а не запись следа целиком.
+ */
+async function resolveActor(event: AuditEvent) {
+  if (!event.actorId) return null;
+
+  try {
+    const user = await db.user.findUnique({
+      where: { id: event.actorId },
+      select: { name: true, role: true },
+    });
+    return user ? { id: event.actorId, name: user.name, role: user.role } : { id: event.actorId };
+  } catch (error) {
+    logger.warn('audit.actor_lookup_failed', {
+      actorId: event.actorId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { id: event.actorId };
+  }
+}
+
 export async function recordAuditEvent(event: AuditEvent): Promise<void> {
   logger.info('audit', event as unknown as Record<string, unknown>);
 
@@ -432,7 +457,7 @@ export async function recordAuditEvent(event: AuditEvent): Promise<void> {
       title: description.title,
       message: description.message,
       audience: 'OPERATIONS',
-      actor: event.actorId ? { id: event.actorId } : null,
+      actor: await resolveActor(event),
       targetId: event.targetId || null,
       requestId: event.requestId || null,
       metadata: event.metadata || null,
