@@ -69,7 +69,7 @@ export function MaintenanceDetailPanel({
 
         <div className="flex-1 space-y-4 px-5 py-4">
           <PanelSection title="Назначение">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <InfoCell label="Объект" value={crew?.site?.name ?? 'Без объекта'} />
               <InfoCell label="Бригада" value={crew?.name ?? 'Без бригады'} />
               <InfoCell label="Оператор" value={crew?.operator?.name ?? '—'} />
@@ -116,7 +116,7 @@ export function MaintenanceDetailPanel({
           </PanelSection>
 
           <PanelSection title="Влияние">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <InfoCell label="Риск простоя" value={deadlineText(record)} />
               <InfoCell label="Объект" value={crew?.site?.name ?? '—'} />
               <InfoCell label="Статус" value={statusView(record).label} />

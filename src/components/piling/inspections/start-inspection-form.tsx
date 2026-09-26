@@ -276,8 +276,8 @@ export function StartInspectionForm() {
                   <Copy className="h-3 w-3" /> Скопировать
                 </Button>
               </div>
-              <div className="overflow-hidden rounded-md border border-success/30 bg-card">
-                <table className="w-full text-xs">
+              <div className="overflow-x-auto rounded-md border border-success/30 bg-card">
+                <table className="w-full min-w-[420px] text-xs">
                   <thead>
                     <tr className="text-left text-2xs uppercase tracking-wide text-muted-foreground">
                       <th className="px-2 py-1.5 font-medium">Материал</th>

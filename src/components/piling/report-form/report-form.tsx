@@ -243,7 +243,7 @@ export function ReportForm({ onExit, anchor }: { onExit?: () => void; anchor?: s
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold text-foreground truncate">Отчёт за смену</h1>
-          <p className="text-sm font-medium text-foreground truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
+          <p className="text-sm font-medium text-foreground break-words sm:truncate">{sites.find((s) => s.id === selectedSiteId)?.name || 'Выберите объект'}</p>
           <p className="text-xs text-muted-foreground" aria-live="polite">
             {draftSavedAt
               ? `Черновик сохранён в ${new Date(draftSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`

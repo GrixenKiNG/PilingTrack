@@ -68,7 +68,7 @@ export function DowntimeSection({
                   <div key={dt.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-base font-semibold text-foreground">{getDowntimeReasonName(dt.reasonId)}</p>
-                      {dt.comment && <p className="text-xs font-medium text-muted-foreground truncate">{dt.comment}</p>}
+                      {dt.comment && <p className="text-xs font-medium text-muted-foreground break-words sm:truncate">{dt.comment}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-base font-mono font-bold text-warning-strong">{formatDowntimeHours(dt.duration)}</span>

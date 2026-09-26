@@ -106,7 +106,7 @@ export function PileSection({
                 <div key={pile.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-semibold text-foreground">{getPileGradeName(pile.pileGradeId)}</p>
-                    {pile.picketId && <p className="text-xs font-medium text-muted-foreground truncate">{getPicketPath(pile.picketId)}</p>}
+                    {pile.picketId && <p className="text-xs font-medium text-muted-foreground break-words sm:truncate">{getPicketPath(pile.picketId)}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-right text-base font-bold text-foreground">

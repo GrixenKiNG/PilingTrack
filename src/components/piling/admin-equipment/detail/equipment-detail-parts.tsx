@@ -206,7 +206,7 @@ export function OperatorRotationCard({ rows }: { rows: TimelineRow[] }) {
     return <p className="text-sm text-muted-foreground">Нет данных о ротации машинистов.</p>;
   }
   return (
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
           <tr>
