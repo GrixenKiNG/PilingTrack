@@ -55,7 +55,10 @@ export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]['key'];
 
 export const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
   downtime30: true,
-  planDeviation: true,
+  // Отправителя у правила нет (`implemented: false`), а умолчание было
+  // «включено»: тумблер обещал работу, которой не происходит. Ключ не удаляем —
+  // сохранённое значение тенанта продолжает читаться, меняется только умолчание.
+  planDeviation: false,
   maintenanceOverdue: true,
   // Дефект, из-за которого нельзя или опасно работать, — то немногое, о чём
   // молчать дороже, чем лишний раз написать. Умолчание «включено».

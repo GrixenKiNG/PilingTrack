@@ -22,6 +22,20 @@ describe('settings sanitizer', () => {
       .toEqual(NOTIFICATION_KEYS.map(({ key }) => key as string).sort());
   });
 
+  it('defaults planDeviation to off while a stored true still parses', () => {
+    // Отправителя у правила нет (`implemented: false`) — значит, умолчание
+    // «включено» обещало работу, которой не происходит. Ключ из каталога при
+    // этом не удалён: сохранённое тенантом значение по-прежнему разбирается.
+    expect(NOTIFICATION_KEYS.find(({ key }) => key === 'planDeviation')?.implemented).toBe(false);
+    expect(DEFAULT_WORKSPACE_SETTINGS.notifications.planDeviation).toBe(false);
+    expect(sanitizeSettings({}).notifications.planDeviation).toBe(false);
+
+    const stored = sanitizeSettings({ notifications: { planDeviation: true } });
+    expect(stored.notifications.planDeviation).toBe(true);
+    // Патч другого поля сохранённое правило не переворачивает.
+    expect(sanitizeSettings({ companyName: 'ООО «Орион»' }, stored).notifications.planDeviation).toBe(true);
+  });
+
   it('rejects an unknown units value and over-long strings', () => {
     const s = sanitizeSettings({ units: 'lightyears', companyName: 'x'.repeat(500) });
     expect(s.units).toBe(DEFAULT_WORKSPACE_SETTINGS.units);

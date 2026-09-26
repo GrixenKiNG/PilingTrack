@@ -275,7 +275,7 @@ export function WorkspaceSettings() {
                         его некому. Молчать об этом — обманывать администратора. */}
                     {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                   </div>
-                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready'} onClick={() => toggleNotification(key)} />
+                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
                 </div>
               ))}
             </CardContent>
@@ -323,10 +323,16 @@ export function WorkspaceSettings() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-signal-strong" />Уведомления</CardTitle><CardDescription>События, о которых система сообщает команде.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            {NOTIFICATION_KEYS.map(({ key, label }) => (
+            {NOTIFICATION_KEYS.map(({ key, label, implemented }) => (
               <div key={key} className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">{label}</p>
-                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready'} onClick={() => toggleNotification(key)} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  {/* Тот же признак, что и на вкладке «Рабочее пространство»:
+                      список строится из общего каталога, и правило без
+                      отправителя не должно выглядеть рабочим ни здесь, ни там. */}
+                  {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
+                </div>
+                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
               </div>
             ))}
             {!isAdmin && <p className="text-xs text-muted-foreground">Только администратор может изменять правила уведомлений.</p>}

@@ -178,7 +178,13 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
                   <div key={rule.key} className="grid min-w-[720px] grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_130px_110px_50px] items-center gap-2 border-b border-border px-4 py-2 text-2xs last:border-b-0">
                     <span className="flex min-w-0 items-center gap-2">
                       <Icon className={cn('h-4 w-4 shrink-0', rule.implemented ? 'text-muted-foreground' : 'text-warning-strong')} />
-                      <span className="min-w-0 leading-snug">{rule.event}</span>
+                      <span className="min-w-0 leading-snug">
+                        {rule.event}
+                        {/* Та же пометка, что на экране настроек рабочего
+                            пространства: признак у правила есть, отправителя
+                            нет — тумблер ниже заблокирован. */}
+                        {!rule.implemented && <span className="block text-3xs text-muted-foreground">Отправитель не реализован</span>}
+                      </span>
                     </span>
                     <span className="min-w-0 truncate text-muted-foreground">{rule.threshold}</span>
                     <span>
@@ -192,7 +198,7 @@ export function NotificationsSettings({ isAdmin }: NotificationsSettingsProps) {
                     <span className="flex justify-end">
                       <Toggle
                         checked={settings.notifications[rule.key] ?? false}
-                        disabled={loadState !== 'ready' || !isAdmin || savingKey !== null}
+                        disabled={loadState !== 'ready' || !isAdmin || savingKey !== null || !rule.implemented}
                         label={rule.event}
                         onChange={() => void toggleRule(rule.key)}
                       />
