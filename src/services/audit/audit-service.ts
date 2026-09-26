@@ -129,6 +129,17 @@ function notificationChangeLabel(meta: Meta): string | null {
   return parts.length ? `уведомления (${parts.join(', ')})` : null;
 }
 
+/** «Канал оповещений «Чат» (чат -100…): оповещения включены.» — без внутренних id. */
+function channelLine(verb: string, meta: Meta, tokenUpdated = false): string {
+  const label = str(meta, 'label');
+  const chatId = str(meta, 'chatId');
+  const name = label ? `«${label}»` : 'Telegram';
+  const chat = chatId ? ` (чат ${chatId})` : '';
+  const state = pick(meta, 'enabled') === false ? 'оповещения выключены' : 'оповещения включены';
+  const token = tokenUpdated ? ', токен бота заменён' : '';
+  return `${verb}: ${name}${chat} — ${state}${token}.`;
+}
+
 // ────────────────────────────────────────────
 // Действие → человеческий текст
 // ────────────────────────────────────────────
@@ -450,6 +461,27 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
         ? `Изменены настройки: ${fields.join(', ')}.`
         : 'Настройки организации сохранены.';
     },
+  },
+
+  // ── Каналы оповещений Telegram ──
+  // Канал решает, кто получит сообщение о дефекте или простое, поэтому в ленте
+  // должно быть видно, какой чат завели, поправили или удалили. Токена бота в
+  // metadata нет ни в каком виде (снимок собирает api/telegram/configs):
+  // виден только факт его замены.
+  'telegram.config.created': {
+    level: 'audit',
+    title: 'Канал оповещений создан',
+    message: (m) => channelLine('Создан канал оповещений', m),
+  },
+  'telegram.config.updated': {
+    level: 'audit',
+    title: 'Канал оповещений изменён',
+    message: (m) => channelLine('Изменён канал оповещений', m, pick(m, 'tokenUpdated') === true),
+  },
+  'telegram.config.deleted': {
+    level: 'warn',
+    title: 'Канал оповещений удалён',
+    message: (m) => channelLine('Удалён канал оповещений', m),
   },
 };
 

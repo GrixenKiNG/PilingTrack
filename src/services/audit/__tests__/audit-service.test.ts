@@ -319,3 +319,86 @@ describe('recordAuditEvent — изменения настроек', () => {
     );
   });
 });
+
+/**
+ * Канал Telegram решает, кто получит алерт о дефекте или простое. Токена бота
+ * в metadata нет ни в каком виде (снимок собирает api/telegram/configs), в
+ * ленте видно только название чата, его id и состояние оповещений.
+ */
+describe('recordAuditEvent — каналы оповещений Telegram', () => {
+  it('называет канал и состояние оповещений при создании', async () => {
+    await recordAuditEvent({
+      action: 'telegram.config.created',
+      scope: 'telegram',
+      actorId: 'admin-a',
+      metadata: { configId: 'cfg-1', label: 'Основной чат', chatId: '-100123', enabled: true },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Канал оповещений создан',
+        message: 'Создан канал оповещений: «Основной чат» (чат -100123) — оповещения включены.',
+      }),
+    );
+  });
+
+  it('показывает выключенный канал, а не только его название', async () => {
+    await recordAuditEvent({
+      action: 'telegram.config.updated',
+      scope: 'telegram',
+      metadata: { label: 'Дежурный', chatId: '-100777', enabled: false },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Канал оповещений изменён',
+        message: 'Изменён канал оповещений: «Дежурный» (чат -100777) — оповещения выключены.',
+      }),
+    );
+  });
+
+  it('отмечает замену токена, не показывая сам токен', async () => {
+    await recordAuditEvent({
+      action: 'telegram.config.updated',
+      scope: 'telegram',
+      metadata: { label: 'Основной чат', chatId: '-100123', enabled: true, tokenUpdated: true },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message:
+          'Изменён канал оповещений: «Основной чат» (чат -100123) — оповещения включены, токен бота заменён.',
+      }),
+    );
+  });
+
+  it('называет удалённый канал по чату, а не внутренним id', async () => {
+    await recordAuditEvent({
+      action: 'telegram.config.deleted',
+      scope: 'telegram',
+      metadata: { configId: 'cfg-7', label: 'Основной чат', chatId: '-100123', enabled: true },
+    });
+
+    // Точное совпадение текста и есть проверка: внутреннего id конфигурации в
+    // ленте нет, а есть название чата и его id.
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Канал оповещений удалён',
+        message: 'Удалён канал оповещений: «Основной чат» (чат -100123) — оповещения включены.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда metadata пустая', async () => {
+    await recordAuditEvent({ action: 'telegram.config.created', scope: 'telegram' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Канал оповещений создан',
+        message: 'Создан канал оповещений: Telegram — оповещения включены.',
+      }),
+    );
+  });
+});
