@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
   outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
+  redisGetClientMock, redisGetMock, redisSetMock,
 } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
@@ -30,6 +31,9 @@ const {
   isNotifMock: vi.fn(),
   getSettingsMock: vi.fn(),
   sendAlertMock: vi.fn(),
+  redisGetClientMock: vi.fn(),
+  redisGetMock: vi.fn(),
+  redisSetMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
@@ -62,6 +66,12 @@ vi.mock('@/modules/settings', () => ({
 
 vi.mock('@/lib/cached-queries', () => ({
   invalidateSiteAnalytics: invalidateAnalyticsMock,
+}));
+
+// Дедуп алертов о простое (F-R33-2) ходит в Redis: без мока тест либо тянул бы
+// живую базу разработчика, либо ждал таймаут подключения.
+vi.mock('@/lib/redis-cache', () => ({
+  getRedisClient: redisGetClientMock,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -317,9 +327,12 @@ describe('алерт о простое (F-R33-1)', () => {
     sendAlertMock.mockReset();
     isNotifMock.mockReset();
     getSettingsMock.mockReset();
+    redisGetClientMock.mockReset();
     findFirstMock.mockResolvedValue(null);
     isNotifMock.mockResolvedValue(true);
     getSettingsMock.mockResolvedValue({ timezone: 'Asia/Krasnoyarsk' });
+    // Redis недоступен → путь «шлём без дедупа»; сами алерты ниже про текст.
+    redisGetClientMock.mockResolvedValue(null);
     registerAlertEventHandler();
   });
 
@@ -365,5 +378,100 @@ describe('алерт о простое (F-R33-1)', () => {
       siteName: undefined,
       reportNumber: undefined,
     }));
+  });
+});
+
+/*
+  F-R33-2: upsertReport пересобирает агрегат со всеми строками и `addDowntime`
+  заново эмитит DowntimeAdded на каждую, поэтому каждое сохранение отчёта в
+  окне правки слало диспетчеру новый алерт про тот же простой — как будто
+  простой новый. Дедуп по (tenantId, reportId, reasonId, duration) в Redis на
+  48 ч: ключ ставится только после успешной отправки, при недоступном Redis
+  шлём как раньше (дубль лучше молчания).
+*/
+describe('дедупликация алерта о простое (F-R33-2)', () => {
+  const sentKeys = new Map<string, string>();
+
+  beforeEach(() => {
+    sentKeys.clear();
+    findFirstMock.mockReset();
+    sendAlertMock.mockReset();
+    isNotifMock.mockReset();
+    getSettingsMock.mockReset();
+    redisGetClientMock.mockReset();
+    redisGetMock.mockReset();
+    redisSetMock.mockReset();
+
+    redisGetMock.mockImplementation(async (key: string) => sentKeys.get(key) ?? null);
+    redisSetMock.mockImplementation(async (key: string, value: string) => {
+      sentKeys.set(key, value);
+      return 'OK';
+    });
+    redisGetClientMock.mockResolvedValue({ get: redisGetMock, set: redisSetMock });
+
+    findFirstMock.mockResolvedValue(null);
+    isNotifMock.mockResolvedValue(true);
+    getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
+    sendAlertMock.mockResolvedValue(true);
+    registerAlertEventHandler();
+  });
+
+  function downtimeEvent(id: string, overrides: { data?: Record<string, unknown>; tenantId?: string } = {}) {
+    return {
+      id,
+      type: REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
+      aggregateId: 'RM-1234-2026-09-26',
+      aggregateType: 'Report' as const,
+      occurredAt: new Date().toISOString(),
+      siteId: 'site-1',
+      userId: 'user-1',
+      tenantId: overrides.tenantId ?? 'tenant-a',
+      data: { reasonId: 'reason-1', duration: 3, ...overrides.data },
+    };
+  }
+
+  it('тот же простой из нового события — одна отправка', async () => {
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('разный простой (другая причина или длительность) — две отправки', async () => {
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2', { data: { reasonId: 'reason-2' } }));
+    await emitDomainEvent(downtimeEvent('evt-dt-3', { data: { duration: 5 } }));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('у той же строки, но другой организации — своя отправка', async () => {
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2', { tenantId: 'tenant-b' }));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('неудачная отправка не закрывает повтор: ключ ставится только после успеха', async () => {
+    sendAlertMock.mockResolvedValue(false);
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    expect(redisSetMock).not.toHaveBeenCalled();
+
+    sendAlertMock.mockResolvedValue(true);
+    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+    expect(redisSetMock).toHaveBeenCalledWith(
+      'alert:downtime:tenant-a:RM-1234-2026-09-26:reason-1:3', '1', 'EX', 48 * 60 * 60,
+    );
+  });
+
+  it('при недоступном Redis шлём без дедупа', async () => {
+    redisGetClientMock.mockResolvedValue(null);
+
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(2);
   });
 });
