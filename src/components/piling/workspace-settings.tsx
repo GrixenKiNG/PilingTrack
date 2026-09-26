@@ -13,6 +13,7 @@ import {
   NOTIFICATION_KEYS,
   type WorkspaceSettings as WorkspaceSettingsData,
 } from '@/modules/settings/domain/settings';
+import { COMMON_TIMEZONES } from '@/lib/timezone';
 import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';
 import { AdminTelegram } from '@/components/piling/admin-telegram';
@@ -48,6 +49,28 @@ function Field({ label, value, onChange, disabled, placeholder }: { label: strin
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:text-muted-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/20"
       />
+    </label>
+  );
+}
+
+function TimezoneField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
+  // Свободный ввод принимал «UTC+3» и «Мск»: Intl таких зон не знает, и пояс
+  // молча подменялся на Europe/Moscow. Выбор из готового списка убирает
+  // возможность сохранить несуществующую зону. Значение вне списка (введённое
+  // до правки) показываем отдельным пунктом, чтобы оно не потерялось.
+  const known = COMMON_TIMEZONES.some((tz) => tz.value === value);
+  return (
+    <label className="block">
+      <span className="text-xs text-muted-foreground">Часовой пояс</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground disabled:bg-muted disabled:text-muted-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/20"
+      >
+        {value !== '' && !known && <option value={value}>{value}</option>}
+        {COMMON_TIMEZONES.map((tz) => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+      </select>
     </label>
   );
 }
@@ -206,7 +229,7 @@ export function WorkspaceSettings() {
                       подписана «₽» в разметке. */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Название компании" value={settings.companyName} disabled={!isAdmin} placeholder="ООО «Орион»" onChange={(v) => setField({ companyName: v })} />
-                    <Field label="Часовой пояс" value={settings.timezone} disabled={!isAdmin} placeholder="Europe/Moscow" onChange={(v) => setField({ timezone: v })} />
+                    <TimezoneField value={settings.timezone} disabled={!isAdmin} onChange={(v) => setField({ timezone: v })} />
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={async () => { await saveWorkspace(); setEditing(false); }} disabled={saving || settingsState !== 'ready'}><Save className="mr-2 h-4 w-4" />Сохранить</Button>

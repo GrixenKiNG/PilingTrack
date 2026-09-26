@@ -81,6 +81,22 @@ function str(value: unknown, max: number, fallback: string): string {
   return typeof value === 'string' && value.length <= max ? value : fallback;
 }
 
+/**
+ * Часовой пояс принимается только как настоящая IANA-зона. Строку вроде
+ * «UTC+3» или «Мск» Intl не знает и бросает RangeError — такое значение
+ * сохранялось и показывалось как факт, хотя всё форматирование молча падало
+ * на Europe/Moscow. Проверяем тем же конструктором, которым потом пользуемся.
+ */
+function timezone(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 40) return fallback;
+  try {
+    new Intl.DateTimeFormat('ru-RU', { timeZone: value });
+    return value;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Sanitize an untrusted patch into a full, safe WorkspaceSettings value. */
 export function sanitizeSettings(input: unknown, base: WorkspaceSettings = DEFAULT_WORKSPACE_SETTINGS): WorkspaceSettings {
   const v = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
@@ -92,7 +108,7 @@ export function sanitizeSettings(input: unknown, base: WorkspaceSettings = DEFAU
   return {
     companyName: str(v.companyName, 200, base.companyName),
     inn: str(v.inn, 20, base.inn),
-    timezone: str(v.timezone, 40, base.timezone),
+    timezone: timezone(v.timezone, base.timezone),
     dateFormat: str(v.dateFormat, 40, base.dateFormat),
     units: UNITS.has(v.units as string) ? (v.units as string) : base.units,
     currency: str(v.currency, 8, base.currency),
