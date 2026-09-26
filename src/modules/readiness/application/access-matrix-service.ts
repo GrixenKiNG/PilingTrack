@@ -17,6 +17,7 @@ import {
   type ReadinessAccessMatrix,
 } from '../domain/access-matrix';
 import { bumpVersion } from '../domain/readiness-rules';
+import { recordChainedReadinessAudit } from '../infrastructure/audit/record-audit';
 
 export interface AccessMatrixState {
   published: ReadinessAccessMatrix;
@@ -91,6 +92,23 @@ export async function getPublishedAccessMatrix(
 
 interface MatrixActor { id: string; name: string; role: string; actingAs?: string | null }
 
+/**
+ * Тело события цепочки — канонический JSON: ключ со значением `undefined`
+ * роняет запись («Audit JSON contains unsupported undefined»), а у матрицы
+ * необязательные `updatedAt`/`updatedBy` всегда лежат ключом. Отсутствие
+ * значения записываем как `null` — так строка и читается журналом.
+ */
+function matrixPayload(matrix: ReadinessAccessMatrix) {
+  return {
+    version: matrix.version,
+    status: matrix.status,
+    grants: matrix.grants,
+    updatedAt: matrix.updatedAt ?? null,
+    updatedBy: matrix.updatedBy ?? null,
+    publishedAt: matrix.publishedAt ?? null,
+  };
+}
+
 async function writeAudit(
   tx: Prisma.TransactionClient,
   input: {
@@ -102,23 +120,29 @@ async function writeAudit(
     after: ReadinessAccessMatrix;
   },
 ) {
-  await tx.auditLog.create({
-    data: {
-      entity: 'ReadinessAccessMatrix',
-      action: input.action,
-      entityId: input.entityId,
-      before: input.before ? input.before as unknown as Prisma.InputJsonValue : undefined,
-      after: {
-        version: input.after.version,
-        grants: input.after.grants,
-        // Список отличий — то, ради чего журнал и читают: «кому что выдали».
-        changes: input.before ? describeAccessChanges(input.before, input.after) : [],
-      } as unknown as Prisma.InputJsonValue,
-      userId: input.actor.id,
-      userName: input.actor.name,
-      userRole: input.actor.role,
+  /*
+    Через цепочечный писатель, а не `tx.auditLog.create`: читатель журнала
+    (`audit-repository.ts` readChain) отбирает звенья по `hash: {not: null}`,
+    поэтому прямая запись не попадала ни на экран «Аудит», ни в проверку
+    цепочки — смена прав оставалась без читаемого следа.
+  */
+  await recordChainedReadinessAudit(tx, {
+    tenantId: input.tenantId,
+    action: input.action,
+    entityType: 'ReadinessAccessMatrix',
+    entityId: input.entityId,
+    actor: {
+      id: input.actor.id,
+      name: input.actor.name,
+      role: input.actor.role,
       actingAs: input.actor.actingAs ?? null,
-      tenantId: input.tenantId,
+    },
+    before: input.before ? matrixPayload(input.before) : null,
+    after: {
+      version: input.after.version,
+      grants: input.after.grants,
+      // Список отличий — то, ради чего журнал и читают: «кому что выдали».
+      changes: input.before ? describeAccessChanges(input.before, input.after) : [],
     },
   });
 }

@@ -8,6 +8,7 @@ import {
   type ReadinessRuleSet,
 } from '../domain/readiness-rules';
 import { requestReadinessSnapshot } from './projection/request-snapshot';
+import { recordChainedReadinessAudit } from '../infrastructure/audit/record-audit';
 
 export interface ReadinessRulesState {
   published: ReadinessRuleSet;
@@ -46,6 +47,24 @@ function toRuleSet(
 
 const diffCount = (draft: ReadinessRuleSet, published: ReadinessRuleSet): number =>
   describeRuleSetChanges(published, draft).length;
+
+/**
+ * Тело события цепочки — канонический JSON: ключ со значением `undefined`
+ * роняет запись («Audit JSON contains unsupported undefined»), а у набора
+ * правил необязательные `updatedAt`/`updatedBy` всегда лежат ключом. Отсутствие
+ * значения записываем как `null` — так строка и читается журналом.
+ */
+function ruleSetPayload(rules: ReadinessRuleSet) {
+  return {
+    version: rules.version,
+    status: rules.status,
+    criteria: rules.criteria,
+    blockers: rules.blockers,
+    updatedAt: rules.updatedAt ?? null,
+    updatedBy: rules.updatedBy ?? null,
+    publishedAt: rules.publishedAt ?? null,
+  };
+}
 
 export async function getReadinessRules(tenantId: string): Promise<ReadinessRulesState> {
   if (!tenantId) throw new Error('getReadinessRules: tenantId is required');
@@ -90,20 +109,20 @@ export async function saveReadinessDraft(
       : await tx.readinessRuleSet.create({
         data: { tenantId, status: 'DRAFT', ...data },
       });
-    await tx.auditLog.create({
-      data: {
-        entity: 'ReadinessRuleSet',
-        action: 'draft_saved',
-        entityId: row.id,
-        before: state.draft
-          ? state.draft as unknown as Prisma.InputJsonValue
-          : undefined,
-        after: next as unknown as Prisma.InputJsonValue,
-        userId: actor.id,
-        userName: actor.name,
-        userRole: actor.role,
-        tenantId,
-      },
+    /*
+      Через цепочечный писатель, а не `tx.auditLog.create`: читатель журнала
+      (`audit-repository.ts` readChain) отбирает звенья по `hash: {not: null}`,
+      поэтому прямая запись не попадала ни на экран «Аудит», ни в проверку
+      цепочки — смена правил готовности оставалась без читаемого следа.
+    */
+    await recordChainedReadinessAudit(tx, {
+      tenantId,
+      action: 'draft_saved',
+      entityType: 'ReadinessRuleSet',
+      entityId: row.id,
+      actor: { id: actor.id, name: actor.name, role: actor.role },
+      before: state.draft ? ruleSetPayload(state.draft) : null,
+      after: ruleSetPayload(next),
     });
   });
   return getReadinessRules(tenantId);
@@ -126,20 +145,16 @@ async function publishBaseline(
         updatedBy: actor.id,
       },
     });
-    await tx.auditLog.create({
-      data: {
-        entity: 'ReadinessRuleSet',
-        action: 'published',
-        entityId: published.id,
-        after: {
-          version: published.version,
-          criteria: published.criteria,
-          blockers: published.blockers,
-        },
-        userId: actor.id,
-        userName: actor.name,
-        userRole: actor.role,
-        tenantId,
+    await recordChainedReadinessAudit(tx, {
+      tenantId,
+      action: 'published',
+      entityType: 'ReadinessRuleSet',
+      entityId: published.id,
+      actor: { id: actor.id, name: actor.name, role: actor.role },
+      after: {
+        version: published.version,
+        criteria: published.criteria,
+        blockers: published.blockers,
       },
     });
     await requestFleetRecalc(tx, tenantId, published.version);
@@ -220,21 +235,17 @@ export async function publishReadinessRules(
         updatedBy: actor.id,
       },
     });
-    await tx.auditLog.create({
-      data: {
-        entity: 'ReadinessRuleSet',
-        action: 'published',
-        entityId: published.id,
-        before: state.published as unknown as Prisma.InputJsonValue,
-        after: {
-          version: published.version,
-          criteria: published.criteria,
-          blockers: published.blockers,
-        },
-        userId: actor.id,
-        userName: actor.name,
-        userRole: actor.role,
-        tenantId,
+    await recordChainedReadinessAudit(tx, {
+      tenantId,
+      action: 'published',
+      entityType: 'ReadinessRuleSet',
+      entityId: published.id,
+      actor: { id: actor.id, name: actor.name, role: actor.role },
+      before: ruleSetPayload(state.published),
+      after: {
+        version: published.version,
+        criteria: published.criteria,
+        blockers: published.blockers,
       },
     });
     await requestFleetRecalc(tx, tenantId, published.version);
