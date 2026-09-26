@@ -151,6 +151,24 @@ function notificationChangeLabel(meta: Meta): string | null {
   return parts.length ? `уведомления (${parts.join(', ')})` : null;
 }
 
+// Поля карточки установки так, как они называются на экране. Снимок, который
+// кладёт api/equipment, содержит только изменившиеся поля — подпись получает
+// ровно то, что поправили (F-R34-14).
+const EQUIPMENT_FIELD_LABELS: ReadonlyArray<readonly [string, string]> = [
+  ['name', 'название'],
+  ['model', 'модель'],
+  ['description', 'описание'],
+  ['qty', 'количество'],
+  ['isActive', 'статус работы'],
+];
+
+/** Поля карточки установки, которые в этом событии действительно изменились. */
+function changedEquipmentFields(meta: Meta): string[] {
+  return EQUIPMENT_FIELD_LABELS
+    .filter(([key]) => pick(meta, `before.${key}`) !== pick(meta, `after.${key}`))
+    .map(([, label]) => label);
+}
+
 /** «Канал оповещений «Чат» (чат -100…): оповещения включены.» — без внутренних id. */
 function channelLine(verb: string, meta: Meta, tokenUpdated = false): string {
   const label = str(meta, 'label');
@@ -527,6 +545,43 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
     level: 'warn',
     title: 'Канал оповещений удалён',
     message: (m) => channelLine('Удалён канал оповещений', m),
+  },
+
+  // ── Техника: карточка установки ──
+  // Выведенная из эксплуатации установка перестаёт допускаться к работе, а
+  // удаление уничтожает карточку целиком: без следа в ленте и то, и другое
+  // неотличимо от «никто не менял» (F-R34-14). Внутренних id в тексте нет —
+  // только название, модель и то, что видно на экране.
+  'equipment.created': {
+    level: 'audit',
+    title: 'Установка заведена',
+    message: (m) => withSubject('Заведена установка', subject(m)),
+  },
+  'equipment.updated': {
+    level: 'audit',
+    title: 'Установка изменена',
+    message: (m) => {
+      const name = subject(m);
+      const where = name ? `Установка «${name}»` : 'Установка';
+      const fields = changedEquipmentFields(m);
+      return fields.length
+        ? `${where}: изменено — ${fields.join(', ')}.`
+        : `${where}: изменения сохранены.`;
+    },
+  },
+  'equipment.retired': {
+    level: 'audit',
+    title: 'Установка выведена из эксплуатации',
+    message: (m) => withSubject('Установка выведена из эксплуатации', subject(m)),
+  },
+  'equipment.deleted': {
+    level: 'warn',
+    title: 'Установка удалена',
+    message: (m) => {
+      const model = str(m, 'before.model');
+      const what = model ? `Удалена установка (${model})` : 'Удалена установка';
+      return withSubject(what, subject(m));
+    },
   },
 
   // ── Техника: моточасы ──

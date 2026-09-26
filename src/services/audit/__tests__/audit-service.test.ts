@@ -592,3 +592,94 @@ describe('recordAuditEvent — удаления по технике', () => {
     );
   });
 });
+
+/**
+ * Заведение, правка, вывод из эксплуатации и удаление установки не оставляли
+ * следа (F-R34-14). Выведенная установка перестаёт допускаться к работе, а
+ * удаление уничтожает карточку — в ленте должно быть видно, что и с какой
+ * установкой сделали, без внутренних id. Правка перечисляет только изменившиеся
+ * поля: снимок даёт api/equipment.
+ */
+describe('recordAuditEvent — карточка установки', () => {
+  it('называет заведённую установку', async () => {
+    await recordAuditEvent({
+      action: 'equipment.created',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: { name: 'ЭО-5111', after: { name: 'ЭО-5111', model: 'ЭО-5111А', qty: 2, isActive: true } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Установка заведена',
+        message: 'Заведена установка: «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('перечисляет изменившиеся поля правки по-русски', async () => {
+    await recordAuditEvent({
+      action: 'equipment.updated',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: {
+        name: 'ЭО-5111',
+        before: { name: 'ЭО-5110', qty: 1 },
+        after: { name: 'ЭО-5111', qty: 2 },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Установка изменена',
+        message: 'Установка «ЭО-5111»: изменено — название, количество.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда правка ничего не изменила', async () => {
+    await recordAuditEvent({
+      action: 'equipment.updated',
+      scope: 'equipment',
+      metadata: { name: 'ЭО-5111', before: {}, after: {} },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Установка «ЭО-5111»: изменения сохранены.' }),
+    );
+  });
+
+  it('сообщает о выводе установки из эксплуатации', async () => {
+    await recordAuditEvent({
+      action: 'equipment.retired',
+      scope: 'equipment',
+      metadata: { name: 'ЭО-5111', before: { isActive: true }, after: { isActive: false } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'audit',
+        title: 'Установка выведена из эксплуатации',
+        message: 'Установка выведена из эксплуатации: «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('называет удалённую установку и её модель', async () => {
+    await recordAuditEvent({
+      action: 'equipment.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: { name: 'ЭО-5111', before: { model: 'ЭО-5111А', kind: 'PILE_DRIVER', isActive: false } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Установка удалена',
+        message: 'Удалена установка (ЭО-5111А): «ЭО-5111».',
+      }),
+    );
+  });
+});

@@ -6,6 +6,7 @@ import { canDecreaseMeter, createEquipment, getEquipmentByIdOrThrow, listAllEqui
 import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -74,6 +75,27 @@ export const POST = withMutation(
     const saved = equipment
       ? await getEquipmentByIdOrThrow(equipment.id, tenantId)
       : equipment;
+
+    // Аудит (F-R34-14): заведение техники не оставляло следа вовсе. Снимок
+    // берётся по сохранённой строке (`saved`), а не по ответу команды: тип и
+    // характеристики пишутся вторым шагом, и снимок «до записи метаданных»
+    // описывал бы не то, что легло в базу. Внутренних id в metadata нет —
+    // только название и то, что видно на экране.
+    await recordAuditEvent({
+      action: 'equipment.created',
+      scope: 'equipment',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      actorId: user!.id,
+      targetId: saved?.id ?? null,
+      tenantId,
+      metadata: saved
+        ? {
+            name: saved.name,
+            after: { name: saved.name, model: saved.model, qty: saved.qty, isActive: saved.isActive },
+          }
+        : undefined,
+    });
+
     return NextResponse.json({ equipment: saved }, { status: 201 });
   },
   { domain: 'equipment' }
