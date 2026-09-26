@@ -187,7 +187,8 @@ describe('Outbox Publisher', () => {
         event.aggregateId,
         event.payload,
         expect.any(Error),
-        5
+        5,
+        expect.objectContaining({ consumer: 'published' }),
       );
     });
 

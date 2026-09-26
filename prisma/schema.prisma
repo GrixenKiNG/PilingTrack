@@ -2820,6 +2820,14 @@ model DeadLetterQueue {
   errorMessage   String
   attempts       Int      @default(0)
   sourceOutboxId String?
+  // Чтобы повтор из DLQ воссоздал событие таким же, каким оно упало: без
+  // tenantId обработчик уходил в базу «безымянным» (RLS fail-closed → пусто),
+  // aggregateType был зашит как Report, а повтор сбрасывал ОБА потребителя
+  // и заново слал уведомления, хотя упала только проекция. NULL — строки,
+  // записанные до 25.09.2026.
+  tenantId       String?
+  aggregateType  String?
+  consumer       String? // published | projected
   status         String   @default("pending") // pending | resolved | discarded
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @db.Timestamptz(3)

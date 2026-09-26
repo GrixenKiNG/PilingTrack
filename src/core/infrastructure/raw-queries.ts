@@ -11,6 +11,7 @@
  */
 
 import { db } from '@/lib/db';
+import { ServiceError } from '@/lib/service-error';
 import { Prisma } from '@/generated/postgres-client';
 import { logger } from '@/lib/logger';
 
@@ -57,7 +58,12 @@ export async function getReportsByPeriodRaw(
   const where: Record<string, unknown> = {
     date: { gte: dateFrom, lte: dateTo },
   };
-  where.tenantId = tenantId && tenantId.trim().length > 0 ? tenantId : null;
+  // Fail closed (CLAUDE.md): пустая организация — отказ, а не `tenantId IS NULL`,
+  // который отдавал строки без организации вместо ошибки (аудит R26-1).
+  if (!tenantId || tenantId.trim().length === 0) {
+    throw new ServiceError('Не определена организация пользователя', 403);
+  }
+  where.tenantId = tenantId;
   if (siteId) where.siteId = siteId;
   if (userId) where.userId = userId;
 

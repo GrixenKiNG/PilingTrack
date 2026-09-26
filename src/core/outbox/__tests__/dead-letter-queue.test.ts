@@ -16,23 +16,29 @@ const mocks = vi.hoisted(() => ({
   mockCount: vi.fn().mockResolvedValue(0),
   mockOutboxUpdate: vi.fn().mockResolvedValue({}),
   mockOutboxCreate: vi.fn().mockResolvedValue({ id: 'outbox-1' }),
+  mockUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const client = {
     deadLetterQueue: {
       create: mocks.mockCreate,
       update: mocks.mockUpdate,
       findUnique: mocks.mockFindUnique,
       findMany: mocks.mockFindMany,
       count: mocks.mockCount,
+      updateMany: mocks.mockUpdateMany,
     },
     outboxEvent: {
       update: mocks.mockOutboxUpdate,
       create: mocks.mockOutboxCreate,
     },
-  },
-}));
+    $transaction: (fn: (tx: unknown) => unknown) => fn(client),
+  };
+  return { db: client };
+});
+
+const ORIGIN = { tenantId: 'orion', aggregateType: 'Report', consumer: 'published' as const };
 
 describe('Dead Letter Queue', () => {
   beforeEach(() => {
@@ -46,7 +52,8 @@ describe('Dead Letter Queue', () => {
       'report-123',
       { id: 'report-123', status: 'draft' },
       new Error('Database connection timeout'),
-      5
+      5,
+      ORIGIN,
     );
 
     expect(mocks.mockCreate).toHaveBeenCalledWith({
@@ -55,6 +62,8 @@ describe('Dead Letter Queue', () => {
         aggregateId: 'report-123',
         attempts: 5,
         sourceOutboxId: 'outbox-1',
+        tenantId: 'orion',
+        consumer: 'published',
       }),
     });
 
@@ -75,10 +84,35 @@ describe('Dead Letter Queue', () => {
     const result = await retryDlqEntry('dlq-1');
 
     expect(result).toBe(true);
-    expect(mocks.mockUpdate).toHaveBeenCalledWith({
-      where: { id: 'dlq-1' },
+    expect(mocks.mockUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'dlq-1', status: 'pending' },
       data: { status: 'resolved' },
     });
+  });
+
+  it('повтор сохраняет организацию и будит только упавшего потребителя', async () => {
+    mocks.mockFindUnique.mockResolvedValue({
+      id: 'dlq-1', eventType: 'ReportSubmitted', aggregateId: 'report-123',
+      payload: { id: 'report-123' }, status: 'resolved',
+      tenantId: 'orion', aggregateType: 'Equipment', consumer: 'projected',
+    });
+
+    await retryDlqEntry('dlq-1');
+
+    // Без tenantId обработчик идёт в базу без организации и под RLS видит пустоту;
+    // без published:true повтор проекции заново разослал бы уведомления.
+    expect(mocks.mockOutboxCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'orion', aggregateType: 'Equipment', published: true, projected: false,
+      }),
+    });
+  });
+
+  it('повтор уже взятой записи ничего не ставит в очередь', async () => {
+    mocks.mockUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    expect(await retryDlqEntry('dlq-1')).toBe(false);
+    expect(mocks.mockOutboxCreate).not.toHaveBeenCalled();
   });
 
   it('discards DLQ entry', async () => {

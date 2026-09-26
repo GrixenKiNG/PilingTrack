@@ -19,9 +19,4 @@ export { authenticateWS } from './server/auth';
 export { publishPendingEvents, startRealtimePublisher } from './publisher/ws-publisher';
 
 // Redis
-export { getPublisher, getSubscriber, onChannel, publishToRedis, closeRedis, CHANNEL_EVENTS, CHANNEL_ALERTS } from './redis/pubsub';
-
-// Alerts
-export { evaluateAlert, processAlertEvent, startAlertEngine } from './alerts/engine';
-export { builtInRules, addCustomRule, removeCustomRule, getAllRules } from './alerts/rules';
-export type { AlertRule, AlertContext } from './alerts/rules';
+export { getPublisher, getSubscriber, onChannel, publishToRedis, closeRedis, CHANNEL_EVENTS } from './redis/pubsub';

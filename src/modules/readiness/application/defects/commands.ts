@@ -2,7 +2,7 @@ import {enqueueCriticalDefects} from '@/core/notifications/durable-alert';
 import type {ReadinessAccessMatrix} from '../../domain/access-matrix';
 import type {Prisma} from '@/generated/postgres-client/client';
 import {recordChainedReadinessAudit} from '../../infrastructure/audit/record-audit';
-import {resolveReadinessCapabilities} from '../capabilities';
+import {canManageDefects, canReportDefects} from '../capabilities';
 import {createIdempotencyScope, hashCommandRequest, requireIdempotencyKey} from '../command-pipeline/idempotency';
 import {executeIdempotentCommand, type CommandHttpResult} from '../command-pipeline/execute-command';
 import {formatStrongEtag, resolveExpectedVersion} from '../command-pipeline/etag';
@@ -52,16 +52,14 @@ export const serializeDefect = (row: DefectRow) => ({
  * неисправность дороже лишней записи.
  */
 function assertCanReport(context: DefectCommandContext): void {
-  if (!resolveReadinessCapabilities(context.actorRole).has('readiness.defect.report')) {
+  if (!canReportDefects(context)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права фиксировать дефекты');
   }
 }
 
-/** Разбирать, закрывать и отклонять — только диспетчер, механик, администратор. */
+/** Разбирать, закрывать и отклонять — по опубликованной матрице (по умолчанию: диспетчер, механик, инженер ОТ, администратор). */
 function assertCanManage(context: DefectCommandContext): void {
-  const direct = resolveReadinessCapabilities(context.actorRole).has('readiness.defect.manage');
-  const adminAsMechanic = context.actorRole === 'ADMIN' && context.actingAs === 'MECHANIC';
-  if (!direct && !adminAsMechanic) {
+  if (!canManageDefects(context)) {
     throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Нет права разбирать дефекты');
   }
 }

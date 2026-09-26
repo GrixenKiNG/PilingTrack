@@ -11,7 +11,7 @@ const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 
 vi.mock('@/lib/db', () => ({ db: { report: { findMany } } }));
 
-import { exportReportsCsv } from '../report-query.service';
+import { exportReportsCsv, listReportsForReview } from '../report-query.service';
 
 describe('exportReportsCsv — tenant isolation', () => {
   beforeEach(() => {
@@ -33,5 +33,16 @@ describe('exportReportsCsv — tenant isolation', () => {
         where: expect.objectContaining({ tenantId: 'orion', siteId: 's1' }),
       })
     );
+  });
+});
+
+// R26-2: для не-платформенной роли без организации фильтр молча не ставился —
+// то есть «все отчёты всех организаций». ADMIN/DISPATCHER видят все организации
+// по решению владельца (AGENTS.md) и под правило не попадают.
+describe('listReportsForReview — tenant isolation', () => {
+  it('refuses an operator without a tenant instead of listing every tenant', async () => {
+    findMany.mockReset();
+    await expect(listReportsForReview({ id: 'u1', role: 'OPERATOR', tenantId: null })).rejects.toThrow(/организац/);
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

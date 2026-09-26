@@ -15,7 +15,6 @@ const { findMany, publishToRedis } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/db', () => ({ db: { outboxEvent: { findMany, update: vi.fn().mockResolvedValue({}) } } }));
 vi.mock('../../redis/pubsub', () => ({ publishToRedis, CHANNEL_EVENTS: 'events' }));
-vi.mock('../../alerts/engine', () => ({ evaluateAlert: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), debug: vi.fn() } }));
 
 import { publishPendingEvents } from '../ws-publisher';
