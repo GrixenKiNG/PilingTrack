@@ -7,6 +7,8 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
+import {writeReportAuditRow} from '@/services/reports/audit-service';
 import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport} from './shared';
 import type {Tx} from './shared';
 
@@ -167,7 +169,7 @@ export async function submitShiftReport(tx: Tx, input: {
     }).format(at)
     : null);
 
-  await tx.report.update({
+  const submittedReport = await tx.report.update({
     where: {id: reportId},
     data: {
       status: 'submitted',
@@ -179,7 +181,36 @@ export async function submitShiftReport(tx: Tx, input: {
       endingFuelPercent: fuelPercent,
       lastEditedById: input.operatorId,
     },
+    select: {reportId: true},
   });
+
+  // Сужение типа: параметр `writeReportAuditRow` описан вручную (его `create`
+  // принимает аргументы Prisma), поэтому клиент транзакции приводится явно —
+  // тот же приём, что в `report.repository.ts` для in-tx хуков.
+  const auditTx = tx as unknown as Parameters<typeof writeReportAuditRow>[1];
+
+  /*
+    СЛЕД СДАЧИ В ИСТОРИИ ОТЧЁТА.
+
+    Статус переводится здесь, а `ReportAudit` писали только создание и правка
+    (`report-command.service.ts`), поэтому в истории отчёта у закрытой с телефона
+    смены были «Создан»/«Изменён», но не было шага сдачи: когда отчёт закрылся и
+    кто его сдал, из журнала не следовало. Пишем строку в ТОЙ ЖЕ транзакции, что
+    и сам статус: иначе смена закрылась бы без следа (F-R34-4).
+
+    Номер в следе — деловой (`RM-…`), а не первичный ключ: история отчёта ищет
+    строки по нему (`report-history-service.ts`).
+  */
+  await writeReportAuditRow({
+    reportId: submittedReport.reportId,
+    action: 'submitted',
+    userId: input.operatorId,
+    newData: {
+      status: 'submitted',
+      submittedAt: input.now.toISOString(),
+      closingComment: input.comment,
+    },
+  }, auditTx);
 
   await publishReportSubmitted(tx, input.tenantId, reportId);
   return {reportId};
