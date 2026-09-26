@@ -47,9 +47,9 @@ describe('computeDashboardKpis', () => {
     expect(k.downtime).toBe(4);
   });
 
-  it('reads shift/rig/crew counts from fleet totals', () => {
+  it('reads today/rig/crew counts from fleet totals', () => {
     const k = computeDashboardKpis([], fleet, new Map(), []);
-    expect(k.shiftsDone).toBe(3); // сдали отчёт за сегодня
+    expect(k.shiftsDone).toBe(3); // машин с отчётом за сегодня — не смен (F-R35-3)
     // «В работе» — открытая смена, а не сданный отчёт. Раньше сюда шло
     // activeToday, и плитка показывала ноль, пока смена шла без отчёта.
     expect(k.rigsWorking).toBe(2);

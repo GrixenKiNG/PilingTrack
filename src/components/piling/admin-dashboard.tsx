@@ -299,7 +299,11 @@ export function AdminDashboard() {
   }
 
   const dashKpiWidgets: Record<string, RenderablePageWidget> = {
-    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="смен сдано сегодня" /> },
+    // Подпись называет то, что плитка считает: снимок парка отдаёт машины
+    // (`activeToday` / `expected`), а не число сданных отчётов. «Смен сдано»
+    // обещало смены: две смены одной установки дают два отчёта, но одну
+    // машину (F-R35-3).
+    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="машин с отчётом сегодня" /> },
     'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={`${formatNumber(kpis.actualPiles)} шт / ${formatNumber(kpis.actualPileMeters)} м.п.`} sub={`план ${formatNumber(kpis.plannedPiles)} шт / ${formatNumber(kpis.plannedPileMeters)} м.п.`} progress={pileProgress} /> },
     'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={`${formatNumber(kpis.actualDrilling)} м / ${formatNumber(kpis.actualDrillingCount)} шт`} sub={`план ${formatNumber(kpis.plannedDrilling)} м / ${formatNumber(kpis.plannedDrillingCount)} шт`} progress={drillingProgress} /> },
     'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={formatDowntimeHours(kpis.downtime)} sub="за период" /> },

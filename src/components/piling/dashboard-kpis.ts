@@ -18,7 +18,7 @@ export interface DashboardAnalyticsRow {
 }
 
 export interface DashboardFleetTotals {
-  /** Сдан отчёт за сегодня. Это НЕ «работает сейчас». */
+  /** Машин с отчётом за сегодня (не смен). Это НЕ «работает сейчас». */
   activeToday: number;
   /** Машин с открытой сменой прямо сейчас. */
   workingNow?: number;
@@ -54,7 +54,14 @@ const hoursOverrun = (rig: DashboardRigHours): boolean =>
   && rig.engineHoursTotal > rig.nextMaintenanceAtHours;
 
 export interface DashboardKpis {
+  /**
+   * Машин с отчётом за сегодня — не «смен сдано» (F-R35-3). Установка,
+   * отработавшая две смены, даёт два отчёта, но здесь считается один раз:
+   * снимок парка считает машины (`fleetMonitoring.totals.activeToday`),
+   * числа сданных отчётов в нём нет.
+   */
   shiftsDone: number;
+  /** Машин, которые раньше сдавали отчёты, но за сегодня ещё нет: знаменатель плитки «Отчёты». */
   reportsExpected: number;
   reports: number;
   actualPiles: number;
