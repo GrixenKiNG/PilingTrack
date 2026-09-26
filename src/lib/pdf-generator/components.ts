@@ -4,6 +4,11 @@ import { sumDowntime, sumDrilling, sumPiles } from './period-row';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import type { PdfDoc, PeriodReportRow } from './types';
 
+/** Метраж сваи неизвестен: у марки не задана длина (PileGrade.lengthMm = null). */
+export const PILE_LENGTH_UNKNOWN_LABEL = 'длина марки не задана';
+/** Пометка к итогу м.п., когда хотя бы у одной марки не задана длина. */
+export const PILE_METERS_INCOMPLETE_NOTE = '(неполный: у марки не задана длина)';
+
 export function ensureSpace(doc: PdfDoc, neededHeight: number) {
   if (doc.y + neededHeight > PAGE.height - PAGE.bottom) {
     doc.addPage();
@@ -67,8 +72,9 @@ export function addInfoGrid(doc: PdfDoc, rows: string[][]) {
   doc.y += 14;
 }
 
-export function addMetricStrip(doc: PdfDoc, metrics: Array<[string, string, string]>) {
-  const height = 76;
+export function addMetricStrip(doc: PdfDoc, metrics: Array<[string, string, string, string?]>) {
+  const hasNote = metrics.some((metric) => metric[3]);
+  const height = 76 + (hasNote ? 18 : 0);
   const columnWidth = CONTENT_WIDTH / metrics.length;
   ensureSpace(doc, height + 16);
 
@@ -76,7 +82,7 @@ export function addMetricStrip(doc: PdfDoc, metrics: Array<[string, string, stri
   doc.rect(PAGE.left, y, CONTENT_WIDTH, height).fill(COLORS.header).strokeColor(COLORS.border).lineWidth(0.5).stroke();
   doc.rect(PAGE.left, y, CONTENT_WIDTH, 3).fill(COLORS.accent);
 
-  metrics.forEach(([label, value, unit], index) => {
+  metrics.forEach(([label, value, unit, note], index) => {
     const x = PAGE.left + columnWidth * index;
     if (index > 0) {
       doc.moveTo(x, y + 14).lineTo(x, y + height - 14).strokeColor(COLORS.border).stroke();
@@ -103,6 +109,11 @@ export function addMetricStrip(doc: PdfDoc, metrics: Array<[string, string, stri
       });
       doc.font('Regular').fontSize(8).fillColor(COLORS.muted);
       doc.text(unit, x + 12, y + 54, { width: columnWidth - 24 });
+    }
+
+    if (note) {
+      doc.font('Regular').fontSize(7.5).fillColor(COLORS.muted);
+      doc.text(note, x + 12, y + height - 18, { width: columnWidth - 24 });
     }
   });
 
