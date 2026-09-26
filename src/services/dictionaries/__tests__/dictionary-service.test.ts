@@ -9,7 +9,7 @@ const { dbMock, auditMock } = vi.hoisted(() => ({
     pileGrade: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
     drillingType: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
     downtimeReason: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
-    report: { findMany: vi.fn() },
+    report: { findMany: vi.fn(), groupBy: vi.fn() },
   },
   auditMock: vi.fn(),
 }));
@@ -19,7 +19,7 @@ vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }
 import {
   deleteDictionaryItem,
   archiveDictionaryItem, restoreDictionaryItem, renameDictionaryItem,
-  createDictionaryItem, getDictionaryUsage, listDictionaries, setPileGradeLength,
+  createDictionaryItem, getDictionaryUsage, getItemUsage, listDictionaries, setPileGradeLength,
 } from '../dictionary-service';
 
 const tenantId = 'tenant-a';
@@ -73,7 +73,7 @@ describe('deleteDictionaryItem (guarded hard delete)', () => {
 
   it('throws 409 when the pile grade is used in reports', async () => {
     dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', isActive: true });
-    dbMock.pileWork.findMany.mockResolvedValue([{ reportId: 'r1', report: { siteId: 's1' } }, { reportId: 'r2', report: { siteId: 's1' } }]);
+    dbMock.report.groupBy.mockResolvedValue([{ siteId: 's1', _count: { _all: 2 } }]);
     dbMock.sitePilePlan.count.mockResolvedValue(0);
 
     await expect(deleteDictionaryItem(mutation, 'pileGrade', 'g1')).rejects.toMatchObject({ status: 409 });
@@ -82,7 +82,7 @@ describe('deleteDictionaryItem (guarded hard delete)', () => {
 
   it('throws 409 when the pile grade is used only in site plans', async () => {
     dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', isActive: true });
-    dbMock.pileWork.findMany.mockResolvedValue([]);
+    dbMock.report.groupBy.mockResolvedValue([]);
     dbMock.sitePilePlan.count.mockResolvedValue(3);
 
     await expect(deleteDictionaryItem(mutation, 'pileGrade', 'g1')).rejects.toMatchObject({ status: 409 });
@@ -91,7 +91,7 @@ describe('deleteDictionaryItem (guarded hard delete)', () => {
 
   it('hard-deletes an unused item', async () => {
     dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', isActive: true });
-    dbMock.pileWork.findMany.mockResolvedValue([]);
+    dbMock.report.groupBy.mockResolvedValue([]);
     dbMock.sitePilePlan.count.mockResolvedValue(0);
     dbMock.pileGrade.delete.mockResolvedValue({ id: 'g1' });
 
@@ -128,7 +128,7 @@ describe('archive/restore/rename', () => {
   it('rename trims and updates the name', async () => {
     dbMock.drillingType.findFirst.mockResolvedValue({ id: 't1', name: 'old' });
     dbMock.drillingType.update.mockResolvedValue({ id: 't1', name: 'new' });
-    dbMock.leaderDrilling.findMany.mockResolvedValue([]);
+    dbMock.report.groupBy.mockResolvedValue([]);
     await renameDictionaryItem(mutation, 'drillingType', 't1', '  new  ');
     expect(dbMock.drillingType.update).toHaveBeenCalledWith({ where: { id: 't1', tenantId }, data: { name: 'new', normalizedName: 'new' } });
   });
@@ -139,11 +139,59 @@ describe('archive/restore/rename', () => {
 
   it('rejects rename when the item is already used', async () => {
     dbMock.drillingType.findFirst.mockResolvedValue({ id: 't1', name: 'old', isActive: true });
-    dbMock.leaderDrilling.findMany.mockResolvedValue([{ reportId: 'r1', report: { siteId: 's1' } }]);
+    dbMock.report.groupBy.mockResolvedValue([{ siteId: 's1', _count: { _all: 1 } }]);
 
     await expect(renameDictionaryItem(mutation, 'drillingType', 't1', 'new'))
       .rejects.toMatchObject({ status: 409 });
     expect(dbMock.drillingType.update).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  Использование элемента справочника теперь считает БД (GROUP BY siteId), а не JS.
+  Фикстура из «того же» набора строк: три отчёта на двух объектах, из них два
+  в s1 и один в s2 — счётчики обязаны остаться прежними.
+*/
+describe('getItemUsage (counts computed by the database)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('keeps report and object counts for a small fixture', async () => {
+    dbMock.report.groupBy.mockResolvedValue([
+      { siteId: 's1', _count: { _all: 2 } },
+      { siteId: 's2', _count: { _all: 1 } },
+    ]);
+    dbMock.sitePilePlan.count.mockResolvedValue(4);
+
+    await expect(getItemUsage(tenantId, 'pileGrade', 'g1')).resolves.toEqual({
+      reportCount: 3, planCount: 4, siteCount: 2,
+    });
+    expect(dbMock.report.groupBy).toHaveBeenCalledWith({
+      by: ['siteId'],
+      where: { tenantId, piles: { some: { pileGradeId: 'g1' } } },
+      _count: { _all: true },
+    });
+    expect(dbMock.pileWork.findMany).not.toHaveBeenCalled();
+  });
+
+  it('scopes drilling and downtime usage to the tenant', async () => {
+    dbMock.report.groupBy.mockResolvedValue([{ siteId: 's1', _count: { _all: 1 } }]);
+
+    await expect(getItemUsage(tenantId, 'drillingType', 't1')).resolves.toEqual({ reportCount: 1, planCount: 0, siteCount: 1 });
+    await expect(getItemUsage(tenantId, 'downtimeReason', 'd1')).resolves.toEqual({ reportCount: 1, planCount: 0, siteCount: 1 });
+
+    expect(dbMock.report.groupBy).toHaveBeenNthCalledWith(1, {
+      by: ['siteId'],
+      where: { tenantId, drillings: { some: { typeId: 't1' } } },
+      _count: { _all: true },
+    });
+    expect(dbMock.report.groupBy).toHaveBeenNthCalledWith(2, {
+      by: ['siteId'],
+      where: { tenantId, downtimes: { some: { reasonId: 'd1' } } },
+      _count: { _all: true },
+    });
+    expect(dbMock.leaderDrilling.findMany).not.toHaveBeenCalled();
+    expect(dbMock.reportDowntime.findMany).not.toHaveBeenCalled();
+    await expect(getItemUsage('', 'pileGrade', 'g1')).rejects.toMatchObject({ status: 403 });
   });
 });
 

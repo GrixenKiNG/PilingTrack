@@ -130,43 +130,51 @@ export async function createDictionaryItem(
   throw new ServiceError('Invalid type', 400);
 }
 
+/** One row per distinct site of the reports that mention a dictionary item. */
+type SiteGroup = { _count: { _all: number } };
+
+/**
+ * Отчёты группируются по объекту в БД: у каждого отчёта ровно один объект,
+ * поэтому сумма `_count._all` — это число отчётов, а число групп — число объектов.
+ * Считать то же в JS означало читать все строки забивки/бурения/простоев тенанта
+ * за все годы ради двух DISTINCT (находка F-R20-3).
+ */
+function usageFromSiteGroups(groups: SiteGroup[], planCount: number): UsageCount {
+  return {
+    reportCount: groups.reduce((total, group) => total + group._count._all, 0),
+    planCount,
+    siteCount: groups.length,
+  };
+}
+
 /** Distinct-report + plan usage for a tenant-owned dictionary item. */
 export async function getItemUsage(tenantId: string, type: DictType, id: string): Promise<UsageCount> {
   assertTenantId(tenantId);
   if (type === 'pileGrade') {
-    const [works, planCount] = await Promise.all([
-      db.pileWork.findMany({
-        where: { pileGradeId: id, report: { tenantId } },
-        select: { reportId: true, report: { select: { siteId: true } } },
+    const [siteGroups, planCount] = await Promise.all([
+      db.report.groupBy({
+        by: ['siteId'],
+        where: { tenantId, piles: { some: { pileGradeId: id } } },
+        _count: { _all: true },
       }),
       db.sitePilePlan.count({ where: { pileGradeId: id, site: { tenantId } } }),
     ]);
-    return {
-      reportCount: new Set(works.map((w) => w.reportId)).size,
-      planCount,
-      siteCount: new Set(works.map((w) => w.report.siteId)).size,
-    };
+    return usageFromSiteGroups(siteGroups, planCount);
   }
   if (type === 'drillingType') {
-    const rows = await db.leaderDrilling.findMany({
-      where: { typeId: id, report: { tenantId } },
-      select: { reportId: true, report: { select: { siteId: true } } },
+    const siteGroups = await db.report.groupBy({
+      by: ['siteId'],
+      where: { tenantId, drillings: { some: { typeId: id } } },
+      _count: { _all: true },
     });
-    return {
-      reportCount: new Set(rows.map((r) => r.reportId)).size,
-      planCount: 0,
-      siteCount: new Set(rows.map((r) => r.report.siteId)).size,
-    };
+    return usageFromSiteGroups(siteGroups, 0);
   }
-  const rows = await db.reportDowntime.findMany({
-    where: { reasonId: id, report: { tenantId } },
-    select: { reportId: true, report: { select: { siteId: true } } },
+  const siteGroups = await db.report.groupBy({
+    by: ['siteId'],
+    where: { tenantId, downtimes: { some: { reasonId: id } } },
+    _count: { _all: true },
   });
-  return {
-    reportCount: new Set(rows.map((r) => r.reportId)).size,
-    planCount: 0,
-    siteCount: new Set(rows.map((r) => r.report.siteId)).size,
-  };
+  return usageFromSiteGroups(siteGroups, 0);
 }
 
 function aggregateUsage(
