@@ -15,6 +15,7 @@
  */
 
 import { cacheAside, cacheAsideInvalidate } from '@/lib/cache-strategies';
+import { cache } from '@/lib/redis-cache';
 import { getResponseCache } from '@/core/cache/response-cache';
 import { recordDeletion } from '@/lib/cache-metrics';
 import { db } from '@/lib/db';
@@ -118,5 +119,23 @@ export async function invalidateCrews(): Promise<void> {
 
 export async function invalidateDictionaries(tenantId: string): Promise<void> {
   await cacheAsideInvalidate(`dictionary:${tenantId}:all`);
+  recordDeletion();
+}
+
+/**
+ * Отчёты изменились — сводка по объектам устарела.
+ *
+ * `/api/analytics/sites` (плитки дашборда, «Объекты», карточка объекта) кладёт
+ * ответ в Redis на 5 минут под ключом
+ * `analytics:sites:v3:${tenantId}:${dateFrom}:${dateTo}:${siteId}`. Мутации
+ * отчёта его не сбрасывали: сданная смена появлялась в журнале и в аналитике
+ * сразу, а на дашборде — только по истечении TTL, и расхождение выглядело
+ * потерей данных (F-R35-2).
+ *
+ * Префикс — начало ключа вместе с организацией, поэтому снимаются все срезы
+ * сводки (любые период и объект) ровно этого тенанта и ни одной чужой записи.
+ */
+export async function invalidateSiteAnalytics(tenantId: string): Promise<void> {
+  await cache.invalidatePattern(`analytics:sites:v3:${tenantId}:*`);
   recordDeletion();
 }

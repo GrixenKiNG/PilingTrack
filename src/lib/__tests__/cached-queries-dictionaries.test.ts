@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   cacheAside: vi.fn(),
   invalidate: vi.fn(),
+  patternInvalidate: vi.fn(),
   recordDeletion: vi.fn(),
   pileGradeFindMany: vi.fn(),
   drillingTypeFindMany: vi.fn(),
@@ -14,6 +15,9 @@ vi.mock('@/lib/cache-strategies', () => ({
   cacheAsideInvalidate: mocks.invalidate,
   writeThrough: vi.fn(),
 }));
+vi.mock('@/lib/redis-cache', () => ({
+  cache: { invalidatePattern: mocks.patternInvalidate },
+}));
 vi.mock('@/lib/cache-metrics', () => ({ recordDeletion: mocks.recordDeletion }));
 vi.mock('@/lib/db', () => ({
   db: {
@@ -23,7 +27,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-import { getCachedAllDictionaries, invalidateDictionaries } from '../cached-queries';
+import { getCachedAllDictionaries, invalidateDictionaries, invalidateSiteAnalytics } from '../cached-queries';
 
 describe('tenant dictionary cache', () => {
   beforeEach(() => {
@@ -66,5 +70,25 @@ describe('tenant dictionary cache', () => {
 
     expect(mocks.invalidate).toHaveBeenCalledWith('dictionary:tenant-a:all');
     expect(mocks.invalidate).not.toHaveBeenCalledWith('dictionary:tenant-b:all');
+  });
+});
+
+describe('site analytics cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /*
+    Сводка по объектам лежит в Redis под ключом `analytics:sites:v3:${tenantId}:…`
+    и не сбрасывалась ни одной мутацией отчёта: дашборд до 5 минут показывал
+    прежнюю выработку (F-R35-2). Снимаем ключи по префиксу с организацией —
+    все срезы (периоды/объекты) своей организации, ни одного чужого.
+  */
+  it('сбрасывает сводку по объектам только своей организации (F-R35-2)', async () => {
+    await invalidateSiteAnalytics('tenant-a');
+
+    expect(mocks.patternInvalidate).toHaveBeenCalledWith('analytics:sites:v3:tenant-a:*');
+    expect(mocks.patternInvalidate).toHaveBeenCalledTimes(1);
+    expect(mocks.recordDeletion).toHaveBeenCalled();
   });
 });

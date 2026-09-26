@@ -13,12 +13,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock } = vi.hoisted(() => ({
+const { findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
   deleteManyMock: vi.fn(),
   findUniqueMock: vi.fn(),
   analyticsUpsertMock: vi.fn(),
+  invalidateAnalyticsMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -27,6 +28,10 @@ vi.mock('@/lib/db', () => ({
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
     reportAnalytics: { upsert: analyticsUpsertMock },
   },
+}));
+
+vi.mock('@/lib/cached-queries', () => ({
+  invalidateSiteAnalytics: invalidateAnalyticsMock,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -44,6 +49,7 @@ describe('handleReportForAnalytics', () => {
     deleteManyMock.mockReset();
     findUniqueMock.mockReset();
     analyticsUpsertMock.mockReset();
+    invalidateAnalyticsMock.mockReset();
     findManyMock.mockResolvedValue([]);
     registerAnalyticsEventHandler();
   });
@@ -149,5 +155,95 @@ describe('recomputeSiteDailySummary', () => {
     expect(args.create).toMatchObject({
       totalPiles: 0, totalDrilling: 0, totalDowntime: 0, reportCount: 1,
     });
+  });
+});
+
+/*
+  Сводка по объектам (/api/analytics/sites) кэшируется в Redis на 5 минут
+  ключом организации и до этого не сбрасывалась ни одной мутацией отчёта:
+  дашборд отставал от журнала (F-R35-2). Сброс — побочный эффект, он не
+  должен валить событие (иначе outbox ушёл бы в ретрай/DLQ).
+*/
+describe('сброс кэша сводки по объектам (F-R35-2)', () => {
+  beforeEach(() => {
+    findManyMock.mockReset();
+    findUniqueMock.mockReset();
+    invalidateAnalyticsMock.mockReset();
+    findManyMock.mockResolvedValue([]);
+    registerAnalyticsEventHandler();
+  });
+
+  it('сбрасывает сводку организации из события', async () => {
+    await emitDomainEvent({
+      id: 'evt-cache-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { date: '2026-04-30' },
+    });
+
+    expect(invalidateAnalyticsMock).toHaveBeenCalledWith('tenant-a');
+  });
+
+  it('сбрасывает сводку и после правки, и после удаления отчёта', async () => {
+    for (const type of [
+      REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,
+    ]) {
+      invalidateAnalyticsMock.mockClear();
+      await emitDomainEvent({
+        id: `evt-${type}`,
+        type,
+        aggregateId: 'report-uuid-1',
+        aggregateType: 'Report',
+        occurredAt: new Date().toISOString(),
+        siteId: 'site_A',
+        userId: 'user-1',
+        tenantId: 'tenant-a',
+        data: { date: '2026-04-30' },
+      });
+
+      expect(invalidateAnalyticsMock).toHaveBeenCalledWith('tenant-a');
+    }
+  });
+
+  it('берёт организацию из отчёта, когда её нет в событии', async () => {
+    findUniqueMock.mockResolvedValue({ tenantId: 'tenant-a' });
+
+    await emitDomainEvent({
+      id: 'evt-cache-3',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-3',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      data: { date: '2026-04-30' },
+    });
+
+    expect(findUniqueMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { reportId: 'report-uuid-3' },
+    }));
+    expect(invalidateAnalyticsMock).toHaveBeenCalledWith('tenant-a');
+  });
+
+  it('не валит событие, если сброс кэша упал', async () => {
+    invalidateAnalyticsMock.mockRejectedValue(new Error('redis down'));
+
+    await expect(emitDomainEvent({
+      id: 'evt-cache-4',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-4',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { date: '2026-04-30' },
+    })).resolves.toBeUndefined();
   });
 });
