@@ -52,4 +52,26 @@ describe('ReportDetailDialog — pile meters', () => {
     // finds no 3-consecutive-digit run and would render "0.0 м.п." instead.
     expect(screen.getByText('45.0 м.п.')).toBeTruthy();
   });
+
+  it('shows «длина марки не задана» instead of 0.0 metres for a grade without length (F-R28-4)', () => {
+    const reportWithoutLength = {
+      ...report,
+      piles: [{ id: 'p1', count: 5, pileGradeId: 'g1', pileGrade: { name: 'С90.30', lengthMm: null } }],
+    } as unknown as ReportDTO;
+
+    render(
+      <ReportDetailDialog
+        report={reportWithoutLength}
+        onClose={vi.fn()}
+        onPreviewPdf={vi.fn()}
+        formatDate={(d) => d}
+        formatLastEditor={() => '—'}
+      />,
+    );
+
+    // left "N м × K шт. = X м.п." line and right "X м.п." line
+    expect(screen.getAllByText('длина марки не задана')).toHaveLength(2);
+    expect(screen.queryByText('0.0 м.п.')).toBeNull();
+    expect(screen.getByText('5 шт.')).toBeTruthy();
+  });
 });
