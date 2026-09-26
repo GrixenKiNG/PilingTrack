@@ -14,7 +14,10 @@ export const DELETE = withMutation(
     const { db } = await import('@/lib/db');
     const media = await db.media.findUnique({
       where: { id },
-      select: { entityType: true, entityId: true, isDeleted: true, userId: true },
+      // tenantId обязателен: тенантное равенство внутри assertCanAccessMedia
+      // сравнивает его с организацией актора, и без поля в выборке вторая
+      // линия обороны не срабатывает никогда.
+      select: { entityType: true, entityId: true, isDeleted: true, userId: true, tenantId: true },
     });
     if (!media) return NextResponse.json({ error: 'Файл не найден' }, { status: 404 });
     if (media.isDeleted) return NextResponse.json({ ok: true });

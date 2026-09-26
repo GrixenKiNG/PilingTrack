@@ -47,7 +47,7 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     let siteId = event.siteId;
     let userId = event.userId;
     let tenantId = event.tenantId;
-    if (!siteId || !userId) {
+    if (!siteId || !userId || !tenantId) {
       const report = await db.report.findUnique({
         where: { reportId: event.aggregateId },
         select: { siteId: true, userId: true, tenantId: true },
@@ -56,8 +56,12 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       userId = userId || report?.userId;
       tenantId = tenantId || report?.tenantId || undefined;
     }
-    if (!siteId || !userId) {
-      logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId', {
+    // Организация обязательна. Строка проекции без неё невидима для тенантных
+    // запросов (сломанная аналитика), а для запроса с пустым тенантом —
+    // видна всем. Раньше здесь писался `tenantId || null`; лучше пропуск
+    // проекции с записью в лог, как для siteId/userId выше.
+    if (!siteId || !userId || !tenantId) {
+      logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId/tenantId', {
         eventType: event.type, aggregateId: event.aggregateId,
       });
       return;
@@ -69,7 +73,7 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
         reportId: event.aggregateId,
         siteId,
         userId,
-        tenantId: tenantId || null,
+        tenantId,
         status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft',
         totalPiles: (event.data.totalPiles as number) || 0,
         totalDrilling: (event.data.totalDrilling as number) || 0,

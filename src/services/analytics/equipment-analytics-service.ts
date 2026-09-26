@@ -156,6 +156,10 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
   const fuelGrouped = await db.telemetryRecord.groupBy({
     by: ['equipmentId'],
     where: {
+      // Таблица тенантная: без фильтра агрегат читает счётчики всех
+      // организаций, и первое же совпадение по equipmentId вернуло бы чужой
+      // расход. siteId остаётся необязательным.
+      tenantId,
       type: 'fuel_total',
       timestamp: { gte: fromTs, lte: toTs },
       ...(siteId ? { siteId } : {}),

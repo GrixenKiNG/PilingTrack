@@ -13,16 +13,19 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock, upsertMock, deleteManyMock } = vi.hoisted(() => ({
+const { findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
   deleteManyMock: vi.fn(),
+  findUniqueMock: vi.fn(),
+  analyticsUpsertMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    report: { findMany: findManyMock },
+    report: { findMany: findManyMock, findUnique: findUniqueMock },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
+    reportAnalytics: { upsert: analyticsUpsertMock },
   },
 }));
 
@@ -30,13 +33,68 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { recomputeSiteDailySummary } from '../event-handlers';
+import { recomputeSiteDailySummary, registerAnalyticsEventHandler } from '../event-handlers';
+import { emitDomainEvent } from '@/services/reports/domain-events';
+import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
+
+describe('handleReportForAnalytics', () => {
+  beforeEach(() => {
+    findManyMock.mockReset();
+    upsertMock.mockReset();
+    deleteManyMock.mockReset();
+    findUniqueMock.mockReset();
+    analyticsUpsertMock.mockReset();
+    findManyMock.mockResolvedValue([]);
+    registerAnalyticsEventHandler();
+  });
+
+  it('writes the projection with the tenant of the event', async () => {
+    await emitDomainEvent({
+      id: 'evt-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock.mock.calls[0][0].create).toMatchObject({ tenantId: 'tenant-a' });
+  });
+
+  /*
+    Проекция без организации раньше писалась с `tenantId: null`: строка
+    становилась невидимой для всех тенантных запросов (сломанная аналитика),
+    а для запроса с пустым тенантом — видна всем организациям. Запись без
+    организации не создаём и сообщаем в лог, как для siteId/userId.
+  */
+  it('пропускает проекцию, когда организацию определить нечем', async () => {
+    findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
+
+    await emitDomainEvent({
+      id: 'evt-2',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'report-uuid-2',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock).not.toHaveBeenCalled();
+  });
+});
 
 describe('recomputeSiteDailySummary', () => {
   beforeEach(() => {
     findManyMock.mockReset();
     upsertMock.mockReset();
     deleteManyMock.mockReset();
+    findUniqueMock.mockReset();
+    analyticsUpsertMock.mockReset();
   });
 
   it('aggregates totals across ALL reports for a (siteId, date) pair', async () => {

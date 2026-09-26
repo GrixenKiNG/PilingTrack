@@ -56,6 +56,26 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
 
     expect(queryRaw).not.toHaveBeenCalled();
   });
+
+  // Расход топлива берётся из TelemetryRecord — тенантной таблицы. Без
+  // фильтра агрегат читал счётчики всех организаций и при совпадении
+  // equipmentId вернул бы чужой расход.
+  it('filters the telemetry fuel aggregate by tenant, keeping siteId optional', async () => {
+    await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', siteId: 'site_A', tenantId: 'orion' });
+
+    expect(groupBy.mock.calls[0][0].where).toMatchObject({
+      tenantId: 'orion',
+      siteId: 'site_A',
+      type: 'fuel_total',
+    });
+
+    groupBy.mockClear();
+    await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    const where = groupBy.mock.calls[0][0].where;
+    expect(where).toMatchObject({ tenantId: 'orion' });
+    expect(where).not.toHaveProperty('siteId');
+  });
 });
 
 /**
