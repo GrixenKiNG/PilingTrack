@@ -39,7 +39,7 @@ describe('getAccessibleCrews', () => {
   });
 
   it('fails closed when tenantId is empty (IDOR guard)', async () => {
-    await expect(getAccessibleCrews('')).rejects.toThrow('tenantId is required');
+    await expect(getAccessibleCrews('')).rejects.toThrow('Не определена организация пользователя');
     expect(mockDb.crew.findMany).not.toHaveBeenCalled();
   });
 });

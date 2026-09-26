@@ -73,7 +73,7 @@ describe('документы работника — доступ', () => {
     findFirstUserMock.mockResolvedValue(null);
     await expect(
       createUserDocument('usr_alien', { typeId: 'type_1' }, ctx({ id: 'usr_admin', role: 'ADMIN' })),
-    ).rejects.toThrow('User not found');
+    ).rejects.toThrow('Пользователь не найден');
     expect(createDocMock).not.toHaveBeenCalled();
   });
 

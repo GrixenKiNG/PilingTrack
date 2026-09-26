@@ -48,7 +48,7 @@ describe('createEquipmentDocument', () => {
     findUniqueEquipmentMock.mockResolvedValue(null);
     await expect(
       createEquipmentDocument('missing', { type: 'OTHER', title: 'x' }, { tenantId: 'orion' }),
-    ).rejects.toThrow('Equipment not found');
+    ).rejects.toThrow('Установка не найдена');
   });
 });
 
@@ -69,7 +69,7 @@ describe('updateEquipmentDocument', () => {
     findUniqueDocMock.mockResolvedValue({ id: 'doc_1', equipmentId: 'eq_1', tenantId: 'orion' });
     await expect(
       updateEquipmentDocument('eq_1', 'doc_1', { title: 'x' }, { tenantId: 'tenant-b' }),
-    ).rejects.toThrow('Document not found');
+    ).rejects.toThrow('Документ не найден');
     expect(updateDocMock).not.toHaveBeenCalled();
   });
 
@@ -77,7 +77,7 @@ describe('updateEquipmentDocument', () => {
     findUniqueDocMock.mockResolvedValue({ id: 'doc_1', equipmentId: 'other_eq', tenantId: 'orion' });
     await expect(
       updateEquipmentDocument('eq_1', 'doc_1', { title: 'x' }, { tenantId: 'orion' }),
-    ).rejects.toThrow('Document not found');
+    ).rejects.toThrow('Документ не найден');
   });
 });
 
@@ -98,7 +98,7 @@ describe('deleteEquipmentDocument', () => {
     findUniqueDocMock.mockResolvedValue({ id: 'doc_1', equipmentId: 'eq_1', tenantId: 'orion' });
     await expect(
       deleteEquipmentDocument('eq_1', 'doc_1', { tenantId: 'tenant-b' }),
-    ).rejects.toThrow('Document not found');
+    ).rejects.toThrow('Документ не найден');
     expect(deleteDocMock).not.toHaveBeenCalled();
   });
 });

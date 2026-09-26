@@ -64,7 +64,7 @@ export async function createMaintenance(
     where: { id: equipmentId, tenantId: ctx.tenantId },
     select: { id: true },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   const status = input.status ?? 'PLANNED';
   const completedAt = toDate(input.completedAt) ?? (status === 'DONE' ? new Date() : null);
@@ -199,7 +199,7 @@ export async function updateMaintenance(
     select: { id: true, equipmentId: true, completedAt: true, startedAt: true, tenantId: true, acceptedById: true, status: true, workDone: true, cancelReason: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
-    throw new ServiceError('Maintenance record not found', 404);
+    throw new ServiceError('Запись ТО не найдена', 404);
   }
   // Accepted records are a closed financial/audit record — acceptMaintenance
   // is the deliberate "lock it" step; allowing edits afterwards defeats that.
@@ -281,7 +281,7 @@ export async function acceptMaintenance(
   recordId: string,
   ctx: { tenantId: string; userId: string },
 ) {
-  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
     // `status` нужен, чтобы приёмка уже закрытого наряда не завела второе
@@ -289,7 +289,7 @@ export async function acceptMaintenance(
     select: { id: true, tenantId: true, acceptedById: true, completedAt: true, workDone: true, status: true },
   });
   if (!existing || existing.tenantId !== ctx.tenantId) {
-    throw new ServiceError('Maintenance record not found', 404);
+    throw new ServiceError('Запись ТО не найдена', 404);
   }
   if (existing.acceptedById) throw new ServiceError('Запись уже принята', 409);
   // Приёмка переводит наряд в DONE напрямую, минуя updateMaintenance, — без
@@ -334,7 +334,7 @@ export async function deleteMaintenance(
     select: { id: true, equipmentId: true, tenantId: true, status: true, acceptedById: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
-    throw new ServiceError('Maintenance record not found', 404);
+    throw new ServiceError('Запись ТО не найдена', 404);
   }
   // Принятый наряд закрыт приёмкой администратора, и правка его запрещена.
   // Удаление было открыто тому же исполнителю, от которого приёмка отделяет:

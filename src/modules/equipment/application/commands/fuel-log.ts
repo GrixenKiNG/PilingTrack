@@ -92,7 +92,7 @@ export async function addFuelEntry(
   input: FuelLogInput,
   ctx: FuelLogContext,
 ): Promise<{ id: string; recordedAt: Date }> {
-  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
 
   const litersAdded = asInt(input.litersAdded);
   const tankPercent = asInt(input.tankPercent);
@@ -112,7 +112,7 @@ export async function addFuelEntry(
     where: { id: equipmentId, tenantId: ctx.tenantId },
     select: { id: true },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   const entry = await db.fuelLog.create({
     data: {
@@ -136,13 +136,13 @@ export async function deleteFuelEntry(
   entryId: string,
   ctx: { tenantId: string },
 ): Promise<void> {
-  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   const existing = await db.fuelLog.findUnique({
     where: { id: entryId },
     select: { id: true, equipmentId: true, tenantId: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
-    throw new ServiceError('Fuel entry not found', 404);
+    throw new ServiceError('Запись о топливе не найдена', 404);
   }
   await db.fuelLog.delete({ where: { id: entryId } });
 }

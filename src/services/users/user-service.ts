@@ -12,7 +12,7 @@ function isUniqueConstraintError(message: string) {
 }
 
 export async function listAssignableUsers(tenantId: string) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   return db.user.findMany({
     where: { tenantId, isActive: true },
     select: { id: true, name: true, role: true },
@@ -152,7 +152,7 @@ export async function createUser(input: {
   tenantId?: string | null;
 }, actorUserId?: string | null) {
   if (!input.email || !input.name || (!input.password && !input.pin)) {
-    throw new ServiceError('email, name and password or PIN required', 400);
+    throw new ServiceError('Укажите email, имя и пароль или ПИН-код', 400);
   }
 
   const tenantId = requireTenantId(input.tenantId);
@@ -192,7 +192,7 @@ export async function createUser(input: {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (isUniqueConstraintError(message)) {
-      throw new ServiceError('User with this email already exists', 409);
+      throw new ServiceError('Пользователь с таким email уже существует', 409);
     }
     throw error;
   }
@@ -217,7 +217,7 @@ export async function updateUser(
 ) {
   const scopedTenantId = requireTenantId(tenantId);
   if (!input.id) {
-    throw new ServiceError('id required', 400);
+    throw new ServiceError('Не указан идентификатор пользователя', 400);
   }
 
   const data: Record<string, unknown> = {};
@@ -241,7 +241,7 @@ export async function updateUser(
       select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
     });
     if (!previousUser) {
-      throw new ServiceError('User not found', 404);
+      throw new ServiceError('Пользователь не найден', 404);
     }
     if (input.role !== undefined && input.role !== previousUser.role) {
       data.sessionVersion = { increment: 1 };
@@ -301,10 +301,10 @@ export async function updateUser(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to update not found')) {
-      throw new ServiceError('User not found', 404);
+      throw new ServiceError('Пользователь не найден', 404);
     }
     if (isUniqueConstraintError(message)) {
-      throw new ServiceError('User with this email already exists', 409);
+      throw new ServiceError('Пользователь с таким email уже существует', 409);
     }
     throw error;
   }
@@ -313,7 +313,7 @@ export async function updateUser(
 export async function deleteUser(tenantId: string, actorUserId: string, targetUserId: string) {
   const scopedTenantId = requireTenantId(tenantId);
   if (!targetUserId) {
-    throw new ServiceError('id required', 400);
+    throw new ServiceError('Не указан идентификатор пользователя', 400);
   }
 
   assertNotSelfAction(actorUserId, targetUserId, 'Cannot delete yourself');
@@ -329,10 +329,10 @@ export async function deleteUser(tenantId: string, actorUserId: string, targetUs
     },
   });
   if (!user) {
-    throw new ServiceError('User not found', 404);
+    throw new ServiceError('Пользователь не найден', 404);
   }
   if (user.crews.length > 0 || user._count.reports > 0 || user._count.sites > 0) {
-    throw new ServiceError('Cannot delete user with reports or assignments; block the user instead', 409);
+    throw new ServiceError('Нельзя удалить пользователя с отчётами или назначениями — заблокируйте его', 409);
   }
 
   try {
@@ -340,10 +340,10 @@ export async function deleteUser(tenantId: string, actorUserId: string, targetUs
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to delete not found')) {
-      throw new ServiceError('User not found', 404);
+      throw new ServiceError('Пользователь не найден', 404);
     }
     if (message.includes('FOREIGN KEY')) {
-      throw new ServiceError('Cannot delete user with linked reports or assignments', 409);
+      throw new ServiceError('Нельзя удалить пользователя со связанными отчётами или назначениями', 409);
     }
     throw error;
   }

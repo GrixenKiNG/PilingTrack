@@ -38,14 +38,14 @@ function assertTrigger(input: { triggerType: PmTriggerType; intervalHours?: numb
 }
 
 export async function createMaintenancePlan(input: MaintenancePlanInput, ctx: { tenantId: string }) {
-  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   assertTrigger(input);
 
   const equipment = await db.equipment.findUnique({
     where: { id: input.equipmentId, tenantId: ctx.tenantId },
     select: { id: true, engineHoursTotal: true },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   // Anchor the first interval at "now" when the caller didn't supply a baseline.
   const lastDoneHours =
@@ -75,12 +75,12 @@ export async function updateMaintenancePlan(
   input: Partial<MaintenancePlanInput> & { isActive?: boolean },
   ctx: { tenantId: string },
 ) {
-  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   const existing = await db.maintenancePlan.findUnique({
     where: { id: planId },
     select: { id: true, tenantId: true, triggerType: true, intervalHours: true, intervalDays: true },
   });
-  if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError('Maintenance plan not found', 404);
+  if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError('Регламент ТО не найден', 404);
 
   const triggerType = (input.triggerType ?? existing.triggerType) as PmTriggerType;
   assertTrigger({
@@ -104,11 +104,11 @@ export async function updateMaintenancePlan(
 }
 
 export async function deleteMaintenancePlan(planId: string, ctx: { tenantId: string }) {
-  if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   const existing = await db.maintenancePlan.findUnique({
     where: { id: planId },
     select: { id: true, tenantId: true },
   });
-  if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError('Maintenance plan not found', 404);
+  if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError('Регламент ТО не найден', 404);
   await db.maintenancePlan.delete({ where: { id: planId } });
 }

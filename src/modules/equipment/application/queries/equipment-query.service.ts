@@ -33,7 +33,7 @@ export async function getEquipmentByIdOrThrow(id: string, tenantId: string) {
       },
     },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
   return equipment;
 }
 
@@ -84,7 +84,7 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       },
     },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const allReports = await db.report.findMany({
@@ -195,7 +195,7 @@ export async function listMaintenance(equipmentId: string, tenantId: string) {
 }
 
 export async function listMeterReadings(equipmentId: string, tenantId: string, limit = 50) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.meterReading.findMany({
     where: { equipmentId, tenantId },
     orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
@@ -204,7 +204,7 @@ export async function listMeterReadings(equipmentId: string, tenantId: string, l
 }
 
 export async function listFuelLog(equipmentId: string, tenantId: string, limit = 50) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.fuelLog.findMany({
     where: { equipmentId, tenantId },
     orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
@@ -235,7 +235,7 @@ export async function getFuelSummary(
   from: Date,
   to: Date,
 ) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
 
   const { computeFuelConsumption } = await import('../commands/fuel-log');
 
@@ -243,7 +243,7 @@ export async function getFuelSummary(
     where: { id: equipmentId, tenantId },
     select: { fuelTankLiters: true },
   });
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   const entries = await db.fuelLog.findMany({
     where: { equipmentId, tenantId, recordedAt: { gte: from, lte: to } },
@@ -296,7 +296,7 @@ export async function getFuelSummary(
  * lib/fleet-kpi.ts.
  */
 export async function getFleetKpiData(tenantId: string, from: Date, to: Date) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   const [records, equipmentCount] = await Promise.all([
     db.maintenanceRecord.findMany({
       where: { tenantId, createdAt: { gte: from, lte: to } },
@@ -335,7 +335,7 @@ export async function getFleetKpiData(tenantId: string, from: Date, to: Date) {
  * its latest meter reading so callers can compute due status via evaluatePlanDue.
  */
 export async function listMaintenancePlans(tenantId: string, equipmentId?: string) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.maintenancePlan.findMany({
     where: { tenantId, ...(equipmentId ? { equipmentId } : {}) },
     orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
@@ -364,7 +364,7 @@ export interface MaintenanceListFilter {
 }
 
 export async function getMaintenanceById(id: string, tenantId: string) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   const record = await db.maintenanceRecord.findUnique({
     where: { id },
     include: {
@@ -391,7 +391,7 @@ export async function getMaintenanceById(id: string, tenantId: string) {
     },
   });
   if (!record || record.tenantId !== tenantId) {
-    throw new ServiceError('Maintenance record not found', 404);
+    throw new ServiceError('Запись ТО не найдена', 404);
   }
   return { ...record, people: await resolveMaintenancePeople(record) };
 }
@@ -423,7 +423,7 @@ async function resolveMaintenancePeople(record: {
 }
 
 export async function listAllMaintenance(tenantId: string, filter: MaintenanceListFilter = {}) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400); // fail-closed (IDOR guard)
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.maintenanceRecord.findMany({
     where: {
       tenantId,

@@ -53,9 +53,9 @@ async function assertEquipmentNotDoubleBooked(equipmentId: string, excludeCrewId
 // requireTenantSite (sites) and getAccessibleCrews (crews list) instead: an
 // unconditional, fail-closed tenant scope with no role bypass.
 async function requireTenantCrew(crewId: string, tenantId: string) {
-  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   const crew = await db.crew.findFirst({ where: { id: crewId, site: { tenantId } } });
-  if (!crew) throw new ServiceError('Crew not found', 404);
+  if (!crew) throw new ServiceError('Бригада не найдена', 404);
 }
 
 // Tenant integrity: a crew may only be assembled from parts of one tenant.
@@ -129,12 +129,12 @@ const crewWriteResponseInclude = {
 export async function createCrew(command: CreateCrewCommand) {
   // Validate required fields before creating aggregate
   if (!command.operatorId || !command.equipmentId || !command.siteId) {
-    throw new ServiceError('operatorId, equipmentId, and siteId are required', 400);
+    throw new ServiceError('Укажите машиниста, установку и объект', 400);
   }
 
   const name = (command.name || 'Unnamed Crew').trim();
   if (!name) {
-    throw new ServiceError('Crew name cannot be empty', 400);
+    throw new ServiceError('Название бригады не может быть пустым', 400);
   }
 
   // Verify dependencies exist
@@ -144,11 +144,11 @@ export async function createCrew(command: CreateCrewCommand) {
     db.site.findUnique({ where: { id: command.siteId } }),
   ]);
 
-  if (!operator) throw new ServiceError('Operator not found', 404);
-  if (operator.role !== 'OPERATOR') throw new ServiceError('User must have OPERATOR role', 400);
+  if (!operator) throw new ServiceError('Машинист не найден', 404);
+  if (operator.role !== 'OPERATOR') throw new ServiceError('Пользователь должен иметь роль машиниста', 400);
 
-  if (!equipment) throw new ServiceError('Equipment not found', 404);
-  if (!site) throw new ServiceError('Site not found', 404);
+  if (!equipment) throw new ServiceError('Установка не найдена', 404);
+  if (!site) throw new ServiceError('Объект не найден', 404);
 
   // Tenant integrity + one-rig-one-crew, before we create anything.
   assertSameTenant({
@@ -182,13 +182,13 @@ export async function createCrew(command: CreateCrewCommand) {
     if (error instanceof ServiceError) throw error;
     const message = error instanceof Error ? error.message : 'Unknown error';
     if (message.includes('UNIQUE') || message.includes('unique')) {
-      throw new ServiceError('Crew with this operator already exists', 409);
+      throw new ServiceError('Бригада с этим машинистом уже существует', 409);
     }
     if (message.includes('FOREIGN KEY')) {
-      throw new ServiceError('Invalid crew dependencies', 400);
+      throw new ServiceError('Некорректные связи бригады', 400);
     }
     logger.error('CrewCommand: failed to save crew', error);
-    throw new ServiceError('Failed to create crew', 500);
+    throw new ServiceError('Не удалось создать бригаду', 500);
   }
 
   const created = await db.crew.findUnique({
@@ -214,7 +214,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
   const repo = getCrewRepository();
   const aggregate = await repo.findById(command.crewId);
   if (!aggregate) {
-    throw new ServiceError('Crew not found', 404);
+    throw new ServiceError('Бригада не найдена', 404);
   }
 
   const beforeAssistants = (
@@ -230,12 +230,12 @@ export async function updateCrew(command: UpdateCrewCommand) {
       command.siteId ? db.site.findUnique({ where: { id: command.siteId } }) : null,
     ]);
 
-    if (command.operatorId && !operator) throw new ServiceError('Operator not found', 404);
+    if (command.operatorId && !operator) throw new ServiceError('Машинист не найден', 404);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
-    if (command.operatorId && operator!.role !== 'OPERATOR') throw new ServiceError('User must have OPERATOR role', 400);
+    if (command.operatorId && operator!.role !== 'OPERATOR') throw new ServiceError('Пользователь должен иметь роль машиниста', 400);
 
-    if (command.equipmentId && !equipment) throw new ServiceError('Equipment not found', 404);
-    if (command.siteId && !site) throw new ServiceError('Site not found', 404);
+    if (command.equipmentId && !equipment) throw new ServiceError('Установка не найдена', 404);
+    if (command.siteId && !site) throw new ServiceError('Объект не найден', 404);
 
     // Tenant integrity of the resulting crew: the effective trio (current
     // values overridden by any provided changes) must share one tenant.
@@ -343,11 +343,11 @@ export async function deleteCrew(command: DeleteCrewCommand) {
   const repo = getCrewRepository();
   const aggregate = await repo.findById(command.crewId);
   if (!aggregate) {
-    throw new ServiceError('Crew not found', 404);
+    throw new ServiceError('Бригада не найдена', 404);
   }
 
   if (!aggregate.getState().isActive) {
-    throw new ServiceError('Crew is already deactivated', 400);
+    throw new ServiceError('Бригада уже расформирована', 400);
   }
 
   const assistantNames = (

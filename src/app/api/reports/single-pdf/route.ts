@@ -84,7 +84,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       const pdfBuffer = await Promise.race([
         generateSinglePdf(context.pdfData),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new ServiceError('PDF generation timeout (30s)', 504)), 30_000),
+          setTimeout(() => reject(new ServiceError('Превышено время подготовки PDF (30 с)', 504)), 30_000),
         ),
       ]);
       return new NextResponse(new Uint8Array(pdfBuffer), {
