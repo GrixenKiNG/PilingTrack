@@ -10,7 +10,6 @@
  * и закрытию смены. Поэтому они здесь, а не в своих модулях.
  */
 import type {Prisma} from '@/generated/postgres-client/client';
-import {ServiceError} from '@/lib/service-error';
 import {type ChecklistAnswer} from '../../domain/checklist-run';
 import {checkOperatorDocuments} from '../../domain/operator-admission';
 import {BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE} from '../../domain/operator-credentials';
@@ -356,25 +355,33 @@ export async function requireConfirmedImages(
 /**
  * Отчёт смены — один на смену. Создаётся при первой записи выработки.
  *
- * ЗАВОДИТСЯ ЧЕРЕЗ `upsert` ПО КЛЮЧУ ОТЧЁТА, А НЕ `findFirst`+`create`.
- * Ключ отчёта выводится из смены и производственных суток, то есть повторный
- * вызов — тот же ключ. Но заводит отчёт не только повтор команды: две вкладки,
- * два устройства либо слив очереди в момент, когда машинист пишет новую сваю,
- * вызывают его одновременно. При чтении с последующей вставкой проигравший
- * падал на уникальности `Report.reportId` и терял запись целиком: свая не
- * записывалась, а сервер отвечал 200 (находка F-R31-1). Конфликт разрешает
- * база, одной операцией; `update: {}` пуст — существующий отчёт не правится.
+ * ЗАВОДИТСЯ ЧЕРЕЗ `upsert` ПО КЛЮЧУ СМЕНЫ, А НЕ `findFirst`+`create`.
+ * Заводит отчёт не только повтор команды: две вкладки, два устройства либо
+ * слив очереди в момент, когда машинист пишет новую сваю, вызывают его
+ * одновременно. При чтении с последующей вставкой проигравший падал на
+ * уникальности отчёта и терял запись целиком: свая не записывалась, а сервер
+ * отвечал 200 (находка F-R31-1). Конфликт разрешает база, одной операцией;
+ * `update: {}` пуст — существующий отчёт не правится.
+ *
+ * КЛЮЧ — `@@unique([tenantId, shiftId])`, А НЕ `reportId`.
+ * У одной смены отчёт может быть заведён и раньше, и другим путём: форма
+ * отчёта (`report-command.service.ts`) пишет тот же `shiftId` со СВОИМ
+ * `reportId`. Upsert по `reportId` такой отчёт не находил и шёл вставлять
+ * второй — база отвергала вставку по `[tenantId, shiftId]`, ошибка
+ * пробрасывалась наружу, и очередь машиниста застревала навсегда: ни записи
+ * в отчёте, ни ответа, по которому клиент снял бы её с устройства.
+ * Организация входит в ключ, поэтому чужой отчёт с тем же `shiftId` не
+ * подхватится — отдельная сверка тенанта не нужна.
  */
 export async function ensureReport(tx: Tx, input: {
   tenantId: string; shiftId: string; operatorId: string; siteId: string;
   equipmentId: string; crewId: string; productionDate: string; shiftType: string;
 }) {
-  const reportId = `RM-${input.shiftId.slice(0, 8)}-${input.productionDate}`;
   const report = await tx.report.upsert({
-    where: {reportId},
+    where: {tenantId_shiftId: {tenantId: input.tenantId, shiftId: input.shiftId}},
     create: {
       tenantId: input.tenantId,
-      reportId,
+      reportId: `RM-${input.shiftId.slice(0, 8)}-${input.productionDate}`,
       userId: input.operatorId,
       crewId: input.crewId,
       equipmentId: input.equipmentId,
@@ -386,15 +393,9 @@ export async function ensureReport(tx: Tx, input: {
       lastEditedById: input.operatorId,
     },
     update: {},
-    select: {id: true, tenantId: true},
+    select: {id: true},
   });
 
-  // Тенант сверяем ПО ЗАПИСИ, которую вернула вставка: ключ отчёта про
-  // организацию ничего не знает, и чужой отчёт с тем же ключом прошёл бы
-  // молча — выработка уехала бы в отчёт другой организации.
-  if (report.tenantId !== input.tenantId) {
-    throw new ServiceError('Отчёт этой смены заведён другой организацией', 409);
-  }
   return report.id;
 }
 

@@ -15,6 +15,7 @@ const {withReadinessTenantTransaction} = vi.hoisted(() => ({withReadinessTenantT
 vi.mock('@/modules/readiness/server', () => ({withReadinessTenantTransaction}));
 
 import {logProduction} from '../production';
+import {ensureReport} from '../shared';
 
 const input = {
   tenantId: 'tenant-a',
@@ -70,5 +71,61 @@ describe('logProduction — P2002 без подтверждения повтор
     tx.reportDowntime.findUnique.mockResolvedValue({id: 'downtime-1'});
 
     await expect(logProduction(input)).resolves.toEqual({reportId: ''});
+  });
+});
+
+/*
+  ОТЧЁТ ЗА СМЕНУ ИЩЕТСЯ ПО КЛЮЧУ СМЕНЫ, А НЕ ПО НОМЕРУ ОТЧЁТА.
+
+  Отчёт той же смены мог завестись раньше и другим путём — формой отчёта,
+  у которой свой номер (`RM-…` из формы, а не из смены). Upsert по `reportId`
+  такой отчёт не находил, шёл вставлять второй и падал на `@@unique([tenantId,
+  shiftId])`: команда не сохранялась, очередь машиниста застревала навсегда
+  (F-R31-1b).
+*/
+describe('ensureReport — upsert по ключу [tenantId, shiftId]', () => {
+  const shiftInput = {
+    tenantId: 'tenant-a',
+    operatorId: 'operator-a',
+    shiftId: 'shift-1234-5678',
+    siteId: 'site-1',
+    equipmentId: 'equipment-1',
+    crewId: 'crew-1',
+    productionDate: '2026-09-26',
+    shiftType: 'DAY',
+  };
+
+  it('ищет отчёт по [tenantId, shiftId], не по reportId', async () => {
+    tx.report.upsert.mockResolvedValue({id: 'report-1'});
+
+    await expect(ensureReport(tx as never, shiftInput)).resolves.toBe('report-1');
+    expect(tx.report.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {tenantId_shiftId: {tenantId: 'tenant-a', shiftId: 'shift-1234-5678'}},
+    }));
+    expect(tx.report.upsert.mock.calls[0][0].where).not.toHaveProperty('reportId');
+  });
+
+  it('подхватывает уже заведённый отчёт смены и не пытается вставить второй', async () => {
+    tx.report.upsert.mockResolvedValue({id: 'report-from-form'});
+
+    await expect(ensureReport(tx as never, shiftInput)).resolves.toBe('report-from-form');
+    expect(tx.report.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.report.upsert.mock.calls[0][0]).toEqual(expect.objectContaining({
+      update: {},
+      select: {id: true},
+      create: expect.objectContaining({shiftId: shiftInput.shiftId}),
+    }));
+  });
+
+  it('номер отчёта для новой смены по-прежнему выводится из смены и суток', async () => {
+    tx.report.upsert.mockResolvedValue({id: 'report-2'});
+
+    await ensureReport(tx as never, shiftInput);
+
+    expect(tx.report.upsert.mock.calls[0][0].create).toEqual(expect.objectContaining({
+      reportId: 'RM-shift-12-2026-09-26',
+      tenantId: 'tenant-a',
+      status: 'draft',
+    }));
   });
 });
