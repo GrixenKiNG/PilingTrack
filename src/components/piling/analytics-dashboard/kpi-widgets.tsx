@@ -83,22 +83,26 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
   return {
     'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего'),
     'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных'),
+    // Данные за сегодня приходят из снимка парка, а он не смотрит на статус
+    // отчёта: в «сделано сегодня» входят и несданные смены (черновики). Период
+    // же считается по сданным отчётам, поэтому пометка стоит только у дневных
+    // значений — иначе она обещала бы несданные смены там, где их нет.
     'kpi-piles': tile('kpi-piles', 'Сваи (шт)',
       p ? `${fmtRu(p.piles.value)} шт` : `${d.pilesToday} шт`,
-      p ? 'за период' : 'за сегодня', pctDelta(p?.piles.deltaPct)),
+      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.piles.deltaPct)),
     'kpi-pile-meters': tile('kpi-pile-meters', 'Погонные метры',
       p ? `${fmtRu(p.meters.value)} м` : `${Math.round(d.pileMetersToday)} м`,
-      p ? 'за период' : 'за сегодня', pctDelta(p?.meters.deltaPct)),
+      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.meters.deltaPct)),
     'kpi-drilling': tile('kpi-drilling', 'Бурение',
       p ? `${fmtRu(p.drilling.value)} м` : `${Math.round(d.drillingToday)} м`,
-      p ? 'за период' : 'за сегодня', pctDelta(p?.drilling.deltaPct)),
+      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.drilling.deltaPct)),
     'kpi-downtime': tile('kpi-downtime', p ? 'Доля простоя в смене, %' : 'Простой',
       p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : formatDowntimeHours(d.downtimeHoursToday),
-      p ? 'по отчётам с указанным временем смены' : 'за сегодня',
+      p ? 'по отчётам с указанным временем смены' : 'за сегодня, включая несданные смены',
       // For downtime a NEGATIVE delta (less idle time) is the good direction.
       p && p.downtime.deltaPp != null ? { text: `${signed(p.downtime.deltaPp, ' п.п.')} ${p.label}`, good: p.downtime.deltaPp <= 0 } : null),
-    'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене'),
-    'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене'),
+    'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене, включая несданные смены'),
+    'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене, включая несданные смены'),
   };
 }
 

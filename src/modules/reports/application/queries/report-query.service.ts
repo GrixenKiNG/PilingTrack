@@ -315,6 +315,18 @@ function pileRowMeters(pile: { count?: number | null; pileGrade?: { lengthMm?: n
   return (pile.count ?? 0) * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm });
 }
 
+/**
+ * Сданность отчёта в выгрузке (решение владельца 26.09.2026): несданная смена
+ * в файле остаётся, но подписана — иначе строка черновика попадает в подшитый
+ * документ как обычная сдача и расходится с аналитикой, которая черновики не
+ * считает. Состав строк выгрузки при этом не меняется.
+ */
+function reportStatusExportLabel(status: string | null | undefined): string {
+  if (status === 'submitted') return 'сдан';
+  if (status === 'draft') return 'черновик (смена не сдана)';
+  return status ?? '';
+}
+
 export interface ReportExportFilters {
   tenantId: string;
   userId?: string | null;
@@ -376,13 +388,14 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
 
   const BOM = '\uFEFF';
   const header =
-    'ID отчёта;Дата;Смена;Объект;Оператор;Экипаж;Установка;Марка сваи;Кол-во свай;Свай, м.п.;Тип бурения;Метры бурения;Причина простоя;Часы простоя;Комментарий';
+    'ID отчёта;Дата;Смена;Статус;Объект;Оператор;Экипаж;Установка;Марка сваи;Кол-во свай;Свай, м.п.;Тип бурения;Метры бурения;Причина простоя;Часы простоя;Комментарий';
 
   const rows = reports.flatMap((report) => {
     const base = {
       reportId: report.reportId,
       date: report.date,
       shift: report.shiftType === 'NIGHT' ? 'Ночная' : 'Дневная',
+      status: reportStatusExportLabel(report.status),
       site: report.site.name,
       operator: report.user.name,
       crew: report.crew?.name || '',
@@ -473,12 +486,12 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
 
   // --- Лист 1: детализация (числа — числами). ---
   const detail: (string | number | null)[][] = [[
-    'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Экипаж', 'Установка',
+    'ID отчёта', 'Дата', 'Смена', 'Статус', 'Объект', 'Оператор', 'Экипаж', 'Установка',
     'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
   ]];
   for (const r of reports) {
     const base = [
-      r.reportId, r.date, shift(r.shiftType), r.site.name, r.user.name,
+      r.reportId, r.date, shift(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
       r.crew?.name || '', r.equipment?.name || r.crew?.equipment?.name || '',
     ];
     // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
@@ -522,6 +535,14 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
       pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '',
     ]);
+  }
+
+  // Итоги периода подписаны, если в него попали несданные смены: иначе по
+  // листу «Итоги» не понять, почему сумма больше аналитики (решение владельца
+  // 26.09.2026 — черновики остаются в выгрузке, но помечены).
+  const draftCount = reports.filter((r) => r.status === 'draft').length;
+  if (draftCount > 0) {
+    totals.push([`Включены несданные смены: ${draftCount}`]);
   }
 
   return buildXlsx([

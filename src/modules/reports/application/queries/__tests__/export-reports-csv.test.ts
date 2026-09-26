@@ -86,6 +86,42 @@ describe('exportReportsCsv — защита от формул', () => {
 });
 
 /**
+ * Статус смены в выгрузке (F-O6, решение владельца 26.09.2026). Незакрытая смена
+ * (черновик) остаётся в файле, но обязана быть помечена: иначе строка черновика
+ * читается как обычная сдача, а аналитика черновики не считает — «общее» число
+ * за один период расходится. Состав строк при этом не меняется.
+ */
+describe('exportReportsCsv — статус смены', () => {
+  const report = (status: string) => ({
+    reportId: 'R-1', date: '2026-09-26', shiftType: 'DAY', status,
+    site: { name: 'Объект' }, user: { name: 'Иванов' },
+    crew: null, equipment: { name: 'Banut 655' },
+    piles: [{ count: 1, pileGrade: { name: 'С300', lengthMm: 12000 } }],
+    drillings: [], downtimes: [],
+  });
+
+  beforeEach(() => { findManyMock.mockReset(); });
+
+  it('печатает колонку «Статус» между сменой и объектом', async () => {
+    findManyMock.mockResolvedValue([report('submitted')]);
+
+    const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+
+    expect(csv).toContain('Дата;Смена;Статус;Объект;');
+  });
+
+  it('черновик подписан «черновик (смена не сдана)», сданный — «сдан»', async () => {
+    findManyMock.mockResolvedValue([report('draft')]);
+    const draftCsv = await exportReportsCsv({ tenantId: 'tenant-a' });
+    expect(draftCsv).toContain('"черновик (смена не сдана)"');
+
+    findManyMock.mockResolvedValue([report('submitted')]);
+    const submittedCsv = await exportReportsCsv({ tenantId: 'tenant-a' });
+    expect(submittedCsv).toContain('"сдан"');
+  });
+});
+
+/**
  * Метраж свай (F-R32-2). Экран «Отчёты» показывает «шт/м.п.», а выгрузка
  * раньше содержала только штуки — по файлу экранный итог было не сверить.
  * Длина берётся из PileGrade.lengthMm через lib/pile-length (единственный
