@@ -22,6 +22,15 @@ interface PilePlanSectionProps {
 }
 
 export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSectionProps) {
+  // Выбор для новой строки — только активные марки (F-R29-2). Архивная марка,
+  // уже закреплённая за строкой плана, остаётся в её списке: иначе Select не
+  // находит значение среди вариантов и показывает пустое поле вместо названия.
+  const activePileGrades = pileGrades.filter((g) => g.isActive);
+  const optionsForRow = (pileGradeId: string) => {
+    const own = pileGrades.find((g) => g.id === pileGradeId);
+    return own && !own.isActive ? [...activePileGrades, own] : activePileGrades;
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -58,7 +67,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
                   <SelectValue placeholder="Марка сваи" />
                 </SelectTrigger>
                 <SelectContent>
-                  {pileGrades.map((g) => (
+                  {optionsForRow(row.pileGradeId).map((g) => (
                     <SelectItem key={g.id} value={g.id} className="text-xs">
                       {g.name}
                     </SelectItem>
