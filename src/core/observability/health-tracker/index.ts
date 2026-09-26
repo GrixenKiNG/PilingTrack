@@ -10,7 +10,6 @@
  *   getFreshStatus()        — force fresh probe (slow; bypasses cache)
  *   checkSystemStatus()     — pure check, no caching (used internally + tests)
  *   recordWorkerHeartbeat() — workers ping this every 30s
- *   setWsConnectionCount()  — WS server reports connection count
  *
  * Internal split (this directory):
  *   types.ts           — SystemStatus, ComponentHealth, etc.
@@ -23,7 +22,6 @@
 
 export { checkSystemStatus } from './aggregate';
 export { recordWorkerHeartbeat } from './checkers/workers';
-export { setWsConnectionCount } from './checkers/websocket';
 export {
   getCurrentStatus,
   getFreshStatus,
@@ -42,7 +40,6 @@ export type {
   SystemComponents,
   SystemMetrics,
   SystemStatus,
-  WebSocketHealth,
   WorkerHealth,
   WorkerStatus,
 } from './types';

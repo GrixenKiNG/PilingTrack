@@ -1,14 +1,12 @@
 import { getDlqStats } from '@/core/outbox/dead-letter-queue';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { getOutboxStats } from '@/services/reports/outbox-publisher';
-import { getStateRedisClient } from '@/lib/redis-cache';
 import { getLagMetrics } from '../lag-monitor';
 import { checkBackupStatus } from './checkers/backup';
 import { checkDatabase } from './checkers/database';
 import { checkOutbox } from './checkers/outbox';
 import { checkRedis } from './checkers/redis';
 import { checkStorage, getStorageProvider } from './checkers/storage';
-import { checkWebSocket } from './checkers/websocket';
 import { checkWorkers } from './checkers/workers';
 import type {
   OverallStatus,
@@ -18,7 +16,7 @@ import type {
 } from './types';
 
 function computeOverallStatus(components: SystemComponents): OverallStatus {
-  const { database, redis, outbox, workers, storage, websocket, backup } = components;
+  const { database, redis, outbox, workers, storage, backup } = components;
 
   if (
     database.status === 'down' ||
@@ -26,7 +24,6 @@ function computeOverallStatus(components: SystemComponents): OverallStatus {
     outbox.status === 'stalled' ||
     workers.status === 'stopped' ||
     storage.status === 'down' ||
-    websocket.status === 'down' ||
     backup.status === 'down'
   ) {
     return 'unhealthy';
@@ -47,7 +44,6 @@ function computeOverallStatus(components: SystemComponents): OverallStatus {
 async function collectMetrics(): Promise<SystemMetrics> {
   let outboxPending = 0;
   let dlqPending = 0;
-  let activeWsConnections = 0;
 
   try {
     const lagMetrics = getLagMetrics();
@@ -71,35 +67,23 @@ async function collectMetrics(): Promise<SystemMetrics> {
     // best effort
   }
 
-  try {
-    const client = await getStateRedisClient();
-    if (client) {
-      const wsCount = await client.get('system:ws:connections');
-      activeWsConnections = wsCount ? parseInt(wsCount, 10) : 0;
-    }
-  } catch {
-    // best effort
-  }
-
   return {
     uptime: typeof process !== 'undefined' ? process.uptime() : 0,
     memoryUsage:
       typeof process !== 'undefined' ? process.memoryUsage() : ({} as NodeJS.MemoryUsage),
     outboxPending,
     dlqPending,
-    activeWsConnections,
   };
 }
 
 export async function checkSystemStatus(): Promise<SystemStatus> {
-  const [database, redis, outbox, workers, storage, websocket, backup, metrics] =
+  const [database, redis, outbox, workers, storage, backup, metrics] =
     await Promise.allSettled([
       checkDatabase(),
       checkRedis(),
       checkOutbox(),
       checkWorkers(),
       checkStorage(),
-      checkWebSocket(),
       checkBackupStatus(),
       collectMetrics(),
     ]);
@@ -114,7 +98,6 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
       storage.status === 'fulfilled'
         ? storage.value
         : { status: 'down', provider: getStorageProvider() },
-    websocket: websocket.status === 'fulfilled' ? websocket.value : { status: 'down' },
     backup: backup.status === 'fulfilled' ? backup.value : { status: 'down' },
   };
 
@@ -139,7 +122,6 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
                 : ({} as NodeJS.MemoryUsage),
             outboxPending: 0,
             dlqPending: 0,
-            activeWsConnections: 0,
           },
   };
 }

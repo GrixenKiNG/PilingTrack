@@ -37,7 +37,6 @@ dockerfile_of() {
     app) echo "Dockerfile runner" ;;
     migrate) echo "Dockerfile migrate" ;;
     workers) echo "Dockerfile.workers runner" ;;
-    ws) echo "Dockerfile.ws runner" ;;
     *) die "неизвестный сервис: $1" ;;
   esac
 }

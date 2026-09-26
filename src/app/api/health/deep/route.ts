@@ -2,12 +2,12 @@
  * GET /api/health/deep
  *
  * Public deep health check for external uptime probes (UptimeRobot etc).
- * Probes every critical dependency (DB, Redis, MinIO/S3, WebSocket) and
+ * Probes every critical dependency (DB, Redis, MinIO/S3) and
  * returns HTTP 200 only when overall status is 'healthy' or 'degraded';
  * 503 when 'unhealthy'.
  *
  * Why this exists vs the other endpoints:
- *   - /api/health         → checks DB + memory + env only. No Redis/S3/WS.
+ *   - /api/health         → checks DB + memory + env only. No Redis/S3.
  *   - /api/readiness      → DB + env, used by orchestrators (cached 5 sec).
  *   - /api/liveness       → process is alive (no probes).
  *   - /api/system/status  → admin-only, full detail (errors, latencies).
@@ -44,7 +44,6 @@ export async function GET(_request: NextRequest) {
       database: status.components.database.status === 'up' ? 'ok' : 'down',
       redis: status.components.redis.status === 'up' ? 'ok' : 'down',
       storage: status.components.storage.status === 'up' ? 'ok' : 'down',
-      websocket: status.components.websocket.status === 'up' ? 'ok' : 'down',
     },
   };
 

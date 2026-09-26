@@ -48,12 +48,6 @@ orionpiling.ru, www.orionpiling.ru {
 		reverse_proxy 127.0.0.1:3010
 	}
 
-	# ----- WebSocket -----
-	@ws path /ws/*
-	handle @ws {
-		reverse_proxy 127.0.0.1:3001
-	}
-
 	# ----- Next.js app -----
 	handle {
 		reverse_proxy 127.0.0.1:3000

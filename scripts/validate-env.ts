@@ -85,7 +85,7 @@ const ENV_CONFIG: Record<string, EnvVarConfig> = {
   // Redis — required for production features
   REDIS_URL: {
     required: false, // optional but recommended
-    description: 'Redis connection string (for rate limiting, WS pub/sub, caching)',
+    description: 'Redis connection string (for rate limiting, queues, caching)',
     validate: (v) => {
       if (!v.startsWith('redis://') && !v.startsWith('rediss://')) {
         return `Must start with "redis://" or "rediss://"`;
@@ -113,8 +113,6 @@ const ENV_CONFIG: Record<string, EnvVarConfig> = {
   DEFAULT_TENANT_ID: { required: false, description: 'Default tenant ID' },
 
   // WebSocket — optional
-  WS_URL: { required: false, description: 'WebSocket server URL' },
-  NEXT_PUBLIC_WS_URL: { required: false, description: 'Public WebSocket URL (client-facing)' },
 
   // Погода — optional. Не задан — используется https://api.open-meteo.com.
   // Переменная существует на случай блокировки провайдером, как это уже

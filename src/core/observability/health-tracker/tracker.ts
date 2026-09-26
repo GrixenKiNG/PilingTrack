@@ -76,7 +76,6 @@ function startBackgroundTracker(): void {
           outbox: status.components.outbox.status,
           workers: status.components.workers.status,
           storage: status.components.storage.status,
-          websocket: status.components.websocket.status,
           backup: status.components.backup.status,
         };
         const signature = Object.values(snapshot).join('|');

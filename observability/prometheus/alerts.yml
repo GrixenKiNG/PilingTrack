@@ -222,12 +222,3 @@ groups:
           summary: "CRITICAL: Host disk free < 2 GB"
           description: "Only {{ $value | humanize1024 }}B free on / — Prometheus TSDB / docker builds will fail"
 
-      - alert: WebSocketConnectionsDropping
-        expr: rate(ws_connections_closed_total{job="pilingtrack-ws"}[5m]) > rate(ws_connections_opened_total{job="pilingtrack-ws"}[5m]) * 1.2
-        for: 5m
-        labels:
-          severity: warning
-          service: pilingtrack-ws
-        annotations:
-          summary: "WebSocket connections being dropped"
-          description: "More connections closing than opening — possible issue"

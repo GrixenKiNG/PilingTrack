@@ -73,12 +73,6 @@ MULTI_TENANT_MODE=single
 DEFAULT_TENANT_ID=default
 
 # ============================================================
-# WebSocket
-# ============================================================
-WS_URL=ws://ws:3001
-NEXT_PUBLIC_WS_URL=ws://localhost:3001
-
-# ============================================================
 # S3 / MinIO (PDF storage)
 # ============================================================
 S3_ENDPOINT=http://minio:9000
@@ -149,12 +143,6 @@ ENCRYPTION_KEY=$encryptionKey
 MULTI_TENANT_MODE=single
 DEFAULT_TENANT_ID=default
 
-# ------------------------------------------------------------
-# WebSocket (use the dockerised ws service on localhost:3001
-# OR run `npm run dev:ws` for a local instance).
-# ------------------------------------------------------------
-WS_URL=ws://localhost:3001
-NEXT_PUBLIC_WS_URL=ws://localhost:3001
 
 # ------------------------------------------------------------
 # S3 / MinIO (Docker port 9000)

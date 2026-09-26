@@ -142,10 +142,11 @@ describe('health-tracker backup monitoring', () => {
 /*
   Инстанс, из которого читается пульс служб.
 
-  На проде 22.09.2026 `/api/health/deep` отдавал 503 с "websocket":"down" при
-  полностью живом ws-сервере: upgrade отвечал 101. Причина — два Redis: ws и
-  workers запущены без REDIS_URL_CACHE и писали пульс в инстанс состояния, а
-  app с этой переменной искал его в кэше. Одинаковый код, разные адреса.
+  На проде 22.09.2026 `/api/health/deep` отдавал 503 при живых службах. Причина
+  — два Redis: ws и workers запущены без REDIS_URL_CACHE и писали пульс в
+  инстанс состояния, а app с этой переменной искал его в кэше. Одинаковый код,
+  разные адреса. Контейнер ws удалён 26.09.2026; урок проверяется на пульсе
+  workers — его читает тот же код.
 
   Проверяем обе стороны промаха: пульс в состоянии — служба жива; тот же пульс
   в кэше — служба мертва. Второй случай и был продом.
@@ -163,26 +164,8 @@ describe('пульс служб: инстанс состояния, а не кэ
     delete process.env.BACKUP_ENABLED;
   });
 
-  it('читает пульс ws из инстанса состояния', async () => {
+  it('читает пульс служб из инстанса состояния', async () => {
     mocks.redisGet.mockResolvedValue(null);
-    mocks.stateSmembers.mockResolvedValue(['outbox']);
-    mocks.stateGet.mockImplementation(async (key: string) =>
-      key === 'system:ws:connections' ? '3'
-        : key === 'system:worker:heartbeat:outbox' ? String(Date.now())
-        : null);
-
-    const { checkSystemStatus } = await import('../health-tracker');
-    const status = await checkSystemStatus();
-
-    expect(mocks.stateGet).toHaveBeenCalledWith('system:ws:connections');
-    expect(status.components.websocket.status).toBe('up');
-    expect(status.metrics.activeWsConnections).toBe(3);
-  });
-
-  it('пульс, попавший в кэш вместо состояния, службу не воскрешает', async () => {
-    // Ровно продовая картина: ключ есть, но не в том инстансе.
-    mocks.redisGet.mockImplementation(async (key: string) =>
-      key === 'system:ws:connections' ? '3' : null);
     mocks.stateSmembers.mockResolvedValue(['outbox']);
     mocks.stateGet.mockImplementation(async (key: string) =>
       key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : null);
@@ -190,7 +173,21 @@ describe('пульс служб: инстанс состояния, а не кэ
     const { checkSystemStatus } = await import('../health-tracker');
     const status = await checkSystemStatus();
 
-    expect(status.components.websocket.status).toBe('down');
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:worker:heartbeat:outbox');
+    expect(status.components.workers.status).toBe('running');
+  });
+
+  it('пульс, попавший в кэш вместо состояния, службу не воскрешает', async () => {
+    // Ровно продовая картина: ключ есть, но не в том инстансе.
+    mocks.redisGet.mockImplementation(async (key: string) =>
+      key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : null);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    mocks.stateGet.mockResolvedValue(null);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(status.components.workers.status).toBe('stopped');
     expect(status.status).toBe('unhealthy');
   });
 });

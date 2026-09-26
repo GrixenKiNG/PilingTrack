@@ -162,7 +162,7 @@ git config core.hooksPath .githooks
 
 ## Переменные окружения для прода
 
-Минимально: `POSTGRES_PASSWORD`, `SESSION_SECRET`, `PIN_LOOKUP_SECRET`, `DEVICE_KEY_LOOKUP_SECRET`, `ENCRYPTION_KEY` (все 32-байтные hex), `NEXT_PUBLIC_WS_URL=wss://<домен>/ws`. **`NEXT_PUBLIC_WS_URL` обязательна** — это публичный адрес WebSocket-сервера, который встраивается в bundle при сборке. По умолчанию в `.env.docker` стоит `ws://localhost:3001`, что годится только для локального dev. Полный список — `docs/deployment.md`.
+Минимально: `POSTGRES_PASSWORD`, `SESSION_SECRET`, `PIN_LOOKUP_SECRET`, `DEVICE_KEY_LOOKUP_SECRET`, `ENCRYPTION_KEY` (все 32-байтные hex). Полный список — `docs/deployment.md`.
 
 ## Состояние репозитория
 

@@ -75,10 +75,6 @@ ENCRYPTION_KEY=${ENCRYPTION_KEY}
 MULTI_TENANT_MODE=single
 DEFAULT_TENANT_ID=default
 
-# WebSocket
-WS_URL=ws://ws:3001
-NEXT_PUBLIC_WS_URL=ws://localhost:3001
-
 # Sentry / OpenTelemetry (blank = disabled)
 SENTRY_ORG=
 SENTRY_PROJECT=pilingtrack

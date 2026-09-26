@@ -29,11 +29,6 @@ export interface StorageHealth {
   provider: StorageProvider;
 }
 
-export interface WebSocketHealth {
-  status: ComponentStatus;
-  connections?: number;
-}
-
 export interface BackupHealth {
   status: ComponentStatus;
   lastBackupAt?: string;
@@ -49,7 +44,6 @@ export interface SystemComponents {
   outbox: OutboxHealth;
   workers: WorkerHealth;
   storage: StorageHealth;
-  websocket: WebSocketHealth;
   backup: BackupHealth;
 }
 
@@ -58,7 +52,6 @@ export interface SystemMetrics {
   memoryUsage: NodeJS.MemoryUsage;
   outboxPending: number;
   dlqPending: number;
-  activeWsConnections: number;
 }
 
 export interface SystemStatus {

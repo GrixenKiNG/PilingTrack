@@ -3,7 +3,6 @@
 #
 # Services:
 # - app: Next.js application (port 3000)
-# - ws: WebSocket real-time server (port 3001)
 # - redis: Redis for Pub/Sub + caching
 # - postgres: Primary database
 # - pgadmin: Database management (dev only)
@@ -19,7 +18,7 @@ services:
   # Migrate — apply Prisma migrations and seed the database once.
   # ------------------------------------------------------------
   # Uses the builder stage which has the full node_modules + prisma CLI
-  # + tsx. Exits when done; app/workers/ws wait for it via service_completed_successfully.
+  # + tsx. Exits when done; app/workers wait for it via service_completed_successfully.
   # ============================================================
   migrate:
     build:
@@ -42,7 +41,7 @@ services:
     environment:
       # Единственный сервис, который ходит в базу РОЛЬЮ-ВЛАДЕЛЬЦЕМ
       # (POSTGRES_USER). Ему нужен DDL: он накатывает миграции и владеет
-      # таблицами. Рантайм (app/workers/ws) ходит ролью APP_DB_USER без
+      # таблицами. Рантайм (app/workers) ходит ролью APP_DB_USER без
       # BYPASSRLS — см. docs/runbooks/011-app-db-role.md.
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
@@ -81,12 +80,10 @@ services:
       - DATABASE_PROVIDER=postgres
       - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - REDIS_URL_CACHE=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis-cache:6379
-      - WS_URL=ws://ws:3001
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
       - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
-      - NEXT_PUBLIC_WS_URL=ws://localhost:3001
       - S3_ENDPOINT=${S3_ENDPOINT:-}
       - S3_REGION=${S3_REGION:-auto}
       - S3_BUCKET=${S3_BUCKET:-pilingtrack-reports}
@@ -224,56 +221,6 @@ services:
       - pilingtrack
 
   # ============================================================
-  # WebSocket Real-Time Server
-  # ============================================================
-  ws:
-    build:
-      context: .
-      dockerfile: Dockerfile.ws
-      target: runner
-    container_name: pilingtrack-ws
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=production
-      # WS server uses PgBouncer for runtime queries too.
-      - DATABASE_URL=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@pgbouncer:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public&pgbouncer=true
-      - DATABASE_URL_POSTGRES=postgresql://${APP_DB_USER:-${POSTGRES_USER:-postgres}}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
-      - DATABASE_PROVIDER=postgres
-      - REDIS_URL=redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
-      - WS_PORT=3001
-      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
-      - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
-      - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
-      # Роль опознания: на неё приложение переключается на время одной
-      # транзакции для трёх запросов, которым организация неизвестна по
-      # устройству — поиск пользователя по email, по ПИН-коду и поиск ключа
-      # устройства (см. core/security/identity-role.ts, ADR-0046).
-      # Переменная обязана быть ЗДЕСЬ, а не только в .env: env_file у сервисов
-      # не объявлен, поэтому в контейнер попадает лишь то, что перечислено в
-      # этом блоке. Пустое значение = переключения нет, поведение как раньше.
-      - DB_IDENTITY_ROLE=${DB_IDENTITY_ROLE:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      redis-cache:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    networks:
-      - pilingtrack
-
-  # ============================================================
   # PgBouncer — Connection Pooling (правило #19)
   # ============================================================
   pgbouncer:
@@ -288,7 +235,7 @@ services:
       # открывается ролью клиента — то есть RLS действует и через пул
       # (проверено 13.08.2026: Shift=0 без GUC, 14 с GUC, current_user =
       # pilingtrack_app).
-      # Держим здесь ту же роль, что у app/workers/ws, по одной причине: иначе
+      # Держим здесь ту же роль, что у app/workers, по одной причине: иначе
       # в контейнере пула лежит пароль суперпользователя, а неизвестные роли
       # аутентифицируются через auth_query к pg_shadow от его имени.
       # Побочный эффект (проверен): владелец через пул больше не подключится —

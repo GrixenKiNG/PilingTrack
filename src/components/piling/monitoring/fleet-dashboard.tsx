@@ -35,7 +35,6 @@ type SortBy = 'status' | 'name' | 'lastReport';
 type Connection = 'connecting' | 'live' | 'offline';
 
 const STATUS_RANK: Record<EquipmentStatus, number> = { active: 0, expected: 1, idle: 2 };
-const MAX_RECONNECT_DELAY_MS = 30_000;
 
 function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
   const sorted = [...cards];
@@ -55,14 +54,9 @@ function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
 
 export function FleetDashboard() {
   const [snap, setSnap] = useState<FleetSnapshot | null>(null);
-  const [conn, setConn] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [siteFilter, setSiteFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('status');
-  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectAttempt = useRef(0);
   const snapshotRequest = useRef(0);
   const fetchSnapshot = useCallback(async (opts?: { bust?: boolean }) => {
     const request = ++snapshotRequest.current;
@@ -87,20 +81,11 @@ export function FleetDashboard() {
   }, []);
 
   // Refetch after an admin uploads/replaces an equipment photo so the new
-  // card.photoUrl shows up without waiting for the next WS event.
+  // card.photoUrl shows up without waiting for the next 30-second refresh.
   const onPhotoUploaded = useCallback(() => {
     void fetchSnapshot({ bust: true });
   }, [fetchSnapshot]);
   const tile = useEquipmentTileTemplate(undefined, onPhotoUploaded);
-
-  // Debounce: many report.* events in quick succession (saving a long
-  // report sends a few updates) collapse into one refetch ~500ms later.
-  const scheduleRefetch = useCallback(() => {
-    if (refetchTimer.current) clearTimeout(refetchTimer.current);
-    refetchTimer.current = setTimeout(() => {
-      void fetchSnapshot({ bust: true });
-    }, 500);
-  }, [fetchSnapshot]);
 
   // Initial load
   useEffect(() => {
@@ -108,73 +93,9 @@ export function FleetDashboard() {
     void fetchSnapshot();
   }, [fetchSnapshot]);
 
-  // WebSocket subscription with exponential backoff reconnect — mobile
-  // dispatchers switching WiFi <-> 4G would otherwise go "offline" forever
-  // the first time the connection drops.
-  useEffect(() => {
-    // Explicit opt-in: only connect when NEXT_PUBLIC_WS_URL is set and non-empty.
-    // Locally we don't run the ws server most of the time; falling back to the
-    // page host's /ws was creating noisy "WebSocket connection failed" lines
-    // in the console on every render.
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
-    if (!wsUrl) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
-      setConn('offline');
-      return;
-    }
-
-    let cancelled = false;
-
-    const connect = () => {
-      if (cancelled) return;
-      let ws: WebSocket;
-      try {
-        ws = new WebSocket(wsUrl);
-      } catch {
-        setConn('offline');
-        return;
-      }
-      wsRef.current = ws;
-      setConn('connecting');
-
-      ws.addEventListener('open', () => {
-        reconnectAttempt.current = 0;
-        setConn('live');
-        void fetchSnapshot({ bust: true });
-      });
-      ws.addEventListener('close', () => {
-        setConn('offline');
-        if (cancelled) return;
-        const delay = Math.min(1000 * 2 ** reconnectAttempt.current, MAX_RECONNECT_DELAY_MS);
-        reconnectAttempt.current += 1;
-        reconnectTimer.current = setTimeout(connect, delay);
-      });
-      ws.addEventListener('error', () => setConn('offline'));
-      ws.addEventListener('message', (ev) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-        let msg: any;
-        try {
-          msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
-        } catch {
-          return;
-        }
-        const eventType: string | undefined = msg?.type === 'event' ? msg?.event?.type : msg?.type;
-        if (typeof eventType === 'string' && eventType.startsWith('report.')) {
-          scheduleRefetch();
-        }
-      });
-    };
-
-    connect();
-
-    return () => {
-      cancelled = true;
-      wsRef.current?.close();
-      if (refetchTimer.current) clearTimeout(refetchTimer.current);
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-    };
-  }, [scheduleRefetch, fetchSnapshot]);
-
+  // Живое обновление — опрос раз в 30 с, при возврате связи и на вкладку.
+  // WebSocket-сервер удалён 26.09.2026: он ни разу не получал событий
+  // (публикатор никто не запускал), и «Соединение активно» было фикцией.
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === 'visible') void fetchSnapshot({bust: true}); };
     const timer = setInterval(refresh, 30_000);
@@ -182,6 +103,9 @@ export function FleetDashboard() {
     document.addEventListener('visibilitychange', refresh);
     return () => { clearInterval(timer); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [fetchSnapshot]);
+
+  // Связь — это ответ последнего опроса, а не сокет.
+  const conn: Connection = error ? 'offline' : snap ? 'live' : 'connecting';
 
   const siteOptions = useMemo(() => {
     if (!snap) return [];
@@ -245,7 +169,7 @@ export function FleetDashboard() {
         {error} Показан предыдущий снимок.
         <button type="button" className="ml-3 underline" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
       </div>}
-      <StatusBar snap={snap} conn={error ? 'offline' : conn} />
+      <StatusBar snap={snap} conn={conn} />
 
       {snap.equipment.length > 1 && (
         <div className="flex flex-wrap items-center gap-2">

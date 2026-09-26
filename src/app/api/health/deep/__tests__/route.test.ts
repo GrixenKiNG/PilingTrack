@@ -36,7 +36,6 @@ function makeStatus(overrides: Record<string, unknown> = {}) {
       outbox: { status: 'ok', pendingCount: 0 },
       workers: { status: 'running' },
       storage: { status: 'up', provider: 's3' },
-      websocket: { status: 'up', connections: 3 },
       backup: { status: 'up' },
     },
     metrics: {
@@ -44,7 +43,6 @@ function makeStatus(overrides: Record<string, unknown> = {}) {
       memoryUsage: {} as NodeJS.MemoryUsage,
       outboxPending: 0,
       dlqPending: 0,
-      activeWsConnections: 3,
     },
     ...overrides,
   };
@@ -75,7 +73,6 @@ describe('GET /api/health/deep', () => {
       database: 'ok',
       redis: 'ok',
       storage: 'ok',
-      websocket: 'ok',
     });
   });
 
@@ -89,7 +86,6 @@ describe('GET /api/health/deep', () => {
           outbox: { status: 'ok', pendingCount: 0 },
           workers: { status: 'running' },
           storage: { status: 'up', provider: 's3' },
-          websocket: { status: 'up' },
           backup: { status: 'up' },
         },
       }),
@@ -115,7 +111,6 @@ describe('GET /api/health/deep', () => {
           outbox: { status: 'ok', pendingCount: 0 },
           workers: { status: 'running' },
           storage: { status: 'up', provider: 's3' },
-          websocket: { status: 'up' },
           backup: { status: 'up' },
         },
       }),

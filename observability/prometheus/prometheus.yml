@@ -34,18 +34,6 @@ scrape_configs:
           tier: 'frontend'
 
   # ============================================================
-  # WebSocket Server
-  # ============================================================
-  - job_name: 'pilingtrack-ws'
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-    static_configs:
-      - targets: ['ws:3001']
-        labels:
-          service: 'pilingtrack-ws'
-          tier: 'realtime'
-
-  # ============================================================
   # PostgreSQL
   # ============================================================
   - job_name: 'postgresql'

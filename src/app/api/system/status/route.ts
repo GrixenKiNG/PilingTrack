@@ -7,7 +7,6 @@
  * - Outbox backlog + DLQ pending count
  * - Worker heartbeats
  * - Storage availability
- * - WebSocket connections
  * - System metrics (uptime, memory, etc.)
  *
  * Returns HTTP 503 when overall status is 'unhealthy'

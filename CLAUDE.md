@@ -187,7 +187,6 @@ You can write unit tests. Flag if you need integration test infrastructure.
 
 **Containers** (`docker compose ps`):
 - `pilingtrack-app` — Next.js (port 3000, behind Caddy)
-- `pilingtrack-ws` — websocket server
 - `pilingtrack-workers` — outbox/projection/PDF workers
 - `pilingtrack-postgres` — DB (user `piling`, db `pilingtrack`)
 - `pilingtrack-redis`, `pilingtrack-minio`, `pilingtrack-pgbouncer`, `pilingtrack-grafana`, `pilingtrack-prometheus`
@@ -208,7 +207,6 @@ docker compose build workers      # fills the 30 GB disk to 100% (run `docker bu
                                   # between builds if `df -h /` is tight)
 docker compose up -d app workers  # atomic swap; old containers keep serving until new ones are
                                   # healthy. Zero-downtime comes from build-before-swap, not parallelism.
-# add 'ws' to the build/up lines if ws-server changed (rare)
 ```
 Old runbook (`stop && rm && rmi → build → up`) created a 3–5 min outage window when the build crashed. Don't use it unless you specifically want to free RAM before the build (heavy on this VPS only).
 

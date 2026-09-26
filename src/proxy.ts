@@ -176,7 +176,7 @@ function buildNonceCsp(nonce: string): string {
     "font-src 'self' data:",
     isDev
       ? "connect-src 'self' https: ws: wss: http://localhost:*"
-      : "connect-src 'self' https: ws: wss:",
+      : "connect-src 'self' https:",
     "media-src 'self'",
     "object-src 'none'",
     "frame-ancestors 'self'",
