@@ -1,6 +1,7 @@
 import { COLORS, CONTENT_WIDTH, PAGE } from './constants';
 import { formatNumber, formatRuDate, safeText } from './format';
 import { sumDowntime, sumDrilling, sumPiles } from './period-row';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import type { PdfDoc, PeriodReportRow } from './types';
 
 export function ensureSpace(doc: PdfDoc, neededHeight: number) {
@@ -176,7 +177,7 @@ export function addPeriodTable(doc: PdfDoc, reports: PeriodReportRow[]) {
       report.user?.name || '—',
       formatNumber(sumPiles(report)),
       formatNumber(sumDrilling(report)),
-      formatNumber(sumDowntime(report)),
+      formatDowntimeHours(sumDowntime(report)),
     ]),
     [0.13, 0.22, 0.23, 0.12, 0.15, 0.15]
   );
@@ -213,7 +214,7 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
     addTable(
       doc,
       ['Простой', 'Часы'],
-      (report.downtimes || []).map((downtime) => [downtime.reason?.name || '—', formatNumber(downtime.duration || 0)]),
+      (report.downtimes || []).map((downtime) => [downtime.reason?.name || '—', formatDowntimeHours(downtime.duration || 0)]),
       [0.72, 0.28],
       true
     );

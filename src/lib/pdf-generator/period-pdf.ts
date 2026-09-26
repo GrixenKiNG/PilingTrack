@@ -9,6 +9,7 @@ import {
 import { formatMeters, formatNumber, formatRuDate } from './format';
 import { toPeriodReportRow } from './period-row';
 import { renderPdf } from './render';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { PeriodPdfData } from './types';
 
@@ -34,7 +35,7 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
       ['Отчётов', String(reports.length), 'шт'],
       ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.'],
       ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт/м.п.'],
-      ['Простои', formatNumber(data.totalDowntime), 'ч'],
+      ['Простои', formatDowntimeHours(data.totalDowntime), ''],
     ]);
 
     if (reports.length === 0) {

@@ -16,6 +16,7 @@ import {
   statusLabel,
 } from './format';
 import { renderPdf } from './render';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { SingleReportData } from './types';
 
@@ -49,7 +50,7 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     addMetricStrip(doc, [
       ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.'],
       ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт/м.п.'],
-      ['Простои', formatNumber(totalDowntime), 'ч'],
+      ['Простои', formatDowntimeHours(totalDowntime), ''],
     ]);
 
     if (data.piles.length > 0) {
@@ -92,7 +93,7 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
         ['Причина', 'Длительность', 'Комментарий'],
         data.downtimes.map((downtime) => [
           downtime.reason?.name || '—',
-          `${formatNumber(downtime.duration)} ч`,
+          formatDowntimeHours(downtime.duration),
           downtime.comment || '—',
         ]),
         [0.48, 0.18, 0.34]
