@@ -6,7 +6,7 @@ vi.mock('@/lib/db', () => ({
 
 import { db } from '@/lib/db';
 import { getSettings, saveSettings } from '@/modules/settings';
-import { sanitizeSettings, DEFAULT_WORKSPACE_SETTINGS, NOTIFICATION_KEYS } from '@/modules/settings/domain/settings';
+import { sanitizeSettings, DEFAULT_NOTIFICATIONS, DEFAULT_WORKSPACE_SETTINGS, NOTIFICATION_KEYS } from '@/modules/settings/domain/settings';
 
 const anyDb = db.tenantSettings as unknown as { findUnique: ReturnType<typeof vi.fn>; upsert: ReturnType<typeof vi.fn> };
 
@@ -34,6 +34,17 @@ describe('settings sanitizer', () => {
     expect(stored.notifications.planDeviation).toBe(true);
     // Патч другого поля сохранённое правило не переворачивает.
     expect(sanitizeSettings({ companyName: 'ООО «Орион»' }, stored).notifications.planDeviation).toBe(true);
+  });
+
+  it('exposes the four owner-requested switches, all on by default', () => {
+    // Решение владельца 26.09.2026: «добавь выключатели для всех уведомлений».
+    // У всех четырёх отправитель был и раньше — умолчание «включено» значит,
+    // что до первого выключения ничего не меняется.
+    for (const key of ['incidents', 'systemAlerts', 'deliveryFailures', 'orionLeads']) {
+      expect(NOTIFICATION_KEYS.find((k) => k.key === key)?.implemented).toBe(true);
+      expect(DEFAULT_NOTIFICATIONS[key]).toBe(true);
+      expect(sanitizeSettings({}).notifications[key]).toBe(true);
+    }
   });
 
   it('rejects an unknown units value and over-long strings', () => {

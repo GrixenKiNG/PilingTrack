@@ -35,7 +35,10 @@ export interface WorkspaceSettings {
  *
  * - `downtime30`, `newReports` — `services/reports/event-handlers.ts`
  * - `maintenanceOverdue` — `workers/unified-worker/pm-scheduler.ts`
- * - `criticalDefect` — `core/notifications/durable-alert.ts` (enqueueCriticalDefects)
+ * - `criticalDefect`, `incidents` — `services/notifications/durable-alert-delivery.ts`
+ * - `systemAlerts` — `app/api/alerts/webhook/route.ts` (тревоги Alertmanager)
+ * - `deliveryFailures` — `core/outbox/dead-letter-queue.ts`
+ * - `orionLeads` — `app/api/orion/lead/route.ts`
  *
  * Без отправителя остаётся только `planDeviation`, и экран настроек об этом
  * говорит прямо.
@@ -49,6 +52,10 @@ export const NOTIFICATION_KEYS = [
   { key: 'maintenanceOverdue', label: 'Просроченные ТО', implemented: true },
   { key: 'criticalDefect', label: 'Опасный дефект установки (срочный или запрет работы)', implemented: true },
   { key: 'newReports', label: 'Новые отчёты и сводки', implemented: true },
+  { key: 'incidents', label: 'Происшествия на площадке', implemented: true },
+  { key: 'systemAlerts', label: 'Сбои сервера (мониторинг)', implemented: true },
+  { key: 'deliveryFailures', label: 'Недоставленные события', implemented: true },
+  { key: 'orionLeads', label: 'Заявки с сайта ОРИОН', implemented: true },
 ] as const;
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]['key'];
@@ -64,6 +71,14 @@ export const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
   // молчать дороже, чем лишний раз написать. Умолчание «включено».
   criticalDefect: true,
   newReports: false,
+  // Решение владельца 26.09.2026: «добавь выключатели для всех уведомлений».
+  // У всех четырёх отправители были и раньше, но выключателя у них не было —
+  // тумблеры заведены включёнными, чтобы поведение не менялось, пока админ
+  // сам не выключит.
+  incidents: true,
+  systemAlerts: true,
+  deliveryFailures: true,
+  orionLeads: true,
 };
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {

@@ -15,6 +15,7 @@
 
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { getRequestTenantId } from '@/core/security/tenant-context';
 
 export interface DlqEntry {
   id: string;
@@ -69,12 +70,23 @@ export async function moveToDlq(
     });
 
     // Best-effort Telegram alert — never blocks the DLQ write.
-    import('@/core/notifications/telegram').then(({ telegramNotifier }) => {
-      void telegramNotifier.sendMessage(
+    //
+    // Выключатель спрашиваем здесь, а не у вызывающего: тумблер «Недоставленные
+    // события» должен гасить именно этот алерт. Контекста запроса у DLQ нет
+    // (moveToDlq зовётся из воркера), поэтому тенант — ambient или тенант
+    // развёртывания, как в core/notifications/telegram.ts:getConfigs.
+    import('@/modules/settings').then(async ({ isNotificationEnabled }) => {
+      const tenantId = getRequestTenantId() ?? process.env.DEFAULT_TENANT_ID;
+      if (!(await isNotificationEnabled(tenantId, 'deliveryFailures'))) {
+        logger.info('DLQ alert suppressed by notification settings', { eventType, outboxId });
+        return;
+      }
+      const { telegramNotifier } = await import('@/core/notifications/telegram');
+      await telegramNotifier.sendMessage(
         `⚠️ <b>Dead Letter Queue</b>\n\nСобытие <code>${eventType}</code> исчерпало ${attempts} попыток.\n` +
         (aggregateId ? `aggregateId: <code>${aggregateId}</code>\n` : '') +
         `Ошибка: <code>${errorMessage.substring(0, 200)}</code>`
-      ).catch(() => {/* ignore */});
+      );
     }).catch(() => {/* ignore */});
   } catch (dlqError) {
     // Last resort — log to console
