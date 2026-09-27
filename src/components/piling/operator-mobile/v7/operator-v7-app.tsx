@@ -197,13 +197,30 @@ export function OperatorV7App() {
     </>
   );
 
+  /*
+    Нижнее меню — и на шаге закрытия смены.
+
+    Отказ сервера оставлял человека на экране без единой вкладки: выйти можно
+    было только перезагрузкой страницы, а она возвращала его на тот же экран
+    (D-20260927-001). Вкладка закрывает шаг и уводит в раздел.
+  */
+  const dock = (
+    <Dock
+      items={OPERATOR_DOCK}
+      active={tab}
+      badges={{MORE: openIncidents}}
+      onSelect={(next) => { setTab(next); setDetour(null); setActionError(null); }}
+    />
+  );
+
   /* ------------------------------------------------------------- шаги --- */
 
   if (detour) {
     const back = () => { setDetour(null); setActionError(null); };
     return (
       <Shell online={online} syncedAt={syncedAt} pending={pending}
-        back={DETOUR_BACK[detour.kind]} onBack={back}>
+        back={DETOUR_BACK[detour.kind]} onBack={back}
+        dock={detour.kind === 'CLOSE' ? dock : undefined}>
         {detour.kind === 'PPE' ? (
           <PpeFlow
             busy={busy}
@@ -299,8 +316,10 @@ export function OperatorV7App() {
 
         {detour.kind === 'CLOSE' ? (
           <CloseFlow
+            state={state}
             busy={busy}
             onBack={back}
+            onChecklist={(stage) => setDetour({kind: 'CHECKLIST', stage})}
             onClose={(comment) => {
               if (!shiftId) {
                 setActionError('Смена не начата');
@@ -344,14 +363,7 @@ export function OperatorV7App() {
       pending={pending}
       back="PilingTrack"
       desktopNav={<aside className="oc-desktop-nav"><div className="oc-brand"><PilingIcon name="equipment-rig" size={30} decorative /><strong>PilingTrack</strong></div><p>Рабочее место оператора</p><nav aria-label="Рабочее место">{OPERATOR_DOCK.map(item=><button type="button" key={item.key} aria-current={tab===item.key?'page':undefined} onClick={()=>setTab(item.key)}><PilingIcon name={item.key==='HOME'?'home':item.key==='SAFETY'?'accepted':item.key==='EQUIP'?'equipment-rig':'menu'} size={24} decorative />{item.label}</button>)}</nav><a href="/operator/v7/history"><PilingIcon name="history" size={24} decorative />История</a></aside>}
-      dock={(
-        <Dock
-          items={OPERATOR_DOCK}
-          active={tab}
-          badges={{MORE: openIncidents}}
-          onSelect={(next) => { setTab(next); setActionError(null); }}
-        />
-      )}
+      dock={dock}
       action={shiftId && !(tab === 'HOME' && state.phase === 'WORK') ? (
         <Button tone="danger" onClick={() => setDetour({kind: 'INCIDENT'})}>
           ⚠ Сообщить об инциденте

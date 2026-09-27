@@ -3,8 +3,9 @@
 import {ChecklistScreen as SharedChecklistScreen} from '../screens/checklist-screen';
 import {useState} from 'react';
 import type {
-  ChecklistAnswer, ChecklistView, IncidentSign, OperatorMobileState,
+  ChecklistAnswer, ChecklistStage, ChecklistView, IncidentSign, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
+import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_HINTS, INCIDENT_CATEGORY_LABELS,
   INCIDENT_DESCRIPTION_MIN, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
@@ -395,7 +396,15 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
 /* --------------------------------------------------------- сдача смены --- */
 
 /**
- * Закрытие смены: одна кнопка и предупреждение, что дальше правит администратор.
+ * Закрытие смены: шаг ЕО после работы, кнопка закрытия и предупреждение, что
+ * дальше правит администратор.
+ *
+ * ЕО ПОСЛЕ РАБОТЫ ЗДЕСЬ ПЕРВЫМ ШАГОМ, А НЕ НА СОСЕДНЕЙ ВКЛАДКЕ (F-QA-001).
+ * Сервер не принимает закрытие, пока не сдан послесменный чек-лист: фазу
+ * `CLOSING` закрывает этап `EO_AFTER` (`PHASE_CHECKLIST`). Экран об этом
+ * молчал: кнопка «Закрыть смену» была единственной, человек получал отказ
+ * 409-й и оставался без пути — кнопка ЕО жила только на вкладке «Работа».
+ * Теперь шаг ЕО стоит на этом же экране, а закрытие ждёт его.
  *
  * ЧЕГО ЗДЕСЬ БОЛЬШЕ НЕТ (решение владельца 18.09.2026). Поля «что передать
  * следующей смене» — передача машины это отдельное действие со своим
@@ -403,18 +412,40 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
  * человек ставит её не глядя, потому что она стоит между ним и кнопкой, —
  * подтверждения она не даёт, а закрытие задерживает.
  */
-export function CloseFlow({busy, onClose, onBack}: {
+export function CloseFlow({state, busy, onChecklist, onClose, onBack}: {
+  state: OperatorMobileState;
   busy: boolean;
+  /** Открыть чек-лист ЕО после работы — этап считаем от фазы, а не по имени. */
+  onChecklist: (stage: ChecklistStage) => void;
   onClose: (comment: string) => void;
   onBack: () => void;
 }) {
+  const stage = PHASE_CHECKLIST.CLOSING;
+  const checklist = stage ? state.checklists.find((item) => item.stage === stage) : undefined;
+  /*
+    Блокируем только по факту «чек-лист есть и не сдан». Отсутствие чек-листа в
+    состоянии — это «неизвестно», а не «не сдан»: заперев закрытие по нему, мы
+    получили бы ту же ловушку, только с другой стороны. Пусть в этом случае
+    отвечает сервер — его причина показывается текстом выше.
+  */
+  const blocked = Boolean(checklist && !checklist.done);
   return (
     <>
       <Title note="После закрытия смена уходит в отчёт и правится только администратором.">
         Закрытие смены
       </Title>
       <div className="body">
-        <Button disabled={busy} onClick={() => onClose('')}>
+        {blocked && stage ? (
+          <>
+            <Banner
+              tone="warn"
+              title="Сначала ЕО после работы"
+              note={checklist?.purpose ?? 'Машину после работы надо осмотреть и обслужить.'}
+            />
+            <Button onClick={() => onChecklist(stage)}>Выполнить ЕО после работы</Button>
+          </>
+        ) : null}
+        <Button disabled={busy || blocked} onClick={() => onClose('')}>
           {busy ? 'Закрываем…' : 'Закрыть смену'}
         </Button>
         <Button tone="ghost" onClick={onBack}>Назад</Button>
