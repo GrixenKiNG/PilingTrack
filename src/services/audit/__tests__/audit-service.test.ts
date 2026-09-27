@@ -818,3 +818,69 @@ describe('recordAuditEvent — допуск к технике', () => {
     );
   });
 });
+
+/**
+ * Пересборка проекций меняет цифры витрин и аналитики по одному запросу, и без
+ * строки в ленте на вопрос «почему у меня другие числа, чем вчера» ответить
+ * нечем (F-R34-23). В тексте — названия витрин по-русски, а не коды схемы
+ * (`site-daily`, `report-analytics`), и число записанных строк.
+ */
+describe('recordAuditEvent — пересборка проекций', () => {
+  it('называет витрины по-русски и число записанных строк', async () => {
+    await recordAuditEvent({
+      action: 'projections.rebuilt',
+      scope: 'projections',
+      actorId: 'admin-1',
+      metadata: { names: ['report-analytics', 'site-daily', 'site-weekly'], rowsWritten: 14 },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'audit',
+        priority: 'MEDIUM',
+        title: 'Проекции пересобраны',
+        message:
+          'Пересобраны проекции: Аналитика отчётов, Сводка по объектам за день, Недельный тренд по объектам — записано строк: 14.',
+      }),
+    );
+  });
+
+  it('называет одну витрину без числа строк, когда пересобирали не всё', async () => {
+    await recordAuditEvent({
+      action: 'projections.rebuilt',
+      scope: 'projections',
+      metadata: { names: ['site-daily'] },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Пересобраны проекции: Сводка по объектам за день.' }),
+    );
+  });
+
+  // Новый код витрины в схеме не должен превращаться в пустую строку: сырое
+  // имя лучше, чем потеря информации.
+  it('оставляет сырое имя для неизвестной витрины', async () => {
+    await recordAuditEvent({
+      action: 'projections.rebuilt',
+      scope: 'projections',
+      metadata: { names: ['operator-performance'], rowsWritten: 0 },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Пересобраны проекции: operator-performance — записано строк: 0.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда metadata пустая', async () => {
+    await recordAuditEvent({ action: 'projections.rebuilt', scope: 'projections' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Проекции пересобраны',
+        message: 'Проекции пересобраны.',
+      }),
+    );
+  });
+});

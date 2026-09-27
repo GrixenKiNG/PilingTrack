@@ -93,6 +93,15 @@ function dictionaryLine(meta: Meta, verb: string, name: string | null): string {
   return name ? `${where}: ${verb} «${name}».` : `${where}: ${verb}.`;
 }
 
+// Проекции читают на витринах и в аналитике, а коды витрин (`site-daily`,
+// `report-analytics`) владельцу ничего не говорят: в ленте должны стоять те же
+// названия, что и на экране (F-R34-23).
+const PROJECTION_LABELS: Record<string, string> = {
+  'site-daily': 'Сводка по объектам за день',
+  'site-weekly': 'Недельный тренд по объектам',
+  'report-analytics': 'Аналитика отчётов',
+};
+
 // Решение по свае в ленте читают словами, а не значением перечисления
 // («NEEDS_REDRIVE» владельцу не говорит ничего).
 const PILE_ACCEPTANCE_LABELS: Record<string, string> = {
@@ -689,6 +698,24 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
       const expires = dateAt(m, 'before.expiresAt');
       const what = title ? `Удалён документ «${title}»` : 'Удалён документ установки';
       return withSubject(expires ? `${what} (срок до ${expires})` : what, subject(m));
+    },
+  },
+
+  // ── Пересборка проекций ──
+  // Пересборка меняет цифры витрин и аналитики по одному запросу, и без строки
+  // в ленте на вопрос «почему у меня другие числа, чем вчера» ответить нечем:
+  // запись называет, какие витрины пересобрали и сколько строк записали, и
+  // оставляет актора (F-R34-23). Имена проекций — по-русски, без кодов схемы.
+  'projections.rebuilt': {
+    level: 'audit',
+    title: 'Проекции пересобраны',
+    message: (m) => {
+      const names = Array.isArray(m.names)
+        ? m.names.map((name) => PROJECTION_LABELS[String(name)] ?? String(name))
+        : [];
+      const what = names.length ? `Пересобраны проекции: ${names.join(', ')}` : 'Проекции пересобраны';
+      const rows = num(m, 'rowsWritten');
+      return rows === null ? `${what}.` : `${what} — записано строк: ${rows}.`;
     },
   },
 };
