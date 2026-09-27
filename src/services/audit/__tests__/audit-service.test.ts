@@ -752,3 +752,69 @@ describe('recordAuditEvent — схема объекта (поле/куст/пи
     );
   });
 });
+
+/**
+ * Допуск работника к технике: строка матрицы перезаписывается и удаляется
+ * целиком, поэтому лента — единственное место, где видно, кто и когда его
+ * выдал или снял. Вид техники и состояние — перечисления схемы, а ленту читает
+ * владелец, а не программист (F-R34-25).
+ */
+describe('recordAuditEvent — допуск к технике', () => {
+  it('переводит вид техники и состояние допуска на русский', async () => {
+    await recordAuditEvent({
+      action: 'user.equipment_permit.saved',
+      scope: 'users',
+      actorId: 'admin-1',
+      targetId: 'user-1',
+      metadata: { permitId: 'permit-1', equipmentKind: 'PILE_DRIVER', status: 'DENIED' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Допуск к технике выдан или изменён',
+        message: 'Допуск работника к технике: Сваебойная установка, не допущен.',
+      }),
+    );
+  });
+
+  it('показывает состояние «ограничен», а не только «допущен/не допущен»', async () => {
+    await recordAuditEvent({
+      action: 'user.equipment_permit.saved',
+      scope: 'users',
+      metadata: { equipmentKind: 'DRILLING_RIG', status: 'LIMITED' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Допуск работника к технике: Буровая установка, ограничен.',
+      }),
+    );
+  });
+
+  // Новый вид техники или состояние в схеме не должны превращаться в «—»:
+  // сырой код лучше, чем потеря информации.
+  it('оставляет сырой код для неизвестного значения перечисления', async () => {
+    await recordAuditEvent({
+      action: 'user.equipment_permit.saved',
+      scope: 'users',
+      metadata: { equipmentKind: 'CRANE', status: 'SUSPENDED' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Допуск работника к технике: CRANE, SUSPENDED.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без вида техники и состояния', async () => {
+    await recordAuditEvent({ action: 'user.equipment_permit.saved', scope: 'users' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Допуск к технике выдан или изменён',
+        message: 'Допуск работника к технике: —, —.',
+      }),
+    );
+  });
+});

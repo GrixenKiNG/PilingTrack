@@ -105,6 +105,24 @@ function pileAcceptanceLabel(value: string | null): string | null {
   return value ? (PILE_ACCEPTANCE_LABELS[value] ?? value) : null;
 }
 
+// Вид техники и состояние допуска в ленте читают словами, а не кодами схемы
+// («PILE_DRIVER, DENIED» владельцу не говорит ничего). Подписи совпадают с
+// матрицей допусков (src/components/piling/to/readiness/screens/equipment-permit-labels.ts),
+// но services/ не может зависеть от components/ — словари скопированы локально (F-R34-25).
+const EQUIPMENT_KIND_LABELS: Record<string, string> = {
+  PILE_DRIVER: 'Сваебойная установка',
+  DRILLING_RIG: 'Буровая установка',
+  VIBRO_HAMMER: 'Вибропогружатель',
+  HYBRID: 'Комбинированная установка',
+  OTHER: 'Прочая техника',
+};
+
+const PERMIT_STATUS_LABELS: Record<string, string> = {
+  ALLOWED: 'допущен',
+  LIMITED: 'ограничен',
+  DENIED: 'не допущен',
+};
+
 // Поля настроек так, как они называются на экране («Настройки организации»).
 // Список переключателей уведомлений живёт в modules/settings, а services/ не
 // может зависеть от modules/ (CLAUDE.md §1): уведомления подписаны общим словом,
@@ -534,7 +552,13 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
   'user.equipment_permit.saved': {
     level: 'audit',
     title: 'Допуск к технике выдан или изменён',
-    message: (m) => `Допуск работника к технике: ${str(m, 'equipmentKind') ?? '—'}, ${str(m, 'status') ?? '—'}.`,
+    message: (m) => {
+      const kind = str(m, 'equipmentKind');
+      const status = str(m, 'status');
+      const kindText = kind ? (EQUIPMENT_KIND_LABELS[kind] ?? kind) : '—';
+      const statusText = status ? (PERMIT_STATUS_LABELS[status] ?? status) : '—';
+      return `Допуск работника к технике: ${kindText}, ${statusText}.`;
+    },
   },
   'user.equipment_permit.deleted': {
     level: 'warn',
