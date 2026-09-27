@@ -228,6 +228,7 @@ function auditDocumentChange(
   ctx: UserDocumentContext,
   document: { id: string; typeId?: string; expiresAt?: Date | null },
   targetUserId: string,
+  before?: { typeId?: string; expiresAt?: Date | null },
 ) {
   return recordAuditEvent({
     action: `user.document.${action}`,
@@ -239,6 +240,16 @@ function auditDocumentChange(
       documentId: document.id,
       typeId: document.typeId,
       expiresAt: document.expiresAt?.toISOString() ?? null,
+      // Прежние срок и вид: без них по следу не видно, насколько продлили
+      // удостоверение — только новая дата (F-R34-22).
+      ...(before
+        ? {
+            before: {
+              typeId: before.typeId,
+              expiresAt: before.expiresAt?.toISOString() ?? null,
+            },
+          }
+        : {}),
       // Правка своих документов — отдельный повод присмотреться: контроль
       // здесь держится не на запрете, а на видимости.
       selfService: ctx.actor.id === targetUserId,
@@ -306,7 +317,9 @@ export async function updateUserDocument(
   );
 
   const updated = await db.userDocument.update({ where: { id: documentId }, data });
-  await auditDocumentChange('updated', ctx, updated, userId);
+  // Прошлую строку читали для проверки прав — берём её же как `before`,
+  // чтобы в следе был виден прежний срок, а не только новый.
+  await auditDocumentChange('updated', ctx, updated, userId, existing);
   return updated;
 }
 
