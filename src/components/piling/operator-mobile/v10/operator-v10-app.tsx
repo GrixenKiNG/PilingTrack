@@ -491,11 +491,12 @@ export function downtimeWindowProblem(
   return null;
 }
 
-function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
+export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   initialKind?: WorkAction;
   state: OperatorMobileState;
   busy: boolean;
-  onLog: (entry: ProductionEntryInput) => void;
+  /** Признак успеха: по нему форма решает, чистить ли поля. */
+  onLog: (entry: ProductionEntryInput) => Promise<boolean>;
 }) {
   const [kind, setKind] = useState<WorkAction>(initialKind);
   const [optionId, setOptionId] = useState('');
@@ -542,17 +543,23 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
         && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
   );
 
-  const submit = () => {
+  // Форма чистится только после подтверждения сервером: отказ 400/409 не
+  // должен уничтожить уже набранное число.
+  const submit = async () => {
     if (!ready) return;
-    if (kind === 'PILES') onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
-    else if (kind === 'DRILLING') {
-      onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
+    let saved = false;
+    if (kind === 'PILES') {
+      saved = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
+    } else if (kind === 'DRILLING') {
+      saved = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
     } else if (interval) {
-      onLog({
+      saved = await onLog({
         kind: 'DOWNTIME', reasonId: optionId,
         startedAt: interval.startedAt, endedAt: interval.endedAt,
       });
     }
+    if (!saved) return;
+
     setOptionId('');
     setCount('');
     setMeters('');
@@ -580,10 +587,7 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
         <PilePassportForm
           grades={state.dictionaries.pileGrades}
           busy={busy}
-          onSubmit={async (pileGradeId, passport) => {
-            onLog({kind: 'PILE_PASSPORT', pileGradeId, passport});
-            return true;
-          }}
+          onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
         />
       ) : (
       <>
@@ -647,7 +651,7 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
       ) : null}
 
       <button type="button" className="ov10-btn" style={{marginTop: 12}}
-        disabled={busy || !ready} onClick={submit}>
+        disabled={busy || !ready} onClick={() => void submit()}>
         {busy ? 'Записываем…' : 'Записать'}
       </button>
       </>
@@ -659,7 +663,7 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
 function ScreenWork({state, busy, onLog, go}: {
   state: OperatorMobileState;
   busy: boolean;
-  onLog: (entry: ProductionEntryInput) => void;
+  onLog: (entry: ProductionEntryInput) => Promise<boolean>;
   go: Go;
 }) {
   const [entry, setEntry] = useState<WorkAction | null>(null);
@@ -1566,25 +1570,41 @@ export function OperatorV10App() {
     })();
   }, []);
 
-  const run = useCallback(async (fn: () => Promise<unknown>, done: string) => {
+  // Возвращает признак успеха: форма чистит поля только по нему. Отказ по
+  // существу (400/409) — это false: введённое человеком должно остаться на
+  // экране. Уход в очередь — принятая запись, то есть true.
+  //
+  // Успех — это «сервер принял запись (или она легла в очередь)», а не «весь
+  // обработчик дошёл до конца»: перечитывание экрана идёт отдельным шагом, и
+  // его сбой не отменяет уже записанное.
+  const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
+    let accepted = true;
     try {
       await fn();
       setCommandId(newCommandId());
       setNotice(done);
-      await reload();
     } catch (cause) {
       // Запись легла в очередь — это принятая запись, а не отказ: следующая
       // обязана получить новый ключ. Со старым ключом очередь считала её
       // повтором той же записи и молча не брала, а сервер — тем более.
-      if (cause instanceof QueuedOffline) setCommandId(newCommandId());
-      setNotice(cause instanceof QueuedOffline
-        ? cause.message
-        : cause instanceof Error ? cause.message : 'Действие не выполнено');
+      if (cause instanceof QueuedOffline) {
+        setCommandId(newCommandId());
+        setNotice(cause.message);
+      } else {
+        accepted = false;
+        setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
+      }
     } finally {
       setBusy(false);
     }
+    try {
+      await reload();
+    } catch {
+      // Запись уже принята — сбой перечитывания её не отменяет.
+    }
+    return accepted;
   }, [reload]);
 
   const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
@@ -1680,13 +1700,13 @@ export function OperatorV10App() {
     [submitChecklist],
   );
 
-  const logProduction = useCallback((entry: ProductionEntryInput) => {
+  const logProduction = useCallback(async (entry: ProductionEntryInput): Promise<boolean> => {
     const shiftId = state?.shift?.id;
     if (!shiftId) {
       setNotice('Смена не начата: записывать некуда.');
-      return;
+      return false;
     }
-    void run(
+    return run(
       () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
       'Записано.',
     );

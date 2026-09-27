@@ -1,9 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
-import {fireEvent, render, screen} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import type {ChecklistView, OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — свои стили; в тесте они не нужны.
 vi.mock('../../operator-concept.css', () => ({}));
-import {gapsBySection, gapsNote, ppeOutcome, downtimeWindowProblem, ScreenClosing} from '../operator-v10-app';
+import {
+  gapsBySection, gapsNote, ppeOutcome, downtimeWindowProblem, ProductionForm, ScreenClosing,
+} from '../operator-v10-app';
 
 /**
  * Ошибка чек-листа обязана называть раздел.
@@ -209,5 +211,58 @@ describe('закрытие смены при непустой очереди', (
     expect(screen.queryByText(/Сначала отправьте записи/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену'}));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * F-R43-3b: форма выработки v10 чистится только по подтверждению сервера.
+ *
+ * Отказ 400/409 приходит уже после отправки: если очистить поля сразу, число,
+ * набранное машинистом в перчатке, пропадёт вместе с текстом отказа. Признак
+ * успеха возвращает `logProduction` (см. `production.ts`): уход в очередь —
+ * принятая запись, отказ по существу — `false`.
+ */
+const working = {
+  phase: 'WORK',
+  productionDate: '2026-09-27',
+  shift: {id: 'shift-1', productionDate: '2026-09-27', startedAt: '2026-09-27T04:00:00.000Z'},
+  assignment: {equipmentId: 'eq-1', equipmentName: 'Liebherr LRH 100', siteName: 'Площадка'},
+  permit: {allowed: true, blocks: []},
+  dictionaries: {
+    pileGrades: [{id: 'grade-1', name: 'С 20-35', lengthMm: 6000}],
+    drillingTypes: [],
+    downtimeReasons: [],
+  },
+} as unknown as OperatorMobileState;
+
+/** Открывает форму свай и вводит «12 шт». Возвращает поле числа. */
+function fillPiles(container: HTMLElement) {
+  fireEvent.change(container.querySelector('select') as HTMLSelectElement, {target: {value: 'grade-1'}});
+  const count = container.querySelector('input[inputmode="decimal"]') as HTMLInputElement;
+  fireEvent.change(count, {target: {value: '12'}});
+  return count;
+}
+
+describe('запись выработки v10 и отказ сервера', () => {
+  it('оставляет введённое число, когда сервер отказал', async () => {
+    const onLog = vi.fn().mockResolvedValue(false);
+    const {container} = render(<ProductionForm state={working} busy={false} onLog={onLog} />);
+    const count = fillPiles(container);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    await waitFor(() => expect(onLog).toHaveBeenCalledTimes(1));
+    expect(count.value).toBe('12');
+  });
+
+  it('чистит поле, когда запись принята', async () => {
+    const onLog = vi.fn().mockResolvedValue(true);
+    const {container} = render(<ProductionForm state={working} busy={false} onLog={onLog} />);
+    const count = fillPiles(container);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    await waitFor(() => expect(onLog).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(count.value).toBe(''));
   });
 });
