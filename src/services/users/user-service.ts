@@ -209,11 +209,18 @@ export interface UpdateUserInput {
   pin?: string;
 }
 
+/**
+ * Клиент, достаточный для проверки «последнего администратора»: чтение/запись
+ * пользователя и транзакционный advisory-замок. Обычный `db` и клиент
+ * транзакции подходят оба.
+ */
+export type UserUpdateClient = Pick<typeof db, 'user' | '$queryRaw'>;
+
 export async function updateUser(
   tenantId: string,
   input: UpdateUserInput,
   actorUserId?: string | null,
-  client: Pick<typeof db, 'user'> = db
+  client: UserUpdateClient = db
 ) {
   const scopedTenantId = requireTenantId(tenantId);
   if (!input.id) {
@@ -236,55 +243,70 @@ export async function updateUser(
   }
 
   try {
-    const previousUser = await client.user.findFirst({
-      where: { id: input.id, tenantId: scopedTenantId },
-      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
-    });
-    if (!previousUser) {
-      throw new ServiceError('Пользователь не найден', 404);
-    }
-    if (input.role !== undefined && input.role !== previousUser.role) {
-      data.sessionVersion = { increment: 1 };
-    }
-
-    /*
-      Организация не должна остаться без администратора.
-
-      Снятие роли и блокировка проходили без единой проверки: администратор мог
-      сменить себе роль на оператора или заблокировать сам себя — и управление
-      организацией терялось. Вернуть его изнутри некому: заводить и повышать
-      пользователей может только администратор. Удаление такой дыры не имело:
-      там стоит запрет на действие над собой.
-
-      Считаем ДРУГИХ действующих администраторов. Если их нет — отказ, независимо
-      от того, себя правит человек или последнего коллегу-администратора.
-    */
-    const losesAdmin = previousUser.role === 'ADMIN'
-      && ((input.role !== undefined && input.role !== 'ADMIN') || input.isActive === false);
-    if (losesAdmin) {
-      const otherAdmins = await client.user.count({
-        where: {
-          tenantId: scopedTenantId,
-          role: 'ADMIN',
-          isActive: true,
-          id: { not: previousUser.id },
-        },
+    const applyUpdate = async (tx: UserUpdateClient) => {
+      const previousUser = await tx.user.findFirst({
+        where: { id: input.id, tenantId: scopedTenantId },
+        select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
       });
-      if (otherAdmins === 0) {
-        throw new ServiceError(
-          input.isActive === false
-            ? 'Это последний администратор организации — его нельзя заблокировать. Сначала назначьте другого администратора'
-            : 'Это последний администратор организации — у него нельзя снять роль. Сначала назначьте другого администратора',
-          409,
-        );
+      if (!previousUser) {
+        throw new ServiceError('Пользователь не найден', 404);
       }
-    }
+      if (input.role !== undefined && input.role !== previousUser.role) {
+        data.sessionVersion = { increment: 1 };
+      }
 
-    const updatedUser = await client.user.update({
-      where: { id: input.id, tenantId: scopedTenantId },
-      data,
-      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
-    });
+      /*
+        Организация не должна остаться без администратора.
+
+        Снятие роли и блокировка проходили без единой проверки: администратор мог
+        сменить себе роль на оператора или заблокировать сам себя — и управление
+        организацией терялось. Вернуть его изнутри некому: заводить и повышать
+        пользователей может только администратор. Удаление такой дыры не имело:
+        там стоит запрет на действие над собой.
+
+        Считаем ДРУГИХ действующих администраторов. Если их нет — отказ, независимо
+        от того, себя правит человек или последнего коллегу-администратора.
+      */
+      const losesAdmin = previousUser.role === 'ADMIN'
+        && ((input.role !== undefined && input.role !== 'ADMIN') || input.isActive === false);
+      if (losesAdmin) {
+        // Подсчёт и запись обязаны быть серийными: без замка два администратора,
+        // снимающие роль друг другу одновременно, оба видят «другой админ есть»
+        // и оба записывают результат — организация остаётся без администратора
+        // (F-R38-8). Замок транзакционный, снимается сам при коммите или откате.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`last-admin:${scopedTenantId}`}))`;
+        const otherAdmins = await tx.user.count({
+          where: {
+            tenantId: scopedTenantId,
+            role: 'ADMIN',
+            isActive: true,
+            id: { not: previousUser.id },
+          },
+        });
+        if (otherAdmins === 0) {
+          throw new ServiceError(
+            input.isActive === false
+              ? 'Это последний администратор организации — его нельзя заблокировать. Сначала назначьте другого администратора'
+              : 'Это последний администратор организации — у него нельзя снять роль. Сначала назначьте другого администратора',
+            409,
+          );
+        }
+      }
+
+      const updated = await tx.user.update({
+        where: { id: input.id, tenantId: scopedTenantId },
+        data,
+        select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
+      });
+      return { previousUser, updatedUser: updated };
+    };
+
+    // Транзакцию открываем только когда запрос вообще может снять права
+    // администратора; если клиент уже транзакционный — берём замок на нём.
+    const mayLoseAdmin = (input.role !== undefined && input.role !== 'ADMIN') || input.isActive === false;
+    const { previousUser, updatedUser } = mayLoseAdmin && client === db
+      ? await db.$transaction((tx) => applyUpdate(tx))
+      : await applyUpdate(client);
 
     await recordAuditEvent({
       action: 'user.updated',
