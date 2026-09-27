@@ -3,7 +3,25 @@ import {describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
 vi.mock('@/components/piling/operator-mobile/operator-concept.css', () => ({}));
-import {CloseScreen, WorkScreen} from '../operator-v5-app';
+
+/**
+ * Источник данных подменён: приложение целиком проверяется на двух ответах
+ * сервера — «состояние сменилось» и «состояния больше нет».
+ */
+const api = vi.hoisted(() => ({
+  currentPosition: vi.fn(async () => null),
+  fetchState: vi.fn(),
+  sendCommand: vi.fn(async () => undefined),
+  sendQueuedCommand: vi.fn(async () => undefined),
+  newCommandId: vi.fn(() => 'cmd-1'),
+}));
+vi.mock('@/components/piling/operator-mobile/api', () => ({
+  ApiError: class ApiError extends Error {},
+  QueuedOffline: class QueuedOffline extends Error {},
+  ...api,
+}));
+
+import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 
 /**
  * F-R43-1: смену нельзя закрыть, пока на телефоне лежат неотправленные записи.
@@ -56,6 +74,7 @@ describe('закрытие смены v5 при непустой очереди'
 const working = {
   phase: 'WORK',
   productionDate: '2026-09-27',
+  operator: {name: 'Сидоров А. В.'},
   shift: {id: 'shift-1', productionDate: '2026-09-27'},
   assignment: {equipmentId: 'eq-1', equipmentName: 'Liebherr LRH 100', siteName: 'Площадка'},
   permit: {allowed: true, blocks: []},
@@ -125,6 +144,35 @@ describe('запись выработки v5 и отказ сервера', () =
     fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
 
     await waitFor(() => expect(onLog).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(count.value).toBe(''));
+  });
+});
+
+/**
+ * F-R43-3a2: успех — это «сервер принял запись», а не «обработчик дошёл до
+ * конца». Перечитывание экрана после принятой команды идёт отдельным шагом:
+ * если его сбой предъявить как отказ, машинист наберёт то же число заново и
+ * выработка задвоится.
+ */
+describe('принятая запись и сбой перечитывания экрана', () => {
+  it('считает запись принятой и не просит вводить её снова', async () => {
+    vi.mocked(api.fetchState)
+      .mockResolvedValueOnce(working)
+      .mockRejectedValueOnce(new Error('нет связи'));
+
+    const {container} = render(<OperatorV5App />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+    const count = fillPiles(container);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    // Запись ушла, экран перечитать не удалось.
+    await waitFor(() => expect(api.fetchState).toHaveBeenCalledTimes(2));
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Записано. Не удалось обновить экран — потяните вниз / обновите.'))
+      .toBeInTheDocument();
+    // Это не отказ: полноэкранной ошибки связи нет, поле очищено.
+    expect(screen.queryByText('Нет связи с сервером')).not.toBeInTheDocument();
     await waitFor(() => expect(count.value).toBe(''));
   });
 });

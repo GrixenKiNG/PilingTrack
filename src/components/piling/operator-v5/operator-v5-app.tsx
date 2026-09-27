@@ -892,12 +892,21 @@ export function OperatorV5App() {
   const [commandId, setCommandId] = useState(newCommandId);
   const [online, setOnline] = useState(true);
 
-  const reload = useCallback(async () => {
+  /**
+   * Перечитать состояние смены.
+   *
+   * quiet — вызов после уже принятой команды. Там сбой перечитывания означает
+   * лишь несвежий экран, а не «нет связи»: если показать его как отказ на весь
+   * экран, машинист решит, что запись не прошла, и отправит её второй раз.
+   * Поэтому ошибку отдаём наверх — вызывающий скажет о ней отдельной строкой.
+   */
+  const reload = useCallback(async (options: {quiet?: boolean} = {}) => {
     try {
       const coordinates = await currentPosition();
       setState(await fetchState({coordinates}));
       setError(null);
     } catch (cause) {
+      if (options.quiet) throw cause;
       setError(cause instanceof ApiError || cause instanceof Error
         ? cause.message
         : 'Состояние смены недоступно');
@@ -923,6 +932,11 @@ export function OperatorV5App() {
   // Возвращает признак успеха: форма чистит поля только по нему. Отказ по
   // существу (400/409) — это false: введённое человеком должно остаться на
   // экране. Уход в очередь — принятая запись, то есть true.
+  //
+  // Успех — это «сервер принял запись (или она легла в очередь)», а не «весь
+  // обработчик дошёл до конца». Перечитывание экрана идёт отдельным шагом:
+  // его сбой не отменяет уже записанное, иначе машинист увидит ошибку, наберёт
+  // то же число заново и выработка задвоится.
   const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
@@ -930,8 +944,6 @@ export function OperatorV5App() {
       await fn();
       setCommandId(newCommandId());
       setNotice(done);
-      await reload();
-      return true;
     } catch (cause) {
       // Запись легла в очередь — это принятая запись, а не отказ: следующая
       // обязана получить новый ключ. Со старым ключом очередь считала её
@@ -946,6 +958,13 @@ export function OperatorV5App() {
     } finally {
       setBusy(false);
     }
+    try {
+      await reload({quiet: true});
+    } catch {
+      // Запись уже принята — говорим только о несвежем экране.
+      setNotice('Записано. Не удалось обновить экран — потяните вниз / обновите.');
+    }
+    return true;
   }, [reload]);
 
   const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
