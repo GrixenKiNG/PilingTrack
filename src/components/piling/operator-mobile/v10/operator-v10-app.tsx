@@ -905,12 +905,21 @@ function ScreenSafetyChecklists({state, answers, measures, busy, onAnswer, onMea
  * Закрытие смены. Поля комментария здесь нет (решение владельца 18.09.2026):
  * то, что надо передать следующей смене, — это передача машины, отдельное
  * действие со своим адресатом, а не строчка в закрытии.
+ *
+ * ЗАПИСИ С ТЕЛЕФОНА ЗАКРЫТИЮ МЕШАЮТ (F-R43-1). Смена, закрытая при непустой
+ * очереди, губит отложенное молча: сервер отвечает таким записям 409 «Смена уже
+ * закрыта», и в отчёт они не попадают. Пока на устройстве есть неотправленное,
+ * закрытие не нажимается, а человеку предложено отправить записи сейчас же.
  */
-function ScreenClosing({state, busy, onClose, go}: {
+export function ScreenClosing({state, busy, onClose, go, unsent, onFlush}: {
   state: OperatorMobileState;
   busy: boolean;
   onClose: () => void;
   go: Go;
+  /** Записей на устройстве, ещё не принятых сервером. */
+  unsent: number;
+  /** Отправить их немедленно. */
+  onFlush: () => void;
 }) {
   const {assignment} = state;
   const closed = state.phase === 'CLOSED';
@@ -951,11 +960,19 @@ function ScreenClosing({state, busy, onClose, go}: {
           </button>
         </>
       ) : null}
+      {!closed && unsent > 0 ? (
+        <>
+          <Banner tone="warn" title={`Сначала отправьте записи с телефона: ${unsent} не отправлено`} />
+          <button type="button" className="ov10-btn ghost" onClick={onFlush}>
+            Отправить сейчас
+          </button>
+        </>
+      ) : null}
       {!closed ? (
         <button
           type="button"
           className="ov10-btn orange"
-          disabled={busy || !afterDone}
+          disabled={busy || !afterDone || unsent > 0}
           onClick={onClose}
         >
           {busy ? 'Закрываем…' : 'Закрыть смену'}
@@ -1570,7 +1587,7 @@ export function OperatorV10App() {
     }
   }, [reload]);
 
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   const inspection = useMemo(
     () => state?.checklists.find((list) => list.stage === 'PRESHIFT_INSPECTION'),
@@ -1749,7 +1766,8 @@ export function OperatorV10App() {
         />
       );
       case 'closing': return (
-        <ScreenClosing state={state} busy={busy} onClose={closeShift} go={setActive} />
+        <ScreenClosing state={state} busy={busy} onClose={closeShift} go={setActive}
+          unsent={queued.length} onFlush={() => void flushQueued()} />
       );
       case 'report': return <ScreenReport state={state} />;
       default: return state.phase === 'WORK' ? <ScreenWork state={state} busy={busy} onLog={logProduction} go={setActive} /> : <ScreenToday state={state} go={setActive} />;

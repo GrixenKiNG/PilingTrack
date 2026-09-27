@@ -795,11 +795,21 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
   );
 }
 
-/** G. Сдача смены и итог — экраны G4, G5 макета. */
-function CloseScreen({state, busy, onClose}: {
+/**
+ * G. Сдача смены и итог — экраны G4, G5 макета.
+ *
+ * НЕОТПРАВЛЕННЫЕ ЗАПИСИ ДЕРЖАТ КНОПКУ (F-R43-1). Закрытая смена отвечает
+ * отложенной выработке 409 «Смена уже закрыта», и в отчёт она не попадает:
+ * сначала очередь, потом закрытие.
+ */
+export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
   state: OperatorMobileState;
   busy: boolean;
   onClose: () => void;
+  /** Записей на устройстве, ещё не принятых сервером. */
+  unsent: number;
+  /** Отправить их немедленно. */
+  onFlush: () => void;
 }) {
   const {receipt} = state;
   const tiles = (
@@ -848,7 +858,13 @@ function CloseScreen({state, busy, onClose}: {
     <div className="scr">
       <p className="kicker">Сдача смены</p>
       {tiles}
-      <button className="b" type="button" disabled={busy} onClick={onClose}>
+      {unsent > 0 ? (
+        <>
+          <p className="note warn">Сначала отправьте записи с телефона: {unsent} не отправлено</p>
+          <button className="b gh" type="button" onClick={onFlush}>Отправить сейчас</button>
+        </>
+      ) : null}
+      <button className="b" type="button" disabled={busy || unsent > 0} onClick={onClose}>
         {busy ? 'Закрываем…' : 'Закрыть смену'}
       </button>
       <p className="note">
@@ -921,7 +937,7 @@ export function OperatorV5App() {
     }
   }, [reload]);
 
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
    * Периодический чек-лист ТБ, открытый по сроку.
@@ -1200,6 +1216,8 @@ export function OperatorV5App() {
       <CloseScreen
         state={state}
         busy={busy}
+        unsent={queued.length}
+        onFlush={() => void flushQueued()}
         onClose={() => {
           if (shiftId) void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
         }}

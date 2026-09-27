@@ -56,6 +56,7 @@ import type {
 import {
   fetchState, QueuedOffline, sendCommand, type ProductionEntryInput,
 } from '@/components/piling/operator-mobile/api';
+import { useOfflineQueue } from '@/components/piling/operator-mobile/use-offline-queue';
 import { SafetyTab } from '@/components/piling/operator-mobile/screens/safety-tab';
 import { PpeScreen } from '@/components/piling/operator-mobile/screens/ppe-screen';
 import { BriefingScreen } from '@/components/piling/operator-mobile/screens/briefing-screen';
@@ -294,6 +295,14 @@ export function OperatorShiftV2() {
   const [mobile, setMobile] = useState<OperatorMobileState | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [safetyStep, setSafetyStep] = useState<'PPE' | 'BRIEFING' | 'KNOWLEDGE' | null>(null);
+
+  /*
+    Очередь устройства читает и сам экран, а не только оболочка шага (F-R43-1):
+    отчёт и передачу смены нельзя сдавать, пока на телефоне лежат неотправленные
+    записи — закрытая смена отвечает им 409, и в отчёт они не попадают. Оболочка
+    шага показывает ту же очередь, но своё состояние отправки наружу не отдаёт.
+  */
+  const {queued, flush: flushQueued} = useOfflineQueue();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1139,6 +1148,7 @@ export function OperatorShiftV2() {
       она не может.
     */
     const submitted = mobile?.receipt != null;
+    const unsent = queued.length;
     return (
       <>
         <StepShell
@@ -1151,9 +1161,29 @@ export function OperatorShiftV2() {
                 ? setHandoverOpen(true)
                 : void submitReport()}
               busy={busy}
+              disabled={unsent > 0}
             />
           }
         >
+          {unsent > 0 && (
+            /*
+              Записи, лежащие на телефоне, — те же выработка и простой. После
+              сдачи отчёта и закрытия смены сервер отвечает им 409, и в отчёт они
+              не попадают: сначала очередь, потом сдача (F-R43-1).
+            */
+            <div className="space-y-2 rounded-xl border border-warning bg-warning/10 p-3">
+              <p className="text-sm font-semibold text-warning-strong">
+                Сначала отправьте записи с телефона: {unsent} не отправлено
+              </p>
+              <button
+                type="button"
+                onClick={() => void flushQueued()}
+                className="flex min-h-12 w-full items-center justify-center rounded-lg border border-warning bg-card text-base font-semibold text-foreground active:scale-[0.99]"
+              >
+                Отправить сейчас
+              </button>
+            </div>
+          )}
           <RowList>
             <li><ValueRow label="Время работы" value={elapsed ?? '—'} /></li>
             <li>

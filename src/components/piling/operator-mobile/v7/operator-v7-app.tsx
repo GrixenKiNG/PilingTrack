@@ -115,7 +115,7 @@ export function OperatorV7App() {
 
   // Когда слать очередь — решает общий хук. Свой набор поводов здесь не
   // отправлял при запуске, а слушатель online не снимался при уходе с экрана.
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
    * Выполнить команду и вернуться к обзору.
@@ -319,6 +319,8 @@ export function OperatorV7App() {
             state={state}
             busy={busy}
             onBack={back}
+            unsent={queued.length}
+            onFlush={() => void flushQueued()}
             onChecklist={(stage) => setDetour({kind: 'CHECKLIST', stage})}
             onClose={(comment) => {
               if (!shiftId) {

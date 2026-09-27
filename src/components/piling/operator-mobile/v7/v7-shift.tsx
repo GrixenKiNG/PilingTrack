@@ -411,14 +411,24 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
  * адресатом, а не строчка в закрытии. И галочки «выработка записана полностью»:
  * человек ставит её не глядя, потому что она стоит между ним и кнопкой, —
  * подтверждения она не даёт, а закрытие задерживает.
+ *
+ * НЕОТПРАВЛЕННЫЕ ЗАПИСИ ДЕРЖАТ КНОПКУ (F-R43-1). Галочку убрали за
+ * бесполезность, а отложенную выработку от этого защищать надо: закрытая смена
+ * отвечает таким записям 409 «Смена уже закрыта» (`shared.ts`), и в отчёт они не
+ * попадают. Поэтому здесь стоит не отметка, а сама очередь с числом записей и
+ * отправкой в одно нажатие.
  */
-export function CloseFlow({state, busy, onChecklist, onClose, onBack}: {
+export function CloseFlow({state, busy, onChecklist, onClose, onBack, unsent, onFlush}: {
   state: OperatorMobileState;
   busy: boolean;
   /** Открыть чек-лист ЕО после работы — этап считаем от фазы, а не по имени. */
   onChecklist: (stage: ChecklistStage) => void;
   onClose: (comment: string) => void;
   onBack: () => void;
+  /** Записей на устройстве, ещё не принятых сервером. */
+  unsent: number;
+  /** Отправить их немедленно. */
+  onFlush: () => void;
 }) {
   const stage = PHASE_CHECKLIST.CLOSING;
   const checklist = stage ? state.checklists.find((item) => item.stage === stage) : undefined;
@@ -445,7 +455,16 @@ export function CloseFlow({state, busy, onChecklist, onClose, onBack}: {
             <Button onClick={() => onChecklist(stage)}>Выполнить ЕО после работы</Button>
           </>
         ) : null}
-        <Button disabled={busy || blocked} onClick={() => onClose('')}>
+        {unsent > 0 ? (
+          <>
+            <Banner
+              tone="warn"
+              title={`Сначала отправьте записи с телефона: ${unsent} не отправлено`}
+            />
+            <Button onClick={onFlush}>Отправить сейчас</Button>
+          </>
+        ) : null}
+        <Button disabled={busy || blocked || unsent > 0} onClick={() => onClose('')}>
           {busy ? 'Закрываем…' : 'Закрыть смену'}
         </Button>
         <Button tone="ghost" onClick={onBack}>Назад</Button>

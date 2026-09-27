@@ -1,8 +1,9 @@
 import {describe, expect, it, vi} from 'vitest';
+import {fireEvent, render, screen} from '@testing-library/react';
 import type {ChecklistView, OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — свои стили; в тесте они не нужны.
 vi.mock('../../operator-concept.css', () => ({}));
-import {gapsBySection, gapsNote, ppeOutcome, downtimeWindowProblem} from '../operator-v10-app';
+import {gapsBySection, gapsNote, ppeOutcome, downtimeWindowProblem, ScreenClosing} from '../operator-v10-app';
 
 /**
  * Ошибка чек-листа обязана называть раздел.
@@ -161,5 +162,52 @@ describe('окно простоя до отправки', () => {
   it('молчит, пока смены нет или поля пусты', () => {
     expect(downtimeWindowProblem('03:00', '05:30', null, now)).toBeNull();
     expect(downtimeWindowProblem('', '', shiftStartedAt, now)).toBeNull();
+  });
+});
+
+/**
+ * F-R43-1: смену нельзя закрыть, пока на телефоне лежат неотправленные записи.
+ *
+ * Закрытая смена отвечает отложенной выработке 409 «Смена уже закрыта»
+ * (`modules/operator-mobile/.../shared.ts`), и в отчёт она не попадает. Экран
+ * обязан держать кнопку закрытия и отправлять очередь по нажатию.
+ */
+describe('закрытие смены при непустой очереди', () => {
+  const ready = {
+    phase: 'CLOSING',
+    assignment: null,
+    receipt: null,
+    defects: [],
+    entries: [],
+    checklists: [{stage: 'EO_AFTER', done: true}],
+  } as unknown as OperatorMobileState;
+
+  it('держит закрытие и предлагает отправить записи', () => {
+    const onClose = vi.fn();
+    const onFlush = vi.fn();
+    render(
+      <ScreenClosing state={ready} busy={false} onClose={onClose} go={() => {}}
+        unsent={2} onFlush={onFlush} />,
+    );
+
+    expect(screen.getByText('Сначала отправьте записи с телефона: 2 не отправлено')).toBeInTheDocument();
+    const close = screen.getByRole('button', {name: 'Закрыть смену'});
+    expect(close).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Отправить сейчас'}));
+    expect(onFlush).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('закрывает смену, когда очередь пуста', () => {
+    const onClose = vi.fn();
+    render(
+      <ScreenClosing state={ready} busy={false} onClose={onClose} go={() => {}}
+        unsent={0} onFlush={() => {}} />,
+    );
+
+    expect(screen.queryByText(/Сначала отправьте записи/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену'}));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
