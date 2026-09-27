@@ -76,7 +76,7 @@ export function ShiftStartScreen({
             if (!activeEquipmentId || !shiftType) return;
             onAccept({equipmentId: activeEquipmentId, shiftType});
           }}
-          disabled={busy}
+          disabled={busy || acceptReason !== undefined}
           reason={acceptReason}
         />
       )}

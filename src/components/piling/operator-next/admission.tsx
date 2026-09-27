@@ -103,7 +103,7 @@ export function AdmissionScreen({
           label="Продолжить"
           tone="ghost"
           onClick={onContinue}
-          disabled={busy}
+          disabled={busy || blockers.length > 0}
           reason={blockers.length > 0 ? `Пока не закрыто: ${blockers.join(', ')}` : undefined}
         />
       </div>

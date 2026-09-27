@@ -55,7 +55,7 @@ export function humanError(error: unknown): string {
     if (error.status >= 500) return 'Сервер не справился. Данные на устройстве сохранены — повторите отправку.';
     return 'Сервер не принял запрос. Повторите — введённое сохранится.';
   }
-  if (error instanceof Error && error.message) return error.message;
+  if (error instanceof Error && error.message && /[А-Яа-яЁё]/.test(error.message)) return error.message;
   return 'Не получилось. Проверьте связь и повторите.';
 }
 

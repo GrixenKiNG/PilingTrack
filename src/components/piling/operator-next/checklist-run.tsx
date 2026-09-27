@@ -276,6 +276,7 @@ function ItemRow({
                 type="number"
                 inputMode="decimal"
                 step="0.1"
+                aria-label={`${measure.label}, ${measure.unit}`}
                 value={draft.measures[measure.key] ?? ''}
                 onChange={(event) => onChange({measures: {...draft.measures, [measure.key]: event.target.value}})}
                 className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"

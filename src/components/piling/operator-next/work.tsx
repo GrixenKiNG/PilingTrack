@@ -98,6 +98,8 @@ export function WorkScreenNext({
     return undefined;
   };
 
+  const reason = blockReason();
+
   const submit = async () => {
     let entry: ProductionEntryInput | null = null;
     if (mode === 'PILES') entry = {kind: 'PILES', pileGradeId: reference, count: Number(count), comment: comment.trim() || undefined};
@@ -231,8 +233,8 @@ export function WorkScreenNext({
           label={busy ? 'Записываем…' : 'Записать'}
           hint={mode === 'PILES' && pileMeters > 0 ? `Автоподсчёт: ${count} шт × ${(grade?.lengthMm ?? 0) / 1000} м = ${pileMeters.toFixed(1)} м.п.` : undefined}
           onClick={() => void submit()}
-          disabled={busy}
-          reason={blockReason()}
+          disabled={busy || reason !== undefined}
+          reason={reason}
         />
       )}
     >
@@ -353,6 +355,7 @@ function NumberField({label, value, onChange, decimal = false}: {
         inputMode={decimal ? 'decimal' : 'numeric'}
         step={decimal ? '0.1' : '1'}
         min="0"
+        aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
@@ -369,6 +372,7 @@ function TimeField({label, value, onChange}: {
       <span className="text-2xs font-medium text-muted-foreground">{label}, ЧЧ:ММ</span>
       <input
         type="time"
+        aria-label={`${label}, ЧЧ:ММ`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
