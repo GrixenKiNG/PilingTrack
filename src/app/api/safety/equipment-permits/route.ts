@@ -57,9 +57,9 @@ export const GET = withApi(
 /**
  * Выдать или изменить допуск.
  *
- * Право строже, чем на чтение: `users.manage` — то же, которым заводят и
- * удаляют чужие документы работника. Кто и на чём вправе работать — кадровое
- * решение, а не наблюдение, и диспетчеру его принимать не за что.
+ * Право строже, чем на чтение: `safety.permits.manage` — у администратора и
+ * инженера ОТ. Кто и на чём вправе работать — решение по охране труда, а не
+ * наблюдение, и диспетчеру его принимать не за что.
  */
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -84,7 +84,7 @@ export const POST = withMutation(
         tenantId,
         userId,
         actor: { id: actor.id, name: actor.name },
-        mayManage: can(actor, 'users.manage'),
+        mayManage: can(actor, 'safety.permits.manage'),
         payload: { ...rest, validUntil: validUntil ? new Date(validUntil) : null },
       });
       await recordAuditEvent({

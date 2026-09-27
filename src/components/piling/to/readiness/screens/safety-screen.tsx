@@ -85,7 +85,7 @@ export function SafetyScreen(props: ReferenceUiProps) {
   // тому, кто действительно может выдать допуск.
   const mayManage = can(
     { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
-    'users.manage',
+    'safety.permits.manage',
   );
 
   const load = useCallback(async () => {

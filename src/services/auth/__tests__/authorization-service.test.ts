@@ -125,6 +125,20 @@ describe('authorization-service', () => {
       expect(can({ role: 'DISPATCHER' }, 'equipment.manage')).toBe(false);
       expect(can({ role: 'OPERATOR' }, 'equipment.read')).toBe(false);
     });
+
+    // Решение владельца 27.09.2026: допуск к технике выдаёт и отзывает
+    // инженер ОТ — это его прямой предмет. Заводить работников он
+    // по-прежнему не может. Администратор в режиме «Действую как инженер ОТ»
+    // теперь выполняет эту работу, а не теряет её.
+    it('lets the safety engineer issue equipment permits without managing users', () => {
+      expect(can({ role: 'SAFETY_ENGINEER' }, 'safety.permits.manage')).toBe(true);
+      expect(can({ role: 'ADMIN', actingAs: 'SAFETY_ENGINEER' }, 'safety.permits.manage')).toBe(true);
+      expect(can({ role: 'ADMIN' }, 'safety.permits.manage')).toBe(true);
+      expect(can({ role: 'SAFETY_ENGINEER' }, 'users.manage')).toBe(false);
+      for (const role of ['DISPATCHER', 'FOREMAN', 'MECHANIC', 'OPERATOR', 'ASSISTANT'] as const) {
+        expect(can({ role }, 'safety.permits.manage')).toBe(false);
+      }
+    });
   });
 
   describe('assertCan', () => {
