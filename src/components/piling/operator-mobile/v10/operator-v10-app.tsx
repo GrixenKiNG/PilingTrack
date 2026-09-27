@@ -1193,6 +1193,27 @@ function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
 /* --------------------------------------------------- шаги допуска (ТБ) --- */
 
 /**
+ * Итог подтверждения СИЗ и куда ведёт «Далее».
+ *
+ * D-20260927-003: подтвердив комплект, человек оставался на том же экране с той
+ * же кнопкой — «СИЗ подтверждены» мелькало во всплывающей строке, а «допуск
+ * пройден» было видно только в другом разделе. Итог и следующий шаг считаются
+ * здесь, разметка — в `ScreenPpe`; правило то же, что в `/operator`: пока сервер
+ * держит фазу `IDENTITY`, допуск не объявляем.
+ */
+export function ppeOutcome(state: OperatorMobileState): {title: string; note: string; screen: string} {
+  if (state.phase !== 'IDENTITY') {
+    return {title: 'Вы допущены к смене', note: 'Допуск пройден', screen: nextScreen(state)};
+  }
+  const next = admissionSteps(state)
+    .find((step) => step.id !== 'SIGNATURE' && step.opens !== null && !step.done);
+  if (next && next.opens) {
+    return {title: 'СИЗ подтверждены', note: `Дальше: ${next.title}`, screen: STEP_SCREEN[next.opens]};
+  }
+  return {title: 'СИЗ подтверждены', note: 'Все шаги допуска пройдены', screen: 'safety'};
+}
+
+/**
  * СИЗ: отмечают ОТСУТСТВИЕ, нехватка записывается как есть и не запирает экран.
  *
  * ПОЧЕМУ ГАЛОЧКИ СТОЯТ ЗАРАНЕЕ. У работника, вышедшего на смену, комплект
@@ -1204,10 +1225,11 @@ function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
  * добросовестно нажав на каждую строку, СНИМАЛ весь комплект. Подтверждение
  * уходило с пометкой «не хватает каски». Экран должен просить то, что делает.
  */
-function ScreenPpe({state, busy, onConfirm}: {
+function ScreenPpe({state, busy, onConfirm, go}: {
   state: OperatorMobileState;
   busy: boolean;
   onConfirm: (items: string[]) => void;
+  go: Go;
 }) {
   const [items, setItems] = useState<string[]>(
     state.identity.ppe.confirmed && state.identity.ppe.items.length > 0
@@ -1218,6 +1240,9 @@ function ScreenPpe({state, busy, onConfirm}: {
   const toggle = (code: string) => setItems((current) => (
     current.includes(code) ? current.filter((value) => value !== code) : [...current, code]
   ));
+  /* Итог показываем, только когда комплект уже подтверждён: до подтверждения
+     «СИЗ подтверждены» — обещание, которого человек ещё не давал. */
+  const outcome = state.identity.ppe.confirmed ? ppeOutcome(state) : null;
 
   return (
     <>
@@ -1239,11 +1264,19 @@ function ScreenPpe({state, busy, onConfirm}: {
           нельзя — простой и происшествия записываются как обычно.
         </Banner>
       ) : null}
+      {outcome ? (
+        <Card>
+          <Row icon="check" tone="ok" title={outcome.title} note={outcome.note} />
+        </Card>
+      ) : null}
       <button type="button" className="ov10-btn" disabled={busy} onClick={() => onConfirm(items)}>
         {busy ? 'Записываем…'
           : missing.length === 0 ? 'Комплект в порядке'
             : `Подтвердить (нет: ${missing.length})`}
       </button>
+      {outcome ? (
+        <button type="button" className="ov10-btn green" onClick={() => go(outcome.screen)}>Далее</button>
+      ) : null}
     </>
   );
 }
@@ -1622,7 +1655,7 @@ export function OperatorV10App() {
     switch (current.id) {
       case 'docs': return <ScreenDocs state={state} />;
       case 'more': return <ScreenMore state={state} go={setActive} />;
-      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} />;
+      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} go={setActive} />;
       case 'briefing': return <ScreenBriefing state={state} busy={busy} onAcknowledge={acknowledgeBriefing} />;
       case 'knowledge': return <ScreenKnowledge busy={busy} onDone={submitKnowledge} />;
       case 'incidents': return <ScreenIncidents state={state} busy={busy} onReport={reportIncident} />;
