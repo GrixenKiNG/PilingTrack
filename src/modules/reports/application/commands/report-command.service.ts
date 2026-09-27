@@ -320,7 +320,10 @@ export async function upsertReport(
   });
 
   if (!report) {
-    throw new ServiceError('Report was saved but could not be retrieved', 500);
+    throw new ServiceError(
+      'Отчёт сохранён, но не удалось его показать. Обновите страницу — повторно отправлять не нужно.',
+      500
+    );
   }
 
   return {
