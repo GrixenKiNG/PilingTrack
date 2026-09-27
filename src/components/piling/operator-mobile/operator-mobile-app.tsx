@@ -197,7 +197,7 @@ export function OperatorMobileApp() {
 
   // Что лежит на устройстве и ещё не ушло: машинист видит это постоянно, а не
   // узнаёт по факту пропажи. Когда слать — решает общий хук (use-offline-queue).
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   if (forbidden) {
     return (
@@ -510,6 +510,8 @@ export function OperatorMobileApp() {
               comment,
             }))}
             tabs={tabBar}
+            unsent={queued.length}
+            onSendNow={() => void flushQueued()}
           />
         );
       case 'CLOSED':

@@ -17,8 +17,12 @@ import {WarningsPanel} from '../warnings-panel';
  * ПОЧЕМУ ЕО ПОСЛЕ РАБОТЫ — УСЛОВИЕ, А НЕ ПОЖЕЛАНИЕ. Машина, оставленная без
  * осмотра, утром становится проблемой того, кто на неё сядет: примёрзшие
  * гусеницы, невидимая на горячем ночью течь, трещина, которую никто не искал.
+ *
+ * ПОЧЕМУ НЕЛЬЗЯ ЗАКРЫТЬ С НЕОТПРАВЛЕННЫМИ ЗАПИСЯМИ. Сервер после закрытия
+ * отвергает всё, что пришло в смену позже («Смена уже закрыта»): сваи,
+ * лежавшие на телефоне без связи, в отчёт бы уже не попали (аудит R43 №1).
  */
-export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs}: {
+export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs, unsent = 0, onSendNow}: {
   state: OperatorMobileState;
   onOpenService: () => void;
   onClose: (comment: string) => void;
@@ -26,6 +30,10 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs}
   error: string | null;
   /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
   tabs?: ReactNode;
+  /** Сколько записей этого машиниста ещё лежит на телефоне. */
+  unsent?: number;
+  /** Отправить их сейчас. */
+  onSendNow?: () => void;
 }) {
   const [comment, setComment] = useState('');
   const service = state.checklists.find((checklist) => checklist.stage === 'EO_AFTER');
@@ -37,16 +45,28 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs}
       title="Закрытие смены"
       subtitle={state.assignment?.equipmentName}
       footer={(
-        serviceDone
-          ? (
-            <BigButton onClick={() => onClose(comment)} disabled={busy}>
-              {busy ? 'Отправляем…' : 'Закрыть смену и отправить отчёт'}
-            </BigButton>
-          )
-          : <BigButton onClick={onOpenService}>Выполнить ЕО после работы</BigButton>
+        !serviceDone
+          ? <BigButton onClick={onOpenService}>Выполнить ЕО после работы</BigButton>
+          : unsent > 0
+            ? <BigButton onClick={onSendNow}>Отправить записи с телефона</BigButton>
+            : (
+              <BigButton onClick={() => onClose(comment)} disabled={busy}>
+                {busy ? 'Отправляем…' : 'Закрыть смену и отправить отчёт'}
+              </BigButton>
+            )
       )}
     >
       <WarningsPanel warnings={state.warnings} />
+
+      {unsent > 0 ? (
+        <Panel tone="warning">
+          <PanelTitle tone="warning">На телефоне не отправлено: {unsent}</PanelTitle>
+          <p className="mt-1 text-sm">
+            Смену можно закрыть, когда эти записи уйдут на сервер. Если отправка не проходит —
+            причина видна в строке с записями вверху экрана.
+          </p>
+        </Panel>
+      ) : null}
 
       <Panel tone={serviceDone ? 'ok' : 'warning'}>
         <PanelTitle tone={serviceDone ? 'ok' : 'warning'}>
