@@ -312,6 +312,34 @@ class RateLimiter {
   }
 
   /**
+   * Вернуть одну попытку — ту, что только что оказалась успешной.
+   *
+   * Не `reset`: для общего счётчика адреса (ПИН-вход) полный сброс по
+   * успеху позволял знающему свой ПИН перебирать чужие без блокировки —
+   * «две чужих, свой, снова две чужих» (Codex-аудит 27.09.2026). Возврат
+   * одной попытки оставляет чужие неудачи в счётчике, а удачные входы с
+   * общего планшета не копятся. Блокировку не снимает: заблокированный
+   * адрес до успеха не доходит.
+   */
+  async refund(identifier: string): Promise<void> {
+    if (this.isRedisAvailable()) {
+      try {
+        // DECR сохраняет TTL ключа — окно счётчика не продлевается.
+        await this.redis?.eval(
+          "local v = redis.call('GET', KEYS[1]) if v and tonumber(v) > 0 then return redis.call('DECR', KEYS[1]) end return 0",
+          1,
+          `rl:${identifier}`,
+        );
+        return;
+      } catch {
+        this.redisReady = false;
+      }
+    }
+    const entry = this.store.get(identifier);
+    if (entry && entry.count > 0) entry.count--;
+  }
+
+  /**
    * Reset rate limit for identifier (e.g., after successful login)
    */
   async reset(identifier: string): Promise<void> {

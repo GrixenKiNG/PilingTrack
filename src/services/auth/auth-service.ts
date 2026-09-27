@@ -288,7 +288,9 @@ export async function authenticateUserByPin(pin: string, clientIdentifier: strin
     });
   }
 
-  await rateLimiter.reset(`pin-ip-${clientIdentifier}`);
+  // Возврат своей попытки, а не сброс: сброс обнулял и чужие неудачи с того
+  // же адреса, и знающий свой ПИН перебирал чужие без блокировки.
+  await rateLimiter.refund(`pin-ip-${clientIdentifier}`);
   return { user: toSessionUser(matchedUser), rateLimited: false };
 }
 

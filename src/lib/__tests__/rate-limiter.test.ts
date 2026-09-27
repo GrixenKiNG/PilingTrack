@@ -97,6 +97,32 @@ describe('rate-limiter', () => {
     });
   });
 
+  // Codex-аудит 27.09: успешный ПИН-вход обнулял общий счётчик адреса, и
+  // знающий свой ПИН перебирал чужие без конца («2 чужих + свой»). Возврат
+  // снимает ровно одну — свою — попытку, неудачи остаются.
+  describe('refund', () => {
+    it('returns exactly one attempt and keeps earlier failures', async () => {
+      await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT); // чужой ПИН
+      await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT); // чужой ПИН
+      await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT); // свой — успех
+      await rateLimiter.refund('pin-ip-x');
+      expect((await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT)).allowed).toBe(true);
+      expect((await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT)).allowed).toBe(false);
+    });
+
+    it('lets successful logins from one shared tablet never pile up', async () => {
+      for (let i = 0; i < 10; i++) {
+        expect((await rateLimiter.check('pin-ip-tab', PIN_RATE_LIMIT)).allowed).toBe(true);
+        await rateLimiter.refund('pin-ip-tab');
+      }
+    });
+
+    it('is a no-op for an unknown identifier', async () => {
+      await rateLimiter.refund('nobody');
+      expect((await rateLimiter.check('nobody', PIN_RATE_LIMIT)).remaining).toBe(PIN_RATE_LIMIT.maxAttempts - 1);
+    });
+  });
+
   describe('reset', () => {
     it('resets rate limit for identifier', async () => {
       for (let i = 0; i < 5; i++) {

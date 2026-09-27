@@ -14,14 +14,15 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vite
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'node:crypto';
 
-const { checkMock, resetMock } = vi.hoisted(() => ({
+const { checkMock, resetMock, refundMock } = vi.hoisted(() => ({
   checkMock: vi.fn(),
   resetMock: vi.fn().mockResolvedValue(undefined),
+  refundMock: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/rate-limiter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/rate-limiter')>();
-  return { ...actual, rateLimiter: { check: checkMock, reset: resetMock } };
+  return { ...actual, rateLimiter: { check: checkMock, reset: resetMock, refund: refundMock } };
 });
 
 const { findUniqueMock, findManyMock, updateMock } = vi.hoisted(() => ({
@@ -67,6 +68,7 @@ beforeEach(() => {
   checkMock.mockReset();
   checkMock.mockResolvedValue(ALLOWED);
   resetMock.mockClear();
+  refundMock.mockClear();
   findUniqueMock.mockReset();
   findManyMock.mockReset();
   findManyMock.mockResolvedValue([]);
@@ -208,13 +210,17 @@ describe('authenticateUserByPin — вход оператора', () => {
     expect(findManyMock).not.toHaveBeenCalled();
   });
 
-  it('пускает по быстрому пути и сбрасывает счётчик', async () => {
+  // Сброс всего счётчика адреса давал перебор чужих ПИНов без блокировки:
+  // «два чужих, свой, снова два чужих» (Codex-аудит 27.09). Успех возвращает
+  // только свою попытку — неудачи других остаются в счётчике.
+  it('пускает по быстрому пути и возвращает одну свою попытку, не обнуляя счётчик', async () => {
     findUniqueMock.mockResolvedValue(pinRow());
 
     const result = await authenticateUserByPin('1234', '198.51.100.9');
 
     expect(result.user).toMatchObject({ id: 'u1', role: 'OPERATOR' });
-    expect(resetMock).toHaveBeenCalledWith('pin-ip-198.51.100.9');
+    expect(refundMock).toHaveBeenCalledWith('pin-ip-198.51.100.9');
+    expect(resetMock).not.toHaveBeenCalled();
     expect(findManyMock).not.toHaveBeenCalled(); // полный перебор не понадобился
   });
 
@@ -243,6 +249,7 @@ describe('authenticateUserByPin — вход оператора', () => {
 
     expect(result.user).toBeNull();
     expect(resetMock).not.toHaveBeenCalled();
+    expect(refundMock).not.toHaveBeenCalled();
   });
 
   it('открытый ПИН переводит в bcrypt при первом входе', async () => {
