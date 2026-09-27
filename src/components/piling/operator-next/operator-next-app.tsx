@@ -1,13 +1,26 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {
+  ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
+} from '@/modules/operator-mobile/contracts';
 import {
-  ApiError, currentPosition, fetchState, newCommandId, QueuedOffline,
+  ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
 } from '@/components/piling/operator-mobile/api';
 import {OfflineQueueBanner} from '@/components/piling/operator-mobile/offline-queue-banner';
 import {useOfflineQueue} from '@/components/piling/operator-mobile/use-offline-queue';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from '@/components/piling/operator-mobile/ui';
+import {BriefingScreen} from '@/components/piling/operator-mobile/screens/briefing-screen';
+import {KnowledgeScreen} from '@/components/piling/operator-mobile/screens/knowledge-screen';
+import {PpeScreen} from '@/components/piling/operator-mobile/screens/ppe-screen';
+import {EquipmentTab} from '@/components/piling/operator-mobile/screens/equipment-tab';
+import {IncidentsTab} from '@/components/piling/operator-mobile/screens/incidents-tab';
+import {ProfileTab} from '@/components/piling/operator-mobile/screens/profile-tab';
+import {SafetyTab} from '@/components/piling/operator-mobile/screens/safety-tab';
+import {knownAnswers} from '@/components/piling/operator-mobile/safety/known-answers';
+import {AdmissionScreen, type AdmissionDetour} from './admission';
+import {ChecklistRunScreen} from './checklist-run';
+import {ShiftStartScreen} from './shift-start';
 import {humanError} from './words';
 
 /**
@@ -25,6 +38,18 @@ import {humanError} from './words';
  */
 type WorkTab = 'SHIFT' | 'SAFETY' | 'EQUIPMENT' | 'MORE';
 
+/** Экраны, открываемые вне очереди фаз. */
+type Detour =
+  | {kind: AdmissionDetour}
+  | {kind: 'CHECKLIST'; stage: ChecklistStage};
+
+/** Чек-лист, закрывающий фазу. Тот же порядок, что на сервере. */
+const PHASE_STAGE: Partial<Record<OperatorPhase, ChecklistStage>> = {
+  PRESHIFT_INSPECTION: 'PRESHIFT_INSPECTION',
+  STARTUP: 'EO_BEFORE',
+  SITE_READY: 'SITE_READY',
+};
+
 export function OperatorNextApp() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,6 +58,7 @@ export function OperatorNextApp() {
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
   const [workTab, setWorkTab] = useState<WorkTab>('SHIFT');
+  const [detour, setDetour] = useState<Detour | null>(null);
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
 
@@ -109,12 +135,14 @@ export function OperatorNextApp() {
     try {
       await work();
       renewKeys();
+      setDetour(null);
       await reload();
       return true;
     } catch (error) {
       // Запись легла в очередь на устройстве — это принято, а не отказ.
       if (error instanceof QueuedOffline) {
         renewKeys();
+        setDetour(null);
         setActionError(null);
         return true;
       }
@@ -177,6 +205,7 @@ export function OperatorNextApp() {
     );
   }
 
+  const shift = state.shift;
   const alarmingIncidents = state.incidents.filter((incident) => incident.reviewedAt === null).length;
 
   // Вкладка «Смена» называется одинаково всю смену: меняется только заголовок
@@ -195,17 +224,164 @@ export function OperatorNextApp() {
     />
   );
 
-  const screen = (): ReactNode => (
-    <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabBar}>
-      <Panel>
-        <PanelTitle>Экран готовится</PanelTitle>
-        <p className="mt-1 text-sm">
-          Оболочка рабочего места собрана: связь, очередь устройства и переходы на месте.
-          Экраны шагов смены подключаются следующими коммитами.
-        </p>
-      </Panel>
-    </Screen>
-  );
+  const stage = detour?.kind === 'CHECKLIST' ? detour.stage : PHASE_STAGE[state.phase] ?? null;
+  const checklist = stage ? state.checklists.find((candidate) => candidate.stage === stage) : undefined;
+  // Вкладки доступны уже после приёмки, но прячутся на время чек-листа и
+  // обходных экранов: посреди осмотра переключаться некуда, его надо закончить.
+  const tabsVisible = !detour && !checklist && state.phase !== 'IDENTITY' && state.phase !== 'ADMISSION';
+
+  const submitChecklist = (checklistStage: ChecklistStage) => (answers: ChecklistAnswer[]) => {
+    const assignment = state.assignment;
+    if (!shift || !assignment) return;
+    void run(() => sendCommand({
+      command: 'submit-checklist',
+      clientCommandId: checklistCommandId,
+      shiftId: shift.id,
+      equipmentId: assignment.equipmentId,
+      stage: checklistStage,
+      answers,
+    }));
+  };
+
+  const screen = (): ReactNode => {
+    if (tabsVisible && workTab !== 'SHIFT') {
+      const title = workTab === 'EQUIPMENT' ? 'Техника' : workTab === 'SAFETY' ? 'Техника безопасности' : 'Ещё';
+      return (
+        <Screen title={title} subtitle={state.assignment?.equipmentName} tabs={tabBar}>
+          {workTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
+          {workTab === 'SAFETY' ? (
+            <SafetyTab
+              state={state}
+              onOpen={(step) => setDetour(
+                step === 'PPE' ? {kind: 'PPE'} : step === 'BRIEFING' ? {kind: 'BRIEFING'} : {kind: 'KNOWLEDGE'},
+              )}
+            />
+          ) : null}
+          {workTab === 'MORE' ? (
+            <>
+              <IncidentsTab
+                state={state}
+                busy={busy}
+                error={actionError}
+                commandId={incidentCommandId}
+                onReport={async (input) => {
+                  if (!shift) return false;
+                  return run(() => sendCommand({
+                    command: 'report-incident',
+                    clientCommandId: incidentCommandId,
+                    shiftId: shift.id,
+                    ...input,
+                  }));
+                }}
+              />
+              <ProfileTab
+                state={state}
+                onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}
+                onOpenKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
+              />
+            </>
+          ) : null}
+        </Screen>
+      );
+    }
+
+    if (detour?.kind === 'PPE') {
+      return (
+        <PpeScreen
+          busy={busy}
+          error={actionError}
+          onBack={() => setDetour(null)}
+          onConfirm={(items) => void run(() => sendCommand({
+            command: 'confirm-ppe',
+            // Сутки считает сервер и отдаёт их в состоянии: у машиниста в ночной
+            // смене полночь наступает посреди работы, и расчёт по часам телефона
+            // записал бы проверку за другие сутки.
+            productionDate: state.productionDate,
+            items,
+          }))}
+        />
+      );
+    }
+
+    if (detour?.kind === 'BRIEFING') {
+      return (
+        <BriefingScreen
+          busy={busy}
+          onBack={() => setDetour(null)}
+          onAcknowledge={() => void run(() => sendCommand({command: 'acknowledge-briefing'}))}
+        />
+      );
+    }
+
+    if (detour?.kind === 'KNOWLEDGE') {
+      return (
+        <KnowledgeScreen
+          busy={busy}
+          error={actionError}
+          onBack={() => setDetour(null)}
+          onDone={(picks, attemptToken) => void run(() => sendCommand({command: 'submit-knowledge', picks, attemptToken}))}
+        />
+      );
+    }
+
+    if (checklist) {
+      return (
+        <ChecklistRunScreen
+          key={checklist.stage}
+          checklist={checklist}
+          warnings={state.warnings}
+          busy={busy}
+          error={actionError}
+          commandId={checklistCommandId}
+          lastMeter={state.assignment?.lastMeter ?? null}
+          known={knownAnswers(checklist.stage, state)}
+          onSubmit={submitChecklist(checklist.stage)}
+          onBack={detour ? () => setDetour(null) : undefined}
+        />
+      );
+    }
+
+    switch (state.phase) {
+      case 'IDENTITY':
+        return (
+          <AdmissionScreen
+            state={state}
+            busy={busy}
+            onOpen={(step) => setDetour({kind: step})}
+            onContinue={() => void reload()}
+          />
+        );
+      case 'ADMISSION':
+        return (
+          <ShiftStartScreen
+            state={state}
+            busy={busy}
+            error={actionError}
+            selectedEquipmentId={equipmentId}
+            onSelectEquipment={setEquipmentId}
+            onReload={() => void reload()}
+            onAccept={(input) => void run(() => sendCommand({
+              command: 'accept-equipment',
+              clientCommandId: acceptCommandId,
+              equipmentId: input.equipmentId,
+              shiftType: input.shiftType,
+            }))}
+          />
+        );
+      default:
+        return (
+          <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
+            <Panel>
+              <PanelTitle>Экран готовится</PanelTitle>
+              <p className="mt-1 text-sm">
+                Допуск, приём установки и осмотры подключены. Экраны работы и конца смены —
+                следующими коммитами.
+              </p>
+            </Panel>
+          </Screen>
+        );
+    }
+  };
 
   return (
     <Frame>
