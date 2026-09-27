@@ -65,6 +65,40 @@ export async function loadCompanyName(tenantId: string | null | undefined): Prom
   }
 }
 
+/**
+ * Подпись установки для шапки сводного PDF («Отчёт по этой установке»).
+ * Читается строго по id вместе с tenantId: без tenantId подписи нет —
+ * подставлять чужую установку нельзя. Ошибка чтения PDF не ломает.
+ */
+async function loadEquipmentLabel(
+  equipmentId: string,
+  tenantId: string | null | undefined
+): Promise<string | undefined> {
+  if (!tenantId) {
+    return undefined;
+  }
+  try {
+    const db = await getDbClient();
+    const equipment = await db.equipment.findFirst({
+      where: { id: equipmentId, tenantId },
+      select: { name: true, model: true },
+    });
+    if (!equipment) {
+      return undefined;
+    }
+    return equipment.model
+      ? `Установка: ${equipment.name} (${equipment.model})`
+      : `Установка: ${equipment.name}`;
+  } catch (error) {
+    logger.warn('PDF: не удалось прочитать установку', {
+      equipmentId,
+      tenantId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
 async function buildFallbackCrewMap(reports: Array<{ userId: string; siteId: string }>) {
   if (reports.length === 0) {
     return new Map<string, unknown>();
@@ -157,6 +191,9 @@ export async function buildPeriodPdfData(input: {
     totalDrilling: summary.totalDrilling,
     totalDowntime: summary.totalDowntime,
     companyName: await loadCompanyName(input.tenantId),
+    equipmentLabel: input.equipmentId
+      ? await loadEquipmentLabel(input.equipmentId, input.tenantId)
+      : undefined,
   };
 }
 

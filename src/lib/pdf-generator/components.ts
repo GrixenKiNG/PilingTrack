@@ -17,7 +17,13 @@ export function ensureSpace(doc: PdfDoc, neededHeight: number) {
   }
 }
 
-export function addHeader(doc: PdfDoc, title: string, subtitle: string, companyName?: string) {
+export function addHeader(
+  doc: PdfDoc,
+  title: string,
+  subtitle: string,
+  companyName?: string,
+  equipmentLabel?: string
+) {
   doc.x = PAGE.left;
   doc.y = PAGE.top;
 
@@ -32,6 +38,12 @@ export function addHeader(doc: PdfDoc, title: string, subtitle: string, companyN
   if (companyName) {
     doc.font('Regular').fontSize(9).fillColor(COLORS.muted);
     doc.text(companyName, PAGE.left, doc.y, { width: CONTENT_WIDTH, align: 'center' });
+    doc.moveDown(0.2);
+  }
+
+  if (equipmentLabel) {
+    doc.font('Regular').fontSize(9).fillColor(COLORS.muted);
+    doc.text(equipmentLabel, PAGE.left, doc.y, { width: CONTENT_WIDTH, align: 'center' });
     doc.moveDown(0.2);
   }
 

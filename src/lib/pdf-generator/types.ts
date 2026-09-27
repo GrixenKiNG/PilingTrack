@@ -9,6 +9,8 @@ export interface PeriodPdfData {
   totalDrilling: number;
   totalDowntime: number;
   companyName?: string;
+  /** «Установка: <название> (<модель>)» — когда отчёт отфильтрован по установке. */
+  equipmentLabel?: string;
 }
 
 export interface SingleReportData {

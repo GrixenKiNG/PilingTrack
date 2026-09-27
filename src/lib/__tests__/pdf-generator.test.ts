@@ -234,6 +234,30 @@ describe('pdf-generator', () => {
     });
     expect(period).toContain('ООО «Орион»');
   });
+
+  it('печатает установку в шапке сводного отчёта только при отборе по установке (F-R44-5)', async () => {
+    const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+
+    const base = {
+      dateFrom: '2026-04-01',
+      dateTo: '2026-04-24',
+      siteId: 'site-1',
+      totalPiles: 0,
+      totalDrilling: 0,
+      totalDowntime: 0,
+      reports: [],
+    };
+
+    const filtered = await capturePdfText(async () => {
+      await generatePeriodPdf({ ...base, equipmentLabel: 'Установка: LRH 100 (Bauer BG 28)' });
+    });
+    expect(filtered).toContain('Установка: LRH 100 (Bauer BG 28)');
+
+    const unfiltered = await capturePdfText(async () => {
+      await generatePeriodPdf({ ...base });
+    });
+    expect(unfiltered.some((line) => line.startsWith('Установка:'))).toBe(false);
+  });
 });
 
 /**
