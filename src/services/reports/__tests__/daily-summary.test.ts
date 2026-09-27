@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
   outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
-  redisGetClientMock, redisGetMock, redisSetMock,
+  redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock,
 } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
@@ -34,11 +34,14 @@ const {
   redisGetClientMock: vi.fn(),
   redisGetMock: vi.fn(),
   redisSetMock: vi.fn(),
+  userFindFirst: vi.fn(),
+  recordAuditEventMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
   const client = {
     report: { findMany: findManyMock, findUnique: findUniqueMock, findFirst: findFirstMock },
+    user: { findFirst: userFindFirst },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
     reportAnalytics: { upsert: analyticsUpsertMock },
     outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate },
@@ -47,6 +50,12 @@ vi.mock('@/lib/db', () => {
   };
   return { db: client };
 });
+
+// След в ленте пишет audit-service; здесь проверяется контракт обработчика —
+// каким актором и с каким именем оператора событие уезжает в запись.
+vi.mock('@/services/audit/audit-service', () => ({
+  recordAuditEvent: recordAuditEventMock,
+}));
 
 vi.mock('@/lib/pdf-data', () => ({
   loadSingleReportPdfContext: vi.fn().mockResolvedValue({
@@ -80,6 +89,7 @@ vi.mock('@/lib/logger', () => ({
 
 import {
   recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler, registerAlertEventHandler,
+  registerAuditEventHandler,
 } from '../event-handlers';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
@@ -473,5 +483,77 @@ describe('дедупликация алерта о простое (F-R33-2)', ()
     await emitDomainEvent(downtimeEvent('evt-dt-2'));
 
     expect(sendAlertMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+/*
+  F-R34-18: черновик сменного отчёта сдаёт планировщик, когда производственные
+  сутки истекли, — оператор отчёт не сдавал. Запись в ленте от его имени была
+  неправдой: у автосдачи актора нет («система»), а имя владельца отчёта уходит
+  в текст сообщения. Признак autoClosed кладёт в payload планировщик
+  (readiness/scheduler), здесь его только читают.
+*/
+describe('аудит автосдачи отчёта планировщиком (F-R34-18)', () => {
+  beforeEach(() => {
+    recordAuditEventMock.mockReset();
+    recordAuditEventMock.mockResolvedValue(undefined);
+    userFindFirst.mockReset();
+    userFindFirst.mockResolvedValue({ name: 'Петров И.И.' });
+    registerAuditEventHandler();
+  });
+
+  function submittedEvent(data: Record<string, unknown>) {
+    return {
+      id: 'evt-audit-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'RM-abcd1234-2026-09-26',
+      aggregateType: 'Report' as const,
+      occurredAt: new Date().toISOString(),
+      siteId: 'site-1',
+      userId: 'op-1',
+      tenantId: 'tenant-a',
+      data,
+    };
+  }
+
+  it('пишет след без актора и передаёт имя оператора', async () => {
+    await emitDomainEvent(submittedEvent({ autoClosed: true }));
+
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      actorId: null,
+      targetId: 'RM-abcd1234-2026-09-26',
+      tenantId: 'tenant-a',
+      metadata: expect.objectContaining({
+        data: expect.objectContaining({ autoClosed: true }),
+        operatorName: 'Петров И.И.',
+      }),
+    }));
+    // Имя читается тенантным запросом — не из чужой организации.
+    expect(userFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'op-1', tenantId: 'tenant-a' },
+    }));
+  });
+
+  it('обычную сдачу оставляет за оператором', async () => {
+    await emitDomainEvent(submittedEvent({}));
+
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: 'op-1',
+      metadata: expect.objectContaining({ data: {} }),
+    }));
+    expect(userFindFirst).not.toHaveBeenCalled();
+  });
+
+  // Имя — украшение записи: сбой чтения не повод терять след.
+  it('пишет след, если имя оператора прочитать не удалось', async () => {
+    userFindFirst.mockRejectedValue(new Error('db down'));
+
+    await emitDomainEvent(submittedEvent({ autoClosed: true }));
+
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: null,
+      metadata: expect.objectContaining({ operatorName: null }),
+    }));
   });
 });

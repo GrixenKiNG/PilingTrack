@@ -414,10 +414,17 @@ async function handleAuditEvent(event: ReportDomainEvent) {
   try {
     const { recordAuditEvent } = await import('@/services/audit/audit-service');
 
+    // Автосдача черновика: смену закрыл планировщик по истечении
+    // производственных суток, оператор отчёт не сдавал, и запись от его имени —
+    // неправда (F-R34-18). Признак `autoClosed` кладёт в payload планировщик;
+    // здесь он решает, что актора у записи нет (лента показывает «система»), а
+    // имя владельца отчёта уходит в текст сообщения.
+    const autoClosed = event.data?.autoClosed === true;
+
     await recordAuditEvent({
       action: event.type,
       scope: 'reports',
-      actorId: event.userId,
+      actorId: autoClosed ? null : event.userId,
       targetId: event.aggregateId,
       tenantId: event.tenantId,
       requestId: event.metadata?.requestId as string,
@@ -426,6 +433,7 @@ async function handleAuditEvent(event: ReportDomainEvent) {
         aggregateType: event.aggregateType,
         version: event.version,
         data: event.data,
+        ...(autoClosed ? { operatorName: await reportOwnerName(event) } : {}),
       },
     });
   } catch (error) {
@@ -433,6 +441,32 @@ async function handleAuditEvent(event: ReportDomainEvent) {
       eventType: event.type,
       aggregateId: event.aggregateId,
     });
+  }
+}
+
+/**
+ * Имя владельца отчёта для текста автосдачи. Имя — украшение записи: сбой его
+ * чтения не повод терять событие, поэтому здесь глушится только он. Запрос
+ * тенантный (строгое равенство по организации события), чтобы имя не приехало
+ * из чужой организации.
+ */
+async function reportOwnerName(event: ReportDomainEvent): Promise<string | null> {
+  if (!event.userId) return null;
+
+  try {
+    const user = await db.user.findFirst({
+      where: event.tenantId
+        ? { id: event.userId, tenantId: event.tenantId }
+        : { id: event.userId },
+      select: { name: true },
+    });
+    return user?.name ?? null;
+  } catch (error) {
+    logger.warn('audit.auto_submitted_owner_lookup_failed', {
+      userId: event.userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 

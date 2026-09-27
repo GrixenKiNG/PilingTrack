@@ -25,7 +25,7 @@ type Meta = Record<string, unknown>;
  */
 interface AuditDescription {
   level: FeedbackEventLevel | ((meta: Meta) => FeedbackEventLevel);
-  title: string;
+  title: string | ((meta: Meta) => string);
   message: string | ((meta: Meta) => string);
 }
 
@@ -289,6 +289,14 @@ function hierarchyLine(verb: 'created' | 'deleted', meta: Meta): string {
   return name ? `${what} «${name}».` : `${what}.`;
 }
 
+// Черновик сменного отчёта сдаёт не оператор, а планировщик — он закрывает
+// смену по истечении производственных суток. Событие несёт признак autoClosed,
+// а не человека за действием (F-R34-18). Оба признака разбираются в текстах
+// ниже, поэтому проверка вынесена сюда.
+function autoSubmitted(meta: Meta): boolean {
+  return pick(meta, 'data.autoClosed') === true;
+}
+
 // ────────────────────────────────────────────
 // Действие → человеческий текст
 // ────────────────────────────────────────────
@@ -379,8 +387,17 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
   },
   ReportSubmitted: {
     level: 'audit',
-    title: 'Отчёт сдан',
-    message: 'Отчёт передан на проверку.',
+    title: (m) => (autoSubmitted(m) ? 'Отчёт сдан автоматически при закрытии смены' : 'Отчёт сдан'),
+    message: (m) => {
+      // Автосдачу сделал планировщик: подписывать запись оператором неправда, а
+      // без его имени непонятно, чей отчёт закрылся. Актора у такой записи нет
+      // (actorId: null), поэтому владельца отчёта называем в тексте.
+      if (!autoSubmitted(m)) return 'Отчёт передан на проверку.';
+      const name = str(m, 'operatorName');
+      return name
+        ? `Смена закрыта автоматически: отчёт оператора ${name} сдан системой.`
+        : 'Смена закрыта автоматически: отчёт сдан системой.';
+    },
   },
   ReportVersionCreated: {
     level: 'audit',
@@ -839,7 +856,7 @@ export function describeAuditEvent(event: AuditEvent) {
   const meta = event.metadata ?? {};
   return {
     level: typeof description.level === 'function' ? description.level(meta) : description.level,
-    title: description.title,
+    title: typeof description.title === 'function' ? description.title(meta) : description.title,
     message: typeof description.message === 'function' ? description.message(meta) : description.message,
   };
 }

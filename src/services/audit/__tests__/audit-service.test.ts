@@ -820,6 +820,71 @@ describe('recordAuditEvent — допуск к технике', () => {
 });
 
 /**
+ * Черновик сменного отчёта закрывает планировщик, когда производственные сутки
+ * истекли, — оператор отчёт не сдавал (F-R34-18). Запись от его имени была
+ * неправдой: у такой сдачи актора нет («система»), а имя владельца отчёта
+ * приходит из обработчика события (metadata.operatorName) и уходит в текст.
+ */
+describe('recordAuditEvent — автосдача отчёта планировщиком', () => {
+  it('пишет запись без актора и называет оператора в тексте', async () => {
+    await recordAuditEvent({
+      action: 'ReportSubmitted',
+      scope: 'reports',
+      actorId: null,
+      targetId: 'RM-abcd1234-2026-09-26',
+      tenantId: 'orion',
+      metadata: {
+        eventType: 'ReportSubmitted',
+        data: { autoClosed: true },
+        operatorName: 'Петров И.И.',
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: null,
+        level: 'audit',
+        title: 'Отчёт сдан автоматически при закрытии смены',
+        message: 'Смена закрыта автоматически: отчёт оператора Петров И.И. сдан системой.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда имя оператора не нашлось', async () => {
+    await recordAuditEvent({
+      action: 'ReportSubmitted',
+      scope: 'reports',
+      actorId: null,
+      metadata: { data: { autoClosed: true }, operatorName: null },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Отчёт сдан автоматически при закрытии смены',
+        message: 'Смена закрыта автоматически: отчёт сдан системой.',
+      }),
+    );
+  });
+
+  it('обычную сдачу оператором оставляет как была', async () => {
+    await recordAuditEvent({
+      action: 'ReportSubmitted',
+      scope: 'reports',
+      actorId: 'op-1',
+      metadata: { eventType: 'ReportSubmitted', data: {} },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: { id: 'op-1' },
+        title: 'Отчёт сдан',
+        message: 'Отчёт передан на проверку.',
+      }),
+    );
+  });
+});
+
+/**
  * Пересборка проекций меняет цифры витрин и аналитики по одному запросу, и без
  * строки в ленте на вопрос «почему у меня другие числа, чем вчера» ответить
  * нечем (F-R34-23). В тексте — названия витрин по-русски, а не коды схемы
