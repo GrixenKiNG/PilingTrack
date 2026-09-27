@@ -34,16 +34,31 @@ export function LoginPage() {
 
     setLoading(true);
 
+    let res: Response;
     try {
-      const res = await fetch('/api/auth/login', {
+      res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
+    } catch {
+      // Браузер сам пишет «Failed to fetch» — человеку это ни о чём (аудит R41).
+      toast.error('Нет связи с сервером. Проверьте интернет и повторите.');
+      setLoading(false);
+      return;
+    }
 
+    try {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Неверный email или пароль');
+        // Блокировку входа показываем со сроком: без него человек жмёт снова
+        // и продлевает её (QA 27.09: причина на экране не читалась).
+        const minutes = res.status === 429 && typeof err.retryAfter === 'number'
+          ? Math.max(1, Math.ceil(err.retryAfter / 60))
+          : null;
+        throw new Error(minutes
+          ? `Слишком много попыток входа. Повторите через ${minutes} мин.`
+          : err.error || 'Неверный email или пароль');
       }
 
       const data = await res.json();

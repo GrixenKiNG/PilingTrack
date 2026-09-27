@@ -21,7 +21,7 @@ export const POST = withApi(async (request: NextRequest) => {
   if (!validation.success) {
     return createJsonResponse(
       {
-        error: 'Validation failed',
+        error: 'ПИН-код — от 4 до 10 цифр',
         requestId,
         details: validation.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
       },
