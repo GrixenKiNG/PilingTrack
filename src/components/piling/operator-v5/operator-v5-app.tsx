@@ -788,8 +788,9 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
       )}
 
       <button className="b gh" type="button" disabled={busy} onClick={onFinish}>
-        Машина безопасно остановлена
+        Завершить работу
       </button>
+      <p className="note">Машина остановлена безопасно — дальше осмотр после смены.</p>
     </div>
   );
 }
@@ -1009,7 +1010,20 @@ export function OperatorV5App() {
   }, [commandId, run, state]);
 
   if (error) {
-    return <div className="app"><div className="scr"><p className="note bad">{error}</p></div></div>;
+    return (
+      <div className="app">
+        <div className="scr">
+          <h2 className="h">Нет связи с сервером</h2>
+          <p className="note bad">{error}</p>
+          <button className="b" type="button" disabled={busy} onClick={() => void reload()}>
+            Повторить
+          </button>
+          <p className="note">
+            Введённые данные сохранены на телефоне и отправятся, когда связь появится.
+          </p>
+        </div>
+      </div>
+    );
   }
   if (!state) {
     return <div className="app"><div className="scr"><p className="note">Читаем состояние смены…</p></div></div>;
