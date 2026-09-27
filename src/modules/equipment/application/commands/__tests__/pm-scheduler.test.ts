@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  findManyMock, findFirstMock, createMock, queryRawMock, dbFindFirstMock,
+  findManyMock, findFirstMock, createMock, executeRawMock, queryRawMock, dbFindFirstMock,
   readinessMock, transactionMock,
 } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   findFirstMock: vi.fn(),
   createMock: vi.fn(),
   // Дедуп и вставка наряда идут в одной транзакции под advisory-замком
-  // pg_advisory_xact_lock — см. F-R38-6.
+  // pg_advisory_xact_lock — см. F-R38-6. Замок возвращает void, поэтому берётся
+  // через $executeRaw: $queryRaw падает на десериализации колонки void.
+  executeRawMock: vi.fn(),
   queryRawMock: vi.fn(),
   dbFindFirstMock: vi.fn(),
   readinessMock: vi.fn(),
@@ -18,6 +20,7 @@ const {
 vi.mock('@/lib/db', () => {
   const tx = {
     maintenanceRecord: { findFirst: findFirstMock, create: createMock },
+    $executeRaw: executeRawMock,
     $queryRaw: queryRawMock,
   };
   return {
@@ -67,12 +70,13 @@ describe('runPmScheduler', () => {
     findManyMock.mockReset();
     findFirstMock.mockReset();
     createMock.mockReset();
+    executeRawMock.mockReset();
     queryRawMock.mockReset();
     dbFindFirstMock.mockReset();
     readinessMock.mockReset();
     transactionMock.mockReset();
     findManyMock.mockResolvedValue([overduePlan]);
-    queryRawMock.mockResolvedValue([]);
+    executeRawMock.mockResolvedValue(1);
     createMock.mockResolvedValue({
       id: 'mr_1',
       updatedAt: new Date('2026-09-27T00:00:00.000Z'),
@@ -85,10 +89,12 @@ describe('runPmScheduler', () => {
     await runPmScheduler('orion', new Date('2026-09-27T00:00:00.000Z'));
 
     // Замок — первый оператор внутри транзакции.
-    expect(queryRawMock).toHaveBeenCalledTimes(1);
-    const call = queryRawMock.mock.calls[0];
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    const call = executeRawMock.mock.calls[0];
     expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
     expect(call.slice(1)).toEqual(['pm:orion:eq_1:TO1']);
+    // $queryRaw для замка не используется: колонка void ломает десериализацию.
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 
   it('создаёт наряд только когда открытого наряда этого типа нет', async () => {

@@ -214,7 +214,7 @@ export interface UpdateUserInput {
  * пользователя и транзакционный advisory-замок. Обычный `db` и клиент
  * транзакции подходят оба.
  */
-export type UserUpdateClient = Pick<typeof db, 'user' | '$queryRaw'>;
+export type UserUpdateClient = Pick<typeof db, 'user' | '$executeRaw'>;
 
 export async function updateUser(
   tenantId: string,
@@ -274,7 +274,7 @@ export async function updateUser(
         // снимающие роль друг другу одновременно, оба видят «другой админ есть»
         // и оба записывают результат — организация остаётся без администратора
         // (F-R38-8). Замок транзакционный, снимается сам при коммите или откате.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`last-admin:${scopedTenantId}`}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`last-admin:${scopedTenantId}`}))`;
         const otherAdmins = await tx.user.count({
           where: {
             tenantId: scopedTenantId,

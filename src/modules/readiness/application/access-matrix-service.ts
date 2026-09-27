@@ -166,7 +166,7 @@ export async function saveAccessMatrixDraft(
     // оказывается два черновика матрицы. Замок транзакционный, снимается сам
     // при коммите или откате; чтение черновика и его запись идут под ним одной
     // транзакцией (F-R38-10).
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
 
     const state = await getAccessMatrix(tenantId, tx);
     const next = sanitizeAccessMatrix(patch, state.draft ?? state.published);
@@ -203,7 +203,7 @@ export async function publishAccessMatrix(
     // начатое до публикации, правит своим `update` по id уже опубликованную
     // матрицу — действующие права меняются без публикации и без черновика
     // (F-R38-10). Замок транзакционный, снимается сам при коммите или откате.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
 
     const state = await getAccessMatrix(tenantId, tx);
     const draftRow = await tx.readinessAccessMatrix.findFirst({

@@ -55,8 +55,9 @@ function installDb(rows: MatrixRow[]) {
   // через глобальный `db` (в обход замка) — ровно та гонка, ради которой замок
   // берётся (F-R38-10). Вызов вне транзакции помечаем отдельной заглушкой.
   const dbFindFirst = vi.fn(async () => null);
+  const txFindFirst = vi.fn(readinessAccessMatrix.findFirst);
   const tx = {
-    readinessAccessMatrix,
+    readinessAccessMatrix: { ...readinessAccessMatrix, findFirst: txFindFirst },
     auditLog: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         auditRows.push(data);
@@ -155,9 +156,14 @@ describe('readiness access matrix audit trail', () => {
 
     await saveAccessMatrixDraft(tenantId, { grants }, actor);
 
-    const call = tx.$queryRaw.mock.calls[0] as unknown[];
+    const call = tx.$executeRaw.mock.calls[0] as unknown[];
     expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
     expect(call.slice(1)).toEqual([`readiness-draft:matrix:${tenantId}`]);
+    // Замок — до чтения черновика, и не через $queryRaw: колонка void ломает
+    // десериализацию.
+    expect(tx.$executeRaw.mock.invocationCallOrder[0])
+      .toBeLessThan(tx.readinessAccessMatrix.findFirst.mock.invocationCallOrder[0]);
+    expect(tx.$queryRaw.mock.calls.filter((c) => sqlOf(c as unknown[]).includes('pg_advisory'))).toEqual([]);
     expect(dbFindFirst).not.toHaveBeenCalled();
   });
 
@@ -176,9 +182,14 @@ describe('readiness access matrix audit trail', () => {
 
     await publishAccessMatrix(tenantId, actor);
 
-    const call = tx.$queryRaw.mock.calls[0] as unknown[];
+    const call = tx.$executeRaw.mock.calls[0] as unknown[];
     expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
     expect(call.slice(1)).toEqual([`readiness-draft:matrix:${tenantId}`]);
+    // Замок — до чтения черновика, и не через $queryRaw: колонка void ломает
+    // десериализацию.
+    expect(tx.$executeRaw.mock.invocationCallOrder[0])
+      .toBeLessThan(tx.readinessAccessMatrix.findFirst.mock.invocationCallOrder[0]);
+    expect(tx.$queryRaw.mock.calls.filter((c) => sqlOf(c as unknown[]).includes('pg_advisory'))).toEqual([]);
     expect(dbFindFirst).not.toHaveBeenCalled();
   });
 });

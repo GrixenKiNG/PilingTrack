@@ -102,7 +102,7 @@ async function runPmSchedulerScoped(tenantId: string, now: Date): Promise<PmSche
     // транзакционный, снимается сам при коммите или откате.
     const lockKey = `pm:${tenantId}:${plan.equipmentId}:${plan.type}`;
     const record = await db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
       // Dedup: skip if an open work order of this type already exists for the rig.
       const existingOpen = await tx.maintenanceRecord.findFirst({

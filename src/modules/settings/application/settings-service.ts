@@ -82,7 +82,7 @@ export async function saveSettings(
   // оба получили ответ «сохранено» (F-R38-11). Замок транзакционный, снимается
   // сам при коммите или откате; чтение и запись идут под ним одной транзакцией.
   return db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`settings:${tenantId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`settings:${tenantId}`}))`;
     const current = await readSettings(tenantId, tx);
     const next = sanitizeSettings(patch, current);
     await tx.tenantSettings.upsert({

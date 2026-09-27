@@ -9,6 +9,7 @@ const {
   groupByFeedbackEventMock,
   updateUserMock,
   countUserMock,
+  executeRawMock,
   queryRawMock,
 } = vi.hoisted(() => ({
   createUserMock: vi.fn(),
@@ -19,7 +20,10 @@ const {
   groupByFeedbackEventMock: vi.fn(),
   updateUserMock: vi.fn(),
   countUserMock: vi.fn(),
-  // Advisory-замок «последнего администратора» — см. F-R38-8.
+  // Advisory-замок «последнего администратора» — см. F-R38-8. Замок возвращает
+  // void, поэтому берётся через $executeRaw: $queryRaw падает на десериализации
+  // колонки void.
+  executeRawMock: vi.fn(),
   queryRawMock: vi.fn(),
 }));
 
@@ -37,6 +41,7 @@ vi.mock('@/lib/db', () => {
       update: updateUserMock,
       count: countUserMock,
     },
+    $executeRaw: executeRawMock,
     $queryRaw: queryRawMock,
     // Одна транзакция передаёт себя же: проверяем, что чтение-запись идут под
     // ней, а не до неё.
@@ -225,6 +230,7 @@ describe('updateUser', () => {
     findFirstUserMock.mockReset();
     updateUserMock.mockReset();
     countUserMock.mockReset();
+    executeRawMock.mockReset();
     queryRawMock.mockReset();
     findFirstUserMock.mockResolvedValue(null);
     updateUserMock.mockResolvedValue({ ...existingUser, name: 'X' });
@@ -278,13 +284,15 @@ describe('updateUser', () => {
 
     await updateUser('tenant-a', { id: 'admin-a', role: 'OPERATOR' }, 'admin-b');
 
-    expect(queryRawMock).toHaveBeenCalledTimes(1);
-    const call = queryRawMock.mock.calls[0];
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    const call = executeRawMock.mock.calls[0];
     expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
     expect(call.slice(1)).toEqual(['last-admin:tenant-a']);
+    // $queryRaw для замка не используется: колонка void ломает десериализацию.
+    expect(queryRawMock).not.toHaveBeenCalled();
     // Замок — до подсчёта: иначе два одновременных понижения оба видят
     // «другой админ есть» и организация остаётся без администратора.
-    expect(queryRawMock.mock.invocationCallOrder[0])
+    expect(executeRawMock.mock.invocationCallOrder[0])
       .toBeLessThan(countUserMock.mock.invocationCallOrder[0]);
   });
 
@@ -294,7 +302,7 @@ describe('updateUser', () => {
     await updateUser('tenant-a', { id: 'user-b', name: 'X' }, 'admin-a');
     await updateUser('tenant-a', { id: 'user-b', role: 'MECHANIC' }, 'admin-a');
 
-    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(executeRawMock).not.toHaveBeenCalled();
     expect(countUserMock).not.toHaveBeenCalled();
   });
 

@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findUniqueMock, upsertMock, queryRawMock, dbFindUniqueMock, transactionMock } = vi.hoisted(() => ({
+const { findUniqueMock, upsertMock, executeRawMock, queryRawMock, dbFindUniqueMock, transactionMock } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
   upsertMock: vi.fn(),
   // Чтение «до» и запись объединённого набора идут в одной транзакции под
-  // advisory-замком pg_advisory_xact_lock — см. F-R38-11.
+  // advisory-замком pg_advisory_xact_lock — см. F-R38-11. Замок возвращает
+  // void, поэтому берётся через $executeRaw: $queryRaw падает на
+  // десериализации колонки void.
+  executeRawMock: vi.fn(),
   queryRawMock: vi.fn(),
   dbFindUniqueMock: vi.fn(),
   transactionMock: vi.fn(),
@@ -13,6 +16,7 @@ const { findUniqueMock, upsertMock, queryRawMock, dbFindUniqueMock, transactionM
 vi.mock('@/lib/db', () => {
   const tx = {
     tenantSettings: { findUnique: findUniqueMock, upsert: upsertMock },
+    $executeRaw: executeRawMock,
     $queryRaw: queryRawMock,
   };
   return {
@@ -47,24 +51,27 @@ describe('saveSettings', () => {
   beforeEach(() => {
     findUniqueMock.mockReset();
     upsertMock.mockReset();
+    executeRawMock.mockReset();
     queryRawMock.mockReset();
     dbFindUniqueMock.mockReset();
     transactionMock.mockReset();
     findUniqueMock.mockResolvedValue(storedRow);
     upsertMock.mockImplementation(async (args: { create: unknown }) => args.create);
-    queryRawMock.mockResolvedValue([]);
+    executeRawMock.mockResolvedValue(1);
   });
 
   it('берёт advisory-замок на настройки организации раньше чтения и записи (F-R38-11)', async () => {
     await saveSettings('tenant-a', { companyName: 'ООО «Новое»' }, 'admin-1');
 
     // Замок — первый оператор внутри транзакции.
-    expect(queryRawMock).toHaveBeenCalledTimes(1);
-    const call = queryRawMock.mock.calls[0];
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    const call = executeRawMock.mock.calls[0];
     expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
     expect(call.slice(1)).toEqual(['settings:tenant-a']);
+    // $queryRaw для замка не используется: колонка void ломает десериализацию.
+    expect(queryRawMock).not.toHaveBeenCalled();
     // Чтение предыдущего набора — под замком, тем же клиентом транзакции.
-    expect(queryRawMock.mock.invocationCallOrder[0])
+    expect(executeRawMock.mock.invocationCallOrder[0])
       .toBeLessThan(findUniqueMock.mock.invocationCallOrder[0]);
     expect(dbFindUniqueMock).not.toHaveBeenCalled();
   });

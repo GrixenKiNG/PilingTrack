@@ -103,7 +103,7 @@ export async function saveReadinessDraft(
     // оказывается два черновика, и какой из них увидит экран, решает updatedAt.
     // Замок транзакционный, снимается сам при коммите или откате; чтение
     // черновика и его запись идут под ним одной транзакцией (F-R38-10).
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:rules:${tenantId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:rules:${tenantId}`}))`;
 
     const state = await getReadinessRules(tenantId, tx);
     const next = sanitizeRuleSet(patch, state.draft ?? state.published);
@@ -222,7 +222,7 @@ export async function publishReadinessRules(
     // начатое до публикации, правит своим `update` по id уже опубликованный
     // набор — действующие правила меняются без публикации и без черновика
     // (F-R38-10). Замок транзакционный, снимается сам при коммите или откате.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:rules:${tenantId}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:rules:${tenantId}`}))`;
 
     const state = await getReadinessRules(tenantId, tx);
     const draftRow = await tx.readinessRuleSet.findFirst({
