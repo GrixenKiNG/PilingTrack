@@ -135,7 +135,18 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
   const {pileGrades, drillingTypes, downtimeReasons} = state.dictionaries;
   const options = kind === 'PILES' || kind === 'PASSPORT' ? pileGrades
     : kind === 'DRILLING' ? drillingTypes : downtimeReasons;
-  const [id, setId] = useState(options[0]?.id ?? '');
+  /*
+    ПЕРВУЮ ЗАПИСЬ СПРАВОЧНИКА НЕ ПОДСТАВЛЯЕМ (F-R40-39).
+
+    Так марка сваи, тип бурения или причина простоя оказывались выбранными
+    заранее: кнопка «Записать» горела, и новичок отправлял в отчёт чужую
+    марку или причину, ничего не нажимая. Начинаем с пустого выбора и прямо
+    пишем, что нужно выбрать. Единственное исключение — справочник из одной
+    записи: там выбора нет, и подставлять её безопасно.
+  */
+  const [id, setId] = useState(options.length === 1 ? options[0].id : '');
+  const pickLabel = kind === 'DOWNTIME' ? 'Выберите причину простоя'
+    : kind === 'DRILLING' ? 'Выберите тип бурения' : 'Выберите марку сваи';
   const [amount, setAmount] = useState('');
   const [startedHm, setStartedHm] = useState('');
   const [endedHm, setEndedHm] = useState('');
@@ -218,6 +229,7 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
       <div className="body">
         <Card title={kind === 'DOWNTIME' ? 'Причина' : (kind === 'PILES' ? 'Марка сваи' : 'Тип бурения')}>
           <CardBody>
+            {!id ? <div className="note">{pickLabel}</div> : null}
             <div className="picks">
               {options.map((option) => (
                 <Pick key={option.id} on={option.id === id} onClick={() => setId(option.id)}>
@@ -275,6 +287,7 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
           </CardBody>
         </Card>
 
+        {!id ? <div className="note">Сначала {pickLabel.toLowerCase()}</div> : null}
         <Button disabled={busy || !ready} onClick={submit}>
           {busy ? 'Записываем…' : 'Записать'}
         </Button>
