@@ -97,6 +97,52 @@ describe('getEntityHistory', () => {
     ]);
   });
 
+  it('состав помощников бригады виден в панели изменений: «Помощники»', async () => {
+    asMock(db.feedbackEvent.findMany).mockResolvedValue([
+      {
+        id: 'e3',
+        action: 'crew.updated',
+        title: 'Бригада изменена',
+        actorName: null,
+        actorRole: null,
+        createdAt: new Date('2026-05-02'),
+        metadata: {
+          before: { name: 'Бригада №1', assistants: ['Иванов И.', 'Петров П.'] },
+          after: { name: 'Бригада №1', assistants: ['Иванов И.', 'Сидоров С.'] },
+        },
+      },
+    ]);
+
+    const [entry] = await getEntityHistory('crews', 'crew-1', 'orion');
+
+    expect(entry.changes).toEqual([
+      { label: 'Помощники', before: 'Иванов И., Петров П.', after: 'Иванов И., Сидоров С.' },
+    ]);
+  });
+
+  it('помощники рендерятся именами и из объектов { name }; пустой состав — «—»', async () => {
+    asMock(db.feedbackEvent.findMany).mockResolvedValue([
+      {
+        id: 'e4',
+        action: 'crew.updated',
+        title: 'Бригада изменена',
+        actorName: null,
+        actorRole: null,
+        createdAt: new Date('2026-05-02'),
+        metadata: {
+          before: { assistants: [{ name: 'Иванов И.' }, { name: 'Петров П.' }] },
+          after: { assistants: [] },
+        },
+      },
+    ]);
+
+    const [entry] = await getEntityHistory('crews', 'crew-1', 'orion');
+
+    expect(entry.changes).toEqual([
+      { label: 'Помощники', before: 'Иванов И., Петров П.', after: '—' },
+    ]);
+  });
+
   it.each([
     ['null', null],
     ['undefined', undefined],

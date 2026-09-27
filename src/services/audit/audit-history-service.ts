@@ -62,6 +62,9 @@ const FIELD_LABELS: Record<string, string> = {
   typeId: 'Вид документа',
   equipmentKind: 'Вид техники',
   status: 'Статус',
+  // Состав помощников бригады (metadata `assistants`): без подписи поле
+  // пропускалось диффом и смена помощника выглядела как «ничего не менялось».
+  assistants: 'Помощники',
 };
 
 // Fields that change on every save but carry no evidentiary meaning.
@@ -114,6 +117,14 @@ export async function getEntityHistory(
 
   const renderValue = (field: string, value: unknown): string => {
     if (value === null || value === undefined || value === '') return '—';
+    if (Array.isArray(value)) {
+      // Списки (состав помощников) рисуем именами через запятую; элементы —
+      // строки имён или объекты вида { name }.
+      const names = value
+        .map((item) => (typeof item === 'string' ? item : (item as { name?: unknown } | null)?.name))
+        .filter((name): name is string => typeof name === 'string' && name !== '');
+      return names.length > 0 ? names.join(', ') : '—';
+    }
     if (field === 'isActive') return value ? 'Да' : 'Нет';
     if (field === 'siteId') return siteMap[String(value)] ?? String(value);
     if (field === 'operatorId') return userMap[String(value)] ?? String(value);
