@@ -48,6 +48,71 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+// The worker loads the header company name from the tenant settings (the same
+// source the synchronous path uses) — settings are stubbed, no DB involved.
+const { getSettingsMock } = vi.hoisted(() => ({ getSettingsMock: vi.fn() }));
+
+vi.mock('@/modules/settings', () => ({ getSettings: getSettingsMock }));
+
+type JobProcessor = (job: { id: string; data: Record<string, unknown> }) => Promise<unknown>;
+
+async function loadJobProcessor(): Promise<JobProcessor> {
+  await import('@/workers/pdf-worker');
+  return MockWorker.mock.calls[0][1] as JobProcessor;
+}
+
+const PERIOD_JOB = {
+  type: 'period',
+  dateFrom: '2026-09-01',
+  dateTo: '2026-09-30',
+  siteId: 'site-1',
+  userId: 'user-1',
+  reports: [],
+  totalPiles: 3,
+  totalDrilling: 24,
+  totalDowntime: 75,
+};
+
+describe('PDF Worker — period report header', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it('loads the company name from the job tenant and passes it to generatePeriodPdf', async () => {
+    getSettingsMock.mockResolvedValue({ companyName: 'ООО «ОРИОН-Строй»' });
+
+    const processJob = await loadJobProcessor();
+    const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+
+    await processJob({ id: 'job-1', data: { ...PERIOD_JOB, tenantId: 'tenant-a' } });
+
+    expect(getSettingsMock).toHaveBeenCalledWith('tenant-a');
+    expect(generatePeriodPdf).toHaveBeenCalledWith(
+      expect.objectContaining({ companyName: 'ООО «ОРИОН-Строй»', totalPiles: 3 })
+    );
+  });
+
+  it('skips the settings lookup and omits the company name without a tenant', async () => {
+    const processJob = await loadJobProcessor();
+    const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+
+    await processJob({ id: 'job-2', data: PERIOD_JOB });
+
+    expect(getSettingsMock).not.toHaveBeenCalled();
+    expect(generatePeriodPdf).toHaveBeenCalledWith({
+      dateFrom: PERIOD_JOB.dateFrom,
+      dateTo: PERIOD_JOB.dateTo,
+      siteId: PERIOD_JOB.siteId,
+      reports: PERIOD_JOB.reports,
+      totalPiles: PERIOD_JOB.totalPiles,
+      totalDrilling: PERIOD_JOB.totalDrilling,
+      totalDowntime: PERIOD_JOB.totalDowntime,
+      companyName: undefined,
+    });
+  });
+});
+
 describe('PDF Worker', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -48,7 +48,7 @@ async function getReportQueryService() {
  * Без tenantId имени нет (DEFAULT_TENANT_ID не подставляем: он подменил бы
  * организацию чужой). Ошибка чтения настроек PDF не ломает — имя пропускается.
  */
-async function loadCompanyName(tenantId: string | null | undefined): Promise<string | undefined> {
+export async function loadCompanyName(tenantId: string | null | undefined): Promise<string | undefined> {
   if (!tenantId) {
     return undefined;
   }

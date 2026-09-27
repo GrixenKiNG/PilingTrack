@@ -112,6 +112,9 @@ export interface PdfJobData {
   type: 'period' | 'single';
   reportId?: string;
   userId: string;
+  // Tenant of the enqueued report — the worker loads the company name for the
+  // PDF header from its settings (same source as the synchronous path).
+  tenantId?: string | null;
   // Period report extras (passed from the route after fetching data)
   reports?: unknown[];
   totalPiles?: number;
