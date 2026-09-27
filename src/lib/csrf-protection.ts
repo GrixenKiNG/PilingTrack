@@ -29,7 +29,6 @@ const CSRF_EXEMPT_PATHS = [
   '/api/ready',
   '/api/health',
   '/api/auth/login',
-  '/api/auth/pin',
   '/api/auth/me',
 ];
 

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   rateLimiter,
   AUTH_RATE_LIMIT,
-  PIN_RATE_LIMIT,
   getRateLimitIdentifier,
   getTenantRateLimitIdentifier,
   createRateLimitMiddleware,
@@ -97,32 +96,6 @@ describe('rate-limiter', () => {
     });
   });
 
-  // Codex-аудит 27.09: успешный ПИН-вход обнулял общий счётчик адреса, и
-  // знающий свой ПИН перебирал чужие без конца («2 чужих + свой»). Возврат
-  // снимает ровно одну — свою — попытку, неудачи остаются.
-  describe('refund', () => {
-    it('returns exactly one attempt and keeps earlier failures', async () => {
-      await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT); // чужой ПИН
-      await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT); // чужой ПИН
-      await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT); // свой — успех
-      await rateLimiter.refund('pin-ip-x');
-      expect((await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT)).allowed).toBe(true);
-      expect((await rateLimiter.check('pin-ip-x', PIN_RATE_LIMIT)).allowed).toBe(false);
-    });
-
-    it('lets successful logins from one shared tablet never pile up', async () => {
-      for (let i = 0; i < 10; i++) {
-        expect((await rateLimiter.check('pin-ip-tab', PIN_RATE_LIMIT)).allowed).toBe(true);
-        await rateLimiter.refund('pin-ip-tab');
-      }
-    });
-
-    it('is a no-op for an unknown identifier', async () => {
-      await rateLimiter.refund('nobody');
-      expect((await rateLimiter.check('nobody', PIN_RATE_LIMIT)).remaining).toBe(PIN_RATE_LIMIT.maxAttempts - 1);
-    });
-  });
-
   describe('reset', () => {
     it('resets rate limit for identifier', async () => {
       for (let i = 0; i < 5; i++) {
@@ -181,24 +154,6 @@ describe('rate-limiter', () => {
       const stats = await rateLimiter.getStats();
       expect(stats.activeIdentifiers).toBe(2);
       expect(stats.blockedIdentifiers).toBe(0);
-    });
-  });
-
-  describe('PIN_RATE_LIMIT', () => {
-    it('has stricter limits', () => {
-      expect(PIN_RATE_LIMIT.maxAttempts).toBe(3);
-      expect(PIN_RATE_LIMIT.windowMs).toBe(10 * 60 * 1000);
-      expect(PIN_RATE_LIMIT.blockDurationMs).toBe(60 * 60 * 1000);
-    });
-
-    it('blocks after 3 attempts', async () => {
-      for (let i = 0; i < 3; i++) {
-        const result = await rateLimiter.check('user-1', PIN_RATE_LIMIT);
-        expect(result.allowed).toBe(true);
-      }
-
-      const result = await rateLimiter.check('user-1', PIN_RATE_LIMIT);
-      expect(result.allowed).toBe(false);
     });
   });
 

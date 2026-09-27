@@ -22,12 +22,6 @@ export const AUTH_RATE_LIMIT: RateLimitConfig = {
   blockDurationMs: 30 * 60 * 1000, // блокировка на 30 минут
 };
 
-export const PIN_RATE_LIMIT: RateLimitConfig = {
-  maxAttempts: 3,          // 3 попытки для PIN
-  windowMs: 10 * 60 * 1000, // 10 минут
-  blockDurationMs: 60 * 60 * 1000, // блокировка на 1 час
-};
-
 // Per-IP guard for email login: caps an attacker's TOTAL attempts from one
 // address regardless of how many emails they rotate through. Looser than the
 // per-account limit so a shared office IP with several legitimate users
@@ -309,34 +303,6 @@ class RateLimiter {
       allowed: true,
       remaining: config.maxAttempts - entry.count,
     };
-  }
-
-  /**
-   * Вернуть одну попытку — ту, что только что оказалась успешной.
-   *
-   * Не `reset`: для общего счётчика адреса (ПИН-вход) полный сброс по
-   * успеху позволял знающему свой ПИН перебирать чужие без блокировки —
-   * «две чужих, свой, снова две чужих» (Codex-аудит 27.09.2026). Возврат
-   * одной попытки оставляет чужие неудачи в счётчике, а удачные входы с
-   * общего планшета не копятся. Блокировку не снимает: заблокированный
-   * адрес до успеха не доходит.
-   */
-  async refund(identifier: string): Promise<void> {
-    if (this.isRedisAvailable()) {
-      try {
-        // DECR сохраняет TTL ключа — окно счётчика не продлевается.
-        await this.redis?.eval(
-          "local v = redis.call('GET', KEYS[1]) if v and tonumber(v) > 0 then return redis.call('DECR', KEYS[1]) end return 0",
-          1,
-          `rl:${identifier}`,
-        );
-        return;
-      } catch {
-        this.redisReady = false;
-      }
-    }
-    const entry = this.store.get(identifier);
-    if (entry && entry.count > 0) entry.count--;
   }
 
   /**

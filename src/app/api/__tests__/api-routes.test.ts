@@ -126,11 +126,9 @@ describe('Rate Limiter', () => {
   });
 
   it('has correct default configs', async () => {
-    const { AUTH_RATE_LIMIT, PIN_RATE_LIMIT } = await import('@/lib/rate-limiter');
+    const { AUTH_RATE_LIMIT } = await import('@/lib/rate-limiter');
 
     expect(AUTH_RATE_LIMIT.maxAttempts).toBe(5);
-    expect(PIN_RATE_LIMIT.maxAttempts).toBe(3);
-    expect(PIN_RATE_LIMIT.maxAttempts).toBeLessThan(AUTH_RATE_LIMIT.maxAttempts);
   });
 });
 
@@ -184,7 +182,6 @@ const WRAPPERS = ['withApi', 'withMutation', 'withReadinessCommand', 'withOperat
  */
 const PUBLIC_ROUTES: Record<string, string> = {
   'auth/login/route.ts': 'выдаёт сессию — требовать сессию здесь было бы замкнутым кругом',
-  'auth/pin/route.ts': 'то же самое для входа по ПИН-коду',
   'health/route.ts': 'проба живости для балансировщика; отдаёт только статус и версию',
   'health/deep/route.ts': 'проба зависимостей для внешнего мониторинга; только ok/down, из кеша фонового трекера',
   'liveness/route.ts': 'проба живости контейнера',
@@ -201,7 +198,6 @@ const PUBLIC_ROUTES: Record<string, string> = {
  */
 const CSRF_EXEMPT_METHODS: Record<string, string> = {
   'auth/login/route.ts#POST': 'сессии ещё нет — угонять нечего',
-  'auth/pin/route.ts#POST': 'то же самое для входа по ПИН-коду',
   'orion/lead/route.ts#POST': 'публичная форма без сессии; защита — лимит по IP и ловушка для ботов',
   'alerts/webhook/route.ts#POST': 'вызывает Alertmanager по общему секрету, не браузер',
   'telemetry/ingest/route.ts#POST': 'вызывает контроллер по ключу устройства, не браузер',

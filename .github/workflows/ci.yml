@@ -22,7 +22,6 @@ jobs:
       # (Tests that exercise the encryption module override these per-test.)
       ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
       SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
-      PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
       DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
       DATABASE_URL: 'postgresql://stub:stub@localhost:5432/stub'
       # prisma.config.ts resolves env('DATABASE_URL_POSTGRES') at load time
@@ -129,7 +128,6 @@ jobs:
       REDIS_URL: 'redis://localhost:6379'
       SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
       ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
-      PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
       DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
       NEXT_TELEMETRY_DISABLED: '1'
       SKIP_SEED: '1'
@@ -230,7 +228,6 @@ jobs:
       REDIS_URL: 'redis://localhost:6379'
       SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
       ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
-      PIN_LOOKUP_SECRET: 'ci-pin-secret-base64-padding-here-1234567890abcdefghijklmnopqr=='
       DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
       DEFAULT_TENANT_ID: 'ci'
       NEXT_TELEMETRY_DISABLED: '1'

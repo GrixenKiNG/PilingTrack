@@ -10,7 +10,6 @@ export interface CreateUserInput {
   email: string;
   phone?: string;
   password?: string;
-  pin?: string;
   role: UserRole;
 }
 
@@ -21,7 +20,6 @@ export interface UpdateUserInput {
   phone?: string;
   role: UserRole;
   password?: string;
-  pin?: string;
 }
 
 function isOperationalUser(value: unknown): value is OperationalUserDTO {
@@ -113,9 +111,6 @@ export function useUsersList() {
     };
     if (input.password) {
       body.password = input.password;
-    }
-    if (input.pin) {
-      body.pin = input.pin;
     }
     const res = await authFetch('/api/users', {
       method: 'PUT',

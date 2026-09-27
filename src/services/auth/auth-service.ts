@@ -1,5 +1,5 @@
 import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { attachRequestIdHeader } from '@/lib/request-context';
 import {
@@ -8,87 +8,18 @@ import {
   createSessionToken,
   type SessionUser,
 } from '@/services/auth/session-service';
-import { rateLimiter, AUTH_RATE_LIMIT, PIN_RATE_LIMIT, LOGIN_IP_RATE_LIMIT } from '@/lib/rate-limiter';
+import { rateLimiter, AUTH_RATE_LIMIT, LOGIN_IP_RATE_LIMIT } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 import { withIdentityRole } from '@/core/security/identity-role';
 
 const BCRYPT_ROUNDS = 12;
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
-const PIN_HASH_PREFIX = '$2';
 /**
  * bcrypt-хеш случайной строки, которой никто не знает. Сверка с ним занимает
  * столько же, сколько сверка с настоящим паролем: без неё ответ «нет такого
  * адреса» приходил мгновенно, и по секундомеру перебирались все e-mail.
  */
 const TIMING_EQUALIZER_HASH = '$2b$12$NgCt4i.5lgeRdr5zSX6/aOm6xxgGEOFfKmpvQy9k9QU3fEiPFiKE2';
-
-/**
- * Compute a deterministic lookup key for a PIN.
- *
- * We cannot index the bcrypt(PIN) column because bcrypt uses a random salt —
- * two users with the same PIN get different hashes, and there's no way to
- * query "find the user whose bcrypt hash matches this input" without
- * scanning every row.
- *
- * Instead we store a second field, `pinLookup`, containing an HMAC of the
- * PIN with a server-side secret. HMAC is deterministic, so we can index it
- * and look up the single candidate user in O(1). The HMAC secret ensures
- * an attacker with read access to the DB cannot brute-force PINs offline
- * without also compromising the secret.
- */
-let pinLookupSecretFallbackWarned = false;
-
-export function computePinLookup(pin: string): string {
-  const explicitSecret = process.env.PIN_LOOKUP_SECRET;
-  const sessionSecret = process.env.SESSION_SECRET;
-
-  if (process.env.NODE_ENV === 'production') {
-    // Production must use a dedicated PIN_LOOKUP_SECRET. Sharing the secret
-    // with SESSION_SECRET means rotating one breaks the other, and a JWT-key
-    // compromise also breaks PIN-lookup integrity.
-    if (!explicitSecret) {
-      throw new Error(
-        'PIN_LOOKUP_SECRET is required in production (must be distinct from SESSION_SECRET).'
-      );
-    }
-    if (explicitSecret === sessionSecret) {
-      throw new Error(
-        'PIN_LOOKUP_SECRET must be different from SESSION_SECRET in production.'
-      );
-    }
-    return createHmac('sha256', explicitSecret).update(pin).digest('hex');
-  }
-
-  // Dev/test: allow fallback chain so local PIN login keeps working without
-  // forcing every developer to manage a separate secret.
-  const secret = explicitSecret || sessionSecret || '';
-  if (!secret) {
-    return createHash('sha256').update(`pinlookup:${pin}`).digest('hex');
-  }
-
-  if (!explicitSecret && sessionSecret && !pinLookupSecretFallbackWarned) {
-    pinLookupSecretFallbackWarned = true;
-    logger.warn(
-      'PIN_LOOKUP_SECRET not set — falling back to SESSION_SECRET (dev-only). ' +
-        'Rotating SESSION_SECRET will invalidate all stored PIN lookups.'
-    );
-  }
-
-  return createHmac('sha256', secret).update(pin).digest('hex');
-}
-
-export async function hashPin(pin: string): Promise<string> {
-  return bcryptHash(pin, BCRYPT_ROUNDS);
-}
-
-/**
- * Constant-time string comparison to prevent timing side-channel attacks
- * on legacy plaintext PIN values.
- */
-function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
 
 export async function hashPassword(value: string): Promise<string> {
   return bcryptHash(value, BCRYPT_ROUNDS);
@@ -228,70 +159,6 @@ export async function authenticateUserByEmailPassword(
     logger.error('authenticateUserByEmailPassword failed', err);
     throw err;
   }
-}
-
-export async function authenticateUserByPin(pin: string, clientIdentifier: string) {
-  // Rate limit by client identifier (IP/tenant). Rate limiting by PIN value
-  // itself was wrong: attackers can try N different PINs from the same IP
-  // without ever tripping the counter, and a legitimate user sharing a PIN
-  // with a blocked attacker would also be blocked.
-  const rateLimit = await rateLimiter.check(`pin-ip-${clientIdentifier}`, PIN_RATE_LIMIT);
-
-  if (!rateLimit.allowed) {
-    return {
-      user: null,
-      rateLimited: true,
-      retryAfter: rateLimit.retryAfter,
-      error: `Too many PIN attempts. Try again in ${Math.ceil((rateLimit.retryAfter || 60) / 60)} minutes.`,
-    };
-  }
-
-  const pinLookup = computePinLookup(pin);
-
-  // O(1) index lookup by deterministic HMAC of the PIN. There is no fallback
-  // scan any more: it bcrypt-compared every user lacking pinLookup on every
-  // attempt, and prod had none of them (checked 24.09.2026). A database error
-  // propagates instead of reading as "Invalid PIN".
-  const matchedUser = await withIdentityRole((client) => client.user.findUnique({
-    where: { pinLookup },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isActive: true,
-      pin: true,
-      tenantId: true,
-      sessionVersion: true,
-    },
-  }));
-
-  if (!matchedUser || !matchedUser.isActive || !matchedUser.pin) {
-    return { user: null, rateLimited: false };
-  }
-
-  const storedPin = matchedUser.pin;
-  const isBcrypt = storedPin.startsWith(PIN_HASH_PREFIX);
-  const matches = isBcrypt ? await bcryptCompare(pin, storedPin) : constantTimeEquals(pin, storedPin);
-  if (!matches) {
-    return { user: null, rateLimited: false };
-  }
-
-  // Opportunistic upgrade: a plaintext PIN must not stay in the database.
-  if (!isBcrypt) {
-    const hashedPin = await hashPin(pin);
-    await withIdentityRole((client) => client.user.update({
-      where: { id: matchedUser.id },
-      data: { pin: hashedPin },
-    })).catch(() => {
-      // Best-effort upgrade — retry on next login if it fails.
-    });
-  }
-
-  // Возврат своей попытки, а не сброс: сброс обнулял и чужие неудачи с того
-  // же адреса, и знающий свой ПИН перебирал чужие без блокировки.
-  await rateLimiter.refund(`pin-ip-${clientIdentifier}`);
-  return { user: toSessionUser(matchedUser), rateLimited: false };
 }
 
 export async function createAuthenticatedResponse(user: SessionUser, requestId?: string) {

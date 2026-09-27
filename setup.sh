@@ -38,7 +38,6 @@ if [ ! -f .env.docker ]; then
   }
 
   SESSION_SECRET=$(rand_hex 32)
-  PIN_LOOKUP_SECRET=$(rand_hex 32)
   DEVICE_KEY_LOOKUP_SECRET=$(rand_hex 32)
   ENCRYPTION_KEY=$(rand_hex 32)
   POSTGRES_PASSWORD=$(rand_alphanum 24)
@@ -67,7 +66,6 @@ REDIS_URL=redis://redis:6379
 
 # Security secrets (32 bytes hex each)
 SESSION_SECRET=${SESSION_SECRET}
-PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET}
 DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 

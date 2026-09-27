@@ -51,14 +51,6 @@ const ENV_CONFIG: Record<string, EnvVarConfig> = {
       return null;
     },
   },
-  PIN_LOOKUP_SECRET: {
-    required: false, // required in production — checked conditionally below
-    description: 'HMAC secret for PIN lookup hashing (min 32 chars). Required in production. Rotating invalidates all PIN logins.',
-    validate: (v) => {
-      if (v.length < 32) return `Too short (${v.length} chars). Must be at least 32 characters.`;
-      return null;
-    },
-  },
 
   // Postgres — required when DATABASE_PROVIDER=postgres
   DATABASE_URL_POSTGRES: {
@@ -152,23 +144,10 @@ function validateEnv(): { valid: boolean; errors: string[]; warnings: string[] }
     // Production-only required secrets — fail-fast on deploy instead of on first request
     if (
       process.env.NODE_ENV === 'production' &&
-      (key === 'DEVICE_KEY_LOOKUP_SECRET' || key === 'PIN_LOOKUP_SECRET') &&
+      key === 'DEVICE_KEY_LOOKUP_SECRET' &&
       (!value || value.trim() === '')
     ) {
       errors.push(`Missing required variable: ${key} — ${config.description} (required when NODE_ENV=production)`);
-      continue;
-    }
-
-    // PIN_LOOKUP_SECRET must be distinct from SESSION_SECRET in production —
-    // shared secret means rotating one breaks the other and JWT-key compromise
-    // also breaks PIN-lookup integrity.
-    if (
-      process.env.NODE_ENV === 'production' &&
-      key === 'PIN_LOOKUP_SECRET' &&
-      value &&
-      value === process.env.SESSION_SECRET
-    ) {
-      errors.push('PIN_LOOKUP_SECRET must be different from SESSION_SECRET in production.');
       continue;
     }
 

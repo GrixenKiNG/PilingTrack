@@ -63,7 +63,6 @@ describe('withCsrf — gating', () => {
     '/api/ready',
     '/api/health',
     '/api/auth/login',
-    '/api/auth/pin',
     '/api/auth/me',
   ])('skips %s (exempt path, exact match)', (path) => {
     const res = withCsrf(makeRequest({ path, method: 'POST' }));

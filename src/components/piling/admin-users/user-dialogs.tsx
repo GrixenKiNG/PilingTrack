@@ -57,7 +57,6 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [pin, setPin] = useState('');
   const [role, setRole] = useState<UserRole>('OPERATOR');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -69,7 +68,6 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
       setEmail('');
       setPhone('');
       setPassword('');
-      setPin('');
       setRole('OPERATOR');
       setErrors({});
     }
@@ -80,9 +78,8 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
     if (!name.trim()) next.name = 'Имя обязательно';
     if (!email.trim()) next.email = 'Email обязателен';
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = 'Некорректный email';
-    if (!password && !pin) next.password = 'Укажите пароль или PIN';
+    if (!password) next.password = 'Укажите пароль';
     else if (password && password.trim().length < 8) next.password = 'Минимум 8 символов';
-    if (pin && !/^\d{4,10}$/.test(pin)) next.pin = 'PIN должен содержать 4–10 цифр';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -96,7 +93,6 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
         email: email.trim(),
         phone: phone.trim(),
         password: password || undefined,
-        pin: pin || undefined,
         role,
       });
       onOpenChange(false);
@@ -156,18 +152,6 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
             }}
             placeholder="Минимум 8 символов"
           />
-          <FormField
-            label="PIN"
-            type="password"
-            inputMode="numeric"
-            value={pin}
-            error={errors.pin}
-            onChange={(value) => {
-              setPin(value);
-              setErrors((prev) => ({ ...prev, pin: '' }));
-            }}
-            placeholder="4–10 цифр"
-          />
           <div className="space-y-1.5">
             <Label>Роль</Label>
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
@@ -210,7 +194,6 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<UserRole>('OPERATOR');
   const [password, setPassword] = useState('');
-  const [pin, setPin] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -222,7 +205,6 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
       setPhone(user.phone);
       setRole(user.role);
       setPassword('');
-      setPin('');
       setErrors({});
     }
   }, [open, user]);
@@ -234,7 +216,6 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
     if (!email.trim()) next.email = 'Email обязателен';
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = 'Некорректный email';
     if (password && password.trim().length < 8) next.password = 'Минимум 8 символов';
-    if (pin && !/^\d{4,10}$/.test(pin)) next.pin = 'PIN должен содержать 4–10 цифр';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -250,7 +231,6 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
         phone: phone.trim(),
         role,
         password: password || undefined,
-        pin: pin || undefined,
       });
       onOpenChange(false);
       toast.success('Пользователь обновлён');
@@ -305,18 +285,6 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
             placeholder="••••••••"
-          />
-          <FormField
-            label="Новый PIN (оставьте пустым, чтобы не менять)"
-            type="password"
-            inputMode="numeric"
-            value={pin}
-            error={errors.pin}
-            onChange={(value) => {
-              setPin(value);
-              setErrors((prev) => ({ ...prev, pin: '' }));
-            }}
-            placeholder="4–10 цифр"
           />
           <div className="space-y-1.5">
             <Label>Роль</Label>

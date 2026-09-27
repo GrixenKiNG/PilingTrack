@@ -31,10 +31,6 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required').max(100),
 });
 
-export const pinAuthSchema = z.object({
-  pin: z.string().regex(/^\d{4,10}$/, 'PIN must contain 4 to 10 digits'),
-});
-
 // ============================================================
 // User schemas
 // ============================================================
@@ -43,11 +39,6 @@ const userBaseSchema = z.object({
   email: z.string().email('Invalid email format').max(255),
   name: z.string().min(1, 'Name is required').max(200),
   role: z.enum(['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT', 'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER']),
-  pin: z
-    .string()
-    .regex(/^\d{4,10}$/, 'PIN must contain 4 to 10 digits')
-    .optional()
-    .or(z.literal('')),
   phone: z.string().max(30).optional(),
   password: z.string().trim().min(8, 'Password must contain at least 8 characters').max(100).optional(),
   isActive: z.boolean().optional(),
@@ -55,8 +46,8 @@ const userBaseSchema = z.object({
 
 export const createUserSchema = userBaseSchema
   .extend({ isActive: z.boolean().default(true) })
-  .refine((value) => Boolean(value.password?.trim() || value.pin?.trim()), {
-    message: 'Password or PIN is required',
+  .refine((value) => Boolean(value.password?.trim()), {
+    message: 'Password is required',
     path: ['password'],
   });
 
