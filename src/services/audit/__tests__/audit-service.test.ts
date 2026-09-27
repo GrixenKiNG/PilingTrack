@@ -884,3 +884,118 @@ describe('recordAuditEvent — пересборка проекций', () => {
     );
   });
 });
+
+/**
+ * Заведение, правка/закрытие/отмена и приёмка наряда ТО не оставляли следа
+ * (F-R34-12). Правку стоимости, трудозатрат и моточасов после закрытия в другом
+ * месте не увидеть: строка хранит только последнее значение, а принятый наряд
+ * закрыт на изменение. Вид и состояние — перечисления схемы, а ленту читает
+ * владелец, поэтому в тексте человеческие подписи и название наряда, не id.
+ */
+describe('recordAuditEvent — наряды ТО', () => {
+  it('называет заведённый наряд и его вид', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.created',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      metadata: { name: 'Замена РВД', after: { type: 'REPAIR', status: 'PLANNED' } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'audit',
+        priority: 'MEDIUM',
+        title: 'Наряд ТО заведён',
+        message: 'Создан наряд ТО «Замена РВД» (ремонт).',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия и вида наряда', async () => {
+    await recordAuditEvent({ action: 'maintenance.created', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Наряд ТО заведён', message: 'Создан наряд ТО.' }),
+    );
+  });
+
+  it('показывает переход статуса и изменённые поля по-русски', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.updated',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: {
+        name: 'Замена РВД',
+        before: { status: 'IN_PROGRESS', cost: 100, laborHours: 2 },
+        after: { status: 'DONE', cost: 150, laborHours: 3 },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Наряд ТО изменён',
+        message: 'Наряд ТО «Замена РВД»: изменено — статус: в работе → выполнено, стоимость, трудозатраты.',
+      }),
+    );
+  });
+
+  it('показывает отмену с причиной, а не только «изменено»', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.updated',
+      scope: 'equipment',
+      metadata: {
+        name: 'Замена РВД',
+        before: { status: 'PLANNED', cancelReason: null },
+        after: { status: 'CANCELLED', cancelReason: 'узел заменён целиком' },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Наряд ТО «Замена РВД»: изменено — статус: запланировано → отменено, причина отмены.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым, когда правка ничего не изменила', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.updated',
+      scope: 'equipment',
+      metadata: { name: 'Замена РВД', before: {}, after: {} },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Наряд ТО «Замена РВД»: изменения сохранены.' }),
+    );
+  });
+
+  it('сообщает о приёмке наряда администратором', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.accepted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      metadata: { name: 'Замена РВД' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Наряд ТО принят',
+        message: 'Наряд ТО «Замена РВД» принят администратором.',
+      }),
+    );
+  });
+
+  it('оставляет сырой код для неизвестного вида или состояния', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.created',
+      scope: 'equipment',
+      metadata: { name: 'Осмотр', after: { type: 'WARRANTY' } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Создан наряд ТО «Осмотр» (WARRANTY).' }),
+    );
+  });
+});

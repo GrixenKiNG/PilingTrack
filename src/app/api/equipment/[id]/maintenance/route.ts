@@ -6,6 +6,8 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { createMaintenance, listMaintenance } from '@/modules/equipment';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -72,6 +74,21 @@ export const POST = withMutation(
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const record = await createMaintenance(id, parsed.data, { tenantId, createdById: user!.id });
+      // Best-effort (F-R34-12): наряд уже заведён — сбой записи следа не должен
+      // превращать успешное создание в 500.
+      try {
+        await recordAuditEvent({
+          action: 'maintenance.created',
+          scope: 'equipment',
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+          actorId: user!.id,
+          targetId: record.id,
+          tenantId,
+          metadata: { name: record.title, after: { type: record.type, status: record.status } },
+        });
+      } catch (err) {
+        logger.error('Maintenance create: audit write failed', err, { recordId: record.id });
+      }
       return NextResponse.json({ record }, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

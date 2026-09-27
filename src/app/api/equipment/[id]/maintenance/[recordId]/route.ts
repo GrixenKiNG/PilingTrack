@@ -6,6 +6,9 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { updateMaintenance, deleteMaintenance } from '@/modules/equipment';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -44,7 +47,8 @@ export const PUT = withMutation(
 
     const { id, recordId } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = requireTenantId(user!);
+    const actor = user!;
+    const tenantId = requireTenantId(actor);
     const body = await readJsonBody(request);
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
@@ -54,9 +58,51 @@ export const PUT = withMutation(
       );
     }
 
+    // Снимок наряда читается ДО правки (F-R34-12): строка хранит только
+    // последнее значение, и правку стоимости, трудозатрат или моточасов после
+    // закрытия иначе не отличить от «никогда не меняли». Строго по тенанту и
+    // по установке — как команда.
+    const snapshot = await db.maintenanceRecord.findFirst({
+      where: { id: recordId, equipmentId: id, tenantId },
+      select: {
+        status: true,
+        cost: true,
+        laborHours: true,
+        engineHoursAtService: true,
+        workDone: true,
+        cancelReason: true,
+      },
+    });
+
     try {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      const record = await updateMaintenance(id, recordId, parsed.data, { tenantId, userId: user!.id });
+      const record = await updateMaintenance(id, recordId, parsed.data, { tenantId, userId: actor.id });
+      // Best-effort (F-R34-12): наряд уже изменён — сбой записи следа не должен
+      // превращать успешную правку в 500 (как в reports/delete).
+      try {
+        await recordAuditEvent({
+          action: 'maintenance.updated',
+          scope: 'equipment',
+          actorId: actor.id,
+          targetId: recordId,
+          tenantId,
+          metadata: snapshot
+            ? {
+                name: record.title,
+                before: snapshot,
+                after: {
+                  status: record.status,
+                  cost: record.cost,
+                  laborHours: record.laborHours,
+                  engineHoursAtService: record.engineHoursAtService,
+                  workDone: record.workDone,
+                  cancelReason: record.cancelReason,
+                },
+              }
+            : undefined,
+        });
+      } catch (err) {
+        logger.error('Maintenance update: audit write failed', err, { recordId });
+      }
       return NextResponse.json({ record });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

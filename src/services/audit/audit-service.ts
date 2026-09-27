@@ -196,6 +196,70 @@ function changedEquipmentFields(meta: Meta): string[] {
     .map(([, label]) => label);
 }
 
+// Вид и состояние наряда ТО — перечисления схемы («TO2», «IN_PROGRESS» ничего
+// не говорят владельцу). Подписи совпадают с экраном нарядов
+// (src/components/piling/maintenance/maintenance-labels.ts), но services/ не
+// может зависеть от components/ — словари скопированы локально.
+const MAINTENANCE_TYPE_LABELS: Record<string, string> = {
+  EO: 'ЕО',
+  TO1: 'ТО-1',
+  TO2: 'ТО-2',
+  TO3: 'ТО-3',
+  SEASONAL: 'сезонное',
+  REPAIR: 'ремонт',
+  FAULT: 'неисправность',
+  SCHEDULED: 'плановое ТО',
+  INSPECTION: 'осмотр',
+};
+
+const MAINTENANCE_STATUS_LABELS: Record<string, string> = {
+  PLANNED: 'запланировано',
+  ASSIGNED: 'назначено',
+  IN_PROGRESS: 'в работе',
+  ON_HOLD: 'приостановлено',
+  DONE: 'выполнено',
+  CANCELLED: 'отменено',
+};
+
+// Поля наряда, которые читают в ленте словами. Примечание о закрытии — это
+// «выполненные работы» (закрытие в DONE) и «причина отмены» (отмена): обе
+// пишутся ровно в момент закрытия и после него уже не меняются.
+const MAINTENANCE_FIELD_LABELS: ReadonlyArray<readonly [string, string]> = [
+  ['cost', 'стоимость'],
+  ['laborHours', 'трудозатраты'],
+  ['engineHoursAtService', 'моточасы'],
+  ['workDone', 'выполненные работы'],
+  ['cancelReason', 'причина отмены'],
+];
+
+function maintenanceTypeLabel(value: string | null): string | null {
+  return value ? (MAINTENANCE_TYPE_LABELS[value] ?? value) : null;
+}
+
+function maintenanceStatusLabel(value: string | null): string | null {
+  return value ? (MAINTENANCE_STATUS_LABELS[value] ?? value) : null;
+}
+
+/**
+ * Поля наряда, которые в этом событии действительно изменились. Статус — не
+ * просто поле: в ленте видно, из какого состояния наряд перевели, поэтому он
+ * идёт переходом («в работе → выполнено»), а не голым словом «статус».
+ */
+function changedMaintenanceFields(meta: Meta): string[] {
+  const fields: string[] = [];
+  const beforeStatus = str(meta, 'before.status');
+  const afterStatus = str(meta, 'after.status');
+  if (beforeStatus !== afterStatus) {
+    const from = maintenanceStatusLabel(beforeStatus);
+    const to = maintenanceStatusLabel(afterStatus);
+    fields.push(from && to && from !== to ? `статус: ${from} → ${to}` : 'статус');
+  }
+  for (const [key, label] of MAINTENANCE_FIELD_LABELS) {
+    if (pick(meta, `before.${key}`) !== pick(meta, `after.${key}`)) fields.push(label);
+  }
+  return fields;
+}
+
 /** «Канал оповещений «Чат» (чат -100…): оповещения включены.» — без внутренних id. */
 function channelLine(verb: string, meta: Meta, tokenUpdated = false): string {
   const label = str(meta, 'label');
@@ -716,6 +780,43 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
       const what = names.length ? `Пересобраны проекции: ${names.join(', ')}` : 'Проекции пересобраны';
       const rows = num(m, 'rowsWritten');
       return rows === null ? `${what}.` : `${what} — записано строк: ${rows}.`;
+    },
+  },
+
+  // ── Техника: наряды ТО ──
+  // Заведение, правка/закрытие/отмена и приёмка наряда не оставляли следа
+  // (F-R34-12). Правку стоимости, трудозатрат и моточасов после закрытия в
+  // другом месте не увидеть: строка хранит только последнее значение, а
+  // принятый наряд вообще закрыт на изменение. Внутренних id в тексте нет —
+  // только название наряда и человеческие подписи вида и состояния.
+  'maintenance.created': {
+    level: 'audit',
+    title: 'Наряд ТО заведён',
+    message: (m) => {
+      const name = subject(m);
+      const type = maintenanceTypeLabel(str(m, 'after.type'));
+      const what = name ? `Создан наряд ТО «${name}»` : 'Создан наряд ТО';
+      return type ? `${what} (${type}).` : `${what}.`;
+    },
+  },
+  'maintenance.updated': {
+    level: 'audit',
+    title: 'Наряд ТО изменён',
+    message: (m) => {
+      const name = subject(m);
+      const where = name ? `Наряд ТО «${name}»` : 'Наряд ТО';
+      const fields = changedMaintenanceFields(m);
+      return fields.length
+        ? `${where}: изменено — ${fields.join(', ')}.`
+        : `${where}: изменения сохранены.`;
+    },
+  },
+  'maintenance.accepted': {
+    level: 'audit',
+    title: 'Наряд ТО принят',
+    message: (m) => {
+      const name = subject(m);
+      return name ? `Наряд ТО «${name}» принят администратором.` : 'Наряд ТО принят администратором.';
     },
   },
 };
