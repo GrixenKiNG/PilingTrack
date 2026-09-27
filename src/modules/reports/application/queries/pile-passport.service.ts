@@ -46,6 +46,8 @@ export interface PilePassportRow {
   pileNumber: string;
   drivenAt: string;
   siteName: string;
+  /** Смена, в которую забита свая (DAY/NIGHT). `null` — отчёт не привязан. */
+  shiftType: string | null;
   /** Куст и пикет по проекту — где эта свая стоит. Пусто, если не привязана. */
   locationName: string | null;
   operatorName: string;
@@ -210,6 +212,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
               user: { select: { name: true } },
               equipment: { select: { name: true } },
               crew: { select: { equipment: { select: { name: true } } } },
+              shiftType: true,
             },
           },
         },
@@ -255,6 +258,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       pileNumber: row.pileNumber,
       drivenAt: row.drivenAt.toISOString(),
       siteName: report?.site?.name ?? '—',
+      shiftType: report?.shiftType ?? null,
       locationName: picket
         ? `${picket.cluster?.name ? `${picket.cluster.name} · ` : ''}${picket.name}`
         : null,
@@ -428,6 +432,17 @@ const ACCEPTANCE_TEXT: Record<PileAcceptanceValue, string> = {
   NEEDS_REDRIVE: 'На добивку',
 };
 
+/** Смена в печатном виде. Пустое/чужое значение печатаем как есть, не выдаём за дневную. */
+const SHIFT_TEXT: Record<string, string> = {
+  DAY: 'Дневная',
+  NIGHT: 'Ночная',
+};
+
+function shiftText(shiftType: string | null): string {
+  if (!shiftType) return '';
+  return SHIFT_TEXT[shiftType] ?? shiftType;
+}
+
 /**
  * Журнал забивки в .xlsx — тот лист, который распечатывают и подшивают.
  *
@@ -443,14 +458,23 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
   const { buildXlsx } = await import('@/lib/xlsx-writer');
   // День документа — день тенанта, а не UTC (F-R17-1): свая, забитая в 00:30
   // МСК, в UTC ещё вчерашняя, и подшитый журнал датировал бы её соседним днём.
-  const { timezone } = await getSettings(filters.tenantId);
+  const { timezone, companyName, inn } = await getSettings(filters.tenantId);
   const { rows, truncated } = await listPilePassports({ ...filters, limit: PILE_JOURNAL_LIMIT, timezone });
   const header = pileJournalHeader(rows, timezone);
 
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : '—');
 
+  // Исполнителя работ печатает нормативный журнал (СП 45.13330): подшитый
+  // документ без организации не привязать к подрядчику. Пустые части не
+  // печатаем — строка «Организация: , ИНН» хуже отсутствия строки.
+  const organisation = [
+    companyName ? `Организация: ${companyName}` : null,
+    inn ? `ИНН ${inn}` : null,
+  ].filter((part): part is string => part !== null).join(', ');
+
   const title: (string | number | null)[][] = [
     ['ЖУРНАЛ ЗАБИВКИ СВАЙ'],
+    ...(organisation ? [[organisation]] : []),
     ['Объект', list(header.siteNames)],
     ['Копровая установка', list(header.equipmentNames)],
     ['Молот', list(header.hammerTypes)],
@@ -473,7 +497,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
   ];
 
   const piles: (string | number | null)[][] = [[
-    '№ п/п', 'Дата забивки', '№ сваи по проекту', 'Куст, пикет', 'Марка сваи', 'Сечение',
+    '№ п/п', 'Дата забивки', 'Смена', '№ сваи по проекту', 'Куст, пикет', 'Марка сваи', 'Сечение',
     'Длина, м', 'Отметка головы проектная, м', 'Отметка головы фактическая, м',
     'Глубина погружения, м', 'Залогов', 'Ударов всего', 'Ударов на последний метр',
     'Отказ проектный, мм/уд', 'Отказ фактический, мм/уд', 'Забита по норме',
@@ -494,6 +518,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     piles.push([
       index + 1,
       printDay(row.drivenAt, timezone),
+      shiftText(row.shiftType),
       row.pileNumber,
       row.locationName ?? '',
       row.pileGradeName,
@@ -537,6 +562,13 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
       ]);
     }
   });
+
+  // Дата составления и подписи — обязательные реквизиты нормативного журнала
+  // (СП 45.13330): без них распечатку не подписать и не подшить.
+  piles.push([]);
+  piles.push([`Дата составления: ${printDay(new Date().toISOString(), timezone)}`]);
+  piles.push(['Производитель работ ____________ / ФИО /']);
+  piles.push(['Представитель технического надзора ____________ / ФИО /']);
 
   return buildXlsx([
     { name: 'Титул', rows: title },
