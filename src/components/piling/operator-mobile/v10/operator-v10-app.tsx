@@ -13,6 +13,7 @@ import {
   PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired,
 } from '@/modules/operator-mobile/contracts';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
+import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import {documentsSummary} from '../safety/documents-summary';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
@@ -620,12 +621,66 @@ function ScreenWork({state, busy, onLog, go}: {
     onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />;
 }
 
+/** Порядок ежесменных чек-листов вкладки «Техника»: от осмотра к ЕО после работы. */
+const MAINT_ORDER: ChecklistStage[] = ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE', 'EO_AFTER'];
+
+/**
+ * Незакрытые пункты чек-листа — по разделам.
+ *
+ * Пункт закрыт, когда есть ответ И заполнен обязательный замер: сервер требует
+ * замер тем же правилом `measureRequired`, а «Чек-лист заполнен не полностью»
+ * приходило именно из-за незаполненных моточасов и остатка топлива, а не из-за
+ * ответов, — и сказать человеку, какой раздел смотреть, было нечем.
+ */
+export function gapsBySection(
+  list: ChecklistView,
+  answers: Record<string, OperatorAnswer>,
+  measures: Record<string, string>,
+): {title: string; left: number}[] {
+  return list.sections
+    .map((section) => ({
+      title: section.title,
+      left: section.items.filter((item) => {
+        const answer = answers[item.id];
+        if (!answer) return true;
+        if (!item.measure || !measureRequired(item, answer)) return false;
+        const value = (measures[item.measure.key] ?? '').trim();
+        return value === '' || !Number.isFinite(Number(value.replace(',', '.')));
+      }).length,
+    }))
+    .filter((section) => section.left > 0);
+}
+
+/** «1 пункт», «2 пункта», «5 пунктов». */
+function pointsRu(count: number): string {
+  const last = count % 10;
+  const tail = count % 100;
+  if (tail >= 11 && tail <= 14) return 'пунктов';
+  if (last === 1) return 'пункт';
+  if (last >= 2 && last <= 4) return 'пункта';
+  return 'пунктов';
+}
+
+/** «Не заполнено: «Заправка и заглушение» — 2 пункта». */
+export function gapsNote(gaps: {title: string; left: number}[]): string {
+  return `Не заполнено: ${gaps
+    .map((gap) => `«${gap.title}» — ${gap.left} ${pointsRu(gap.left)}`)
+    .join('; ')}`;
+}
+
 /**
  * ЕО здесь ПРОХОДЯТ, а не читают (решение владельца 18.09.2026).
  *
  * Экран показывал «Не отмечено» и не давал ответить ни на один пункт. Сервер
  * при этом не закрывает смену без ЕО после работы — поэтому смену, начатую в
  * v10, закрыть было нельзя вовсе. Это и была жалоба «не могу закрыть смену».
+ *
+ * ЧЕК-ЛИСТ ЗДЕСЬ ОДИН — ТЕКУЩЕГО ЭТАПА (F-QA-002). Экран показывал все
+ * ежесменные списки сразу, у каждого своя кнопка «Сдать»: площадку, ЕО перед
+ * работой и ЕО после работы одновременно. Машинист нажимал послесменную кнопку
+ * до работы, получал «Чек-лист заполнен не полностью» и не знал, какой из трёх
+ * списков не заполнен. Этап смены считает сервер (`state.phase`), по нему видно,
+ * какой список идёт сейчас, а какие ещё закрыты.
  */
 function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSubmit, go}: {
   state: OperatorMobileState;
@@ -637,18 +692,19 @@ function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSub
   onSubmit: (stage: ChecklistStage) => void;
   go: Go;
 }) {
-  // ВСЕ списки смены, а не только ЕО. Раньше здесь были два чек-листа из
-  // четырёх, и «Готовность площадки» пройти было негде: сервер не закрывал
-  // смену, а экрана под неё в модуле не существовало.
-  const lists = state.checklists.filter((list) => list.stage !== 'TB_PILING'
-    && list.stage !== 'TB_DRILLING');
+  const currentStage = PHASE_CHECKLIST[state.phase] ?? null;
+  const currentIndex = currentStage ? MAINT_ORDER.indexOf(currentStage) : -1;
+  const lists = MAINT_ORDER
+    .map((stage) => state.checklists.find((list) => list.stage === stage))
+    .filter((list): list is ChecklistView => Boolean(list));
+  const currentTitle = lists.find((list) => list.stage === currentStage)?.title;
+
   return (
     <>
       {lists.length === 0
         ? <Card><Nodata>Чек-листы обслуживания недоступны</Nodata></Card>
         : lists.map((list) => {
           const items = list.sections.flatMap((section) => section.items);
-          const left = items.filter((item) => !answers[item.id]).length;
           if (list.done) {
             return (
               <Card key={list.stage} title={list.title}>
@@ -657,6 +713,23 @@ function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSub
               </Card>
             );
           }
+          // Всё, что идёт после текущего этапа, закрыто до его наступления.
+          // У ЕО после работы этапа в фазе «Работа» нет вовсе, поэтому подсказка
+          // там про конец работы, а не про список.
+          const later = currentStage
+            ? MAINT_ORDER.indexOf(list.stage) > currentIndex
+            : list.stage === 'EO_AFTER';
+          if (later) {
+            return (
+              <Card key={list.stage}>
+                <Row icon="clock" title={list.title} note={currentTitle
+                  ? `Станет доступно после «${currentTitle}»`
+                  : 'Станет доступно после завершения работы'} />
+              </Card>
+            );
+          }
+          const gaps = gapsBySection(list, answers, measures);
+          const left = gaps.reduce((sum, gap) => sum + gap.left, 0);
           return (
             <div key={list.stage}>
               <Card title={list.title}>
@@ -665,6 +738,10 @@ function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSub
               </Card>
               <ChecklistItems checklist={list} answers={answers} measures={measures}
                 onAnswer={onAnswer} onMeasure={onMeasure} />
+              {/* Раздел и число незакрытых пунктов — ДО отправки: общая строка
+                  сервера «Чек-лист заполнен не полностью» не говорит, куда
+                  смотреть. */}
+              {left > 0 ? <Banner tone="warn" title={gapsNote(gaps)} /> : null}
               <button type="button" className="ov10-btn green" disabled={busy || left > 0}
                 onClick={() => onSubmit(list.stage)}>
                 {busy ? 'Отправляем…' : left > 0 ? `Осталось ответить: ${left}` : 'Сдать ' + list.title}
@@ -1475,12 +1552,15 @@ export function OperatorV10App() {
       setNotice('Список недоступен: сначала примите установку.');
       return;
     }
-    const items = list.sections.flatMap((section) => section.items);
-    const missing = items.filter((item) => !answers[item.id]);
-    if (missing.length > 0) {
-      setNotice(`Без ответа пунктов: ${missing.length}. Список сдаётся целиком.`);
+    // Проверка ДО отправки и с названием раздела: сервер отвечает общей
+    // строкой «Чек-лист заполнен не полностью», по которой не видно, куда
+    // смотреть. Серверный текст остаётся запасным — он печатается в `run`.
+    const gaps = gapsBySection(list, answers, measures);
+    if (gaps.length > 0) {
+      setNotice(gapsNote(gaps));
       return;
     }
+    const items = list.sections.flatMap((section) => section.items);
     void run(() => sendCommand({
       command: 'submit-checklist',
       clientCommandId: commandId,
