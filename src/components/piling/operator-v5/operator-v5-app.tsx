@@ -593,10 +593,11 @@ function IncidentScreen({state, busy, onReport}: {
 }
 
 /** F. Работа: плитки выработки и запись — экраны F1–F5 макета. */
-function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
+export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
   state: OperatorMobileState;
   busy: boolean;
-  onLog: (entry: ProductionEntryInput) => void;
+  /** Признак успеха: по нему форма решает, чистить ли поля. */
+  onLog: (entry: ProductionEntryInput) => Promise<boolean>;
   onFinish: () => void;
   onIncident: () => void;
   /** Открыть периодический чек-лист ТБ — срок вышел либо подходит. */
@@ -645,17 +646,23 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
     setEndedHm('');
   };
 
-  const submit = () => {
+  // Форма чистится только после подтверждения сервером: отказ 400/409 не
+  // должен уничтожать уже набранное число.
+  const submit = async () => {
     if (!ready) return;
-    if (kind === 'PILES') onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
-    else if (kind === 'DRILLING') {
-      onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
+    let saved = false;
+    if (kind === 'PILES') {
+      saved = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
+    } else if (kind === 'DRILLING') {
+      saved = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
     } else if (interval) {
-      onLog({
+      saved = await onLog({
         kind: 'DOWNTIME', reasonId: optionId,
         startedAt: interval.startedAt, endedAt: interval.endedAt,
       });
     }
+    if (!saved) return;
+
     setOptionId('');
     setCount('');
     setMeters('');
@@ -727,10 +734,7 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
         <PilePassportForm
           grades={state.dictionaries.pileGrades}
           busy={busy}
-          onSubmit={async (pileGradeId, passport) => {
-            onLog({kind: 'PILE_PASSPORT', pileGradeId, passport});
-            return true;
-          }}
+          onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
         />
       ) : (
       <div className="card">
@@ -780,7 +784,7 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
           className={ready ? 'b' : 'b dis'}
           type="button"
           disabled={busy || !ready}
-          onClick={submit}
+          onClick={() => void submit()}
         >
           {busy ? 'Записываем…' : 'Записать'}
         </button>
@@ -916,7 +920,10 @@ export function OperatorV5App() {
     };
   }, []);
 
-  const run = useCallback(async (fn: () => Promise<unknown>, done: string) => {
+  // Возвращает признак успеха: форма чистит поля только по нему. Отказ по
+  // существу (400/409) — это false: введённое человеком должно остаться на
+  // экране. Уход в очередь — принятая запись, то есть true.
+  const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
     try {
@@ -924,14 +931,18 @@ export function OperatorV5App() {
       setCommandId(newCommandId());
       setNotice(done);
       await reload();
+      return true;
     } catch (cause) {
       // Запись легла в очередь — это принятая запись, а не отказ: следующая
       // обязана получить новый ключ. Со старым ключом очередь считала её
       // повтором той же записи и молча не брала, а сервер — тем более.
-      if (cause instanceof QueuedOffline) setCommandId(newCommandId());
-      setNotice(cause instanceof QueuedOffline
-        ? cause.message
-        : cause instanceof Error ? cause.message : 'Действие не выполнено');
+      if (cause instanceof QueuedOffline) {
+        setCommandId(newCommandId());
+        setNotice(cause.message);
+        return true;
+      }
+      setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -1016,10 +1027,10 @@ export function OperatorV5App() {
     }), 'Происшествие записано.');
   }, [commandId, run, state]);
 
-  const logProduction = useCallback((entry: ProductionEntryInput) => {
+  const logProduction = useCallback(async (entry: ProductionEntryInput): Promise<boolean> => {
     const shiftId = state?.shift?.id;
-    if (!shiftId) return;
-    void run(
+    if (!shiftId) return false;
+    return run(
       () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
       'Записано.',
     );
