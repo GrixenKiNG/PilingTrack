@@ -84,6 +84,61 @@ function documentStatusText(document: ClearanceDocument): string {
 }
 
 /**
+ * Тип смены по часам телефона.
+ *
+ * День длится с 07:00 до 19:00, ночь — с 19:00 до 07:00 (решение владельца
+ * 26.09.2026). Раньше границы стояли на 20:00 и 08:00, и смена, начатая в
+ * 19:30, записывалась дневной — а начатая в 07:30 ночной.
+ */
+function shiftTypeByClock(): 'DAY' | 'NIGHT' {
+  const hour = new Date().getHours();
+  return hour >= 7 && hour < 19 ? 'DAY' : 'NIGHT';
+}
+
+/** Что предлагаем человеку до приёмки установки: оба типа смены со своими окнами. */
+const SHIFT_TYPE_CHOICES: { value: 'DAY' | 'NIGHT'; label: string }[] = [
+  { value: 'DAY', label: 'Смена: дневная (07:00–19:00)' },
+  { value: 'NIGHT', label: 'Смена: ночная (19:00–07:00)' },
+];
+
+/**
+ * Выбор типа смены перед приёмкой установки.
+ *
+ * Тип смены записывается в отчёт и определяет всю смену, а по часам телефона
+ * его не угадать: смену начинают до пуска, а не по будильнику. Показываем оба
+ * варианта с окнами — человек видит, что именно уйдёт на сервер, и может
+ * поправить, если телефон идёт не по сменному времени.
+ */
+function ShiftTypePicker({ value, onChange }: {
+  value: 'DAY' | 'NIGHT';
+  onChange: (type: 'DAY' | 'NIGHT') => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-foreground">Тип смены</p>
+      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-1">
+        {SHIFT_TYPE_CHOICES.map((choice) => (
+          <button
+            key={choice.value}
+            type="button"
+            aria-pressed={value === choice.value}
+            onClick={() => onChange(choice.value)}
+            className={cn(
+              'min-h-12 rounded-lg px-3 text-base font-medium transition-colors',
+              value === choice.value
+                ? 'border bg-secondary font-semibold text-foreground shadow-xs'
+                : 'text-muted-foreground',
+            )}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Личный допуск одной строкой, раскрывается касанием.
  *
  * Список из тринадцати удостоверений — это лист на полэкрана, который человек
@@ -188,6 +243,12 @@ export function OperatorShiftV2() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  /*
+    Тип смены выбран заранее по часам телефона, но остаётся выбором человека:
+    пока установка не принята, границы смены можно поправить. Дальше он уже
+    записан в смену и отчёт.
+  */
+  const [shiftType, setShiftType] = useState<'DAY' | 'NIGHT'>(() => shiftTypeByClock());
   /*
     Ключ команды осмотра и его ошибка.
 
@@ -514,12 +575,11 @@ export function OperatorShiftV2() {
   const acceptOn = async (equipmentId: string) => {
     setBusy(true);
     try {
-      const hour = new Date().getHours();
       await sendCommand({
         command: 'accept-equipment',
         clientCommandId: crypto.randomUUID(),
         equipmentId,
-        shiftType: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY',
+        shiftType,
       });
       setAccepted(true);
       await Promise.all([load(), loadMobile()]);
@@ -572,12 +632,11 @@ export function OperatorShiftV2() {
     }
     setBusy(true);
     try {
-      const hour = new Date().getHours();
       await sendCommand({
         command: 'accept-equipment',
         clientCommandId: crypto.randomUUID(),
         equipmentId,
-        shiftType: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY',
+        shiftType,
       });
       setAccepted(true);
       await Promise.all([load(), loadMobile()]);
@@ -794,6 +853,12 @@ export function OperatorShiftV2() {
           <p className="text-base text-muted-foreground">
             {facts.assignments.length > 0 ? 'Выберите установку' : 'Установка не закреплена'}
           </p>
+        )}
+
+        {/* Тип смены — до приёмки установки: он уходит в команду приёмки и
+            определяет смену и отчёт. Догадаться по экрану было нечем. */}
+        {!facts.shift && (
+          <ShiftTypePicker value={shiftType} onChange={setShiftType} />
         )}
 
         {/* Выбор установки — всегда, даже когда закреплена одна. Список тот,
