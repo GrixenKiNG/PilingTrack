@@ -91,22 +91,32 @@ async function runPmSchedulerScoped(tenantId: string, now: Date): Promise<PmSche
       });
     }
 
-    // Dedup: skip if an open work order of this type already exists for the rig.
-    const existingOpen = await db.maintenanceRecord.findFirst({
-      where: {
-        equipmentId: plan.equipmentId,
-        tenantId,
-        type: plan.type,
-        status: { in: [...OPEN_STATUSES] },
-      },
-      select: { id: true },
-    });
-    if (existingOpen) continue;
-
     const dueLabel =
       result.status === 'overdue' ? 'просрочено' : 'подходит срок';
-    await db.$transaction(async (tx) => {
-      const record = await tx.maintenanceRecord.create({
+
+    // Проверка на открытый наряд и вставка идут в одной транзакции под
+    // advisory-замком на пару «установка + тип наряда» в организации. Без
+    // замка два одновременных прогона (рестарт, ручной запуск, второй воркер)
+    // успевают оба прочитать «открытых нарядов нет» и оба создать PLANNED —
+    // по установке висят два одинаковых наряда ТО (F-R38-6). Замок
+    // транзакционный, снимается сам при коммите или откате.
+    const lockKey = `pm:${tenantId}:${plan.equipmentId}:${plan.type}`;
+    const record = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+      // Dedup: skip if an open work order of this type already exists for the rig.
+      const existingOpen = await tx.maintenanceRecord.findFirst({
+        where: {
+          equipmentId: plan.equipmentId,
+          tenantId,
+          type: plan.type,
+          status: { in: [...OPEN_STATUSES] },
+        },
+        select: { id: true },
+      });
+      if (existingOpen) return null;
+
+      const createdRecord = await tx.maintenanceRecord.create({
         data: {
           tenantId,
           equipmentId: plan.equipmentId,
@@ -123,14 +133,15 @@ async function runPmSchedulerScoped(tenantId: string, now: Date): Promise<PmSche
       await requestReadinessSnapshot(tx as typeof db, {
         tenantId,
         equipmentId: plan.equipmentId,
-        aggregateId: record.id,
+        aggregateId: createdRecord.id,
         aggregateType: 'MaintenanceRecord',
         triggerType: 'MAINTENANCE_CHANGED',
-        triggerId: `${record.id}:scheduled:${record.updatedAt.toISOString()}`,
-        occurredAt: record.updatedAt,
+        triggerId: `${createdRecord.id}:scheduled:${createdRecord.updatedAt.toISOString()}`,
+        occurredAt: createdRecord.updatedAt,
       });
+      return createdRecord;
     });
-    created++;
+    if (record) created++;
   }
 
   return { evaluated: plans.length, due, created, overdue };
