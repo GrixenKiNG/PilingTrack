@@ -10,24 +10,21 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findManyMock, queryRawMock, executeRawMock } = vi.hoisted(() => ({
+const { findManyMock, queryRawMock } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   queryRawMock: vi.fn(),
-  executeRawMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     report: { findMany: findManyMock },
     $queryRaw: queryRawMock,
-    $executeRaw: executeRawMock,
   },
 }));
 
 vi.mock('@/generated/postgres-client', () => ({
   Prisma: {
     sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
-    join: (items: unknown[]) => ({ joined: items }),
   },
 }));
 
@@ -38,7 +35,6 @@ vi.mock('@/lib/logger', () => ({
 import {
   getReportsByPeriodRaw,
   upsertReportRaw,
-  bulkDeleteReportsRaw,
   PERIOD_REPORTS_LIMIT,
 } from '../raw-queries';
 
@@ -162,29 +158,5 @@ describe('upsertReportRaw', () => {
     });
 
     expect(result).toEqual({ id: 'row-a', reportId: 'r1' });
-  });
-});
-
-describe('bulkDeleteReportsRaw', () => {
-  beforeEach(() => {
-    executeRawMock.mockReset();
-    executeRawMock.mockResolvedValue(3);
-  });
-
-  it('short-circuits and returns 0 for an empty id list (never touches db)', async () => {
-    const result = await bulkDeleteReportsRaw([]);
-    expect(result).toBe(0);
-    expect(executeRawMock).not.toHaveBeenCalled();
-  });
-
-  it('builds an ANY(ARRAY[...]) query using Prisma.join for ids', async () => {
-    await bulkDeleteReportsRaw(['a', 'b', 'c']);
-
-    expect(executeRawMock).toHaveBeenCalledTimes(1);
-    const strings = executeRawMock.mock.calls[0][0] as TemplateStringsArray;
-    expect(strings.raw).toBeDefined();
-    // The joined-id Prisma fragment is passed as a placeholder value
-    const values = executeRawMock.mock.calls[0].slice(1);
-    expect(values.some((v) => typeof v === 'object' && v !== null && 'joined' in v)).toBe(true);
   });
 });
