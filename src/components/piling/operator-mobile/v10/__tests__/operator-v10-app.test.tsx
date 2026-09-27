@@ -2,7 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import type {ChecklistView, OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — свои стили; в тесте они не нужны.
 vi.mock('../../operator-concept.css', () => ({}));
-import {gapsBySection, gapsNote, ppeOutcome} from '../operator-v10-app';
+import {gapsBySection, gapsNote, ppeOutcome, downtimeWindowProblem} from '../operator-v10-app';
 
 /**
  * Ошибка чек-листа обязана называть раздел.
@@ -133,5 +133,33 @@ describe('итог подтверждения СИЗ', () => {
       note: 'Все шаги допуска пройдены',
       screen: 'safety',
     });
+  });
+});
+
+/**
+ * D-20260927-004: окно смены проверял только сервер, и отказ «Простой не может
+ * начаться раньше смены…» приходил уже после «Записать». Границы обязаны быть
+ * видны до отправки, а текст — тот же, что у сервера.
+ */
+describe('окно простоя до отправки', () => {
+  const now = new Date(2026, 8, 27, 5, 30, 0);
+  const shiftStartedAt = new Date(2026, 8, 27, 4, 44, 0).toISOString();
+
+  it('называет начало смены, когда простой начинается раньше', () => {
+    expect(downtimeWindowProblem('03:00', '05:30', shiftStartedAt, now))
+      .toBe('Простой не может начаться раньше смены — смена начата в 04:44.');
+  });
+
+  it('пропускает простой в окне смены', () => {
+    expect(downtimeWindowProblem('04:50', '05:30', shiftStartedAt, now)).toBeNull();
+  });
+
+  it('не придирается к расхождению часов в пять минут', () => {
+    expect(downtimeWindowProblem('04:40', '05:30', shiftStartedAt, now)).toBeNull();
+  });
+
+  it('молчит, пока смены нет или поля пусты', () => {
+    expect(downtimeWindowProblem('03:00', '05:30', null, now)).toBeNull();
+    expect(downtimeWindowProblem('', '', shiftStartedAt, now)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useMemo, useState} from 'react';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {DOWNTIME_MAX_HOURS, formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
   ChecklistStage, ChecklistView, DocumentVerdict, IncidentCategory, IncidentSign,
   OperatorAnswer, OperatorMobileState,
@@ -459,7 +459,38 @@ function ScreenReady({state, checklist, answers, busy, onSubmit, go}: {
  *
  * Поля те же, что и в рабочем экране /operator, и уходят той же командой
  * log-production: сервер один, и правила приёмки записи тоже одни.
+ *
+ * ОКНО ПРОСТОЯ ВИДНО ДО ОТПРАВКИ (F-QA-004). Раньше границы проверял только
+ * сервер, и отказ «Простой не может начаться раньше смены…» приходил уже после
+ * нажатия «Записать». Оператор тратил цикл «отправил — получил ошибку», а при
+ * слабой связи мог решить, что простой записан. Границы здесь те же, что у
+ * сервера (domain/downtime-interval): начало не раньше старта смены с допуском
+ * пять минут на расхождение часов, конец не в будущем, длительность не больше
+ * DOWNTIME_MAX_HOURS. Тексты повторяют серверные дословно — об одном запрете
+ * не должно быть двух разных формулировок.
  */
+const CLOCK_SKEW_MIN = 5;
+
+export function downtimeWindowProblem(
+  startValue: string, endValue: string,
+  shiftStartedAt: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const interval = downtimeInterval(startValue, endValue, now);
+  if (!interval || !shiftStartedAt) return null;
+  const startedAt = new Date(interval.startedAt).getTime();
+  const shiftStart = new Date(shiftStartedAt).getTime();
+
+  // Начало раньше смены — то, из-за чего и приходил серверный отказ.
+  if (startedAt < shiftStart - CLOCK_SKEW_MIN * 60_000) {
+    return `Простой не может начаться раньше смены — смена начата в ${hhmm(new Date(shiftStart))}.`;
+  }
+  if (interval.minutes > DOWNTIME_MAX_HOURS * 60) {
+    return `Простой длиннее суток (${Math.round(interval.minutes / 60)} ч). Проверьте время.`;
+  }
+  return null;
+}
+
 function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   initialKind?: WorkAction;
   state: OperatorMobileState;
@@ -470,8 +501,12 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   const [optionId, setOptionId] = useState('');
   const [count, setCount] = useState('');
   const [meters, setMeters] = useState('');
-  const [startedHm, setStartedHm] = useState('');
-  const [endedHm, setEndedHm] = useState('');
+  // Простой предзаполнен окном смены: начало — старт смены, конец — сейчас.
+  const shiftStartedAt = state.shift?.startedAt ?? null;
+  const shiftStartDate = shiftStartedAt ? new Date(shiftStartedAt) : null;
+  const shiftStartHm = shiftStartDate ? hhmm(shiftStartDate) : '';
+  const [startedHm, setStartedHm] = useState(initialKind === 'DOWNTIME' ? shiftStartHm : '');
+  const [endedHm, setEndedHm] = useState(initialKind === 'DOWNTIME' ? hhmm(new Date()) : '');
 
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
@@ -483,8 +518,8 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
     setOptionId('');
     setCount('');
     setMeters('');
-    setStartedHm('');
-    setEndedHm('');
+    setStartedHm(next === 'DOWNTIME' ? shiftStartHm : '');
+    setEndedHm(next === 'DOWNTIME' ? hhmm(new Date()) : '');
   };
 
   const amount = Number(count.replace(',', '.'));
@@ -492,11 +527,17 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   // Простой задаётся интервалом: подпись под полями и то, что уйдёт на
   // сервер, — одна и та же величина (см. downtime-interval).
   const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  // Границы окна смены — те же, что проверит сервер: раньше отправки и рядом с
+  // полем, а не только отказом после запроса (F-QA-004).
+  const windowProblem = kind === 'DOWNTIME' ? downtimeWindowProblem(startedHm, endedHm, shiftStartedAt) : null;
+  const earliestHm = shiftStartDate
+    ? hhmm(new Date(shiftStartDate.getTime() - CLOCK_SKEW_MIN * 60_000)) : undefined;
+  const latestHm = hhmm(new Date(Date.now() + CLOCK_SKEW_MIN * 60_000));
   // Запрет закрывает выработку и не трогает простой — domain/production-permit.ts.
   const forbidden = kind !== 'DOWNTIME' && !state.permit.allowed;
   const ready = !forbidden && optionId !== '' && (
     kind === 'DOWNTIME'
-      ? interval !== null
+      ? interval !== null && windowProblem === null
       : Number.isFinite(amount) && amount > 0
         && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
   );
@@ -569,16 +610,22 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
         <>
           <label className="ov10-field">
             <span className="lab">Простой начался</span>
-            <input type="time" value={startedHm}
+            <input type="time" value={startedHm} min={earliestHm} max={latestHm}
               onChange={(event) => setStartedHm(event.target.value)} />
           </label>
           <label className="ov10-field">
             <span className="lab">Закончился</span>
-            <input type="time" value={endedHm}
+            <input type="time" value={endedHm} min={earliestHm} max={latestHm}
               onChange={(event) => setEndedHm(event.target.value)} />
           </label>
           <button type="button" className="ov10-rowbtn"
             onClick={() => setEndedHm(hhmm(new Date()))}>Закончился сейчас</button>
+          {shiftStartHm ? (
+            <p className="ov10-hint">
+              Допустимое время: с {shiftStartHm} до {hhmm(new Date())}, не дольше {DOWNTIME_MAX_HOURS} ч.
+            </p>
+          ) : null}
+          {windowProblem ? <p className="ov10-hint">{windowProblem}</p> : null}
           {interval ? (
             <p className="ov10-hint">Простой: {formatIntervalMinutes(interval.minutes)}</p>
           ) : null}
