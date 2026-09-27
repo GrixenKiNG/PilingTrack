@@ -180,6 +180,24 @@ function channelLine(verb: string, meta: Meta, tokenUpdated = false): string {
   return `${verb}: ${name}${chat} — ${state}${token}.`;
 }
 
+// Элементы схемы объекта (поле/куст/пикет) называются по-разному, и род слова
+// в фразе от них зависит: «Добавлен пикет», но «Добавлено поле». Пикет — ключ
+// привязки выработки (PileWork.picketId), поэтому в ленте должно быть видно,
+// какой именно узел схемы завели или убрали (F-R34-15). Внутренних id в тексте
+// нет: itemId остаётся только в metadata.
+const HIERARCHY_TYPE_LINES: Record<string, { created: string; deleted: string }> = {
+  field: { created: 'Добавлено поле', deleted: 'Удалено поле' },
+  cluster: { created: 'Добавлен куст', deleted: 'Удалён куст' },
+  picket: { created: 'Добавлен пикет', deleted: 'Удалён пикет' },
+};
+
+function hierarchyLine(verb: 'created' | 'deleted', meta: Meta): string {
+  const line = HIERARCHY_TYPE_LINES[str(meta, 'type') ?? ''];
+  const what = line ? line[verb] : verb === 'created' ? 'Добавлен элемент схемы объекта' : 'Удалён элемент схемы объекта';
+  const name = str(meta, 'name');
+  return name ? `${what} «${name}».` : `${what}.`;
+}
+
 // ────────────────────────────────────────────
 // Действие → человеческий текст
 // ────────────────────────────────────────────
@@ -352,6 +370,19 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
     level: 'audit',
     title: 'Доступ к объекту закрыт',
     message: 'Сотрудник откреплён от объекта.',
+  },
+  // Схема объекта: поле/куст/пикет. Строки после удаления уже нет, а пикет —
+  // ключ привязки выработки (PileWork.picketId), поэтому создание и удаление
+  // узла должны быть видно в ленте (F-R34-15).
+  'site.hierarchy.created': {
+    level: 'audit',
+    title: 'Элемент схемы объекта добавлен',
+    message: (m) => hierarchyLine('created', m),
+  },
+  'site.hierarchy.deleted': {
+    level: 'audit',
+    title: 'Элемент схемы объекта удалён',
+    message: (m) => hierarchyLine('deleted', m),
   },
 
   // ── Бригады ──

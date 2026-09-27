@@ -683,3 +683,72 @@ describe('recordAuditEvent — карточка установки', () => {
     );
   });
 });
+
+/**
+ * Схема объекта (поле/куст/пикет) не оставляла следа при создании и удалении
+ * (F-R34-15), хотя пикет — ключ привязки выработки (PileWork.picketId) и его
+ * удаление ломает связи задним числом. В ленте должно быть видно, какой именно
+ * узел завели или убрали; род слова берётся из типа, внутренних id нет.
+ */
+describe('recordAuditEvent — схема объекта (поле/куст/пикет)', () => {
+  it('называет добавленный пикет', async () => {
+    await recordAuditEvent({
+      action: 'site.hierarchy.created',
+      scope: 'sites',
+      actorId: 'admin-1',
+      targetId: 'site-1',
+      metadata: { type: 'picket', name: 'П-12', itemId: 'picket-1' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'audit',
+        priority: 'MEDIUM',
+        title: 'Элемент схемы объекта добавлен',
+        message: 'Добавлен пикет «П-12».',
+      }),
+    );
+  });
+
+  it('называет удалённый куст', async () => {
+    await recordAuditEvent({
+      action: 'site.hierarchy.deleted',
+      scope: 'sites',
+      actorId: 'admin-1',
+      targetId: 'site-1',
+      metadata: { type: 'cluster', name: 'К-3', itemId: 'cluster-1' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Элемент схемы объекта удалён',
+        message: 'Удалён куст «К-3».',
+      }),
+    );
+  });
+
+  // «Добавлен куст», но «Добавлено поле»: у поля другой род, и общая фраза
+  // читалась бы как «Добавлен поле».
+  it('согласует род слова с типом узла', async () => {
+    await recordAuditEvent({
+      action: 'site.hierarchy.created',
+      scope: 'sites',
+      metadata: { type: 'field', name: 'Поле-1' },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Добавлено поле «Поле-1».' }),
+    );
+  });
+
+  it('остаётся читаемым без типа и названия узла', async () => {
+    await recordAuditEvent({ action: 'site.hierarchy.deleted', scope: 'sites' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Элемент схемы объекта удалён',
+        message: 'Удалён элемент схемы объекта.',
+      }),
+    );
+  });
+});
