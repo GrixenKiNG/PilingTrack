@@ -6,6 +6,7 @@ import type {
 } from '@/modules/operator-mobile/contracts';
 import {
   ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
+  type ProductionEntryInput,
 } from '@/components/piling/operator-mobile/api';
 import {OfflineQueueBanner} from '@/components/piling/operator-mobile/offline-queue-banner';
 import {useOfflineQueue} from '@/components/piling/operator-mobile/use-offline-queue';
@@ -19,8 +20,10 @@ import {ProfileTab} from '@/components/piling/operator-mobile/screens/profile-ta
 import {SafetyTab} from '@/components/piling/operator-mobile/screens/safety-tab';
 import {knownAnswers} from '@/components/piling/operator-mobile/safety/known-answers';
 import {AdmissionScreen, type AdmissionDetour} from './admission';
+import {ActionButton} from './parts';
 import {ChecklistRunScreen} from './checklist-run';
 import {ShiftStartScreen} from './shift-start';
+import {WorkScreenNext} from './work';
 import {humanError} from './words';
 
 /**
@@ -368,14 +371,54 @@ export function OperatorNextApp() {
             }))}
           />
         );
+      case 'WORK': {
+        if (!shift) {
+          return (
+            <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
+              <Panel tone="warning">
+                <PanelTitle tone="warning">Смена не открыта</PanelTitle>
+                <p className="mt-1 text-sm">
+                  Сервер не отдал открытую смену. Нажмите «Обновить», чтобы перечитать состояние.
+                </p>
+                <div className="mt-3">
+                  <ActionButton label="Обновить" tone="ghost" onClick={() => void reload()} />
+                </div>
+              </Panel>
+            </Screen>
+          );
+        }
+        return (
+          <WorkScreenNext
+            state={state}
+            busy={busy}
+            error={actionError}
+            tabs={tabsVisible ? tabBar : undefined}
+            onOpenTab={setWorkTab}
+            onOpenSafety={(safetyStage) => setDetour({kind: 'CHECKLIST', stage: safetyStage})}
+            onFinish={() => void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}))}
+            onSubmitEntry={(entry: ProductionEntryInput) => run(() => sendCommand({
+              command: 'log-production',
+              clientCommandId: productionCommandId,
+              shiftId: shift.id,
+              entry,
+            }))}
+            onCorrect={(input) => run(() => sendCommand({
+              command: 'correct-production',
+              clientCommandId: correctionCommandId,
+              shiftId: shift.id,
+              ...input,
+            }))}
+          />
+        );
+      }
       default:
         return (
           <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
             <Panel>
               <PanelTitle>Экран готовится</PanelTitle>
               <p className="mt-1 text-sm">
-                Допуск, приём установки и осмотры подключены. Экраны работы и конца смены —
-                следующими коммитами.
+                Допуск, приём установки, осмотры и работа подключены. Экран конца смены —
+                следующим коммитом.
               </p>
             </Panel>
           </Screen>
