@@ -108,6 +108,11 @@ export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
     { label: 'Дашборд', href: '/admin', icon: 'dashboard' },
     { label: 'Мониторинг', href: '/monitoring', icon: 'monitoring' },
     { label: 'Объекты', href: '/admin/sites', icon: 'site' },
+    // Готовность техники открыта мастеру (`readiness.read`, см.
+    // `(readiness-admin)/layout.tsx`), а дороги в меню не было: раздел
+    // открывался только по прямому адресу из уведомления. Подпись — как у
+    // механика: одно место не должно называться двумя словами.
+    { label: 'Готовность техники', href: '/admin/to', icon: 'technical-readiness' },
     { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
     // Читать происшествия на своём участке мастеру разрешено
     // (`incidents.read`), а пункта в меню не было: экран открывался только по

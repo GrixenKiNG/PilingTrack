@@ -96,6 +96,23 @@ describe('ROLE_NAVIGATION', () => {
       .toEqual(['/admin/to', '/admin/safety']);
   });
 
+  /**
+   * Право без дороги — это тот же тупик, что дорога без права.
+   *
+   * `readiness.read` выдан мастеру и раздел `/admin/to` ему открыт
+   * (`(readiness-admin)/layout.tsx`), но пункта в меню не было: сверить по
+   * меню, что роли положено, было нельзя, а сам раздел открывался только по
+   * прямому адресу из уведомления. Подпись сторожится здесь же: место, которое
+   * механик видит как «Готовность техники», не должно называться у мастера
+   * иначе — иначе одно место выглядит как два.
+   */
+  it('gives the foreman a way to the readiness section he may read', () => {
+    const foremanRoutes = ROLE_NAVIGATION.FOREMAN.map((item) => item.href);
+    expect(foremanRoutes).toContain('/admin/to');
+    expect(ROLE_NAVIGATION.FOREMAN.find((item) => item.href === '/admin/to')?.label)
+      .toBe('Готовность техники');
+  });
+
   it('folds Telegram and DLQ into Settings (out of top-level navigation)', () => {
     for (const items of Object.values(ROLE_NAVIGATION)) {
       const routes = items.map((item) => item.href);
