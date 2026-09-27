@@ -2,7 +2,9 @@
  * Сверка цифр между слоями за 14 дней — только чтение базы (SELECT):
  *   первичные сваи (PileWork) → строка аналитики отчёта (ReportAnalytics)
  *   → дневная сводка объекта (SiteDailySummary).
- * Расхождение — повод для разбора, а не готовый дефект: сверку проверяет
+ * Черновики (несданные смены) аналитики ещё не имеют — это не расхождение,
+ * их число выводится отдельно. Расхождение — повод для разбора, а не готовый
+ * дефект: сверку проверяет
  * Hermes (черновики, поправки, фильтры) и затем ревьюер.
  */
 import { test } from '@playwright/test';
@@ -30,7 +32,7 @@ test('сверка: сваи отчёта ↔ аналитика ↔ дневн�
         FROM "Report" r JOIN "Site" s ON s.id = r."siteId"
         LEFT JOIN (SELECT "reportId", sum(count) cnt FROM "PileWork" GROUP BY "reportId") p ON p."reportId" = r.id
         LEFT JOIN "ReportAnalytics" ra ON ra."reportId" = r."reportId"
-        WHERE r."tenantId" = 'orion' AND r.date >= ${SINCE}
+        WHERE r."tenantId" = 'orion' AND r.date >= ${SINCE} AND r.status <> 'draft'
           AND coalesce(p.cnt,0) <> coalesce(ra."totalPiles", -1)
         ORDER BY r.date DESC;`),
     },
@@ -50,16 +52,18 @@ test('сверка: сваи отчёта ↔ аналитика ↔ дневн�
         ORDER BY d.date DESC;`),
     },
     {
-      name: 'Отчёты за период без строки аналитики',
+      name: 'Сданные отчёты за период без строки аналитики',
       header: 'reportId;дата;статус',
       rows: select(`
         SELECT r."reportId", r.date, r.status FROM "Report" r
-        WHERE r."tenantId" = 'orion' AND r.date >= ${SINCE}
+        WHERE r."tenantId" = 'orion' AND r.date >= ${SINCE} AND r.status <> 'draft'
           AND NOT EXISTS (SELECT 1 FROM "ReportAnalytics" ra WHERE ra."reportId" = r."reportId");`),
     },
   ];
 
-  const lines: string[] = [`# Сверка слоёв данных (14 дней), ${new Date().toISOString()}`, ''];
+  const drafts = select(`SELECT count(*) FROM "Report" WHERE "tenantId" = 'orion' AND status = 'draft' AND date >= ${SINCE};`)[0]?.[0] ?? '0';
+  const lines: string[] = [`# Сверка слоёв данных (14 дней), ${new Date().toISOString()}`, '',
+    `Черновиков (несданных смен) за период: ${drafts} — в сверку не входят: аналитика строится при сдаче.`, ''];
   for (const c of checks) {
     lines.push(`## ${c.name}: ${c.rows.length}`, '', c.header, ...c.rows.map((r) => r.join(';')), '');
     coverage({ module: 'сверка', screen: 'база', element: c.name, role: 'ADMIN', version: '-',
