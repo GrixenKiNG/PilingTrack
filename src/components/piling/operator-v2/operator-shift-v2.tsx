@@ -267,6 +267,15 @@ export function OperatorShiftV2() {
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [tab, setTab] = useState<V2Tab>('shift');
   /*
+    Выбранная установка на приёмке.
+
+    Касание строки только ВЫБИРАЕТ машину — смену открывает отдельная кнопка
+    «Принять установку». Раньше тап по строке сразу принимал установку, и
+    человек, просто листавший список, открывал смену — возможно, на чужой
+    машине (находка F-R40-19).
+  */
+  const [acceptTargetId, setAcceptTargetId] = useState<string | null>(null);
+  /*
     Снимок рабочего места (`/api/operator/mobile/state`) — второй источник
     экрана, и он же единственный источник выработки.
 
@@ -758,8 +767,7 @@ export function OperatorShiftV2() {
   if (step === 'acceptance') {
     const cleared = state.blockers.length === 0;
     const documents = facts.clearance.documents;
-    // До открытия смены кнопки внизу нет: машину выбирают из списка, и
-    // единственная закреплённая — тоже выбор, а не подстановка за человека.
+    // Приёмка уже открытой смены (передача от прошлой) — кнопка внизу.
     const canAct = cleared && Boolean(facts.shift);
     return (
       <StepShell
@@ -775,6 +783,16 @@ export function OperatorShiftV2() {
           <>
             {tab === 'shift' && canAct ? (
               <StepButton label="Принять установку" onClick={() => void acceptEquipment()} busy={busy} />
+            ) : null}
+            {/* До открытия смены машину сначала выбирают, а принимают кнопкой —
+                она погашена, пока строка не отмечена. */}
+            {tab === 'shift' && !facts.shift && facts.assignments.length > 0 ? (
+              <StepButton
+                label="Принять установку"
+                onClick={() => { if (acceptTargetId) void acceptOn(acceptTargetId); }}
+                disabled={!acceptTargetId}
+                busy={busy}
+              />
             ) : null}
             <BottomTabs active={tab} onSelect={setTab} />
           </>
@@ -863,7 +881,8 @@ export function OperatorShiftV2() {
 
         {/* Выбор установки — всегда, даже когда закреплена одна. Список тот,
             что администратор закрепил за оператором; чужую машину сюда не
-            подставить, границу держит команда на сервере. */}
+            подставить, границу держит команда на сервере. Касание строки только
+            отмечает машину — принимает её кнопка внизу. */}
         {!facts.shift && facts.assignments.length > 0 && (
           <>
             <p className="text-base font-medium text-foreground">На какой установке работаете</p>
@@ -873,7 +892,8 @@ export function OperatorShiftV2() {
                   <CheckRow
                     label={assignment.equipmentName}
                     hint={`${assignment.model} · ${assignment.siteName}`}
-                    onToggle={() => void acceptOn(assignment.equipmentId)}
+                    checked={acceptTargetId === assignment.equipmentId}
+                    onToggle={() => setAcceptTargetId(assignment.equipmentId)}
                   />
                 </li>
               ))}
