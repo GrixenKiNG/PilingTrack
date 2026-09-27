@@ -24,11 +24,12 @@ sudo apt-get install k6
 ```bash
 # Убедись что сервисы запущены
 npm run dev           # Next.js API (порт 3000)
-npx tsx src/realtime/server/index.ts   # WS server (порт 3001)
 
 # Для event-storm — нужен Redis
 redis-server          # порт 6379
 ```
+
+WebSocket-сервер удалён 26.09.2026 — нагрузочных сценариев для него нет.
 
 ### 3. Запуск тестов
 
@@ -36,12 +37,6 @@ redis-server          # порт 6379
 
 ```bash
 k6 run load-tests/load-http.js
-```
-
-#### WebSocket нагрузка (1000+ соединений)
-
-```bash
-k6 run load-tests/load-ws.js
 ```
 
 #### Event Storm (1000 events/sec)
@@ -64,15 +59,12 @@ npx tsx load-tests/slo-monitor.ts
 | API p95 latency | < 300ms | 🔴 Critical |
 | API p99 latency | < 500ms | 🟡 Warning |
 | Error rate | < 1% | 🔴 Critical |
-| WS delivery latency | < 500ms | 🔴 Critical |
-| WS connections | > 900 | 🟡 Warning |
 | DB query latency | < 100ms | 🟡 Warning |
 
 ## Ожидаемые узкие места
 
 | Компонент | Симптом | Решение |
 |-----------|---------|---------|
-| WS server (Node) | CPU 100%, задержки > 1s | uWebSockets.js + clustering |
 | Redis Pub/Sub | lag, drop сообщений | Redis cluster / Kafka |
 | DB write spikes | lock contention | batch writes, BullMQ queue |
 | Sync API overload | timeout 500 | rate limit, batching, debounce |
@@ -81,7 +73,6 @@ npx tsx load-tests/slo-monitor.ts
 
 | Компонент | Требования |
 |-----------|------------|
-| WS server | 2–4 vCPU |
 | API server (Next.js) | 4–8 vCPU |
 | Redis | 2 vCPU / 2–4GB RAM |
 | PostgreSQL | 4–8 vCPU |
@@ -91,6 +82,5 @@ npx tsx load-tests/slo-monitor.ts
 | Файл | Назначение |
 |------|------------|
 | `load-http.js` | k6 HTTP нагрузка (sync API) |
-| `load-ws.js` | k6 WebSocket нагрузка |
 | `event-storm.ts` | Flood Redis Pub/Sub событиями |
 | `slo-monitor.ts` | Сбор метрик + SLO отчёты |

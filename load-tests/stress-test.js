@@ -3,9 +3,8 @@
  *
  * Tests:
  * 1. HTTP API under load (1000 VU)
- * 2. WebSocket connection stability
- * 3. Event storm simulation
- * 4. Sync endpoint under concurrent load
+ * 2. Event storm simulation
+ * 3. Sync endpoint under concurrent load
  *
  * Usage:
  *   k6 run --vus 1000 --duration 5m load-tests/stress-test.js
@@ -13,7 +12,6 @@
  *
  * Targets:
  * - p95 API latency < 200ms
- * - WS latency < 500ms
  * - Error rate < 0.1%
  * - 1000 concurrent users
  */
@@ -55,7 +53,6 @@ export const options = {
   ],
   thresholds: {
     'api_latency': ['p(95)<200', 'p(99)<500'],
-    'ws_latency': ['p(95)<500'],
     'errors': ['rate<0.01'],
     'http_req_duration': ['p(95)<200'],
     'http_req_failed': ['rate<0.01'],
