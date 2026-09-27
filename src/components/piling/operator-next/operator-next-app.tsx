@@ -18,10 +18,12 @@ import {EquipmentTab} from '@/components/piling/operator-mobile/screens/equipmen
 import {IncidentsTab} from '@/components/piling/operator-mobile/screens/incidents-tab';
 import {ProfileTab} from '@/components/piling/operator-mobile/screens/profile-tab';
 import {SafetyTab} from '@/components/piling/operator-mobile/screens/safety-tab';
+import {ClosedScreen} from '@/components/piling/operator-mobile/screens/closing-screen';
 import {knownAnswers} from '@/components/piling/operator-mobile/safety/known-answers';
 import {AdmissionScreen, type AdmissionDetour} from './admission';
 import {ActionButton} from './parts';
 import {ChecklistRunScreen} from './checklist-run';
+import {ReportSendScreen} from './report-send';
 import {ShiftStartScreen} from './shift-start';
 import {WorkScreenNext} from './work';
 import {humanError} from './words';
@@ -160,7 +162,7 @@ export function OperatorNextApp() {
   }, [reload]);
 
   // Что записано на устройстве и ещё не ушло. Плашка — одна на все экраны.
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   if (forbidden) {
     return (
@@ -411,14 +413,46 @@ export function OperatorNextApp() {
           />
         );
       }
+      case 'CLOSING':
+        if (!shift) {
+          return (
+            <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
+              <Panel tone="warning">
+                <PanelTitle tone="warning">Смена не открыта</PanelTitle>
+                <p className="mt-1 text-sm">Нажмите «Обновить», чтобы перечитать состояние.</p>
+                <div className="mt-3">
+                  <ActionButton label="Обновить" tone="ghost" onClick={() => void reload()} />
+                </div>
+              </Panel>
+            </Screen>
+          );
+        }
+        return (
+          <ReportSendScreen
+            state={state}
+            busy={busy}
+            error={actionError}
+            tabs={tabsVisible ? tabBar : undefined}
+            unsentCount={queued.length}
+            onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
+            onFlushQueued={() => void flush()}
+            onClose={(comment) => void run(() => sendCommand({
+              command: 'close-shift',
+              shiftId: shift.id,
+              comment,
+            }))}
+          />
+        );
+      case 'CLOSED':
+        return <ClosedScreen state={state} tabs={tabsVisible ? tabBar : undefined} />;
       default:
         return (
           <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
             <Panel>
-              <PanelTitle>Экран готовится</PanelTitle>
+              <PanelTitle>Раздел пока недоступен</PanelTitle>
               <p className="mt-1 text-sm">
-                Допуск, приём установки, осмотры и работа подключены. Экран конца смены —
-                следующим коммитом.
+                Этот шаг смены пока не поддержан на сервере или ещё не собран. Вернитесь на «Смену»
+                или нажмите «Обновить».
               </p>
             </Panel>
           </Screen>
