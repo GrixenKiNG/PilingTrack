@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -118,5 +118,47 @@ describe('AdminDictionaries', () => {
     expect(JSON.parse(patch?.[1]?.body as string)).toMatchObject({
       type: 'pileGrade', id: 'g1', lengthMm: 15000, confirmRecalculate: true,
     });
+  });
+});
+
+describe('AdminDictionaries: архивация (решение владельца 28.09.2026)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH' ? jsonResponse({ ok: true }) : jsonResponse(registry));
+  });
+
+  const patches = () => authFetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH');
+
+  it('«Выбрать все» → «Архивировать» сначала спрашивает, с числом записей', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Выбрать все' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Архивировать' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Архивировать 1 запись?');
+    expect(patches()).toHaveLength(0);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Архивировать' }));
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(JSON.parse(patches()[0][1].body as string)).toMatchObject({ id: 'g1', isActive: false });
+  });
+
+  it('одна запись архивируется сразу, а в уведомлении есть «Отменить»', async () => {
+    const { toast } = await import('sonner');
+    render(<AdminDictionaries />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Архивировать СВ 120-35' }));
+
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    const [, opts] = vi.mocked(toast.success).mock.calls.at(-1) ?? [];
+    const action = (opts as { action?: { label: string; onClick: () => void } } | undefined)?.action;
+    expect(action?.label).toBe('Отменить');
+
+    action?.onClick();
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    expect(JSON.parse(patches()[1][1].body as string)).toMatchObject({ id: 'g1', isActive: true });
   });
 });

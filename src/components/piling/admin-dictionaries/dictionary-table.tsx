@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { pluralizeRu } from '@/lib/format';
 
 export type DictionaryKind = 'pileGrade' | 'drillingType' | 'downtimeReason';
 
@@ -28,6 +30,8 @@ interface DictionaryTableProps {
   onRename: (item: RegistryItem) => void;
   onLength: (item: RegistryItem) => void;
   onStatus: (item: RegistryItem, isActive: boolean) => void;
+  /** Массовая смена статуса — одним действием и одним уведомлением. */
+  onBulkStatus: (items: RegistryItem[], isActive: boolean) => void;
   onDelete: (item: RegistryItem) => void;
   onSelect: (item: RegistryItem) => void;
   selectedId?: string;
@@ -40,7 +44,7 @@ function lengthLabel(lengthMm?: number | null): string {
 }
 
 export function DictionaryTable({
-  kind, title, statusLabel, items, onRename, onLength, onStatus, onDelete, onSelect, selectedId, compact = false,
+  kind, title, statusLabel, items, onRename, onLength, onStatus, onBulkStatus, onDelete, onSelect, selectedId, compact = false,
 }: DictionaryTableProps) {
   const isPileGrade = kind === 'pileGrade';
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
@@ -57,8 +61,15 @@ export function DictionaryTable({
     setCheckedIds(checked ? items.map((item) => item.id) : []);
   };
 
+  // Массовая архивация — только через подтверждение с числом записей (решение
+  // владельца 28.09.2026): «Выбрать все» → «Архивировать» одним нажатием убирал
+  // из форм операторов весь список, например все причины простоя.
+  const [confirmArchive, setConfirmArchive] = useState<RegistryItem[] | null>(null);
   const bulkStatus = (isActive: boolean) => {
-    for (const item of checkedItems.filter((it) => it.isActive !== isActive)) onStatus(item, isActive);
+    const targets = checkedItems.filter((it) => it.isActive !== isActive);
+    if (!targets.length) return;
+    if (!isActive) { setConfirmArchive(targets); return; }
+    onBulkStatus(targets, true);
     setCheckedIds([]);
   };
 
@@ -271,6 +282,18 @@ export function DictionaryTable({
       </div>
     </Card>}
     {items.length === 0 && <div className="mt-5 rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground"><p className="font-medium text-foreground">Ничего не найдено</p><p className="mt-1 text-xs">Попробуйте изменить параметры поиска или фильтра.</p></div>}
+      <ConfirmActionDialog
+        open={!!confirmArchive}
+        onOpenChange={(open) => { if (!open) setConfirmArchive(null); }}
+        title={`Архивировать ${confirmArchive?.length ?? 0} ${pluralizeRu(confirmArchive?.length ?? 0, ['запись', 'записи', 'записей'])}?`}
+        description={`«${title}»: архивные записи нельзя выбрать в формах операторов, пока их не восстановят. Если архивировать все, операторы не смогут указать это в отчёте.`}
+        confirmLabel="Архивировать"
+        onConfirm={() => {
+          if (confirmArchive) onBulkStatus(confirmArchive, false);
+          setConfirmArchive(null);
+          setCheckedIds([]);
+        }}
+      />
     </div>
   );
 }

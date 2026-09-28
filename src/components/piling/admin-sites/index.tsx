@@ -40,6 +40,8 @@ import { useSitesOverview, type SiteOverviewRow } from './use-sites-overview';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import type { SiteCrew, SiteFullData, SiteListItem } from './types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { deactivateDescription } from './site-deactivate';
 
 type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 
@@ -91,6 +93,10 @@ export function AdminSites() {
   const [showCreate, setShowCreate] = useState(false);
   const [editSite, setEditSite] = useState<SiteListItem | null>(null);
   const [deleteSite, setDeleteSite] = useState<SiteListItem | null>(null);
+  // Деактивация — с подтверждением (решение владельца 28.09.2026): объект
+  // пропадает из выбора при назначении бригад, это задевает работу диспетчера.
+  // Активация обратно — сразу, без окна.
+  const [deactivateRow, setDeactivateRow] = useState<SiteOverviewRow | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addType, setAddType] = useState<'field' | 'cluster' | 'picket'>('field');
   const [addSiteId, setAddSiteId] = useState('');
@@ -285,7 +291,7 @@ export function AdminSites() {
               onDelete={() => setDeleteSite(toListItem(active))}
               onAssign={() => setAssignSiteId(active.siteId)}
               onToggleCompleted={() => mutations.handleSetCompleted(toListItem(active), !active.completionDate)}
-              onToggleActive={() => mutations.handleToggleActive(toListItem(active))}
+              onToggleActive={() => (active.isActive ? setDeactivateRow(active) : mutations.handleToggleActive(toListItem(active)))}
               tree={siteTree[active.siteId]}
               onAddHierarchy={(type, siteId, parentId) => { setAddType(type); setAddSiteId(siteId); setAddParentId(parentId); setShowAdd(true); }}
               onDeleteHierarchy={async (siteId, type, itemId) => { await mutations.handleDeleteHierarchy(siteId, type, itemId); await refreshTree(siteId); }}
@@ -335,6 +341,20 @@ export function AdminSites() {
           // между ними была дыра.
           const ok = await mutations.handleSaveEdit(siteId, name, isActive, pilePlans, drillingPlans, coordinates);
           if (ok) { setEditSite(null); reload(); }
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={!!deactivateRow}
+        onOpenChange={(open) => { if (!open) setDeactivateRow(null); }}
+        title={`Деактивировать объект «${deactivateRow?.siteName ?? ''}»?`}
+        description={deactivateRow ? deactivateDescription(deactivateRow) : ''}
+        confirmLabel="Деактивировать"
+        onConfirm={async () => {
+          if (!deactivateRow) return;
+          const row = deactivateRow;
+          setDeactivateRow(null);
+          await mutations.handleToggleActive(toListItem(row));
         }}
       />
 

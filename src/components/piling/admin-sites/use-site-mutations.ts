@@ -180,7 +180,9 @@ export function useSiteMutations({
     }
   };
 
-  const handleSetCompleted = async (site: SiteListItem, completed: boolean) => {
+  // Отметка «Выполнен» — без окна, но с «Отменить» в уведомлении (решение
+  // владельца 28.09.2026): данные не пропадают, возврат в одно нажатие.
+  const handleSetCompleted = async (site: SiteListItem, completed: boolean, undoable = true) => {
     try {
       const res = await authFetch(`/api/sites/${site.id}`, {
         method: 'PUT',
@@ -195,7 +197,12 @@ export function useSiteMutations({
       setSites((prev) =>
         prev.map((s) => (s.id === site.id ? { ...s, completionDate: data.site?.completionDate ?? null } : s))
       );
-      toast.success(completed ? 'Объект отмечен «Выполнен»' : 'Отметка «Выполнен» снята');
+      toast.success(
+        completed ? 'Объект отмечен «Выполнен»' : 'Отметка «Выполнен» снята',
+        undoable
+          ? { duration: 10_000, action: { label: 'Отменить', onClick: () => { void handleSetCompleted(site, !completed, false); } } }
+          : undefined,
+      );
     } catch {
       toast.error('Ошибка');
     }
