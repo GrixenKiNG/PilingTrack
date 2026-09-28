@@ -10,6 +10,7 @@ import {
 } from '@/components/piling/operator-mobile/api';
 import {OfflineQueueBanner} from '@/components/piling/operator-mobile/offline-queue-banner';
 import {useOfflineQueue} from '@/components/piling/operator-mobile/use-offline-queue';
+import {usePilingStore} from '@/lib/store';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from '@/components/piling/operator-mobile/ui';
 import {BriefingScreen} from '@/components/piling/operator-mobile/screens/briefing-screen';
 import {KnowledgeScreen} from '@/components/piling/operator-mobile/screens/knowledge-screen';
@@ -27,7 +28,10 @@ import {
   draftsForShift, emptyDrafts, emptyFormFields, emptyWorkDraft,
   type ChecklistDrafts, type Drafts, type FormMode, type WorkDraft,
 } from './drafts';
-import {ErrorStrip, NoticeStrip, ActionButton, NextActionCard} from './parts';
+import {
+  clearPassportDraft, loadShellDrafts, saveShellDrafts, storageAvailable,
+} from './draft-storage';
+import {ErrorStrip, NoticeStrip, ActionButton, NextActionCard, ReasonNote} from './parts';
 import {ownPendingCount} from './queue-snapshot';
 import {ReportSendScreen} from './report-send';
 import {ShiftStartScreen} from './shift-start';
@@ -88,6 +92,10 @@ export function OperatorNextApp() {
    * «отложено» прошлой смены не прилипало к такой же фазе новой.
    */
   const [checklistExit, setChecklistExit] = useState<{stage: ChecklistStage; shiftId: string | null} | null>(null);
+  /** Кто вошёл: черновики хранятся и читаются только по своему пользователю. */
+  const userId = usePilingStore((store) => store.currentUser?.id ?? null);
+  /** Последний известный результат проверки хранилища черновиков. */
+  const [storageOk, setStorageOk] = useState(true);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
 
   /** Номер последнего запроса: применяем только его ответ (находка №4 ревью). */
@@ -100,6 +108,32 @@ export function OperatorNextApp() {
   const shiftId = state?.shift?.id ?? null;
 
   /**
+   * Живая ссылка на текущую смену — только для черновиков.
+   *
+   * ПОЧЕМУ. Загрузка снимка может завершиться уже после перехода к другой
+   * смене: обработчик остался от прежнего рендера. Такой поздний вызов смеет
+   * менять черновики только если смена не сменилась — иначе он затрёт черновики
+   * новой смены пустыми старыми (дефект круга 4, ревью №3).
+   */
+  const shiftIdRef = useRef<string | null>(shiftId);
+  useEffect(() => {
+    shiftIdRef.current = shiftId;
+  }, [shiftId]);
+
+  /**
+   * Правка черновиков смены с проверкой поколения.
+   *
+   * Поздний вызов приходит с зашитой сменой А: если живая ссылка уже указывает
+   * на Б — вызов игнорируется, и черновики Б не подменяются пустыми черновиками А.
+   */
+  const mutateDraftsForShift = useCallback((expectedShiftId: string | null, change: (base: Drafts) => Drafts) => {
+    setDrafts((current) => {
+      if (shiftIdRef.current !== expectedShiftId) return current;
+      return change(draftsForShift(current, expectedShiftId));
+    });
+  }, []);
+
+  /**
    * Правка черновика работы.
    *
    * Живёт здесь, у оболочки: формы размонтируются в любой момент — вкладка,
@@ -107,11 +141,8 @@ export function OperatorNextApp() {
    * закрывает форму выработки по концу защищённого цикла (ревью №2).
    */
   const updateWorkDraft = useCallback((updater: (current: WorkDraft) => WorkDraft) => {
-    setDrafts((current) => {
-      const base = draftsForShift(current, shiftId);
-      return {...base, work: updater(base.work)};
-    });
-  }, [shiftId]);
+    mutateDraftsForShift(shiftId, (base) => ({...base, work: updater(base.work)}));
+  }, [mutateDraftsForShift, shiftId]);
 
   const reload = useCallback(async () => {
     const seq = ++requestSeq.current;
@@ -125,6 +156,20 @@ export function OperatorNextApp() {
       // сделанный первым, затрёт показанную Б.
       if (seq !== requestSeq.current) return;
       setState(next);
+      // Смена перечитана: поздние ответы прежней смены больше не должны
+      // подменять черновики; заодно читаем черновик этой смены из хранилища
+      // (перезагрузили страницу — черновик вернётся).
+      const nextShiftId = next.shift?.id ?? null;
+      shiftIdRef.current = nextShiftId;
+      const canStore = storageAvailable();
+      setStorageOk(canStore);
+      setDrafts((current) => {
+        if (current.shiftId === nextShiftId) return current;
+        const stored = canStore && nextShiftId ? loadShellDrafts(userId, nextShiftId) : null;
+        return stored
+          ? {shiftId: nextShiftId, work: stored.work, closeNote: stored.closeNote, checklists: stored.checklists}
+          : emptyDrafts(nextShiftId);
+      });
       setLoadError(null);
       // Роль могла быть исправлена, пока человек смотрел на отказ: успешное
       // чтение снимает экран «доступ закрыт», иначе он остаётся тупиком.
@@ -146,7 +191,7 @@ export function OperatorNextApp() {
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [equipmentId]);
+  }, [equipmentId, userId]);
 
   useEffect(() => {
     void (async () => {
@@ -251,32 +296,54 @@ export function OperatorNextApp() {
   // Что записано на устройстве и ещё не ушло. Плашка — одна на все экраны.
   const {queued, flush, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
+  /**
+   * Зеркалим черновики смены в localStorage на каждое изменение — перезагрузка
+   * страницы не спрашивает разрешения. Недоступное хранилище — не ошибка: экран
+   * честно говорит, что черновик его не переживёт (ревью №3, пункт C).
+   */
+  useEffect(() => {
+    if (!shiftId || drafts.shiftId !== shiftId) return;
+    saveShellDrafts(userId, shiftId, {
+      work: drafts.work,
+      checklists: drafts.checklists,
+      closeNote: drafts.closeNote,
+    });
+  }, [drafts, shiftId, userId]);
+
   const draftsAreCurrent = drafts.shiftId === shiftId;
   const workDraft: WorkDraft = draftsAreCurrent ? drafts.work : emptyWorkDraft();
   const closeNote = draftsAreCurrent ? drafts.closeNote : '';
 
   const updateCloseNote = useCallback((value: string) => {
-    setDrafts((current) => ({...draftsForShift(current, shiftId), closeNote: value}));
-  }, [shiftId]);
+    mutateDraftsForShift(shiftId, (base) => ({...base, closeNote: value}));
+  }, [mutateDraftsForShift, shiftId]);
 
   /** Заметка отправленной смены — не черновик: чистим по подтверждённому закрытию (ревью №2). */
   const clearCloseNote = useCallback(() => {
-    setDrafts((current) => (
-      current.shiftId === shiftId ? {...current, closeNote: ''} : current
-    ));
-  }, [shiftId]);
+    mutateDraftsForShift(shiftId, (base) => ({...base, closeNote: ''}));
+  }, [mutateDraftsForShift, shiftId]);
+
+  /** Живая заметка: в момент отправки `close-shift` берём текущее значение (ревью №3, п.4). */
+  const closeNoteRef = useRef(closeNote);
+  useEffect(() => {
+    closeNoteRef.current = closeNote;
+  }, [closeNote]);
 
   /**
    * Поля отправленной выработки — не черновик: чистим сразу по подтверждению.
-   * Форму закрывает сам экран работы, когда цикл отпустит поля (ревью №2).
+   * Форму закрывает сам экран работы, когда цикл отпустит поля (ревью №2);
+   * подтверждённый паспорт чистится и в хранилище черновиков (круг 4).
    */
   const clearSubmittedEntry = (entry: ProductionEntryInput) => {
-    if (entry.kind === 'PILE_PASSPORT') return;
+    if (entry.kind === 'PILE_PASSPORT') {
+      clearPassportDraft(userId, shiftId);
+      return;
+    }
     const form: FormMode = entry.kind;
-    setDrafts((current) => {
-      const base = draftsForShift(current, shiftId);
-      return {...base, work: {...base.work, forms: {...base.work.forms, [form]: emptyFormFields()}}};
-    });
+    mutateDraftsForShift(shiftId, (base) => ({
+      ...base,
+      work: {...base.work, forms: {...base.work.forms, [form]: emptyFormFields()}},
+    }));
   };
 
   const checklistDraftsFor = (stage: ChecklistStage): ChecklistDrafts => (
@@ -291,19 +358,18 @@ export function OperatorNextApp() {
    * Ключ — этап: ответы сданного осмотра чистятся по подтверждённой отправке.
    */
   const updateChecklistDrafts = (stage: ChecklistStage, updater: (current: ChecklistDrafts) => ChecklistDrafts) => {
-    setDrafts((current) => {
-      const base = draftsForShift(current, shiftId);
-      return {...base, checklists: {...base.checklists, [stage]: updater(base.checklists[stage] ?? {})}};
-    });
+    mutateDraftsForShift(shiftId, (base) => ({
+      ...base,
+      checklists: {...base.checklists, [stage]: updater(base.checklists[stage] ?? {})},
+    }));
   };
 
   /** Ответы отправленного этапа больше не черновик: чистим по приёму сервером. */
   const forgetChecklistDrafts = (stage: ChecklistStage) => {
-    setDrafts((current) => {
-      if (current.shiftId !== shiftId) return current;
-      const next = {...current.checklists};
+    mutateDraftsForShift(shiftId, (base) => {
+      const next = {...base.checklists};
       delete next[stage];
-      return {...current, checklists: next};
+      return {...base, checklists: next};
     });
   };
 
@@ -406,7 +472,7 @@ export function OperatorNextApp() {
     }), () => forgetChecklistDrafts(checklistStage));
   };
 
-  const closeShift = async (comment: string) => {
+  const closeShift = async () => {
     if (!shift) return;
     // Замок и блокировка полей — ДО первого `await flush()`: пока идёт
     // подготовка, заметка не может измениться, а повторное нажатие не запускает
@@ -427,7 +493,9 @@ export function OperatorNextApp() {
             : `На устройстве ${fresh} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`);
           return;
         }
-        await sendCommand({command: 'close-shift', shiftId: shift.id, comment});
+        // Заметку читаем В МОМЕНТ отправки, а не снимком до подготовки
+        // (ревью №3, п.4): источник истины — текущее состояние черновика.
+        await sendCommand({command: 'close-shift', shiftId: shift.id, comment: closeNoteRef.current});
         // Подтверждено: заметка этой смены больше не черновик.
         clearCloseNote();
         await reload();
@@ -527,7 +595,9 @@ export function OperatorNextApp() {
                 ? remaining > 0
                   ? `Осталось отметить: ${remaining}. Отмеченное сохранено — продолжите осмотр, когда сможете.`
                   : 'Все пункты отмечены — вернитесь к осмотру и отправьте его.'
-                : 'Осмотр сохранён на устройстве, отправить можно, когда появится связь.'}
+                : storageOk
+                  ? 'Осмотр сохранён на устройстве, отправить можно, когда появится связь.'
+                  : 'Осмотр сохранён до перезагрузки: при перезагрузке страницы ответы не сохранятся.'}
               actionLabel="Продолжить осмотр"
               onAction={() => setChecklistExit(null)}
               testId="resume-checklist"
@@ -538,6 +608,11 @@ export function OperatorNextApp() {
                 Пока осмотр не завершён, работа не начнётся. Отмеченное сохранено — оно не пропало.
               </p>
             </Panel>
+            {!storageOk ? (
+              <ReasonNote>
+                Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
+              </ReasonNote>
+            ) : null}
           </Screen>
         );
       }
@@ -608,6 +683,8 @@ export function OperatorNextApp() {
             busy={busy}
             error={actionError}
             tabs={shiftTabs}
+            userId={userId}
+            storageOk={storageOk}
             draft={workDraft}
             onDraftChange={updateWorkDraft}
             onOpenTab={setWorkTab}
@@ -652,7 +729,7 @@ export function OperatorNextApp() {
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
             onFlushQueued={() => void flush()}
             onReload={() => void reload()}
-            onClose={(comment) => void closeShift(comment)}
+            onClose={() => void closeShift()}
           />
         );
       case 'CLOSED':
@@ -707,21 +784,23 @@ export function OperatorNextApp() {
           ) : null}
           {workTab === 'MORE' ? (
             <>
-              <IncidentsTab
-                state={state}
-                busy={busy}
-                error={actionError}
-                commandId={keys.get('incident')}
-                onReport={async (input) => {
-                  if (!shift) return false;
-                  return run('incident', () => sendCommand({
-                    command: 'report-incident',
-                    clientCommandId: keys.get('incident'),
-                    shiftId: shift.id,
-                    ...input,
-                  }));
-                }}
-              />
+              <fieldset className="onx-gate" disabled={busy}>
+                <IncidentsTab
+                  state={state}
+                  busy={busy}
+                  error={actionError}
+                  commandId={keys.get('incident')}
+                  onReport={async (input) => {
+                    if (!shift) return false;
+                    return run('incident', () => sendCommand({
+                      command: 'report-incident',
+                      clientCommandId: keys.get('incident'),
+                      shiftId: shift.id,
+                      ...input,
+                    }));
+                  }}
+                />
+              </fieldset>
               <ProfileTab
                 state={state}
                 onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}

@@ -12,6 +12,7 @@ import {
   downtimeInterval, formatIntervalMinutes, hhmmAgo,
 } from '@/components/piling/operator-mobile/downtime-interval';
 import {ActionButton, ChoiceButton, NextActionCard, ReasonNote, StageTitle} from './parts';
+import {PassportPersist} from './passport-persist';
 import {emptyFormFields, type FormMode, type WorkDraft, type WorkMode} from './drafts';
 import {WORDS} from './words';
 
@@ -31,13 +32,17 @@ import {WORDS} from './words';
  * (находки №2 и №3 ревью).
  */
 export function WorkScreenNext({
-  state, busy, error, tabs, draft, onDraftChange,
+  state, busy, error, tabs, userId, storageOk, draft, onDraftChange,
   onSubmitEntry, onCorrect, onFinish, onOpenSafety, onOpenTab,
 }: {
   state: OperatorMobileState;
   busy: boolean;
   error: string | null;
   tabs?: ReactNode;
+  /** Вошедший: ключ черновика паспорта — пользователь и смена. */
+  userId: string | null;
+  /** Доступно ли хранилище черновиков — от этого зависит честная подсказка. */
+  storageOk: boolean;
   draft: WorkDraft;
   onDraftChange: (updater: (current: WorkDraft) => WorkDraft) => void;
   onSubmitEntry: (entry: ProductionEntryInput) => Promise<boolean>;
@@ -208,7 +213,9 @@ export function WorkScreenNext({
 
           <StageTitle>Журнал записей смены</StageTitle>
           <Panel>
-            <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
+            <fieldset className="onx-gate" disabled={busy}>
+              <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
+            </fieldset>
           </Panel>
 
           <ErrorNote message={error} />
@@ -228,9 +235,9 @@ export function WorkScreenNext({
       ) : null}
 
       {/*
-        Форма паспорта НЕ размонтируется при «Назад к смене»: замеры паспорта —
-        полтора десятка полей, и терять их при каждом заходе нельзя (ревью №2).
-        Скрываем, а не выбрасываем; сменилась смена — форма начинается заново.
+        Форма паспорта не размонтируется при «Назад к смене», а её черновик
+        держится в localStorage по смене и пользователю (ревью №3, круг 4).
+        Пока идёт отправка, поля закрыты fieldset'ом — как у остальных форм.
       */}
       <div key={state.shift?.id ?? 'no-shift'} hidden={mode !== 'PASSPORT' || needsSafety}>
         <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
@@ -241,15 +248,19 @@ export function WorkScreenNext({
             а не поломка машины.
           </p>
           <div className="mt-3">
-            <PilePassportForm
-              grades={state.dictionaries.pileGrades}
-              busy={busy}
-              onSubmit={async (pileGradeId, passport: PilePassportInput) => {
-                const ok = await onSubmitEntry({kind: 'PILE_PASSPORT', pileGradeId, passport});
-                if (ok) open('NONE');
-                return ok;
-              }}
-            />
+            <fieldset className="onx-gate" disabled={busy}>
+              <PassportPersist userId={userId} shiftId={state.shift?.id ?? null} enabled={storageOk}>
+                <PilePassportForm
+                  grades={state.dictionaries.pileGrades}
+                  busy={busy}
+                  onSubmit={async (pileGradeId, passport: PilePassportInput) => {
+                    const ok = await onSubmitEntry({kind: 'PILE_PASSPORT', pileGradeId, passport});
+                    if (ok) open('NONE');
+                    return ok;
+                  }}
+                />
+              </PassportPersist>
+            </fieldset>
           </div>
         </Panel>
         {mode === 'PASSPORT' ? <ErrorNote message={error} /> : null}
@@ -264,7 +275,9 @@ export function WorkScreenNext({
             <ActionButton label="Очистить" tone="ghost" onClick={() => patchFields(emptyFormFields())} disabled={locked || !dirty} />
           </div>
           <p className="text-2xs text-muted-foreground">
-            Набранное сохраняется при переходах и уйдёт только после подтверждённой записи.
+            {storageOk
+              ? 'Набранное сохраняется при переходах и переживёт перезагрузку страницы. Уйдёт только после подтверждённой записи.'
+              : 'Черновик не сохранится при перезагрузке страницы: память браузера недоступна. Уйдёт только после подтверждённой записи.'}
           </p>
 
           {mode === 'PILES' ? (
