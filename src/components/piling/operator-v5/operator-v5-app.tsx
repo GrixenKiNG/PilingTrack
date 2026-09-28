@@ -937,6 +937,13 @@ export function OperatorV5App() {
   // обработчик дошёл до конца». Перечитывание экрана идёт отдельным шагом:
   // его сбой не отменяет уже записанное, иначе машинист увидит ошибку, наберёт
   // то же число заново и выработка задвоится.
+  //
+  // КНОПКА ЖДЁТ ПЕРЕЧИТЫВАНИЯ (F-R43-3d). Ключ команды меняется сразу по её
+  // принятию, а состояние смены приходит только после перечитывания. Отпусти
+  // кнопку раньше — машинист увидит прежние счётчики, нажмёт второй раз, и та
+  // же выработка уйдёт с новым ключом, то есть задвоится. Поэтому busy снимаем
+  // после reload — и когда запись принята сервером, и когда она легла в
+  // очередь. Отказ по существу (400/409) перечитывать нечего: там сразу.
   const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
@@ -951,12 +958,11 @@ export function OperatorV5App() {
       if (cause instanceof QueuedOffline) {
         setCommandId(newCommandId());
         setNotice(cause.message);
-        return true;
+      } else {
+        setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
+        setBusy(false);
+        return false;
       }
-      setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
-      return false;
-    } finally {
-      setBusy(false);
     }
     try {
       await reload({quiet: true});
@@ -964,6 +970,7 @@ export function OperatorV5App() {
       // Запись уже принята — говорим только о несвежем экране.
       setNotice('Записано. Не удалось обновить экран — потяните вниз / обновите.');
     }
+    setBusy(false);
     return true;
   }, [reload]);
 

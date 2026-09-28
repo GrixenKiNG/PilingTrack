@@ -23,6 +23,15 @@ vi.mock('@/components/piling/operator-mobile/api', () => ({
 
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 
+/** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return {promise, resolve};
+}
+
 /**
  * F-R43-1: смену нельзя закрыть, пока на телефоне лежат неотправленные записи.
  *
@@ -174,5 +183,46 @@ describe('принятая запись и сбой перечитывания �
     // Это не отказ: полноэкранной ошибки связи нет, поле очищено.
     expect(screen.queryByText('Нет связи с сервером')).not.toBeInTheDocument();
     await waitFor(() => expect(count.value).toBe(''));
+  });
+});
+
+/**
+ * F-R43-3d: кнопка выработки занята, пока экран не перечитан.
+ *
+ * Ключ команды меняется сразу по её принятию, а счётчики смены приходят только
+ * с перечитыванием. Отпусти кнопку раньше — машинист увидит прежние числа,
+ * нажмёт второй раз, и та же выработка уйдёт с новым ключом, то есть задвоится.
+ */
+describe('принятая запись и незавершённое перечитывание экрана', () => {
+  it('держит кнопку занятой и не отправляет ту же выработку второй раз', async () => {
+    const reload = deferred<OperatorMobileState>();
+    let calls = 0;
+    vi.mocked(api.fetchState).mockImplementation(() => {
+      calls += 1;
+      return calls === 1 ? Promise.resolve(working) : reload.promise;
+    });
+
+    const {container} = render(<OperatorV5App />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+    fillPiles(container);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    // Запись ушла, перечитывание началось и ещё не закончилось.
+    await waitFor(() => expect(api.fetchState).toHaveBeenCalledTimes(2));
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+
+    const busyButton = screen.getByRole('button', {name: 'Записываем…'});
+    expect(busyButton).toBeDisabled();
+    fireEvent.click(busyButton);
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+    // Форма ещё не очищена: набранное число на экране до подтверждения экрана.
+    expect(container.querySelector<HTMLInputElement>('input[inputmode="decimal"]')?.value).toBe('12');
+
+    reload.resolve(working);
+
+    await waitFor(() => expect(container.querySelector<HTMLInputElement>('input[inputmode="decimal"]')?.value).toBe(''));
+    // Форма очищена по подтверждению сервера: отправлять больше нечего.
+    expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
   });
 });
