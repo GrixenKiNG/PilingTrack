@@ -1153,6 +1153,19 @@ describe('ревью №3, C: черновики переживают перез
     expect(screen.queryByLabelText('Сколько свай забито, шт')).toBeNull();
   });
 
+  it('явное «Очистить» — пустая форма после перезагрузки', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    const first = render(<OperatorNextApp />);
+    await openPileForm();
+    fireEvent.click(screen.getByRole('button', {name: 'Очистить'}));
+    await waitFor(() => expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(null));
+    first.unmount();
+
+    render(<OperatorNextApp />);
+    await waitFor(() => expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(null));
+    expect(screen.getByRole('button', {name: 'Очистить'})).toBeDisabled();
+  });
+
   it('недоступное хранилище — честное «не сохранится при перезагрузке»', async () => {
     const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation(() => {
       throw new Error('quota');
