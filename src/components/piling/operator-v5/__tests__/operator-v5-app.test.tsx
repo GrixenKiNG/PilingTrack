@@ -21,6 +21,7 @@ vi.mock('@/components/piling/operator-mobile/api', () => ({
   ...api,
 }));
 
+import {QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
@@ -224,5 +225,37 @@ describe('принятая запись и незавершённое переч
     // Форма очищена по подтверждению сервера: отправлять больше нечего.
     expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
     expect(api.sendCommand).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * F-R43-3d: запись, ушедшая в офлайн-очередь, перечитывания не требует.
+ *
+ * Сервер этой записи ещё не видел, обновлять на экране нечего — а без связи
+ * reload падает и затирает сообщение очереди текстом «Записано. Не удалось
+ * обновить экран»: машинист решит, что запись уже на сервере, хотя она в
+ * телефоне. Кнопку при этом отпускаем сразу, а не по таймауту сети.
+ */
+describe('запись ушла в офлайн-очередь', () => {
+  it('показывает текст очереди, не перечитывает экран и отпускает кнопку', async () => {
+    const queuedMessage = 'Запись выработки: сохранено на устройстве, отправим при связи';
+    vi.mocked(api.fetchState).mockResolvedValue(working);
+    vi.mocked(api.sendCommand).mockRejectedValueOnce(new QueuedOffline(queuedMessage));
+
+    const {container} = render(<OperatorV5App />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+    const count = fillPiles(container);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(queuedMessage)).toBeInTheDocument();
+    expect(screen.queryByText('Записано. Не удалось обновить экран — потяните вниз / обновите.'))
+      .not.toBeInTheDocument();
+    // Перечитывания нет: состояние читалось только при открытии экрана.
+    expect(api.fetchState).toHaveBeenCalledTimes(1);
+    // Запись принята устройством — форма чистится, кнопка свободна.
+    await waitFor(() => expect(count.value).toBe(''));
+    expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
   });
 });
