@@ -1596,15 +1596,24 @@ export function OperatorV10App() {
         accepted = false;
         setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
       }
-    } finally {
+    }
+    // Отказ по существу (400/409) перечитывать нечего: кнопку отпускаем сразу,
+    // чтобы человек исправил ввод и повторил.
+    if (!accepted) {
       setBusy(false);
+      return false;
     }
     try {
       await reload();
     } catch {
       // Запись уже принята — сбой перечитывания её не отменяет.
     }
-    return accepted;
+    // Кнопка ждёт перечитывания (F-R43-3e). Ключ команды уже заменён, а счётчики
+    // смены приходят только с reload: отпусти раньше — машинист увидит прежние
+    // числа, нажмёт второй раз, и та же выработка уйдёт с новым ключом, то есть
+    // задвоится. Касается и записи, ушедшей в офлайн-очередь.
+    setBusy(false);
+    return true;
   }, [reload]);
 
   const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);

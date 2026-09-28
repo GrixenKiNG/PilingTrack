@@ -3,9 +3,35 @@ import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import type {ChecklistView, OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — свои стили; в тесте они не нужны.
 vi.mock('../../operator-concept.css', () => ({}));
+/**
+ * Источник данных подменён: приложение целиком проверяется на ответах сервера,
+ * приходящих в известном тесту порядке.
+ */
+const api = vi.hoisted(() => ({
+  currentPosition: vi.fn(async () => null),
+  fetchState: vi.fn(),
+  sendCommand: vi.fn(async () => undefined),
+  sendQueuedCommand: vi.fn(async () => undefined),
+  newCommandId: vi.fn(() => 'cmd-1'),
+}));
+vi.mock('@/components/piling/operator-mobile/api', () => ({
+  ApiError: class ApiError extends Error {},
+  QueuedOffline: class QueuedOffline extends Error {},
+  ...api,
+}));
+
 import {
-  gapsBySection, gapsNote, ppeOutcome, downtimeWindowProblem, ProductionForm, ScreenClosing,
+  gapsBySection, gapsNote, OperatorV10App, ppeOutcome, downtimeWindowProblem, ProductionForm, ScreenClosing,
 } from '../operator-v10-app';
+
+/** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return {promise, resolve};
+}
 
 /**
  * Ошибка чек-листа обязана называть раздел.
@@ -264,5 +290,81 @@ describe('запись выработки v10 и отказ сервера', () 
 
     await waitFor(() => expect(onLog).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(count.value).toBe(''));
+  });
+});
+
+/**
+ * F-R43-3e: кнопка выработки занята, пока экран не перечитан.
+ *
+ * Ключ команды меняется сразу по её принятию, а счётчики смены приходят только
+ * с перечитыванием. Отпусти кнопку раньше — машинист увидит прежние числа,
+ * нажмёт второй раз, и та же выработка уйдёт с новым ключом, то есть задвоится.
+ * Касается и записи, ушедшей в офлайн-очередь.
+ */
+const workState = {
+  phase: 'WORK',
+  productionDate: '2026-09-27',
+  shift: {id: 'shift-1', productionDate: '2026-09-27', startedAt: '2026-09-27T04:00:00.000Z'},
+  assignment: {equipmentId: 'eq-1', equipmentName: 'Liebherr LRH 100', siteName: 'Площадка'},
+  permit: {allowed: true, blocks: []},
+  identity: {
+    ppe: {confirmed: true, missing: []},
+    briefing: {ok: true},
+    knowledge: {ok: true},
+    documents: [],
+  },
+  checklists: [
+    {stage: 'PRESHIFT_INSPECTION', done: true, period: null},
+    {stage: 'SITE_READY', done: true, period: null},
+    {stage: 'EO_BEFORE', done: true, period: null},
+  ],
+  dictionaries: {
+    pileGrades: [{id: 'grade-1', name: 'С 20-35', lengthMm: 6000}],
+    drillingTypes: [],
+    downtimeReasons: [],
+  },
+  production: {piles: {count: 0, meters: 0}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
+  entries: [],
+} as unknown as OperatorMobileState;
+
+/** Открывает форму свай на «Работе» и вводит «12 шт». Возвращает поле числа. */
+async function openPilesForm(container: HTMLElement) {
+  fireEvent.click(await screen.findByRole('button', {name: 'Свая'}));
+  fireEvent.change(container.querySelector('select') as HTMLSelectElement, {target: {value: 'grade-1'}});
+  const count = container.querySelector('input[inputmode="decimal"]') as HTMLInputElement;
+  fireEvent.change(count, {target: {value: '12'}});
+  return count;
+}
+
+describe('принятая запись и незавершённое перечитывание экрана в v10', () => {
+  it('держит кнопку занятой и не отправляет ту же выработку второй раз', async () => {
+    const reload = deferred<OperatorMobileState>();
+    let calls = 0;
+    api.fetchState.mockImplementation(() => {
+      calls += 1;
+      return calls === 1 ? Promise.resolve(workState) : reload.promise;
+    });
+
+    const {container} = render(<OperatorV10App />);
+    const count = await openPilesForm(container);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    // Запись ушла, перечитывание началось и ещё не закончилось.
+    await waitFor(() => expect(api.fetchState).toHaveBeenCalledTimes(2));
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+
+    const busyButton = screen.getByRole('button', {name: 'Записываем…'});
+    expect(busyButton).toBeDisabled();
+    fireEvent.click(busyButton);
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+    // Форма ещё не очищена: набранное число ждёт подтверждения экрана.
+    expect(count.value).toBe('12');
+
+    reload.resolve(workState);
+
+    await waitFor(() => expect(count.value).toBe(''));
+    // Форма очищена по подтверждению сервера: отправлять больше нечего.
+    expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
   });
 });
