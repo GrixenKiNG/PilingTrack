@@ -168,6 +168,7 @@ export async function readJsonBody<T = unknown>(request: NextRequest): Promise<T
 }
 
 const MUTATION_RATE_LIMIT = { maxAttempts: 100, windowMs: 60_000, blockDurationMs: 60_000 };
+const MUTATION_SOURCE_LIMIT = { maxAttempts: 1800, windowMs: 60_000, blockDurationMs: 60_000 };
 
 /**
  * Wrap a mutation handler with CSRF check + rate limiting + error boundary.
@@ -193,6 +194,17 @@ export function withMutation<T extends any[]>(
     // in, and any caller can send a fresh value per request — each one was a
     // new, empty bucket, so the limit did not apply at all.
     const ip = getRateLimitIdentifier(request);
+    // The session bucket below is keyed by an UNVERIFIED token: a random
+    // Bearer per request opened a fresh 100/min budget (Codex out13 #5). One
+    // shared per-IP budget over all mutation routes is checked first, so no
+    // header choice escapes it. 1800/min is far above a crew behind one NAT.
+    const source = await rateLimiter.check(`mut:source:${ip}`, MUTATION_SOURCE_LIMIT);
+    if (!source.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(source.retryAfter || 60) } }
+      );
+    }
     const sessionToken = readSessionToken(request);
     const sessionScope = sessionToken
       ? createHash('sha256').update(sessionToken).digest('hex').slice(0, 24)
