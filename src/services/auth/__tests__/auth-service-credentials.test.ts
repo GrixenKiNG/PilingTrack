@@ -110,13 +110,15 @@ describe('authenticateUserByEmailPassword — кого пускать', () => {
     expect(resetMock).not.toHaveBeenCalled();
   });
 
-  it('на успехе сбрасывает только счётчик аккаунта, не общий по адресу', async () => {
+  it('на успехе сбрасывает счётчики аккаунта (с адреса и общий), но не общий по адресу', async () => {
     findUniqueMock.mockResolvedValue(userRow());
 
     await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
 
-    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(resetMock).toHaveBeenCalledTimes(2);
     expect(resetMock).toHaveBeenCalledWith('login:operator@piling.ru:10.0.0.1');
+    expect(resetMock).toHaveBeenCalledWith('login-acct:operator@piling.ru');
+    expect(resetMock).not.toHaveBeenCalledWith('login-ip:10.0.0.1');
   });
 
   it('на неизвестном адресе тратит время на bcrypt, как на известном', async () => {

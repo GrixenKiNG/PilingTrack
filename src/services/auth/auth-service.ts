@@ -8,7 +8,7 @@ import {
   createSessionToken,
   type SessionUser,
 } from '@/services/auth/session-service';
-import { rateLimiter, AUTH_RATE_LIMIT, LOGIN_IP_RATE_LIMIT } from '@/lib/rate-limiter';
+import { rateLimiter, AUTH_RATE_LIMIT, LOGIN_IP_RATE_LIMIT, ACCOUNT_LOCKOUT_RATE_LIMIT } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 import { withIdentityRole } from '@/core/security/identity-role';
 
@@ -111,6 +111,18 @@ export async function authenticateUserByEmailPassword(
     return { user: null, rateLimited: true, retryAfter: ipLimit.retryAfter };
   }
 
+  // Аккаунт целиком, со всех адресов (решение владельца 28.09.2026, вариант
+  // «б»). Прежняя схема сознательно не блокировала аккаунт глобально — чтобы
+  // чужой не мог запереть машиниста, — но тогда каждый новый IP давал ещё
+  // 5 попыток на тот же аккаунт. Владелец выбрал блок на 15 минут. Ключ — по
+  // почте, есть такой пользователь или нет: блок не выдаёт, существует ли
+  // аккаунт. Пользователя не ищем, пока аккаунт закрыт.
+  const lockoutKey = `login-acct:${email.toLowerCase()}`;
+  const lockout = await rateLimiter.check(lockoutKey, ACCOUNT_LOCKOUT_RATE_LIMIT);
+  if (!lockout.allowed) {
+    return { user: null, rateLimited: true, retryAfter: lockout.retryAfter };
+  }
+
   // Account bucket is scoped to email+IP, not bare email: a stranger firing
   // wrong passwords at a known email must not lock the real owner out from
   // their own address (lockout-DoS). Brute-forcing one account across many
@@ -154,6 +166,7 @@ export async function authenticateUserByEmailPassword(
 
     await upgradeLegacyPasswordIfNeeded(user.id, password, verification.needsUpgrade);
     await rateLimiter.reset(accountKey);
+    await rateLimiter.reset(lockoutKey);
     return { user: toSessionUser(user), rateLimited: false };
   } catch (err) {
     logger.error('authenticateUserByEmailPassword failed', err);
