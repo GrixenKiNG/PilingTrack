@@ -9,12 +9,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { findMany, sheets } = vi.hoisted(() => ({
+const { findMany, sheets, getSettings } = vi.hoisted(() => ({
   findMany: vi.fn(),
   sheets: { current: [] as Sheet[] },
+  getSettings: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({ db: { report: { findMany } } }));
+vi.mock('@/modules/settings', () => ({ getSettings }));
 // Листы перехватываем до упаковки в ZIP: «Статус» и подпись итогов — текст
 // листа, а не бинарник.
 vi.mock('@/lib/xlsx-writer', () => ({
@@ -84,6 +86,8 @@ describe('exportReportsXlsx — статус смены', () => {
   beforeEach(() => {
     sheets.current = [];
     findMany.mockReset();
+    getSettings.mockReset();
+    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: 'ООО «ОРИОН-Строй»', inn: '7701234567' });
   });
 
   it('печатает «Статус» в детализации: черновик и сданный', async () => {
@@ -92,9 +96,40 @@ describe('exportReportsXlsx — статус смены', () => {
     await exportReportsXlsx({ tenantId: 'tenant-a' });
 
     const detail = sheet('Детализация');
-    expect(detail.rows[0]).toContain('Статус');
-    expect(detail.rows[1][3]).toBe('черновик (смена не сдана)');
-    expect(detail.rows[2][3]).toBe('сдан');
+    const header = detail.rows.findIndex((row) => row[0] === 'ID отчёта');
+    expect(detail.rows[header]).toContain('Статус');
+    expect(detail.rows[header + 1][3]).toBe('черновик (смена не сдана)');
+    expect(detail.rows[header + 2][3]).toBe('сдан');
+  });
+
+  /**
+   * Реквизиты выгрузки (F-R44-9). Файл уходит в переписку или подшивается —
+   * без организации, периода и отметки «выгружено» проверить его вне интерфейса
+   * нечем. Отметка «Выгружено» — по поясу организации, как в журнале забивки.
+   */
+  it('печатает реквизиты над таблицей детализации', async () => {
+    findMany.mockResolvedValue([]);
+
+    await exportReportsXlsx({ tenantId: 'tenant-a', dateFrom: '2026-09-01', dateTo: '2026-09-30' });
+
+    const rows = sheet('Детализация').rows;
+    expect(rows[0]).toEqual(['Организация: ООО «ОРИОН-Строй», ИНН 7701234567']);
+    expect(rows[1][0]).toBe('Период: 01.09.2026 — 30.09.2026');
+    expect(String(rows[2][0])).toMatch(/^Выгружено: \d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$/);
+    // Пустая строка отделяет реквизиты от шапки таблицы.
+    expect(rows[3]).toEqual([]);
+    expect(rows[4][0]).toBe('ID отчёта');
+  });
+
+  it('без названия организации и ИНН строку организации не печатает', async () => {
+    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
+    findMany.mockResolvedValue([]);
+
+    await exportReportsXlsx({ tenantId: 'tenant-a' });
+
+    const rows = sheet('Детализация').rows;
+    expect(rows[0][0]).toBe('Период: — — —');
+    expect(rows.some((row) => String(row[0]).startsWith('Организация'))).toBe(false);
   });
 
   it('подписывает итоги периода, в который попали несданные смены', async () => {

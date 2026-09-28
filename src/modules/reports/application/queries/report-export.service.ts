@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
 import { formatRuDate } from '@/lib/format';
+import { getSettings } from '@/modules/settings';
 
 /**
  * Ячейка CSV: экранирование кавычек плюс защита от подстановки формул.
@@ -210,6 +211,32 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
   return BOM + header + '\n' + csvLines.join('\n');
 }
 
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ. */
+function printYmd(ymd: string): string {
+  const [year, month, day] = ymd.split('-');
+  return `${day}.${month}.${year}`;
+}
+
+/** День журнала в печатном виде — ДД.ММ.ГГГГ по поясу тенанта. */
+function printDay(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: timezone,
+  });
+}
+
+/** Момент времени в печатном виде — ДД.ММ.ГГГГ ЧЧ:ММ в поясе тенанта. */
+function printMoment(date: Date, timezone: string): string {
+  const time = date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
+  return `${printDay(date.toISOString(), timezone)} ${time}`;
+}
+
 /**
  * Та же выгрузка отчётов, но настоящим .xlsx. В отличие от CSV числа лежат
  * числами (Excel их суммирует без «преобразования текста»), а итоги вынесены
@@ -219,14 +246,36 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
 export async function exportReportsXlsx(filters: ReportExportFilters): Promise<Buffer> {
   const { buildXlsx } = await import('@/lib/xlsx-writer');
   const reports = await fetchReportsForExport(filters);
+  // Пояс и реквизиты тенанта — те же, что печатает журнал забивки (F-R17-1):
+  // отметка «Выгружено» обязана стоять по поясу организации, а не сервера.
+  const { timezone, companyName, inn } = await getSettings(filters.tenantId);
 
   const shift = (t: string) => (t === 'NIGHT' ? 'Ночная' : 'Дневная');
 
+  // Реквизиты выгрузки — над таблицей (F-R44-9). Файл уходит в переписку или
+  // подшивается, и по нему должно быть видно, чья это организация, за какой
+  // период и когда выгружен: иначе проверить его вне интерфейса нечем. Те же
+  // три факта журнал забивки печатает на титуле. Пустые части организации не
+  // печатаем — строка «Организация: , ИНН» хуже её отсутствия.
+  const organisation = [
+    companyName ? `Организация: ${companyName}` : null,
+    inn ? `ИНН ${inn}` : null,
+  ].filter((part): part is string => part !== null).join(', ');
+  const requisites: (string | number | null)[][] = [
+    ...(organisation ? [[organisation]] : []),
+    [`Период: ${filters.dateFrom ? printYmd(filters.dateFrom) : '—'} — ${filters.dateTo ? printYmd(filters.dateTo) : '—'}`],
+    [`Выгружено: ${printMoment(new Date(), timezone)}`],
+    [],
+  ];
+
   // --- Лист 1: детализация (числа — числами). ---
-  const detail: (string | number | null)[][] = [[
-    'ID отчёта', 'Дата', 'Смена', 'Статус', 'Объект', 'Оператор', 'Экипаж', 'Установка',
-    'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
-  ]];
+  const detail: (string | number | null)[][] = [
+    ...requisites,
+    [
+      'ID отчёта', 'Дата', 'Смена', 'Статус', 'Объект', 'Оператор', 'Экипаж', 'Установка',
+      'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
+    ],
+  ];
   for (const r of reports) {
     const base = [
       r.reportId, formatRuDate(r.date), shift(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
