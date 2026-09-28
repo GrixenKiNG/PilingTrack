@@ -1,7 +1,10 @@
 import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import {usePilingStore} from '@/lib/store';
 import {OperatorNextApp} from '../operator-next-app';
+import {draftStorageKey} from '../draft-storage';
+import {emptyFormFields, emptyWorkDraft} from '../drafts';
 import {checklistView, makeChecklist, makeState} from './fixtures';
 
 /**
@@ -38,6 +41,8 @@ let sent: Record<string, unknown>[];
 
 beforeEach(() => {
   globalThis.localStorage?.clear();
+  // Черновики хранятся по вошедшему: между тестами пользователя сбрасываем.
+  usePilingStore.setState({currentUser: null});
   sent = [];
   stateImpl = () => json({data: makeState()});
   commandImpl = () => json({data: {ok: true}});
@@ -554,11 +559,10 @@ describe('ревью №2, п.6: гонка установок — оба зап
 
     // Запрос Б уходит и «висит».
     fireEvent.click(screen.getByRole('button', {name: /СУ-2/}));
-    // Строки уже погашены — второй выбор делаем напрямую, чтобы получить
-    // настоящую гонку двух чтений по разным установкам (ревью №2, п.6).
-    const rowA = screen.getByRole('button', {name: /СУ-1/}) as HTMLButtonElement;
-    rowA.removeAttribute('disabled');
-    fireEvent.click(rowA);
+    // Строка уже погашена после первого касания; второй выбор подаём событием
+    // напрямую обработчику — нужна именно гонка двух чтений (ревью №3, п.5).
+    const rowA = screen.getByRole('button', {name: /СУ-1/});
+    rowA.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
 
     // Оба запроса действительно запущены: два чтения по разным установкам.
     await waitFor(() => expect(reads.some((url) => url.includes('equipmentId=eq-2'))).toBe(true));
@@ -584,10 +588,14 @@ describe('ревью №2, п.6: гонка установок — оба зап
 describe('ревью №2, п.9: обход в отсутствующий чек-лист не тупик', () => {
   it('сказано, что списка нет; «Обновить» и «Назад к смене» работают', async () => {
     let servicePresent = true;
-    stateImpl = () => json({data: makeState({
-      phase: 'CLOSING',
-      checklists: servicePresent ? [checklistView('EO_AFTER', false)] : [],
-    })});
+    let reads = 0;
+    stateImpl = () => {
+      reads += 1;
+      return json({data: makeState({
+        phase: 'CLOSING',
+        checklists: servicePresent ? [checklistView('EO_AFTER', false)] : [],
+      })});
+    };
     render(<OperatorNextApp />);
 
     fireEvent.click(await screen.findByRole('button', {name: /Выполнить осмотр после работы/}));
@@ -597,11 +605,18 @@ describe('ревью №2, п.9: обход в отсутствующий чек
     await act(async () => { globalThis.dispatchEvent(new Event('online')); });
 
     expect(await screen.findByText(/Сервер не отдал этот чек-лист/)).toBeInTheDocument();
+    // «Обновить» действительно спрашивает сервер заново (ревью №3, п.6).
+    const before = reads;
     fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
-    expect(await screen.findByText(/Сервер не отдал этот чек-лист/)).toBeInTheDocument();
+    await waitFor(() => expect(reads).toBeGreaterThan(before));
 
-    fireEvent.click(screen.getByRole('button', {name: 'Назад к смене'}));
-    expect(await screen.findByText('Чек-лист осмотра после работы не получен')).toBeInTheDocument();
+    // Список восстановился — вместо заглушки показывается сам осмотр.
+    servicePresent = true;
+    fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
+    expect(await screen.findByTestId('inspection-counter')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Назад'}));
+    expect(await screen.findByText('Выполнить осмотр после работы')).toBeInTheDocument();
   });
 });
 
@@ -770,5 +785,391 @@ describe('ревью №2, C и находка Д1: осмотр отклады�
 
     fireEvent.click(screen.getByRole('button', {name: /Отложить осмотр/}));
     expect(await screen.findByText(/Осмотр сохранён на устройстве, отправить можно, когда появится связь/)).toBeInTheDocument();
+  });
+});
+
+describe('ревью №3, п.1: поздняя загрузка чужой смены не трогает черновики', () => {
+  it('фото смены А догрузилось после перехода к смене Б — черновики Б целы', async () => {
+    const shiftOne = () => makeState({
+      phase: 'WORK',
+      checklists: [makeChecklist({stage: 'TB_PILING', title: 'ТБ: забивка свай'}), checklistView('TB_DRILLING', true)],
+    });
+    stateImpl = () => json({data: shiftOne()});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+
+    // Смена А: открываем осмотр ТБ и запускаем загрузку снимка к неисправности.
+    fireEvent.click(screen.getAllByRole('button', {name: /Записать сваи/})[0]);
+    fireEvent.click(await screen.findByRole('button', {name: /Пройти чек-лист ТБ/}));
+    const leak = await screen.findByTestId('inspection-item-i-leak');
+    fireEvent.click(within(leak).getByRole('button', {name: 'Неисправность'}));
+
+    // Медиа-цепочка под нашим контролем: подтверждение загрузки «висит».
+    const baseFetch = globalThis.fetch as unknown as (input: unknown, init?: RequestInit) => Promise<Response>;
+    const mediaGate = deferred<void>();
+    globalThis.fetch = vi.fn(async (input: unknown, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/media') return json({mediaId: 'm-late', uploadUrl: 'https://media.test/put/m-late'});
+      if (url === 'https://media.test/put/m-late') {
+        await mediaGate.promise;
+        return json({ok: true});
+      }
+      if (url === '/api/media/m-late/confirm') return json({ok: true});
+      return baseFetch(input, init);
+    }) as unknown as typeof fetch;
+
+    const fileInput = leak.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(fileInput, 'files', {value: [new File(['a'], 'a.jpg', {type: 'image/jpeg'})], configurable: true});
+    fireEvent.change(fileInput);
+
+    // Пока загрузка висит, оболочка переходит к смене Б (перечитывание по связи).
+    stateImpl = () => json({data: makeState({
+      phase: 'WORK',
+      shift: {id: 'shift-2', productionDate: '2026-09-27', startedAt: '2026-09-27T04:00:00.000Z', state: 'OPEN'},
+      checklists: [makeChecklist({stage: 'TB_PILING', title: 'ТБ: забивка свай'}), checklistView('TB_DRILLING', true)],
+    })});
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('queued-switch')]));
+    await act(async () => { globalThis.dispatchEvent(new Event('online')); });
+
+    // На смене Б: закрываем осмотр и заводим свой черновик — число 7.
+    fireEvent.click(await screen.findByRole('button', {name: 'Назад'}));
+    fireEvent.click(screen.getAllByRole('button', {name: /Записать сваи/})[0]);
+    fireEvent.click(screen.getByRole('button', {name: /С 100\.30/}));
+    fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '7'}});
+
+    // Поздняя загрузка завершается: её обработчик остался от смены А.
+    await act(async () => {
+      mediaGate.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Черновики Б не изменились.
+    expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(7);
+    fireEvent.click(screen.getByRole('button', {name: /Пройти чек-лист ТБ/}));
+    const levelB = await screen.findByTestId('inspection-item-i-level');
+    expect(within(levelB).getByRole('button', {name: 'Норма'})).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText(/Снимков приложено/)).toBeNull();
+  });
+});
+
+describe('ревью №3, п.2: паспорт сваи — черновик, блокировка, очистка', () => {
+  it('переход в обходной экран и обратно — паспорт на месте', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    fireEvent.change(await screen.findByPlaceholderText('С-130'), {target: {value: 'С-301'}});
+
+    // Обходной экран (инструктаж) размонтирует экран работы — черновик должен вернуться.
+    fireEvent.click(screen.getByRole('button', {name: 'ТБ'}));
+    fireEvent.click(await screen.findByRole('button', {name: /Ознакомление с инструкциями/}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Назад'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Смена'}));
+    expect(await screen.findByPlaceholderText('С-130')).toHaveValue('С-301');
+  });
+
+  it('черновик паспорта переживает перезагрузку страницы', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    const first = render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    fireEvent.change(await screen.findByPlaceholderText('С-130'), {target: {value: 'С-402'}});
+    // Черновик оседает в хранилище сразу по вводу.
+    const snapshot = globalThis.localStorage.getItem(draftStorageKey(null, 'shift-1'));
+    expect(snapshot ?? '').toContain('С-402');
+    first.unmount();
+
+    render(<OperatorNextApp />);
+    await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-402'));
+  });
+
+  it('подтверждённый паспорт очищается сразу, до перечитывания; поля закрыты', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    fireEvent.change(await screen.findByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-77'}});
+
+    const slowReload = deferred<Response>();
+    let delayReads = false;
+    stateImpl = () => (delayReads ? slowReload.promise : json({data: makeState({phase: 'WORK'})}));
+    delayReads = true;
+
+    fireEvent.click(screen.getByRole('button', {name: /Записать сваю с паспортом/}));
+    await waitFor(() => expect(sent.some((item) => item.command === 'log-production')).toBe(true));
+    // до перечитывания: номер очищен формой, поля закрыты на время отправки
+    await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue(''));
+    expect(screen.getByPlaceholderText('С-130')).toBeDisabled();
+    const again = screen.queryByRole('button', {name: /Записываем/});
+    if (again) {
+      fireEvent.click(again);
+      await act(async () => { await Promise.resolve(); });
+    }
+    expect(sent.filter((item) => item.command === 'log-production')).toHaveLength(1);
+
+    slowReload.resolve(json({data: makeState({phase: 'WORK'})}));
+    await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+    // В хранилище подтверждённого паспорта нет — он не воскреснет при перезагрузке.
+    const raw = globalThis.localStorage.getItem(draftStorageKey(null, 'shift-1'));
+    const stored = raw ? JSON.parse(raw) as {passport?: unknown} : null;
+    expect(stored?.passport ?? null).toBeNull();
+  });
+});
+
+describe('ревью №3, п.3: единый цикл для очереди, происшествия и поправки', () => {
+  const correctionEntries = () => [{
+    id: 'e1', kind: 'PILES' as const, label: 'С 100.30 · 5 шт', value: 5, meters: 15,
+    occurredAt: '2026-09-27T05:00:00.000Z', corrections: [],
+  }];
+
+  it('ветка очереди: блокировка до подтверждения, очистка и единственная отправка', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await openPileForm();
+
+    const gate = deferred<Response>();
+    commandImpl = () => gate.promise;
+    fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
+    // Пока команда в пути — поля закрыты, но ещё заполнены: очистка по подтверждению.
+    await waitFor(() => expect(screen.getByLabelText('Сколько свай забито, шт')).toBeDisabled());
+    expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(5);
+
+    // Обрыв: запись легла в очередь.
+    gate.reject(new TypeError('network down'));
+    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+    const stored = JSON.parse(globalThis.localStorage.getItem(STORAGE_KEY) ?? '[]') as unknown[];
+    expect(stored).toHaveLength(1);
+    expect(sent.filter((item) => item.command === 'log-production')).toHaveLength(1);
+  });
+
+  it('происшествие: форма закрывается по подтверждению, отправка одна', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: 'Ещё'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Записать происшествие'}));
+    fireEvent.click(screen.getByRole('button', {name: /Рабочая зона/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Утечка'}));
+    fireEvent.change(screen.getByLabelText('Как было дело'), {target: {value: 'Разлив масла у насосной'}});
+
+    // Команда «зависает»: поля обязаны быть закрыты (затвор вокруг формы).
+    const gate = deferred<Response>();
+    commandImpl = () => gate.promise;
+    fireEvent.click(screen.getByRole('button', {name: /^Записать происшествие$/}));
+    await waitFor(() => expect(screen.getByLabelText('Как было дело')).toBeDisabled());
+
+    // Перечитывание — отдельный шаг; форма закрывается и очищается по подтверждению.
+    const slowReload = deferred<Response>();
+    let delayReads = false;
+    stateImpl = () => (delayReads ? slowReload.promise : json({data: makeState({phase: 'WORK'})}));
+    delayReads = true;
+    gate.resolve(json({data: {ok: true}}));
+    await waitFor(() => expect(screen.queryByLabelText('Как было дело')).toBeNull());
+    expect(sent.filter((item) => item.command === 'report-incident')).toHaveLength(1);
+    slowReload.resolve(json({data: makeState({phase: 'WORK'})}));
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Записать происшествие'})).toBeInTheDocument());
+  });
+
+  it('поправка: форма закрывается по подтверждению, отправка одна', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK', entries: correctionEntries()})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    fireEvent.change(screen.getByLabelText(/Сколько свай было на самом деле/), {target: {value: '6'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+
+    // Команда «зависает»: поля закрыты, пока идёт отправка.
+    const gate = deferred<Response>();
+    commandImpl = () => gate.promise;
+    fireEvent.click(screen.getByRole('button', {name: /Записать поправку/}));
+    await waitFor(() => expect(screen.getByLabelText(/Сколько свай было на самом деле/)).toBeDisabled());
+
+    const slowReload = deferred<Response>();
+    let delayReads = false;
+    stateImpl = () => (delayReads ? slowReload.promise : json({data: makeState({phase: 'WORK', entries: correctionEntries()})}));
+    delayReads = true;
+    gate.resolve(json({data: {ok: true}}));
+    await waitFor(() => expect(screen.queryByLabelText(/Сколько свай было на самом деле/)).toBeNull());
+    expect(sent.filter((item) => item.command === 'correct-production')).toHaveLength(1);
+    slowReload.resolve(json({data: makeState({phase: 'WORK', entries: correctionEntries()})}));
+  });
+});
+
+describe('ревью №3, п.4: заметка закрытия читается в момент отправки', () => {
+  it('подготовка одна, комментарий — актуальный', async () => {
+    const closingState = () => makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]});
+    stateImpl = () => json({data: closingState()});
+    render(<OperatorNextApp />);
+    await screen.findByText('Проверьте итоги и закройте смену');
+    fireEvent.change(screen.getByPlaceholderText(/осталось 4 сваи/i), {target: {value: 'вывезти грунт к 19:00'}});
+
+    // Подготовка зависает на отправке записи из очереди.
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-1')]));
+    const slow = deferred<Response>();
+    commandImpl = (body) => (body && body.clientCommandId === 'q-1' ? slow.promise : json({data: {ok: true}}));
+
+    fireEvent.click(screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0]);
+    await waitFor(() => expect(sent.filter((item) => item.clientCommandId === 'q-1')).toHaveLength(1));
+
+    // Второе нажатие не запускает вторую подготовку.
+    fireEvent.click(screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0]);
+    await act(async () => { await Promise.resolve(); });
+    expect(sent.filter((item) => item.clientCommandId === 'q-1')).toHaveLength(1);
+
+    slow.resolve(json({data: {ok: true}}));
+    await waitFor(() => expect(sent.some((item) => item.command === 'close-shift')).toBe(true));
+    const closeBody = sent.find((item) => item.command === 'close-shift') as {comment?: string};
+    expect(closeBody.comment).toBe('вывезти грунт к 19:00');
+    expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(1);
+  });
+});
+
+describe('ревью №3, п.7: ключи происшествия и поправки не трогает чужой успех', () => {
+  it('успех выработки не меняет ключи происшествия и поправки', async () => {
+    const correctionEntries = () => [{
+      id: 'e1', kind: 'PILES' as const, label: 'С 100.30 · 5 шт', value: 5, meters: 15,
+      occurredAt: '2026-09-27T05:00:00.000Z', corrections: [],
+    }];
+    stateImpl = () => json({data: makeState({phase: 'WORK', entries: correctionEntries()})});
+    commandImpl = () => json({error: 'Validation failed'}, 400);
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+
+    // Происшествие отклонено — ключ зафиксирован.
+    fireEvent.click(screen.getByRole('button', {name: 'Ещё'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Записать происшествие'}));
+    fireEvent.click(screen.getByRole('button', {name: /Рабочая зона/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Утечка'}));
+    fireEvent.change(screen.getByLabelText('Как было дело'), {target: {value: 'Разлив масла у насосной'}});
+    fireEvent.click(screen.getByRole('button', {name: /^Записать происшествие$/}));
+    await waitFor(() => expect(sent.some((item) => item.command === 'report-incident')).toBe(true));
+    const incidentKey = sent[sent.length - 1].clientCommandId;
+
+    // Поправка отклонена — свой ключ.
+    fireEvent.click(screen.getByRole('button', {name: 'Смена'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    fireEvent.change(screen.getByLabelText(/Сколько свай было на самом деле/), {target: {value: '6'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+    fireEvent.click(screen.getByRole('button', {name: /Записать поправку/}));
+    await waitFor(() => expect(sent.some((item) => item.command === 'correct-production')).toBe(true));
+    const correctionKey = sent[sent.length - 1].clientCommandId;
+
+    // Успех выработки — соседний вид.
+    commandImpl = () => json({data: {ok: true}});
+    await openPileForm();
+    fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
+    await waitFor(() => expect(sent.filter((item) => item.command === 'log-production')).toHaveLength(1));
+    await screen.findByText('Запишите результат работы');
+
+    // Оба ключа не изменились: повторные отправки идут с теми же ключами.
+    fireEvent.click(screen.getByRole('button', {name: 'Ещё'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Записать происшествие'}));
+    fireEvent.click(screen.getByRole('button', {name: /Рабочая зона/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Утечка'}));
+    fireEvent.change(screen.getByLabelText('Как было дело'), {target: {value: 'Разлив масла у насосной'}});
+    fireEvent.click(screen.getByRole('button', {name: /^Записать происшествие$/}));
+    await waitFor(() => expect(sent.filter((item) => item.command === 'report-incident')).toHaveLength(2));
+    expect(sent[sent.length - 1].clientCommandId).toBe(incidentKey);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Смена'}));
+    // Форма поправки — внутри списка и пересоздаётся после форм выработки:
+    // открываем и заполняем заново, сверяя ключ ВИДА.
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    fireEvent.change(screen.getByLabelText(/Сколько свай было на самом деле/), {target: {value: '6'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+    fireEvent.click(screen.getByRole('button', {name: /Записать поправку/}));
+    await waitFor(() => expect(sent.filter((item) => item.command === 'correct-production')).toHaveLength(2));
+    expect(sent[sent.length - 1].clientCommandId).toBe(correctionKey);
+  });
+});
+
+describe('ревью №3, п.8: отказ чтения localStorage держит закрытие', () => {
+  it('брошенное исключение — «не удалось проверить», а не «пусто»', async () => {
+    const closingState = () => makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]});
+    stateImpl = () => json({data: closingState()});
+    render(<OperatorNextApp />);
+    await screen.findByText('Проверьте итоги и закройте смену');
+
+    const original = globalThis.localStorage.getItem.bind(globalThis.localStorage);
+    const spy = vi.spyOn(globalThis.localStorage, 'getItem').mockImplementation((key: string) => {
+      if (String(key) === STORAGE_KEY) throw new Error('storage denied');
+      return original(key);
+    });
+    try {
+      fireEvent.click(screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0]);
+      await waitFor(() => expect(screen.getAllByText(/Не удалось проверить очередь на устройстве/).length).toBeGreaterThan(0));
+      expect(sent.some((item) => item.command === 'close-shift')).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('ревью №3, C: черновики переживают перезагрузку страницы', () => {
+  it('перезагрузка возвращает черновик своей смены', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    const first = render(<OperatorNextApp />);
+    await openPileForm();
+    first.unmount();
+
+    render(<OperatorNextApp />);
+    expect(await screen.findByLabelText('Сколько свай забито, шт')).toHaveValue(5);
+    expect(screen.getByRole('button', {name: /С 100\.30/})).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('чужой черновик не показывается', async () => {
+    const foreign = {
+      work: {
+        ...emptyWorkDraft(),
+        mode: 'PILES' as const,
+        forms: {...emptyWorkDraft().forms, PILES: {...emptyFormFields(), reference: 'g1', count: '9'}},
+      },
+    };
+    globalThis.localStorage.setItem(draftStorageKey('user-b', 'shift-1'), JSON.stringify(foreign));
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    expect(screen.queryByLabelText('Сколько свай забито, шт')).toBeNull();
+  });
+
+  it('после подтверждения черновика в хранилище нет, и форма не поднимается', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    const first = render(<OperatorNextApp />);
+    await openPileForm();
+    fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
+    await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+
+    const raw = globalThis.localStorage.getItem(draftStorageKey(null, 'shift-1'));
+    const stored = raw ? JSON.parse(raw) as {work?: {forms?: {PILES?: {count?: string}}}} : null;
+    expect(stored?.work?.forms?.PILES?.count ?? '').toBe('');
+    first.unmount();
+
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    expect(screen.queryByLabelText('Сколько свай забито, шт')).toBeNull();
+  });
+
+  it('недоступное хранилище — честное «не сохранится при перезагрузке»', async () => {
+    const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    try {
+      stateImpl = () => json({data: makeState({phase: 'PRESHIFT_INSPECTION', checklists: [makeChecklist()]})});
+      render(<OperatorNextApp />);
+      await screen.findByTestId('inspection-item-i-level');
+      Object.defineProperty(globalThis.navigator, 'onLine', {value: false, configurable: true});
+      await act(async () => { globalThis.dispatchEvent(new Event('offline')); });
+
+      fireEvent.click(screen.getByRole('button', {name: /Отложить осмотр/}));
+      expect(await screen.findByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+      expect(screen.queryByText(/Осмотр сохранён на устройстве/)).toBeNull();
+    } finally {
+      setSpy.mockRestore();
+      delete (globalThis.navigator as unknown as Record<string, unknown>).onLine;
+    }
   });
 });

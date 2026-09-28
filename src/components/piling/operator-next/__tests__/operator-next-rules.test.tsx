@@ -63,6 +63,8 @@ function WorkHarness({
       state={state}
       busy={false}
       error={null}
+      userId={null}
+      storageOk
       draft={draft}
       onDraftChange={(updater) => setDraft((current) => updater(current))}
       onSubmitEntry={onSubmitEntry as never}
