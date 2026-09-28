@@ -97,8 +97,25 @@ const settingsNav: NavigationItem = { label: 'Настройки', href: '/admin
 export const ROLE_NAVIGATION: Record<UserRole, NavigationItem[]> = {
   OPERATOR: operatorNavigation,
   ASSISTANT: assistantNavigation,
+  // Механик ведёт технику: осмотры, наряды ТО, моточасы. Права на это у него
+  // есть (`authorization-service.ts`), а дорог в меню было две — «Готовность
+  // техники» и общий модуль охраны труда: до обслуживания, установок и бригад
+  // он добирался только по прямому адресу. Ниже — разделы, вход в которые его
+  // права действительно открывают; чужих (объекты, отчёты, аналитика) здесь
+  // по-прежнему нет.
   MECHANIC: [
     { label: 'Готовность техники', href: '/admin/to', icon: 'technical-readiness' },
+    // «Установки» (`equipment.read`, `admin/equipment/layout.tsx`): механик
+    // обслуживает машину по карточке — паспорт, документы, история ТО.
+    { label: 'Установки', href: '/admin/equipment', icon: 'equipment-rig' },
+    // «Обслуживание» (`maintenance.manage`, `admin/maintenance/layout.tsx`):
+    // наряды ТО и ремонты — ежедневная работа роли. Раньше попасть сюда можно
+    // было только вкладкой «Обслуживание ТО» чужого модуля готовности.
+    { label: 'Обслуживание', href: '/admin/maintenance', icon: 'work-order' },
+    // «Бригады» (`crews.read`, `admin/crews/layout.tsx`): механик возвращает
+    // машину бригаде после ремонта и обязан видеть, кому возвращает, — на это
+    // прямо указывает комментарий у права.
+    { label: 'Бригады', href: '/admin/crews', icon: 'crew' },
     { label: 'ТБ и допуски', href: SAFETY_MODULE_ROUTE, icon: 'accepted' },
   ],
   // Мастер смотрит за ходом работ на участке, инженер ОТ — за допусками и
