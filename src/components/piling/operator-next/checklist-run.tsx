@@ -12,6 +12,7 @@ import {uploadPhoto} from '@/components/piling/operator-mobile/api';
 import {ErrorNote, Panel, PanelTitle, Screen} from '@/components/piling/operator-mobile/ui';
 import {WarningsPanel} from '@/components/piling/operator-mobile/warnings-panel';
 import type {KnownAnswer} from '@/components/piling/operator-mobile/safety/known-answers';
+import {emptyChecklistDraft, type ChecklistDraft, type ChecklistDrafts} from './drafts';
 import {ActionButton, ReasonNote, StatusMark} from './parts';
 import {humanError} from './words';
 
@@ -29,25 +30,15 @@ const ANSWERS: {value: OperatorAnswer; label: string}[] = [
   {value: 'FAULT', label: 'Неисправность'},
 ];
 
-interface Draft {
-  answer?: OperatorAnswer;
-  note: string;
-  measures: Record<string, string>;
-  mediaIds: string[];
-  uploading: boolean;
-  uploadError: string | null;
-}
-
-const emptyDraft = (): Draft => ({note: '', measures: {}, mediaIds: [], uploading: false, uploadError: null});
-
 /**
  * Что было в пункте ДО массовой отметки раздела.
  *
  * ПОЧЕМУ ХРАНИМ СНИМОК. «Отменить» обязано вернуть прежнее, а не поставить
  * «норму» второй раз (находка №5 ревью: обработчик отмены снова писал `OK`).
- * Без снимка откатывать нечего.
+ * Без снимка откатывать нечего. Снимок живёт в экране: он нужен только внутри
+ * одного захода, ответы же хранятся выше — в черновиках оболочки.
  */
-type BulkBackup = Record<string, Record<string, Draft | undefined>>;
+type BulkBackup = Record<string, Record<string, ChecklistDraft | undefined>>;
 
 /** Пустая строка — не ноль: `Number('')` даёт 0, и незаполненный долив сошёл бы за заполненный. */
 function filled(raw: string | undefined): boolean {
@@ -60,21 +51,37 @@ function filled(raw: string | undefined): boolean {
  * СЧЁТЧИК ВЗЯТ ИЗ v5. Он отвечает на вопрос, который машинист задаёт себе на
  * каждом круге: «сколько ещё». Пока его не было, человек либо листал список
  * целиком, либо закрывал раздел «не глядя».
+ *
+ * ОТВЕТЫ ХРАНЯТСЯ ВЫШЕ ЭКРАНА. `key={checklist.stage}` пересоздаёт экран при
+ * каждом возврате, и внутреннее состояние умирало бы вместе с ответами
+ * (находка Д2 аудита). Экран управляемый: ответы приходят и меняются в оболочке.
  */
 export function ChecklistRunScreen({
-  checklist, warnings, busy, error, commandId, onSubmit, onBack, lastMeter, known = {},
+  checklist, warnings, busy, error, commandId, drafts, onDraftsChange,
+  onSubmit, onBack, onExit, lastMeter, known = {},
 }: {
   checklist: ChecklistView;
   warnings: WorkWarning[];
   busy: boolean;
   error: string | null;
   commandId: string;
+  /** Ответы этапа: пункт → черновик. */
+  drafts: ChecklistDrafts;
+  onDraftsChange: (updater: (current: ChecklistDrafts) => ChecklistDrafts) => void;
   onSubmit: (answers: ChecklistAnswer[]) => void;
   onBack?: () => void;
+  /**
+   * «Отложить осмотр» для осмотра фазы (находка Д1 аудита).
+   *
+   * У обходного осмотра есть «Назад»; у фазового выхода не было вовсе, и без
+   * связи осмотр нельзя было ни завершить, ни покинуть. Отложенный осмотр
+   * остаётся несданным, ответы сохранены, а «Следующее действие» ведёт обратно.
+   */
+  onExit?: () => void;
   lastMeter?: {engineHours: number; recordedAt: string} | null;
   known?: Record<string, KnownAnswer>;
 }) {
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const setDrafts = onDraftsChange;
   const [bulkBackup, setBulkBackup] = useState<BulkBackup>({});
   const [showGaps, setShowGaps] = useState(false);
 
@@ -83,8 +90,8 @@ export function ChecklistRunScreen({
     [checklist.sections],
   );
 
-  const update = (itemId: string, patch: Partial<Draft>) => {
-    setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...patch}}));
+  const update = (itemId: string, patch: Partial<ChecklistDraft>) => {
+    setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyChecklistDraft()), ...patch}}));
   };
 
   /**
@@ -98,7 +105,7 @@ export function ChecklistRunScreen({
    */
   const addMedia = (itemId: string, mediaId: string) => {
     setDrafts((current) => {
-      const draft = current[itemId] ?? emptyDraft();
+      const draft = current[itemId] ?? emptyChecklistDraft();
       return {...current, [itemId]: {...draft, uploading: false, mediaIds: [...draft.mediaIds, mediaId]}};
     });
   };
@@ -115,7 +122,7 @@ export function ChecklistRunScreen({
     // сам назовёт «Пункт не заполнен», и подставлять за человека «норму» нельзя.
     const built = items
       .filter((item) => known[item.id] || drafts[item.id]?.answer)
-      .map((item) => buildAnswer(item, drafts[item.id] ?? emptyDraft(), known[item.id]));
+      .map((item) => buildAnswer(item, drafts[item.id] ?? emptyChecklistDraft(), known[item.id]));
     return validateChecklistRun(items, built);
   }, [items, drafts, known]);
 
@@ -146,12 +153,12 @@ export function ChecklistRunScreen({
   const applyBulk = (section: ChecklistSection) => {
     const targets = bulkTargets(section);
     if (targets.length === 0) return;
-    const snapshot: Record<string, Draft | undefined> = {};
+    const snapshot: Record<string, ChecklistDraft | undefined> = {};
     for (const item of targets) snapshot[item.id] = drafts[item.id];
     setBulkBackup((current) => ({...current, [section.id]: snapshot}));
     setDrafts((current) => {
       const next = {...current};
-      for (const item of targets) next[item.id] = {...(next[item.id] ?? emptyDraft()), answer: 'OK'};
+      for (const item of targets) next[item.id] = {...(next[item.id] ?? emptyChecklistDraft()), answer: 'OK'};
       return next;
     });
   };
@@ -179,7 +186,7 @@ export function ChecklistRunScreen({
       setShowGaps(true);
       return;
     }
-    onSubmit(items.map((item) => buildAnswer(item, drafts[item.id] ?? emptyDraft(), known[item.id])));
+    onSubmit(items.map((item) => buildAnswer(item, drafts[item.id] ?? emptyChecklistDraft(), known[item.id])));
   };
 
   return (
@@ -200,6 +207,15 @@ export function ChecklistRunScreen({
             disabled={busy}
           />
           {onBack ? <ActionButton label="Назад" tone="ghost" onClick={onBack} /> : null}
+          {onExit ? (
+            <ActionButton
+              label="Отложить осмотр"
+              hint="Ответы сохранятся — вернётесь и продолжите"
+              disabled={busy}
+              reason="Подождите: осмотр отправляется."
+              onClick={onExit}
+            />
+          ) : null}
         </>
       )}
     >
@@ -239,8 +255,12 @@ export function ChecklistRunScreen({
               {canBulk || canceled ? (
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => (canceled ? cancelBulk(section) : applyBulk(section))}
-                  className="onx-quiet shrink-0 rounded-lg border px-3 text-2xs font-semibold"
+                  className={cn(
+                    'onx-quiet shrink-0 rounded-lg border px-3 text-2xs font-semibold',
+                    'disabled:cursor-not-allowed disabled:opacity-55',
+                  )}
                 >
                   {canceled ? 'Отменить' : 'Весь раздел — норма'}
                 </button>
@@ -256,7 +276,7 @@ export function ChecklistRunScreen({
                 <ItemRow
                   key={item.id}
                   item={item}
-                  draft={drafts[item.id] ?? emptyDraft()}
+                  draft={drafts[item.id] ?? emptyChecklistDraft()}
                   known={known[item.id]}
                   problem={problemByItem.get(item.id)}
                   lastMeter={lastMeter}
@@ -280,12 +300,12 @@ function ItemRow({
   item, draft, known, problem, lastMeter, disabled, onChange, onAddMedia, commandId,
 }: {
   item: ChecklistItem;
-  draft: Draft;
+  draft: ChecklistDraft;
   known?: KnownAnswer;
   problem?: string;
   lastMeter?: {engineHours: number; recordedAt: string} | null;
   disabled: boolean;
-  onChange: (patch: Partial<Draft>) => void;
+  onChange: (patch: Partial<ChecklistDraft>) => void;
   onAddMedia: (itemId: string, mediaId: string) => void;
   commandId: string;
 }) {
@@ -409,7 +429,7 @@ function ItemRow({
   );
 }
 
-function buildAnswer(item: ChecklistItem, draft: Draft, known?: KnownAnswer): ChecklistAnswer {
+function buildAnswer(item: ChecklistItem, draft: ChecklistDraft, known?: KnownAnswer): ChecklistAnswer {
   const measures = Object.fromEntries(
     Object.entries(draft.measures)
       .filter(([, value]) => filled(value))

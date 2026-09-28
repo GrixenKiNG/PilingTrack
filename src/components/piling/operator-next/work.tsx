@@ -123,82 +123,100 @@ export function WorkScreenNext({
       entry = {kind: 'DOWNTIME', reasonId: fields.reference, startedAt: interval.startedAt, endedAt: interval.endedAt, comment: fields.comment.trim() || undefined};
     }
     if (!entry || !formMode) return;
-    const ok = await onSubmitEntry(entry);
-    if (ok) {
-      // Чистим ровно ту форму, которая ушла, и ровно один раз.
-      onDraftChange((current) => ({...current, mode: 'NONE', forms: {...current.forms, [formMode]: emptyFormFields()}}));
-    }
+    // Очистку полей и закрытие формы ведёт оболочка в защищённом цикле
+    // (ревью №2): очистка — сразу по подтверждению, закрытие — по концу цикла,
+    // чтобы позднее закрытие не стёрло ничего, что человек успел изменить.
+    await onSubmitEntry(entry);
   };
 
-  if (mode === 'NONE') {
-    return (
-      <Screen title="Работа" subtitle={state.assignment?.equipmentName} tabs={tabs}>
-        <NextActionCard
-          title="Запишите результат работы"
-          hint="Сваи, бурение и простой записываются сразу. Каждая запись уходит на сервер, а без связи — в очередь на устройстве."
-          actionLabel={WORDS.logPiles}
-          onAction={() => open('PILES')}
-          disabled={busy}
+  const options = mode === 'DRILLING' ? state.dictionaries.drillingTypes : state.dictionaries.downtimeReasons;
+  const title = mode === 'NONE'
+    ? 'Работа'
+    : mode === 'PASSPORT'
+      ? 'Сваи с паспортом'
+      : mode === 'PILES' ? WORDS.logPiles : mode === 'DRILLING' ? WORDS.logDrilling : WORDS.logDowntime;
+  const dirty = Boolean(fields.reference || fields.count || fields.metersPerUnit || fields.started || fields.ended || fields.comment);
+
+  return (
+    <Screen
+      title={title}
+      subtitle={state.assignment?.equipmentName}
+      tabs={tabs}
+      footer={mode === 'PILES' || mode === 'DRILLING' || mode === 'DOWNTIME' ? (
+        <ActionButton
+          label={busy ? 'Записываем…' : 'Записать'}
+          hint={mode === 'PILES' && pileMeters > 0 ? `Автоподсчёт: ${fields.count} шт × ${(grade?.lengthMm ?? 0) / 1000} м = ${pileMeters.toFixed(1)} м.п.` : undefined}
+          onClick={() => void submit()}
+          disabled={busy || reason !== undefined}
+          reason={reason}
         />
+      ) : undefined}
+    >
+      {mode === 'NONE' ? (
+        <>
+          <NextActionCard
+            title="Запишите результат работы"
+            hint="Сваи, бурение и простой записываются сразу. Каждая запись уходит на сервер, а без связи — в очередь на устройстве."
+            actionLabel={WORDS.logPiles}
+            onAction={() => open('PILES')}
+            disabled={busy}
+          />
 
-        <WarningsPanel warnings={state.warnings} />
+          <WarningsPanel warnings={state.warnings} />
 
-        <Panel>
-          <PanelTitle>Итоги смены</PanelTitle>
-          <div className="mt-2">
-            <VolumeFact label="Свай за смену" count={state.production.piles.count} meters={state.production.piles.meters} />
-            <VolumeFact label="Лидерное бурение" count={state.production.drilling.count} meters={state.production.drilling.meters} />
-            <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
-          </div>
-        </Panel>
-
-        <StageTitle>Записать</StageTitle>
-        <div className="space-y-2">
-          <ActionButton label={WORDS.logPiles} hint="Крупными кнопками: марка, количество, метраж посчитается сам" onClick={() => open('PILES')} disabled={busy} />
-          <ActionButton label={WORDS.logDrilling} tone="ghost" onClick={() => open('DRILLING')} disabled={busy} />
-          <ActionButton label={WORDS.logDowntime} tone="ghost" onClick={() => open('DOWNTIME')} disabled={busy} />
-          <ActionButton label="Сваи с паспортом" tone="ghost" onClick={() => open('PASSPORT')} disabled={busy} />
-        </div>
-
-        <StageTitle hint="Происшествие и неисправность записываются на своих вкладках — они не про выработку, а про безопасность и технику.">
-          Происшествие и неисправность
-        </StageTitle>
-        <div className="space-y-2">
-          <ActionButton label={`Записать ${WORDS.incident.toLowerCase()}`} tone="ghost" onClick={() => onOpenTab('MORE')} />
-          <ActionButton label={`Записать ${WORDS.fault.toLowerCase()}`} tone="ghost" onClick={() => onOpenTab('EQUIPMENT')} />
-        </div>
-
-        <div className="pt-1">
-          {finishing ? (
-            <div className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
-              <p className="text-sm font-bold">
-                {WORDS.finishWork}? Дальше — осмотр после работы, новую выработку записать будет нельзя.
-              </p>
-              <p className="text-2xs text-muted-foreground">
-                За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин, простой {formatDowntimeHours(state.production.downtimeHours)}.
-              </p>
-              <ActionButton label="Да, работа завершена" tone="danger" onClick={onFinish} disabled={busy} />
-              <ActionButton label="Продолжить работу" tone="ghost" onClick={() => setFinishing(false)} />
+          <Panel>
+            <PanelTitle>Итоги смены</PanelTitle>
+            <div className="mt-2">
+              <VolumeFact label="Свай за смену" count={state.production.piles.count} meters={state.production.piles.meters} />
+              <VolumeFact label="Лидерное бурение" count={state.production.drilling.count} meters={state.production.drilling.meters} />
+              <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
             </div>
-          ) : (
-            <ActionButton label={WORDS.finishWork} tone="neutral" onClick={() => setFinishing(true)} disabled={busy} />
-          )}
-        </div>
+          </Panel>
 
-        <StageTitle>Журнал записей смены</StageTitle>
-        <Panel>
-          <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
-        </Panel>
+          <StageTitle>Записать</StageTitle>
+          <div className="space-y-2">
+            <ActionButton label={WORDS.logPiles} hint="Крупными кнопками: марка, количество, метраж посчитается сам" onClick={() => open('PILES')} disabled={busy} />
+            <ActionButton label={WORDS.logDrilling} tone="ghost" onClick={() => open('DRILLING')} disabled={busy} />
+            <ActionButton label={WORDS.logDowntime} tone="ghost" onClick={() => open('DOWNTIME')} disabled={busy} />
+            <ActionButton label="Сваи с паспортом" tone="ghost" onClick={() => open('PASSPORT')} disabled={busy} />
+          </div>
 
-        <ErrorNote message={error} />
-      </Screen>
-    );
-  }
+          <StageTitle hint="Происшествие и неисправность записываются на своих вкладках — они не про выработку, а про безопасность и технику.">
+            Происшествие и неисправность
+          </StageTitle>
+          <div className="space-y-2">
+            <ActionButton label={`Записать ${WORDS.incident.toLowerCase()}`} tone="ghost" onClick={() => onOpenTab('MORE')} />
+            <ActionButton label={`Записать ${WORDS.fault.toLowerCase()}`} tone="ghost" onClick={() => onOpenTab('EQUIPMENT')} />
+          </div>
 
-  if (mode === 'PASSPORT') {
-    if (needsSafety) {
-      return (
-        <Screen title="Сваи с паспортом" tabs={tabs}>
+          <div className="pt-1">
+            {finishing ? (
+              <div className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
+                <p className="text-sm font-bold">
+                  {WORDS.finishWork}? Дальше — осмотр после работы, новую выработку записать будет нельзя.
+                </p>
+                <p className="text-2xs text-muted-foreground">
+                  За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин, простой {formatDowntimeHours(state.production.downtimeHours)}.
+                </p>
+                <ActionButton label="Да, работа завершена" tone="danger" onClick={onFinish} disabled={busy} />
+                <ActionButton label="Продолжить работу" tone="ghost" onClick={() => setFinishing(false)} />
+              </div>
+            ) : (
+              <ActionButton label={WORDS.finishWork} tone="neutral" onClick={() => setFinishing(true)} disabled={busy} />
+            )}
+          </div>
+
+          <StageTitle>Журнал записей смены</StageTitle>
+          <Panel>
+            <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
+          </Panel>
+
+          <ErrorNote message={error} />
+        </>
+      ) : null}
+
+      {mode === 'PASSPORT' && needsSafety ? (
+        <>
           <NextActionCard
             title="Сначала чек-лист ТБ"
             hint="Паспорт сваи открывается после инструктажа по безопасности работ."
@@ -206,11 +224,15 @@ export function WorkScreenNext({
             onAction={() => onOpenSafety('TB_PILING')}
           />
           <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
-        </Screen>
-      );
-    }
-    return (
-      <Screen title="Сваи с паспортом" subtitle={state.assignment?.equipmentName} tabs={tabs}>
+        </>
+      ) : null}
+
+      {/*
+        Форма паспорта НЕ размонтируется при «Назад к смене»: замеры паспорта —
+        полтора десятка полей, и терять их при каждом заходе нельзя (ревью №2).
+        Скрываем, а не выбрасываем; сменилась смена — форма начинается заново.
+      */}
+      <div key={state.shift?.id ?? 'no-shift'} hidden={mode !== 'PASSPORT' || needsSafety}>
         <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
         <Panel>
           <PanelTitle>Паспорт сваи</PanelTitle>
@@ -230,149 +252,132 @@ export function WorkScreenNext({
             />
           </div>
         </Panel>
-        <ErrorNote message={error} />
-      </Screen>
-    );
-  }
-
-  const options = mode === 'DRILLING' ? state.dictionaries.drillingTypes : state.dictionaries.downtimeReasons;
-  const title = mode === 'PILES' ? WORDS.logPiles : mode === 'DRILLING' ? WORDS.logDrilling : WORDS.logDowntime;
-  const dirty = Boolean(fields.reference || fields.count || fields.metersPerUnit || fields.started || fields.ended || fields.comment);
-
-  return (
-    <Screen
-      title={title}
-      subtitle={state.assignment?.equipmentName}
-      tabs={tabs}
-      footer={(
-        <ActionButton
-          label={busy ? 'Записываем…' : 'Записать'}
-          hint={mode === 'PILES' && pileMeters > 0 ? `Автоподсчёт: ${fields.count} шт × ${(grade?.lengthMm ?? 0) / 1000} м = ${pileMeters.toFixed(1)} м.п.` : undefined}
-          onClick={() => void submit()}
-          disabled={busy || reason !== undefined}
-          reason={reason}
-        />
-      )}
-    >
-      <div className="flex gap-2">
-        <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} disabled={locked} />
-        {/* Черновик стирается только по воле человека: случайный уход с формы
-            больше ничего не теряет. */}
-        <ActionButton label="Очистить" tone="ghost" onClick={() => patchFields(emptyFormFields())} disabled={locked || !dirty} />
+        {mode === 'PASSPORT' ? <ErrorNote message={error} /> : null}
       </div>
-      <p className="text-2xs text-muted-foreground">
-        Набранное сохраняется при переходах и уйдёт только после подтверждённой записи.
-      </p>
 
-      {mode === 'PILES' ? (
+      {mode !== 'NONE' && mode !== 'PASSPORT' ? (
         <>
-          <StageTitle hint="Марка не выбрана заранее — это делает человек, а не экран.">Марка сваи</StageTitle>
-          <div className="space-y-2">
-            {state.dictionaries.pileGrades.map((item) => (
-              <ChoiceButton
-                key={item.id}
-                label={item.name}
-                hint={item.lengthMm ? `длина ${item.lengthMm / 1000} м` : 'длина не указана'}
-                selected={fields.reference === item.id}
-                onClick={() => patchFields({reference: item.id})}
-                disabled={locked}
-              />
-            ))}
+          <div className="flex gap-2">
+            <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} disabled={locked} />
+            {/* Черновик стирается только по воле человека: случайный уход с формы
+                больше ничего не теряет. */}
+            <ActionButton label="Очистить" tone="ghost" onClick={() => patchFields(emptyFormFields())} disabled={locked || !dirty} />
           </div>
-          <NumberField label="Сколько свай забито, шт" value={fields.count} onChange={(value) => patchFields({count: value})} disabled={locked} />
-        </>
-      ) : null}
+          <p className="text-2xs text-muted-foreground">
+            Набранное сохраняется при переходах и уйдёт только после подтверждённой записи.
+          </p>
 
-      {mode === 'DRILLING' ? (
-        <>
-          <StageTitle>Тип бурения</StageTitle>
-          <div className="space-y-2">
-            {options.map((item) => (
-              <ChoiceButton
-                key={item.id}
-                label={item.name}
-                selected={fields.reference === item.id}
-                onClick={() => patchFields({reference: item.id})}
-                disabled={locked}
-              />
-            ))}
-          </div>
-          <NumberField label="Сколько скважин, шт" value={fields.count} onChange={(value) => patchFields({count: value})} disabled={locked} />
-          <NumberField label="Метраж одной скважины, м" value={fields.metersPerUnit} onChange={(value) => patchFields({metersPerUnit: value})} decimal disabled={locked} />
-          {drillVolume > 0 ? (
-            <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
-              Автоподсчёт: {fields.count} шт × {fields.metersPerUnit} м = {drillVolume.toFixed(1)} м.п.
-            </p>
+          {mode === 'PILES' ? (
+            <>
+              <StageTitle hint="Марка не выбрана заранее — это делает человек, а не экран.">Марка сваи</StageTitle>
+              <div className="space-y-2">
+                {state.dictionaries.pileGrades.map((item) => (
+                  <ChoiceButton
+                    key={item.id}
+                    label={item.name}
+                    hint={item.lengthMm ? `длина ${item.lengthMm / 1000} м` : 'длина не указана'}
+                    selected={fields.reference === item.id}
+                    onClick={() => patchFields({reference: item.id})}
+                    disabled={locked}
+                  />
+                ))}
+              </div>
+              <NumberField label="Сколько свай забито, шт" value={fields.count} onChange={(value) => patchFields({count: value})} disabled={locked} />
+            </>
           ) : null}
-        </>
-      ) : null}
 
-      {mode === 'DOWNTIME' ? (
-        <>
-          <StageTitle>Причина простоя</StageTitle>
-          <div className="space-y-2">
-            {options.map((item) => (
-              <ChoiceButton
-                key={item.id}
-                label={item.name}
-                selected={fields.reference === item.id}
-                onClick={() => patchFields({reference: item.id})}
+          {mode === 'DRILLING' ? (
+            <>
+              <StageTitle>Тип бурения</StageTitle>
+              <div className="space-y-2">
+                {options.map((item) => (
+                  <ChoiceButton
+                    key={item.id}
+                    label={item.name}
+                    selected={fields.reference === item.id}
+                    onClick={() => patchFields({reference: item.id})}
+                    disabled={locked}
+                  />
+                ))}
+              </div>
+              <NumberField label="Сколько скважин, шт" value={fields.count} onChange={(value) => patchFields({count: value})} disabled={locked} />
+              <NumberField label="Метраж одной скважины, м" value={fields.metersPerUnit} onChange={(value) => patchFields({metersPerUnit: value})} decimal disabled={locked} />
+              {drillVolume > 0 ? (
+                <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
+                  Автоподсчёт: {fields.count} шт × {fields.metersPerUnit} м = {drillVolume.toFixed(1)} м.п.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+
+          {mode === 'DOWNTIME' ? (
+            <>
+              <StageTitle>Причина простоя</StageTitle>
+              <div className="space-y-2">
+                {options.map((item) => (
+                  <ChoiceButton
+                    key={item.id}
+                    label={item.name}
+                    selected={fields.reference === item.id}
+                    onClick={() => patchFields({reference: item.id})}
+                    disabled={locked}
+                  />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <TimeField label="Начало" value={fields.started} onChange={(value) => patchFields({started: value})} disabled={locked} />
+                <TimeField label="Конец" value={fields.ended} onChange={(value) => patchFields({ended: value})} disabled={locked} />
+              </div>
+              <button
+                type="button"
+                className="onx-quiet w-full rounded-lg border bg-card text-2xs font-semibold"
                 disabled={locked}
+                onClick={() => {
+                  // Начало и конец считаются от «сейчас»: дату машинист не вводит,
+                  // переход через полночь разбирает общий модуль интервала.
+                  patchFields({ended: hhmmAgo(0), started: hhmmAgo(30)});
+                }}
+              >
+                Простой за последние 30 минут
+              </button>
+              {interval ? (
+                <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
+                  Длительность: {formatIntervalMinutes(interval.minutes)}
+                </p>
+              ) : (
+                <ReasonNote>Укажите начало и конец: конец должен быть позже начала. Ночная смена переходит через полночь — это учтено.</ReasonNote>
+              )}
+            </>
+          ) : null}
+
+          {/* У бурения комментария нет: в контракте `ProductionEntryInput` у
+              `DRILLING` поля `comment` не существует, и показывать поле, которое
+              никуда не уходит, значит обещать сохранение, которого не будет. */}
+          {mode === 'DRILLING' ? null : (
+            <label className="block">
+              <span className="text-2xs font-medium text-muted-foreground">Комментарий, если нужно</span>
+              <textarea
+                value={fields.comment}
+                disabled={locked}
+                onChange={(event) => patchFields({comment: event.target.value})}
+                rows={2}
+                className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
               />
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <TimeField label="Начало" value={fields.started} onChange={(value) => patchFields({started: value})} disabled={locked} />
-            <TimeField label="Конец" value={fields.ended} onChange={(value) => patchFields({ended: value})} disabled={locked} />
-          </div>
-          <button
-            type="button"
-            className="onx-quiet w-full rounded-lg border bg-card text-2xs font-semibold"
-            disabled={locked}
-            onClick={() => {
-              // Начало и конец считаются от «сейчас»: дату машинист не вводит,
-              // переход через полночь разбирает общий модуль интервала.
-              patchFields({ended: hhmmAgo(0), started: hhmmAgo(30)});
-            }}
-          >
-            Простой за последние 30 минут
-          </button>
-          {interval ? (
-            <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
-              Длительность: {formatIntervalMinutes(interval.minutes)}
-            </p>
-          ) : (
-            <ReasonNote>Укажите начало и конец: конец должен быть позже начала. Ночная смена переходит через полночь — это учтено.</ReasonNote>
+            </label>
           )}
+
+          {needsSafety ? (
+            <NextActionCard
+              title="Нужен чек-лист ТБ"
+              hint="Инструктаж по безопасности работ по этому виду работ обязателен до записи. Введённое сохранится — вернётесь и допишете."
+              actionLabel="Пройти чек-лист ТБ"
+              onAction={() => onOpenSafety(safetyStage)}
+            />
+          ) : null}
+
+          <ErrorNote message={error} />
         </>
       ) : null}
-
-      {/* У бурения комментария нет: в контракте `ProductionEntryInput` у
-          `DRILLING` поля `comment` не существует, и показывать поле, которое
-          никуда не уходит, значит обещать сохранение, которого не будет. */}
-      {mode === 'DRILLING' ? null : (
-        <label className="block">
-          <span className="text-2xs font-medium text-muted-foreground">Комментарий, если нужно</span>
-          <textarea
-            value={fields.comment}
-            disabled={locked}
-            onChange={(event) => patchFields({comment: event.target.value})}
-            rows={2}
-            className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
-          />
-        </label>
-      )}
-
-      {needsSafety ? (
-        <NextActionCard
-          title="Нужен чек-лист ТБ"
-          hint="Инструктаж по безопасности работ по этому виду работ обязателен до записи. Введённое сохранится — вернётесь и допишете."
-          actionLabel="Пройти чек-лист ТБ"
-          onAction={() => onOpenSafety(safetyStage)}
-        />
-      ) : null}
-
-      <ErrorNote message={error} />
     </Screen>
   );
 }

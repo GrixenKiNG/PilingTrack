@@ -24,9 +24,10 @@ import {AdmissionScreen, type AdmissionDetour} from './admission';
 import {ChecklistRunScreen} from './checklist-run';
 import {createCommandKeys, type CommandKind, type CommandKeys} from './command-keys';
 import {
-  emptyDrafts, emptyWorkDraft, type Drafts, type WorkDraft,
+  draftsForShift, emptyDrafts, emptyFormFields, emptyWorkDraft,
+  type ChecklistDrafts, type Drafts, type FormMode, type WorkDraft,
 } from './drafts';
-import {ErrorStrip, NoticeStrip, ActionButton} from './parts';
+import {ErrorStrip, NoticeStrip, ActionButton, NextActionCard} from './parts';
 import {ownPendingCount} from './queue-snapshot';
 import {ReportSendScreen} from './report-send';
 import {ShiftStartScreen} from './shift-start';
@@ -60,6 +61,9 @@ const PHASE_STAGE: Partial<Record<OperatorPhase, ChecklistStage>> = {
   SITE_READY: 'SITE_READY',
 };
 
+/** Пустая карта ответов: общая ссылка, чтобы не менять её на каждом рендере. */
+const EMPTY_CHECKLIST_DRAFTS: ChecklistDrafts = {};
+
 export function OperatorNextApp() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   /**
@@ -79,6 +83,11 @@ export function OperatorNextApp() {
   const [detour, setDetour] = useState<Detour | null>(null);
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Drafts>(() => emptyDrafts(null));
+  /**
+   * Отложенный осмотр: этап и смена. Смена хранится рядом с этапом, чтобы
+   * «отложено» прошлой смены не прилипало к такой же фазе новой.
+   */
+  const [checklistExit, setChecklistExit] = useState<{stage: ChecklistStage; shiftId: string | null} | null>(null);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
 
   /** Номер последнего запроса: применяем только его ответ (находка №4 ревью). */
@@ -87,6 +96,22 @@ export function OperatorNextApp() {
   const [flight] = useState<SingleFlight>(() => createSingleFlight());
   /** Ключи команд по видам: обновляется только тот, что прошёл. */
   const [keys] = useState<CommandKeys>(() => createCommandKeys());
+
+  const shiftId = state?.shift?.id ?? null;
+
+  /**
+   * Правка черновика работы.
+   *
+   * Живёт здесь, у оболочки: формы размонтируются в любой момент — вкладка,
+   * возврат к смене, обязательный осмотр. Объявлено до `run`, потому что `run`
+   * закрывает форму выработки по концу защищённого цикла (ревью №2).
+   */
+  const updateWorkDraft = useCallback((updater: (current: WorkDraft) => WorkDraft) => {
+    setDrafts((current) => {
+      const base = draftsForShift(current, shiftId);
+      return {...base, work: updater(base.work)};
+    });
+  }, [shiftId]);
 
   const reload = useCallback(async () => {
     const seq = ++requestSeq.current;
@@ -142,78 +167,145 @@ export function OperatorNextApp() {
   }, []);
 
   /**
+   * Вход в закрытие показывает вкладку «Смена» ОДИН раз.
+   *
+   * ПОЧЕМУ. Если человек после «Завершить работу» остался на «Технике», экран
+   * отчёта и кнопка закрытия оказывались за другой вкладкой (находка Д8). Но
+   * перекрывать выбор вкладки всю фазу закрытия нельзя — «Техника», ТБ и «Ещё»
+   * переставали открываться вовсе (находка ревью №2). Переключаем один раз, при
+   * входе в закрытие; дальше человек сам решает, куда смотреть.
+   */
+  const closingPhase = state?.phase === 'CLOSING' || state?.phase === 'CLOSED';
+  const wasClosing = useRef(false);
+  useEffect(() => {
+    if (closingPhase && !wasClosing.current) setWorkTab('SHIFT');
+    wasClosing.current = closingPhase;
+  }, [closingPhase]);
+
+  /**
    * Выполнить команду и сказать, получилось ли.
    *
-   * ПРАВИЛО 6 ЗАДАНИЯ. Форма очищается только по `true`. Успех — это сервер
-   * принял ИЛИ запись легла в очередь.
+   * ОДНА ОТПРАВКА — ОДИН ЗАЩИЩЁННЫЙ ЦИКЛ (ревью №2). Синхронный замок берётся
+   * до первого `await`, поля закрыты от первого нажатия до конца цикла, а
+   * подтверждённый черновик очищается СРАЗУ по подтверждению — не дожидаясь
+   * перечитывания. Перечитывание — отдельный шаг после: его сбой ничего не
+   * отменяет и форму не возвращает. Пока цикл не закончился, `busy` держит
+   * поля закрытыми, поэтому повторное нажатие не отправит ту же запись с новым
+   * ключом, а поздняя очистка не сотрёт новый ввод.
    *
-   * ЗАМОК ПОВТОРНОГО ВХОДА. Второе нажатие в том же такте не входит в команду
-   * вовсе: `busy` в состоянии React ещё не успел стать `true`.
-   *
-   * ПЕРЕЧИТЫВАНИЕ — ПОСЛЕ ПРИЁМА И НЕ ОТМЕНЯЕТ ЕГО. Сбой чтения после удачной
-   * записи оставляет экран рабочим и показывает «Записано», а не «Нет связи».
+   * ВОЗВРАТ — В МОМЕНТ ПОДТВЕРЖДЕНИЯ. «Успех» = сервер принял ИЛИ запись легла
+   * в очередь; экран получает `true` сразу, чтобы очистить свою форму, не
+   * дожидаясь чтения. Полное завершение цикла видно по `busy`.
    */
-  const run = useCallback(async (
+  const run = useCallback((
     kind: CommandKind | null,
     work: () => Promise<unknown>,
+    afterConfirm?: () => void,
   ): Promise<boolean> => {
-    const outcome = await flight.run(async () => {
+    let settle!: (ok: boolean) => void;
+    const confirmed = new Promise<boolean>((resolve) => { settle = resolve; });
+    void flight.run(async () => {
       setBusy(true);
       setActionError(null);
       setNotice(null);
       try {
         await work();
         if (kind) keys.renew(kind);
+        afterConfirm?.();
+        settle(true);
+        await reload();
         return {ok: true, queued: false};
       } catch (error) {
         if (error instanceof QueuedOffline) {
           if (kind) keys.renew(kind);
+          afterConfirm?.();
+          settle(true);
           return {ok: true, queued: true};
         }
         setActionError(humanError(error));
         // 409 — сервер уже в другом состоянии: перечитываем, чтобы экран не спорил.
         if (error instanceof ApiError && error.status === 409) void reload();
+        settle(false);
         return {ok: false, queued: false};
       } finally {
         setBusy(false);
       }
+    }).then((outcome) => {
+      // Повторное нажатие в том же такте: вторая команда не начиналась.
+      if (!outcome.started) settle(false);
+      const value = outcome.value;
+      if (!value || !value.ok) return;
+      // Форму выработки закрываем по КОНЦУ цикла: поля уже очищены по
+      // подтверждению, а закрытие теперь ничего не стирает (ревью №2).
+      if (kind === 'production') {
+        updateWorkDraft((current) => (current.mode === 'NONE' ? current : {...current, mode: 'NONE'}));
+      }
+      setDetour(null);
+      setNotice(value.queued
+        ? 'Записано на устройстве: отправим, когда появится связь.'
+        : 'Записано: сервер принял запись.');
     });
-    // Повторное нажатие в том же такте: команда уже идёт, второй не будет.
-    if (!outcome.started || !outcome.value) return false;
-    const {ok, queued} = outcome.value;
-    if (!ok) return false;
-    setDetour(null);
-    if (queued) {
-      setNotice('Записано на устройстве: отправим, когда появится связь.');
-      return true;
-    }
-    await reload();
-    setNotice('Записано: сервер принял запись.');
-    return true;
-  }, [reload, flight, keys]);
+    return confirmed;
+  }, [reload, flight, keys, updateWorkDraft]);
 
   // Что записано на устройстве и ещё не ушло. Плашка — одна на все экраны.
   const {queued, flush, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
-
-  const shiftId = state?.shift?.id ?? null;
 
   const draftsAreCurrent = drafts.shiftId === shiftId;
   const workDraft: WorkDraft = draftsAreCurrent ? drafts.work : emptyWorkDraft();
   const closeNote = draftsAreCurrent ? drafts.closeNote : '';
 
-  const updateWorkDraft = useCallback((updater: (current: WorkDraft) => WorkDraft) => {
-    setDrafts((current) => {
-      const base = current.shiftId === shiftId ? current : emptyDrafts(shiftId);
-      return {...base, work: updater(base.work)};
-    });
+  const updateCloseNote = useCallback((value: string) => {
+    setDrafts((current) => ({...draftsForShift(current, shiftId), closeNote: value}));
   }, [shiftId]);
 
-  const updateCloseNote = useCallback((value: string) => {
-    setDrafts((current) => {
-      const base = current.shiftId === shiftId ? current : emptyDrafts(shiftId);
-      return {...base, closeNote: value};
-    });
+  /** Заметка отправленной смены — не черновик: чистим по подтверждённому закрытию (ревью №2). */
+  const clearCloseNote = useCallback(() => {
+    setDrafts((current) => (
+      current.shiftId === shiftId ? {...current, closeNote: ''} : current
+    ));
   }, [shiftId]);
+
+  /**
+   * Поля отправленной выработки — не черновик: чистим сразу по подтверждению.
+   * Форму закрывает сам экран работы, когда цикл отпустит поля (ревью №2).
+   */
+  const clearSubmittedEntry = (entry: ProductionEntryInput) => {
+    if (entry.kind === 'PILE_PASSPORT') return;
+    const form: FormMode = entry.kind;
+    setDrafts((current) => {
+      const base = draftsForShift(current, shiftId);
+      return {...base, work: {...base.work, forms: {...base.work.forms, [form]: emptyFormFields()}}};
+    });
+  };
+
+  const checklistDraftsFor = (stage: ChecklistStage): ChecklistDrafts => (
+    draftsAreCurrent ? drafts.checklists[stage] ?? EMPTY_CHECKLIST_DRAFTS : EMPTY_CHECKLIST_DRAFTS
+  );
+
+  /**
+   * Правка ответов осмотра.
+   *
+   * Ответы живут здесь, а не в экране: `key={checklist.stage}` пересоздаёт экран
+   * при каждом возврате, и ответы терялись при «Назад» (находка Д2 аудита).
+   * Ключ — этап: ответы сданного осмотра чистятся по подтверждённой отправке.
+   */
+  const updateChecklistDrafts = (stage: ChecklistStage, updater: (current: ChecklistDrafts) => ChecklistDrafts) => {
+    setDrafts((current) => {
+      const base = draftsForShift(current, shiftId);
+      return {...base, checklists: {...base.checklists, [stage]: updater(base.checklists[stage] ?? {})}};
+    });
+  };
+
+  /** Ответы отправленного этапа больше не черновик: чистим по приёму сервером. */
+  const forgetChecklistDrafts = (stage: ChecklistStage) => {
+    setDrafts((current) => {
+      if (current.shiftId !== shiftId) return current;
+      const next = {...current.checklists};
+      delete next[stage];
+      return {...current, checklists: next};
+    });
+  };
 
   if (forbidden) {
     return (
@@ -267,23 +359,12 @@ export function OperatorNextApp() {
   const shift = state.shift;
   const alarmingIncidents = state.incidents.filter((incident) => incident.reviewedAt === null).length;
 
-  /**
-   * На закрытии смены показываем вкладку «Смена» независимо от прежнего выбора.
-   *
-   * ПОЧЕМУ. Если человек после «Завершить работу» остался на «Технике», экран
-   * отчёта и кнопка закрытия оказывались за другой вкладкой, хотя следующий шаг
-   * смены — именно закрытие (находка Д8 аудита). Не сбрасываем выбор человека, а
-   * показываем нужное сейчас: вернуться на «Технику» он сможет после закрытия.
-   */
-  const closingPhase = state.phase === 'CLOSING' || state.phase === 'CLOSED';
-  const effectiveTab: WorkTab = closingPhase ? 'SHIFT' : workTab;
-
   // Вкладка «Смена» называется одинаково всю смену: меняется только заголовок
   // внутри экрана. Пока название вкладки бегало (Допуск → Работа → Сдача),
   // вернувшийся вечером человек не находил привычную кнопку (находка №11).
   const tabBar = (
     <TabBar<WorkTab>
-      active={effectiveTab}
+      active={workTab}
       onSelect={setWorkTab}
       tabs={[
         {id: 'SHIFT', label: 'Смена'},
@@ -296,13 +377,25 @@ export function OperatorNextApp() {
 
   const stage = detour?.kind === 'CHECKLIST' ? detour.stage : PHASE_STAGE[state.phase] ?? null;
   const checklist = stage ? state.checklists.find((candidate) => candidate.stage === stage) : undefined;
-  // Вкладки доступны уже после приёмки, но прячутся на время чек-листа и
-  // обходных экранов: посреди осмотра переключаться некуда.
-  const tabsVisible = !detour && !checklist && state.phase !== 'IDENTITY' && state.phase !== 'ADMISSION';
+  // Фазовый осмотр можно ОТЛОЖИТЬ: ответы сохраняются, человек возвращается к
+  // смене, вкладки доступны, а «Следующее действие» ведёт обратно к осмотру —
+  // допуск к работе без завершённого осмотра не выдаётся (находка Д1).
+  const checklistExited = Boolean(
+    checklist && !detour && checklistExit?.stage === checklist.stage && checklistExit.shiftId === shiftId,
+  );
+  // Вкладки доступны уже после приёмки, но прячутся на время осмотра и обходных
+  // экранов: посреди осмотра переключаться некуда. Отложенный осмотр не запирает.
+  const tabsVisible = !detour && !(checklist && !checklistExited) && state.phase !== 'IDENTITY' && state.phase !== 'ADMISSION';
+  // Вкладка открыта поверх смены; смена при этом НЕ размонтируется: черновик
+  // паспорта сваи живёт внутри своей формы и иначе терялся бы (ревью №2).
+  const tabActive = tabsVisible && workTab !== 'SHIFT';
+  const shiftTabs = tabActive ? undefined : tabsVisible ? tabBar : undefined;
 
   const submitChecklist = (checklistStage: ChecklistStage) => (answers: ChecklistAnswer[]) => {
     const assignment = state.assignment;
     if (!shift || !assignment) return;
+    // Ответы сданного осмотра — не черновик: оболочка чистит их сразу по
+    // подтверждению, не дожидаясь перечитывания (ревью №2).
     void run('checklist', () => sendCommand({
       command: 'submit-checklist',
       clientCommandId: keys.get('checklist'),
@@ -310,68 +403,45 @@ export function OperatorNextApp() {
       equipmentId: assignment.equipmentId,
       stage: checklistStage,
       answers,
-    }));
+    }), () => forgetChecklistDrafts(checklistStage));
   };
 
   const closeShift = async (comment: string) => {
     if (!shift) return;
-    // Попытка отправить всё, что лежит, и свежий пересчёт очереди
-    // НЕПОСРЕДСТВЕННО перед закрытием: между показом экрана и нажатием связь
-    // могла появиться, а записи — уйти.
-    await flush();
-    const fresh = ownPendingCount();
-    if (fresh !== 0) {
-      setActionError(fresh < 0
-        ? 'Не удалось проверить очередь на устройстве. Обновите экран и повторите.'
-        : `На устройстве ${fresh} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`);
+    // Замок и блокировка полей — ДО первого `await flush()`: пока идёт
+    // подготовка, заметка не может измениться, а повторное нажатие не запускает
+    // вторую подготовку (ревью №2).
+    await flight.run(async () => {
+      setBusy(true);
+      setActionError(null);
       setNotice(null);
-      return;
-    }
-    await run(null, () => sendCommand({command: 'close-shift', shiftId: shift.id, comment}));
+      try {
+        // Попытка отправить всё, что лежит, и свежий пересчёт очереди
+        // НЕПОСРЕДСТВЕННО перед закрытием: между показом экрана и нажатием
+        // связь могла появиться, а записи — уйти.
+        await flush();
+        const fresh = ownPendingCount();
+        if (fresh !== 0) {
+          setActionError(fresh < 0
+            ? 'Не удалось проверить очередь на устройстве. Обновите экран и повторите.'
+            : `На устройстве ${fresh} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`);
+          return;
+        }
+        await sendCommand({command: 'close-shift', shiftId: shift.id, comment});
+        // Подтверждено: заметка этой смены больше не черновик.
+        clearCloseNote();
+        await reload();
+        setNotice('Записано: сервер принял запись.');
+      } catch (error) {
+        setActionError(humanError(error));
+        if (error instanceof ApiError && error.status === 409) void reload();
+      } finally {
+        setBusy(false);
+      }
+    });
   };
 
   const screen = (): ReactNode => {
-    if (tabsVisible && effectiveTab !== 'SHIFT') {
-      const title = effectiveTab === 'EQUIPMENT' ? 'Техника' : effectiveTab === 'SAFETY' ? 'Техника безопасности' : 'Ещё';
-      return (
-        <Screen title={title} subtitle={state.assignment?.equipmentName} tabs={tabBar}>
-          {effectiveTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
-          {effectiveTab === 'SAFETY' ? (
-            <SafetyTab
-              state={state}
-              onOpen={(step) => setDetour(
-                step === 'PPE' ? {kind: 'PPE'} : step === 'BRIEFING' ? {kind: 'BRIEFING'} : {kind: 'KNOWLEDGE'},
-              )}
-            />
-          ) : null}
-          {effectiveTab === 'MORE' ? (
-            <>
-              <IncidentsTab
-                state={state}
-                busy={busy}
-                error={actionError}
-                commandId={keys.get('incident')}
-                onReport={async (input) => {
-                  if (!shift) return false;
-                  return run('incident', () => sendCommand({
-                    command: 'report-incident',
-                    clientCommandId: keys.get('incident'),
-                    shiftId: shift.id,
-                    ...input,
-                  }));
-                }}
-              />
-              <ProfileTab
-                state={state}
-                onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}
-                onOpenKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
-              />
-            </>
-          ) : null}
-        </Screen>
-      );
-    }
-
     if (detour?.kind === 'PPE') {
       return (
         <PpeScreen
@@ -443,6 +513,34 @@ export function OperatorNextApp() {
     }
 
     if (checklist) {
+      if (checklistExited) {
+        const known = knownAnswers(checklist.stage, state);
+        const stageDrafts = checklistDraftsFor(checklist.stage);
+        const remaining = checklist.sections
+          .flatMap((section) => section.items)
+          .filter((item) => !(known[item.id] || stageDrafts[item.id]?.answer)).length;
+        return (
+          <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={shiftTabs}>
+            <NextActionCard
+              title="Осмотр не сдан"
+              hint={online
+                ? remaining > 0
+                  ? `Осталось отметить: ${remaining}. Отмеченное сохранено — продолжите осмотр, когда сможете.`
+                  : 'Все пункты отмечены — вернитесь к осмотру и отправьте его.'
+                : 'Осмотр сохранён на устройстве, отправить можно, когда появится связь.'}
+              actionLabel="Продолжить осмотр"
+              onAction={() => setChecklistExit(null)}
+              testId="resume-checklist"
+            />
+            <Panel tone="warning">
+              <PanelTitle tone="warning">Допуск к работе не выдан</PanelTitle>
+              <p className="mt-1 text-sm">
+                Пока осмотр не завершён, работа не начнётся. Отмеченное сохранено — оно не пропало.
+              </p>
+            </Panel>
+          </Screen>
+        );
+      }
       return (
         <ChecklistRunScreen
           key={checklist.stage}
@@ -453,8 +551,11 @@ export function OperatorNextApp() {
           commandId={keys.get('checklist')}
           lastMeter={state.assignment?.lastMeter ?? null}
           known={knownAnswers(checklist.stage, state)}
+          drafts={checklistDraftsFor(checklist.stage)}
+          onDraftsChange={(updater) => updateChecklistDrafts(checklist.stage, updater)}
           onSubmit={submitChecklist(checklist.stage)}
           onBack={detour ? () => setDetour(null) : undefined}
+          onExit={detour ? undefined : () => setChecklistExit({stage: checklist.stage, shiftId})}
         />
       );
     }
@@ -490,7 +591,7 @@ export function OperatorNextApp() {
       case 'WORK': {
         if (!shift) {
           return (
-            <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
+            <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={shiftTabs}>
               <Panel tone="warning">
                 <PanelTitle tone="warning">Смена не открыта</PanelTitle>
                 <p className="mt-1 text-sm">
@@ -506,7 +607,7 @@ export function OperatorNextApp() {
             state={state}
             busy={busy}
             error={actionError}
-            tabs={tabsVisible ? tabBar : undefined}
+            tabs={shiftTabs}
             draft={workDraft}
             onDraftChange={updateWorkDraft}
             onOpenTab={setWorkTab}
@@ -517,7 +618,7 @@ export function OperatorNextApp() {
               clientCommandId: keys.get('production'),
               shiftId: shift.id,
               entry,
-            }))}
+            }), () => clearSubmittedEntry(entry))}
             onCorrect={(input) => run('correction', () => sendCommand({
               command: 'correct-production',
               clientCommandId: keys.get('correction'),
@@ -530,7 +631,7 @@ export function OperatorNextApp() {
       case 'CLOSING':
         if (!shift) {
           return (
-            <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
+            <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={shiftTabs}>
               <Panel tone="warning">
                 <PanelTitle tone="warning">Смена не открыта</PanelTitle>
                 <p className="mt-1 text-sm">Нажмите «Обновить», чтобы перечитать состояние.</p>
@@ -544,7 +645,7 @@ export function OperatorNextApp() {
             state={state}
             busy={busy}
             error={actionError}
-            tabs={tabsVisible ? tabBar : undefined}
+            tabs={shiftTabs}
             unsentCount={queued.length}
             closeNote={closeNote}
             onCloseNoteChange={updateCloseNote}
@@ -555,10 +656,10 @@ export function OperatorNextApp() {
           />
         );
       case 'CLOSED':
-        return <ClosedScreen state={state} tabs={tabsVisible ? tabBar : undefined} />;
+        return <ClosedScreen state={state} tabs={shiftTabs} />;
       default:
         return (
-          <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={tabsVisible ? tabBar : undefined}>
+          <Screen title="Смена" subtitle={state.assignment?.equipmentName} tabs={shiftTabs}>
             <Panel>
               <PanelTitle>Раздел пока недоступен</PanelTitle>
               <p className="mt-1 text-sm">
@@ -584,7 +685,52 @@ export function OperatorNextApp() {
       {loadError ? <ErrorStrip message={loadError} onRetry={() => void reload()} /> : null}
       {notice ? <NoticeStrip>{notice}</NoticeStrip> : null}
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
-      {screen()}
+      {/*
+        Смена НЕ размонтируется при заходе на вкладку: форма паспорта сваи
+        держит черновик внутри себя, и размонтирование теряло бы его (ревью №2).
+      */}
+      <div className={tabActive ? 'hidden' : 'contents'} hidden={tabActive}>{screen()}</div>
+      {tabActive ? (
+        <Screen
+          title={workTab === 'EQUIPMENT' ? 'Техника' : workTab === 'SAFETY' ? 'Техника безопасности' : 'Ещё'}
+          subtitle={state.assignment?.equipmentName}
+          tabs={tabBar}
+        >
+          {workTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
+          {workTab === 'SAFETY' ? (
+            <SafetyTab
+              state={state}
+              onOpen={(step) => setDetour(
+                step === 'PPE' ? {kind: 'PPE'} : step === 'BRIEFING' ? {kind: 'BRIEFING'} : {kind: 'KNOWLEDGE'},
+              )}
+            />
+          ) : null}
+          {workTab === 'MORE' ? (
+            <>
+              <IncidentsTab
+                state={state}
+                busy={busy}
+                error={actionError}
+                commandId={keys.get('incident')}
+                onReport={async (input) => {
+                  if (!shift) return false;
+                  return run('incident', () => sendCommand({
+                    command: 'report-incident',
+                    clientCommandId: keys.get('incident'),
+                    shiftId: shift.id,
+                    ...input,
+                  }));
+                }}
+              />
+              <ProfileTab
+                state={state}
+                onOpenBriefing={() => setDetour({kind: 'BRIEFING'})}
+                onOpenKnowledge={() => setDetour({kind: 'KNOWLEDGE'})}
+              />
+            </>
+          ) : null}
+        </Screen>
+      ) : null}
     </Frame>
   );
 }

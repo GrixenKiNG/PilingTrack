@@ -1,6 +1,39 @@
 import {pendingCount} from '@/components/piling/operator-mobile/offline-queue';
 
 /**
+ * Хранилище очереди: тот же ключ, что в `offline-queue.ts`.
+ *
+ * ПОЧЕМУ КЛЮЧ ЗДЕСЬ. Публичное чтение очереди не различает «пусто» и
+ * «прочитать нельзя»: испорченное значение оно превращает в пустой список.
+ * Для закрытия смены это разные вещи — «пусто» пускает закрытие, «не прочитано»
+ * держит, — и отличить их можно только по самому хранилищу. Ключ менять
+ * синхронно с `offline-queue.ts`; очередь здесь только ЧИТАЕТСЯ, правило 9 не
+ * нарушается: ни одной записи в неё этот модуль не делает.
+ */
+const QUEUE_STORAGE_KEY = 'pilingtrack.operator.queue.v1';
+
+/**
+ * Очередь прочиталась?
+ *
+ * `false` — значение есть, но разобрать его нельзя (или хранилище отказало):
+ * доверять счётчику нельзя, закрывать смену вслепую тоже.
+ */
+function queueReadable(): boolean {
+  let raw: string | null;
+  try {
+    raw = globalThis.localStorage?.getItem(QUEUE_STORAGE_KEY) ?? null;
+  } catch {
+    return false;
+  }
+  if (raw === null) return true; // значения нет — очередь пуста, читать нечего
+  try {
+    return Array.isArray(JSON.parse(raw));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Сколько СВОИХ записей лежит на устройстве прямо сейчас.
  *
  * ЗАЧЕМ ОТДЕЛЬНАЯ ФУНКЦИЯ. Закрытие смены обязано перечитать очередь
@@ -18,6 +51,7 @@ import {pendingCount} from '@/components/piling/operator-mobile/offline-queue';
  * обязан трактовать это как «проверить не удалось».
  */
 export function ownPendingCount(): number {
+  if (!queueReadable()) return -1;
   try {
     return pendingCount();
   } catch {

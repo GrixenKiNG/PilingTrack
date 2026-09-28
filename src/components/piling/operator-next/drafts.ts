@@ -10,6 +10,8 @@
  * Ключ — смена и вид формы. Новому машинисту и новой смене старые черновики не
  * достаются: пароль к чужому вводу тут не нужен.
  */
+import type {ChecklistStage, OperatorAnswer} from '@/modules/operator-mobile/contracts';
+
 export type WorkMode = 'NONE' | 'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT';
 
 /** Виды форм, у которых свои поля (паспорт сваи — готовая форма со своим состоянием). */
@@ -31,12 +33,37 @@ export interface WorkDraft {
   forms: Record<FormMode, FormFields>;
 }
 
+/**
+ * Черновик ответа на один пункт осмотра.
+ *
+ * ПОЧЕМУ ОН ТОЖЕ ЖИВЁТ ВЫШЕ ЭКРАНА. Ответы осмотра терялись при «Назад» и
+ * возврате: `key={checklist.stage}` пересоздавал экран вместе с ответами
+ * (находка Д2 аудита). Держим их по этапу — как поля форм по виду формы.
+ */
+export interface ChecklistDraft {
+  answer?: OperatorAnswer;
+  note: string;
+  measures: Record<string, string>;
+  mediaIds: string[];
+  uploading: boolean;
+  uploadError: string | null;
+}
+
+/** Ответы одного этапа: пункт → черновик. */
+export type ChecklistDrafts = Record<string, ChecklistDraft>;
+
+export const emptyChecklistDraft = (): ChecklistDraft => ({
+  note: '', measures: {}, mediaIds: [], uploading: false, uploadError: null,
+});
+
 export interface Drafts {
   /** Смена, которой принадлежат черновики. Меняется — черновики обнуляются. */
   shiftId: string | null;
   work: WorkDraft;
   /** Заметка «что оставить себе на завтра» на экране закрытия. */
   closeNote: string;
+  /** Ответы осмотров по этапам: этап → пункт → черновик. */
+  checklists: Partial<Record<ChecklistStage, ChecklistDrafts>>;
 }
 
 export const emptyFormFields = (): FormFields => ({
@@ -52,6 +79,7 @@ export const emptyDrafts = (shiftId: string | null = null): Drafts => ({
   shiftId,
   work: emptyWorkDraft(),
   closeNote: '',
+  checklists: {},
 });
 
 /** Черновики той же смены; смена сменилась — начинаем с чистого листа. */
