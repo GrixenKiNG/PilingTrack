@@ -1,0 +1,46 @@
+Revert-checks r4 (review No.3): each test must fail without its fix.
+
+### p.1 - late callback guard
+Tests  1 failed | 42 passed (43)
+FAILED: × фото смены А догрузилось после перехода к смене Б — черновики Б целы 341ms
+### p.2a - passport persistence enabled
+Tests  2 failed | 41 passed (43)
+FAILED: × переход в обходной экран и обратно — паспорт на месте 234ms
+### p.2b - passport fields locked while sending
+Tests  1 failed | 42 passed (43)
+FAILED: × подтверждённый паспорт очищается сразу, до перечитывания; поля закрыты 130ms
+### p.3a - queued branch locks fields
+Tests  3 failed | 40 passed (43)
+FAILED: × ветка очереди: блокировка до подтверждения, очистка и единственная отправка 1156ms
+### p.3b - incident fields locked while sending
+Tests  1 failed | 42 passed (43)
+FAILED: × происшествие: форма закрывается по подтверждению, отправка одна 1191ms
+### p.3c - correction fields locked while sending
+Tests  1 failed | 42 passed (43)
+FAILED: × поправка: форма закрывается по подтверждению, отправка одна 1111ms
+### p.4 - comment read at send time
+Tests  1 failed | 42 passed (43)
+FAILED: × подготовка одна, комментарий — актуальный 73ms
+### p.5 - stale equipment response dropped
+Tests  2 failed | 41 passed (43)
+FAILED: × устаревший ответ отброшен; приёмка отправляет последнюю выбранную 65ms
+### p.6 - refresh really reloads
+Tests  1 failed | 42 passed (43)
+FAILED: × сказано, что списка нет; «Обновить» и «Назад к смене» работают 1061ms
+### p.7 - neighbours keep their keys
+Tests  3 failed | 40 passed (43)
+FAILED: × успех выработки не меняет ключи происшествия и поправки 516ms
+### p.8 - thrown getItem keeps closing blocked
+Tests  2 failed | 41 passed (43)
+FAILED: × брошенное исключение — «не удалось проверить», а не «пусто» 1030ms
+### C-a - reload restores own-shift draft
+Tests  1 failed | 42 passed (43)
+FAILED: × перезагрузка возвращает черновик своей смены 1129ms
+### C-b - foreign user's draft is invisible
+Tests  1 failed | 42 passed (43)
+FAILED: × чужой черновик не показывается 1034ms
+### C-c - honest message without storage
+Tests  1 failed | 42 passed (43)
+FAILED: × недоступное хранилище — честное «не сохранится при перезагрузке» 61ms
+
+DONE. All rollbacks restored.
