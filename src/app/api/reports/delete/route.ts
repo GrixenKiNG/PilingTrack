@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
 import { db } from '@/lib/db';
+import { invalidateReports } from '@/lib/cached-queries';
 
 export const runtime = 'nodejs';
 
@@ -73,6 +74,7 @@ export const DELETE = withMutation(
       });
     }
 
+    invalidateReports();
     return NextResponse.json({ ok: true });
   },
   { domain: 'reports' }

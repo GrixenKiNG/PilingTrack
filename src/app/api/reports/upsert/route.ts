@@ -5,6 +5,7 @@ import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { reportUpsertSchema } from '@/lib/validation-schemas';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
+import { invalidateReports } from '@/lib/cached-queries';
 
 
 export const runtime = 'nodejs';
@@ -146,6 +147,7 @@ export const POST = withMutation(
       },
     });
 
+    invalidateReports();
     return createJsonResponse({ report: result, meterWarning, meterError, requestId }, { status: 200 }, requestId);
   },
   { domain: 'reports' }
