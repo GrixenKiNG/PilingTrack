@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
+import { resolveEffectiveRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -102,7 +103,13 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   // null — отмену не запрашивали; строка — открыто поле «почему».
   const [cancelDraft, setCancelDraft] = useState<string | null>(null);
-  const isAdmin = usePilingStore((s) => s.currentUser?.role === 'ADMIN');
+  const currentUser = usePilingStore((s) => s.currentUser);
+  const actingAs = usePilingStore((s) => s.actingAs);
+  // Приёмку подписывает администратор — и интерфейс, и API
+  // (api/maintenance/[id]/accept) считают исполняемую роль, а не собственную:
+  // иначе в режиме «Действую как» кнопка «Принять» остаётся видимой и
+  // отвечает 403.
+  const isAdmin = resolveEffectiveRole(currentUser?.role ?? '', actingAs) === 'ADMIN';
 
   const names = useMemo(() => new Map(assignees.map((u) => [u.id, u.name])), [assignees]);
 

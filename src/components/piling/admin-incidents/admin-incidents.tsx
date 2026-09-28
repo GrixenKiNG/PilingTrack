@@ -8,6 +8,7 @@ import {
 import {cn} from '@/lib/utils';
 import {usePilingStore} from '@/lib/store';
 import {resolveEffectiveRole} from '@/lib/types';
+import {can} from '@/services/auth/authorization-service';
 
 /**
  * Разбор происшествий на сменах.
@@ -65,16 +66,17 @@ async function fetchIncidents(
 
 /**
  * Право на разбор считается по исполняемой роли — той же, по которой его
- * считает сервер. Экран здесь только прячет кнопку: отказ всё равно придёт
- * от API, и прятать кнопку нужно ради того, чтобы её не искали, а не ради
- * безопасности.
+ * считает сервер (`incidents.review` в authorization-service). Экран здесь
+ * только прячет кнопку: отказ всё равно придёт от API, и прятать кнопку нужно
+ * ради того, чтобы её не искали, а не ради безопасности.
  */
-const REVIEWERS = new Set(['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER']);
+const canReview = (user: { role: string } | null, actingAs: string | null) =>
+  can({...user, role: resolveEffectiveRole(user?.role ?? '', actingAs)}, 'incidents.review');
 
 export function AdminIncidents() {
   const currentUser = usePilingStore((state) => state.currentUser);
   const actingAs = usePilingStore((state) => state.actingAs);
-  const canReview = REVIEWERS.has(resolveEffectiveRole(currentUser?.role ?? '', actingAs));
+  const allowReview = canReview(currentUser, actingAs);
   const [scope, setScope] = useState<'open' | 'all'>('open');
   const [rows, setRows] = useState<IncidentRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -227,7 +229,7 @@ export function AdminIncidents() {
                 </div>
               ) : null}
 
-              {canReview && !row.reviewedAt ? (
+              {allowReview && !row.reviewedAt ? (
                 openForm === row.id ? (
                   <div className="mt-3 space-y-2">
                     <label htmlFor={`note-${row.id}`} className="block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
