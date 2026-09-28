@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
-import { formatNumber, pluralizeRu } from '@/lib/format';
+import { formatCountMeters, formatNumber, pluralizeRu } from '@/lib/format';
 import {
   OpsPage,
   OpsHeader,
@@ -112,6 +112,7 @@ export function AdminSites() {
       ? { ...operational.get(site.id)!, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate }
       : { siteId: site.id, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate,
           plannedPiles: site.plannedPiles, plannedPileMeters: 0, actualPiles: 0, actualPileMeters: 0,
+          plannedDrillingCount: 0, actualDrillingCount: 0,
           plannedDrilling: site.plannedDrilling, actualDrilling: 0, pileProgress: 0, drillingProgress: 0,
           totalReports: 0, totalDowntime: 0, crewCount: crewsError ? null : 0, rigNames: [] });
   }, [rows, sites, crewsError]);
@@ -165,6 +166,8 @@ export function AdminSites() {
   const kpis: OpsKpiItem[] = useMemo(() => {
     const piles = rows.reduce((s, r) => s + r.actualPiles, 0);
     const meters = rows.reduce((s, r) => s + r.actualPileMeters, 0);
+    const drillCount = rows.reduce((s, r) => s + r.actualDrillingCount, 0);
+    const drillMeters = rows.reduce((s, r) => s + r.actualDrilling, 0);
     const behind = rows.filter((r) => r.plannedPiles > 0 && r.pileProgress < 60).length;
     const noCrew = rows.filter((r) => r.crewCount === 0).length;
     return [
@@ -172,8 +175,10 @@ export function AdminSites() {
       { label: 'Отставание', value: String(behind), detail: '< 60% плана', icon: AlertTriangle, tone: behind > 0 ? 'amber' : 'slate' },
       // Бригады не загрузились — «Без бригад: 0» было бы утверждением о данных.
       { label: 'Без бригад', value: crewsError ? '—' : String(noCrew), detail: 'не назначены', icon: Users, tone: crewsError ? 'slate' : noCrew > 0 ? 'red' : 'slate' },
-      { label: 'Сваи факт', value: formatNumber(piles), detail: 'шт. суммарно', icon: HardHat, tone: 'orange' },
-      { label: 'Метры факт', value: formatNumber(meters), detail: 'м.п. суммарно', icon: Drill, tone: 'blue' },
+      // «Метры факт» с иконкой бура показывали м.п. СВАЙ — читалось как бурение.
+      // Сваи и бурение — отдельными плитками, каждая «шт. / м.п.» (28.09.2026).
+      { label: 'Сваи факт', value: formatCountMeters(piles, meters), detail: 'суммарно', icon: HardHat, tone: 'orange' },
+      { label: 'Бурение факт', value: formatCountMeters(drillCount, drillMeters), detail: 'суммарно', icon: Drill, tone: 'blue' },
     ];
   }, [rows, allRows, crewsError]);
 
@@ -404,9 +409,11 @@ function SiteDetail({
         <OpsFact label="Сваи план" value={`${formatNumber(row.plannedPiles)} шт.`} sub={`${formatNumber(row.plannedPileMeters)} м.п.`} />
         <OpsFact label="Сваи факт" value={`${formatNumber(row.actualPiles)} шт.`} sub={`${formatNumber(row.actualPileMeters)} м.п.`} />
       </div>
-      <div className="grid grid-cols-3 divide-x rounded-md border border-border">
-        <OpsFact label="Бурение план" value={formatNumber(row.plannedDrilling)} sub="м" />
-        <OpsFact label="Бурение факт" value={formatNumber(row.actualDrilling)} sub="м" />
+      <div className="grid grid-cols-2 divide-x rounded-md border border-border">
+        <OpsFact label="Бурение план" value={`${formatNumber(row.plannedDrillingCount)} шт.`} sub={`${formatNumber(row.plannedDrilling)} м.п.`} />
+        <OpsFact label="Бурение факт" value={`${formatNumber(row.actualDrillingCount)} шт.`} sub={`${formatNumber(row.actualDrilling)} м.п.`} />
+      </div>
+      <div className="grid grid-cols-1 rounded-md border border-border">
         <OpsFact label="Простой" value={row.totalDowntime > 0 ? formatDowntimeHours(row.totalDowntime) : '—'} />
       </div>
 

@@ -55,3 +55,13 @@ export function shiftDurationHours(report: ReportDTO): number | null {
   if (end < start) end += 24 * 60;
   return (end - start) / 60;
 }
+
+/** Итоги сданных отчётов по всему отбору журнала — считает сервер (reports/all). */
+export interface JournalSums {
+  reports: number;
+  piles: number;
+  pileMeters: number;
+  drillingCount: number;
+  drillingMeters: number;
+  downtimeHours: number;
+}

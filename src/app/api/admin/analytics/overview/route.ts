@@ -33,6 +33,7 @@ interface ReportRow {
   piles: number;
   meters: number;
   drilling: number;
+  drillingCount: number;
   downtime: number;
 }
 
@@ -65,7 +66,7 @@ async function loadPeriod(tenantId: string, from: string, to: string, siteId: st
       equipment: { select: { name: true } },
       site: { select: { name: true } },
       piles: { select: { count: true, pileGrade: { select: { lengthMm: true } } } },
-      drillings: { select: { meters: true } },
+      drillings: { select: { meters: true, count: true } },
       downtimes: { select: { duration: true } },
     },
   });
@@ -81,12 +82,13 @@ async function loadPeriod(tenantId: string, from: string, to: string, siteId: st
     piles: r.piles.reduce((s, p) => s + p.count, 0),
     meters: r.piles.reduce((s, p) => s + p.count * pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }), 0),
     drilling: r.drillings.reduce((s, d) => s + d.meters, 0),
+    drillingCount: r.drillings.reduce((s, d) => s + d.count, 0),
     downtime: r.downtimes.reduce((s, d) => s + d.duration, 0), // HOURS (domain invariant)
   }));
 }
 
 interface Totals {
-  piles: number; meters: number; drilling: number;
+  piles: number; meters: number; drilling: number; drillingCount: number;
   downtimePct: number | null;
   /** Простой превысил длительность смены — цифру ввели с ошибкой. */
   downtimeOverrun: boolean;
@@ -117,10 +119,10 @@ function downtimeShare(downtimeHours: number, shiftMinutes: number): {
 }
 
 function totalsOf(rows: ReportRow[]): Totals {
-  let piles = 0; let meters = 0; let drilling = 0;
+  let piles = 0; let meters = 0; let drilling = 0; let drillingCount = 0;
   let shiftMin = 0; let downtimeInShift = 0;
   for (const r of rows) {
-    piles += r.piles; meters += r.meters; drilling += r.drilling;
+    piles += r.piles; meters += r.meters; drilling += r.drilling; drillingCount += r.drillingCount;
     if (r.shiftMinutes != null && r.shiftMinutes > 0) {
       shiftMin += r.shiftMinutes;
       downtimeInShift += r.downtime;
@@ -131,6 +133,7 @@ function totalsOf(rows: ReportRow[]): Totals {
     piles,
     meters: Math.round(meters * 10) / 10,
     drilling: Math.round(drilling * 10) / 10,
+    drillingCount,
     downtimePct: share.pct,
     downtimeOverrun: share.overrun,
   };
@@ -205,27 +208,27 @@ export const GET = withApi(async (request: NextRequest) => {
     .sort((a, b) => b.usagePct - a.usagePct);
 
   // Site rating by meters.
-  const bySite = new Map<string, { id: string; name: string; meters: number; piles: number }>();
+  const bySite = new Map<string, { id: string; name: string; meters: number; piles: number; drilling: number; drillingCount: number }>();
   for (const r of rows) {
-    const cur = bySite.get(r.siteId) ?? { id: r.siteId, name: r.siteName, meters: 0, piles: 0 };
-    cur.meters += r.meters; cur.piles += r.piles;
+    const cur = bySite.get(r.siteId) ?? { id: r.siteId, name: r.siteName, meters: 0, piles: 0, drilling: 0, drillingCount: 0 };
+    cur.meters += r.meters; cur.piles += r.piles; cur.drilling += r.drilling; cur.drillingCount += r.drillingCount;
     bySite.set(r.siteId, cur);
   }
   const siteRating = [...bySite.values()]
-    .map((s) => ({ ...s, meters: Math.round(s.meters * 10) / 10 }))
+    .map((s) => ({ ...s, meters: Math.round(s.meters * 10) / 10, drilling: Math.round(s.drilling * 10) / 10 }))
     .sort((a, b) => b.meters - a.meters);
 
   // Per-operator table.
   const byOperator = new Map<string, {
-    userId: string; userName: string; piles: number; meters: number; drilling: number;
+    userId: string; userName: string; piles: number; meters: number; drilling: number; drillingCount: number;
     reports: number; shiftMin: number; downtimeInShift: number; hasShift: boolean;
   }>();
   for (const r of rows) {
     const cur = byOperator.get(r.userId) ?? {
-      userId: r.userId, userName: r.userName, piles: 0, meters: 0, drilling: 0,
+      userId: r.userId, userName: r.userName, piles: 0, meters: 0, drilling: 0, drillingCount: 0,
       reports: 0, shiftMin: 0, downtimeInShift: 0, hasShift: false,
     };
-    cur.piles += r.piles; cur.meters += r.meters; cur.drilling += r.drilling; cur.reports += 1;
+    cur.piles += r.piles; cur.meters += r.meters; cur.drilling += r.drilling; cur.drillingCount += r.drillingCount; cur.reports += 1;
     if (r.shiftMinutes != null && r.shiftMinutes > 0) {
       cur.shiftMin += r.shiftMinutes; cur.downtimeInShift += r.downtime; cur.hasShift = true;
     }
@@ -239,6 +242,7 @@ export const GET = withApi(async (request: NextRequest) => {
       meters: Math.round(o.meters * 10) / 10,
       piles: o.piles,
       drilling: Math.round(o.drilling * 10) / 10,
+      drillingCount: o.drillingCount,
       downtimePct: downtimeShare(o.downtimeInShift, o.shiftMin).pct,
       downtimeOverrun: downtimeShare(o.downtimeInShift, o.shiftMin).overrun,
       reports: o.reports,
@@ -251,6 +255,7 @@ export const GET = withApi(async (request: NextRequest) => {
       meters: { value: current.meters, deltaPct: deltaPct(current.meters, previous.meters) },
       piles: { value: current.piles, deltaPct: deltaPct(current.piles, previous.piles) },
       drilling: { value: current.drilling, deltaPct: deltaPct(current.drilling, previous.drilling) },
+      drillingCount: { value: current.drillingCount, deltaPct: deltaPct(current.drillingCount, previous.drillingCount) },
       downtimePct: {
         value: current.downtimePct,
         deltaPp: current.downtimePct != null && previous.downtimePct != null

@@ -11,10 +11,9 @@ import { STATUS_META, KIND_LABEL } from './equipment-status';
 import { getMaintenanceFlag } from './equipment-maintenance-flag';
 import { getEquipmentBrand } from './equipment-brand-logo';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { formatCountMeters } from '@/lib/format';
 
 const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('ru'));
-const formatNum = (n: number | null | undefined, digits = 0) =>
-  n == null ? '—' : n.toLocaleString('ru', { maximumFractionDigits: digits });
 
 export function EquipmentTile({
   card,
@@ -111,8 +110,8 @@ export function EquipmentTile({
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Metric label="сваи шт/м.п." value={t ? `${formatNum(t.piles)} / ${formatNum(t.pileMeters, 1)}` : '—'} />
-          <Metric label="бурение шт/м.п." value={t ? `${formatNum(t.drillingCount)} / ${formatNum(t.drillingMeters, 1)}` : '—'} />
+          <Metric label="сваи" value={t ? formatCountMeters(t.piles, t.pileMeters) : '—'} />
+          <Metric label="бурение" value={t ? formatCountMeters(t.drillingCount, t.drillingMeters) : '—'} />
           <Metric label="простой" value={t ? formatDowntimeHours(t.downtimeHours) : '—'} />
         </div>
 

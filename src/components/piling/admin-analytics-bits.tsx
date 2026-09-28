@@ -15,14 +15,15 @@ export interface OverviewData {
     meters: { value: number; deltaPct: number | null };
     piles: { value: number; deltaPct: number | null };
     drilling: { value: number; deltaPct: number | null };
+    drillingCount: { value: number; deltaPct: number | null };
     downtimePct: { value: number | null; deltaPp: number | null };
   };
   daily: { date: string; meters: number }[];
   equipmentUsage: { id: string; name: string; activeDays: number; usagePct: number }[];
-  siteRating: { id: string; name: string; meters: number; piles: number }[];
+  siteRating: { id: string; name: string; meters: number; piles: number; drilling: number; drillingCount: number }[];
   operators: {
     userId: string; userName: string; workedHours: number | null;
-    meters: number; piles: number; drilling: number; downtimePct: number | null; reports: number;
+    meters: number; piles: number; drilling: number; drillingCount: number; downtimePct: number | null; reports: number;
   }[];
 }
 
@@ -60,7 +61,7 @@ export interface FleetKpiData {
 }
 
 export interface FleetSnapshotSummary {
-  totals: { totalEquipment: number; activeToday: number; pilesToday: number; pileMetersToday: number; drillingToday: number; downtimeHoursToday: number; crewsOnShiftToday: number; operatorsOnShiftToday: number };
+  totals: { totalEquipment: number; activeToday: number; pilesToday: number; pileMetersToday: number; drillingToday: number; drillingCountToday: number; downtimeHoursToday: number; crewsOnShiftToday: number; operatorsOnShiftToday: number };
 }
 
 function fmtHours(h: number | null): string {

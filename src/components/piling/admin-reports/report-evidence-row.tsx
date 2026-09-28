@@ -25,9 +25,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '@/lib/format';
+import { formatCountMeters, formatNumber } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
-import { getReportTotals, type ReportTotals } from './report-totals';
+import { getReportTotals, type JournalSums, type ReportTotals } from './report-totals';
 import { ReportThumbnail } from './report-thumbnail';
 import { statusLabel } from '@/services/reports/report-history';
 import { shortDate, shiftLabel } from './report-list-format';
@@ -110,23 +110,29 @@ export function ReportsHeader({
  * после одного нажатия «Загрузить ещё» те же 100 отчётов превращались в 200, а
  * сваи — с 821 в 2320. Руководитель читал первую сотню как весь срез.
  *
- * Пока подгружено не всё, плитки честно говорят, по скольким отчётам из
- * скольких они посчитаны. Полный подсчёт на сервере по всему отбору — работа
- * отдельная: три быстрых фильтра (простой, с фото, изменены админом) сейчас
- * применяются на экране, и перенос их в запрос меняет устройство экрана.
+ * С 28.09.2026 сервер отдаёт итоги сданных отчётов по всему отбору (`sums`),
+ * и плитки берут их. Быстрые фильтры (сегодня, простой, с фото, установка)
+ * применяются на экране — при них `sums` не передаётся, и плитки снова
+ * считают по загруженным строкам с честной подписью «по загруженным N из M».
+ * Черновики в итоги не входят нигде — как в «Аналитике» и на дашборде.
  */
-export function EvidenceSummary({ reportCount, totals, photoCount, totalReports, complete }: {
+export function EvidenceSummary({ reportCount, totals, photoCount, totalReports, complete, sums }: {
   reportCount: number;
+  /** Суммы сданных отчётов среди загруженных и отфильтрованных на экране. */
   totals: ReportTotals;
   photoCount: number;
   /** Сколько отчётов под отбором всего, по данным сервера. */
   totalReports: number;
   /** Загружен ли весь отбор: только тогда суммы описывают его целиком. */
   complete: boolean;
+  /** Итоги сервера по всему отбору; null — считать по загруженным. */
+  sums: JournalSums | null;
 }) {
-  const scope = complete
+  const loadedScope = complete
     ? 'за выбранный срез'
     : `по загруженным ${reportCount} из ${totalReports}`;
+  const work = sums ?? totals;
+  const scope = sums ? 'сданные · весь отбор' : `сданные · ${loadedScope}`;
   const items = [
     {
       label: 'Отчёты',
@@ -135,10 +141,10 @@ export function EvidenceSummary({ reportCount, totals, photoCount, totalReports,
       detail: complete ? 'за выбранный срез' : 'загружено из отбора',
       tone: 'slate',
     },
-    { label: 'Сваи', value: formatNumber(totals.piles), icon: HardHat, detail: `${formatNumber(totals.pileMeters)} м.п. · ${scope}`, tone: 'orange' },
-    { label: 'Бурение', value: formatNumber(totals.drillingCount), icon: Drill, detail: `${formatNumber(totals.drillingMeters)} м · ${scope}`, tone: 'blue' },
-    { label: 'Простой', value: formatDowntimeHours(totals.downtimeHours), icon: Clock, detail: scope, tone: 'amber' },
-    { label: 'Фото', value: String(photoCount), icon: ImageIcon, detail: `отчётов с фото · ${scope}`, tone: 'emerald' },
+    { label: 'Сваи', value: formatCountMeters(work.piles, work.pileMeters), icon: HardHat, detail: scope, tone: 'orange' },
+    { label: 'Бурение', value: formatCountMeters(work.drillingCount, work.drillingMeters), icon: Drill, detail: scope, tone: 'blue' },
+    { label: 'Простой', value: formatDowntimeHours(work.downtimeHours), icon: Clock, detail: scope, tone: 'amber' },
+    { label: 'Фото', value: String(photoCount), icon: ImageIcon, detail: `отчётов с фото · ${loadedScope}`, tone: 'emerald' },
   ];
 
   return (
@@ -148,7 +154,7 @@ export function EvidenceSummary({ reportCount, totals, photoCount, totalReports,
           <KpiTile key={item.label} icon={item.icon} label={item.label} value={item.value} detail={item.detail} />
         ))}
       </div>
-      {!complete ? (
+      {!complete && !sums ? (
         <p className="rounded-md bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
           Суммы посчитаны по загруженным {reportCount} отчётам из {totalReports}.
           Нажмите «Загрузить ещё отчёты» внизу списка, чтобы получить итог по всему отбору.
@@ -215,8 +221,8 @@ export function EvidenceReportRow({
         )}>{statusLabel(report.status)}</span>
       </div>
 
-      <MetricCell value={formatNumber(totals.piles)} sub={`${formatNumber(totals.pileMeters)} м.п.`} tone="orange" />
-      <MetricCell value={formatNumber(totals.drillingCount)} sub={`${formatNumber(totals.drillingMeters)} м`} tone="blue" />
+      <MetricCell value={`${formatNumber(totals.piles)} шт.`} sub={`${formatNumber(totals.pileMeters)} м.п.`} tone="orange" />
+      <MetricCell value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м.п.`} tone="blue" />
       <MetricCell value={formatDowntimeHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} tone={totals.downtimeHours > 0 ? 'amber' : 'slate'} />
 
       <div className="grid grid-cols-3 justify-items-end gap-1">

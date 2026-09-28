@@ -93,7 +93,7 @@ export function EquipmentTable({
                   {t ? <CompactMetric first={`${formatNum(t.piles)} шт.`} second={`${formatNum(t.pileMeters, 1)} м.п.`} /> : '—'}
                 </td>
                 <td className="text-right font-mono leading-tight text-foreground">
-                  {t ? <CompactMetric first={`${formatNum(t.drillingCount)} шт.`} second={`${formatNum(t.drillingMeters, 1)} м`} /> : '—'}
+                  {t ? <CompactMetric first={`${formatNum(t.drillingCount)} шт.`} second={`${formatNum(t.drillingMeters, 1)} м.п.`} /> : '—'}
                 </td>
                 <td>
                   <div className="font-mono text-foreground">{t ? `${formatNum(t.downtimeHours, 1)} ч` : '—'}</div>

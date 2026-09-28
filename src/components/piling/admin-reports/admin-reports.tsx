@@ -48,7 +48,7 @@ export function AdminReports() {
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
     periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, filterError, dictionaryError,
-    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports,
+    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports, serverSums,
   } = useReportsData();
 
   const [detailReport, setDetailReport] = useState<ReportDTO | null>(null);
@@ -166,7 +166,15 @@ export function AdminReports() {
     });
   }, [filterEquipmentId, quickFilter, reports]);
 
-  const totals = useMemo(() => addTotals(filteredReports), [filteredReports]);
+  // Итоги — только сданные отчёты, как на всех экранах; черновик виден в
+  // списке с пометкой, но в суммы не входит.
+  const totals = useMemo(
+    () => addTotals(filteredReports.filter((r) => r.status === 'submitted')),
+    [filteredReports],
+  );
+  // Быстрые фильтры и отбор по установке работают на экране — серверные
+  // итоги их не учитывают, поэтому при них считаем по загруженным строкам.
+  const clientFilterActive = quickFilter !== 'all' || filterEquipmentId !== 'all';
   const photoCount = useMemo(
     () => filteredReports.filter((r) => r.hasPhotos === true).length,
     [filteredReports],
@@ -252,6 +260,7 @@ export function AdminReports() {
             totalReports={totalReports}
             // Суммы описывают весь отбор, только когда догружать больше нечего.
             complete={!hasMore}
+            sums={clientFilterActive ? null : serverSums}
           />
 
           <div

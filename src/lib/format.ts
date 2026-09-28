@@ -122,3 +122,12 @@ export function pluralizeRu(
 
   return forms[2];
 }
+
+/**
+ * Сваи и бурение везде пишутся одинаково: штуки, затем погонные метры —
+ * «2 832 шт. / 40 311 м.п.». Решение владельца 28.09.2026: разнобой
+ * («м / шт», «м» вместо «м.п.», одни метры без штук) читался как разные цифры.
+ */
+export function formatCountMeters(count: number, meters: number): string {
+  return `${formatNumber(count, 0)} шт. / ${formatNumber(meters, 1)} м.п.`;
+}
