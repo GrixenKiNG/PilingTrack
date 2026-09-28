@@ -122,24 +122,34 @@ export function OperatorV7App() {
    *
    * Отказ по существу показываем текстом: «сохранено на устройстве» — не
    * ошибка, а обещание, и форму после него можно закрывать.
+   *
+   * ПРИЗНАК ЗАПИСИ, ПРИНЯТОЙ СЕРВЕРОМ (F-R43-3c). Форму паспорта эта функция
+   * кормит своим результатом: она чистит поля только по `true`
+   * (`screens/pile-passport-form.tsx`), иначе отказ 400/409 уничтожал бы
+   * набранный журнал забивки. `true` — сервер принял команду либо она легла в
+   * очередь на устройстве; `false` — отказ по существу.
+   *
+   * ПРИЗНАК ИДЁТ ОТ ОТВЕТА СЕРВЕРА, А НЕ ОТ ПЕРЕЧИТЫВАНИЯ ЭКРАНА (F-R43-3a).
+   * Когда команда прошла, запись уже сохранена: сбой следующего `reload()` не
+   * повод возвращать `false` — иначе машинист набрал бы то же заново и отправил
+   * вторую выработку. Поэтому запись закрывается по ответу, а перечитывание
+   * состояния идёт своим шагом.
    */
   const run = useCallback(async (
     command: Parameters<typeof sendCommand>[0],
     options: {close?: boolean} = {close: true},
-  ) => {
+  ): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
     setNotice(null);
+    let accepted = false;
     try {
       await sendCommand(command);
-      setCommandId(newCommandId());
-      await reload();
-      if (options.close !== false) setDetour(null);
+      accepted = true;
     } catch (cause) {
       if (cause instanceof QueuedOffline) {
         setNotice(cause.message);
-        setCommandId(newCommandId());
-        if (options.close !== false) setDetour(null);
+        accepted = true;
       } else if (cause instanceof ApiError && cause.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
@@ -149,6 +159,18 @@ export function OperatorV7App() {
     } finally {
       setBusy(false);
     }
+
+    if (!accepted) return false;
+
+    setCommandId(newCommandId());
+    if (options.close !== false) setDetour(null);
+    try {
+      await reload();
+    } catch {
+      // Перечитывание состояния не отменяет принятую запись: о своей неудаче
+      // `reload` сообщает сам текстом ошибки состояния.
+    }
+    return true;
   }, [reload]);
 
   if (loadError) {
@@ -289,9 +311,9 @@ export function OperatorV7App() {
             onSubmit={(entry: ProductionEntryInput) => {
               if (!shiftId) {
                 setActionError('Смена не начата');
-                return;
+                return Promise.resolve(false);
               }
-              void run({command: 'log-production', clientCommandId: commandId, shiftId, entry});
+              return run({command: 'log-production', clientCommandId: commandId, shiftId, entry});
             }}
           />
         ) : null}
