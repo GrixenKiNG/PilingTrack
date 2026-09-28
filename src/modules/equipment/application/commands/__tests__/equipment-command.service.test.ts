@@ -3,13 +3,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { findUniqueMock, deleteMock } = vi.hoisted(() => ({
+const { findUniqueMock, deleteMock, queryRawMock, transactionMock } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
   deleteMock: vi.fn(),
+  queryRawMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
+    $transaction: transactionMock,
     equipment: { findUnique: findUniqueMock, delete: deleteMock },
   },
 }));
@@ -44,6 +47,11 @@ describe('deleteEquipment', () => {
     findUniqueMock.mockReset();
     deleteMock.mockReset();
     deleteMock.mockResolvedValue({ id: 'eq_1' });
+    queryRawMock.mockReset().mockResolvedValue([{ id: 'eq_1' }]);
+    transactionMock.mockReset().mockImplementation(
+      (fn: (client: unknown) => unknown) =>
+        fn({ $queryRaw: queryRawMock, equipment: { findUnique: findUniqueMock, delete: deleteMock } }),
+    );
   });
 
   it('deletes a rig with no history at all', async () => {
@@ -80,6 +88,18 @@ describe('deleteEquipment', () => {
     await expect(deleteEquipment('eq_1', 'orion')).rejects.toThrow(
       'Нельзя удалить установку: у неё есть история (осмотры, показания моточасов, записи топлива, дефекты). Выведите её из эксплуатации — история сохранится.',
     );
+  });
+
+  it('locks the rig row FOR UPDATE before counting, all inside one transaction', async () => {
+    found();
+    await deleteEquipment('eq_1', 'orion');
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(queryRawMock.mock.calls[0][0].join('')).toContain('SELECT id FROM "Equipment" WHERE id = ');
+    expect(queryRawMock.mock.calls[0][0].join('')).toContain('FOR UPDATE');
+    expect(queryRawMock.mock.calls[0][1]).toBe('eq_1');
+    expect(queryRawMock.mock.invocationCallOrder[0]).toBeLessThan(findUniqueMock.mock.invocationCallOrder[0]);
+    expect(queryRawMock.mock.invocationCallOrder[0]).toBeLessThan(deleteMock.mock.invocationCallOrder[0]);
   });
 
   it('maps a RESTRICT foreign-key failure (P2003) to 409 instead of 500', async () => {
