@@ -298,9 +298,16 @@ export function SafetyScreen(props: ReferenceUiProps) {
                     current?.id === row.userId ? null : { id: row.userId, name: row.name })}>
                   {selected?.id === row.userId ? 'Скрыть допуски' : 'Допуски к технике'}
                 </Button>
-                <Button asChild variant="outline" className="h-8 text-2xs">
-                  <Link href="/admin/users">Карточка</Link>
-                </Button>
+                {/* «Карточка» ведёт в /admin/users — раздел, закрытый правом
+                    users.manage (то же, что и у mayManage выше). Диспетчеру и
+                    инженеру ОТ — рабочим ролям этой вкладки — страница откажет
+                    и вернёт на дашборд, поэтому ссылку показываем только тому,
+                    кто её действительно откроет. */}
+                {mayManage && (
+                  <Button asChild variant="outline" className="h-8 text-2xs">
+                    <Link href="/admin/users">Карточка</Link>
+                  </Button>
+                )}
                 <Button variant="outline" className="h-8 text-2xs"
                   onClick={() => setCardRow(row)}>
                   Карточка ТБ и допуски
