@@ -46,7 +46,19 @@ export function ShiftStartScreen({
    * повторить ошибку предвыбора: человек подписывает то, чего не выбирал.
    */
   const [shiftType, setShiftType] = useState<ShiftTypeValue | null>(null);
-  const activeEquipmentId = selectedEquipmentId ?? assignment?.equipmentId ?? state.options[0]?.equipmentId ?? null;
+  /**
+   * Что считаем выбором человека.
+   *
+   * ПОЧЕМУ НЕ ПРОСТО ПЕРВУЮ УСТАНОВКУ СПИСКА. Сервер отдаёт выбранную установку
+   * заранее, и строка сразу выглядела выбранной: при нескольких машинах человек
+   * мог принять ту, которую сам не выбирал (находка Д3 аудита). Когда машин
+   * больше одной, приёмка ждёт явного касания; когда одна — выбора нет, и
+   * серверный вариант и есть единственный (иначе нечего выбирать).
+   */
+  const autoEquipmentId = state.options.length <= 1
+    ? (state.options[0]?.equipmentId ?? assignment?.equipmentId ?? null)
+    : null;
+  const activeEquipmentId = selectedEquipmentId ?? autoEquipmentId;
   // Какая установка ПОКАЗАНА сейчас. Ответ на прежний выбор — это не она.
   const shownEquipmentId = assignment?.equipmentId ?? null;
   const shownIsChosen = Boolean(activeEquipmentId) && shownEquipmentId === activeEquipmentId;

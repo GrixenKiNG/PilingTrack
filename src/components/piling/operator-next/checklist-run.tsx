@@ -87,6 +87,22 @@ export function ChecklistRunScreen({
     setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...patch}}));
   };
 
+  /**
+   * Добавить снимок к пункту.
+   *
+   * ПОЧЕМУ ОТДЕЛЬНОЙ ФУНКЦИЕЙ, А НЕ ПАТЧЕМ ИЗ ПРОПСОВ. Список снимков брался из
+   * черновика на момент рендера: два снимка подряд (второй выбран, пока грузится
+   * первый) перезаписывали друг друга, и в команду уходил только последний —
+   * доказательство терялось (находка Д5 аудита). Здесь список берётся из
+   * текущего состояния.
+   */
+  const addMedia = (itemId: string, mediaId: string) => {
+    setDrafts((current) => {
+      const draft = current[itemId] ?? emptyDraft();
+      return {...current, [itemId]: {...draft, uploading: false, mediaIds: [...draft.mediaIds, mediaId]}};
+    });
+  };
+
   const answered = items.filter((item) => known[item.id] || drafts[item.id]?.answer).length;
   const remaining = items.length - answered;
 
@@ -246,6 +262,7 @@ export function ChecklistRunScreen({
                   lastMeter={lastMeter}
                   disabled={busy}
                   onChange={(patch) => update(item.id, patch)}
+                  onAddMedia={addMedia}
                   commandId={commandId}
                 />
               ))}
@@ -260,7 +277,7 @@ export function ChecklistRunScreen({
 }
 
 function ItemRow({
-  item, draft, known, problem, lastMeter, disabled, onChange, commandId,
+  item, draft, known, problem, lastMeter, disabled, onChange, onAddMedia, commandId,
 }: {
   item: ChecklistItem;
   draft: Draft;
@@ -269,6 +286,7 @@ function ItemRow({
   lastMeter?: {engineHours: number; recordedAt: string} | null;
   disabled: boolean;
   onChange: (patch: Partial<Draft>) => void;
+  onAddMedia: (itemId: string, mediaId: string) => void;
   commandId: string;
 }) {
   const isIssue = draft.answer === 'REMARK' || draft.answer === 'FAULT';
@@ -346,10 +364,18 @@ function ItemRow({
             </label>
           ) : null}
 
-          {needsPhoto ? (
+          {isIssue && item.photoOnIssue ? (
             <div className="space-y-1.5">
-              <label className="onx-quiet flex cursor-pointer items-center justify-center rounded-lg border border-dashed px-3 text-2xs font-semibold">
-                {draft.uploading ? 'Загружаем снимок…' : 'Приложить фотографию'}
+              {/* Подтверждение и кнопка живут, пока пункт требует снимок: пока
+                  блок исчезал после первого файла, человек не видел, что снимок
+                  приложен, и не мог добавить второй. */}
+              {draft.mediaIds.length > 0 ? (
+                <p className="text-2xs text-success-strong">Снимков приложено: {draft.mediaIds.length}</p>
+              ) : null}
+              <label className="onx-quiet flex cursor-pointer items-center justify-center rounded-lg border border-dashed px-3">
+                {draft.uploading
+                  ? 'Загружаем снимок…'
+                  : draft.mediaIds.length > 0 ? 'Добавить ещё снимок' : 'Приложить фотографию'}
                 <input
                   type="file"
                   accept="image/*"
@@ -362,18 +388,17 @@ function ItemRow({
                     onChange({uploading: true, uploadError: null});
                     try {
                       const mediaId = await uploadPhoto({file, clientCommandId: commandId, itemId: item.id});
-                      onChange({uploading: false, mediaIds: [...draft.mediaIds, mediaId]});
+                      onAddMedia(item.id, mediaId);
                     } catch (uploadError) {
                       onChange({uploading: false, uploadError: humanError(uploadError)});
                     }
                   }}
                 />
               </label>
-              {draft.mediaIds.length > 0 ? (
-                <p className="text-2xs text-success-strong">Снимков приложено: {draft.mediaIds.length}</p>
-              ) : null}
               {draft.uploadError ? <ReasonNote>{draft.uploadError}</ReasonNote> : null}
-              <ReasonNote>Фотография обязательна: по ней механик видит, что случилось.</ReasonNote>
+              {needsPhoto ? (
+                <ReasonNote>Фотография обязательна: по ней механик видит, что случилось.</ReasonNote>
+              ) : null}
             </div>
           ) : null}
         </>

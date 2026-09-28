@@ -277,6 +277,72 @@ describe('находка №7: ошибка инструктажа видна н
   });
 });
 
+describe('находка Д4: отказ по роли не тупик', () => {
+  it('есть «Обновить», и успешное чтение снимает экран отказа', async () => {
+    let denied = true;
+    stateImpl = () => (denied
+      ? json({error: 'Forbidden'}, 403)
+      : json({data: makeState({phase: 'ADMISSION'})}));
+    render(<OperatorNextApp />);
+
+    expect(await screen.findByText(/Это действие вам недоступно/)).toBeInTheDocument();
+    denied = false;
+    fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
+    expect(await screen.findByRole('button', {name: /Принять установку/})).toBeInTheDocument();
+  });
+});
+
+describe('находка Д3: установка не выбрана за человека', () => {
+  it('при нескольких установках приёмка ждёт касания, и в команду уходит выбранная', async () => {
+    const base = makeState({
+      phase: 'ADMISSION',
+      options: [
+        {crewId: 'c1', equipmentId: 'eq-1', equipmentName: 'СУ-1', siteName: 'Объект А'},
+        {crewId: 'c2', equipmentId: 'eq-2', equipmentName: 'СУ-2', siteName: 'Объект Б'},
+      ],
+    });
+    stateImpl = (url) => (url.includes('equipmentId=eq-2')
+      ? json({data: withEquipment(base, 'eq-2', 'СУ-2')})
+      : json({data: withEquipment(base, 'eq-1', 'СУ-1')}));
+    render(<OperatorNextApp />);
+
+    await screen.findByRole('button', {name: /Принять установку/});
+    fireEvent.click(screen.getByRole('button', {name: /Ночная/}));
+    expect(screen.getByRole('button', {name: /Принять установку/})).toBeDisabled();
+    expect(screen.getByText('Сначала выберите установку.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: /СУ-2/}));
+    const accept = await screen.findByRole('button', {name: /Принять установку/});
+    await waitFor(() => expect(accept).not.toBeDisabled());
+    fireEvent.click(accept);
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({command: 'accept-equipment', equipmentId: 'eq-2', shiftType: 'NIGHT'});
+  });
+});
+
+describe('находка Д8: следующий шаг не прячется за вкладкой', () => {
+  it('при переходе фазы в закрытие показывается вкладка «Смена»', async () => {
+    let phase: 'WORK' | 'CLOSING' = 'WORK';
+    stateImpl = () => json({data: makeState({phase, checklists: [checklistView('EO_AFTER', true)]})});
+    commandImpl = () => json({data: {ok: true}});
+    render(<OperatorNextApp />);
+
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: 'Техника'}));
+    expect(screen.getByRole('heading', {name: 'Техника'})).toBeInTheDocument();
+
+    // Смена ушла в закрытие (например, работу завершили с другого устройства),
+    // а экран перечитает состояние по появлению связи.
+    phase = 'CLOSING';
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('queued-9')]));
+    await act(async () => {
+      globalThis.dispatchEvent(new Event('online'));
+    });
+
+    expect(await screen.findByText('Проверьте итоги и закройте смену')).toBeInTheDocument();
+  });
+});
+
 describe('гарантия: закрытие перечитывает очередь перед close-shift', () => {
   const closing = () => makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]});
 

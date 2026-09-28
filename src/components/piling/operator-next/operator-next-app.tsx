@@ -101,6 +101,9 @@ export function OperatorNextApp() {
       if (seq !== requestSeq.current) return;
       setState(next);
       setLoadError(null);
+      // Роль могла быть исправлена, пока человек смотрел на отказ: успешное
+      // чтение снимает экран «доступ закрыт», иначе он остаётся тупиком.
+      setForbidden(null);
     } catch (error) {
       if (seq !== requestSeq.current) return;
       if (error instanceof ApiError && error.status === 401) {
@@ -223,6 +226,9 @@ export function OperatorNextApp() {
               подаёт он. Если это ошибка — обратитесь к диспетчеру.
             </p>
           </Panel>
+          {/* Отказ по роли — не тупик: связь и права могли восстановиться,
+              и экран обязан дать попробовать снова без перезагрузки страницы. */}
+          <ActionButton label="Обновить" tone="ghost" onClick={() => void reload()} disabled={busy} />
         </Screen>
       </Frame>
     );
@@ -261,12 +267,23 @@ export function OperatorNextApp() {
   const shift = state.shift;
   const alarmingIncidents = state.incidents.filter((incident) => incident.reviewedAt === null).length;
 
+  /**
+   * На закрытии смены показываем вкладку «Смена» независимо от прежнего выбора.
+   *
+   * ПОЧЕМУ. Если человек после «Завершить работу» остался на «Технике», экран
+   * отчёта и кнопка закрытия оказывались за другой вкладкой, хотя следующий шаг
+   * смены — именно закрытие (находка Д8 аудита). Не сбрасываем выбор человека, а
+   * показываем нужное сейчас: вернуться на «Технику» он сможет после закрытия.
+   */
+  const closingPhase = state.phase === 'CLOSING' || state.phase === 'CLOSED';
+  const effectiveTab: WorkTab = closingPhase ? 'SHIFT' : workTab;
+
   // Вкладка «Смена» называется одинаково всю смену: меняется только заголовок
   // внутри экрана. Пока название вкладки бегало (Допуск → Работа → Сдача),
   // вернувшийся вечером человек не находил привычную кнопку (находка №11).
   const tabBar = (
     <TabBar<WorkTab>
-      active={workTab}
+      active={effectiveTab}
       onSelect={setWorkTab}
       tabs={[
         {id: 'SHIFT', label: 'Смена'},
@@ -314,12 +331,12 @@ export function OperatorNextApp() {
   };
 
   const screen = (): ReactNode => {
-    if (tabsVisible && workTab !== 'SHIFT') {
-      const title = workTab === 'EQUIPMENT' ? 'Техника' : workTab === 'SAFETY' ? 'Техника безопасности' : 'Ещё';
+    if (tabsVisible && effectiveTab !== 'SHIFT') {
+      const title = effectiveTab === 'EQUIPMENT' ? 'Техника' : effectiveTab === 'SAFETY' ? 'Техника безопасности' : 'Ещё';
       return (
         <Screen title={title} subtitle={state.assignment?.equipmentName} tabs={tabBar}>
-          {workTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
-          {workTab === 'SAFETY' ? (
+          {effectiveTab === 'EQUIPMENT' ? <EquipmentTab state={state} /> : null}
+          {effectiveTab === 'SAFETY' ? (
             <SafetyTab
               state={state}
               onOpen={(step) => setDetour(
@@ -327,7 +344,7 @@ export function OperatorNextApp() {
               )}
             />
           ) : null}
-          {workTab === 'MORE' ? (
+          {effectiveTab === 'MORE' ? (
             <>
               <IncidentsTab
                 state={state}

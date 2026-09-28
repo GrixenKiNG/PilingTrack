@@ -384,8 +384,8 @@ describe('правило 11 — крупные цели нажатия и чит
     const css = readFileSync(path.join(APP_DIR, 'operator-next.css'), 'utf8');
     expect(css).toMatch(/\.onx-action\s*\{[^}]*min-height:\s*56px/);
     expect(css).toMatch(/\.onx-choice\s*\{[^}]*min-height:\s*56px/);
-    expect(css).toMatch(/\.onx-quiet\s*\{[^}]*min-height:\s*56px/);
-    expect(css).toMatch(/\.onx-step\s*\{[^}]*min-height:\s*48px/);
+    expect(css).toMatch(/\.onx-quiet\s*\{[^}]*min-height:\s*56px[^}]*font-size:\s*1\.125rem/);
+    expect(css).toMatch(/\.onx-step\s*\{[^}]*min-height:\s*48px[^}]*font-size:\s*1\.125rem/);
     // Находка №9: было 48 px и 15 px.
     expect(css).toMatch(/\.onx-answers button\s*\{[^}]*min-height:\s*56px[^}]*font-size:\s*1\.125rem/);
 
