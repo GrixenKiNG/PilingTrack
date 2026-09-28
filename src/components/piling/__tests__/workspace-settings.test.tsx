@@ -48,3 +48,24 @@ describe('WorkspaceSettings: тумблер уведомления', () => {
     await waitFor(() => expect(screen.getByRole('switch', { name: LABEL })).toHaveAttribute('aria-checked', 'false'));
   });
 });
+
+describe('WorkspaceSettings: пока идёт сохранение', () => {
+  it('тумблеры недоступны — поздний отказ не откатит более новое значение', async () => {
+    let finish: (r: Response) => void = () => {};
+    mocks.authFetch.mockReset();
+    mocks.authFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/settings' && init?.method === 'PUT') return new Promise<Response>((r) => { finish = r; });
+      if (url === '/api/settings') return Promise.resolve(json({ companyName: 'Орион', timezone: 'Europe/Moscow', notifications: {} }));
+      return Promise.resolve(json({ users: [], nextCursor: null }));
+    });
+    render(<WorkspaceSettings />);
+
+    const toggle = await screen.findByRole('switch', { name: LABEL });
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(screen.getByRole('switch', { name: LABEL })).toBeDisabled());
+    finish(json({ companyName: 'Орион', timezone: 'Europe/Moscow', notifications: { [LABEL]: true } }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: LABEL })).not.toBeDisabled());
+  });
+});

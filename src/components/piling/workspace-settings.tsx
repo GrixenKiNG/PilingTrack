@@ -282,7 +282,7 @@ export function WorkspaceSettings() {
                         его некому. Молчать об этом — обманывать администратора. */}
                     {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                   </div>
-                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
+                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented || saving} onClick={() => toggleNotification(key)} />
                 </div>
               ))}
             </CardContent>
@@ -339,7 +339,7 @@ export function WorkspaceSettings() {
                       отправителя не должно выглядеть рабочим ни здесь, ни там. */}
                   {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                 </div>
-                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
+                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented || saving} onClick={() => toggleNotification(key)} />
               </div>
             ))}
             {!isAdmin && <p className="text-xs text-muted-foreground">Только администратор может изменять правила уведомлений.</p>}
