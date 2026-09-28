@@ -444,10 +444,13 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
   await requireTenantSite(siteId, ctx.tenantId);
   if (type === 'field') {
     return db.$transaction(async (tx) => {
-      // Блокируем строку узла: чужой INSERT со ссылкой на него ждёт нашу
-      // транзакцию (FK-проверка берёт FOR KEY SHARE), поэтому подсчёт ниже
-      // видит уже зафиксированные чужие записи, а не гоняется с ними.
+      // Блокируем всё поддерево сверху вниз в одном порядке: поле → его кусты →
+      // их пикеты. Одного поля мало: чужой INSERT выработки берёт FOR KEY SHARE
+      // на пикете (FK `picketId`), а не на поле, и блокировка предка ему не
+      // мешает (F-R39-RACE2). Только после блокировок — подсчёт и удаление.
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "PileField" WHERE id = ${itemId} FOR UPDATE`;
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId} ORDER BY id FOR UPDATE`;
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" IN (SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId}) ORDER BY id FOR UPDATE`;
       const item = await tx.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true } });
       if (!item) throw new ServiceError('Hierarchy item not found', 404);
       await assertNoSubtreeProduction(tx, 'field', itemId);
@@ -458,7 +461,9 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
 
   if (type === 'cluster') {
     return db.$transaction(async (tx) => {
+      // Куст → его пикеты (F-R39-RACE2).
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE id = ${itemId} FOR UPDATE`;
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" = ${itemId} ORDER BY id FOR UPDATE`;
       const item = await tx.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true } });
       if (!item) throw new ServiceError('Hierarchy item not found', 404);
       await assertNoSubtreeProduction(tx, 'cluster', itemId);

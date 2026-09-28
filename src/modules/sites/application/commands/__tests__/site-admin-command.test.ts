@@ -297,4 +297,35 @@ describe('deleteSiteHierarchyItem', () => {
     await deleteSiteHierarchyItem('s1', 'cluster', 'item-1', ctx);
     expect(tx.$queryRaw.mock.calls[0][0].join('')).toContain('FROM "Cluster"');
   });
+
+  it('locks the whole field subtree top-down (field → clusters → pickets) before counting', async () => {
+    await deleteSiteHierarchyItem('s1', 'field', 'item-1', ctx);
+
+    const locks = tx.$queryRaw.mock.calls.map((call) => call[0].join(''));
+    expect(locks).toHaveLength(3);
+    expect(locks[0]).toContain('FROM "PileField" WHERE id = ');
+    expect(locks[0]).toContain('FOR UPDATE');
+    expect(locks[1]).toContain('FROM "Cluster" WHERE "fieldId" = ');
+    expect(locks[1]).toContain('ORDER BY id FOR UPDATE');
+    expect(locks[2]).toContain('FROM "Picket" WHERE "clusterId" IN ');
+    expect(locks[2]).toContain('ORDER BY id FOR UPDATE');
+    // Все три блокировки — до подсчёта выработки и до удаления.
+    const lastLock = tx.$queryRaw.mock.invocationCallOrder[2];
+    expect(lastLock).toBeLessThan(tx.pileWork.count.mock.invocationCallOrder[0]);
+    expect(lastLock).toBeLessThan(tx.pileField.delete.mock.invocationCallOrder[0]);
+  });
+
+  it('locks a cluster and then its pickets before counting', async () => {
+    await deleteSiteHierarchyItem('s1', 'cluster', 'item-1', ctx);
+
+    const locks = tx.$queryRaw.mock.calls.map((call) => call[0].join(''));
+    expect(locks).toHaveLength(2);
+    expect(locks[0]).toContain('FROM "Cluster" WHERE id = ');
+    expect(locks[0]).toContain('FOR UPDATE');
+    expect(locks[1]).toContain('FROM "Picket" WHERE "clusterId" = ');
+    expect(locks[1]).toContain('ORDER BY id FOR UPDATE');
+    const lastLock = tx.$queryRaw.mock.invocationCallOrder[1];
+    expect(lastLock).toBeLessThan(tx.pileWork.count.mock.invocationCallOrder[0]);
+    expect(lastLock).toBeLessThan(tx.cluster.delete.mock.invocationCallOrder[0]);
+  });
 });
