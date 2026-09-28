@@ -1,0 +1,56 @@
+Revert-checks: test must fail without its fix. Rollback -> run -> restore.
+
+### p.1 - clear+unlock in one cycle
+Tests  1 failed | 28 passed (29)
+FAILED: ? после подтверждения поля пусты и закрыты до конца перечитывания; повтор не отправляет 192ms
+
+### p.2 - lock and busy before flush
+Tests  5 failed | 24 passed (29)
+FAILED: ? во время подготовки заметка закрыта, повтор не запускает вторую подготовку 1048ms
+
+### p.3 - tabs work while closing
+Tests  1 failed | 28 passed (29)
+FAILED: ? «Техника» реально открывается, заметка переживает возврат 1059ms
+
+### p.4 - close note cleared
+Tests  1 failed | 28 passed (29)
+FAILED: ? закрытие принято, чтение упало — заметки нет, повторно её отправить нечем 58ms
+
+### p.5a - checklist answers in shell
+Tests  4 failed | 25 passed (29)
+FAILED: ? ответы обходного осмотра переживают «Назад» и повторное открытие 123ms
+
+### p.5b - passport form stays mounted
+Tests  1 failed | 28 passed (29)
+FAILED: ? черновик паспорта сваи переживает «Назад к смене» и возврат 159ms
+
+### p.6 - stale equipment response dropped
+Tests  2 failed | 27 passed (29)
+FAILED: ? устаревший ответ отброшен; приёмка отправляет последнюю выбранную 126ms
+
+### p.7 - bulk button disabled while busy
+Tests  1 failed | 19 passed (20)
+FAILED: ? пока команда в пути, массовая кнопка заблокирована 25ms
+
+### p.8 - retry sends acknowledge-briefing
+Tests  1 failed | 28 passed (29)
+FAILED: ? отказ показан с кнопкой «Повторить» 117ms
+
+### p.9 - missing checklist screen works
+Tests  4 failed | 25 passed (29)
+FAILED: ? сказано, что списка нет; «Обновить» и «Назад к смене» работают 1056ms
+
+### p.10 - success renews its own key
+Tests  2 failed | 27 passed (29)
+FAILED: ? успех выработки не меняет ключ осмотра; своя команда ключ обновляет 545ms
+
+### p.11 - unreadable queue is not zero
+Tests  2 failed | 2 passed (4)
+FAILED: ? испорченное значение — «проверить не удалось», а не ноль 8ms
+
+### C - postpone checklist button
+Tests  2 failed | 27 passed (29)
+FAILED: ? «Отложить осмотр»: ответы целы, вкладки доступны, карточка ведёт обратно 51ms
+
+
+DONE. All rollbacks restored.
