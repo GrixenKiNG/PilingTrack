@@ -142,6 +142,58 @@ export function NextActionCard({
 }
 
 /**
+ * Полоса ошибки ПОВЕРХ рабочего экрана.
+ *
+ * ПОЧЕМУ НЕ ПОЛНОЭКРАННАЯ ОШИБКА. Полноэкранная ошибка размонтирует рабочий
+ * экран вместе с открытой формой: сбой обновления стирал бы набранное, хотя
+ * человек его не отправлял и ни в чём не виноват. Полноэкранная ошибка остаётся
+ * только для первой загрузки, когда показывать ещё нечего.
+ */
+export function ErrorStrip({
+  message, onRetry, retryLabel = 'Обновить', testId,
+}: {
+  message: string;
+  onRetry: () => void;
+  retryLabel?: string;
+  testId?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      data-testid={testId ?? 'error-strip'}
+      className="mx-3 mt-2 space-y-2 rounded-xl border border-destructive/45 bg-destructive/8 p-3"
+    >
+      <p className="text-sm font-semibold text-destructive-strong">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="onx-action w-full rounded-lg border border-destructive bg-card px-3 text-sm font-bold text-destructive-strong"
+      >
+        {retryLabel}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Полоса подтверждения: запись принята.
+ *
+ * Нужна там, где раньше обрыв следующего чтения показывал «Нет связи» уже
+ * после того, как сервер запись принял: человек вводил то же второй раз.
+ */
+export function NoticeStrip({children, testId}: {children: ReactNode; testId?: string}) {
+  return (
+    <div
+      role="status"
+      data-testid={testId ?? 'notice-strip'}
+      className="mx-3 mt-2 rounded-xl border border-success/45 bg-success/8 px-3 py-2 text-2xs font-semibold text-success-strong"
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
  * Значок состояния: цвет читают не все, знак — все.
  * Локальная копия нужна потому, что общий `Sign` рисует круг под 20 точек —
  * для поля этого мало.
