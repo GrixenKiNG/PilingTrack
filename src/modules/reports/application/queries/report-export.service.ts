@@ -48,6 +48,32 @@ const PILE_LENGTH_UNKNOWN_LABEL = 'длина марки не задана';
 /** Пометка к итогу м.п., когда хотя бы у одной марки не задана длина. */
 const PILE_METERS_INCOMPLETE_NOTE = '(неполный: у марки не задана длина)';
 
+/**
+ * Смена в печатном виде. Одно правило на CSV и XLSX (находка 19): раньше
+ * `=== 'NIGHT' ? … : 'Дневная'` печатало любое чужое значение как «Дневная»,
+ * то есть выгрузка молча подменяла смену, если в базе окажется что-то кроме
+ * DAY/NIGHT. Пустое значение — пустая ячейка, чужое — как есть.
+ */
+const SHIFT_TEXT: Record<string, string> = {
+  DAY: 'Дневная',
+  NIGHT: 'Ночная',
+};
+
+function shiftLabel(shiftType: string | null | undefined): string {
+  if (!shiftType) return '';
+  return SHIFT_TEXT[shiftType] ?? shiftType;
+}
+
+/**
+ * Погонные метры в CSV: доли — через запятую (находка 13). Русский Excel с
+ * разделителем «;» читает «37.5» как текст и колонку не суммирует.
+ * `formatFixed` из @/lib/format сюда не подходит: он добавляет ещё и разряды
+ * неразрывным пробелом («1 200,0»), а это для Excel снова текст.
+ */
+function csvMeters(meters: number): string {
+  return meters.toFixed(1).replace('.', ',');
+}
+
 /** Метраж по строке свай: count × длина сваи из единственного источника (lib/pile-length). */
 function pileRowMeters(pile: { count?: number | null; pileGrade?: { lengthMm?: number | null } | null }): number {
   return (pile.count ?? 0) * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm });
@@ -133,7 +159,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       reportId: report.reportId,
       // Выгрузку открывает человек: дата — ДД.ММ.ГГГГ, а не ISO-строка из БД.
       date: formatRuDate(report.date),
-      shift: report.shiftType === 'NIGHT' ? 'Ночная' : 'Дневная',
+      shift: shiftLabel(report.shiftType),
       status: reportStatusExportLabel(report.status),
       site: report.site.name,
       operator: report.user.name,
@@ -150,7 +176,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
         pileCount: String(pile.count),
         // Без длины марки метраж не считается: печатаем пояснение, а не «0.0» —
         // иначе пустая длина выглядит как реальный ноль погонных метров.
-        pileMeters: meters > 0 ? meters.toFixed(1) : PILE_LENGTH_UNKNOWN_LABEL,
+        pileMeters: meters > 0 ? csvMeters(meters) : PILE_LENGTH_UNKNOWN_LABEL,
         drillType: '',
         drillMeters: '',
         dtReason: '',
@@ -250,7 +276,8 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   // отметка «Выгружено» обязана стоять по поясу организации, а не сервера.
   const { timezone, companyName, inn } = await getSettings(filters.tenantId);
 
-  const shift = (t: string) => (t === 'NIGHT' ? 'Ночная' : 'Дневная');
+  // Смена — единым правилом (находка 19), см. shiftLabel. Незнакомое значение
+  // печатаем как есть, а не выдаём за дневную.
 
   // Реквизиты выгрузки — над таблицей (F-R44-9). Файл уходит в переписку или
   // подшивается, и по нему должно быть видно, чья это организация, за какой
@@ -274,11 +301,12 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     [
       'ID отчёта', 'Дата', 'Смена', 'Статус', 'Объект', 'Оператор', 'Экипаж', 'Установка',
       'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
+      'Примечание',
     ],
   ];
   for (const r of reports) {
     const base = [
-      r.reportId, formatRuDate(r.date), shift(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
+      r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
       r.crew?.name || '', r.equipment?.name || r.crew?.equipment?.name || '',
     ];
     // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
@@ -287,14 +315,17 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     for (const p of r.piles as any[]) {
       const meters = pileRowMeters(p);
-      detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : PILE_LENGTH_UNKNOWN_LABEL, '', null, '', null, '']);
+      // Колонка «Свай, м.п.» — числовая: без длины марки её оставляем пустой,
+      // а пояснение печатаем в «Примечании» (находка 14) — иначе текст в
+      // числовой колонке делает её текстовой и лист не суммируется.
+      detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : null, '', null, '', null, '', meters > 0 ? '' : PILE_LENGTH_UNKNOWN_LABEL]);
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.drillings as any[]) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '']);
+    for (const d of r.drillings as any[]) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '', '']);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '']);
+    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '', '']);
     if (!r.piles.length && !r.drillings.length && !r.downtimes.length) {
-      detail.push([...base, '', null, '', '', null, '', null, '']);
+      detail.push([...base, '', null, '', '', null, '', null, '', '']);
     }
   }
 
@@ -318,7 +349,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
     totals.push([
-      r.reportId, formatRuDate(r.date), shift(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
+      r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
       pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '',
     ]);
