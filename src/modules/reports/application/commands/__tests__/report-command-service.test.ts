@@ -48,7 +48,12 @@ const mockReport = {
   downtimes: [],
 };
 
-const mockDb = {
+// Клиент транзакции. Тот же объект, что и db: команда передаёт его в
+// репозиторий и читает им же, поэтому тесты читающих методов не меняются.
+const mockTx = {
+  // Фазы 2–5 команды идут одной транзакцией (F-R38-1): замок берётся её
+  // первым оператором, чтение и запись — тем же клиентом.
+  $executeRaw: vi.fn().mockResolvedValue(1),
   report: {
     findUnique: vi.fn().mockResolvedValue(mockReport),
     findMany: vi.fn().mockResolvedValue([]),
@@ -65,18 +70,28 @@ const mockDb = {
   },
 };
 
+const mockDb = {
+  ...mockTx,
+  $transaction: (cb: (tx: typeof mockTx) => unknown) => cb(mockTx),
+};
+
 vi.mock('@/lib/db', () => ({
+  DEFAULT_TX_OPTIONS: {},
   get db() { return mockDb; },
 }));
+
+/** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
+const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
 
 // Mock repository
 const mockRepoSave = vi.fn().mockResolvedValue(undefined);
 const mockRepoFindById = vi.fn().mockResolvedValue(null);
+const mockRepoFindByNaturalKey = vi.fn().mockResolvedValue(null);
 
 const mockRepo: ReportRepository = {
   save: mockRepoSave,
   findById: mockRepoFindById,
-  findByUserIdAndDate: vi.fn().mockResolvedValue(null),
+  findByUserIdAndDate: mockRepoFindByNaturalKey,
 };
 
 vi.mock('../../../infrastructure', () => ({
@@ -516,7 +531,51 @@ describe('Report Command Service', () => {
       expect(mockRepoSave).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ expectedVersion: 7 }),
+        // Третьим аргументом идёт клиент транзакции команды (F-R38-1).
+        expect.anything(),
       );
+    });
+  });
+
+  /*
+    Гонка двух отправок без reportId (F-R38-1).
+
+    Маршрут генерирует новый reportId на каждый запрос, поэтому повторная
+    отправка (потерян ответ, перепосылка из очереди телефона) приходит с
+    неизвестным идентификатором и попадает на поиск по естественному ключу
+    «машинист + объект + день». Раньше поиск и вставка шли врозь: обе отправки
+    успевали прочитать «отчёта нет» и обе создавали строку — два отчёта за одну
+    смену одного человека, и выработка задваивалась в аналитике и в дневной
+    сводке объекта.
+  */
+  describe('advisory-замок по естественному ключу отчёта (F-R38-1)', () => {
+    it('берёт замок раньше поиска по машинисту, объекту и дате, и пишет тем же клиентом', async () => {
+      const order: string[] = [];
+      mockTx.$executeRaw.mockImplementation(async () => { order.push('lock'); });
+      mockRepoFindByNaturalKey.mockImplementation(async () => { order.push('lookup'); return null; });
+      mockRepoSave.mockImplementation(async () => { order.push('save'); });
+
+      await upsertReport({
+        reportId: 'report-race',
+        userId: 'user-1',
+        siteId: 'site-1',
+        tenantId: 'orion',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 1 }],
+      });
+
+      // Замок — первый оператор транзакции, до чтения. $queryRaw для него не
+      // годится: pg_advisory_xact_lock возвращает void и колонка не
+      // десериализуется.
+      expect(mockTx.$executeRaw).toHaveBeenCalledTimes(1);
+      const call = mockTx.$executeRaw.mock.calls[0];
+      expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
+      expect(call.slice(1)).toEqual(['report:orion:user-1:site-1:2026-04-05']);
+
+      // Чтение «есть ли отчёт» и запись — под тем же замком и той же
+      // транзакцией: иначе замок не мешает второй отправке создать дубль.
+      expect(order).toEqual(['lock', 'lookup', 'save']);
+      expect(mockRepoSave.mock.calls[0][2]).toBe(mockTx);
     });
   });
 });
