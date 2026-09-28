@@ -9,28 +9,55 @@
  *   - "Скачать PDF" → downloads as an attachment.
  *
  * GET is cookie-authenticated, so window.open / location carry the session.
+ *
+ * «Сегодня» и «N дней» отмеряются производственным днём организации, а не днём
+ * браузера (F-R44-8): у машины с чужим поясом кнопка «Сегодня» печатала отчёт
+ * за соседние сутки. Экран пояса не получает — берём его из /api/settings,
+ * как соседние экраны (журнал отчётов отмеряет день тем же помощником).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Printer, Download } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
+import { authFetch } from '@/lib/api';
+import { getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 
-function todayYmd(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** День организации («ГГГГ-ММ-ДД»). До загрузки настроек — пояс по умолчанию. */
+function todayYmd(timezone?: string): string {
+  return getTodayInTimezone(timezone);
 }
 
-function shiftYmd(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** Сдвиг дня организации на N дней: полдень UTC, без перевода часов. */
+function shiftYmd(days: number, timezone?: string): string {
+  const day = todayYmd(timezone);
+  return new Date(new Date(`${day}T12:00:00.000Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
 export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) {
-  const [from, setFrom] = useState(todayYmd());
-  const [to, setTo] = useState(todayYmd());
+  const [timezone, setTimezone] = useState<string>();
+  const [from, setFrom] = useState(() => todayYmd());
+  const [to, setTo] = useState(() => todayYmd());
   const invalid = from > to;
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await authFetch('/api/settings');
+        if (!active || !res.ok) return;
+        const zone = ((await res.json()) as { timezone?: string }).timezone;
+        if (!zone) return;
+        setTimezone(zone);
+        // Пересчитываем только нетронутый период: выбор человека не перебиваем.
+        setFrom((prev) => (prev === todayYmd() ? todayYmd(zone) : prev));
+        setTo((prev) => (prev === todayYmd() ? todayYmd(zone) : prev));
+      } catch {
+        // Пояс не критичен: остаёмся на поясе по умолчанию.
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const url = (inline: boolean) => {
     const qs = new URLSearchParams({ dateFrom: from, dateTo: to, equipmentId });
@@ -39,13 +66,13 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
   };
 
   const setToday = () => {
-    const t = todayYmd();
+    const t = todayYmd(timezone);
     setFrom(t);
     setTo(t);
   };
   const setRange = (days: number) => {
-    setTo(todayYmd());
-    setFrom(shiftYmd(-(days - 1)));
+    setTo(todayYmd(timezone));
+    setFrom(shiftYmd(-(days - 1), timezone));
   };
 
   const chip = 'rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted';
