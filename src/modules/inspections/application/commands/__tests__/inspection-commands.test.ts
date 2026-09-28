@@ -6,8 +6,12 @@ const m = vi.hoisted(() => ({
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
   crewFindFirst: vi.fn(),
+  defectFindMany: vi.fn(), defectCreate: vi.fn(),
   // Снимки к пунктам осмотра считаются по Media, а не по числу из запроса.
   mediaGroupBy: vi.fn(),
+  // Замок дедупликации дефектов берётся через $executeRaw: pg_advisory_xact_lock
+  // возвращает void, и $queryRaw падает на десериализации этой колонки (F-R38-5).
+  executeRaw: vi.fn(), queryRaw: vi.fn(),
   // Счётчик открытых транзакций: фиксируем, что запись идёт одной.
   transaction: vi.fn(),
 }));
@@ -21,9 +25,12 @@ vi.mock('@/lib/db', () => {
     },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
+    equipmentDefect: { findMany: m.defectFindMany, create: m.defectCreate },
     crew: { findFirst: m.crewFindFirst },
     outboxEvent: { createMany: m.outboxCreate },
     media: { groupBy: m.mediaGroupBy },
+    $executeRaw: m.executeRaw,
+    $queryRaw: m.queryRaw,
     $transaction: (run: (tx: unknown) => unknown) => {
       m.transaction();
       return run(client);
@@ -33,12 +40,18 @@ vi.mock('@/lib/db', () => {
 });
 import { startInspection, startToInspection, saveAnswers, completeInspection } from '../inspection-commands';
 
+/** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
+const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
+
 beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
   // По умолчанию снимков нет — их наличие тест задаёт явно там, где проверяет.
   m.mediaGroupBy.mockResolvedValue([]);
   // Захват строки по умолчанию удался: строка найдена и ещё не завершена.
   m.insUpdateMany.mockResolvedValue({ count: 1 });
+  // Замок ничего не возвращает — $executeRaw отдаёт число затронутых строк.
+  m.executeRaw.mockResolvedValue(1);
+  m.defectFindMany.mockResolvedValue([]);
 });
 
 describe('startInspection', () => {
@@ -246,6 +259,41 @@ describe('completeInspection', () => {
     expect(m.recUpdateMany).not.toHaveBeenCalled();
     expect(m.outboxCreate).not.toHaveBeenCalled();
     expect(res).not.toBeNull();
+  });
+
+  /**
+   * Дедупликация дефектов «прочитал открытые по ключу → создал недостающие»
+   * опирается только на чтение, а `EquipmentDefect.sourceKey` — обычная
+   * колонка, уникального ограничения у неё нет. На одновременности это не
+   * работает: два осмотра одной машины (ежесменный у оператора и ТО-1 у
+   * механика, либо повтор завершения с телефона) оба читают «открытых по
+   * этому пункту нет» и оба создают запись — в журнале две одинаковые строки,
+   * обе идут в готовность как открытые (F-R38-5). Замок на ключ дедупликации
+   * берётся первым оператором транзакции, до чтения открытых дефектов.
+   */
+  it('берёт advisory-замок на ключ дедупликации дефектов до чтения открытых (F-R38-5)', async () => {
+    m.insFindUnique.mockResolvedValue({
+      id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1',
+      templateSnapshot: [{ id: 'i1', text: 'Течь гидравлики', answerType: 'YES_NO', required: true, photoRequired: false, createsDefect: true }],
+      answers: [{ itemId: 'i1', result: 'NO', photoCount: 0 }],
+    });
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', equipmentId: 'eq1' });
+    m.defectCreate.mockResolvedValue({ id: 'd1' });
+
+    await completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+
+    // Замок — первый оператор транзакции: раньше чтения открытых дефектов.
+    expect(m.executeRaw).toHaveBeenCalledTimes(1);
+    const call = m.executeRaw.mock.calls[0];
+    expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
+    expect(call.slice(1)).toEqual(['defect:orion:eq1:inspection-item:eq1:i1']);
+    // $queryRaw для замка не используется: колонка void ломает десериализацию.
+    expect(m.queryRaw).not.toHaveBeenCalled();
+    expect(m.executeRaw.mock.invocationCallOrder[0])
+      .toBeLessThan(m.defectFindMany.mock.invocationCallOrder[0]);
+    // Чтение открытых и вставка — той же транзакцией, под тем же замком.
+    expect(m.transaction).toHaveBeenCalledTimes(1);
+    expect(m.defectCreate).toHaveBeenCalledTimes(1);
   });
 });
 
