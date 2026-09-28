@@ -281,7 +281,7 @@ function StepLadder({state, go}: {state: OperatorMobileState; go: Go}) {
           return (
             <Row
               key={step.phase}
-              icon={done ? 'check' : now ? 'work' : 'minus'}
+              icon={done ? 'check' : now ? 'work' : 'list'}
               tone={done ? 'ok' : now ? 'orange' : ''}
               title={`${index + 1}. ${step.title}`}
               note={done ? 'выполнено' : now ? 'сейчас' : 'откроется после предыдущего шага'}
@@ -586,7 +586,7 @@ function ScreenMaint({state, go}: {state: OperatorMobileState; go: Go}) {
                   note="сейчас — нажмите, чтобы пройти" chevron onClick={() => go('step')} />
               );
             }
-            return <Row key={list.stage} icon="minus" tone="" title={list.title} note="откроется в свою очередь" />;
+            return <Row key={list.stage} icon="list" tone="" title={list.title} note="откроется в свою очередь" />;
           })}
       </Card>
       <Card title="Открытые неисправности">
