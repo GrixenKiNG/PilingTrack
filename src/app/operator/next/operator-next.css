@@ -7,7 +7,7 @@
  * Поэтому здесь остаётся только то, чего у общего контура нет:
  *
  * 1. рамка страницы под телефон,
- * 2. кнопки действий не ниже 56 точек и зоны нажатия не меньше 48,
+ * 2. кнопки действий не ниже 56 точек (правило 11) и зоны нажатия не меньше 48,
  * 3. счётчик «Осталось отметить» и крупные строки выбора.
  *
  * Тёмной темы у продукта нет — палитра одна и светлая, из системных токенов
@@ -51,7 +51,14 @@
   min-height: 56px;
 }
 
-/* Строка списка шагов допуска: не ниже 48 точек по всей ширине. */
+/* Второстепенное действие (приложить снимок, быстрый простой, «весь раздел»):
+   тоже кнопка действия, поэтому тоже не ниже 56 точек, а не 48. */
+.onx-quiet {
+  min-height: 56px;
+}
+
+/* Строка списка (шаг допуска, установка, пункт): это ЗОНА нажатия, её минимум
+   по правилу 11 — 48×48. */
 .onx-step {
   min-height: 48px;
 }
@@ -85,24 +92,31 @@
   color: var(--success-strong);
 }
 
-/* Ответы в осмотре: три крупные кнопки в ряд, в перчатке попасть можно. */
+/* Ответы в осмотре: три крупные кнопки в ряд. Кнопка действия — не ниже 56
+   точек, текст — не меньше 18 px (правило 11; было 48 px и 15 px). */
 .onx-answers {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .onx-answers button {
-  min-height: 48px;
+  min-height: 56px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
-  font-size: 0.9375rem;
+  padding: 4px 6px;
+  font-size: 1.125rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 .onx-answers button[aria-pressed='true'] {
   border-color: var(--signal);
   background: color-mix(in oklab, var(--signal) 12%, var(--card));
   color: var(--signal-strong);
+}
+.onx-answers button:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 2px;
 }
 
 /* Журнал записей смены. */
@@ -116,9 +130,10 @@
 .onx-entry:first-child {
   border-top: 0;
 }
+/* Время записи — служебная подпись, но не мельче 16 px. */
 .onx-entry time {
   min-width: 56px;
   font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--muted-foreground);
 }

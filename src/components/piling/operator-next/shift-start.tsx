@@ -21,12 +21,19 @@ import {SHIFT_TYPE_LABELS} from './words';
  * и нигде не показывали: смена, начатая в 19:30, записывалась дневной
  * (находка P0 №20). Тип выбирается явно и до приёмки; по часам телефона не
  * угадывается никогда.
+ *
+ * ПОЧЕМУ ПРИЁМКА ЖДЁТ ЗАГРУЗКИ ВЫБРАННОЙ МАШИНЫ. Состояние с сервера приходит
+ * по конкретной установке. Пока ответ на смену выбора не пришёл, на экране
+ * цифры прежней машины: принять по такой карточке значит открыть смену не на
+ * той установке, которую человек выбрал (находка №4 ревью).
  */
 export function ShiftStartScreen({
-  state, busy, error, onAccept, onSelectEquipment, selectedEquipmentId, onReload,
+  state, busy, loading, error, onAccept, onSelectEquipment, selectedEquipmentId, onReload,
 }: {
   state: OperatorMobileState;
   busy: boolean;
+  /** Идёт чтение состояния (первое или после смены установки). */
+  loading: boolean;
   error: string | null;
   onAccept: (input: {equipmentId: string; shiftType: 'DAY' | 'NIGHT'}) => void;
   onSelectEquipment: (equipmentId: string) => void;
@@ -40,6 +47,9 @@ export function ShiftStartScreen({
    */
   const [shiftType, setShiftType] = useState<ShiftTypeValue | null>(null);
   const activeEquipmentId = selectedEquipmentId ?? assignment?.equipmentId ?? state.options[0]?.equipmentId ?? null;
+  // Какая установка ПОКАЗАНА сейчас. Ответ на прежний выбор — это не она.
+  const shownEquipmentId = assignment?.equipmentId ?? null;
+  const shownIsChosen = Boolean(activeEquipmentId) && shownEquipmentId === activeEquipmentId;
 
   if (state.options.length === 0 && !assignment) {
     return (
@@ -62,7 +72,9 @@ export function ShiftStartScreen({
     ? 'Сначала выберите тип смены: дневная или ночная.'
     : !activeEquipmentId
       ? 'Сначала выберите установку.'
-      : undefined;
+      : !shownIsChosen
+        ? 'Показываем другую установку — дождитесь загрузки выбранной.'
+        : undefined;
 
   return (
     <Screen
@@ -71,17 +83,27 @@ export function ShiftStartScreen({
       footer={(
         <ActionButton
           label="Принять установку"
-          hint={shiftType ? `Смена: ${SHIFT_TYPE_LABELS[shiftType].title.toLowerCase()}, ${SHIFT_TYPE_LABELS[shiftType].window}` : 'Откроет смену на выбранной машине'}
+          hint={shiftType
+            ? `Смена: ${SHIFT_TYPE_LABELS[shiftType].title.toLowerCase()}, ${SHIFT_TYPE_LABELS[shiftType].window}`
+            : 'Откроет смену на выбранной машине'}
           onClick={() => {
-            if (!activeEquipmentId || !shiftType) return;
-            onAccept({equipmentId: activeEquipmentId, shiftType});
+            // В команду уходит установка, ПОКАЗАННАЯ на карточке: она совпадает
+            // с выбранной только тогда, когда кнопка доступна.
+            if (!shownEquipmentId || !shiftType) return;
+            onAccept({equipmentId: shownEquipmentId, shiftType});
           }}
-          disabled={busy || acceptReason !== undefined}
+          disabled={busy || loading || acceptReason !== undefined}
           reason={acceptReason}
         />
       )}
     >
       <WarningsPanel warnings={state.warnings} />
+
+      {loading ? (
+        <p role="status" className="text-2xs font-semibold text-info-strong">
+          Загружаем выбранную установку…
+        </p>
+      ) : null}
 
       {state.options.length > 1 ? (
         <div className="space-y-2">
@@ -93,6 +115,7 @@ export function ShiftStartScreen({
               hint={option.siteName}
               selected={activeEquipmentId === option.equipmentId}
               onClick={() => onSelectEquipment(option.equipmentId)}
+              disabled={busy || loading}
             />
           ))}
           <p className="text-2xs text-muted-foreground">
@@ -185,6 +208,7 @@ export function ShiftStartScreen({
             hint={SHIFT_TYPE_LABELS[type].window}
             selected={shiftType === type}
             onClick={() => setShiftType(type)}
+            disabled={busy}
           />
         ))}
       </div>

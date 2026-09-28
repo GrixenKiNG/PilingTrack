@@ -40,6 +40,15 @@ interface Draft {
 
 const emptyDraft = (): Draft => ({note: '', measures: {}, mediaIds: [], uploading: false, uploadError: null});
 
+/**
+ * Что было в пункте ДО массовой отметки раздела.
+ *
+ * ПОЧЕМУ ХРАНИМ СНИМОК. «Отменить» обязано вернуть прежнее, а не поставить
+ * «норму» второй раз (находка №5 ревью: обработчик отмены снова писал `OK`).
+ * Без снимка откатывать нечего.
+ */
+type BulkBackup = Record<string, Record<string, Draft | undefined>>;
+
 /** Пустая строка — не ноль: `Number('')` даёт 0, и незаполненный долив сошёл бы за заполненный. */
 function filled(raw: string | undefined): boolean {
   return raw !== undefined && raw.trim() !== '' && Number.isFinite(Number(raw));
@@ -66,6 +75,7 @@ export function ChecklistRunScreen({
   known?: Record<string, KnownAnswer>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [bulkBackup, setBulkBackup] = useState<BulkBackup>({});
   const [showGaps, setShowGaps] = useState(false);
 
   const items = useMemo(
@@ -95,17 +105,55 @@ export function ChecklistRunScreen({
 
   const problemByItem = new Map(problems.map((problem) => [problem.itemId, problem.message]));
 
-  /** Пункты, которые закрываются одной кнопкой: без снимка и без обязательного замера. */
-  const bulkItems = (section: ChecklistSection) => section.items.filter(
+  /**
+   * Пункты, которые можно закрыть одной кнопкой.
+   *
+   * ПРАВИЛО ИСКЛЮЧЕНИЯ. Кнопка не трогает пункт, где неисправность требует
+   * снимка, и пункт с обязательным замером: это ровно те строки, где слепая
+   * «норма» опасна.
+   */
+  const bulkable = (section: ChecklistSection) => section.items.filter(
     (item) => !known[item.id] && !item.photoOnIssue && !measureRequired(item, 'OK'),
   );
 
-  const answerSection = (section: ChecklistSection) => {
+  /**
+   * Пункты, которые массовая отметка действительно заполнит.
+   *
+   * ПОЧЕМУ ТОЛЬКО НЕОТМЕЧЕННЫЕ. Раньше «Весь раздел — норма» переписывала и
+   * уже отмеченные пункты: замечание или неисправность молча становились
+   * «нормой», а примечания и замеры оставались — запись противоречила себе
+   * (находка №5 ревью).
+   */
+  const bulkTargets = (section: ChecklistSection) => bulkable(section)
+    .filter((item) => !drafts[item.id]?.answer);
+
+  const applyBulk = (section: ChecklistSection) => {
+    const targets = bulkTargets(section);
+    if (targets.length === 0) return;
+    const snapshot: Record<string, Draft | undefined> = {};
+    for (const item of targets) snapshot[item.id] = drafts[item.id];
+    setBulkBackup((current) => ({...current, [section.id]: snapshot}));
     setDrafts((current) => {
       const next = {...current};
-      for (const item of bulkItems(section)) {
-        next[item.id] = {...(next[item.id] ?? emptyDraft()), answer: 'OK'};
+      for (const item of targets) next[item.id] = {...(next[item.id] ?? emptyDraft()), answer: 'OK'};
+      return next;
+    });
+  };
+
+  const cancelBulk = (section: ChecklistSection) => {
+    const snapshot = bulkBackup[section.id];
+    if (!snapshot) return;
+    setDrafts((current) => {
+      const next = {...current};
+      for (const [itemId, draft] of Object.entries(snapshot)) {
+        if (draft === undefined) delete next[itemId];
+        else next[itemId] = draft;
       }
+      return next;
+    });
+    setBulkBackup((current) => {
+      const next = {...current};
+      delete next[section.id];
       return next;
     });
   };
@@ -160,8 +208,8 @@ export function ChecklistRunScreen({
       ) : null}
 
       {checklist.sections.map((section) => {
-        const bulk = bulkItems(section);
-        const bulkOn = bulk.length > 0 && bulk.every((item) => drafts[item.id]?.answer === 'OK');
+        const canceled = Boolean(bulkBackup[section.id]);
+        const canBulk = bulkTargets(section).length > 0;
         const doneCount = section.items.filter((item) => known[item.id] || drafts[item.id]?.answer).length;
         return (
           <Panel key={section.id}>
@@ -172,17 +220,21 @@ export function ChecklistRunScreen({
                   {doneCount} из {section.items.length}
                 </span>
               </PanelTitle>
-              {bulk.length > 0 ? (
+              {canBulk || canceled ? (
                 <button
                   type="button"
-                  aria-pressed={bulkOn}
-                  onClick={() => answerSection(section)}
-                  className="onx-step shrink-0 rounded-lg border px-3 text-2xs font-semibold"
+                  onClick={() => (canceled ? cancelBulk(section) : applyBulk(section))}
+                  className="onx-quiet shrink-0 rounded-lg border px-3 text-2xs font-semibold"
                 >
-                  {bulkOn ? 'Отменить' : 'Весь раздел — норма'}
+                  {canceled ? 'Отменить' : 'Весь раздел — норма'}
                 </button>
               ) : null}
             </div>
+            {canceled ? (
+              <p className="mt-1 text-2xs text-muted-foreground">
+                Отмечены только пункты без ответа. Уже выбранные замечания и неисправности не тронуты.
+              </p>
+            ) : null}
             <ul className="mt-2 space-y-4">
               {section.items.map((item) => (
                 <ItemRow
@@ -192,6 +244,7 @@ export function ChecklistRunScreen({
                   known={known[item.id]}
                   problem={problemByItem.get(item.id)}
                   lastMeter={lastMeter}
+                  disabled={busy}
                   onChange={(patch) => update(item.id, patch)}
                   commandId={commandId}
                 />
@@ -207,13 +260,14 @@ export function ChecklistRunScreen({
 }
 
 function ItemRow({
-  item, draft, known, problem, lastMeter, onChange, commandId,
+  item, draft, known, problem, lastMeter, disabled, onChange, commandId,
 }: {
   item: ChecklistItem;
   draft: Draft;
   known?: KnownAnswer;
   problem?: string;
   lastMeter?: {engineHours: number; recordedAt: string} | null;
+  disabled: boolean;
   onChange: (patch: Partial<Draft>) => void;
   commandId: string;
 }) {
@@ -245,6 +299,7 @@ function ItemRow({
                 key={option.value}
                 type="button"
                 aria-pressed={draft.answer === option.value}
+                disabled={disabled}
                 onClick={() => onChange({answer: option.value})}
               >
                 {option.label}
@@ -259,6 +314,7 @@ function ItemRow({
               </span>
               <textarea
                 value={draft.note}
+                disabled={disabled}
                 onChange={(event) => onChange({note: event.target.value})}
                 rows={2}
                 className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
@@ -277,6 +333,7 @@ function ItemRow({
                 inputMode="decimal"
                 step="0.1"
                 aria-label={`${measure.label}, ${measure.unit}`}
+                disabled={disabled}
                 value={draft.measures[measure.key] ?? ''}
                 onChange={(event) => onChange({measures: {...draft.measures, [measure.key]: event.target.value}})}
                 className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
@@ -291,12 +348,13 @@ function ItemRow({
 
           {needsPhoto ? (
             <div className="space-y-1.5">
-              <label className="onx-step flex cursor-pointer items-center justify-center rounded-lg border border-dashed px-3 text-2xs font-semibold">
+              <label className="onx-quiet flex cursor-pointer items-center justify-center rounded-lg border border-dashed px-3 text-2xs font-semibold">
                 {draft.uploading ? 'Загружаем снимок…' : 'Приложить фотографию'}
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  disabled={disabled}
                   className="hidden"
                   onChange={async (event: ChangeEvent<HTMLInputElement>) => {
                     const file = event.target.files?.[0];

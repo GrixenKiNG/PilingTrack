@@ -1,6 +1,6 @@
 'use client';
 
-import {useState, type ReactNode} from 'react';
+import type {ReactNode} from 'react';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {formatDowntimeHours} from '@/lib/downtime-hours';
 import {ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '@/components/piling/operator-mobile/ui';
@@ -13,37 +13,85 @@ import {WORDS} from './words';
  *
  * ПОЧЕМУ ЗАКРЫТИЕ ЗАПРЕЩЕНО ПРИ НЕПУСТОЙ ОЧЕРЕДИ. Это критичная находка аудита
  * очереди: смену можно было закрыть, пока записи лежали на устройстве, и после
- * закрытия сервер отвергал их с 409 «Смена уже закрыта» — выработка гибла молча
- * (находка №1 в `43-offline-queue-edges.md`). Здесь число неотправленных записей
- * показано, кнопка отправки рядом, а закрытие держится с видимой причиной.
+ * закрытия сервер отвергал их с 409 «Смена уже закрыта» — выработка гибла молча.
+ * Здесь число неотправленных записей показано, кнопка отправки рядом, а закрытие
+ * держится с видимой причиной.
  *
  * ПОЧЕМУ ПЕРЕДАЧИ СМЕНЫ НЕТ. У «Ориона» сменщиков нет: установку утром примет
- * тот же машинист, а закрытие сразу отправляет отчёт диспетчеру (решение
- * владельца 27.09.2026, задача F-QA-005).
+ * тот же машинист, а закрытие сразу отправляет отчёт диспетчеру.
+ *
+ * ПОЧЕМУ БЫВАЕТ «ЧЕК-ЛИСТА НЕТ». Сервер отдаёт чек-лист осмотра после работы не
+ * всегда: его состав зависит от условий. Пока экран молча звал «перейти к
+ * осмотру», а открывать было нечего, машинист попадал в тупик (находка №8
+ * ревью). Теперь про это сказано прямо и рядом рабочая кнопка «Обновить».
  */
 export function ReportSendScreen({
-  state, busy, error, tabs, unsentCount, onOpenService, onFlushQueued, onClose,
+  state, busy, error, tabs, unsentCount, closeNote, onCloseNoteChange,
+  onOpenService, onFlushQueued, onReload, onClose,
 }: {
   state: OperatorMobileState;
   busy: boolean;
   error: string | null;
   tabs?: ReactNode;
-  /** Сколько записей лежит на устройстве и ещё не ушло на сервер. */
+  /** Сколько записей лежит на устройстве и ещё не ушло. `-1` — проверить не удалось. */
   unsentCount: number;
+  closeNote: string;
+  onCloseNoteChange: (value: string) => void;
   onOpenService: () => void;
   onFlushQueued: () => void;
+  onReload: () => void;
   onClose: (comment: string) => void;
 }) {
-  const [comment, setComment] = useState('');
   const service = state.checklists.find((checklist) => checklist.stage === 'EO_AFTER');
+  const serviceMissing = service === undefined;
   const serviceDone = service?.done ?? false;
-  const blocked = !serviceDone || unsentCount > 0;
+  const queueUnknown = unsentCount < 0;
+  const blocked = serviceMissing || !serviceDone || unsentCount !== 0;
 
-  const closeReason = !serviceDone
-    ? 'Пока не выполнен осмотр и обслуживание после работы, смену закрыть нельзя.'
-    : unsentCount > 0
-      ? `На устройстве ${unsentCount} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`
-      : undefined;
+  const closeReason = queueUnknown
+    ? 'Не удалось проверить очередь на устройстве. Обновите экран — закрывать смену вслепую нельзя.'
+    : serviceMissing
+      ? 'Сервер не отдал чек-лист осмотра после работы. Обновите экран; если он не появится — смену закрывает диспетчер.'
+      : !serviceDone
+        ? 'Пока не выполнен осмотр и обслуживание после работы, смену закрыть нельзя.'
+        : unsentCount > 0
+          ? `На устройстве ${unsentCount} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`
+          : undefined;
+
+  const card = serviceMissing
+    ? {
+      title: 'Чек-лист осмотра после работы не получен',
+      hint: 'Сервер не отдал список. Нажмите «Обновить»: если список не появится, закрыть смену сможет диспетчер — работа не пропадёт.',
+      actionLabel: 'Обновить',
+      onAction: onReload,
+    }
+    : !serviceDone
+      ? {
+        title: 'Осмотр и обслуживание после работы',
+        hint: 'Пока машина не осмотрена и не обслужена, смену закрыть нельзя: оставленная без осмотра машина утром станет проблемой следующего.',
+        actionLabel: 'Выполнить осмотр после работы',
+        onAction: onOpenService,
+      }
+      : unsentCount > 0
+        ? {
+          title: `Отправьте записи с телефона: ${unsentCount}`,
+          hint: 'Записи сохранены на устройстве. Нажмите «Отправить записи с телефона» — как только связь появится, они уйдут.',
+          actionLabel: 'Отправить записи с телефона',
+          onAction: onFlushQueued,
+        }
+        : queueUnknown
+          ? {
+            title: 'Очередь на устройстве не прочитана',
+            hint: 'Проверить очередь не удалось — это не то же самое, что «пусто». Обновите экран и повторите.',
+            actionLabel: 'Обновить',
+            onAction: onReload,
+          }
+          : {
+            title: 'Проверьте итоги и закройте смену',
+            hint: 'Итоги ниже. Если всё верно — закройте смену: отчёт уйдёт диспетчеру.',
+            actionLabel: WORDS.closeShift,
+            onAction: () => onClose(closeNote),
+          };
 
   return (
     <Screen
@@ -54,66 +102,57 @@ export function ReportSendScreen({
         <ActionButton
           label={busy ? 'Отправляем…' : WORDS.closeShift}
           hint={unsentCount > 0 ? `Не отправлено на сервер: ${unsentCount}` : 'Отчёт уйдёт диспетчеру сразу'}
-          onClick={() => onClose(comment)}
+          onClick={() => onClose(closeNote)}
           disabled={busy || blocked}
           reason={closeReason}
           tone={blocked ? 'neutral' : 'primary'}
         />
       )}
     >
-      <NextActionCard
-        title={!serviceDone
-          ? 'Осмотр и обслуживание после работы'
-          : unsentCount > 0
-            ? `Отправьте записи с телефона: ${unsentCount}`
-            : 'Проверьте итоги и закройте смену'}
-        hint={!serviceDone
-          ? 'Пока машина не осмотрена и не обслужена, смену закрыть нельзя: оставленная без осмотра машина утром станет проблемой следующего.'
-          : unsentCount > 0
-            ? 'Записи сохранены на устройстве. Нажмите «Отправить записи с телефона» — как только связь появится, они уйдут.'
-            : 'Итоги ниже. Если всё верно — закройте смену: отчёт уйдёт диспетчеру.'}
-        actionLabel={!serviceDone
-          ? 'Выполнить осмотр после работы'
-          : unsentCount > 0
-            ? 'Отправить записи с телефона'
-            : WORDS.closeShift}
-        onAction={!serviceDone
-          ? onOpenService
-          : unsentCount > 0
-            ? onFlushQueued
-            : () => onClose(comment)}
-        disabled={busy}
-      />
+      <NextActionCard {...card} disabled={busy} />
 
       <WarningsPanel warnings={state.warnings} />
 
-      <Panel tone={serviceDone ? 'ok' : 'warning'}>
-        <PanelTitle tone={serviceDone ? 'ok' : 'warning'}>
-          {serviceDone ? `${WORDS.eoAfter}: выполнено` : `Сначала ${WORDS.eoAfter.toLowerCase()}`}
-        </PanelTitle>
-        <p className="mt-1 text-sm">
-          {serviceDone
-            ? 'Машина осмотрена и обслужена. Осталось проверить итоги и закрыть смену.'
-            : 'Это осмотр и обслуживание машины после работы, а не «конец работы». Пока он не выполнен, смену закрыть нельзя.'}
-        </p>
-        {!serviceDone ? (
+      {serviceMissing ? (
+        <Panel tone="warning">
+          <PanelTitle tone="warning">Осмотр после работы недоступен</PanelTitle>
+          <p className="mt-1 text-sm">
+            Сервер не прислал чек-лист «{WORDS.eoAfter}». Обычно он приходит вместе со сменой.
+            Нажмите «Обновить»; если список не появится, оставьте смену открытой и скажите диспетчеру —
+            закрывать её вслепую нельзя.
+          </p>
           <div className="mt-3">
-            <ActionButton label="Перейти к осмотру после работы" tone="ghost" onClick={onOpenService} disabled={busy} />
+            <ActionButton label="Обновить" tone="ghost" onClick={onReload} disabled={busy} />
           </div>
-        ) : null}
-      </Panel>
+        </Panel>
+      ) : (
+        <Panel tone={serviceDone ? 'ok' : 'warning'}>
+          <PanelTitle tone={serviceDone ? 'ok' : 'warning'}>
+            {serviceDone ? `${WORDS.eoAfter}: выполнено` : `Сначала ${WORDS.eoAfter.toLowerCase()}`}
+          </PanelTitle>
+          <p className="mt-1 text-sm">
+            {serviceDone
+              ? 'Машина осмотрена и обслужена. Осталось проверить итоги и закрыть смену.'
+              : 'Это осмотр и обслуживание машины после работы, а не «конец работы». Пока он не выполнен, смену закрыть нельзя.'}
+          </p>
+          {!serviceDone ? (
+            <div className="mt-3">
+              <ActionButton label="Перейти к осмотру после работы" tone="ghost" onClick={onOpenService} disabled={busy} />
+            </div>
+          ) : null}
+        </Panel>
+      )}
 
-      {/* Очередь устройства — отдельной панелью. Это то место, где её отсутствие
-          стоило выработки: человек закрывал смену, а записи оставались на
-          телефоне и после закрытия уже не принимались. */}
-      <Panel tone={unsentCount > 0 ? 'warning' : 'plain'}>
-        <PanelTitle tone={unsentCount > 0 ? 'warning' : 'plain'}>
-          Неотправленные записи: {unsentCount}
+      <Panel tone={unsentCount !== 0 ? 'warning' : 'plain'}>
+        <PanelTitle tone={unsentCount !== 0 ? 'warning' : 'plain'}>
+          {queueUnknown ? 'Очередь на устройстве не прочитана' : `Неотправленные записи: ${unsentCount}`}
         </PanelTitle>
         <p className="mt-1 text-sm">
-          {unsentCount > 0
-            ? 'Эти записи ещё не на сервере. Они уйдут, когда появится связь, но смену до этого закрывать нельзя.'
-            : 'Все записи отправлены на сервер. Дополнительно отправлять нечего.'}
+          {queueUnknown
+            ? 'Проверить очередь не удалось. Это не то же самое, что «пусто»: сначала обновите экран.'
+            : unsentCount > 0
+              ? 'Эти записи ещё не на сервере. Они уйдут, когда появится связь, но смену до этого закрывать нельзя.'
+              : 'Все записи отправлены на сервер. Дополнительно отправлять нечего.'}
         </p>
         {unsentCount > 0 ? (
           <div className="mt-3">
@@ -133,12 +172,13 @@ export function ReportSendScreen({
 
       {serviceDone ? (
         <div className="space-y-1.5">
-          <StageTitle hint="Что оставить себе на завтра: незаконченная работа, что подготовить, на что обратить внимание.">
+          <StageTitle hint="Что оставить себе на завтра: незаконченная работа, что подготовить, на что обратить внимание. Заметка сохраняется при переходах.">
             Заметка на завтра
           </StageTitle>
           <textarea
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
+            value={closeNote}
+            disabled={busy}
+            onChange={(event) => onCloseNoteChange(event.target.value)}
             rows={3}
             placeholder="Например: осталось 4 сваи у оси Б, вывезти грунт"
             className="w-full rounded-md border bg-card p-3 text-sm shadow-xs"

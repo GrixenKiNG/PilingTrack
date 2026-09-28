@@ -12,9 +12,8 @@ import {
   downtimeInterval, formatIntervalMinutes, hhmmAgo,
 } from '@/components/piling/operator-mobile/downtime-interval';
 import {ActionButton, ChoiceButton, NextActionCard, ReasonNote, StageTitle} from './parts';
+import {emptyFormFields, type FormMode, type WorkDraft, type WorkMode} from './drafts';
 import {WORDS} from './words';
-
-type Mode = 'NONE' | 'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT';
 
 /**
  * Работа: запись выработки, простоя и паспорта сваи.
@@ -25,17 +24,22 @@ type Mode = 'NONE' | 'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT';
  * пустым, марки — крупными кнопками, а кнопка записи погашена, пока выбор не
  * сделан, и рядом написано, чего не хватает.
  *
- * ПОЧЕМУ ФОРМА ЧИСТИТСЯ ТОЛЬКО ПО УСПЕХУ. Правило 6 задания: успех — это сервер
- * принял ИЛИ запись легла в очередь. Пока форма чистилась сразу, обрыв связи на
- * последней свае стирал введённое, и набирать приходилось по памяти.
+ * ПОЧЕМУ ЧЕРНОВИК ЖИВЁТ СНАРУЖИ. Раньше поля были состоянием этого экрана,
+ * и любой переход (вкладка «Техника», «Назад к смене», обязательный чек-лист ТБ)
+ * размонтировал форму вместе с набранным. Теперь черновик хранится выше экранов
+ * и очищается только после подтверждённой записи или явного «Очистить»
+ * (находки №2 и №3 ревью).
  */
 export function WorkScreenNext({
-  state, busy, error, tabs, onSubmitEntry, onCorrect, onFinish, onOpenSafety, onOpenTab,
+  state, busy, error, tabs, draft, onDraftChange,
+  onSubmitEntry, onCorrect, onFinish, onOpenSafety, onOpenTab,
 }: {
   state: OperatorMobileState;
   busy: boolean;
   error: string | null;
   tabs?: ReactNode;
+  draft: WorkDraft;
+  onDraftChange: (updater: (current: WorkDraft) => WorkDraft) => void;
   onSubmitEntry: (entry: ProductionEntryInput) => Promise<boolean>;
   onCorrect: (input: {
     entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
@@ -44,39 +48,42 @@ export function WorkScreenNext({
   onOpenSafety: (stage: 'TB_PILING' | 'TB_DRILLING') => void;
   onOpenTab: (tab: 'EQUIPMENT' | 'MORE') => void;
 }) {
-  const [mode, setMode] = useState<Mode>('NONE');
-  const [reference, setReference] = useState('');
-  const [count, setCount] = useState('');
-  const [metersPerUnit, setMetersPerUnit] = useState('');
-  const [started, setStarted] = useState('');
-  const [ended, setEnded] = useState('');
-  const [comment, setComment] = useState('');
   const [finishing, setFinishing] = useState(false);
+  const mode = draft.mode;
+  const formMode: FormMode | null = mode === 'PILES' || mode === 'DRILLING' || mode === 'DOWNTIME' ? mode : null;
+  const fields = formMode ? draft.forms[formMode] : emptyFormFields();
 
-  const clear = () => {
-    setReference('');
-    setCount('');
-    setMetersPerUnit('');
-    setStarted('');
-    setEnded('');
-    setComment('');
+  const patchFields = (patch: Partial<typeof fields>) => {
+    if (!formMode) return;
+    onDraftChange((current) => ({
+      ...current,
+      forms: {...current.forms, [formMode]: {...current.forms[formMode], ...patch}},
+    }));
   };
 
-  const open = (next: Mode) => {
-    clear();
+  /** Открыть форму. Черновик НЕ стирается: возвращение к форме возвращает ввод. */
+  const open = (next: WorkMode) => {
     setFinishing(false);
-    setMode(next);
+    onDraftChange((current) => ({...current, mode: next}));
   };
+
+  /**
+   * Поля закрыты, пока команда в пути.
+   *
+   * Находка №3 ревью: успех отправки стирал то, что человек успел изменить после
+   * нажатия. Пока ответа нет, менять нечего — и чистить по успеху безопасно.
+   */
+  const locked = busy;
 
   const safetyStage: 'TB_PILING' | 'TB_DRILLING' = mode === 'DRILLING' ? 'TB_DRILLING' : 'TB_PILING';
   const safetyDone = state.checklists.find((checklist) => checklist.stage === safetyStage)?.done ?? false;
   const needsSafety = (mode === 'PILES' || mode === 'DRILLING' || mode === 'PASSPORT') && !safetyDone;
   const permitBlocks = state.permit.blocks.map((block) => block.title);
 
-  const drillVolume = Number(count || 0) * Number(metersPerUnit || 0);
-  const grade = state.dictionaries.pileGrades.find((item) => item.id === reference);
-  const pileMeters = grade?.lengthMm ? (Number(count || 0) * grade.lengthMm) / 1000 : 0;
-  const interval = mode === 'DOWNTIME' ? downtimeInterval(started, ended) : null;
+  const drillVolume = Number(fields.count || 0) * Number(fields.metersPerUnit || 0);
+  const grade = state.dictionaries.pileGrades.find((item) => item.id === fields.reference);
+  const pileMeters = grade?.lengthMm ? (Number(fields.count || 0) * grade.lengthMm) / 1000 : 0;
+  const interval = mode === 'DOWNTIME' ? downtimeInterval(fields.started, fields.ended) : null;
 
   /** Что мешает записать — одной строкой, чтобы кнопка не гасла молча (находка №5). */
   const blockReason = (): string | undefined => {
@@ -88,11 +95,13 @@ export function WorkScreenNext({
           : 'Запись выработки сейчас закрыта. Простой и осмотр остаются доступны.';
       }
     }
-    if (!reference) return mode === 'PILES' ? 'Выберите марку сваи.' : mode === 'DRILLING' ? 'Выберите тип бурения.' : 'Выберите причину простоя.';
-    if (mode === 'PILES' && !(Number(count) > 0)) return 'Укажите, сколько свай забито.';
+    if (!fields.reference) {
+      return mode === 'PILES' ? 'Выберите марку сваи.' : mode === 'DRILLING' ? 'Выберите тип бурения.' : 'Выберите причину простоя.';
+    }
+    if (mode === 'PILES' && !(Number(fields.count) > 0)) return 'Укажите, сколько свай забито.';
     if (mode === 'DRILLING') {
-      if (!(Number(count) > 0)) return 'Укажите, сколько скважин пробурено.';
-      if (!(Number(metersPerUnit) > 0)) return 'Укажите метраж одной скважины.';
+      if (!(Number(fields.count) > 0)) return 'Укажите, сколько скважин пробурено.';
+      if (!(Number(fields.metersPerUnit) > 0)) return 'Укажите метраж одной скважины.';
     }
     if (mode === 'DOWNTIME' && !interval) return 'Укажите начало и конец простоя: конец должен быть позже начала.';
     return undefined;
@@ -102,16 +111,22 @@ export function WorkScreenNext({
 
   const submit = async () => {
     let entry: ProductionEntryInput | null = null;
-    if (mode === 'PILES') entry = {kind: 'PILES', pileGradeId: reference, count: Number(count), comment: comment.trim() || undefined};
-    if (mode === 'DRILLING') entry = {kind: 'DRILLING', typeId: reference, count: Number(count), metersPerUnit: Number(metersPerUnit)};
-    if (mode === 'DOWNTIME' && interval) {
-      entry = {kind: 'DOWNTIME', reasonId: reference, startedAt: interval.startedAt, endedAt: interval.endedAt, comment: comment.trim() || undefined};
+    if (mode === 'PILES') {
+      entry = {kind: 'PILES', pileGradeId: fields.reference, count: Number(fields.count), comment: fields.comment.trim() || undefined};
     }
-    if (!entry) return;
+    if (mode === 'DRILLING') {
+      // Комментарий у бурения не передаётся: в контракте `ProductionEntryInput`
+      // у `DRILLING` поля `comment` нет, и поле формы здесь не показывается.
+      entry = {kind: 'DRILLING', typeId: fields.reference, count: Number(fields.count), metersPerUnit: Number(fields.metersPerUnit)};
+    }
+    if (mode === 'DOWNTIME' && interval) {
+      entry = {kind: 'DOWNTIME', reasonId: fields.reference, startedAt: interval.startedAt, endedAt: interval.endedAt, comment: fields.comment.trim() || undefined};
+    }
+    if (!entry || !formMode) return;
     const ok = await onSubmitEntry(entry);
     if (ok) {
-      clear();
-      setMode('NONE');
+      // Чистим ровно ту форму, которая ушла, и ровно один раз.
+      onDraftChange((current) => ({...current, mode: 'NONE', forms: {...current.forms, [formMode]: emptyFormFields()}}));
     }
   };
 
@@ -190,13 +205,13 @@ export function WorkScreenNext({
             actionLabel="Пройти чек-лист ТБ"
             onAction={() => onOpenSafety('TB_PILING')}
           />
-          <ActionButton label="Назад к смене" tone="ghost" onClick={() => setMode('NONE')} />
+          <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
         </Screen>
       );
     }
     return (
       <Screen title="Сваи с паспортом" subtitle={state.assignment?.equipmentName} tabs={tabs}>
-        <ActionButton label="Назад к смене" tone="ghost" onClick={() => setMode('NONE')} />
+        <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
         <Panel>
           <PanelTitle>Паспорт сваи</PanelTitle>
           <p className="mt-1 text-2xs text-muted-foreground">
@@ -209,7 +224,7 @@ export function WorkScreenNext({
               busy={busy}
               onSubmit={async (pileGradeId, passport: PilePassportInput) => {
                 const ok = await onSubmitEntry({kind: 'PILE_PASSPORT', pileGradeId, passport});
-                if (ok) setMode('NONE');
+                if (ok) open('NONE');
                 return ok;
               }}
             />
@@ -222,6 +237,7 @@ export function WorkScreenNext({
 
   const options = mode === 'DRILLING' ? state.dictionaries.drillingTypes : state.dictionaries.downtimeReasons;
   const title = mode === 'PILES' ? WORDS.logPiles : mode === 'DRILLING' ? WORDS.logDrilling : WORDS.logDowntime;
+  const dirty = Boolean(fields.reference || fields.count || fields.metersPerUnit || fields.started || fields.ended || fields.comment);
 
   return (
     <Screen
@@ -231,14 +247,22 @@ export function WorkScreenNext({
       footer={(
         <ActionButton
           label={busy ? 'Записываем…' : 'Записать'}
-          hint={mode === 'PILES' && pileMeters > 0 ? `Автоподсчёт: ${count} шт × ${(grade?.lengthMm ?? 0) / 1000} м = ${pileMeters.toFixed(1)} м.п.` : undefined}
+          hint={mode === 'PILES' && pileMeters > 0 ? `Автоподсчёт: ${fields.count} шт × ${(grade?.lengthMm ?? 0) / 1000} м = ${pileMeters.toFixed(1)} м.п.` : undefined}
           onClick={() => void submit()}
           disabled={busy || reason !== undefined}
           reason={reason}
         />
       )}
     >
-      <ActionButton label="Назад к смене" tone="ghost" onClick={() => setMode('NONE')} />
+      <div className="flex gap-2">
+        <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} disabled={locked} />
+        {/* Черновик стирается только по воле человека: случайный уход с формы
+            больше ничего не теряет. */}
+        <ActionButton label="Очистить" tone="ghost" onClick={() => patchFields(emptyFormFields())} disabled={locked || !dirty} />
+      </div>
+      <p className="text-2xs text-muted-foreground">
+        Набранное сохраняется при переходах и уйдёт только после подтверждённой записи.
+      </p>
 
       {mode === 'PILES' ? (
         <>
@@ -249,12 +273,13 @@ export function WorkScreenNext({
                 key={item.id}
                 label={item.name}
                 hint={item.lengthMm ? `длина ${item.lengthMm / 1000} м` : 'длина не указана'}
-                selected={reference === item.id}
-                onClick={() => setReference(item.id)}
+                selected={fields.reference === item.id}
+                onClick={() => patchFields({reference: item.id})}
+                disabled={locked}
               />
             ))}
           </div>
-          <NumberField label="Сколько свай забито, шт" value={count} onChange={setCount} />
+          <NumberField label="Сколько свай забито, шт" value={fields.count} onChange={(value) => patchFields({count: value})} disabled={locked} />
         </>
       ) : null}
 
@@ -266,16 +291,17 @@ export function WorkScreenNext({
               <ChoiceButton
                 key={item.id}
                 label={item.name}
-                selected={reference === item.id}
-                onClick={() => setReference(item.id)}
+                selected={fields.reference === item.id}
+                onClick={() => patchFields({reference: item.id})}
+                disabled={locked}
               />
             ))}
           </div>
-          <NumberField label="Сколько скважин, шт" value={count} onChange={setCount} />
-          <NumberField label="Метраж одной скважины, м" value={metersPerUnit} onChange={setMetersPerUnit} decimal />
+          <NumberField label="Сколько скважин, шт" value={fields.count} onChange={(value) => patchFields({count: value})} disabled={locked} />
+          <NumberField label="Метраж одной скважины, м" value={fields.metersPerUnit} onChange={(value) => patchFields({metersPerUnit: value})} decimal disabled={locked} />
           {drillVolume > 0 ? (
             <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
-              Автоподсчёт: {count} шт × {metersPerUnit} м = {drillVolume.toFixed(1)} м.п.
+              Автоподсчёт: {fields.count} шт × {fields.metersPerUnit} м = {drillVolume.toFixed(1)} м.п.
             </p>
           ) : null}
         </>
@@ -289,23 +315,24 @@ export function WorkScreenNext({
               <ChoiceButton
                 key={item.id}
                 label={item.name}
-                selected={reference === item.id}
-                onClick={() => setReference(item.id)}
+                selected={fields.reference === item.id}
+                onClick={() => patchFields({reference: item.id})}
+                disabled={locked}
               />
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <TimeField label="Начало" value={started} onChange={setStarted} />
-            <TimeField label="Конец" value={ended} onChange={setEnded} />
+            <TimeField label="Начало" value={fields.started} onChange={(value) => patchFields({started: value})} disabled={locked} />
+            <TimeField label="Конец" value={fields.ended} onChange={(value) => patchFields({ended: value})} disabled={locked} />
           </div>
           <button
             type="button"
-            className="onx-step w-full rounded-lg border bg-card text-2xs font-semibold"
+            className="onx-quiet w-full rounded-lg border bg-card text-2xs font-semibold"
+            disabled={locked}
             onClick={() => {
               // Начало и конец считаются от «сейчас»: дату машинист не вводит,
               // переход через полночь разбирает общий модуль интервала.
-              setEnded(hhmmAgo(0));
-              setStarted(hhmmAgo(30));
+              patchFields({ended: hhmmAgo(0), started: hhmmAgo(30)});
             }}
           >
             Простой за последние 30 минут
@@ -320,20 +347,26 @@ export function WorkScreenNext({
         </>
       ) : null}
 
-      <label className="block">
-        <span className="text-2xs font-medium text-muted-foreground">Комментарий, если нужно</span>
-        <textarea
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          rows={2}
-          className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
-        />
-      </label>
+      {/* У бурения комментария нет: в контракте `ProductionEntryInput` у
+          `DRILLING` поля `comment` не существует, и показывать поле, которое
+          никуда не уходит, значит обещать сохранение, которого не будет. */}
+      {mode === 'DRILLING' ? null : (
+        <label className="block">
+          <span className="text-2xs font-medium text-muted-foreground">Комментарий, если нужно</span>
+          <textarea
+            value={fields.comment}
+            disabled={locked}
+            onChange={(event) => patchFields({comment: event.target.value})}
+            rows={2}
+            className="mt-1 w-full rounded-md border bg-card p-3 text-sm shadow-xs"
+          />
+        </label>
+      )}
 
       {needsSafety ? (
         <NextActionCard
           title="Нужен чек-лист ТБ"
-          hint="Инструктаж по безопасности работ по этому виду работ обязателен до записи."
+          hint="Инструктаж по безопасности работ по этому виду работ обязателен до записи. Введённое сохранится — вернётесь и допишете."
           actionLabel="Пройти чек-лист ТБ"
           onAction={() => onOpenSafety(safetyStage)}
         />
@@ -344,8 +377,8 @@ export function WorkScreenNext({
   );
 }
 
-function NumberField({label, value, onChange, decimal = false}: {
-  label: string; value: string; onChange: (value: string) => void; decimal?: boolean;
+function NumberField({label, value, onChange, decimal = false, disabled}: {
+  label: string; value: string; onChange: (value: string) => void; decimal?: boolean; disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -356,6 +389,7 @@ function NumberField({label, value, onChange, decimal = false}: {
         step={decimal ? '0.1' : '1'}
         min="0"
         aria-label={label}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
@@ -364,8 +398,8 @@ function NumberField({label, value, onChange, decimal = false}: {
   );
 }
 
-function TimeField({label, value, onChange}: {
-  label: string; value: string; onChange: (value: string) => void;
+function TimeField({label, value, onChange, disabled}: {
+  label: string; value: string; onChange: (value: string) => void; disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -373,6 +407,7 @@ function TimeField({label, value, onChange}: {
       <input
         type="time"
         aria-label={`${label}, ЧЧ:ММ`}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
