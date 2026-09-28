@@ -6,12 +6,12 @@ import {useState} from 'react';
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {AdmissionScreen} from '../admission';
 import {ActionButton} from '../parts';
-import {ChecklistRunScreen} from '../checklist-run';
 import {emptyWorkDraft} from '../drafts';
 import {ReportSendScreen} from '../report-send';
 import {ShiftStartScreen} from '../shift-start';
 import {WorkScreenNext} from '../work';
 import {humanError, WORDS} from '../words';
+import {ChecklistHarness} from './checklist-harness';
 import {checklistView, makeChecklist, makeState} from './fixtures';
 
 /**
@@ -284,12 +284,7 @@ describe('находка №8 — фаза закрытия без чек-лис
 
 describe('находка №5 — массовая «норма» и настоящая отмена', () => {
   it('не перезаписывает неисправность, а «Отменить» возвращает прежние ответы', () => {
-    render(
-      <ChecklistRunScreen
-        checklist={makeChecklist()} warnings={[]} busy={false} error={null}
-        commandId="cmd-1" onSubmit={noop}
-      />,
-    );
+    render(<ChecklistHarness checklist={makeChecklist()} onSubmit={noop} />);
 
     const leak = screen.getByTestId('inspection-item-i-leak');
     fireEvent.click(within(leak).getByRole('button', {name: 'Неисправность'}));
@@ -368,12 +363,7 @@ describe('правило 10 — единые слова', () => {
     expect(WORDS.incident).toBe('Происшествие');
     expect(WORDS.closeShift).toBe('Закрыть смену и отправить отчёт');
 
-    render(
-      <ChecklistRunScreen
-        checklist={makeChecklist()} warnings={[]} busy={false} error={null}
-        commandId="cmd-1" onSubmit={noop}
-      />,
-    );
+    render(<ChecklistHarness checklist={makeChecklist()} onSubmit={noop} />);
     expect(screen.getAllByRole('button', {name: 'Неисправность'})).toHaveLength(2);
     expect(screen.queryByRole('button', {name: 'Отказ'})).toBeNull();
   });
@@ -397,5 +387,37 @@ describe('правило 11 — крупные цели нажатия и чит
 
     render(<ActionButton label="Проверка" onClick={noop} />);
     expect(screen.getByRole('button', {name: 'Проверка'})).toHaveClass('onx-action');
+  });
+});
+
+describe('ревью №2, п.7 — массовая отметка и занятость', () => {
+  const threeItems = () => makeChecklist({
+    sections: [{
+      id: 's-hydraulics',
+      title: 'Гидравлика',
+      items: [
+        {id: 'i-level', text: 'Уровень масла в баке', severity: 'NOTE'},
+        {id: 'i-leak', text: 'Подтёки на гидроцилиндре', severity: 'ALERT', photoOnIssue: true},
+        {id: 'i-hose', text: 'Шланги высокого давления', severity: 'NOTE'},
+      ],
+    }],
+  } as never);
+
+  it('FAULT на пункте из массовой отметки не перезаписывается', () => {
+    render(<ChecklistHarness checklist={threeItems()} />);
+
+    const level = screen.getByTestId('inspection-item-i-level');
+    fireEvent.click(within(level).getByRole('button', {name: 'Неисправность'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Весь раздел — норма'}));
+
+    // Неотмеченный пункт закрыт «нормой», а выбранная неисправность — нет.
+    const hose = screen.getByTestId('inspection-item-i-hose');
+    expect(within(hose).getByRole('button', {name: 'Норма'})).toHaveAttribute('aria-pressed', 'true');
+    expect(within(level).getByRole('button', {name: 'Неисправность'})).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('пока команда в пути, массовая кнопка заблокирована', () => {
+    render(<ChecklistHarness checklist={threeItems()} busy />);
+    expect(screen.getByRole('button', {name: 'Весь раздел — норма'})).toBeDisabled();
   });
 });

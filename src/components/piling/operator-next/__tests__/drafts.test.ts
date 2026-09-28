@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
-  draftsForShift, emptyDrafts, emptyFormFields, hasDirtyDraft, isFormDirty,
+  draftsForShift, emptyChecklistDraft, emptyDrafts, emptyFormFields, hasDirtyDraft, isFormDirty,
 } from '../drafts';
 
 /**
@@ -45,5 +45,15 @@ describe('черновики', () => {
     const switched = {...withPiles, mode: 'DRILLING' as const};
     expect(switched.forms.PILES.count).toBe('5');
     expect(switched.forms.DRILLING.count).toBe('');
+  });
+
+  it('ответы осмотра живут по этапу и начинаются заново в новой смене', () => {
+    const drafts = emptyDrafts('shift-1');
+    drafts.checklists = {
+      TB_PILING: {i1: {...emptyChecklistDraft(), answer: 'OK'}},
+    };
+    const same = draftsForShift(drafts, 'shift-1');
+    expect(same.checklists.TB_PILING?.i1.answer).toBe('OK');
+    expect(draftsForShift(drafts, 'shift-2').checklists).toEqual({});
   });
 });

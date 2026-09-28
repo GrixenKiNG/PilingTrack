@@ -1,7 +1,7 @@
 import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
 import {uploadPhoto} from '@/components/piling/operator-mobile/api';
-import {ChecklistRunScreen} from '../checklist-run';
+import {ChecklistHarness} from './checklist-harness';
 import {makeChecklist} from './fixtures';
 
 /**
@@ -55,12 +55,7 @@ describe('находка Д5: снимки не теряются при загр
     upload.mockReset();
     upload.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
 
-    const {container} = render(
-      <ChecklistRunScreen
-        checklist={makeChecklist()} warnings={[]} busy={false} error={null}
-        commandId="cmd-1" onSubmit={() => {}}
-      />,
-    );
+    const {container} = render(<ChecklistHarness checklist={makeChecklist()} />);
 
     const leak = screen.getByTestId('inspection-item-i-leak');
     fireEvent.click(within(leak).getByRole('button', {name: 'Неисправность'}));
