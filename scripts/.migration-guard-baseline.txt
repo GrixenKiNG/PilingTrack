@@ -1,9 +1,16 @@
-# Migrations reviewed and known to contain intentional destructive
-# statements (DROP COLUMN / DROP TABLE / TRUNCATE / DELETE FROM). Checked
-# by scripts/check-migrations.js. One migration directory name per line.
+# Migrations reviewed and allowlisted. Two reasons to be here:
+#   1. the migration contains an intentional destructive statement
+#      (DROP COLUMN / DROP TABLE / TRUNCATE / DELETE FROM);
+#   2. a migration newer than 20260930000000 does data-dependent DDL
+#      (CREATE UNIQUE INDEX, ADD CONSTRAINT UNIQUE/CHECK/FOREIGN KEY,
+#      SET NOT NULL, ADD COLUMN NOT NULL without DEFAULT) without a
+#      `DO $$ … RAISE EXCEPTION` pre-flight block — only after the
+#      operation was verified on a copy of the prod database.
+# Checked by scripts/check-migrations.js. One migration directory name
+# per line.
 #
 # Add a line here ONLY after reading the migration.sql and confirming
-# the destructive change is intentional. See check-migrations.js header.
+# what it does. See check-migrations.js header.
 
 # Contains the historical `DROP COLUMN "journalPhotoMediaId"` (the
 # 2026-05-30 incident). Already applied to prod and compensated by
