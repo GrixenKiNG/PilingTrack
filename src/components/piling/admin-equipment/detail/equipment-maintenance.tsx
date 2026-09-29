@@ -25,7 +25,7 @@ import { resolveAssigneeName } from '@/components/piling/maintenance/maintenance
 import { WorkOrderFormDialog } from '@/components/piling/maintenance/work-order-form-dialog';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
-interface MaintenanceRow {
+export interface MaintenanceRow {
   id: string;
   type: string;
   status: string;
@@ -42,6 +42,21 @@ interface MaintenanceRow {
 
 interface AssigneeOption { id: string; name: string }
 
+/**
+ * Порядок журнала на экране: по дате записи — фактической, а при её отсутствии
+ * плановой — от новых к старым. Записи без даты уходят в конец. Сервер отдаёт
+ * строки, сгруппированные по статусу (алфавит), поэтому внутри одной карточки
+ * даты шли вразнобой.
+ */
+export function sortMaintenanceRecords(records: MaintenanceRow[]): MaintenanceRow[] {
+  const time = (r: MaintenanceRow) => {
+    const raw = r.completedAt ?? r.scheduledAt;
+    const t = raw ? Date.parse(raw) : NaN;
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return [...records].sort((a, b) => time(b) - time(a));
+}
+
 export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   const [records, setRecords] = useState<MaintenanceRow[]>([]);
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -57,7 +72,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       const res = await authFetch(`/api/equipment/${equipmentId}/maintenance`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setRecords(data.records ?? []);
+      setRecords(sortMaintenanceRecords(data.records ?? []));
     } catch {
       toast.error('Не удалось загрузить журнал ТО');
     } finally {
