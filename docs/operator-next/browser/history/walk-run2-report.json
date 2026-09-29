@@ -1,0 +1,154 @@
+{
+  "base": "http://localhost:3210",
+  "executedAt": "2026-09-29T19:31:15.827Z",
+  "steps": [
+    {
+      "step": "допуск: СИЗ (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "01-допуск-сиз.png"
+    },
+    {
+      "step": "приёмка: ночная смена (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "03-приёмка.png"
+    },
+    {
+      "step": "осмотр фазы PRESHIFT_INSPECTION (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "04-осмотр-предсменный.png"
+    },
+    {
+      "step": "осмотр фазы SITE_READY (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "05-площадка.png"
+    },
+    {
+      "step": "осмотр фазы STARTUP (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "06-пуск.png"
+    },
+    {
+      "step": "работа: экран",
+      "status": "OK",
+      "evidence": "07-работа.png"
+    },
+    {
+      "step": "работа: записать сваи (10 шт) + повтор команды",
+      "status": "OK",
+      "evidence": "08-сваи-записаны.png"
+    },
+    {
+      "step": "работа: паспорт — три залога заполнены",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: locator.waitFor: Timeout 20000ms exceeded. Call log: \u001b[2m - waiting for getByPlaceholder('С-130') to be visible\u001b[22m \u001b[2m 43 × locator resolved to hidden <input value=\"\" placeholde (снимок fail-работа_паспорт_три_залога_заполнены.png)"
+    },
+    {
+      "step": "черновик: перезагрузка страницы (проверка №3)",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: черновик не выжил перезагрузку: номер «», залогов 1 — см. 10-паспорт-после-перезагрузки.png (снимок fail-черновик_перезагрузка_страницы_проверка_3_.png)"
+    },
+    {
+      "step": "работа: паспорт — отправка после перезагрузки",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: locator.waitFor: Timeout 20000ms exceeded. Call log: \u001b[2m - waiting for getByPlaceholder('С-130') to be visible\u001b[22m \u001b[2m 42 × locator resolved to hidden <input value=\"\" placeholde (снимок fail-работа_паспорт_отправка_после_перезагрузки.png)"
+    },
+    {
+      "step": "работа: простой 30 минут",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m Expected: >= \u001b[32m1\u001b[39m Received: \u001b[31m0\u001b[39m Call Log: - Timeout 40000ms (снимок fail-работа_простой_30_минут.png)"
+    },
+    {
+      "step": "работа: без связи — очередь и ровно одна запись",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: locator.click: Timeout 20000ms exceeded. Call log: \u001b[2m - waiting for getByRole('button', { name: 'Записать сваи' }).first()\u001b[22m  (снимок fail-работа_без_связи_очередь_и_ровно_одна_запи.png)"
+    },
+    {
+      "step": "работа: завершение (двойное нажатие — одна команда)",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: locator.click: Timeout 20000ms exceeded. Call log: \u001b[2m - waiting for getByRole('button', { name: 'Завершить работу' })\u001b[22m  (снимок fail-работа_завершение_двойное_нажатие_одна_ком.png)"
+    },
+    {
+      "step": "консоль браузера",
+      "status": "ДЕФЕКТ",
+      "evidence": "1 — см. console-errors.txt"
+    }
+  ],
+  "dbChecks": [
+    "повтор log-production: ответ 403; записей до 1, после 1"
+  ],
+  "checks": [
+    {
+      "step": "работа",
+      "shot": "07-работа.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "p.text-2xs.text-muted-foreground «Черновик не сохранится при перезаг» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "h2.text-2xs.font-semibold «Записать» — 11px",
+        "h2.text-2xs.font-semibold «Происшествие и неисправность» — 11px",
+        "p.mt-1.text-2xs «Происшествие и неисправность запис» — 11px",
+        "h2.text-2xs.font-semibold «Журнал записей смены» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "сваи-записаны",
+      "shot": "08-сваи-записаны.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "h2.text-2xs.font-semibold «Записать» — 11px",
+        "h2.text-2xs.font-semibold «Происшествие и неисправность» — 11px",
+        "p.mt-1.text-2xs «Происшествие и неисправность запис» — 11px",
+        "h2.text-2xs.font-semibold «Журнал записей смены» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "паспорт-после-перезагрузки",
+      "shot": "10-паспорт-после-перезагрузки.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "h2.text-2xs.font-semibold «Записать» — 11px",
+        "h2.text-2xs.font-semibold «Происшествие и неисправность» — 11px",
+        "p.mt-1.text-2xs «Происшествие и неисправность запис» — 11px",
+        "h2.text-2xs.font-semibold «Журнал записей смены» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "простой",
+      "shot": "11-простой.png",
+      "controls": [],
+      "captions": [
+        "span.text-2xs.font-medium «Начало, ЧЧ:ММ» — 11px",
+        "span.text-2xs.font-medium «Конец, ЧЧ:ММ» — 11px",
+        "span.text-2xs.font-medium «Комментарий, если нужно» — 11px"
+      ],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "p.text-2xs.text-muted-foreground «Набранное сохраняется при перехода» — 11px",
+        "h2.text-2xs.font-semibold «Причина простоя» — 11px",
+        "p.rounded-md.bg-info/10 «Длительность: 30 мин» — 14px"
+      ],
+      "scrollX": false
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ]
+}
