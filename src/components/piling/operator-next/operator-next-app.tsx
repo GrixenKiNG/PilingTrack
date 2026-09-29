@@ -587,16 +587,17 @@ export function OperatorNextApp() {
         // НЕПОСРЕДСТВЕННО перед закрытием: между показом экрана и нажатием
         // связь могла появиться, а записи — уйти.
         await flush();
+        // Сверка владельца — первой строкой после подготовки, до подсчёта
+        // очереди и до любых надписей (ревью №6, Е2): чужая операция
+        // прекращается молча, на экране нового пользователя — ничего.
+        if (userIdRef.current !== closeUserId || shiftIdRef.current !== closeShiftId) {
+          return;
+        }
         const fresh = ownPendingCount();
         if (fresh !== 0) {
           setActionError(fresh < 0
             ? 'Не удалось проверить очередь на устройстве. Обновите экран и повторите.'
             : `На устройстве ${fresh} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`);
-          return;
-        }
-        // Пока шла подготовка, мог войти другой пользователь (общий планшет):
-        // чужую смену с чужой заметкой не закрываем — прекращаем без ошибки.
-        if (userIdRef.current !== closeUserId || shiftIdRef.current !== closeShiftId) {
           return;
         }
         // Заметку читаем В МОМЕНТ отправки, а не снимком до подготовки
@@ -608,6 +609,11 @@ export function OperatorNextApp() {
         await reload();
         setNotice('Записано: сервер принял запись.');
       } catch (error) {
+        // Отказ мог случиться уже после смены контекста — чужую ошибку не
+        // показываем (ревью №6, Е2: та же сверка и здесь).
+        if (userIdRef.current !== closeUserId || shiftIdRef.current !== closeShiftId) {
+          return;
+        }
         setActionError(humanError(error));
         if (error instanceof ApiError && error.status === 409) void reload();
       } finally {

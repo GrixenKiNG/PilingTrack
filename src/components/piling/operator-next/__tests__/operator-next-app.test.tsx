@@ -1574,6 +1574,40 @@ describe('ревью №3, C: черновики переживают перез
     expect(screen.queryByText(/Не удалось проверить очередь|неотправленных записей/)).toBeNull();
   });
 
+  it('А→Б во время flush с непустой очередью — ошибка А не показывается Б', async () => {
+    let stateCalls = 0;
+    stateImpl = () => { stateCalls += 1; return json({data: makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]})}); };
+    render(<OperatorNextApp />);
+    await screen.findByText('Проверьте итоги и закройте смену');
+
+    // Запись в очереди не уходит (сервер отвечает отказом) — подготовка задерживается.
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-8')]));
+    const slow = deferred<Response>();
+    commandImpl = (body) => (body && body.clientCommandId === 'q-8' ? slow.promise : json({data: {ok: true}}));
+
+    const closeButton = screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0];
+    await act(async () => { closeButton.click(); });
+    await waitFor(() => expect(sent.filter((item) => item.clientCommandId === 'q-8')).toHaveLength(1));
+
+    // Во время подготовки входит Б.
+    await act(async () => { usePilingStore.setState({currentUser: USER_B}); });
+    // Экран Б сам честно сообщает о непустой очереди — фиксируем число копий
+    // этого текста: продолжение чужого закрытия не должно добавлять свою ошибку.
+    await waitFor(() => expect(stateCalls).toBeGreaterThan(1));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const errorCopies = () => screen.queryAllByText(/На устройстве 1 неотправленных|Не удалось проверить очередь/).length;
+    const copiesBefore = errorCopies();
+
+    // Отправка отказывает: очередь не опустела — раньше это показало бы ошибку
+    // очереди на экране Б (сверка владельца должна стоять до этого места).
+    await act(async () => { slow.resolve(json({error: 'temporary'}, 503)); await Promise.resolve(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+    expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(0);
+    // Ни одной новой копии: продолжение А промолчало на экране Б.
+    expect(errorCopies()).toBe(copiesBefore);
+  });
+
   it('успешное перечитывание не снимает предупреждение об отказе записи — только новая запись', async () => {
     let stateCalls = 0;
     stateImpl = () => { stateCalls += 1; return json({data: makeState({phase: 'WORK'})}); };
