@@ -176,6 +176,29 @@ groups:
           summary: "Outbox event backlog > 1000"
           description: "{{ $value }} events pending processing"
 
+      - alert: OutboxLagHigh
+        # пороги скопированы из src/core/observability/lag-monitor.ts:71-76
+        # (lagWarnThresholdSec=60, lagCriticalThresholdSec=300) — там они
+        # уходили только в лог, F-WORKERS-SCRAPE (R59 #5).
+        expr: outbox_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "CRITICAL: публикация outbox отстала больше чем на 5 минут"
+          description: "Самое старое неопубликованное outbox-событие ждёт {{ $value }} с — воркер публикации стоит или не успевает"
+
+      - alert: OutboxLagWarn
+        expr: outbox_lag_seconds > 60
+        for: 10m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "Публикация outbox отстала больше чем на минуту"
+          description: "Самое старое неопубликованное outbox-событие ждёт {{ $value }} с (порог кода — 60 с)"
+
       - alert: DeadLetterQueueNotEmpty
         expr: dlq_pending_count > 0
         for: 5m
@@ -199,6 +222,19 @@ groups:
         annotations:
           summary: "Monitoring target {{ $labels.job }} is DOWN"
           description: "{{ $labels.instance }} has been unreachable for 2 minutes"
+
+      - alert: WorkersDown
+        # F-WORKERS-SCRAPE (R59 #3): контейнер workers — единственный, где живут
+        # суточные планировщики и PDF-воркер BullMQ. Его /metrics теперь
+        # scrape'ится job'ом pilingtrack-workers.
+        expr: up{job="pilingtrack-workers"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: pilingtrack-workers
+        annotations:
+          summary: "CRITICAL: контейнер воркеров недоступен"
+          description: "{{ $labels.instance }} не отвечает 5 минут — смены не закрываются, наряды не истекают, PDF-задачи стоят в очереди"
 
       - alert: RedisHighMemory
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
