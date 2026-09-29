@@ -1,5 +1,14 @@
 # Runbook: Point-in-time recovery (PITR)
 
+**Состояние на 30.09.2026: PITR выключен.** `archive_mode=off` в
+`docker-compose.prod.yml`, WAL-архив пуст — посекундного восстановления нет.
+`scripts/pitr-basebackup.sh` снимает только полный еженедельный снимок, поэтому
+реально доступна точка восстановления «на момент снимка» (а не «на любую
+секунду»). Числа RPO/RTO и процедура проверки — runbook 010
+(`docs/runbooks/010-restore-drill.md`). Чтобы PITR заработал, нужны
+`archive_mode=on` и рабочий `archive_command`; до этого раздел «Restore»
+ниже неприменим (см. предупреждение).
+
 > ## ⚠️ PITR СЕЙЧАС НЕДОСТУПЕН (с 2026-06-24)
 >
 > `archive_mode=off` в `docker-compose.prod.yml` — осознанное решение после
