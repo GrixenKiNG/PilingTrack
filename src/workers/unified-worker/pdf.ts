@@ -1,5 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
+import * as Sentry from '@sentry/nextjs';
 import { generatePeriodPdf, generateSinglePdf, savePdfBuffer } from '@/lib/pdf-generator';
 import { loadCompanyName } from '@/lib/pdf-data';
 import { logger } from '@/lib/logger';
@@ -99,6 +100,7 @@ export async function startPdf(): Promise<void> {
         name: error.name,
         stack: error.stack,
       });
+      Sentry.captureException(error, { tags: { task: 'pdf-worker' } });
       // Per-job failure is expected; only record the last error, do not flip worker health.
       state.error = error.message;
     });

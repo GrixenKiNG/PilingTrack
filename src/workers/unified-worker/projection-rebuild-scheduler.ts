@@ -13,6 +13,7 @@
  * source of truth — idempotent, so no leader election is needed.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { rebuildAll } from '@/modules/reports/application/projections/rebuild';
 
@@ -34,6 +35,7 @@ async function runOnce(): Promise<void> {
     logger.error('Projection rebuild pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'projection-rebuild' } });
   }
 }
 

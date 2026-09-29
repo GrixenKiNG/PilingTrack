@@ -25,6 +25,7 @@ import { startProjection } from './unified-worker/projection';
 import { startPmScheduler } from './unified-worker/pm-scheduler';
 import { startProjectionRebuildScheduler } from './unified-worker/projection-rebuild-scheduler';
 import { startReadinessScheduler } from './unified-worker/readiness-scheduler';
+import { initWorkerSentry } from './unified-worker/sentry';
 import { workerStates } from './unified-worker/state';
 
 let isShuttingDown = false;
@@ -84,6 +85,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // Наблюдаемость: ошибки фоновых задач должны уходить в Sentry, а не только
+  // в docker-лог. Подключаем раньше планировщиков, чтобы их падения попали.
+  await initWorkerSentry();
+
   logger.info('Unified Worker Service starting', {
     enabledWorkers: ENABLED_WORKERS,
     healthPort: HEALTH_PORT,

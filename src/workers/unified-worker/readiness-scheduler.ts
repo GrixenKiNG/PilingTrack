@@ -11,6 +11,7 @@
  * готовности дедуплицируется по дате.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';
@@ -38,6 +39,7 @@ async function runOnce(): Promise<void> {
     logger.error('Readiness scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'readiness-scheduler' } });
   }
 }
 

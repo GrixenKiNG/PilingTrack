@@ -5,6 +5,7 @@
  * it needs no leader election — a double run can't create duplicates.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { db } from '@/lib/db';
@@ -57,6 +58,7 @@ async function notifyOverdue(
     logger.error('PM overdue alert failed', {
       tenantId, error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'pm-overdue-alert' } });
   }
 }
 
@@ -78,6 +80,7 @@ async function runOnce(): Promise<void> {
     logger.error('PM scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'pm-scheduler' } });
   }
 }
 
