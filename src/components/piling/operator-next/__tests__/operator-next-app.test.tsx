@@ -1443,6 +1443,72 @@ describe('ревью №3, C: черновики переживают перез
     expect(rawAAfter ?? '').not.toContain('"count":"9"');
   });
 
+  it('повторный отказ чтения не заменяет свежую память старым документом', async () => {
+    let stateCalls = 0;
+    stateImpl = () => { stateCalls += 1; return json({data: makeState({phase: 'WORK'})}); };
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    fireEvent.change(await screen.findByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-616'}});
+
+    // Дальнейшая запись отказывает (квота), память остаётся свежей.
+    const origSet = globalThis.localStorage.setItem.bind(globalThis.localStorage);
+    const origGet = globalThis.localStorage.getItem.bind(globalThis.localStorage);
+    const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation((key, value) => {
+      if (String(key).includes(':user-a:')) throw new Error('quota');
+      return origSet(key, value);
+    });
+    try {
+      fireEvent.click(screen.getByRole('button', {name: '+ Добавить залог'}));
+      fireEvent.click(screen.getByRole('button', {name: '+ Добавить залог'}));
+      const blows = screen.getAllByLabelText('Ударов');
+      const penetration = screen.getAllByLabelText(/^Погружение/);
+      ['30', '31', '32'].forEach((v, i) => fireEvent.change(blows[i], {target: {value: v}}));
+      ['12', '10', '8'].forEach((v, i) => fireEvent.change(penetration[i], {target: {value: v}}));
+      expect(await screen.findByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+
+      // Первое перечитывание отказывает: признак «пара загружена» не сбрасывается.
+      let throwsLeft = 1;
+      const getSpy = vi.spyOn(globalThis.localStorage, 'getItem').mockImplementation((key) => {
+        if (String(key).startsWith('piling.onx.drafts.v1:') && throwsLeft > 0) {
+          throwsLeft -= 1;
+          throw new Error('storage offline');
+        }
+        return origGet(key);
+      });
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-e1a')]));
+      await act(async () => { globalThis.dispatchEvent(new Event('online')); await Promise.resolve(); });
+      await waitFor(() => expect(stateCalls).toBeGreaterThan(1));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      getSpy.mockRestore();
+
+      // Второе перечитывание удаётся — но память (свежие залоги) не заменяется
+      // старой версией из хранилища.
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-e1b')]));
+      await act(async () => { globalThis.dispatchEvent(new Event('online')); await Promise.resolve(); });
+      await waitFor(() => expect(stateCalls).toBeGreaterThan(2));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+      const blowsAfter = screen.getAllByLabelText('Ударов');
+      expect(blowsAfter).toHaveLength(3);
+      expect(blowsAfter[0]).toHaveValue(30);
+      expect(blowsAfter[2]).toHaveValue(32);
+      expect(screen.getAllByLabelText(/^Погружение/)[1]).toHaveValue(10);
+      expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-616');
+      // Предупреждение не снято: успешной записи так и не было.
+      expect(screen.getByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+
+      // Следующая успешная запись — хранилище догоняет, предупреждение уходит.
+      setSpy.mockRestore();
+      fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-616-А'}});
+      await waitFor(() => expect(screen.queryByText(/Черновик не сохранится при перезагрузке страницы/)).toBeNull());
+      expect(screen.getAllByLabelText('Ударов')).toHaveLength(3);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
   it('отказ первого чтения не перезаписывает документ; успешное перечтение возвращает его на экран', async () => {
     // В хранилище лежит паспорт; первое чтение этой смены отказало.
     saveShellDrafts('user-a', 'shift-1', {
