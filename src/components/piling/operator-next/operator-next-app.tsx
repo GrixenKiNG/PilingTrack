@@ -25,7 +25,7 @@ import {AdmissionScreen, type AdmissionDetour} from './admission';
 import {ChecklistRunScreen} from './checklist-run';
 import {createCommandKeys, type CommandKind, type CommandKeys} from './command-keys';
 import {
-  draftsForScope, emptyDrafts, emptyFormFields, emptyPassportDraft, emptyWorkDraft,
+  draftScopeKey, draftsForScope, emptyDrafts, emptyFormFields, emptyPassportDraft, emptyWorkDraft,
   passportAfterSubmit,
   type ChecklistDrafts, type Drafts, type FormMode, type PassportDraftData, type WorkDraft,
 } from './drafts';
@@ -135,6 +135,16 @@ export function OperatorNextApp() {
   const [closeSending, setCloseSending] = useState(false);
 
   /**
+   * Признак «документ пары успешно загружен» (ревью №5, Д1).
+   *
+   * ПОЧЕМУ ОТДЕЛЬНО ОТ `storageOk`. Пока документ не прочитан, автосохранение
+   * запрещено: иначе восстановившаяся запись затрёт непрочитанный черновик
+   * пустой памятью. Выставляется только успешным чтением, содержимое которого
+   * легло в память.
+   */
+  const draftsLoadedRef = useRef<string | null>(null);
+
+  /**
    * Правка черновиков пары «пользователь + смена» с проверкой поколения.
    *
    * Поздний вызов приходит с зашитой парой А: если живая пара уже другая —
@@ -188,17 +198,25 @@ export function OperatorNextApp() {
       // больше нет, а ошибка чтения — это не «пусто» (ревью №4, A2 и Д3).
       let canStore = storageAvailable() && userId != null && nextShiftId != null;
       let stored: ShellDraftsData | null = null;
+      let readOk = false;
       if (canStore) {
         const read = loadShellDrafts(userId, nextShiftId);
         if (read.status === 'error') {
           canStore = false;
         } else {
           stored = read.value;
+          readOk = true;
         }
       }
+      // Признак «документ пары загружен» выставляется только успешным чтением,
+      // содержимое которого ложится в память; пока его нет, автосохранение
+      // молчит, чтобы пустая память не затёрла непрочитанный черновик (№5, Д1).
+      const scopeKey = draftScopeKey(userId, nextShiftId);
+      const wasLoaded = draftsLoadedRef.current === scopeKey;
+      draftsLoadedRef.current = readOk ? scopeKey : null;
       setStorageOk(canStore);
       setDrafts((current) => {
-        if (current.userId === userId && current.shiftId === nextShiftId) return current;
+        if (current.userId === userId && current.shiftId === nextShiftId && wasLoaded) return current;
         return stored
           ? {
             userId,
@@ -347,6 +365,9 @@ export function OperatorNextApp() {
     // Пишем только текущую пару: черновик прежнего пользователя не сохраняется
     // под новым, пока идёт смена контекста (ревью №4, A2).
     if (!userId || !shiftId || drafts.userId !== userId || drafts.shiftId !== shiftId) return;
+    // Документ ещё не загружен (отказ чтения) — автосохранение молчит: иначе
+    // пустая память затрёт непрочитанный черновик (ревью №5, Д1).
+    if (draftsLoadedRef.current !== draftScopeKey(userId, shiftId)) return;
     const ok = saveShellDrafts(userId, shiftId, {
       work: drafts.work,
       checklists: drafts.checklists,

@@ -143,6 +143,11 @@ export const emptyDrafts = (
   passport: null,
 });
 
+/** Ключ пары для признаков загрузки — тем же составом, что и ключ хранилища. */
+export function draftScopeKey(userId: string | null, shiftId: string | null): string {
+  return `${userId ?? ''}::${shiftId ?? ''}`;
+}
+
 /** Черновики той же пары; пользователь или смена сменились — начинаем с чистого листа. */
 export function draftsForScope(drafts: Drafts, userId: string | null, shiftId: string | null): Drafts {
   return drafts.userId === userId && drafts.shiftId === shiftId

@@ -3,8 +3,8 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {usePilingStore} from '@/lib/store';
 import {OperatorNextApp} from '../operator-next-app';
-import {draftStorageKey} from '../draft-storage';
-import {emptyFormFields, emptyWorkDraft} from '../drafts';
+import {draftStorageKey, saveShellDrafts} from '../draft-storage';
+import {emptyFormFields, emptyPassportDraft, emptyWorkDraft} from '../drafts';
 import {checklistView, makeChecklist, makeState} from './fixtures';
 
 /**
@@ -1425,6 +1425,44 @@ describe('ревью №3, C: черновики переживают перез
     const rawAAfter = globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string);
     expect(rawAAfter ?? '').toContain('"count":"5"');
     expect(rawAAfter ?? '').not.toContain('"count":"9"');
+  });
+
+  it('отказ первого чтения не перезаписывает документ; успешное перечтение возвращает его на экран', async () => {
+    // В хранилище лежит паспорт; первое чтение этой смены отказало.
+    saveShellDrafts('user-a', 'shift-1', {
+      work: {...emptyWorkDraft(), mode: 'PASSPORT'},
+      checklists: {},
+      closeNote: '',
+      passport: {...emptyPassportDraft(), grade: 'g1', number: 'С-717'},
+    });
+    const origGet = globalThis.localStorage.getItem.bind(globalThis.localStorage);
+    let throwsLeft = 1;
+    const getSpy = vi.spyOn(globalThis.localStorage, 'getItem').mockImplementation((key) => {
+      if (String(key).startsWith('piling.onx.drafts.v1:') && throwsLeft > 0) {
+        throwsLeft -= 1;
+        throw new Error('storage offline');
+      }
+      return origGet(key);
+    });
+    try {
+      stateImpl = () => json({data: makeState({phase: 'WORK'})});
+      render(<OperatorNextApp />);
+      await screen.findByText('Запишите результат работы');
+
+      // Первое сохранение после отказа чтения НЕ пишет поверх документа.
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      const key = draftStorageKey('user-a', 'shift-1') as string;
+      expect(origGet(key) ?? '').toContain('С-717');
+
+      // Доступ восстановился, перечитывание прошло: содержимое вернулось на экран.
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-d1')]));
+      await act(async () => { globalThis.dispatchEvent(new Event('online')); await Promise.resolve(); });
+      await waitFor(() => expect(sent.some((item) => item.clientCommandId === 'q-d1')).toBe(true));
+      await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-717'));
+      expect(origGet(key) ?? '').toContain('С-717');
+    } finally {
+      getSpy.mockRestore();
+    }
   });
 
   it('отказ записи после успешного старта — честный статус на экране формы', async () => {
