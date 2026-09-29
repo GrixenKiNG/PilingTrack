@@ -77,15 +77,20 @@ groups:
           summary: "CRITICAL: PostgreSQL pool nearly exhausted"
           description: "{{ $value }} connections — risk of request queuing"
 
-      - alert: PostgresSlowQueries
-        expr: rate(pg_stat_statatments_mean_time_seconds{datname="pilingtrack"}[5m]) > 0.3
-        for: 5m
-        labels:
-          severity: warning
-          service: postgresql
-        annotations:
-          summary: "PostgreSQL average query time > 300ms"
-          description: "Average query time: {{ $value | humanizeDuration }}"
+      # метрики нет, см. R56. pg_stat_statements не включён нигде: в Postgres нет
+      # shared_preload_libraries (docker-compose.prod.yml), у postgres-exporter
+      # (prometheuscommunity/postgres-exporter:latest) не включён коллектор
+      # stat_statements и файла queries.yaml в репозитории нет
+      # (docker-compose.monitoring-prod.yml:101-116).
+      # - alert: PostgresSlowQueries
+      #   expr: rate(pg_stat_statements_mean_time_seconds{datname="pilingtrack"}[5m]) > 0.3
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     service: postgresql
+      #   annotations:
+      #     summary: "PostgreSQL average query time > 300ms"
+      #     description: "Average query time: {{ $value | humanizeDuration }}"
 
       - alert: PostgresDeadlocks
         expr: increase(pg_stat_database_deadlocks{datname="pilingtrack"}[5m]) > 0
