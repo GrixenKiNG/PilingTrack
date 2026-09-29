@@ -1465,6 +1465,33 @@ describe('ревью №3, C: черновики переживают перез
     }
   });
 
+  it('смена пользователя во время задержанного flush — чужая смена не закрывается', async () => {
+    stateImpl = () => json({data: makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Проверьте итоги и закройте смену');
+
+    // В подготовке — запись из очереди, её отправка задерживается.
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-d3')]));
+    const slow = deferred<Response>();
+    commandImpl = (body) => (body && body.clientCommandId === 'q-d3' ? slow.promise : json({data: {ok: true}}));
+
+    const closeButton = screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0];
+    await act(async () => { closeButton.click(); });
+    await waitFor(() => expect(sent.filter((item) => item.clientCommandId === 'q-d3')).toHaveLength(1));
+
+    // Пока подготовка идёт, в ту же оболочку входит Б.
+    await act(async () => {
+      usePilingStore.setState({currentUser: USER_B});
+    });
+
+    // Подготовка А заканчивается — но чужую смену она не закрывает.
+    await act(async () => { slow.resolve(json({data: {ok: true}})); await Promise.resolve(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(0);
+    // И на экране нет чужой ошибки от прерванного закрытия.
+    expect(screen.queryByText(/Не удалось проверить очередь|неотправленных записей/)).toBeNull();
+  });
+
   it('успешное перечитывание не снимает предупреждение об отказе записи — только новая запись', async () => {
     let stateCalls = 0;
     stateImpl = () => { stateCalls += 1; return json({data: makeState({phase: 'WORK'})}); };

@@ -578,6 +578,10 @@ export function OperatorNextApp() {
       console.log('[close] task-start');
       setActionError(null);
       setNotice(null);
+      // Принадлежность операции — на старте закрытия: за время подготовки
+      // контекст мог смениться, и закрывать чужую смену нельзя (ревью №5, Д3).
+      const closeUserId = userIdRef.current;
+      const closeShiftId = shift.id; // значение пары на старте; живое — под сверку
       try {
         // Попытка отправить всё, что лежит, и свежий пересчёт очереди
         // НЕПОСРЕДСТВЕННО перед закрытием: между показом экрана и нажатием
@@ -592,11 +596,16 @@ export function OperatorNextApp() {
             : `На устройстве ${fresh} неотправленных записей. Сначала отправьте их — иначе выработка не попадёт в отчёт.`);
           return;
         }
+        // Пока шла подготовка, мог войти другой пользователь (общий планшет):
+        // чужую смену с чужой заметкой не закрываем — прекращаем без ошибки.
+        if (userIdRef.current !== closeUserId || shiftIdRef.current !== closeShiftId) {
+          return;
+        }
         // Заметку читаем В МОМЕНТ отправки, а не снимком до подготовки
         // (ревью №3, п.4): источник истины — текущее состояние черновика.
         setCloseSending(true);
         console.log('[close] sending');
-        await sendCommand({command: 'close-shift', shiftId: shift.id, comment: closeNoteRef.current});
+        await sendCommand({command: 'close-shift', shiftId: closeShiftId, comment: closeNoteRef.current});
         // Подтверждено: заметка этой смены больше не черновик.
         clearCloseNote();
         await reload();
