@@ -200,6 +200,75 @@ describe('пульс служб: инстанс состояния, а не кэ
 });
 
 
+/*
+  Ключи бэкапа: инстанс состояния, а не кэш (F-OFFSITE-SIGNAL-b).
+
+  scripts/backup-postgres.sh пишет system:backup:* в инстанс состояния
+  (REDIS_URL). На проде задан REDIS_URL_CACHE, и getRedisClient уходит на
+  вытесняющий кэш — ключей там нет, метрики бэкапа оставались нулями (та же
+  ловушка двух Redis, что и с пульсом служб). Проверка должна брать
+  getStateRedisClient: state-клиент вызван, кэш ключей бэкапа не видит.
+*/
+describe('ключи бэкапа: инстанс состояния, а не кэш (F-OFFSITE-SIGNAL-b)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mocks.outboxStats.mockResolvedValue({ unpublished: 0, failed: 0, total: 0 });
+    mocks.dlqStats.mockResolvedValue({ pending: 0 });
+    mocks.lagMetrics.mockReturnValue(null);
+    mocks.redisPing.mockResolvedValue('PONG');
+    mocks.statePing.mockResolvedValue('PONG');
+    mocks.redisSmembers.mockResolvedValue(['outbox']);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
+    process.env.BACKUP_ENABLED = 'true';
+    // Продовая конфигурация app-контейнера: кэш-инстанс задан.
+    process.env.REDIS_URL_CACHE = 'redis://redis-cache:6379';
+  });
+
+  afterEach(() => {
+    delete process.env.BACKUP_ENABLED;
+    delete process.env.REDIS_URL_CACHE;
+  });
+
+  it('читает system:backup:* из инстанса состояния', async () => {
+    mocks.redisGet.mockResolvedValue(null);
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:backup:last_timestamp') {
+        return new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      }
+      if (key === 'system:backup:last_size') {
+        return '10485760';
+      }
+      if (key === 'system:backup:s3_synced') {
+        return 'true';
+      }
+      return null;
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:backup:last_timestamp');
+    expect(status.components.backup.source).toBe('redis');
+    expect(status.components.backup.status).toBe('up');
+    expect(status.components.backup.s3Synced).toBe(true);
+    // Кэш ключей бэкапа не получал — на проде их там и нет.
+    expect(mocks.redisGet).not.toHaveBeenCalledWith('system:backup:last_timestamp');
+  });
+
+  it('ключи бэкапа, попавшие в кэш вместо состояния, метрику не воскрешают', async () => {
+    mocks.redisGet.mockImplementation(async (key: string) =>
+      key.startsWith('system:backup:') ? new Date().toISOString() : null);
+    mocks.stateGet.mockResolvedValue(null);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(status.components.backup.source).toBe('missing');
+  });
+});
+
 describe('shouldLogHealthSnapshot', () => {
   it('пишет первую поломку — предыдущей картины ещё нет', async () => {
     const { shouldLogHealthSnapshot } = await import('../health-tracker/tracker');
