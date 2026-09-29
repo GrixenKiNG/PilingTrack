@@ -6,7 +6,7 @@ import {useState} from 'react';
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {AdmissionScreen} from '../admission';
 import {ActionButton} from '../parts';
-import {emptyWorkDraft} from '../drafts';
+import {emptyPassportDraft, emptyWorkDraft} from '../drafts';
 import {ReportSendScreen} from '../report-send';
 import {ShiftStartScreen} from '../shift-start';
 import {WorkScreenNext} from '../work';
@@ -58,15 +58,17 @@ function WorkHarness({
   onSubmitEntry?: (entry: unknown) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState(emptyWorkDraft());
+  const [passport, setPassport] = useState(emptyPassportDraft());
   return (
     <WorkScreenNext
       state={state}
       busy={false}
       error={null}
-      userId={null}
       storageOk
       draft={draft}
       onDraftChange={(updater) => setDraft((current) => updater(current))}
+      passport={passport}
+      onPassportChange={setPassport}
       onSubmitEntry={onSubmitEntry as never}
       onCorrect={async () => true}
       onFinish={noop}

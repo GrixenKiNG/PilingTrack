@@ -17,6 +17,12 @@ const STORAGE_KEY = 'pilingtrack.operator.queue.v1';
 
 type Responder = (url: string) => Response | Promise<Response>;
 
+/** По умолчанию в тестах — конкретный вошедший: без него черновики не хранятся. */
+const DEFAULT_USER = {id: 'user-a', email: 'user-a@piling.test', name: 'Машинист А', role: 'OPERATOR' as const};
+
+/** Второй машинист — для смены пользователя на общем планшете. */
+const USER_B = {id: 'user-b', email: 'user-b@piling.test', name: 'Машинист Б', role: 'OPERATOR' as const};
+
 function json(data: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
@@ -41,8 +47,9 @@ let sent: Record<string, unknown>[];
 
 beforeEach(() => {
   globalThis.localStorage?.clear();
-  // Черновики хранятся по вошедшему: между тестами пользователя сбрасываем.
-  usePilingStore.setState({currentUser: null});
+  // Черновики хранятся по паре «пользователь + смена»: между тестами ставим
+  // конкретного машиниста — с неизвестным пользователем хранилище не работает.
+  usePilingStore.setState({currentUser: DEFAULT_USER});
   sent = [];
   stateImpl = () => json({data: makeState()});
   commandImpl = () => json({data: {ok: true}});
@@ -211,6 +218,73 @@ describe('гарантия: двойное нажатие шлёт одну ко
     expect(sent).toHaveLength(1);
     pending.resolve(json({data: {ok: true}}));
     await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+  });
+});
+
+describe('ревью №4, B4: второе нажатие во время отправки — одна команда', () => {
+  it('происшествие: двойное нажатие в одном такте — одна отправка', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: 'Ещё'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Записать происшествие'}));
+    fireEvent.click(screen.getByRole('button', {name: /Рабочая зона/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Утечка'}));
+    fireEvent.change(screen.getByLabelText('Как было дело'), {target: {value: 'Разлив масла у насосной'}});
+
+    const gate = deferred<Response>();
+    commandImpl = () => gate.promise;
+    const submit = screen.getByRole('button', {name: /^Записать происшествие$/}) as HTMLButtonElement;
+    await act(async () => {
+      submit.click();
+      submit.click();
+    });
+    expect(sent.filter((item) => item.command === 'report-incident')).toHaveLength(1);
+    gate.resolve(json({data: {ok: true}}));
+    await waitFor(() => expect(screen.queryByLabelText('Как было дело')).toBeNull());
+  });
+
+  it('поправка: двойное нажатие в одном такте — одна отправка', async () => {
+    const entries = () => [{
+      id: 'e1', kind: 'PILES' as const, label: 'С 100.30 · 5 шт', value: 5, meters: 15,
+      occurredAt: '2026-09-27T05:00:00.000Z', corrections: [],
+    }];
+    stateImpl = () => json({data: makeState({phase: 'WORK', entries: entries()})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    fireEvent.change(screen.getByLabelText(/Сколько свай было на самом деле/), {target: {value: '6'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+
+    const gate = deferred<Response>();
+    commandImpl = () => gate.promise;
+    const submit = screen.getByRole('button', {name: /Записать поправку/}) as HTMLButtonElement;
+    await act(async () => {
+      submit.click();
+      submit.click();
+    });
+    expect(sent.filter((item) => item.command === 'correct-production')).toHaveLength(1);
+    gate.resolve(json({data: {ok: true}}));
+    await waitFor(() => expect(screen.queryByLabelText(/Сколько свай было на самом деле/)).toBeNull());
+  });
+
+  it('запись в очередь: двойное нажатие при обрыве — ровно одна запись', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await openPileForm();
+    const gate = deferred<Response>();
+    commandImpl = () => gate.promise;
+    const submit = screen.getByRole('button', {name: /^Записать/}) as HTMLButtonElement;
+    await act(async () => {
+      submit.click();
+      submit.click();
+    });
+    gate.reject(new TypeError('network down'));
+    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+    const stored = JSON.parse(globalThis.localStorage.getItem(STORAGE_KEY) ?? '[]') as unknown[];
+    expect(stored).toHaveLength(1);
+    expect(sent.filter((item) => item.command === 'log-production')).toHaveLength(1);
   });
 });
 
@@ -420,7 +494,7 @@ describe('ревью №2, п.1: подтверждение, очистка и �
 });
 
 describe('ревью №2, п.2: подготовка закрытия смены — под замком', () => {
-  it('во время подготовки заметка закрыта, повтор не запускает вторую подготовку', async () => {
+  it('во время подготовки заметка редактируема, повтор не запускает вторую подготовку', async () => {
     stateImpl = () => json({data: makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]})});
     render(<OperatorNextApp />);
     await screen.findByText('Проверьте итоги и закройте смену');
@@ -431,17 +505,26 @@ describe('ревью №2, п.2: подготовка закрытия смен�
     commandImpl = (body) => (body && body.command === 'log-production' ? slowSend.promise : json({data: {ok: true}}));
 
     fireEvent.click(screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0]);
+    // Подготовка началась: запись из очереди ушла в отправку.
+    await waitFor(() => expect(sent.some((item) => item.command === 'log-production')).toBe(true));
 
-    // Идёт подготовка — заметка закрыта.
-    await waitFor(() => expect(screen.getByPlaceholderText(/осталось 4 сваи/i)).toBeDisabled());
-    // Повторное нажатие ничего не запускает.
+    // Заметку можно менять во время подготовки (ревью №4, B5): в команду уйдёт
+    // актуальный текст, а не снимок на момент нажатия.
+    const note = screen.getByPlaceholderText(/осталось 4 сваи/i);
+    expect(note).not.toBeDisabled();
+    fireEvent.change(note, {target: {value: 'вывезти грунт к 19:00'}});
+
+    // Повторное нажатие ничего не запускает: подготовка одна.
     fireEvent.click(screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0]);
     await act(async () => { await Promise.resolve(); });
     expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(0);
 
-    // Подготовка закончилась: запись ушла, смена закрывается.
+    // Подготовка закончилась: смена закрывается ОДНОЙ командой с новой заметкой.
     slowSend.resolve(json({data: {ok: true}}));
     await waitFor(() => expect(sent.some((item) => item.command === 'close-shift')).toBe(true));
+    const closeBody = sent.find((item) => item.command === 'close-shift') as {comment?: string};
+    expect(closeBody.comment).toBe('вывезти грунт к 19:00');
+    expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(1);
   });
 });
 
@@ -536,7 +619,7 @@ describe('ревью №2, п.5: черновики переживают пер�
   });
 });
 
-describe('ревью №2, п.6: гонка установок — оба запроса и оба ответа', () => {
+describe('ревью №4, B6: гонка установок — два запроса и раздельно управляемые ответы', () => {
   it('устаревший ответ отброшен; приёмка отправляет последнюю выбранную', async () => {
     const base = makeState({
       phase: 'ADMISSION',
@@ -547,31 +630,46 @@ describe('ревью №2, п.6: гонка установок — оба зап
     });
     const stateA = withEquipment(base, 'eq-1', 'Основная СУ-1');
     const stateB = withEquipment(base, 'eq-2', 'Чужая СУ-9');
-    const lateB = deferred<Response>();
+    const answerB = deferred<Response>();
+    const answerA = deferred<Response>();
     const reads: string[] = [];
     stateImpl = (url) => {
       reads.push(url);
-      return url.includes('equipmentId=eq-2') ? lateB.promise : json({data: stateA});
+      if (url.includes('equipmentId=eq-2')) return answerB.promise;
+      if (url.includes('equipmentId=eq-1')) return answerA.promise;
+      return json({data: stateA});
     };
 
     render(<OperatorNextApp />);
     await screen.findByRole('button', {name: /Принять установку/});
+    const initialReads = reads.length;
 
-    // Запрос Б уходит и «висит».
+    // Первый выбор: запрос Б уходит и «висит» — как в бою до ответа сервера.
     fireEvent.click(screen.getByRole('button', {name: /СУ-2/}));
-    // Строка уже погашена после первого касания; второй выбор подаём событием
-    // напрямую обработчику — нужна именно гонка двух чтений (ревью №3, п.5).
+    await waitFor(() => expect(reads.filter((u) => u.includes('eq-2')).length).toBe(1));
+
+    // Второй выбор вызываем у обработчика строки НАПРЯМУЮ (ревью №4, B6):
+    // нативная блокировка на время загрузки не пускает второе нажатие человека,
+    // а гонку двух чтений нужно воспроизвести — оба запроса должны быть реально
+    // начаты после точки отсчёта.
     const rowA = screen.getByRole('button', {name: /СУ-1/});
-    rowA.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+    const propsKey = Object.keys(rowA).find((key) => key.startsWith('__reactProps'));
+    if (!propsKey) throw new Error('не найден React-обработчик строки выбора');
+    const rowProps = (rowA as unknown as Record<string, {onClick?: () => void}>)[propsKey];
+    if (!rowProps?.onClick) throw new Error('у строки выбора нет onClick');
+    await act(async () => { rowProps.onClick?.(); });
 
-    // Оба запроса действительно запущены: два чтения по разным установкам.
-    await waitFor(() => expect(reads.some((url) => url.includes('equipmentId=eq-2'))).toBe(true));
-    await waitFor(() => expect(reads.some((url) => url.includes('equipmentId=eq-1'))).toBe(true));
+    // Ровно +2 новых запроса: по одному на каждый выбор.
+    await waitFor(() => expect(reads.length).toBe(initialReads + 2));
+    expect(reads.filter((u) => u.includes('eq-1')).length).toBe(1);
+    // Второй выбор действительно применён — иначе и гонки нет.
+    await waitFor(() => expect(screen.getByRole('button', {name: /СУ-1/})).toHaveAttribute('aria-pressed', 'true'));
+
+    // Ответы приходят в обратном порядке: свежий (А) раньше, устаревший (Б) позже.
+    answerA.resolve(json({data: stateA}));
     await waitFor(() => expect(screen.getByText('Основная СУ-1')).toBeInTheDocument());
-
-    // Устаревший ответ Б приходит позже и не должен победить.
-    lateB.resolve(json({data: stateB}));
-    await act(async () => { await Promise.resolve(); });
+    answerB.resolve(json({data: stateB}));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.queryByText('Чужая СУ-9')).toBeNull();
     expect(screen.getByText('Основная СУ-1')).toBeInTheDocument();
 
@@ -877,7 +975,7 @@ describe('ревью №3, п.2: паспорт сваи — черновик, �
     fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
     fireEvent.change(await screen.findByPlaceholderText('С-130'), {target: {value: 'С-402'}});
     // Черновик оседает в хранилище сразу по вводу.
-    const snapshot = globalThis.localStorage.getItem(draftStorageKey(null, 'shift-1'));
+    const snapshot = globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string);
     expect(snapshot ?? '').toContain('С-402');
     first.unmount();
 
@@ -900,7 +998,7 @@ describe('ревью №3, п.2: паспорт сваи — черновик, �
 
     fireEvent.click(screen.getByRole('button', {name: /Записать сваю с паспортом/}));
     await waitFor(() => expect(sent.some((item) => item.command === 'log-production')).toBe(true));
-    // до перечитывания: номер очищен формой, поля закрыты на время отправки
+    // до перечитывания: отправленная строка уже очищена (память оболочки), поля закрыты
     await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue(''));
     expect(screen.getByPlaceholderText('С-130')).toBeDisabled();
     const again = screen.queryByRole('button', {name: /Записываем/});
@@ -912,10 +1010,129 @@ describe('ревью №3, п.2: паспорт сваи — черновик, �
 
     slowReload.resolve(json({data: makeState({phase: 'WORK'})}));
     await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
-    // В хранилище подтверждённого паспорта нет — он не воскреснет при перезагрузке.
-    const raw = globalThis.localStorage.getItem(draftStorageKey(null, 'shift-1'));
-    const stored = raw ? JSON.parse(raw) as {passport?: unknown} : null;
-    expect(stored?.passport ?? null).toBeNull();
+
+    // После разблокировки новый ввод цел: поздние продолжения отправки не стирают его.
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    await waitFor(() => expect(screen.getByPlaceholderText('С-130')).not.toBeDisabled());
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-999'}});
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-999');
+    // «Константы проекта» остались для следующей сваи.
+    expect(screen.getByLabelText('Марка сваи')).toHaveValue('g1');
+
+    // В хранилище отправленного нет: «С-77» не воскреснет при перезагрузке.
+    const raw = globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string);
+    expect(raw ?? '').not.toContain('С-77');
+  });
+
+  it('паспорт с тремя залогами переживает обходной экран и при отключённом localStorage', async () => {
+    const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    try {
+      stateImpl = () => json({data: makeState({phase: 'WORK'})});
+      render(<OperatorNextApp />);
+      await screen.findByText('Запишите результат работы');
+      fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+      fireEvent.change(await screen.findByLabelText('Марка сваи'), {target: {value: 'g2'}});
+      fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-555'}});
+      fireEvent.click(screen.getByRole('button', {name: '+ Добавить залог'}));
+      fireEvent.click(screen.getByRole('button', {name: '+ Добавить залог'}));
+      const blows = screen.getAllByLabelText('Ударов');
+      const penetration = screen.getAllByLabelText(/^Погружение/);
+      expect(blows).toHaveLength(3);
+      ['30', '32', '34'].forEach((v, i) => fireEvent.change(blows[i], {target: {value: v}}));
+      ['12', '9', '7'].forEach((v, i) => fireEvent.change(penetration[i], {target: {value: v}}));
+
+      // Обходной экран размонтирует работу — паспорт должен вернуться целиком.
+      fireEvent.click(screen.getByRole('button', {name: 'ТБ'}));
+      fireEvent.click(await screen.findByRole('button', {name: /Ознакомление с инструкциями/}));
+      fireEvent.click(await screen.findByRole('button', {name: 'Назад'}));
+      fireEvent.click(screen.getByRole('button', {name: 'Смена'}));
+      // Форма паспорта никуда не девалась: режим остался «паспорт», и после
+      // возврата на «Смену» видно её же — с полным черновиком.
+      expect(await screen.findByPlaceholderText('С-130')).toHaveValue('С-555');
+      const blowsBack = screen.getAllByLabelText('Ударов');
+      expect(blowsBack).toHaveLength(3);
+      expect(blowsBack[0]).toHaveValue(30);
+      expect(blowsBack[2]).toHaveValue(34);
+      const penBack = screen.getAllByLabelText(/^Погружение/);
+      expect(penBack[1]).toHaveValue(9);
+      // Честный статус на экране формы: при перезагрузке не сохранится.
+      expect(screen.getByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  it('отправленный паспорт после восстановления содержит все три залога', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    const first = render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    fireEvent.change(await screen.findByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-777'}});
+    fireEvent.click(screen.getByRole('button', {name: '+ Добавить залог'}));
+    fireEvent.click(screen.getByRole('button', {name: '+ Добавить залог'}));
+    const blows = screen.getAllByLabelText('Ударов');
+    const penetration = screen.getAllByLabelText(/^Погружение/);
+    ['30', '31', '32'].forEach((v, i) => fireEvent.change(blows[i], {target: {value: v}}));
+    ['12', '10', '8'].forEach((v, i) => fireEvent.change(penetration[i], {target: {value: v}}));
+    first.unmount();
+
+    // «Перезагрузка»: черновик поднялся из хранилища — вместе с открытой формой
+    // паспорта (режим формы — часть черновика), со всеми тремя залогами.
+    render(<OperatorNextApp />);
+    expect(await screen.findByPlaceholderText('С-130')).toHaveValue('С-777');
+    expect(screen.getAllByLabelText('Ударов')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', {name: /Записать сваю с паспортом/}));
+    await waitFor(() => expect(sent.some((item) => item.command === 'log-production')).toBe(true));
+    const body = sent.find((item) => item.command === 'log-production') as {
+      entry: {passport: {sets: {blows: number; penetrationMm: number}[]}};
+    };
+    expect(body.entry.passport.sets).toHaveLength(3);
+    expect(body.entry.passport.sets[0]).toMatchObject({blows: 30});
+    expect(body.entry.passport.sets[2]).toMatchObject({blows: 32, penetrationMm: 8});
+  });
+});
+
+describe('ревью №4, B4: позднее продолжение отправки не стирает новое', () => {
+  it('выработка: «reload» упал — очистка уже сделана, новый ввод цел', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await openPileForm();
+
+    const slowReload = deferred<Response>();
+    let delayReads = false;
+    stateImpl = () => (delayReads ? slowReload.promise : json({data: makeState({phase: 'WORK'})}));
+    delayReads = true;
+
+    fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
+    await waitFor(() => expect(sent.filter((item) => item.command === 'log-production')).toHaveLength(1));
+    // Подтверждение очистило поля сразу — перечитывание ещё идёт, форма
+    // закрывается по концу цикла (ревью №2), а не по подтверждению.
+    await waitFor(() => expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(null));
+
+    // Перечитывание падает — введённое заново не стирается поздним продолжением.
+    slowReload.resolve(json({error: 'Сеть недоступна'}, 500));
+    await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+    await openPileForm();
+    fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '9'}});
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(9);
+    expect(sent.filter((item) => item.command === 'log-production')).toHaveLength(1);
+  });
+
+  it('выработка: «reload» завершился сразу — новый ввод цел', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await openPileForm();
+    fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
+    await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
+    await openPileForm();
+    fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '9'}});
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(9);
   });
 });
 
@@ -1028,6 +1245,40 @@ describe('ревью №3, п.4: заметка закрытия читаетс�
   });
 });
 
+describe('ревью №4, B5: заметку меняют во время задержанного flush — уходит новая', () => {
+  it('двойное нажатие — одна подготовка; правка заметки доходит до отправки', async () => {
+    const closingState = () => makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]});
+    stateImpl = () => json({data: closingState()});
+    render(<OperatorNextApp />);
+    await screen.findByText('Проверьте итоги и закройте смену');
+    const note = screen.getByPlaceholderText(/осталось 4 сваи/i);
+    fireEvent.change(note, {target: {value: 'старый текст'}});
+
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-5')]));
+    const slow = deferred<Response>();
+    commandImpl = (body) => (body && body.clientCommandId === 'q-5' ? slow.promise : json({data: {ok: true}}));
+
+    const closeButton = screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0];
+    await act(async () => {
+      closeButton.click();
+      closeButton.click();
+    });
+    await waitFor(() => expect(sent.filter((item) => item.clientCommandId === 'q-5')).toHaveLength(1));
+
+    // Пока идёт подготовка, заметка редактируема: в команду уйдёт актуальный текст.
+    expect(note).not.toBeDisabled();
+    fireEvent.change(note, {target: {value: 'новый текст к 19:00'}});
+
+    slow.resolve(json({data: {ok: true}}));
+    await waitFor(() => expect(sent.some((item) => item.command === 'close-shift')).toBe(true));
+    const closeBody = sent.find((item) => item.command === 'close-shift') as {comment?: string};
+    expect(closeBody.comment).toBe('новый текст к 19:00');
+    // Подготовка ровно одна: запись из очереди ушла один раз, закрытие — одно.
+    expect(sent.filter((item) => item.clientCommandId === 'q-5')).toHaveLength(1);
+    expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(1);
+  });
+});
+
 describe('ревью №3, п.7: ключи происшествия и поправки не трогает чужой успех', () => {
   it('успех выработки не меняет ключи происшествия и поправки', async () => {
     const correctionEntries = () => [{
@@ -1129,11 +1380,69 @@ describe('ревью №3, C: черновики переживают перез
         forms: {...emptyWorkDraft().forms, PILES: {...emptyFormFields(), reference: 'g1', count: '9'}},
       },
     };
-    globalThis.localStorage.setItem(draftStorageKey('user-b', 'shift-1'), JSON.stringify(foreign));
+    globalThis.localStorage.setItem(draftStorageKey('user-b', 'shift-1') as string, JSON.stringify(foreign));
     stateImpl = () => json({data: makeState({phase: 'WORK'})});
     render(<OperatorNextApp />);
     await screen.findByText('Запишите результат работы');
     expect(screen.queryByLabelText('Сколько свай забито, шт')).toBeNull();
+  });
+
+  it('смена пользователя А→Б без размонтирования: черновик А исчезает и не уходит под Б', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await openPileForm();
+    const rawA = globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string);
+    expect(rawA ?? '').toContain('"count":"5"');
+
+    // Общий планшет: пользователь меняется в уже открытой оболочке, а
+    // перечитывание контекста Б намеренно задерживается — окно, в котором
+    // прежние черновики не должны ни показываться, ни сохраняться.
+    const slowB = deferred<Response>();
+    let switchSlow = false;
+    stateImpl = () => (switchSlow ? slowB.promise : json({data: makeState({phase: 'WORK'})}));
+    await act(async () => {
+      switchSlow = true;
+      usePilingStore.setState({currentUser: USER_B});
+    });
+
+    // Чужой черновик не показывается: полей А на экране нет.
+    expect(screen.queryByLabelText('Сколько свай забито, шт')).toBeNull();
+    // И ни одна строка А не записана под Б.
+    const rawBEarly = globalThis.localStorage.getItem(draftStorageKey('user-b', 'shift-1') as string);
+    expect(rawBEarly ?? '').not.toContain('"count":"5"');
+
+    // Перечитывание Б завершилось: ввод ложится в ключ Б, а ключ А не тронут.
+    await act(async () => {
+      slowB.resolve(json({data: makeState({phase: 'WORK'})}));
+      await Promise.resolve();
+    });
+    await openPileForm();
+    fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '9'}});
+    await waitFor(() => {
+      const rawB = globalThis.localStorage.getItem(draftStorageKey('user-b', 'shift-1') as string);
+      expect(rawB ?? '').toContain('"count":"9"');
+    });
+    const rawAAfter = globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string);
+    expect(rawAAfter ?? '').toContain('"count":"5"');
+    expect(rawAAfter ?? '').not.toContain('"count":"9"');
+  });
+
+  it('отказ записи после успешного старта — честный статус на экране формы', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await openPileForm();
+    // Старт был успешен: черновик дошёл до хранилища.
+    expect(globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string) ?? '').toContain('"count":"5"');
+
+    const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    try {
+      fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '6'}});
+      expect((await screen.findAllByText(/Черновик не сохранится при перезагрузке страницы/)).length).toBeGreaterThan(0);
+    } finally {
+      setSpy.mockRestore();
+    }
   });
 
   it('после подтверждения черновика в хранилище нет, и форма не поднимается', async () => {
@@ -1143,7 +1452,7 @@ describe('ревью №3, C: черновики переживают перез
     fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
     await waitFor(() => expect(screen.getByText('Запишите результат работы')).toBeInTheDocument());
 
-    const raw = globalThis.localStorage.getItem(draftStorageKey(null, 'shift-1'));
+    const raw = globalThis.localStorage.getItem(draftStorageKey('user-a', 'shift-1') as string);
     const stored = raw ? JSON.parse(raw) as {work?: {forms?: {PILES?: {count?: string}}}} : null;
     expect(stored?.work?.forms?.PILES?.count ?? '').toBe('');
     first.unmount();
@@ -1178,7 +1487,7 @@ describe('ревью №3, C: черновики переживают перез
       await act(async () => { globalThis.dispatchEvent(new Event('offline')); });
 
       fireEvent.click(screen.getByRole('button', {name: /Отложить осмотр/}));
-      expect(await screen.findByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+      expect((await screen.findAllByText(/Черновик не сохранится при перезагрузке страницы/)).length).toBeGreaterThan(0);
       expect(screen.queryByText(/Осмотр сохранён на устройстве/)).toBeNull();
     } finally {
       setSpy.mockRestore();
