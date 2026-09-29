@@ -1,61 +1,43 @@
 /**
- * Черновики экрана машиниста в localStorage.
+ * Копия черновиков экрана машиниста в localStorage.
  *
- * ЗАЧЕМ. Телефон на площадке сворачивают и перезагружают часто (экономия
- * батареи, «подвисло — перезапущу»), а смена всё та же. Черновик, живущий
- * только в памяти, перезагрузку не переживал: выработка, ответы осмотра и
- * заметка закрытия пропадали между двумя касаниями экрана (ревью №3, круг 4).
+ * ЗАЧЕМ. Телефон на площадке сворачивают и перезагружают часто, а смена та же.
+ * Источник правды — память оболочки (ревью №4, пункт A1); сюда она пишется
+ * после каждого изменения и читается при входе в смену. Персистенции через DOM
+ * больше нет: черновик паспорта — такой же объект в памяти, как выработка.
  *
- * ХРАНИТСЯ ПО ПОЛЬЗОВАТЕЛЮ И СМЕНЕ. Планшет на установке общий: черновики
- * машиниста не должны ни показываться следующему вошедшему, ни тем более
- * уходить под его именем. Ключ собирается из идентификатора вошедшего и смены;
- * чужие ключи не читаются вовсе.
+ * ХРАНИТСЯ ПО ПАРЕ «ПОЛЬЗОВАТЕЛЬ + СМЕНА». Планшет общий: чужие ключи не
+ * читаются и не пишутся. Пока пользователь неизвестен, пользовательские
+ * черновики не читаются и не пишутся — общего «anon» нет (ревью №4, A2).
  *
- * ХРАНИЛИЩЕ МОЖЕТ ОТКАЗАТЬ. Приватный режим или переполнение — не повод
- * падать: сохранение возвращает `false`, чтение — `null`, а экран честно
- * говорит, что черновик не переживёт перезагрузку.
+ * ОШИБКА ЧТЕНИЯ — НЕ «ПУСТО» (ревью №4, Д3). Если `getItem` отказал, данные
+ * могут существовать: запись поверх неизвестного содержимого не выполняется, а
+ * вызывающий получает честный статус ошибки. Испорченное значение (не
+ * разбирается) — как пустое: восстанавливать из него нечего.
  */
+import type {Drafts, PassportDraftData, WorkDraft} from './drafts';
 
-import type {Drafts, WorkDraft} from './drafts';
-
-/** Поля паспорта сваи, снятые с формы, — структура для хранения. */
-export interface PassportDraftData {
-  grade: string;
-  number: string;
-  designHead: string;
-  actualHead: string;
-  depth: string;
-  sets: {blows: string; penetration: string; dropHeight: string}[];
-  designRefusal: string;
-  totalBlows: string;
-  blowsLastMeter: string;
-  dropHeight: string;
-  planDeviation: string;
-  tilt: string;
-  redriven: boolean;
-  followerUsed: boolean;
-  headCutOff: boolean;
-  note: string;
-}
+export type {PassportDraftData} from './drafts';
 
 /** Разделы, которые ведёт оболочка. */
 export interface ShellDraftsData {
   work: WorkDraft;
   checklists: Drafts['checklists'];
   closeNote: string;
+  passport: PassportDraftData | null;
 }
 
-interface StoredDrafts {
-  work?: WorkDraft;
-  checklists?: Drafts['checklists'];
-  closeNote?: string;
-  passport?: PassportDraftData | null;
-}
+/** Результат чтения: ошибка отличается от «данных нет». */
+export type DraftRead<Value> =
+  | {status: 'ok'; value: Value}
+  | {status: 'error'};
 
 const KEY_PREFIX = 'piling.onx.drafts.v1';
 
-export function draftStorageKey(userId: string | null, shiftId: string): string {
-  return `${KEY_PREFIX}:${userId ?? 'anon'}:${shiftId}`;
+/** Ключ пары; у неизвестного пользователя ключа нет — писать некуда. */
+export function draftStorageKey(userId: string | null, shiftId: string | null): string | null {
+  if (!userId || !shiftId) return null;
+  return `${KEY_PREFIX}:${userId}:${shiftId}`;
 }
 
 /** Проверка записи: недоступное или переполненное хранилище — `false`. */
@@ -70,70 +52,72 @@ export function storageAvailable(): boolean {
   }
 }
 
-function readAll(userId: string | null, shiftId: string | null): StoredDrafts | null {
-  if (!shiftId) return null;
+function readAll(userId: string | null, shiftId: string | null): DraftRead<ShellDraftsData | null> {
+  const key = draftStorageKey(userId, shiftId);
+  if (!key) return {status: 'ok', value: null};
+  let raw: string | null;
   try {
-    const raw = globalThis.localStorage?.getItem(draftStorageKey(userId, shiftId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as StoredDrafts;
+    raw = globalThis.localStorage?.getItem(key) ?? null;
   } catch {
-    return null;
+    return {status: 'error'};
   }
-}
-
-/**
- * Дописать разделы, не затирая соседние.
- *
- * Оболочка сохраняет выработку, осмотр и заметку; обёртка паспорта — свою
- * секцию. Читаем перед записью: иначе один сохраняющий затёр бы работу другого.
- */
-function mergeWrite(userId: string | null, shiftId: string | null, patch: StoredDrafts): boolean {
-  if (!shiftId) return false;
+  if (raw === null) return {status: 'ok', value: null};
+  let parsed: unknown;
   try {
-    const current = readAll(userId, shiftId) ?? {};
-    const value = JSON.stringify({...current, ...patch});
-    globalThis.localStorage.setItem(draftStorageKey(userId, shiftId), value);
-    return true;
+    parsed = JSON.parse(raw);
   } catch {
-    return false;
+    // Испорченное значение восстановить нечем — считаем черновик отсутствующим.
+    return {status: 'ok', value: null};
   }
-}
-
-export function loadShellDrafts(userId: string | null, shiftId: string | null): ShellDraftsData | null {
-  const stored = readAll(userId, shiftId);
-  if (!stored || !stored.work || typeof stored.work !== 'object') return null;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {status: 'ok', value: null};
+  }
+  const stored = parsed as Partial<ShellDraftsData>;
+  if (!stored.work || typeof stored.work !== 'object') return {status: 'ok', value: null};
   return {
-    work: stored.work,
-    closeNote: typeof stored.closeNote === 'string' ? stored.closeNote : '',
-    checklists: stored.checklists && typeof stored.checklists === 'object' ? stored.checklists : {},
+    status: 'ok',
+    value: {
+      work: stored.work as WorkDraft,
+      closeNote: typeof stored.closeNote === 'string' ? stored.closeNote : '',
+      checklists: stored.checklists && typeof stored.checklists === 'object' ? stored.checklists : {},
+      passport: stored.passport && typeof stored.passport === 'object' ? stored.passport : null,
+    },
   };
 }
 
+/** Прочитать черновик пары. Ошибка чтения — статус `error`, не «пусто». */
+export function loadShellDrafts(
+  userId: string | null,
+  shiftId: string | null,
+): DraftRead<ShellDraftsData | null> {
+  return readAll(userId, shiftId);
+}
+
+/**
+ * Записать черновик пары после изменения.
+ *
+ * Перед записью читаем: ошибка чтения останавливает запись — поверх
+ * неизвестного содержимого не пишем.
+ */
 export function saveShellDrafts(
   userId: string | null,
   shiftId: string | null,
   data: ShellDraftsData,
 ): boolean {
-  return mergeWrite(userId, shiftId, data);
-}
-
-export function loadPassportDraft(userId: string | null, shiftId: string | null): PassportDraftData | null {
-  const stored = readAll(userId, shiftId);
-  const passport = stored?.passport;
-  return passport && typeof passport === 'object' ? passport : null;
-}
-
-export function savePassportDraft(
-  userId: string | null,
-  shiftId: string | null,
-  data: PassportDraftData,
-): boolean {
-  return mergeWrite(userId, shiftId, {passport: data});
-}
-
-/** Подтверждённый паспорт — не черновик: чистим по приёму сервером. */
-export function clearPassportDraft(userId: string | null, shiftId: string | null): void {
-  mergeWrite(userId, shiftId, {passport: null});
+  const key = draftStorageKey(userId, shiftId);
+  if (!key) return false;
+  const current = readAll(userId, shiftId);
+  if (current.status === 'error') return false;
+  try {
+    const value = JSON.stringify({
+      work: data.work,
+      checklists: data.checklists,
+      closeNote: data.closeNote,
+      passport: data.passport ?? null,
+    });
+    globalThis.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
 }

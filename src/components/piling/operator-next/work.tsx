@@ -7,13 +7,12 @@ import {formatDowntimeHours} from '@/lib/downtime-hours';
 import {ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '@/components/piling/operator-mobile/ui';
 import {WarningsPanel} from '@/components/piling/operator-mobile/warnings-panel';
 import {EntriesList} from '@/components/piling/operator-mobile/screens/entries-list';
-import {PilePassportForm} from '@/components/piling/operator-mobile/screens/pile-passport-form';
 import {
   downtimeInterval, formatIntervalMinutes, hhmmAgo,
 } from '@/components/piling/operator-mobile/downtime-interval';
 import {ActionButton, ChoiceButton, NextActionCard, ReasonNote, StageTitle} from './parts';
-import {PassportPersist} from './passport-persist';
-import {emptyFormFields, type FormMode, type WorkDraft, type WorkMode} from './drafts';
+import {PassportForm} from './passport-form';
+import {emptyFormFields, type FormMode, type PassportDraftData, type WorkDraft, type WorkMode} from './drafts';
 import {WORDS} from './words';
 
 /**
@@ -32,19 +31,20 @@ import {WORDS} from './words';
  * (находки №2 и №3 ревью).
  */
 export function WorkScreenNext({
-  state, busy, error, tabs, userId, storageOk, draft, onDraftChange,
+  state, busy, error, tabs, storageOk, draft, onDraftChange, passport, onPassportChange,
   onSubmitEntry, onCorrect, onFinish, onOpenSafety, onOpenTab,
 }: {
   state: OperatorMobileState;
   busy: boolean;
   error: string | null;
   tabs?: ReactNode;
-  /** Вошедший: ключ черновика паспорта — пользователь и смена. */
-  userId: string | null;
   /** Доступно ли хранилище черновиков — от этого зависит честная подсказка. */
   storageOk: boolean;
   draft: WorkDraft;
   onDraftChange: (updater: (current: WorkDraft) => WorkDraft) => void;
+  /** Черновик паспорта сваи живёт в памяти оболочки — как и остальные формы. */
+  passport: PassportDraftData;
+  onPassportChange: (next: PassportDraftData) => void;
   onSubmitEntry: (entry: ProductionEntryInput) => Promise<boolean>;
   onCorrect: (input: {
     entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
@@ -235,11 +235,11 @@ export function WorkScreenNext({
       ) : null}
 
       {/*
-        Форма паспорта не размонтируется при «Назад к смене», а её черновик
-        держится в localStorage по смене и пользователю (ревью №3, круг 4).
-        Пока идёт отправка, поля закрыты fieldset'ом — как у остальных форм.
+        Паспорт сваи — управляемая форма: значения — в памяти оболочки, форме
+        приходят пропом и уходят колбэком (ревью №4, пункт A1). Персистенции
+        через DOM нет вовсе; пока идёт отправка, поля закрыты fieldset'ом.
       */}
-      <div key={state.shift?.id ?? 'no-shift'} hidden={mode !== 'PASSPORT' || needsSafety}>
+      <div hidden={mode !== 'PASSPORT' || needsSafety}>
         <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
         <Panel>
           <PanelTitle>Паспорт сваи</PanelTitle>
@@ -249,19 +249,24 @@ export function WorkScreenNext({
           </p>
           <div className="mt-3">
             <fieldset className="onx-gate" disabled={busy}>
-              <PassportPersist userId={userId} shiftId={state.shift?.id ?? null} enabled={storageOk}>
-                <PilePassportForm
-                  grades={state.dictionaries.pileGrades}
-                  busy={busy}
-                  onSubmit={async (pileGradeId, passport: PilePassportInput) => {
-                    const ok = await onSubmitEntry({kind: 'PILE_PASSPORT', pileGradeId, passport});
-                    if (ok) open('NONE');
-                    return ok;
-                  }}
-                />
-              </PassportPersist>
+              <PassportForm
+                grades={state.dictionaries.pileGrades}
+                busy={busy}
+                value={passport}
+                onChange={onPassportChange}
+                onSubmit={async (pileGradeId, input: PilePassportInput) => {
+                  const ok = await onSubmitEntry({kind: 'PILE_PASSPORT', pileGradeId, passport: input});
+                  if (ok) open('NONE');
+                  return ok;
+                }}
+              />
             </fieldset>
           </div>
+          {!storageOk && mode === 'PASSPORT' ? (
+            <p className="mt-2 text-2xs text-muted-foreground">
+              Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
+            </p>
+          ) : null}
         </Panel>
         {mode === 'PASSPORT' ? <ErrorNote message={error} /> : null}
       </div>

@@ -26,7 +26,7 @@ import {WORDS} from './words';
  * ревью). Теперь про это сказано прямо и рядом рабочая кнопка «Обновить».
  */
 export function ReportSendScreen({
-  state, busy, error, tabs, unsentCount, closeNote, onCloseNoteChange,
+  state, busy, error, tabs, unsentCount, closeNote, onCloseNoteChange, noteLocked = false,
   onOpenService, onFlushQueued, onReload, onClose,
 }: {
   state: OperatorMobileState;
@@ -37,6 +37,12 @@ export function ReportSendScreen({
   unsentCount: number;
   closeNote: string;
   onCloseNoteChange: (value: string) => void;
+  /**
+   * Заметка закрыта только на время самой отправки `close-shift`. Пока идёт
+   * подготовка (flush очереди), её можно менять: в команду уйдёт актуальный
+   * текст, прочитанный в момент отправки (ревью №4, B5).
+   */
+  noteLocked?: boolean;
   onOpenService: () => void;
   onFlushQueued: () => void;
   onReload: () => void;
@@ -177,7 +183,7 @@ export function ReportSendScreen({
           </StageTitle>
           <textarea
             value={closeNote}
-            disabled={busy}
+            disabled={noteLocked}
             onChange={(event) => onCloseNoteChange(event.target.value)}
             rows={3}
             placeholder="Например: осталось 4 сваи у оси Б, вывезти грунт"

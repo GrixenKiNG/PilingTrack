@@ -25,12 +25,11 @@ import {AdmissionScreen, type AdmissionDetour} from './admission';
 import {ChecklistRunScreen} from './checklist-run';
 import {createCommandKeys, type CommandKind, type CommandKeys} from './command-keys';
 import {
-  draftsForShift, emptyDrafts, emptyFormFields, emptyWorkDraft,
-  type ChecklistDrafts, type Drafts, type FormMode, type WorkDraft,
+  draftsForScope, emptyDrafts, emptyFormFields, emptyPassportDraft, emptyWorkDraft,
+  passportAfterSubmit,
+  type ChecklistDrafts, type Drafts, type FormMode, type PassportDraftData, type WorkDraft,
 } from './drafts';
-import {
-  clearPassportDraft, loadShellDrafts, saveShellDrafts, storageAvailable,
-} from './draft-storage';
+import {loadShellDrafts, saveShellDrafts, storageAvailable, type ShellDraftsData} from './draft-storage';
 import {ErrorStrip, NoticeStrip, ActionButton, NextActionCard, ReasonNote} from './parts';
 import {ownPendingCount} from './queue-snapshot';
 import {ReportSendScreen} from './report-send';
@@ -86,7 +85,7 @@ export function OperatorNextApp() {
   const [workTab, setWorkTab] = useState<WorkTab>('SHIFT');
   const [detour, setDetour] = useState<Detour | null>(null);
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Drafts>(() => emptyDrafts(null));
+  const [drafts, setDrafts] = useState<Drafts>(() => emptyDrafts(null, null));
   /**
    * Отложенный осмотр: этап и смена. Смена хранится рядом с этапом, чтобы
    * «отложено» прошлой смены не прилипало к такой же фазе новой.
@@ -121,15 +120,34 @@ export function OperatorNextApp() {
   }, [shiftId]);
 
   /**
-   * Правка черновиков смены с проверкой поколения.
+   * Живая ссылка на вошедшего — вторая половина принадлежности черновика.
    *
-   * Поздний вызов приходит с зашитой сменой А: если живая ссылка уже указывает
-   * на Б — вызов игнорируется, и черновики Б не подменяются пустыми черновиками А.
+   * ПОЧЕМУ ПАРА. Планшет общий: при смене пользователя в уже открытой оболочке
+   * черновики прежнего не должны ни показываться, ни сохраняться под новым.
+   * Пара «пользователь + смена» — единственная верная проверка принадлежности.
    */
-  const mutateDraftsForShift = useCallback((expectedShiftId: string | null, change: (base: Drafts) => Drafts) => {
+  const userIdRef = useRef<string | null>(userId);
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  /** Идёт отправка `close-shift`: заметка закрывается только на это время. */
+  const [closeSending, setCloseSending] = useState(false);
+
+  /**
+   * Правка черновиков пары «пользователь + смена» с проверкой поколения.
+   *
+   * Поздний вызов приходит с зашитой парой А: если живая пара уже другая —
+   * вызов игнорируется, и черновики Б не подменяются пустыми черновиками А.
+   */
+  const mutateDraftsForScope = useCallback((
+    expectedUserId: string | null,
+    expectedShiftId: string | null,
+    change: (base: Drafts) => Drafts,
+  ) => {
     setDrafts((current) => {
-      if (shiftIdRef.current !== expectedShiftId) return current;
-      return change(draftsForShift(current, expectedShiftId));
+      if (userIdRef.current !== expectedUserId || shiftIdRef.current !== expectedShiftId) return current;
+      return change(draftsForScope(current, expectedUserId, expectedShiftId));
     });
   }, []);
 
@@ -141,8 +159,13 @@ export function OperatorNextApp() {
    * закрывает форму выработки по концу защищённого цикла (ревью №2).
    */
   const updateWorkDraft = useCallback((updater: (current: WorkDraft) => WorkDraft) => {
-    mutateDraftsForShift(shiftId, (base) => ({...base, work: updater(base.work)}));
-  }, [mutateDraftsForShift, shiftId]);
+    mutateDraftsForScope(userId, shiftId, (base) => ({...base, work: updater(base.work)}));
+  }, [mutateDraftsForScope, userId, shiftId]);
+
+  /** Правка черновика паспорта: значения идут в форму пропом, изменения — сюда. */
+  const updatePassportDraft = useCallback((next: PassportDraftData) => {
+    mutateDraftsForScope(userId, shiftId, (base) => ({...base, passport: next}));
+  }, [mutateDraftsForScope, userId, shiftId]);
 
   const reload = useCallback(async () => {
     const seq = ++requestSeq.current;
@@ -161,14 +184,31 @@ export function OperatorNextApp() {
       // (перезагрузили страницу — черновик вернётся).
       const nextShiftId = next.shift?.id ?? null;
       shiftIdRef.current = nextShiftId;
-      const canStore = storageAvailable();
+      // Читаем черновик пары только при известном пользователе: общего «anon»
+      // больше нет, а ошибка чтения — это не «пусто» (ревью №4, A2 и Д3).
+      let canStore = storageAvailable() && userId != null && nextShiftId != null;
+      let stored: ShellDraftsData | null = null;
+      if (canStore) {
+        const read = loadShellDrafts(userId, nextShiftId);
+        if (read.status === 'error') {
+          canStore = false;
+        } else {
+          stored = read.value;
+        }
+      }
       setStorageOk(canStore);
       setDrafts((current) => {
-        if (current.shiftId === nextShiftId) return current;
-        const stored = canStore && nextShiftId ? loadShellDrafts(userId, nextShiftId) : null;
+        if (current.userId === userId && current.shiftId === nextShiftId) return current;
         return stored
-          ? {shiftId: nextShiftId, work: stored.work, closeNote: stored.closeNote, checklists: stored.checklists}
-          : emptyDrafts(nextShiftId);
+          ? {
+            userId,
+            shiftId: nextShiftId,
+            work: stored.work,
+            closeNote: stored.closeNote,
+            checklists: stored.checklists,
+            passport: stored.passport ?? emptyPassportDraft(),
+          }
+          : emptyDrafts(userId, nextShiftId);
       });
       setLoadError(null);
       // Роль могла быть исправлена, пока человек смотрел на отказ: успешное
@@ -297,31 +337,37 @@ export function OperatorNextApp() {
   const {queued, flush, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
-   * Зеркалим черновики смены в localStorage на каждое изменение — перезагрузка
-   * страницы не спрашивает разрешения. Недоступное хранилище — не ошибка: экран
-   * честно говорит, что черновик его не переживёт (ревью №3, пункт C).
+   * Зеркалим черновики пары в localStorage на каждое изменение — перезагрузка
+   * страницы не спрашивает разрешения. Статус — по результату РЕАЛЬНОЙ записи,
+   * а не только пробы: маленькая проба проходит, а большой черновик может не
+   * уложиться в квоту (ревью №4, Д2). Недоступное хранилище — не ошибка: экран
+   * честно говорит, что черновик его не переживёт.
    */
   useEffect(() => {
-    if (!shiftId || drafts.shiftId !== shiftId) return;
-    saveShellDrafts(userId, shiftId, {
+    // Пишем только текущую пару: черновик прежнего пользователя не сохраняется
+    // под новым, пока идёт смена контекста (ревью №4, A2).
+    if (!userId || !shiftId || drafts.userId !== userId || drafts.shiftId !== shiftId) return;
+    const ok = saveShellDrafts(userId, shiftId, {
       work: drafts.work,
       checklists: drafts.checklists,
       closeNote: drafts.closeNote,
+      passport: drafts.passport ?? null,
     });
+    setStorageOk((previous) => (previous === ok ? previous : ok));
   }, [drafts, shiftId, userId]);
 
-  const draftsAreCurrent = drafts.shiftId === shiftId;
+  const draftsAreCurrent = drafts.userId === userId && drafts.shiftId === shiftId;
   const workDraft: WorkDraft = draftsAreCurrent ? drafts.work : emptyWorkDraft();
   const closeNote = draftsAreCurrent ? drafts.closeNote : '';
 
   const updateCloseNote = useCallback((value: string) => {
-    mutateDraftsForShift(shiftId, (base) => ({...base, closeNote: value}));
-  }, [mutateDraftsForShift, shiftId]);
+    mutateDraftsForScope(userId, shiftId, (base) => ({...base, closeNote: value}));
+  }, [mutateDraftsForScope, userId, shiftId]);
 
   /** Заметка отправленной смены — не черновик: чистим по подтверждённому закрытию (ревью №2). */
   const clearCloseNote = useCallback(() => {
-    mutateDraftsForShift(shiftId, (base) => ({...base, closeNote: ''}));
-  }, [mutateDraftsForShift, shiftId]);
+    mutateDraftsForScope(userId, shiftId, (base) => ({...base, closeNote: ''}));
+  }, [mutateDraftsForScope, userId, shiftId]);
 
   /** Живая заметка: в момент отправки `close-shift` берём текущее значение (ревью №3, п.4). */
   const closeNoteRef = useRef(closeNote);
@@ -332,15 +378,19 @@ export function OperatorNextApp() {
   /**
    * Поля отправленной выработки — не черновик: чистим сразу по подтверждению.
    * Форму закрывает сам экран работы, когда цикл отпустит поля (ревью №2);
-   * подтверждённый паспорт чистится и в хранилище черновиков (круг 4).
+   * отправленный паспорт уходит из памяти оболочки тем же порядком, а «константы
+   * проекта» в нём остаются (ревью №4, A1).
    */
   const clearSubmittedEntry = (entry: ProductionEntryInput) => {
     if (entry.kind === 'PILE_PASSPORT') {
-      clearPassportDraft(userId, shiftId);
+      mutateDraftsForScope(userId, shiftId, (base) => ({
+        ...base,
+        passport: passportAfterSubmit(base.passport ?? emptyPassportDraft()),
+      }));
       return;
     }
     const form: FormMode = entry.kind;
-    mutateDraftsForShift(shiftId, (base) => ({
+    mutateDraftsForScope(userId, shiftId, (base) => ({
       ...base,
       work: {...base.work, forms: {...base.work.forms, [form]: emptyFormFields()}},
     }));
@@ -358,7 +408,7 @@ export function OperatorNextApp() {
    * Ключ — этап: ответы сданного осмотра чистятся по подтверждённой отправке.
    */
   const updateChecklistDrafts = (stage: ChecklistStage, updater: (current: ChecklistDrafts) => ChecklistDrafts) => {
-    mutateDraftsForShift(shiftId, (base) => ({
+    mutateDraftsForScope(userId, shiftId, (base) => ({
       ...base,
       checklists: {...base.checklists, [stage]: updater(base.checklists[stage] ?? {})},
     }));
@@ -366,7 +416,7 @@ export function OperatorNextApp() {
 
   /** Ответы отправленного этапа больше не черновик: чистим по приёму сервером. */
   const forgetChecklistDrafts = (stage: ChecklistStage) => {
-    mutateDraftsForShift(shiftId, (base) => {
+    mutateDraftsForScope(userId, shiftId, (base) => {
       const next = {...base.checklists};
       delete next[stage];
       return {...base, checklists: next};
@@ -473,12 +523,14 @@ export function OperatorNextApp() {
   };
 
   const closeShift = async () => {
+    console.log('[close] start');
     if (!shift) return;
     // Замок и блокировка полей — ДО первого `await flush()`: пока идёт
     // подготовка, заметка не может измениться, а повторное нажатие не запускает
     // вторую подготовку (ревью №2).
     await flight.run(async () => {
       setBusy(true);
+      console.log('[close] task-start');
       setActionError(null);
       setNotice(null);
       try {
@@ -486,7 +538,9 @@ export function OperatorNextApp() {
         // НЕПОСРЕДСТВЕННО перед закрытием: между показом экрана и нажатием
         // связь могла появиться, а записи — уйти.
         await flush();
+        console.log('[close] flushed');
         const fresh = ownPendingCount();
+        console.log('[close] fresh=' + fresh);
         if (fresh !== 0) {
           setActionError(fresh < 0
             ? 'Не удалось проверить очередь на устройстве. Обновите экран и повторите.'
@@ -495,6 +549,8 @@ export function OperatorNextApp() {
         }
         // Заметку читаем В МОМЕНТ отправки, а не снимком до подготовки
         // (ревью №3, п.4): источник истины — текущее состояние черновика.
+        setCloseSending(true);
+        console.log('[close] sending');
         await sendCommand({command: 'close-shift', shiftId: shift.id, comment: closeNoteRef.current});
         // Подтверждено: заметка этой смены больше не черновик.
         clearCloseNote();
@@ -504,6 +560,7 @@ export function OperatorNextApp() {
         setActionError(humanError(error));
         if (error instanceof ApiError && error.status === 409) void reload();
       } finally {
+        setCloseSending(false);
         setBusy(false);
       }
     });
@@ -683,10 +740,11 @@ export function OperatorNextApp() {
             busy={busy}
             error={actionError}
             tabs={shiftTabs}
-            userId={userId}
             storageOk={storageOk}
             draft={workDraft}
             onDraftChange={updateWorkDraft}
+            passport={draftsAreCurrent ? drafts.passport ?? emptyPassportDraft() : emptyPassportDraft()}
+            onPassportChange={updatePassportDraft}
             onOpenTab={setWorkTab}
             onOpenSafety={(safetyStage) => setDetour({kind: 'CHECKLIST', stage: safetyStage})}
             onFinish={() => void run(null, () => sendCommand({command: 'finish-work', shiftId: shift.id}))}
@@ -726,6 +784,7 @@ export function OperatorNextApp() {
             unsentCount={queued.length}
             closeNote={closeNote}
             onCloseNoteChange={updateCloseNote}
+            noteLocked={closeSending}
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
             onFlushQueued={() => void flush()}
             onReload={() => void reload()}
