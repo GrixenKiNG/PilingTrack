@@ -79,6 +79,73 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
 });
 
 /**
+ * Regression (F-TO-DUE / W-10): the fleet analytics screen used its own
+ * ≤14-day / ≤50h rule that collapsed "overdue" into "soon", so the same rig
+ * read "ТО скоро" here while every other screen (checkMaintenanceDue) showed
+ * "Просрочено". The service must now delegate to the shared helper and expose
+ * overdue and soon separately (maintenanceDue stays as their union for the
+ * counter).
+ */
+describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenanceDue', () => {
+  const DAY_MS = 86_400_000;
+
+  function equipmentRow(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      equipmentId: 'e1',
+      name: 'Kopernik',
+      model: null,
+      kind: 'rig',
+      reportCount: 0,
+      activeDays: 0,
+      piles: 0,
+      pileMeters: 0,
+      drillingCount: 0,
+      drillingMeters: 0,
+      downtimeHours: 0,
+      engineHoursTotal: null,
+      nextMaintenanceAtHours: null,
+      nextMaintenanceDate: null,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    queryRaw.mockReset();
+    groupBy.mockReset();
+    groupBy.mockResolvedValue([]);
+  });
+
+  it('marks a past service date as overdue, not soon', async () => {
+    const past = new Date(Date.now() - 5 * DAY_MS);
+    queryRaw
+      .mockResolvedValueOnce([equipmentRow({ nextMaintenanceDate: past })])
+      .mockResolvedValueOnce([]);
+
+    const res = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    expect(res.equipment[0].maintenanceOverdue).toBe(true);
+    expect(res.equipment[0].maintenanceSoon).toBe(false);
+    expect(res.equipment[0].maintenanceDue).toBe(true);
+    expect(res.fleet.maintenanceDueCount).toBe(1);
+  });
+
+  it('marks a service date inside the soon window as soon, not overdue', async () => {
+    // Проверяем общий порог checkMaintenanceDue (SOON_DAYS = 7), а не старую
+    // 14-дневную эвристику этого экрана.
+    const soon = new Date(Date.now() + 5 * DAY_MS);
+    queryRaw
+      .mockResolvedValueOnce([equipmentRow({ nextMaintenanceDate: soon })])
+      .mockResolvedValueOnce([]);
+
+    const res = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    expect(res.equipment[0].maintenanceOverdue).toBe(false);
+    expect(res.equipment[0].maintenanceSoon).toBe(true);
+    expect(res.equipment[0].maintenanceDue).toBe(true);
+  });
+});
+
+/**
  * Regression: pile metres (м.п.) per rig must come from PileGrade.lengthMm —
  * the single source of truth (src/lib/pile-length.ts) — not from
  * SitePilePlan.metersPerUnit (a planning figure with known-unreliable values)
