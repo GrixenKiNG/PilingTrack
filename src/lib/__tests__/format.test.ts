@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatNumber, formatFixed, formatRuDate, formatPersonName } from '@/lib/format';
+import { formatCountMeters, formatNumber, formatFixed, formatRuDate, formatPersonName } from '@/lib/format';
 
 describe('formatRuDate', () => {
   it('formats a date-only string as DD.MM.YYYY', () => {
@@ -49,5 +49,17 @@ describe('formatNumber vs formatFixed', () => {
   it('the two agree when decimals = 0 (no fractional part to pad)', () => {
     expect(formatFixed(6, 0)).toBe(formatNumber(6, 0));
     expect(formatFixed(5.7, 0)).toBe(formatNumber(5.7, 0)); // both round to "6"
+  });
+});
+
+describe('formatCountMeters', () => {
+  it('везде одна запись: штуки, затем погонные метры', () => {
+    expect(formatCountMeters(2832, 40311)).toBe('2 832 шт. / 40 311 м.п.');
+    expect(formatCountMeters(1218, 19136.5)).toBe('1 218 шт. / 19 136,5 м.п.');
+  });
+
+  it('метры округляются до десятых, штуки — до целых', () => {
+    expect(formatCountMeters(3, 12.345)).toBe('3 шт. / 12,3 м.п.');
+    expect(formatCountMeters(0, 0)).toBe('0 шт. / 0 м.п.');
   });
 });

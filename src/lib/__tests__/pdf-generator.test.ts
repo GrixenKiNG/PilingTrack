@@ -175,8 +175,8 @@ describe('pdf-generator', () => {
     });
 
     expect(rendered).not.toContain('(неполный: у марки не задана длина)');
-    // Метраж — с десятичной запятой (аудит 17, находка 4).
-    expect(rendered).toContain('3 / 36,0');
+    // Метраж идёт в общем формате «шт. / м.п.» (F-R51-FORMAT).
+    expect(rendered).toContain('3 шт. / 36 м.п.');
   }, 30_000);
 
   it('marks the period metres total as incomplete when a grade has no length (F-R28-2)', async () => {

@@ -199,7 +199,7 @@ export function addTable(
 export function addPeriodTable(doc: PdfDoc, reports: PeriodReportRow[]) {
   addTable(
     doc,
-    ['Дата', 'Объект', 'Оператор', 'Сваи', 'Бурение', 'Простои'],
+    ['Дата', 'Объект', 'Оператор', 'Сваи, шт.', 'Бурение, м.п.', 'Простои'],
     reports.map((report) => [
       formatRuDate(report.date || ''),
       report.site?.name || '—',
@@ -222,7 +222,7 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   if ((report.piles || []).length > 0) {
     addTable(
       doc,
-      ['Свайные работы', 'Кол-во'],
+      ['Свайные работы', 'Кол-во, шт.'],
       (report.piles || []).map((pile) => [pile.pileGrade?.name || '—', formatNumber(pile.count || 0)]),
       [0.72, 0.28],
       true
@@ -232,7 +232,7 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   if ((report.drillings || []).length > 0) {
     addTable(
       doc,
-      ['Бурение', 'Метров'],
+      ['Бурение', 'Метров, м.п.'],
       (report.drillings || []).map((drilling) => [drilling.type?.name || '—', formatNumber(drilling.meters || 0)]),
       [0.72, 0.28],
       true
