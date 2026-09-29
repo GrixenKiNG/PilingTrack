@@ -103,7 +103,7 @@ groups:
   - name: application
     rules:
       - alert: HighMemoryUsage
-        expr: nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.9
+        expr: process_heap_used_bytes / process_heap_bytes > 0.9
         for: 5m
         labels:
           severity: warning
@@ -123,43 +123,46 @@ groups:
           summary: "Node.js event loop lag > 100ms"
           description: "Event loop lag on {{ $labels.instance }} is {{ $value | humanizeDuration }}"
 
-      - alert: HighGarbageCollectionTime
-        expr: rate(nodejs_gc_duration_seconds_sum[5m]) > 0.05
-        for: 10m
-        labels:
-          severity: warning
-          service: nodejs
-        annotations:
-          summary: "Excessive GC activity"
-          description: "GC is consuming {{ $value | humanizePercentage }} of CPU time"
+      # метрики нет в приложении, см. R56
+      # - alert: HighGarbageCollectionTime
+      #   expr: rate(nodejs_gc_duration_seconds_sum[5m]) > 0.05
+      #   for: 10m
+      #   labels:
+      #     severity: warning
+      #     service: nodejs
+      #   annotations:
+      #     summary: "Excessive GC activity"
+      #     description: "GC is consuming {{ $value | humanizePercentage }} of CPU time"
 
   # ============================================================
   # Business Logic Alerts
   # ============================================================
   - name: business-logic
     rules:
-      - alert: NoReportsCreated
-        expr: rate(reports_created_total[1h]) == 0
-        for: 1h
-        labels:
-          severity: warning
-          service: pilingtrack-app
-        annotations:
-          summary: "No reports created in the last hour"
-          description: "Zero report creation activity — possible system issue"
+      # метрики нет в приложении, см. R56
+      # - alert: NoReportsCreated
+      #   expr: rate(reports_created_total[1h]) == 0
+      #   for: 1h
+      #   labels:
+      #     severity: warning
+      #     service: pilingtrack-app
+      #   annotations:
+      #     summary: "No reports created in the last hour"
+      #     description: "Zero report creation activity — possible system issue"
 
-      - alert: HighSyncFailureRate
-        expr: rate(sync_errors_total[5m]) / rate(sync_updates_total[5m]) > 0.1
-        for: 5m
-        labels:
-          severity: warning
-          service: pilingtrack-app
-        annotations:
-          summary: "Sync failure rate > 10%"
-          description: "{{ $value | humanizePercentage }} of sync operations are failing"
+      # метрики нет в приложении, см. R56
+      # - alert: HighSyncFailureRate
+      #   expr: rate(sync_errors_total[5m]) / rate(sync_updates_total[5m]) > 0.1
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     service: pilingtrack-app
+      #   annotations:
+      #     summary: "Sync failure rate > 10%"
+      #     description: "{{ $value | humanizePercentage }} of sync operations are failing"
 
       - alert: OutboxBacklog
-        expr: outbox_events_pending_total > 1000
+        expr: outbox_pending_count > 1000
         for: 10m
         labels:
           severity: warning
