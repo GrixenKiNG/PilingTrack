@@ -568,14 +568,12 @@ export function OperatorNextApp() {
   };
 
   const closeShift = async () => {
-    console.log('[close] start');
     if (!shift) return;
     // Замок и блокировка полей — ДО первого `await flush()`: пока идёт
     // подготовка, заметка не может измениться, а повторное нажатие не запускает
     // вторую подготовку (ревью №2).
     await flight.run(async () => {
       setBusy(true);
-      console.log('[close] task-start');
       setActionError(null);
       setNotice(null);
       // Принадлежность операции — на старте закрытия: за время подготовки
@@ -587,9 +585,7 @@ export function OperatorNextApp() {
         // НЕПОСРЕДСТВЕННО перед закрытием: между показом экрана и нажатием
         // связь могла появиться, а записи — уйти.
         await flush();
-        console.log('[close] flushed');
         const fresh = ownPendingCount();
-        console.log('[close] fresh=' + fresh);
         if (fresh !== 0) {
           setActionError(fresh < 0
             ? 'Не удалось проверить очередь на устройстве. Обновите экран и повторите.'
@@ -604,7 +600,6 @@ export function OperatorNextApp() {
         // Заметку читаем В МОМЕНТ отправки, а не снимком до подготовки
         // (ревью №3, п.4): источник истины — текущее состояние черновика.
         setCloseSending(true);
-        console.log('[close] sending');
         await sendCommand({command: 'close-shift', shiftId: closeShiftId, comment: closeNoteRef.current});
         // Подтверждено: заметка этой смены больше не черновик.
         clearCloseNote();
