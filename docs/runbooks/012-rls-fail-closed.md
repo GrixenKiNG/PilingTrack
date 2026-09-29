@@ -66,6 +66,10 @@ ls -lh /opt/pilingtrack/backups/pre-rls-flip-*.dump
 
 ## Этап 1. Роль опознания (до миграции)
 
+**Этот шаг обязателен и в ранбуке 011** (`docs/runbooks/011-app-db-role.md`):
+перевод приложения на роль `pilingtrack_app` без роли опознания роняет вход
+всем (401), поэтому там его выполняют до переключения `DATABASE_URL`/`APP_DB_*`.
+
 ```bash
 # Заводит pilingtrack_identity: BYPASSRLS, без LOGIN, права ровно на две
 # таблицы и ровно на те колонки, которые нужны опознанию.

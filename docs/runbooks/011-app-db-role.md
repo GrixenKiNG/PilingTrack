@@ -134,6 +134,55 @@ ssh -i ~/.ssh/orionpiling user1@87.242.102.125 \
 Ожидаем те же критерии, что в драйве. Приложение в этот момент работает как
 работало — оно всё ещё ходит под `piling`.
 
+### Роль опознания `pilingtrack_identity` — обязательный шаг до переключения
+
+Без неё переключение на `pilingtrack_app` роняет вход **всем**: строку
+пользователя ищут раньше, чем известна организация, а под ролью без
+`BYPASSRLS` такой запрос отдаёт ноль строк — и вход отвечает 401. Локально это
+уже ловилось 22.09.2026. Роль заводится, а переменная выставляется **здесь**, до
+того как `APP_DB_*` уведут приложение на app-роль. Разбор роли — ранбук 012,
+этап 1.
+
+```bash
+# 1. Роль: BYPASSRLS, без LOGIN, права ровно на две таблицы опознания
+#    (User, DeviceKey). Запускать ролью-владельцем — той же, что накатывает
+#    миграции; способ доставки тот же, что у app-role-grants.sql выше.
+ssh -i ~/.ssh/orionpiling user1@87.242.102.125 \
+  'cd /opt/pilingtrack && docker compose exec -T -e PGCLIENTENCODING=UTF8 postgres psql -v ON_ERROR_STOP=1 -U piling -d pilingtrack' \
+  < scripts/identity-role-grants.sql
+```
+
+```bash
+# 2. Роль заведена и урезана: f | t | f — не суперпользователь, обходит RLS,
+#    войти ею нельзя.
+docker compose exec -T postgres psql -U piling -d pilingtrack -c \
+  "SELECT rolname, rolsuper, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname='pilingtrack_identity';"
+```
+
+```bash
+# 3. Переменная окружения — только имя роли, без значения-секрета.
+cd /opt/pilingtrack
+grep -q '^DB_IDENTITY_ROLE=' .env || echo 'DB_IDENTITY_ROLE=pilingtrack_identity' >> .env
+grep '^DB_IDENTITY_ROLE=' .env
+
+# Одного .env мало: env_file у сервисов не объявлен, в контейнер попадает
+# только то, что перечислено в блоке environment: docker-compose.yml.
+grep -n 'DB_IDENTITY_ROLE' docker-compose.yml   # должен быть у app и workers
+```
+
+```bash
+# 4. Перезапуск, чтобы переменная доехала, и проверка, что она видна изнутри.
+docker compose up -d app workers ws
+docker compose exec -T app printenv DB_IDENTITY_ROLE   # pilingtrack_identity
+```
+
+**Проверка шага.** Приложение ещё ходит под `piling`, но роль опознания уже
+подключена — войти диспетчером и убедиться, что вход даёт **200**, а не 401.
+Тот же вход обязан давать 200 и после переключения (этап 4): 401 там — прямой
+признак того, что `DB_IDENTITY_ROLE` не доехала до контейнера. Откат до
+переключения стоит одну строку: убрать `DB_IDENTITY_ROLE` из `.env` и
+перезапустить сервисы.
+
 ## Этап 3. Прод: переключение
 
 ```bash
