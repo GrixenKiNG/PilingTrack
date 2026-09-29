@@ -1547,6 +1547,54 @@ describe('ревью №3, C: черновики переживают перез
     }
   });
 
+  it('путь А→Б→А с отказами чтения не затирает документ А пустой памятью (ревью №7)', async () => {
+    saveShellDrafts('user-a', 'shift-1', {
+      work: {...emptyWorkDraft(), mode: 'PASSPORT'},
+      checklists: {},
+      closeNote: '',
+      passport: {...emptyPassportDraft(), grade: 'g1', number: 'С-818'},
+    });
+    const shiftB = {id: 'shift-2', productionDate: '2026-09-27', startedAt: '2026-09-27T04:00:00.000Z', state: 'OPEN' as const};
+    let onShiftB = false;
+    let stateCalls = 0;
+    stateImpl = () => {
+      stateCalls += 1;
+      return json({data: onShiftB ? makeState({phase: 'WORK', shift: shiftB}) : makeState({phase: 'WORK'})});
+    };
+    render(<OperatorNextApp />);
+    await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-818'));
+
+    const origGet = globalThis.localStorage.getItem.bind(globalThis.localStorage);
+    let failReads = true;
+    const getSpy = vi.spyOn(globalThis.localStorage, 'getItem').mockImplementation((key) => {
+      if (failReads && String(key).startsWith('piling.onx.drafts.v1:')) throw new Error('storage offline');
+      return origGet(key);
+    });
+    const rereadAs = async (toB: boolean, id: string) => {
+      const before = stateCalls;
+      onShiftB = toB;
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry(id)]));
+      await act(async () => { globalThis.dispatchEvent(new Event('online')); await Promise.resolve(); });
+      await waitFor(() => expect(stateCalls).toBeGreaterThan(before));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    };
+    try {
+      // Б: чтение отказало. Обратно на А: чтение снова отказало — память пустая.
+      await rereadAs(true, 'q-aba-1');
+      await rereadAs(false, 'q-aba-2');
+      const keyA = draftStorageKey('user-a', 'shift-1') as string;
+      expect(origGet(keyA) ?? '').toContain('С-818');
+
+      // Доступ вернулся: документ А читается и появляется на экране.
+      failReads = false;
+      await rereadAs(false, 'q-aba-3');
+      await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-818'));
+      expect(origGet(keyA) ?? '').toContain('С-818');
+    } finally {
+      getSpy.mockRestore();
+    }
+  });
+
   it('смена пользователя во время задержанного flush — чужая смена не закрывается', async () => {
     stateImpl = () => json({data: makeState({phase: 'CLOSING', checklists: [checklistView('EO_AFTER', true)]})});
     render(<OperatorNextApp />);
