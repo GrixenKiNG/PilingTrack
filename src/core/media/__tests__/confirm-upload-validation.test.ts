@@ -106,6 +106,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { MediaService } from '../media-service';
+import { db } from '@/lib/db';
 
 function seedMedia(over: Partial<FakeMediaRow>): FakeMediaRow {
   const row: FakeMediaRow = {
@@ -361,5 +362,44 @@ describe('MediaService.confirmUpload — F-R50-2 download timeout', () => {
 
     expect(result.id).toBe('media-1');
     expect(mediaTable.get('media-1')?.uploadStatus).toBe('completed');
+  });
+
+  it('F-R50-2b: aborts when the BODY read stalls past the deadline (headers arrived fast) — 504, row untouched, signal aborted', async () => {
+    vi.useFakeTimers();
+    seedMedia({ contentType: 'application/pdf', fileName: 'doc.pdf', uploadStatus: 'pending' });
+
+    let receivedSignal: AbortSignal | undefined;
+    let aborted = false;
+    sendMock.mockImplementation(
+      (command: { __type: string }, options?: { abortSignal?: AbortSignal }) => {
+        if (command.__type !== 'GetObjectCommand') return Promise.resolve({});
+        receivedSignal = options?.abortSignal;
+        receivedSignal?.addEventListener('abort', () => {
+          aborted = true;
+        });
+        // Headers arrive immediately with a valid size; the BODY then stalls
+        // forever — the R2 this fix must still bound.
+        return Promise.resolve({
+          ContentLength: 8,
+          Body: { transformToByteArray: () => new Promise<Uint8Array>(() => {}) },
+        });
+      },
+    );
+
+    const service = makeService();
+    const assertion = expect(service.confirmUpload('media-1')).rejects.toMatchObject({
+      status: 504,
+      message: 'Хранилище не ответило, повторите отправку фото',
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    expect(aborted).toBe(true);
+    // A timed-out body read (unlike a size/type rejection) leaves the row
+    // 'pending' and never writes 'failed' — the id stays retryable.
+    expect(db.media.update).not.toHaveBeenCalled();
+    expect(mediaTable.get('media-1')?.uploadStatus).toBe('pending');
   });
 });
