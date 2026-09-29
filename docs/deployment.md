@@ -29,7 +29,6 @@ git checkout main
 ```bash
 # Сгенерировать 32-байтные секреты
 openssl rand -hex 32   # для SESSION_SECRET
-openssl rand -hex 32   # для PIN_LOOKUP_SECRET
 openssl rand -hex 32   # для DEVICE_KEY_LOOKUP_SECRET
 openssl rand -hex 32   # для ENCRYPTION_KEY
 openssl rand -hex 16   # для POSTGRES_PASSWORD
@@ -45,7 +44,7 @@ POSTGRES_DB=pilingtrack
 
 # Application secrets — все обязательны, иначе compose упадёт
 SESSION_SECRET=<32 bytes hex, 64 chars>
-PIN_LOOKUP_SECRET=<32 bytes hex>
+# PIN_LOOKUP_SECRET удалён вместе со входом по ПИН-коду 27.09.2026
 DEVICE_KEY_LOOKUP_SECRET=<32 bytes hex>
 ENCRYPTION_KEY=<32 bytes hex>
 
