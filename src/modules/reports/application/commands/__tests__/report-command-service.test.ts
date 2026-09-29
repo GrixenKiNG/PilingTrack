@@ -12,11 +12,12 @@
  * Uses a mock repository to avoid database dependency.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReportAggregate } from '../../../domain';
 import type { ReportRepository } from '../../../infrastructure';
 import { upsertReport, assertCanActForUser, resolveReportUserId } from '../report-command.service';
 import type { UpsertReportCommand } from '../upsert-report.command';
+import { ServiceError } from '@/lib/service-error';
 
 // ============================================================
 // Mocks
@@ -255,6 +256,157 @@ describe('Report Command Service', () => {
       };
 
       const result = await upsertReport(input, { enforceEditWindow: false });
+
+      expect(result._action).toBe('updated');
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /*
+    Границы окна правки отчёта (F-29).
+
+    Окно объявлено константой EDIT_WINDOW_HOURS = 24 в
+    report-command.service.ts и отсчитывается от СДАЧИ отчёта
+    (`submittedAt`, для отчёта из формы — от создания). До сих пор тестами
+    был закрыт только грубый случай «сдано двое суток назад»; ни одна из
+    границ не закреплена.
+
+    Системное время подменяем: иначе тест зависел бы от момента запуска.
+    Время начала окна задаём в самой записи, а не через createdAt агрегата,
+    — как это и делает сервер.
+  */
+  describe('окно правки отчёта — границы (F-29)', () => {
+    const HOUR_MS = 60 * 60 * 1000;
+    // 12:00 UTC = 15:00 МСК — дата отчёта считается «сегодняшней» в любом
+    // рабочем часовом поясе, поэтому валидация «не в будущем» не мешает.
+    const NOW = new Date('2026-04-05T12:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Правка своего отчёта за 2026-04-05, сданного `msAgo` мс назад. */
+    function editOfReportSubmitted(msAgo: number): UpsertReportCommand {
+      const existingAggregate = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+      });
+      existingAggregate.addPileWork({ pileGradeId: 'grade-1', count: 3 }, 'user-1');
+      mockRepoFindById.mockResolvedValue(existingAggregate);
+      mockDb.report.findUnique.mockResolvedValueOnce({
+        submittedAt: new Date(NOW.getTime() - msAgo),
+      });
+
+      return {
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+        piles: [{ pileGradeId: 'grade-1', count: 5 }],
+      };
+    }
+
+    it('через 23 ч 59 мин правка ещё разрешена', async () => {
+      const result = await upsertReport(
+        editOfReportSubmitted(24 * HOUR_MS - 60 * 1000),
+        { enforceEditWindow: true },
+      );
+
+      expect(result._action).toBe('updated');
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
+    });
+
+    it('через 24 ч 1 мин — отказ 403 с понятной русской ошибкой', async () => {
+      const error = await upsertReport(
+        editOfReportSubmitted(24 * HOUR_MS + 60 * 1000),
+        { enforceEditWindow: true },
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(ServiceError);
+      expect((error as ServiceError).status).toBe(403);
+      expect((error as ServiceError).message).toMatch(/Окно редактирования истекло/);
+      // Оператор должен понять, как исправить: отчёт сдан N ч назад и правка
+      // возможна через администратора.
+      expect((error as ServiceError).message).toContain('24 ч назад');
+      expect((error as ServiceError).message).toContain('администратора');
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    /*
+      Ровно 24 ч — правка ЕЩЁ проходит: условие в коде строгое
+      (`elapsedHours > EDIT_WINDOW_HOURS`). Это зафиксировано как фактическое
+      поведение, а не как желаемое: независимый аудит (F-29) ожидал отказа на
+      самой границе. Код проверки не меняем — тест фиксирует текущее правило,
+      чтобы будущая правка границы не прошла молча.
+    */
+    it('ровно через 24 ч правка ещё проходит (граница строгая, > 24)', async () => {
+      const result = await upsertReport(
+        editOfReportSubmitted(24 * HOUR_MS),
+        { enforceEditWindow: true },
+      );
+
+      expect(result._action).toBe('updated');
+      expect(mockRepoSave).toHaveBeenCalledTimes(1);
+    });
+
+    /*
+      Отчёт без отметки сдачи (созданный формой) — окно считается от создания,
+      а не от последней правки. Иначе каждое сохранение продлевало бы окно.
+    */
+    it('без отметки сдачи окно отсчитывается от создания отчёта', async () => {
+      vi.setSystemTime(new Date(NOW.getTime() - 25 * HOUR_MS));
+      const existingAggregate = ReportAggregate.create({
+        reportId: 'report-1',
+        userId: 'user-1',
+        siteId: 'site-1',
+        date: '2026-04-05',
+      });
+      existingAggregate.addPileWork({ pileGradeId: 'grade-1', count: 3 }, 'user-1');
+      vi.setSystemTime(NOW);
+
+      mockRepoFindById.mockResolvedValue(existingAggregate);
+      mockDb.report.findUnique.mockResolvedValueOnce({ submittedAt: null });
+
+      const error = await upsertReport(
+        {
+          reportId: 'report-1',
+          userId: 'user-1',
+          siteId: 'site-1',
+          date: '2026-04-05',
+          piles: [{ pileGradeId: 'grade-1', count: 5 }],
+        },
+        { enforceEditWindow: true },
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+
+      expect((error as ServiceError)?.status).toBe(403);
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    /*
+      Особое правило роли в коде одно: маршрут админской правки
+      (src/app/api/reports/admin-upsert/route.ts) вызывает команду с
+      enforceEditWindow: false — администратор окном не ограничен. Операторский
+      маршрут (upsert/route.ts) всегда передаёт true, добавленной роли в самой
+      команде нет.
+    */
+    it('админскому пути окно не мешает (admin-upsert передаёт enforceEditWindow: false)', async () => {
+      const result = await upsertReport(
+        editOfReportSubmitted(5 * 24 * HOUR_MS),
+        { enforceEditWindow: false, actor: { id: 'admin-1', name: 'Админ', role: 'ADMIN' } },
+      );
 
       expect(result._action).toBe('updated');
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
