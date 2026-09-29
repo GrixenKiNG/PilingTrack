@@ -84,18 +84,18 @@ function isAuthorized(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Неверный токен вебхука' }, { status: 401 });
   }
 
   let payload: AlertmanagerPayload;
   try {
     const parsed = webhookSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
     }
     payload = parsed.data as AlertmanagerPayload;
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
   }
 
   const alerts = (payload.alerts ?? []).slice(0, MAX_FORWARDED);

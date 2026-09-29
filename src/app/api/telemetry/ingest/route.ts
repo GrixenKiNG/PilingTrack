@@ -66,7 +66,7 @@ async function authenticateDevice(
     return {
       identity: null,
       error: createJsonResponse(
-        { error: 'Device authentication required (X-Device-Key header)' },
+        { error: 'Требуется ключ устройства (заголовок X-Device-Key)' },
         { status: 401 },
         getRequestId(request)
       ),
@@ -78,7 +78,7 @@ async function authenticateDevice(
     return {
       identity: null,
       error: createJsonResponse(
-        { error: 'Invalid or revoked device key' },
+        { error: 'Ключ устройства неверный или отозван' },
         { status: 403 },
         getRequestId(request)
       ),
@@ -100,7 +100,7 @@ export const POST = withApi(async (request: NextRequest) => {
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
+      { error: 'Слишком много запросов. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
     );
   }
@@ -115,7 +115,7 @@ export const POST = withApi(async (request: NextRequest) => {
   const validation = validateTelemetry(body);
   if (!validation.valid) {
     return createJsonResponse(
-      { error: 'Invalid telemetry data', details: validation.errors, requestId },
+      { error: 'Некорректные данные телеметрии', details: validation.errors, requestId },
       { status: 400 },
       requestId
     );
@@ -142,7 +142,7 @@ export const PATCH = withApi(async (request: NextRequest) => {
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
+      { error: 'Слишком много запросов. Попробуйте позже.' },
       { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
     );
   }
@@ -154,7 +154,7 @@ export const PATCH = withApi(async (request: NextRequest) => {
 
   if (!Array.isArray(body)) {
     return createJsonResponse(
-      { error: 'Expected array of telemetry records' },
+      { error: 'Ожидается массив записей телеметрии' },
       { status: 400 },
       requestId
     );
@@ -162,7 +162,7 @@ export const PATCH = withApi(async (request: NextRequest) => {
 
   if (body.length > 1000) {
     return createJsonResponse(
-      { error: 'Batch too large: max 1000 records per request', count: body.length },
+      { error: 'Слишком много записей за раз: максимум 1000', count: body.length },
       { status: 413 },
       requestId
     );
@@ -178,7 +178,7 @@ export const PATCH = withApi(async (request: NextRequest) => {
 
   if (errors.length > 0) {
     return createJsonResponse(
-      { error: `${errors.length} invalid records`, details: errors.slice(0, 5), requestId },
+      { error: `Некорректных записей: ${errors.length}`, details: errors.slice(0, 5), requestId },
       { status: 400 },
       requestId
     );
@@ -206,20 +206,20 @@ function validateTelemetry(data: unknown): ValidationResult {
   const errors: string[] = [];
 
   if (!data || typeof data !== 'object') {
-    return { valid: false, errors: ['Invalid data structure'] };
+    return { valid: false, errors: ['Некорректная структура данных'] };
   }
 
   const telemetry = data as Record<string, unknown>;
 
   // Required fields
   if (!telemetry.type || typeof telemetry.type !== 'string') {
-    errors.push('type is required and must be string');
+    errors.push('Поле type обязательно и должно быть строкой');
   }
 
   if (telemetry.value === undefined || telemetry.value === null) {
-    errors.push('value is required');
+    errors.push('Поле value обязательно');
   } else if (typeof telemetry.value !== 'number') {
-    errors.push('value must be a number');
+    errors.push('Поле value должно быть числом');
   }
 
   // Valid telemetry types.
@@ -251,21 +251,21 @@ function validateTelemetry(data: unknown): ValidationResult {
   ];
 
   if (telemetry.type && !validTypes.includes(telemetry.type as string)) {
-    errors.push(`Invalid type: ${telemetry.type}. Valid types: ${validTypes.join(', ')}`);
+    errors.push(`Неизвестный тип: ${telemetry.type}. Допустимые типы: ${validTypes.join(', ')}`);
   }
 
   // GPS coordinates validation
   if (telemetry.latitude !== undefined) {
     const lat = Number(telemetry.latitude);
     if (lat < -90 || lat > 90) {
-      errors.push('latitude must be between -90 and 90');
+      errors.push('latitude должен быть в диапазоне от -90 до 90');
     }
   }
 
   if (telemetry.longitude !== undefined) {
     const lon = Number(telemetry.longitude);
     if (lon < -180 || lon > 180) {
-      errors.push('longitude must be between -180 and 180');
+      errors.push('longitude должен быть в диапазоне от -180 до 180');
     }
   }
 

@@ -103,16 +103,16 @@ describe('POST /api/alerts/webhook — payload validation', () => {
     process.env.ALERTMANAGER_WEBHOOK_TOKEN = originalEnv;
   });
 
-  it('rejects a null body with 400 Invalid payload', async () => {
+  it('rejects a null body with 400 Некорректные данные', async () => {
     const res = await POST(reqWithBody(null));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'Invalid payload' });
+    expect(await res.json()).toEqual({ error: 'Некорректные данные' });
   });
 
   it('rejects an alert missing labels/annotations with 400', async () => {
     const res = await POST(reqWithBody({ alerts: [{ status: 'firing' }] }));
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'Invalid payload' });
+    expect(await res.json()).toEqual({ error: 'Некорректные данные' });
   });
 
   it('rejects a non-string labels.severity with 400', async () => {
