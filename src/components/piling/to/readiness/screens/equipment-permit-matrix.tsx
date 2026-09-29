@@ -19,6 +19,7 @@ import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { cn } from '@/lib/utils';
 import { card } from '../settings/shared-ui';
 import {
@@ -56,6 +57,7 @@ export function EquipmentPermitMatrix({
   const [failed, setFailed] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PermitRow | null>(null);
 
   const [kind, setKind] = useState<string>('PILE_DRIVER');
   const [model, setModel] = useState('');
@@ -134,6 +136,7 @@ export function EquipmentPermitMatrix({
       setFailed(error instanceof Error ? error.message : 'Не удалось удалить допуск');
     } finally {
       setBusy(false);
+      setPendingDelete(null);
     }
   };
 
@@ -267,7 +270,7 @@ export function EquipmentPermitMatrix({
                   {editable && (
                     <td className="py-2">
                       <Button variant="outline" className="h-8 text-2xs" disabled={busy}
-                        onClick={() => void remove(row.id)}>
+                        onClick={() => setPendingDelete(row)}>
                         Убрать
                       </Button>
                     </td>
@@ -284,6 +287,18 @@ export function EquipmentPermitMatrix({
         блокировки контура готовности. Включение матрицы в этот расчёт — отдельное решение, и
         принимать его стоит, когда она наполнится по всем работникам.
       </p>
+
+      <ConfirmActionDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => { if (!open && !busy) setPendingDelete(null); }}
+        title="Удалить допуск?"
+        description={pendingDelete
+          ? `Допуск на «${EQUIPMENT_KIND_LABELS[pendingDelete.equipmentKind] ?? pendingDelete.equipmentKind}»${userName ? ` для ${userName}` : ''} будет удалён без возможности восстановления.`
+          : ''}
+        confirmLabel="Удалить"
+        busy={busy}
+        onConfirm={() => { if (pendingDelete) void remove(pendingDelete.id); }}
+      />
     </section>
   );
 }

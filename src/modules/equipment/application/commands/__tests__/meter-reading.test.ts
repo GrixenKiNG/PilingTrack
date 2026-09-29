@@ -1,29 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  findUniqueEquipmentMock, findFirstMock, createReadingMock, updateEquipmentMock,
-  outboxCreateManyMock, deleteReadingMock, txMock,
+  findUniqueEquipmentMock, findFirstMock, createReadingMock, executeRawMock,
+  outboxCreateManyMock, deleteReadingMock, findUniqueReadingMock, txMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   findFirstMock: vi.fn(),
   createReadingMock: vi.fn(),
-  updateEquipmentMock: vi.fn(),
+  // Кэш наработки Equipment.engineHoursTotal обновляется запросом самой базы
+  // (GREATEST / MAX), а не прочитанным в JS значением — см. F-R38-4.
+  executeRawMock: vi.fn(),
   // Показание меняет наработку — вход критерия готовности «Моточасы», поэтому
   // команда заказывает пересчёт снимка в той же транзакции.
   outboxCreateManyMock: vi.fn(),
   deleteReadingMock: vi.fn(),
+  findUniqueReadingMock: vi.fn(),
   txMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
   const tx = {
     meterReading: { findFirst: findFirstMock, create: createReadingMock, delete: deleteReadingMock },
-    equipment: { update: updateEquipmentMock },
     outboxEvent: { createMany: outboxCreateManyMock },
+    $executeRaw: executeRawMock,
   };
   return {
     db: {
       equipment: { findUnique: findUniqueEquipmentMock },
+      meterReading: { findUnique: findUniqueReadingMock },
       // $transaction(cb) runs the callback with the tx stub above
       $transaction: (cb: (t: typeof tx) => unknown) => {
         txMock();
@@ -33,14 +37,17 @@ vi.mock('@/lib/db', () => {
   };
 });
 
-import { addMeterReading, canDecreaseMeter, checkMeterReading } from '../meter-reading';
+import { addMeterReading, canDecreaseMeter, checkMeterReading, deleteMeterReading } from '../meter-reading';
+
+/** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
+const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
 
 describe('addMeterReading', () => {
   beforeEach(() => {
     findUniqueEquipmentMock.mockReset();
     findFirstMock.mockReset();
     createReadingMock.mockReset();
-    updateEquipmentMock.mockReset();
+    executeRawMock.mockReset();
     outboxCreateManyMock.mockReset();
     deleteReadingMock.mockReset();
     findUniqueEquipmentMock.mockResolvedValue({ id: 'eq_1' });
@@ -70,14 +77,15 @@ describe('addMeterReading', () => {
     await expect(addMeterReading('eq_1', { engineHours: 1.5 }, { tenantId: 'orion' })).rejects.toThrow();
   });
 
-  it('syncs Equipment.engineHoursTotal to the latest reading', async () => {
-    // first findFirst = previous latest (none); second = latest after insert
-    findFirstMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ engineHours: 5670 });
+  it('двигает кэш наработки монотонно, запросом самой базы (GREATEST)', async () => {
+    findFirstMock.mockResolvedValueOnce(null);
     await addMeterReading('eq_1', { engineHours: 5670 }, { tenantId: 'orion' });
-    expect(updateEquipmentMock).toHaveBeenCalledWith({
-      where: { id: 'eq_1' },
-      data: { engineHoursTotal: 5670 },
-    });
+    const call = executeRawMock.mock.calls[0];
+    const sql = sqlOf(call);
+    expect(sql).toMatch(/UPDATE "Equipment"/);
+    expect(sql).toMatch(/SET "engineHoursTotal" = GREATEST\(COALESCE\("engineHoursTotal", 0\), \?\)/);
+    expect(sql).toMatch(/WHERE id = \? AND "tenantId" = \?/);
+    expect(call.slice(1)).toEqual([5670, 'eq_1', 'orion']);
   });
 
   it('отклоняет показание ниже предыдущего и ничего не пишет', async () => {
@@ -86,7 +94,7 @@ describe('addMeterReading', () => {
       addMeterReading('eq_1', { engineHours: 5800 }, { tenantId: 'orion' }),
     ).rejects.toThrow(/меньше предыдущего/);
     expect(createReadingMock).not.toHaveBeenCalled();
-    expect(updateEquipmentMock).not.toHaveBeenCalled();
+    expect(executeRawMock).not.toHaveBeenCalled();
   });
 
   it('разрешает снижение с предупреждением, когда счётчик заменили', async () => {
@@ -147,6 +155,32 @@ describe('addMeterReading', () => {
       { tenantId: 'orion' },
     );
     expect(createReadingMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('deleteMeterReading', () => {
+  beforeEach(() => {
+    findUniqueReadingMock.mockReset();
+    deleteReadingMock.mockReset();
+    executeRawMock.mockReset();
+    findUniqueReadingMock.mockResolvedValue({ id: 'rd_1', equipmentId: 'eq_1', tenantId: 'orion' });
+  });
+
+  it('пересчитывает кэш наработки максимумом оставшихся показаний в той же транзакции', async () => {
+    await deleteMeterReading('eq_1', 'rd_1', { tenantId: 'orion' });
+    expect(deleteReadingMock).toHaveBeenCalledWith({ where: { id: 'rd_1' } });
+    const call = executeRawMock.mock.calls[0];
+    const sql = sqlOf(call);
+    expect(sql).toMatch(/SELECT MAX\("engineHours"\) FROM "MeterReading"/);
+    expect(sql).toMatch(/WHERE "equipmentId" = \? AND "tenantId" = \?/);
+    expect(call.slice(1)).toEqual(['eq_1', 'orion', 'eq_1', 'orion']);
+  });
+
+  it('чужое показание (другой tenant) не удаляет', async () => {
+    findUniqueReadingMock.mockResolvedValue({ id: 'rd_1', equipmentId: 'eq_1', tenantId: 'other' });
+    await expect(deleteMeterReading('eq_1', 'rd_1', { tenantId: 'orion' })).rejects.toThrow();
+    expect(deleteReadingMock).not.toHaveBeenCalled();
+    expect(executeRawMock).not.toHaveBeenCalled();
   });
 });
 

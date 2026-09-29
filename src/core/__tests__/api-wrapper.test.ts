@@ -219,7 +219,7 @@ describe('withApi', () => {
     const body = await res.json();
 
     expect(res.status).toBe(404);
-    expect(body.error).toBe('Not found');
+    expect(body.error).toBe('Запись не найдена — возможно, её уже удалили. Обновите страницу.');
   });
 
   it('should map Prisma P2002 to 409', async () => {
@@ -260,7 +260,7 @@ describe('withApi', () => {
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body.error).toBe('Internal server error');
+    expect(body.error).toBe('Внутренняя ошибка сервера. Повторите попытку; если повторится — сообщите администратору.');
     consoleSpy.mockRestore();
   });
 
@@ -272,7 +272,7 @@ describe('withApi', () => {
     const body = await res.json();
 
     expect(res.status).toBe(503);
-    expect(body.error).toBe('Service temporarily unavailable');
+    expect(body.error).toBe('Сервис временно недоступен. Повторите через минуту.');
     expect(body.retryAfter).toBe(15);
     expect(res.headers.get('Retry-After')).toBe('15');
   });
@@ -336,7 +336,7 @@ describe('withMutation', () => {
     const body = await res.json();
 
     expect(res.status).toBe(429);
-    expect(body.error).toBe('Too many requests');
+    expect(body.error).toBe('Слишком много запросов. Подождите немного и повторите.');
     expect(res.headers.get('Retry-After')).toBe('30');
   });
 

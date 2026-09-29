@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
 import { generatePeriodPdf, generateSinglePdf, savePdfBuffer } from '@/lib/pdf-generator';
+import { loadCompanyName } from '@/lib/pdf-data';
 import { logger } from '@/lib/logger';
 import { PDF_CONCURRENCY, REDIS_URL } from './config';
 import {
@@ -46,6 +47,7 @@ export async function startPdf(): Promise<void> {
             totalPiles: data.totalPiles || 0,
             totalDrilling: data.totalDrilling || 0,
             totalDowntime: data.totalDowntime || 0,
+            companyName: await loadCompanyName(data.tenantId),
           });
         } else if (data.type === 'single') {
           if (!data.report) {

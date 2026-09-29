@@ -593,10 +593,11 @@ function IncidentScreen({state, busy, onReport}: {
 }
 
 /** F. Работа: плитки выработки и запись — экраны F1–F5 макета. */
-function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
+export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
   state: OperatorMobileState;
   busy: boolean;
-  onLog: (entry: ProductionEntryInput) => void;
+  /** Признак успеха: по нему форма решает, чистить ли поля. */
+  onLog: (entry: ProductionEntryInput) => Promise<boolean>;
   onFinish: () => void;
   onIncident: () => void;
   /** Открыть периодический чек-лист ТБ — срок вышел либо подходит. */
@@ -645,17 +646,23 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
     setEndedHm('');
   };
 
-  const submit = () => {
+  // Форма чистится только после подтверждения сервером: отказ 400/409 не
+  // должен уничтожать уже набранное число.
+  const submit = async () => {
     if (!ready) return;
-    if (kind === 'PILES') onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
-    else if (kind === 'DRILLING') {
-      onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
+    let saved = false;
+    if (kind === 'PILES') {
+      saved = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
+    } else if (kind === 'DRILLING') {
+      saved = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
     } else if (interval) {
-      onLog({
+      saved = await onLog({
         kind: 'DOWNTIME', reasonId: optionId,
         startedAt: interval.startedAt, endedAt: interval.endedAt,
       });
     }
+    if (!saved) return;
+
     setOptionId('');
     setCount('');
     setMeters('');
@@ -727,10 +734,7 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
         <PilePassportForm
           grades={state.dictionaries.pileGrades}
           busy={busy}
-          onSubmit={async (pileGradeId, passport) => {
-            onLog({kind: 'PILE_PASSPORT', pileGradeId, passport});
-            return true;
-          }}
+          onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
         />
       ) : (
       <div className="card">
@@ -780,7 +784,7 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
           className={ready ? 'b' : 'b dis'}
           type="button"
           disabled={busy || !ready}
-          onClick={submit}
+          onClick={() => void submit()}
         >
           {busy ? 'Записываем…' : 'Записать'}
         </button>
@@ -788,17 +792,28 @@ function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
       )}
 
       <button className="b gh" type="button" disabled={busy} onClick={onFinish}>
-        Машина безопасно остановлена
+        Завершить работу
       </button>
+      <p className="note">Машина остановлена безопасно — дальше осмотр после смены.</p>
     </div>
   );
 }
 
-/** G. Сдача смены и итог — экраны G4, G5 макета. */
-function CloseScreen({state, busy, onClose}: {
+/**
+ * G. Сдача смены и итог — экраны G4, G5 макета.
+ *
+ * НЕОТПРАВЛЕННЫЕ ЗАПИСИ ДЕРЖАТ КНОПКУ (F-R43-1). Закрытая смена отвечает
+ * отложенной выработке 409 «Смена уже закрыта», и в отчёт она не попадает:
+ * сначала очередь, потом закрытие.
+ */
+export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
   state: OperatorMobileState;
   busy: boolean;
   onClose: () => void;
+  /** Записей на устройстве, ещё не принятых сервером. */
+  unsent: number;
+  /** Отправить их немедленно. */
+  onFlush: () => void;
 }) {
   const {receipt} = state;
   const tiles = (
@@ -847,7 +862,13 @@ function CloseScreen({state, busy, onClose}: {
     <div className="scr">
       <p className="kicker">Сдача смены</p>
       {tiles}
-      <button className="b" type="button" disabled={busy} onClick={onClose}>
+      {unsent > 0 ? (
+        <>
+          <p className="note warn">Сначала отправьте записи с телефона: {unsent} не отправлено</p>
+          <button className="b gh" type="button" onClick={onFlush}>Отправить сейчас</button>
+        </>
+      ) : null}
+      <button className="b" type="button" disabled={busy || unsent > 0} onClick={onClose}>
         {busy ? 'Закрываем…' : 'Закрыть смену'}
       </button>
       <p className="note">
@@ -871,12 +892,21 @@ export function OperatorV5App() {
   const [commandId, setCommandId] = useState(newCommandId);
   const [online, setOnline] = useState(true);
 
-  const reload = useCallback(async () => {
+  /**
+   * Перечитать состояние смены.
+   *
+   * quiet — вызов после уже принятой команды. Там сбой перечитывания означает
+   * лишь несвежий экран, а не «нет связи»: если показать его как отказ на весь
+   * экран, машинист решит, что запись не прошла, и отправит её второй раз.
+   * Поэтому ошибку отдаём наверх — вызывающий скажет о ней отдельной строкой.
+   */
+  const reload = useCallback(async (options: {quiet?: boolean} = {}) => {
     try {
       const coordinates = await currentPosition();
       setState(await fetchState({coordinates}));
       setError(null);
     } catch (cause) {
+      if (options.quiet) throw cause;
       setError(cause instanceof ApiError || cause instanceof Error
         ? cause.message
         : 'Состояние смены недоступно');
@@ -899,28 +929,60 @@ export function OperatorV5App() {
     };
   }, []);
 
-  const run = useCallback(async (fn: () => Promise<unknown>, done: string) => {
+  // Возвращает признак успеха: форма чистит поля только по нему. Отказ по
+  // существу (400/409) — это false: введённое человеком должно остаться на
+  // экране. Уход в очередь — принятая запись, то есть true.
+  //
+  // Успех — это «сервер принял запись (или она легла в очередь)», а не «весь
+  // обработчик дошёл до конца». Перечитывание экрана идёт отдельным шагом:
+  // его сбой не отменяет уже записанное, иначе машинист увидит ошибку, наберёт
+  // то же число заново и выработка задвоится.
+  //
+  // КНОПКА ЖДЁТ ПЕРЕЧИТЫВАНИЯ (F-R43-3d). Ключ команды меняется сразу по её
+  // принятию, а состояние смены приходит только после перечитывания. Отпусти
+  // кнопку раньше — машинист увидит прежние счётчики, нажмёт второй раз, и та
+  // же выработка уйдёт с новым ключом, то есть задвоится. Поэтому busy снимаем
+  // после reload — когда запись принята сервером. Отказ по существу (400/409)
+  // перечитывать нечего: там сразу.
+  const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
     try {
       await fn();
       setCommandId(newCommandId());
       setNotice(done);
-      await reload();
     } catch (cause) {
       // Запись легла в очередь — это принятая запись, а не отказ: следующая
       // обязана получить новый ключ. Со старым ключом очередь считала её
       // повтором той же записи и молча не брала, а сервер — тем более.
-      if (cause instanceof QueuedOffline) setCommandId(newCommandId());
-      setNotice(cause instanceof QueuedOffline
-        ? cause.message
-        : cause instanceof Error ? cause.message : 'Действие не выполнено');
-    } finally {
-      setBusy(false);
+      //
+      // ПЕРЕЧИТЫВАНИЯ ЗДЕСЬ НЕТ (F-R43-3d). Сервер этой записи ещё не видел,
+      // обновлять на экране нечего — а без связи reload падает и затирает
+      // сообщение очереди текстом «Записано. Не удалось обновить экран»:
+      // машинист решит, что запись уже на сервере, хотя она в телефоне. Кнопку
+      // отпускаем сразу: держать её занятой до таймаута сети незачем.
+      if (cause instanceof QueuedOffline) {
+        setCommandId(newCommandId());
+        setNotice(cause.message);
+        setBusy(false);
+        return true;
+      } else {
+        setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
+        setBusy(false);
+        return false;
+      }
     }
+    try {
+      await reload({quiet: true});
+    } catch {
+      // Запись уже принята — говорим только о несвежем экране.
+      setNotice('Записано. Не удалось обновить экран — потяните вниз / обновите.');
+    }
+    setBusy(false);
+    return true;
   }, [reload]);
 
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
    * Периодический чек-лист ТБ, открытый по сроку.
@@ -999,17 +1061,30 @@ export function OperatorV5App() {
     }), 'Происшествие записано.');
   }, [commandId, run, state]);
 
-  const logProduction = useCallback((entry: ProductionEntryInput) => {
+  const logProduction = useCallback(async (entry: ProductionEntryInput): Promise<boolean> => {
     const shiftId = state?.shift?.id;
-    if (!shiftId) return;
-    void run(
+    if (!shiftId) return false;
+    return run(
       () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
       'Записано.',
     );
   }, [commandId, run, state]);
 
   if (error) {
-    return <div className="app"><div className="scr"><p className="note bad">{error}</p></div></div>;
+    return (
+      <div className="app">
+        <div className="scr">
+          <h2 className="h">Нет связи с сервером</h2>
+          <p className="note bad">{error}</p>
+          <button className="b" type="button" disabled={busy} onClick={() => void reload()}>
+            Повторить
+          </button>
+          <p className="note">
+            Введённые данные сохранены на телефоне и отправятся, когда связь появится.
+          </p>
+        </div>
+      </div>
+    );
   }
   if (!state) {
     return <div className="app"><div className="scr"><p className="note">Читаем состояние смены…</p></div></div>;
@@ -1186,6 +1261,8 @@ export function OperatorV5App() {
       <CloseScreen
         state={state}
         busy={busy}
+        unsent={queued.length}
+        onFlush={() => void flushQueued()}
         onClose={() => {
           if (shiftId) void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
         }}

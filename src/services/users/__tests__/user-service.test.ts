@@ -9,6 +9,8 @@ const {
   groupByFeedbackEventMock,
   updateUserMock,
   countUserMock,
+  executeRawMock,
+  queryRawMock,
 } = vi.hoisted(() => ({
   createUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
@@ -18,10 +20,15 @@ const {
   groupByFeedbackEventMock: vi.fn(),
   updateUserMock: vi.fn(),
   countUserMock: vi.fn(),
+  // Advisory-замок «последнего администратора» — см. F-R38-8. Замок возвращает
+  // void, поэтому берётся через $executeRaw: $queryRaw падает на десериализации
+  // колонки void.
+  executeRawMock: vi.fn(),
+  queryRawMock: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const client = {
     feedbackEvent: {
       findMany: findManyFeedbackEventMock,
       groupBy: groupByFeedbackEventMock,
@@ -34,8 +41,14 @@ vi.mock('@/lib/db', () => ({
       update: updateUserMock,
       count: countUserMock,
     },
-  },
-}));
+    $executeRaw: executeRawMock,
+    $queryRaw: queryRawMock,
+    // Одна транзакция передаёт себя же: проверяем, что чтение-запись идут под
+    // ней, а не до неё.
+    $transaction: (cb: (tx: unknown) => unknown) => cb(client),
+  };
+  return { db: client };
+});
 vi.mock('@/services/auth/auth-service', () => ({
   hashPassword: vi.fn(async () => 'password-hash'),
 }));
@@ -60,6 +73,9 @@ const existingUser = {
   role: 'OPERATOR',
   isActive: true,
 };
+
+/** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
+const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
 
 describe('listAssignableUsers', () => {
   beforeEach(() => {
@@ -206,6 +222,8 @@ describe('updateUser', () => {
     findFirstUserMock.mockReset();
     updateUserMock.mockReset();
     countUserMock.mockReset();
+    executeRawMock.mockReset();
+    queryRawMock.mockReset();
     findFirstUserMock.mockResolvedValue(null);
     updateUserMock.mockResolvedValue({ ...existingUser, name: 'X' });
   });
@@ -250,6 +268,34 @@ describe('updateUser', () => {
     expect(countUserMock).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-a', role: 'ADMIN', isActive: true, id: { not: 'admin-a' } },
     });
+  });
+
+  it('берёт advisory-замок «последнего администратора» до подсчёта, когда роль снимается', async () => {
+    findFirstUserMock.mockResolvedValue(adminUser);
+    countUserMock.mockResolvedValue(1);
+
+    await updateUser('tenant-a', { id: 'admin-a', role: 'OPERATOR' }, 'admin-b');
+
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    const call = executeRawMock.mock.calls[0];
+    expect(sqlOf(call)).toMatch(/SELECT pg_advisory_xact_lock\(hashtext\(\?\)\)/);
+    expect(call.slice(1)).toEqual(['last-admin:tenant-a']);
+    // $queryRaw для замка не используется: колонка void ломает десериализацию.
+    expect(queryRawMock).not.toHaveBeenCalled();
+    // Замок — до подсчёта: иначе два одновременных понижения оба видят
+    // «другой админ есть» и организация остаётся без администратора.
+    expect(executeRawMock.mock.invocationCallOrder[0])
+      .toBeLessThan(countUserMock.mock.invocationCallOrder[0]);
+  });
+
+  it('не берёт advisory-замок, когда права администратора не снимаются', async () => {
+    findFirstUserMock.mockResolvedValue(existingUser);
+
+    await updateUser('tenant-a', { id: 'user-b', name: 'X' }, 'admin-a');
+    await updateUser('tenant-a', { id: 'user-b', role: 'MECHANIC' }, 'admin-a');
+
+    expect(executeRawMock).not.toHaveBeenCalled();
+    expect(countUserMock).not.toHaveBeenCalled();
   });
 
   it('allows demoting an administrator while another one remains', async () => {

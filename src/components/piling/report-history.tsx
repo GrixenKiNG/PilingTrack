@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
+import { formatFixed, formatNumber } from '@/lib/format';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -323,14 +324,14 @@ export function ReportHistory() {
                     <div className="flex items-center gap-1.5">
                       <HardHat className="w-3.5 h-3.5 text-signal-strong" />
                       <span className="text-sm font-mono font-semibold text-foreground">
-                        {report.totalPiles}/{(report.totalPileMeters ?? 0).toFixed(1)}
+                        {report.totalPiles}/{formatFixed(report.totalPileMeters ?? 0, 1)}
                       </span>
                       <span className="text-xs text-muted-foreground">шт/м.п.</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Drill className="w-3.5 h-3.5 text-info-strong" />
                       <span className="text-sm font-mono font-semibold text-foreground">
-                        {report.totalDrillingCount ?? 0}/{(report.totalDrilling ?? 0).toFixed(1)}
+                        {report.totalDrillingCount ?? 0}/{formatFixed(report.totalDrilling ?? 0, 1)}
                       </span>
                       <span className="text-xs text-muted-foreground">шт/м.п.</span>
                     </div>
@@ -338,7 +339,7 @@ export function ReportHistory() {
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-warning-strong" />
                         <span className="text-sm font-mono font-semibold text-warning-strong">
-                          {report.totalDowntime}
+                          {formatNumber(report.totalDowntime)}
                         </span>
                         <span className="text-xs text-muted-foreground">ч</span>
                       </div>

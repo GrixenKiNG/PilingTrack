@@ -249,6 +249,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
             {' '}
             <span className="text-muted-foreground">из {snap.totals.totalEquipment} в работе</span>
           </div>
+          <div className="mt-1 text-xs text-muted-foreground">включая несданные смены</div>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div aria-live="polite" className={cn(
@@ -264,14 +265,22 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
       </div>
 
       <div className={cn(KPI_GRID, 'mt-4')} style={kpiGridStyle(6)}>
-        <KpiTile icon="pile-driving" label="Сваи" tone="info" value={formatCountMeters(snap.totals.pilesToday, snap.totals.pileMetersToday)} />
-        <KpiTile icon="drilling-auger" label="Бурение" tone="info" value={formatCountMeters(snap.totals.drillingCountToday, snap.totals.drillingToday)} />
+        {/* Снимок парка не смотрит на статус отчёта: сюда попадают и несданные
+            смены (черновики). Подписываем это прямо на плитках — иначе
+            «сделано сегодня» здесь больше, чем в аналитике, и расхождение
+            выглядит потерей данных. */}
+        <KpiTile icon="pile-driving" label="Сваи" tone="info" value={formatCountMeters(snap.totals.pilesToday, snap.totals.pileMetersToday)}
+          detail="включая несданные смены" />
+        <KpiTile icon="drilling-auger" label="Бурение" tone="info" value={formatCountMeters(snap.totals.drillingCountToday, snap.totals.drillingToday)}
+          detail="включая несданные смены" />
         <KpiTile icon="downtime" label="Простой" tone={snap.totals.downtimeHoursToday > 0 ? 'danger' : 'neutral'}
-          value={formatHours(snap.totals.downtimeHoursToday)} />
+          value={formatHours(snap.totals.downtimeHoursToday)} detail="включая несданные смены" />
         <KpiTile icon="reports" label="Ожидаются отчёты" tone={snap.totals.expected > 0 ? 'warning' : 'success'}
           value={snap.totals.expected} alert={snap.totals.expected > 0} />
-        <KpiTile icon="crew" label="Бригад на смене" tone="neutral" value={snap.totals.crewsOnShiftToday} />
-        <KpiTile icon="operator" label="Операторов на смене" tone="neutral" value={snap.totals.operatorsOnShiftToday} />
+        <KpiTile icon="crew" label="Бригад на смене" tone="neutral" value={snap.totals.crewsOnShiftToday}
+          detail="включая несданные смены" />
+        <KpiTile icon="operator" label="Операторов на смене" tone="neutral" value={snap.totals.operatorsOnShiftToday}
+          detail="включая несданные смены" />
       </div>
     </section>
   );

@@ -13,9 +13,16 @@ import {
   type WorkspaceSettings,
 } from '../domain/settings';
 
-export async function getSettings(tenantId: string): Promise<WorkspaceSettings> {
-  if (!tenantId) throw new Error('getSettings: tenantId is required'); // fail closed
-  const row = await db.tenantSettings.findUnique({ where: { tenantId } });
+/**
+ * Клиент передаётся там, где вызов уже внутри транзакции: читать через
+ * глобальный `db` изнутри транзакции — значит выйти из неё и завести второе
+ * подключение, а вместе с ним и незащищённое чтение (F-R38-11).
+ */
+async function readSettings(
+  tenantId: string,
+  client: Pick<typeof db, 'tenantSettings'> = db,
+): Promise<WorkspaceSettings> {
+  const row = await client.tenantSettings.findUnique({ where: { tenantId } });
   if (!row) return { ...DEFAULT_WORKSPACE_SETTINGS, notifications: { ...DEFAULT_WORKSPACE_SETTINGS.notifications } };
   return sanitizeSettings({
     companyName: row.companyName,
@@ -26,6 +33,11 @@ export async function getSettings(tenantId: string): Promise<WorkspaceSettings> 
     currency: row.currency,
     notifications: row.notifications,
   });
+}
+
+export async function getSettings(tenantId: string): Promise<WorkspaceSettings> {
+  if (!tenantId) throw new Error('getSettings: tenantId is required'); // fail closed
+  return readSettings(tenantId);
 }
 
 /**
@@ -64,12 +76,20 @@ export async function saveSettings(
   updatedBy: string,
 ): Promise<WorkspaceSettings> {
   if (!tenantId) throw new Error('saveSettings: tenantId is required'); // fail closed
-  const current = await getSettings(tenantId);
-  const next = sanitizeSettings(patch, current);
-  await db.tenantSettings.upsert({
-    where: { tenantId },
-    create: { tenantId, updatedBy, ...next, notifications: next.notifications as object },
-    update: { updatedBy, ...next, notifications: next.notifications as object },
+  // Чтение всего набора и запись объединённого результата обязаны быть
+  // серийными: два администратора, правящие разные поля одновременно, читают
+  // одно и то же «до», и запись последнего затирает правку первого — при этом
+  // оба получили ответ «сохранено» (F-R38-11). Замок транзакционный, снимается
+  // сам при коммите или откате; чтение и запись идут под ним одной транзакцией.
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`settings:${tenantId}`}))`;
+    const current = await readSettings(tenantId, tx);
+    const next = sanitizeSettings(patch, current);
+    await tx.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, updatedBy, ...next, notifications: next.notifications as object },
+      update: { updatedBy, ...next, notifications: next.notifications as object },
+    });
+    return next;
   });
-  return next;
 }

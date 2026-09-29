@@ -1,5 +1,6 @@
 import type { PeriodPdfData, SingleReportData } from '@/lib/pdf-generator';
 import { normalizeCrewData } from '@/lib/normalize-crew';
+import { logger } from '@/lib/logger';
 import type { RawReportRow } from '@/core/infrastructure/raw-queries';
 
 type PeriodReportRecord = RawReportRow;
@@ -40,6 +41,62 @@ async function getDbClient() {
 
 async function getReportQueryService() {
   return import('@/modules/reports/application/queries/report-query.service');
+}
+
+/**
+ * Название компании из настроек организации — для шапки PDF.
+ * Без tenantId имени нет (DEFAULT_TENANT_ID не подставляем: он подменил бы
+ * организацию чужой). Ошибка чтения настроек PDF не ломает — имя пропускается.
+ */
+export async function loadCompanyName(tenantId: string | null | undefined): Promise<string | undefined> {
+  if (!tenantId) {
+    return undefined;
+  }
+  try {
+    const { getSettings } = await import('@/modules/settings');
+    const settings = await getSettings(tenantId);
+    return settings.companyName || undefined;
+  } catch (error) {
+    logger.warn('PDF: не удалось прочитать название компании', {
+      tenantId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
+/**
+ * Подпись установки для шапки сводного PDF («Отчёт по этой установке»).
+ * Читается строго по id вместе с tenantId: без tenantId подписи нет —
+ * подставлять чужую установку нельзя. Ошибка чтения PDF не ломает.
+ */
+async function loadEquipmentLabel(
+  equipmentId: string,
+  tenantId: string | null | undefined
+): Promise<string | undefined> {
+  if (!tenantId) {
+    return undefined;
+  }
+  try {
+    const db = await getDbClient();
+    const equipment = await db.equipment.findFirst({
+      where: { id: equipmentId, tenantId },
+      select: { name: true, model: true },
+    });
+    if (!equipment) {
+      return undefined;
+    }
+    return equipment.model
+      ? `Установка: ${equipment.name} (${equipment.model})`
+      : `Установка: ${equipment.name}`;
+  } catch (error) {
+    logger.warn('PDF: не удалось прочитать установку', {
+      equipmentId,
+      tenantId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
 }
 
 async function buildFallbackCrewMap(reports: Array<{ userId: string; siteId: string }>) {
@@ -133,12 +190,17 @@ export async function buildPeriodPdfData(input: {
     totalPiles: summary.totalPiles,
     totalDrilling: summary.totalDrilling,
     totalDowntime: summary.totalDowntime,
+    companyName: await loadCompanyName(input.tenantId),
+    equipmentLabel: input.equipmentId
+      ? await loadEquipmentLabel(input.equipmentId, input.tenantId)
+      : undefined,
   };
 }
 
 function toSingleReportPdfData(
   report: SingleReportContextReport,
-  fallbackCrew: unknown
+  fallbackCrew: unknown,
+  companyName: string | undefined
 ): SingleReportData {
   const effectiveCrew = report.crew || fallbackCrew;
   const crewData = normalizeCrewData(effectiveCrew);
@@ -159,6 +221,7 @@ function toSingleReportPdfData(
     piles: report.piles,
     drillings: report.drillings,
     downtimes: report.downtimes,
+    companyName,
   };
 }
 
@@ -205,6 +268,6 @@ export async function loadSingleReportPdfContext(
 
   return {
     report,
-    pdfData: toSingleReportPdfData(report, fallbackCrew),
+    pdfData: toSingleReportPdfData(report, fallbackCrew, await loadCompanyName(report.tenantId)),
   };
 }

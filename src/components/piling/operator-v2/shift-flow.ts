@@ -151,6 +151,23 @@ export function resolveV2State(
   postDone: boolean,
   session: V2Session,
 ): V2State {
+  /*
+    Закрытая смена — раньше всего остального.
+
+    Факты с сервера отдают только живые смены (PLANNED/PENDING_ACCEPTANCE/
+    STARTED/HANDOVER_PENDING): сразу после «Закрыть смену и отправить отчёт»
+    смена уходит в CLOSED и `facts.shift` становится `null`. Нижестоящая ветка
+    «нет смены → приёмка» возвращала человека на «Приёмку установки» — сразу
+    после закрытия он видел первый экран и думал, что отчёт не сохранился.
+
+    Фаза рабочего места переживает закрытие, поэтому именно она решает: раз
+    работа сдана и смена закрыта, показываем «Смена закрыта» и препятствия
+    (допуск, отсутствие закрепления) закрытую смену перекрывать не должны.
+  */
+  if (phase === 'CLOSED') {
+    return { step: 'closed', blockers: [] };
+  }
+
   // Допуск по документам — раньше всего: с просроченным удостоверением
   // человеку нельзя за рычаги, и обсуждать осмотр незачем.
   const started = facts.shift?.state === 'STARTED' || facts.shift?.state === 'HANDOVER_PENDING';
@@ -226,9 +243,6 @@ export function resolveV2State(
   // одной её мало: без ЕО после работы это осмотр, после него — отчёт.
   if (!postDone && (phase === 'CLOSING' || (phase === 'WORK' && session.finishing))) {
     return { step: 'post-inspection', blockers: [] };
-  }
-  if (phase === 'CLOSED') {
-    return { step: 'closed', blockers: [] };
   }
 
   return {

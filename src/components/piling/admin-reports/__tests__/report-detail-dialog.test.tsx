@@ -50,7 +50,8 @@ describe('ReportDetailDialog — pile meters', () => {
 
     // 9000mm / 1000 = 9.0 m/pile × 5 = 45.0 м.п. The old name-regex on "С90.30"
     // finds no 3-consecutive-digit run and would render "0.0 м.п." instead.
-    expect(screen.getByText('45.0 м.п.')).toBeTruthy();
+    // Разделитель дробной части — запятая (Аудит 17, находка 10).
+    expect(screen.getByText('45,0 м.п.')).toBeTruthy();
   });
 
   it('shows «длина марки не задана» instead of 0.0 metres for a grade without length (F-R28-4)', () => {
@@ -71,7 +72,7 @@ describe('ReportDetailDialog — pile meters', () => {
 
     // left "N м × K шт. = X м.п." line and right "X м.п." line
     expect(screen.getAllByText('длина марки не задана')).toHaveLength(2);
-    expect(screen.queryByText('0.0 м.п.')).toBeNull();
+    expect(screen.queryByText('0,0 м.п.')).toBeNull();
     expect(screen.getByText('5 шт.')).toBeTruthy();
   });
 });

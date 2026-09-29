@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Формы, которые открываются поверх экрана смены: свая, простой, сдача.
+ * Формы, которые открываются поверх экрана смены: свая, бурение, простой.
  *
  * Все три раньше были переходами на `/report` — то есть модуль отдавал работу
  * старому экрану и переставал быть самостоятельным. Здесь они живут поверх
@@ -9,7 +9,6 @@
  */
 
 import { useState, type ReactNode } from 'react';
-import { cn } from '@/lib/utils';
 import { StepButton } from './ui';
 import { downtimeInterval, formatIntervalMinutes, hhmm } from '../operator-mobile/downtime-interval';
 
@@ -276,48 +275,6 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
           placeholder="Что именно случилось"
           className="w-full rounded-lg border border-border bg-card p-3 text-base" />
       </Field>
-    </Sheet>
-  );
-}
-
-/** Сдача смены: состояние машины словами следующему оператору. */
-export function HandoverSheet({ open, equipmentName, busy, onClose, onSubmit }: {
-  open: boolean;
-  equipmentName: string | null;
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (summary: string) => void;
-}) {
-  const [summary, setSummary] = useState('');
-  if (!open) return null;
-  const tooShort = summary.trim().length < 3;
-
-  return (
-    <Sheet
-      title="Сдать смену"
-      onClose={onClose}
-      footer={
-        <StepButton label="Передать смену" onClick={() => onSubmit(summary.trim())}
-          disabled={tooShort} busy={busy} />
-      }
-    >
-      <p className="text-base text-muted-foreground">
-        {equipmentName ?? 'Установка'} — что важно знать следующей смене
-      </p>
-      <textarea
-        rows={6}
-        value={summary}
-        maxLength={4000}
-        onChange={(event) => setSummary(event.target.value)}
-        placeholder="Состояние машины, незавершённые работы, на что обратить внимание"
-        className="w-full rounded-lg border border-border bg-card p-3 text-base"
-      />
-      {/* Пустая передача — это «всё нормально», сказанное молчанием. Следующий
-          оператор из неё ничего не узнаёт, поэтому три знака минимум требует и
-          сервер, и эта форма. */}
-      <p className={cn('text-sm', tooShort ? 'text-muted-foreground' : 'text-success-strong')}>
-        {tooShort ? 'Опишите состояние машины — хотя бы коротко' : 'Готово к передаче'}
-      </p>
     </Sheet>
   );
 }

@@ -3,8 +3,9 @@
 import {ChecklistScreen as SharedChecklistScreen} from '../screens/checklist-screen';
 import {useState} from 'react';
 import type {
-  ChecklistAnswer, ChecklistView, IncidentSign, OperatorMobileState,
+  ChecklistAnswer, ChecklistStage, ChecklistView, IncidentSign, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
+import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_HINTS, INCIDENT_CATEGORY_LABELS,
   INCIDENT_DESCRIPTION_MIN, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
@@ -129,13 +130,29 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
   state: OperatorMobileState;
   busy: boolean;
   kind: EntryKind;
-  onSubmit: (entry: ProductionEntryInput) => void;
+  /**
+   * `true` — сервер принял запись (или она легла в очередь на устройстве),
+   * `false` — отказ по существу. Форма паспорта чистит поля по этому признаку
+   * (F-R43-3c): иначе отказ 400/409 стирал набранный журнал забивки.
+   */
+  onSubmit: (entry: ProductionEntryInput) => Promise<boolean>;
   onBack: () => void;
 }) {
   const {pileGrades, drillingTypes, downtimeReasons} = state.dictionaries;
   const options = kind === 'PILES' || kind === 'PASSPORT' ? pileGrades
     : kind === 'DRILLING' ? drillingTypes : downtimeReasons;
-  const [id, setId] = useState(options[0]?.id ?? '');
+  /*
+    ПЕРВУЮ ЗАПИСЬ СПРАВОЧНИКА НЕ ПОДСТАВЛЯЕМ (F-R40-39).
+
+    Так марка сваи, тип бурения или причина простоя оказывались выбранными
+    заранее: кнопка «Записать» горела, и новичок отправлял в отчёт чужую
+    марку или причину, ничего не нажимая. Начинаем с пустого выбора и прямо
+    пишем, что нужно выбрать. Единственное исключение — справочник из одной
+    записи: там выбора нет, и подставлять её безопасно.
+  */
+  const [id, setId] = useState(options.length === 1 ? options[0].id : '');
+  const pickLabel = kind === 'DOWNTIME' ? 'Выберите причину простоя'
+    : kind === 'DRILLING' ? 'Выберите тип бурения' : 'Выберите марку сваи';
   const [amount, setAmount] = useState('');
   const [startedHm, setStartedHm] = useState('');
   const [endedHm, setEndedHm] = useState('');
@@ -199,10 +216,9 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
           <PilePassportForm
             grades={pileGrades}
             busy={busy}
-            onSubmit={async (pileGradeId, passport) => {
-              onSubmit({kind: 'PILE_PASSPORT', pileGradeId, passport});
-              return true;
-            }}
+            onSubmit={async (pileGradeId, passport) => onSubmit({
+              kind: 'PILE_PASSPORT', pileGradeId, passport,
+            })}
           />
           <Button tone="ghost" onClick={onBack}>Назад</Button>
         </div>
@@ -218,6 +234,7 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
       <div className="body">
         <Card title={kind === 'DOWNTIME' ? 'Причина' : (kind === 'PILES' ? 'Марка сваи' : 'Тип бурения')}>
           <CardBody>
+            {!id ? <div className="note">{pickLabel}</div> : null}
             <div className="picks">
               {options.map((option) => (
                 <Pick key={option.id} on={option.id === id} onClick={() => setId(option.id)}>
@@ -275,6 +292,7 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
           </CardBody>
         </Card>
 
+        {!id ? <div className="note">Сначала {pickLabel.toLowerCase()}</div> : null}
         <Button disabled={busy || !ready} onClick={submit}>
           {busy ? 'Записываем…' : 'Записать'}
         </Button>
@@ -382,26 +400,75 @@ export function IncidentFlow({busy, onSubmit, onBack}: {
 /* --------------------------------------------------------- сдача смены --- */
 
 /**
- * Закрытие смены: одна кнопка и предупреждение, что дальше правит администратор.
+ * Закрытие смены: шаг ЕО после работы, кнопка закрытия и предупреждение, что
+ * дальше правит администратор.
+ *
+ * ЕО ПОСЛЕ РАБОТЫ ЗДЕСЬ ПЕРВЫМ ШАГОМ, А НЕ НА СОСЕДНЕЙ ВКЛАДКЕ (F-QA-001).
+ * Сервер не принимает закрытие, пока не сдан послесменный чек-лист: фазу
+ * `CLOSING` закрывает этап `EO_AFTER` (`PHASE_CHECKLIST`). Экран об этом
+ * молчал: кнопка «Закрыть смену» была единственной, человек получал отказ
+ * 409-й и оставался без пути — кнопка ЕО жила только на вкладке «Работа».
+ * Теперь шаг ЕО стоит на этом же экране, а закрытие ждёт его.
  *
  * ЧЕГО ЗДЕСЬ БОЛЬШЕ НЕТ (решение владельца 18.09.2026). Поля «что передать
  * следующей смене» — передача машины это отдельное действие со своим
  * адресатом, а не строчка в закрытии. И галочки «выработка записана полностью»:
  * человек ставит её не глядя, потому что она стоит между ним и кнопкой, —
  * подтверждения она не даёт, а закрытие задерживает.
+ *
+ * НЕОТПРАВЛЕННЫЕ ЗАПИСИ ДЕРЖАТ КНОПКУ (F-R43-1). Галочку убрали за
+ * бесполезность, а отложенную выработку от этого защищать надо: закрытая смена
+ * отвечает таким записям 409 «Смена уже закрыта» (`shared.ts`), и в отчёт они не
+ * попадают. Поэтому здесь стоит не отметка, а сама очередь с числом записей и
+ * отправкой в одно нажатие.
  */
-export function CloseFlow({busy, onClose, onBack}: {
+export function CloseFlow({state, busy, onChecklist, onClose, onBack, unsent, onFlush}: {
+  state: OperatorMobileState;
   busy: boolean;
+  /** Открыть чек-лист ЕО после работы — этап считаем от фазы, а не по имени. */
+  onChecklist: (stage: ChecklistStage) => void;
   onClose: (comment: string) => void;
   onBack: () => void;
+  /** Записей на устройстве, ещё не принятых сервером. */
+  unsent: number;
+  /** Отправить их немедленно. */
+  onFlush: () => void;
 }) {
+  const stage = PHASE_CHECKLIST.CLOSING;
+  const checklist = stage ? state.checklists.find((item) => item.stage === stage) : undefined;
+  /*
+    Блокируем только по факту «чек-лист есть и не сдан». Отсутствие чек-листа в
+    состоянии — это «неизвестно», а не «не сдан»: заперев закрытие по нему, мы
+    получили бы ту же ловушку, только с другой стороны. Пусть в этом случае
+    отвечает сервер — его причина показывается текстом выше.
+  */
+  const blocked = Boolean(checklist && !checklist.done);
   return (
     <>
       <Title note="После закрытия смена уходит в отчёт и правится только администратором.">
         Закрытие смены
       </Title>
       <div className="body">
-        <Button disabled={busy} onClick={() => onClose('')}>
+        {blocked && stage ? (
+          <>
+            <Banner
+              tone="warn"
+              title="Сначала ЕО после работы"
+              note={checklist?.purpose ?? 'Машину после работы надо осмотреть и обслужить.'}
+            />
+            <Button onClick={() => onChecklist(stage)}>Выполнить ЕО после работы</Button>
+          </>
+        ) : null}
+        {unsent > 0 ? (
+          <>
+            <Banner
+              tone="warn"
+              title={`Сначала отправьте записи с телефона: ${unsent} не отправлено`}
+            />
+            <Button onClick={onFlush}>Отправить сейчас</Button>
+          </>
+        ) : null}
+        <Button disabled={busy || blocked || unsent > 0} onClick={() => onClose('')}>
           {busy ? 'Закрываем…' : 'Закрыть смену'}
         </Button>
         <Button tone="ghost" onClick={onBack}>Назад</Button>

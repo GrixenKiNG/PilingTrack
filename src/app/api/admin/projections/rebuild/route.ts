@@ -19,6 +19,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 import {
   rebuildReportAnalytics,
   rebuildSiteDailySummary,
@@ -38,6 +40,8 @@ export const POST = withMutation(
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'projections.rebuild');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const actor = user!;
 
     const nameParam = (request.nextUrl.searchParams.get('name') || 'all') as ProjectionName;
     if (!VALID.includes(nameParam)) {
@@ -56,6 +60,26 @@ export const POST = withMutation(
       results = [await rebuildSiteDailySummary()];
     } else {
       results = [await rebuildSiteWeeklyTrend()];
+    }
+
+    // Пересборка меняет цифры витрин и аналитики одним запросом, поэтому должна
+    // оставлять след: без него вопрос «почему у меня другие числа, чем вчера»
+    // упирается в отсутствие записи о том, что её кто-то запускал (F-R34-23).
+    //
+    // Best-effort: проекции уже пересобраны — сбой записи следа не должен
+    // превращать успешную пересборку в 500 и толкать админа повторять запрос.
+    try {
+      await recordAuditEvent({
+        action: 'projections.rebuilt',
+        scope: 'projections',
+        actorId: actor.id,
+        metadata: {
+          names: results.map((result) => result.name),
+          rowsWritten: results.reduce((sum, result) => sum + result.rowsWritten, 0),
+        },
+      });
+    } catch (err) {
+      logger.error('Projections rebuild: audit write failed', err, { name: nameParam });
     }
 
     return NextResponse.json({ results });

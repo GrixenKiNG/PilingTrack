@@ -204,6 +204,29 @@ export class WorkPermitRepository {
     return this.get(tenantId, id);
   }
 
+  /**
+   * Блокировка строки наряда на время подписи.
+   *
+   * Двое согласующих открывают карточку и жмут «Согласовать» одновременно.
+   * Подписи ложатся в разные строки `WorkPermitApproval`, а саму строку наряда
+   * ни одна из транзакций не трогает — конфликта по ней нет, поэтому ни одна
+   * не уступает другой. Каждая видит только свою подпись, «подписей хватает»
+   * не наступает ни у одной, и наряд навсегда остаётся «на согласовании» со
+   * всеми подписями: повтор отбивается «Решение по этой роли уже принято».
+   *
+   * `FOR UPDATE` ставит вторую транзакцию в очередь за первой: полнота подписей
+   * считается после того, как чужая подпись зафиксирована. `tenantId` в условии
+   * обязателен — блокировка обязана попадать в свою строку, а не в чужую.
+   */
+  async lockForApproval(tenantId: string, id: string): Promise<void> {
+    const rows = await this.tx.$queryRaw<Array<{id: string}>>`
+      SELECT "id" FROM "WorkPermit"
+      WHERE "tenantId" = ${tenantId} AND "id" = ${id}
+      FOR UPDATE
+    `;
+    if (!rows[0]) throw new ReadinessCommandError('VALIDATION_ERROR', 404, 'Запись не найдена');
+  }
+
   async addApproval(input: {
     tenantId: string; permitId: string; permitVersion: number;
     role: WorkPermitApprovalRole; actorId: string;

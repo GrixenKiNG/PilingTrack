@@ -1,3 +1,8 @@
+// Локальные имена сохранены ради вызывающих (single-pdf, period-pdf, components),
+// но сами правила берутся из общего @/lib/format: иначе в PDF точек заместо
+// запятой и нет пробела в разрядах («12.5 шт/м.п.», «1200 м»).
+import { formatFixed, formatNumber as formatNumberRu } from '@/lib/format';
+
 export function safeText(value: unknown): string {
   const text = value === null || value === undefined || value === '' ? '—' : String(value);
   return text.replace(/\s+/g, ' ').trim();
@@ -5,11 +10,11 @@ export function safeText(value: unknown): string {
 
 export function formatNumber(value: number | null | undefined): string {
   const numeric = Number(value || 0);
-  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
+  return formatNumberRu(numeric, Number.isInteger(numeric) ? 0 : 1);
 }
 
 export function formatMeters(value: number | null | undefined): string {
-  return Number(value || 0).toFixed(1);
+  return formatFixed(Number(value || 0), 1);
 }
 
 export function formatRuDate(value: string): string {

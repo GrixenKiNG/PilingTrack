@@ -10,6 +10,11 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
     window.location.reload();
   }, []);
 
+  // Наружу отдаём только идентификатор (digest): сам текст исключения может
+  // содержать пути файлов, английские строки библиотек и данные пользователя.
+  // Полный текст остаётся в консоли/Sentry.
+  const digest = (error as Error & { digest?: string }).digest;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-red-50 to-red-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md text-center">
@@ -20,10 +25,10 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
           Произошла ошибка
         </h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Приложение столкнулось с непредвиденной ошибкой. Попробуйте обновить страницу.
+          Экран не открылся из-за ошибки. Обновите страницу; если повторится — сообщите администратору.
         </p>
         <details className="text-left bg-card rounded-lg p-4 mb-6 text-xs font-mono text-muted-foreground max-h-40 overflow-auto">
-          {(error as Error).message}
+          {digest ? `Идентификатор ошибки: ${digest}` : 'Идентификатор ошибки недоступен'}
         </details>
         <div className="flex gap-3 justify-center">
           <button

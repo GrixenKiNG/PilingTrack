@@ -4,7 +4,7 @@ const {
   findUniqueEquipmentMock, createRecMock, findUniqueRecMock, updateRecMock,
   deleteRecMock, outboxCreateManyMock,
   findFirstEquipmentMock, updateEquipmentMock, findManyPlanMock, updatePlanMock,
-  findFirstReadingMock, createReadingMock,
+  findFirstReadingMock, createReadingMock, executeRawMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   createRecMock: vi.fn(),
@@ -18,9 +18,11 @@ const {
   findManyPlanMock: vi.fn(),
   updatePlanMock: vi.fn(),
   // Наработка, снятая при закрытии наряда, уходит в журнал показаний тем же
-  // путём, что ручной ввод и осмотр.
+  // путём, что ручной ввод и осмотр. Кэш наработки двигает запрос базы
+  // (GREATEST), а не прочитанное в JS значение — F-R38-4.
   findFirstReadingMock: vi.fn(),
   createReadingMock: vi.fn(),
+  executeRawMock: vi.fn(),
   // Открытый наряд ТО — вход критерия готовности «Обслуживание»: команды
   // заказывают пересчёт снимка в той же транзакции, что и саму запись.
   outboxCreateManyMock: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('@/lib/db', () => {
       delete: deleteRecMock,
     },
     outboxEvent: { createMany: outboxCreateManyMock },
+    $executeRaw: executeRawMock,
     $transaction: (cb: (t: unknown) => unknown) => cb(client),
   };
   return { db: client };
@@ -63,6 +66,7 @@ beforeEach(() => {
   updateEquipmentMock.mockResolvedValue({});
   findFirstReadingMock.mockReset();
   createReadingMock.mockReset();
+  executeRawMock.mockReset();
   findFirstReadingMock.mockResolvedValue(null);
   createReadingMock.mockResolvedValue({ id: 'mr_1', engineHours: 0, recordedAt: new Date() });
 });

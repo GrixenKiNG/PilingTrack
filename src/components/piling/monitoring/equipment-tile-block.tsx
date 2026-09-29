@@ -5,7 +5,7 @@ import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types'
 import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { KIND_LABEL } from '@/components/piling/admin-equipment/equipment-status';
-import { formatCountMeters, formatHours } from '@/lib/format';
+import { formatCountMeters, formatFixed, formatHours } from '@/lib/format';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
 import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
 import type { EquipmentTileBlock } from './equipment-tile-template';
@@ -153,7 +153,7 @@ export function EquipmentTileBlockContent({
     case 'operator':
       return <Value label="Оператор" value={card.assignedOperatorName ?? '—'} icon={<User className="h-4 w-4" />} />;
     case 'engineHours':
-      return <Value label="Моточасы" value={card.engineHoursTotal != null ? `${card.engineHoursTotal.toLocaleString('ru')} ч` : '—'} icon={<Timer className="h-4 w-4" />} />;
+      return <Value label="Моточасы" value={card.engineHoursTotal != null ? `${formatFixed(card.engineHoursTotal, 0)} ч` : '—'} icon={<Timer className="h-4 w-4" />} />;
     case 'maintenance':
       return <Value label="Ближайшее ТО" value={hoursLeft != null ? `${Math.max(0, Math.round(hoursLeft))} ч` : '—'} icon={<Wrench className="h-4 w-4" />} />;
     case 'todayPiles':

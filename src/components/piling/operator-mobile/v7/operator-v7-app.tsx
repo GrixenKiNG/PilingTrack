@@ -115,31 +115,41 @@ export function OperatorV7App() {
 
   // Когда слать очередь — решает общий хук. Свой набор поводов здесь не
   // отправлял при запуске, а слушатель online не снимался при уходе с экрана.
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
   /**
    * Выполнить команду и вернуться к обзору.
    *
    * Отказ по существу показываем текстом: «сохранено на устройстве» — не
    * ошибка, а обещание, и форму после него можно закрывать.
+   *
+   * ПРИЗНАК ЗАПИСИ, ПРИНЯТОЙ СЕРВЕРОМ (F-R43-3c). Форму паспорта эта функция
+   * кормит своим результатом: она чистит поля только по `true`
+   * (`screens/pile-passport-form.tsx`), иначе отказ 400/409 уничтожал бы
+   * набранный журнал забивки. `true` — сервер принял команду либо она легла в
+   * очередь на устройстве; `false` — отказ по существу.
+   *
+   * ПРИЗНАК ИДЁТ ОТ ОТВЕТА СЕРВЕРА, А НЕ ОТ ПЕРЕЧИТЫВАНИЯ ЭКРАНА (F-R43-3a).
+   * Когда команда прошла, запись уже сохранена: сбой следующего `reload()` не
+   * повод возвращать `false` — иначе машинист набрал бы то же заново и отправил
+   * вторую выработку. Поэтому запись закрывается по ответу, а перечитывание
+   * состояния идёт своим шагом.
    */
   const run = useCallback(async (
     command: Parameters<typeof sendCommand>[0],
     options: {close?: boolean} = {close: true},
-  ) => {
+  ): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
     setNotice(null);
+    let accepted = false;
     try {
       await sendCommand(command);
-      setCommandId(newCommandId());
-      await reload();
-      if (options.close !== false) setDetour(null);
+      accepted = true;
     } catch (cause) {
       if (cause instanceof QueuedOffline) {
         setNotice(cause.message);
-        setCommandId(newCommandId());
-        if (options.close !== false) setDetour(null);
+        accepted = true;
       } else if (cause instanceof ApiError && cause.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
@@ -149,6 +159,18 @@ export function OperatorV7App() {
     } finally {
       setBusy(false);
     }
+
+    if (!accepted) return false;
+
+    setCommandId(newCommandId());
+    if (options.close !== false) setDetour(null);
+    try {
+      await reload();
+    } catch {
+      // Перечитывание состояния не отменяет принятую запись: о своей неудаче
+      // `reload` сообщает сам текстом ошибки состояния.
+    }
+    return true;
   }, [reload]);
 
   if (loadError) {
@@ -197,13 +219,30 @@ export function OperatorV7App() {
     </>
   );
 
+  /*
+    Нижнее меню — и на шаге закрытия смены.
+
+    Отказ сервера оставлял человека на экране без единой вкладки: выйти можно
+    было только перезагрузкой страницы, а она возвращала его на тот же экран
+    (D-20260927-001). Вкладка закрывает шаг и уводит в раздел.
+  */
+  const dock = (
+    <Dock
+      items={OPERATOR_DOCK}
+      active={tab}
+      badges={{MORE: openIncidents}}
+      onSelect={(next) => { setTab(next); setDetour(null); setActionError(null); }}
+    />
+  );
+
   /* ------------------------------------------------------------- шаги --- */
 
   if (detour) {
     const back = () => { setDetour(null); setActionError(null); };
     return (
       <Shell online={online} syncedAt={syncedAt} pending={pending}
-        back={DETOUR_BACK[detour.kind]} onBack={back}>
+        back={DETOUR_BACK[detour.kind]} onBack={back}
+        dock={detour.kind === 'CLOSE' ? dock : undefined}>
         {detour.kind === 'PPE' ? (
           <PpeFlow
             busy={busy}
@@ -272,9 +311,9 @@ export function OperatorV7App() {
             onSubmit={(entry: ProductionEntryInput) => {
               if (!shiftId) {
                 setActionError('Смена не начата');
-                return;
+                return Promise.resolve(false);
               }
-              void run({command: 'log-production', clientCommandId: commandId, shiftId, entry});
+              return run({command: 'log-production', clientCommandId: commandId, shiftId, entry});
             }}
           />
         ) : null}
@@ -299,8 +338,12 @@ export function OperatorV7App() {
 
         {detour.kind === 'CLOSE' ? (
           <CloseFlow
+            state={state}
             busy={busy}
             onBack={back}
+            unsent={queued.length}
+            onFlush={() => void flushQueued()}
+            onChecklist={(stage) => setDetour({kind: 'CHECKLIST', stage})}
             onClose={(comment) => {
               if (!shiftId) {
                 setActionError('Смена не начата');
@@ -344,14 +387,7 @@ export function OperatorV7App() {
       pending={pending}
       back="PilingTrack"
       desktopNav={<aside className="oc-desktop-nav"><div className="oc-brand"><PilingIcon name="equipment-rig" size={30} decorative /><strong>PilingTrack</strong></div><p>Рабочее место оператора</p><nav aria-label="Рабочее место">{OPERATOR_DOCK.map(item=><button type="button" key={item.key} aria-current={tab===item.key?'page':undefined} onClick={()=>setTab(item.key)}><PilingIcon name={item.key==='HOME'?'home':item.key==='SAFETY'?'accepted':item.key==='EQUIP'?'equipment-rig':'menu'} size={24} decorative />{item.label}</button>)}</nav><a href="/operator/v7/history"><PilingIcon name="history" size={24} decorative />История</a></aside>}
-      dock={(
-        <Dock
-          items={OPERATOR_DOCK}
-          active={tab}
-          badges={{MORE: openIncidents}}
-          onSelect={(next) => { setTab(next); setActionError(null); }}
-        />
-      )}
+      dock={dock}
       action={shiftId && !(tab === 'HOME' && state.phase === 'WORK') ? (
         <Button tone="danger" onClick={() => setDetour({kind: 'INCIDENT'})}>
           ⚠ Сообщить об инциденте

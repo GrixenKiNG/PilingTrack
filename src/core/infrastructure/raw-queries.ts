@@ -271,34 +271,3 @@ export async function upsertReportRaw(params: {
   return report[0];
 }
 
-// ============================================================
-// Bulk Delete Reports — удаление с каскадом
-// ============================================================
-
-export async function bulkDeleteReportsRaw(reportIds: string[]): Promise<number> {
-  if (reportIds.length === 0) return 0;
-
-  const start = Date.now();
-
-  const ids = Prisma.join(reportIds);
-
-  const result = await db.$executeRaw`
-    WITH deleted_pilework AS (
-      DELETE FROM "PileWork" WHERE "reportId" = ANY(ARRAY[${ids}])
-    ),
-    deleted_drillings AS (
-      DELETE FROM "LeaderDrilling" WHERE "reportId" = ANY(ARRAY[${ids}])
-    ),
-    deleted_downtimes AS (
-      DELETE FROM "ReportDowntime" WHERE "reportId" = ANY(ARRAY[${ids}])
-    )
-    DELETE FROM "Report" WHERE id = ANY(ARRAY[${ids}])
-  `;
-
-  const elapsed = Date.now() - start;
-  if (elapsed > 100) {
-    logger.warn('RawQuery: bulkDeleteReports slow', { elapsedMs: elapsed, count: reportIds.length });
-  }
-
-  return result as number;
-}

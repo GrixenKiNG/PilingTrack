@@ -15,7 +15,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
-  outboxFindUnique, outboxUpdate, sendDocument,
+  outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
+  redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock,
 } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
@@ -26,11 +27,21 @@ const {
   outboxFindUnique: vi.fn(),
   outboxUpdate: vi.fn(),
   sendDocument: vi.fn(),
+  findFirstMock: vi.fn(),
+  isNotifMock: vi.fn(),
+  getSettingsMock: vi.fn(),
+  sendAlertMock: vi.fn(),
+  redisGetClientMock: vi.fn(),
+  redisGetMock: vi.fn(),
+  redisSetMock: vi.fn(),
+  userFindFirst: vi.fn(),
+  recordAuditEventMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
   const client = {
-    report: { findMany: findManyMock, findUnique: findUniqueMock },
+    report: { findMany: findManyMock, findUnique: findUniqueMock, findFirst: findFirstMock },
+    user: { findFirst: userFindFirst },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
     reportAnalytics: { upsert: analyticsUpsertMock },
     outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate },
@@ -40,6 +51,12 @@ vi.mock('@/lib/db', () => {
   return { db: client };
 });
 
+// След в ленте пишет audit-service; здесь проверяется контракт обработчика —
+// каким актором и с каким именем оператора событие уезжает в запись.
+vi.mock('@/services/audit/audit-service', () => ({
+  recordAuditEvent: recordAuditEventMock,
+}));
+
 vi.mock('@/lib/pdf-data', () => ({
   loadSingleReportPdfContext: vi.fn().mockResolvedValue({
     report: { version: 1 },
@@ -47,17 +64,33 @@ vi.mock('@/lib/pdf-data', () => ({
   }),
 }));
 vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn().mockResolvedValue(Buffer.from('pdf')) }));
-vi.mock('@/core/notifications/telegram', () => ({ telegramNotifier: { sendDocument } }));
+vi.mock('@/core/notifications/telegram', () => ({
+  telegramNotifier: { sendDocument, sendAlert: sendAlertMock },
+}));
+
+vi.mock('@/modules/settings', () => ({
+  isNotificationEnabled: isNotifMock,
+  getSettings: getSettingsMock,
+}));
 
 vi.mock('@/lib/cached-queries', () => ({
   invalidateSiteAnalytics: invalidateAnalyticsMock,
+}));
+
+// Дедуп алертов о простое (F-R33-2) ходит в Redis: без мока тест либо тянул бы
+// живую базу разработчика, либо ждал таймаут подключения.
+vi.mock('@/lib/redis-cache', () => ({
+  getRedisClient: redisGetClientMock,
 }));
 
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler } from '../event-handlers';
+import {
+  recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler, registerAlertEventHandler,
+  registerAuditEventHandler,
+} from '../event-handlers';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 
@@ -289,5 +322,238 @@ describe('сброс кэша сводки по объектам (F-R35-2)', () 
       tenantId: 'tenant-a',
       data: { date: '2026-04-30' },
     })).resolves.toBeUndefined();
+  });
+});
+
+/*
+  F-R33-1: алерт о простое уходил диспетчеру сырым числом часов
+  («Простой 2.3333333333333335 ч») и внутренними id вместо названия объекта и
+  номера отчёта. Обработчик обязан подтянуть их одним тенантным запросом
+  (строгое равенство по организации события) и передать зону из настроек.
+*/
+describe('алерт о простое (F-R33-1)', () => {
+  beforeEach(() => {
+    findFirstMock.mockReset();
+    sendAlertMock.mockReset();
+    isNotifMock.mockReset();
+    getSettingsMock.mockReset();
+    redisGetClientMock.mockReset();
+    findFirstMock.mockResolvedValue(null);
+    isNotifMock.mockResolvedValue(true);
+    getSettingsMock.mockResolvedValue({ timezone: 'Asia/Krasnoyarsk' });
+    // Redis недоступен → путь «шлём без дедупа»; сами алерты ниже про текст.
+    redisGetClientMock.mockResolvedValue(null);
+    registerAlertEventHandler();
+  });
+
+  function downtimeEvent() {
+    return {
+      id: 'evt-dt-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
+      aggregateId: 'RM-abcd1234-2026-09-26',
+      aggregateType: 'Report' as const,
+      occurredAt: new Date().toISOString(),
+      siteId: 'clx-site-cuid',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { duration: 2.3333333333333335 },
+    };
+  }
+
+  it('передаёт название объекта, номер отчёта и зону тенанта', async () => {
+    findFirstMock.mockResolvedValue({
+      reportId: 'RM-abcd1234-2026-09-26',
+      site: { name: 'Северный' },
+    });
+
+    await emitDomainEvent(downtimeEvent());
+
+    expect(findFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { reportId: 'RM-abcd1234-2026-09-26', tenantId: 'tenant-a' },
+    }));
+    expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Простой 2 ч 20 мин зафиксирован в отчёте',
+      siteName: 'Северный',
+      reportNumber: 'RM-abcd1234-2026-09-26',
+      timeZone: 'Asia/Krasnoyarsk',
+    }));
+  });
+
+  it('падает обратно на строки с id, если отчёт не нашёлся', async () => {
+    findFirstMock.mockResolvedValue(null);
+
+    await emitDomainEvent(downtimeEvent());
+
+    expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({
+      siteName: undefined,
+      reportNumber: undefined,
+    }));
+  });
+});
+
+/*
+  F-R33-2: upsertReport пересобирает агрегат со всеми строками и `addDowntime`
+  заново эмитит DowntimeAdded на каждую, поэтому каждое сохранение отчёта в
+  окне правки слало диспетчеру новый алерт про тот же простой — как будто
+  простой новый. Дедуп по (tenantId, reportId, reasonId, duration) в Redis на
+  48 ч: ключ ставится только после успешной отправки, при недоступном Redis
+  шлём как раньше (дубль лучше молчания).
+*/
+describe('дедупликация алерта о простое (F-R33-2)', () => {
+  const sentKeys = new Map<string, string>();
+
+  beforeEach(() => {
+    sentKeys.clear();
+    findFirstMock.mockReset();
+    sendAlertMock.mockReset();
+    isNotifMock.mockReset();
+    getSettingsMock.mockReset();
+    redisGetClientMock.mockReset();
+    redisGetMock.mockReset();
+    redisSetMock.mockReset();
+
+    redisGetMock.mockImplementation(async (key: string) => sentKeys.get(key) ?? null);
+    redisSetMock.mockImplementation(async (key: string, value: string) => {
+      sentKeys.set(key, value);
+      return 'OK';
+    });
+    redisGetClientMock.mockResolvedValue({ get: redisGetMock, set: redisSetMock });
+
+    findFirstMock.mockResolvedValue(null);
+    isNotifMock.mockResolvedValue(true);
+    getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
+    sendAlertMock.mockResolvedValue(true);
+    registerAlertEventHandler();
+  });
+
+  function downtimeEvent(id: string, overrides: { data?: Record<string, unknown>; tenantId?: string } = {}) {
+    return {
+      id,
+      type: REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
+      aggregateId: 'RM-1234-2026-09-26',
+      aggregateType: 'Report' as const,
+      occurredAt: new Date().toISOString(),
+      siteId: 'site-1',
+      userId: 'user-1',
+      tenantId: overrides.tenantId ?? 'tenant-a',
+      data: { reasonId: 'reason-1', duration: 3, ...overrides.data },
+    };
+  }
+
+  it('тот же простой из нового события — одна отправка', async () => {
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('разный простой (другая причина или длительность) — две отправки', async () => {
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2', { data: { reasonId: 'reason-2' } }));
+    await emitDomainEvent(downtimeEvent('evt-dt-3', { data: { duration: 5 } }));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('у той же строки, но другой организации — своя отправка', async () => {
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2', { tenantId: 'tenant-b' }));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('неудачная отправка не закрывает повтор: ключ ставится только после успеха', async () => {
+    sendAlertMock.mockResolvedValue(false);
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    expect(redisSetMock).not.toHaveBeenCalled();
+
+    sendAlertMock.mockResolvedValue(true);
+    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+    expect(redisSetMock).toHaveBeenCalledWith(
+      'alert:downtime:tenant-a:RM-1234-2026-09-26:reason-1:3', '1', 'EX', 48 * 60 * 60,
+    );
+  });
+
+  it('при недоступном Redis шлём без дедупа', async () => {
+    redisGetClientMock.mockResolvedValue(null);
+
+    await emitDomainEvent(downtimeEvent('evt-dt-1'));
+    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+
+    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+/*
+  F-R34-18: черновик сменного отчёта сдаёт планировщик, когда производственные
+  сутки истекли, — оператор отчёт не сдавал. Запись в ленте от его имени была
+  неправдой: у автосдачи актора нет («система»), а имя владельца отчёта уходит
+  в текст сообщения. Признак autoClosed кладёт в payload планировщик
+  (readiness/scheduler), здесь его только читают.
+*/
+describe('аудит автосдачи отчёта планировщиком (F-R34-18)', () => {
+  beforeEach(() => {
+    recordAuditEventMock.mockReset();
+    recordAuditEventMock.mockResolvedValue(undefined);
+    userFindFirst.mockReset();
+    userFindFirst.mockResolvedValue({ name: 'Петров И.И.' });
+    registerAuditEventHandler();
+  });
+
+  function submittedEvent(data: Record<string, unknown>) {
+    return {
+      id: 'evt-audit-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      aggregateId: 'RM-abcd1234-2026-09-26',
+      aggregateType: 'Report' as const,
+      occurredAt: new Date().toISOString(),
+      siteId: 'site-1',
+      userId: 'op-1',
+      tenantId: 'tenant-a',
+      data,
+    };
+  }
+
+  it('пишет след без актора и передаёт имя оператора', async () => {
+    await emitDomainEvent(submittedEvent({ autoClosed: true }));
+
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+      actorId: null,
+      targetId: 'RM-abcd1234-2026-09-26',
+      tenantId: 'tenant-a',
+      metadata: expect.objectContaining({
+        data: expect.objectContaining({ autoClosed: true }),
+        operatorName: 'Петров И.И.',
+      }),
+    }));
+    // Имя читается тенантным запросом — не из чужой организации.
+    expect(userFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'op-1', tenantId: 'tenant-a' },
+    }));
+  });
+
+  it('обычную сдачу оставляет за оператором', async () => {
+    await emitDomainEvent(submittedEvent({}));
+
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: 'op-1',
+      metadata: expect.objectContaining({ data: {} }),
+    }));
+    expect(userFindFirst).not.toHaveBeenCalled();
+  });
+
+  // Имя — украшение записи: сбой чтения не повод терять след.
+  it('пишет след, если имя оператора прочитать не удалось', async () => {
+    userFindFirst.mockRejectedValue(new Error('db down'));
+
+    await emitDomainEvent(submittedEvent({ autoClosed: true }));
+
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: null,
+      metadata: expect.objectContaining({ operatorName: null }),
+    }));
   });
 });

@@ -2,17 +2,34 @@
  * Site Admin Command Service — Unit Tests
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { normalizeSitePlans } from '../site-admin-command.service';
+
+// Клиент интерактивной транзакции: удаление узла и подсчёт выработки идут в ней
+// и по одному клиенту (F-R39-RACE).
+const { txState } = vi.hoisted(() => ({
+  txState: {
+    tx: {
+      $queryRaw: vi.fn(),
+      pileWork: { count: vi.fn() },
+      leaderDrilling: { count: vi.fn() },
+      pileField: { findFirst: vi.fn(), delete: vi.fn() },
+      cluster: { findFirst: vi.fn(), delete: vi.fn() },
+      picket: { findFirst: vi.fn(), delete: vi.fn() },
+    },
+  },
+}));
 
 // Mock db for functions that require it
 vi.mock('@/lib/db', () => ({
   db: {
-    $transaction: vi.fn(),
+    $transaction: vi.fn((fn: (client: unknown) => unknown) => fn(txState.tx)),
     userSiteAssignment: { upsert: vi.fn(), deleteMany: vi.fn() },
-    pileField: { create: vi.fn(), delete: vi.fn() },
-    cluster: { create: vi.fn(), delete: vi.fn() },
-    picket: { create: vi.fn(), delete: vi.fn() },
+    pileField: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    cluster: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    picket: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    pileWork: { count: vi.fn() },
+    leaderDrilling: { count: vi.fn() },
     site: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
     sitePilePlan: { create: vi.fn() },
     siteDrillingPlan: { create: vi.fn() },
@@ -214,6 +231,19 @@ describe('hardDeleteSite — irreversible-delete safety guard', () => {
 });
 
 describe('deleteSiteHierarchyItem', () => {
+  const tx = txState.tx;
+
+  beforeEach(() => {
+    vi.mocked(db.site.findFirst).mockResolvedValue({ id: 's1', tenantId: 't1' } as never);
+    tx.$queryRaw.mockReset().mockResolvedValue([{ id: 'p-1' }]);
+    tx.pileWork.count.mockReset().mockResolvedValue(0);
+    tx.leaderDrilling.count.mockReset().mockResolvedValue(0);
+    tx.pileField.findFirst.mockReset().mockResolvedValue({ id: 'item-1' } as never);
+    tx.cluster.findFirst.mockReset().mockResolvedValue({ id: 'item-1' } as never);
+    tx.picket.findFirst.mockReset().mockResolvedValue({ id: 'p-1' } as never);
+    tx.picket.delete.mockReset().mockResolvedValue({ id: 'p-1' } as never);
+  });
+
   it('should throw when type is empty', async () => {
     await expect(deleteSiteHierarchyItem('s1', '', 'item-1', ctx)).rejects.toThrow('Type and itemId required');
   });
@@ -224,5 +254,78 @@ describe('deleteSiteHierarchyItem', () => {
 
   it('should throw for invalid type', async () => {
     await expect(deleteSiteHierarchyItem('s1', 'unknown', 'item-1', ctx)).rejects.toThrow('Invalid type');
+  });
+
+  it('refuses (409) to delete a picket with production rows and never calls delete', async () => {
+    tx.pileWork.count.mockResolvedValue(12);
+
+    await expect(deleteSiteHierarchyItem('s1', 'picket', 'p-1', ctx)).rejects.toThrow(
+      'Нельзя удалить пикет: на нём 12 записей выработки. Сначала перенесите их.'
+    );
+    expect(tx.picket.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes an empty picket without production rows', async () => {
+    const result = await deleteSiteHierarchyItem('s1', 'picket', 'p-1', ctx);
+
+    expect(tx.pileWork.count).toHaveBeenCalledWith({ where: { picketId: 'p-1' } });
+    expect(tx.picket.delete).toHaveBeenCalledWith({ where: { id: 'p-1' } });
+    expect(result).toEqual({ success: true });
+  });
+
+  it('locks the node row FOR UPDATE as the first statement and keeps the whole check on the tx client', async () => {
+    await deleteSiteHierarchyItem('s1', 'picket', 'p-1', ctx);
+
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw.mock.calls[0][0].join('')).toContain('SELECT id FROM "Picket" WHERE id = ');
+    expect(tx.$queryRaw.mock.calls[0][0].join('')).toContain('FOR UPDATE');
+    expect(tx.$queryRaw.mock.calls[0][1]).toBe('p-1');
+    // Блокировка — до подсчёта выработки и до удаления.
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.pileWork.count.mock.invocationCallOrder[0]);
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.picket.delete.mock.invocationCallOrder[0]);
+    // Ни один шаг не ушёл на клиент вне транзакции.
+    expect(db.pileWork.count).not.toHaveBeenCalled();
+    expect(db.picket.findFirst).not.toHaveBeenCalled();
+    expect(db.picket.delete).not.toHaveBeenCalled();
+  });
+
+  it('locks the matching table for each hierarchy type', async () => {
+    await deleteSiteHierarchyItem('s1', 'field', 'item-1', ctx);
+    expect(tx.$queryRaw.mock.calls[0][0].join('')).toContain('FROM "PileField"');
+
+    tx.$queryRaw.mockClear();
+    await deleteSiteHierarchyItem('s1', 'cluster', 'item-1', ctx);
+    expect(tx.$queryRaw.mock.calls[0][0].join('')).toContain('FROM "Cluster"');
+  });
+
+  it('locks the whole field subtree top-down (field → clusters → pickets) before counting', async () => {
+    await deleteSiteHierarchyItem('s1', 'field', 'item-1', ctx);
+
+    const locks = tx.$queryRaw.mock.calls.map((call) => call[0].join(''));
+    expect(locks).toHaveLength(3);
+    expect(locks[0]).toContain('FROM "PileField" WHERE id = ');
+    expect(locks[0]).toContain('FOR UPDATE');
+    expect(locks[1]).toContain('FROM "Cluster" WHERE "fieldId" = ');
+    expect(locks[1]).toContain('ORDER BY id FOR UPDATE');
+    expect(locks[2]).toContain('FROM "Picket" WHERE "clusterId" IN ');
+    expect(locks[2]).toContain('ORDER BY id FOR UPDATE');
+    // Все три блокировки — до подсчёта выработки и до удаления.
+    const lastLock = tx.$queryRaw.mock.invocationCallOrder[2];
+    expect(lastLock).toBeLessThan(tx.pileWork.count.mock.invocationCallOrder[0]);
+    expect(lastLock).toBeLessThan(tx.pileField.delete.mock.invocationCallOrder[0]);
+  });
+
+  it('locks a cluster and then its pickets before counting', async () => {
+    await deleteSiteHierarchyItem('s1', 'cluster', 'item-1', ctx);
+
+    const locks = tx.$queryRaw.mock.calls.map((call) => call[0].join(''));
+    expect(locks).toHaveLength(2);
+    expect(locks[0]).toContain('FROM "Cluster" WHERE id = ');
+    expect(locks[0]).toContain('FOR UPDATE');
+    expect(locks[1]).toContain('FROM "Picket" WHERE "clusterId" = ');
+    expect(locks[1]).toContain('ORDER BY id FOR UPDATE');
+    const lastLock = tx.$queryRaw.mock.invocationCallOrder[1];
+    expect(lastLock).toBeLessThan(tx.pileWork.count.mock.invocationCallOrder[0]);
+    expect(lastLock).toBeLessThan(tx.cluster.delete.mock.invocationCallOrder[0]);
   });
 });

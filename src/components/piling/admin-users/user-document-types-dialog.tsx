@@ -25,6 +25,23 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
+/**
+ * Границы полей совпадают с zod-схемой вида документа
+ * (`app/api/user-document-types/schema.ts`): 1..600 месяцев, 0..365 дней.
+ * Одни и те же значения используют форма создания и правка строки списка.
+ */
+const MONTHS_MIN = 1;
+const MONTHS_MAX = 600;
+const LEAD_DAYS_MIN = 0;
+const LEAD_DAYS_MAX = 365;
+const DEFAULT_LEAD_DAYS = 30;
+
+/** Поля формы → тело запроса: пустой срок — «не задан», пустое предупреждение — 30 дней. */
+const limitsBody = (months: string, leadDays: string) => ({
+  defaultValidMonths: months ? Number(months) : null,
+  leadTimeDays: leadDays ? Number(leadDays) : DEFAULT_LEAD_DAYS,
+});
+
 interface TypeRow {
   id: string;
   name: string;
@@ -43,9 +60,11 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
   const [rows, setRows] = useState<TypeRow[] | null>(null);
   const [name, setName] = useState('');
   const [months, setMonths] = useState('');
-  const [leadDays, setLeadDays] = useState('30');
+  const [leadDays, setLeadDays] = useState(String(DEFAULT_LEAD_DAYS));
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<TypeRow | null>(null);
+  /** Черновик правки строки списка; null — ни одна строка не редактируется. */
+  const [draft, setDraft] = useState<{ id: string; name: string; months: string; leadDays: string } | null>(null);
 
   const load = useCallback(async () => {
     const response = await authFetch('/api/user-document-types?scope=all');
@@ -68,8 +87,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: name.trim(),
-        defaultValidMonths: months ? Number(months) : null,
-        leadTimeDays: leadDays ? Number(leadDays) : 30,
+        ...limitsBody(months, leadDays),
       }),
     });
     setBusy(false);
@@ -78,11 +96,11 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
       return toast.error(body.error || 'Не удалось создать вид документа');
     }
     toast.success('Вид документа добавлен');
-    setName(''); setMonths(''); setLeadDays('30');
+    setName(''); setMonths(''); setLeadDays(String(DEFAULT_LEAD_DAYS));
     await load();
   };
 
-  const patch = async (row: TypeRow, body: Record<string, unknown>) => {
+  const patch = async (row: TypeRow, body: Record<string, unknown>): Promise<boolean> => {
     const response = await authFetch(`/api/user-document-types/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -90,9 +108,30 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      return toast.error(payload.error || 'Не удалось сохранить');
+      toast.error(payload.error || 'Не удалось сохранить');
+      return false;
     }
     await load();
+    return true;
+  };
+
+  const startEdit = (row: TypeRow) => setDraft({
+    id: row.id,
+    name: row.name,
+    months: row.defaultValidMonths ? String(row.defaultValidMonths) : '',
+    leadDays: String(row.leadTimeDays),
+  });
+
+  const saveEdit = async (row: TypeRow) => {
+    if (!draft) return;
+    const nextName = draft.name.trim();
+    if (!nextName) return toast.error('Укажите название вида документа');
+    setBusy(true);
+    const saved = await patch(row, { name: nextName, ...limitsBody(draft.months, draft.leadDays) });
+    setBusy(false);
+    if (!saved) return;
+    toast.success('Вид документа обновлён');
+    setDraft(null);
   };
 
   const remove = async (row: TypeRow) => {
@@ -122,12 +161,12 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
               </div>
               <div>
                 <Label htmlFor="dt-months">Срок, мес.</Label>
-                <Input id="dt-months" type="number" min={1} value={months}
+                <Input id="dt-months" type="number" min={MONTHS_MIN} max={MONTHS_MAX} value={months}
                   onChange={(event) => setMonths(event.target.value)} placeholder="—" />
               </div>
               <div>
                 <Label htmlFor="dt-lead">Предупредить за</Label>
-                <Input id="dt-lead" type="number" min={0} value={leadDays}
+                <Input id="dt-lead" type="number" min={LEAD_DAYS_MIN} max={LEAD_DAYS_MAX} value={leadDays}
                   onChange={(event) => setLeadDays(event.target.value)} />
               </div>
               <Button onClick={create} disabled={busy} className="bg-signal text-white hover:bg-signal-strong">
@@ -145,44 +184,86 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
             <div className="flex justify-center py-8 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : (
             <div className="divide-y divide-border">
-              {rows.map((row) => (
-                <div key={row.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <div className={cn('truncate font-medium', !row.isActive && 'text-muted-foreground line-through')}>
-                      {row.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {row.defaultValidMonths ? `${row.defaultValidMonths} мес.` : 'срок не задан'}
-                      {' · '}предупреждение за {row.leadTimeDays} дн.
-                      {' · '}документов: {row.documentCount}
-                      {row.requiredForOperator && (
-                        <span className="ml-1 font-semibold text-destructive-strong">· обязателен для смены</span>
-                      )}
-                    </div>
+              {rows.map((row) => {
+                const editing = draft?.id === row.id;
+                return (
+                  <div key={row.id} className={cn('py-2 text-sm', !editing && 'flex flex-wrap items-center gap-3')}>
+                    {editing ? (
+                      /* Правка строки: на широком экране поля идут в одну строку с
+                         названием, на узком (включая 375 px) переносятся под него. */
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px_130px_auto] sm:items-end">
+                        <div>
+                          <Label htmlFor={`dt-edit-name-${row.id}`}>Название</Label>
+                          <Input id={`dt-edit-name-${row.id}`} value={draft.name}
+                            onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor={`dt-edit-months-${row.id}`}>Срок действия, мес.</Label>
+                          <Input id={`dt-edit-months-${row.id}`} type="number" min={MONTHS_MIN} max={MONTHS_MAX}
+                            value={draft.months} placeholder="—"
+                            onChange={(event) => setDraft({ ...draft, months: event.target.value })} />
+                        </div>
+                        <div>
+                          <Label htmlFor={`dt-edit-lead-${row.id}`}>Предупредить за, дн.</Label>
+                          <Input id={`dt-edit-lead-${row.id}`} type="number" min={LEAD_DAYS_MIN} max={LEAD_DAYS_MAX}
+                            value={draft.leadDays}
+                            onChange={(event) => setDraft({ ...draft, leadDays: event.target.value })} />
+                        </div>
+                        <div className="flex gap-2 sm:justify-end">
+                          <Button onClick={() => void saveEdit(row)} disabled={busy}
+                            className="h-8 text-2xs bg-signal text-white hover:bg-signal-strong">
+                            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Сохранить
+                          </Button>
+                          <Button variant="outline" className="h-8 text-2xs" onClick={() => setDraft(null)}>
+                            Отмена
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-0 flex-1">
+                          <div className={cn('truncate font-medium', !row.isActive && 'text-muted-foreground line-through')}>
+                            {row.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {row.defaultValidMonths ? `${row.defaultValidMonths} мес.` : 'срок не задан'}
+                            {' · '}предупреждение за {row.leadTimeDays} дн.
+                            {' · '}документов: {row.documentCount}
+                            {row.requiredForOperator && (
+                              <span className="ml-1 font-semibold text-destructive-strong">· обязателен для смены</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button variant="outline" className="h-8 text-2xs" onClick={() => startEdit(row)}>
+                          Изменить
+                        </Button>
+                        {/* Обязательность останавливает работу людей: без действующего
+                            документа оператор не начнёт смену. Поэтому переключатель
+                            стоит рядом со списком, а не прячется в отдельной форме. */}
+                        <Button variant="outline" className="h-8 text-2xs"
+                          onClick={() => void patch(row, { requiredForOperator: !row.requiredForOperator })}>
+                          {row.requiredForOperator ? 'Не требовать' : 'Требовать для смены'}
+                        </Button>
+                        <Button variant="outline" className="h-8 text-2xs"
+                          onClick={() => void patch(row, { isActive: !row.isActive })}>
+                          {row.isActive ? 'Отключить' : 'Включить'}
+                        </Button>
+                        {/* Кнопка есть всегда, но у используемого вида сервер ответит
+                            отказом с объяснением — счётчик документов рядом. */}
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(row)}
+                          aria-label={`Удалить вид «${row.name}»`}
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-destructive-strong hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
-                  {/* Обязательность останавливает работу людей: без действующего
-                      документа оператор не начнёт смену. Поэтому переключатель
-                      стоит рядом со списком, а не прячется в отдельной форме. */}
-                  <Button variant="outline" className="h-8 text-2xs"
-                    onClick={() => void patch(row, { requiredForOperator: !row.requiredForOperator })}>
-                    {row.requiredForOperator ? 'Не требовать' : 'Требовать для смены'}
-                  </Button>
-                  <Button variant="outline" className="h-8 text-2xs"
-                    onClick={() => void patch(row, { isActive: !row.isActive })}>
-                    {row.isActive ? 'Отключить' : 'Включить'}
-                  </Button>
-                  {/* Кнопка есть всегда, но у используемого вида сервер ответит
-                      отказом с объяснением — счётчик документов рядом. */}
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(row)}
-                    aria-label={`Удалить вид «${row.name}»`}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-destructive-strong hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {rows.length === 0 && (
                 <p className="py-8 text-center text-sm text-muted-foreground">Виды документов ещё не заведены.</p>
               )}

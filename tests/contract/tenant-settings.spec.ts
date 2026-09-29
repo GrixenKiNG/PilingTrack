@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/lib/db', () => ({
-  db: { tenantSettings: { findUnique: vi.fn(), upsert: vi.fn() } },
-}));
+vi.mock('@/lib/db', () => {
+  const db: Record<string, unknown> = { tenantSettings: { findUnique: vi.fn(), upsert: vi.fn() } };
+  // saveSettings читает предыдущий набор и пишет объединённый в одной
+  // транзакции под advisory-замком (F-R38-11): вне транзакции настроек
+  // не читаем и не пишем.
+  db.$queryRaw = vi.fn();
+  // Замок берётся через $executeRaw: $queryRaw на void-функции падает в PrismaPg.
+  db.$executeRaw = vi.fn();
+  db.$transaction = (cb: (tx: unknown) => unknown) => cb(db);
+  return { db };
+});
 
 import { db } from '@/lib/db';
 import { getSettings, saveSettings } from '@/modules/settings';

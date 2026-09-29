@@ -87,6 +87,11 @@ export function SafetyScreen(props: ReferenceUiProps) {
     { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
     'safety.permits.manage',
   );
+  // Ссылка «Карточка» ведёт в /admin/users — туда пускает только users.manage.
+  const mayOpenUsers = can(
+    { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
+    'users.manage',
+  );
 
   const load = useCallback(async () => {
     try {
@@ -298,9 +303,16 @@ export function SafetyScreen(props: ReferenceUiProps) {
                     current?.id === row.userId ? null : { id: row.userId, name: row.name })}>
                   {selected?.id === row.userId ? 'Скрыть допуски' : 'Допуски к технике'}
                 </Button>
-                <Button asChild variant="outline" className="h-8 text-2xs">
-                  <Link href="/admin/users">Карточка</Link>
-                </Button>
+                {/* «Карточка» ведёт в /admin/users — раздел, закрытый правом
+                    users.manage (mayOpenUsers выше). Диспетчеру и
+                    инженеру ОТ — рабочим ролям этой вкладки — страница откажет
+                    и вернёт на дашборд, поэтому ссылку показываем только тому,
+                    кто её действительно откроет. */}
+                {mayOpenUsers && (
+                  <Button asChild variant="outline" className="h-8 text-2xs">
+                    <Link href="/admin/users">Карточка</Link>
+                  </Button>
+                )}
                 <Button variant="outline" className="h-8 text-2xs"
                   onClick={() => setCardRow(row)}>
                   Карточка ТБ и допуски

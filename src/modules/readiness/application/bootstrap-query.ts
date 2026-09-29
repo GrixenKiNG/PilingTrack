@@ -2,6 +2,7 @@ import { ServiceError } from '@/lib/service-error';
 import { getPublishedAccessMatrix } from './access-matrix-service';
 import { canActAs, type ActingRole } from '@/lib/types';
 import type { ReadinessTransaction } from '../infrastructure/tenant-transaction';
+import { recordChainedReadinessAudit } from '../infrastructure/audit/record-audit';
 import { normalizeTenantTimezone } from '../domain/shifts/tenant-production-date';
 import {
   hasReadinessCapability,
@@ -85,20 +86,46 @@ export async function queryReadinessBootstrap(
     actor,
     actingAs,
     async (entry) => {
-      await tx.auditLog.create({
-        data: {
-          entity: 'ReadinessActor',
-          action: 'acting_as_mechanic',
-          entityId: actor.id,
-          after: {
-            actualRole: entry.actualRole,
-            actingAs: entry.actingAs,
-          },
-          userId: actor.id,
-          userName: actor.name,
-          userRole: entry.actualRole,
+      // Режим замещения меняется редко, а bootstrap вызывается на каждой
+      // загрузке раздела: запись на каждый запрос превращала журнал в поток
+      // повторов «включён режим замещения», по которому нельзя понять, когда
+      // режим действительно переключили. Пишем только смену режима, сверяясь с
+      // последней такой строкой этого же человека в своей организации.
+      const last = await tx.auditLog.findFirst({
+        where: {
           tenantId: actor.tenantId,
-          requestId,
+          userId: actor.id,
+          action: 'acting_as_mechanic',
+        },
+        orderBy: { timestamp: 'desc' },
+        select: { after: true },
+      });
+      const previous = last?.after as { actualRole?: string; actingAs?: string } | null;
+      if (previous?.actualRole === entry.actualRole && previous.actingAs === entry.actingAs) {
+        return;
+      }
+      /*
+        Через цепочечный писатель, а не `tx.auditLog.create`: читатель журнала
+        (`audit-repository.ts` readChain) отбирает звенья по `hash: {not: null}`,
+        поэтому прямая запись не попадала ни на экран «Аудит», ни в проверку
+        цепочки — включение замещения оставалось без читаемого следа
+        (как у правил и матрицы, F-R34-3).
+      */
+      await recordChainedReadinessAudit(tx, {
+        tenantId: actor.tenantId,
+        action: 'acting_as_mechanic',
+        entityType: 'ReadinessActor',
+        entityId: actor.id,
+        actor: {
+          id: actor.id,
+          name: actor.name,
+          role: entry.actualRole,
+          actingAs: entry.actingAs,
+        },
+        requestId,
+        after: {
+          actualRole: entry.actualRole,
+          actingAs: entry.actingAs,
         },
       });
     },

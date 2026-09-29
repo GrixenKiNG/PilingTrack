@@ -6,8 +6,32 @@
  * и свой путь повтора команды при обрыве сети.
  */
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
-import {OperatorCommandError, requireCrew, requireOpenShift} from './shared';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
+import {writeReportAuditRow} from '@/services/reports/audit-service';
+import {OperatorCommandError, requireCrew, requireOpenShift, businessReportId} from './shared';
+import type {Tx} from './shared';
 import {findByCommand} from './production';
+
+/**
+ * След поправки в истории отчёта — «было N → стало M» (F-R34-2).
+ *
+ * `ReportAudit` писали только создание и правка отчёта (`report-command.service.ts`),
+ * а поправка выработки мобильного контура ложилась без единой строки. Пишем в
+ * ТОЙ ЖЕ транзакции, что и саму поправку: иначе итог изменится, а следа о том,
+ * с чего на что правили, не останется. Номер отчёта — деловой (`RM-…`), история
+ * отчёта ищет строки по нему (`report-history-service.ts`). Действие — `updated`
+ * («Изменён»): отдельного шага «поправка» в истории отчёта нет.
+ */
+async function writeCorrectionAudit(
+  tx: Tx, actorId: string, reportPk: string, before: string, after: string,
+) {
+  await writeReportAuditRow({
+    reportId: await businessReportId(tx, reportPk),
+    action: 'updated',
+    userId: actorId,
+    diff: {'Выработка': {old: before, new: after}},
+  }, tx as unknown as Parameters<typeof writeReportAuditRow>[1]);
+}
 
 /**
  * Поправка к записи выработки.
@@ -99,6 +123,10 @@ export async function correctProduction(input: {
         },
         select: {id: true},
       });
+      await writeCorrectionAudit(
+        tx, input.operatorId, original.reportId,
+        `было ${Math.round(current)}`, `стало ${Math.round(input.actual)}`,
+      );
       return {correctionId: created.id, was: current, now: Math.round(input.actual)};
     }
 
@@ -136,6 +164,10 @@ export async function correctProduction(input: {
         },
         select: {id: true},
       });
+      await writeCorrectionAudit(
+        tx, input.operatorId, original.reportId,
+        `было ${Math.round(current)}`, `стало ${Math.round(input.actual)}`,
+      );
       return {correctionId: created.id, was: current, now: Math.round(input.actual)};
     }
 
@@ -174,6 +206,10 @@ export async function correctProduction(input: {
       },
       select: {id: true},
     });
+    await writeCorrectionAudit(
+      tx, input.operatorId, original.reportId,
+      `было ${current}`, `стало ${actual}`,
+    );
     return {correctionId: created.id, was: current, now: actual};
   });
 }

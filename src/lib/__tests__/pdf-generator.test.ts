@@ -175,7 +175,8 @@ describe('pdf-generator', () => {
     });
 
     expect(rendered).not.toContain('(неполный: у марки не задана длина)');
-    expect(rendered).toContain('3 / 36.0');
+    // Метраж — с десятичной запятой (аудит 17, находка 4).
+    expect(rendered).toContain('3 / 36,0');
   });
 
   it('marks the period metres total as incomplete when a grade has no length (F-R28-2)', async () => {
@@ -206,5 +207,72 @@ describe('pdf-generator', () => {
     });
 
     expect(rendered).toContain('(неполный: у марки не задана длина)');
+  });
+
+  it('печатает название компании из настроек в шапке PDF (F-R30-6)', async () => {
+    const { generateSinglePdf, generatePeriodPdf } = await import('@/lib/pdf-generator');
+
+    const single = await capturePdfText(async () => {
+      await generateSinglePdf({
+        ...singleReportWithPiles([{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }]),
+        companyName: 'ООО «Орион»',
+      });
+    });
+    expect(single).toContain('ООО «Орион»');
+
+    const period = await capturePdfText(async () => {
+      await generatePeriodPdf({
+        dateFrom: '2026-04-01',
+        dateTo: '2026-04-24',
+        siteId: 'site-1',
+        totalPiles: 3,
+        totalDrilling: 12,
+        totalDowntime: 2,
+        reports: [],
+        companyName: 'ООО «Орион»',
+      });
+    });
+    expect(period).toContain('ООО «Орион»');
+  });
+
+  it('печатает установку в шапке сводного отчёта только при отборе по установке (F-R44-5)', async () => {
+    const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+
+    const base = {
+      dateFrom: '2026-04-01',
+      dateTo: '2026-04-24',
+      siteId: 'site-1',
+      totalPiles: 0,
+      totalDrilling: 0,
+      totalDowntime: 0,
+      reports: [],
+    };
+
+    const filtered = await capturePdfText(async () => {
+      await generatePeriodPdf({ ...base, equipmentLabel: 'Установка: LRH 100 (Bauer BG 28)' });
+    });
+    expect(filtered).toContain('Установка: LRH 100 (Bauer BG 28)');
+
+    const unfiltered = await capturePdfText(async () => {
+      await generatePeriodPdf({ ...base });
+    });
+    expect(unfiltered.some((line) => line.startsWith('Установка:'))).toBe(false);
+  });
+});
+
+/**
+ * Числа PDF — по правилам продукта (Аудит 17, находка 4): разделитель дробной
+ * части запятая, разряды тысяч — пробелом. Раньше здесь были `toFixed(1)` и
+ * `String(int)`, то есть «12.5 м.п.» и «1200 м» в подшитом документе.
+ */
+describe('pdf-generator — числа ru-RU', () => {
+  it('метры и метраж — с запятой, целые — с пробелом в разрядах', async () => {
+    const { formatMeters, formatNumber, safeText } = await import('@/lib/pdf-generator/format');
+
+    expect(formatMeters(12.5)).toBe('12,5');
+    expect(formatNumber(1200)).toBe('1\u00A0200');
+    expect(formatNumber(2.5)).toBe('2,5');
+    expect(formatNumber(null)).toBe('0');
+    expect(safeText('')).toBe('—');
   });
 });

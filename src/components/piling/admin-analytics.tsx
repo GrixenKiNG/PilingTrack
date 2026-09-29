@@ -148,7 +148,9 @@ export function AdminAnalytics() {
     setKpiLoading(true);
     setKpiError(null);
     try {
-      const params = new URLSearchParams({ from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` });
+      // Производственный день строкой: границы суток считает сервер по поясу
+      // организации, а не по UTC процесса (F-R37-3).
+      const params = new URLSearchParams({ from: dateFrom, to: dateTo });
       const res = await authFetch(`/api/maintenance/kpi?${params}`);
       if (res.ok) {
         setKpi((await res.json()).kpi as FleetKpiData);
@@ -352,7 +354,7 @@ export function AdminAnalytics() {
                         <th className="py-2 px-3 text-right">Отработано, ч</th>
                         <th className="py-2 px-3 text-right">Сваи, шт. / м.п.</th>
                         <th className="py-2 px-3 text-right">Бурение, шт. / м.п.</th>
-                        <th className="py-2 px-3 text-right">Простой, %</th>
+                        <th className="py-2 px-3 text-right" title="по отчётам с указанным временем смены">Доля простоя в смене, %</th>
                         <th className="py-2 pl-3 text-right">Отчётов</th>
                       </tr>
                     </thead>

@@ -17,6 +17,12 @@
  *     Прежние восемь шагов плюс карточка на каждый узел давали пятнадцать-
  *     двадцать экранов до начала работы.
  *
+ * СМЕНА ЗАКРЫВАЕТСЯ, А НЕ ПЕРЕДАЁТСЯ. Отчёт и закрытие — одна кнопка и одна
+ * команда `close-shift`, как в остальных модулях: бригада работает в одну
+ * смену, следующего оператора, который принял бы машину, нет (решение владельца
+ * 27.09.2026). Приём ПЕРЕДАЧИ от прошлой смены на приёмке остаётся — передачи,
+ * уже оставленные в базе, нужно принимать.
+ *
  * СКОЛЬКО ЭТО ЗАНИМАЕТ. Норматив владельца: штатная смена без замечаний —
  * 7–10 минут от допуска до «Работа разрешена», из них не больше 3–5 минут в
  * телефоне; остальное — физический обход машины и площадки. Секундомер в
@@ -44,7 +50,7 @@ import type { OperatorShiftFacts } from '@/modules/readiness/application/operato
 import type { ClearanceDocument } from '@/modules/users';
 import { WeatherCard } from './weather-card';
 import { DefectSheet } from './defect-sheet';
-import { DowntimeSheet, DrillingSheet, HandoverSheet, PileSheet } from './sheets';
+import { DowntimeSheet, DrillingSheet, PileSheet } from './sheets';
 import { PilePassportForm } from '@/components/piling/operator-mobile/screens/pile-passport-form';
 import { IncidentsTab } from '@/components/piling/operator-mobile/screens/incidents-tab';
 import {
@@ -56,6 +62,7 @@ import type {
 import {
   fetchState, QueuedOffline, sendCommand, type ProductionEntryInput,
 } from '@/components/piling/operator-mobile/api';
+import { useOfflineQueue } from '@/components/piling/operator-mobile/use-offline-queue';
 import { SafetyTab } from '@/components/piling/operator-mobile/screens/safety-tab';
 import { PpeScreen } from '@/components/piling/operator-mobile/screens/ppe-screen';
 import { BriefingScreen } from '@/components/piling/operator-mobile/screens/briefing-screen';
@@ -81,6 +88,61 @@ function documentStatusText(document: ClearanceDocument): string {
     case 'perpetual': return 'бессрочный';
     default: return until ? `до ${until}` : 'действителен';
   }
+}
+
+/**
+ * Тип смены по часам телефона.
+ *
+ * День длится с 07:00 до 19:00, ночь — с 19:00 до 07:00 (решение владельца
+ * 26.09.2026). Раньше границы стояли на 20:00 и 08:00, и смена, начатая в
+ * 19:30, записывалась дневной — а начатая в 07:30 ночной.
+ */
+function shiftTypeByClock(): 'DAY' | 'NIGHT' {
+  const hour = new Date().getHours();
+  return hour >= 7 && hour < 19 ? 'DAY' : 'NIGHT';
+}
+
+/** Что предлагаем человеку до приёмки установки: оба типа смены со своими окнами. */
+const SHIFT_TYPE_CHOICES: { value: 'DAY' | 'NIGHT'; label: string }[] = [
+  { value: 'DAY', label: 'Смена: дневная (07:00–19:00)' },
+  { value: 'NIGHT', label: 'Смена: ночная (19:00–07:00)' },
+];
+
+/**
+ * Выбор типа смены перед приёмкой установки.
+ *
+ * Тип смены записывается в отчёт и определяет всю смену, а по часам телефона
+ * его не угадать: смену начинают до пуска, а не по будильнику. Показываем оба
+ * варианта с окнами — человек видит, что именно уйдёт на сервер, и может
+ * поправить, если телефон идёт не по сменному времени.
+ */
+function ShiftTypePicker({ value, onChange }: {
+  value: 'DAY' | 'NIGHT';
+  onChange: (type: 'DAY' | 'NIGHT') => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-foreground">Тип смены</p>
+      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-1">
+        {SHIFT_TYPE_CHOICES.map((choice) => (
+          <button
+            key={choice.value}
+            type="button"
+            aria-pressed={value === choice.value}
+            onClick={() => onChange(choice.value)}
+            className={cn(
+              'min-h-12 rounded-lg px-3 text-base font-medium transition-colors',
+              value === choice.value
+                ? 'border bg-secondary font-semibold text-foreground shadow-xs'
+                : 'text-muted-foreground',
+            )}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -189,6 +251,12 @@ export function OperatorShiftV2() {
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false);
   /*
+    Тип смены выбран заранее по часам телефона, но остаётся выбором человека:
+    пока установка не принята, границы смены можно поправить. Дальше он уже
+    записан в смену и отчёт.
+  */
+  const [shiftType, setShiftType] = useState<'DAY' | 'NIGHT'>(() => shiftTypeByClock());
+  /*
     Ключ команды осмотра и его ошибка.
 
     Ключ переживает нажатие: на морозе в перчатке по кнопке попадают дважды, и
@@ -203,8 +271,16 @@ export function OperatorShiftV2() {
   const [passportOpen, setPassportOpen] = useState(false);
   const [drillingOpen, setDrillingOpen] = useState(false);
   const [downtimeOpen, setDowntimeOpen] = useState(false);
-  const [handoverOpen, setHandoverOpen] = useState(false);
   const [tab, setTab] = useState<V2Tab>('shift');
+  /*
+    Выбранная установка на приёмке.
+
+    Касание строки только ВЫБИРАЕТ машину — смену открывает отдельная кнопка
+    «Принять установку». Раньше тап по строке сразу принимал установку, и
+    человек, просто листавший список, открывал смену — возможно, на чужой
+    машине (находка F-R40-19).
+  */
+  const [acceptTargetId, setAcceptTargetId] = useState<string | null>(null);
   /*
     Снимок рабочего места (`/api/operator/mobile/state`) — второй источник
     экрана, и он же единственный источник выработки.
@@ -224,6 +300,14 @@ export function OperatorShiftV2() {
   const [mobile, setMobile] = useState<OperatorMobileState | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [safetyStep, setSafetyStep] = useState<'PPE' | 'BRIEFING' | 'KNOWLEDGE' | null>(null);
+
+  /*
+    Очередь устройства читает и сам экран, а не только оболочка шага (F-R43-1):
+    отчёт и передачу смены нельзя сдавать, пока на телефоне лежат неотправленные
+    записи — закрытая смена отвечает им 409, и в отчёт они не попадают. Оболочка
+    шага показывает ту же очередь, но своё состояние отправки наружу не отдаёт.
+  */
+  const {queued, flush: flushQueued} = useOfflineQueue();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -475,23 +559,6 @@ export function OperatorShiftV2() {
     }
   }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
 
-  const command = async (path: string, version: number, body: Record<string, unknown> = {}) => {
-    const shiftId = facts?.shift?.id;
-    if (!shiftId) throw new Error('Смена не найдена');
-    const response = await authFetch(`/api/readiness/shifts/${shiftId}/${path}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'idempotency-key': crypto.randomUUID(),
-        'if-match': `"shift-${shiftId}-v${version}"`,
-      },
-      body: JSON.stringify({ expectedVersion: version, ...body }),
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error?.message ?? 'Команда не выполнена');
-    return payload?.data as { version: number } | undefined;
-  };
-
   /**
    * Принять машину.
    *
@@ -514,12 +581,11 @@ export function OperatorShiftV2() {
   const acceptOn = async (equipmentId: string) => {
     setBusy(true);
     try {
-      const hour = new Date().getHours();
       await sendCommand({
         command: 'accept-equipment',
         clientCommandId: crypto.randomUUID(),
         equipmentId,
-        shiftType: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY',
+        shiftType,
       });
       setAccepted(true);
       await Promise.all([load(), loadMobile()]);
@@ -572,12 +638,11 @@ export function OperatorShiftV2() {
     }
     setBusy(true);
     try {
-      const hour = new Date().getHours();
       await sendCommand({
         command: 'accept-equipment',
         clientCommandId: crypto.randomUUID(),
         equipmentId,
-        shiftType: hour >= 20 || hour < 8 ? 'NIGHT' : 'DAY',
+        shiftType,
       });
       setAccepted(true);
       await Promise.all([load(), loadMobile()]);
@@ -588,43 +653,30 @@ export function OperatorShiftV2() {
     }
   };
 
-  /** Передать смену следующему оператору — последняя команда цикла. */
   /**
-   * Сдать отчёт — той же командой и с тем же содержимым, что и остальные модули.
+   * Закрыть смену и отправить отчёт — одной командой, той же, что и у остальных
+   * модулей.
    *
-   * Смену она не закрывает: здесь её принимает следующий оператор, и передача
-   * (ниже) работает с ещё живой сменой.
+   * ПЕРЕДАЧИ СМЕНЫ ЗДЕСЬ НЕТ. Бригада работает в одну смену, следующие
+   * операторы машину не принимают, и смена после отчёта ждала в
+   * HANDOVER_PENDING коллегу, который не приходил, до авто-закрытия через пять
+   * часов (D-20260927-005). `close-shift` закрывает смену и отправляет отчёт в
+   * одной транзакции — второго нажатия «Сдать смену» больше не нужно.
    */
-  const submitReport = useCallback(async () => {
+  const closeShift = useCallback(async () => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     if (!shiftId) return;
     setBusy(true);
     try {
-      await sendCommand({command: 'submit-report', shiftId, comment: ''});
+      await sendCommand({command: 'close-shift', shiftId, comment: ''});
       await Promise.all([loadMobile(), load()]);
-      toast.success('Отчёт отправлен');
+      toast.success('Смена закрыта, отчёт отправлен');
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : 'Отчёт не отправлен');
+      toast.error(cause instanceof Error ? cause.message : 'Смена не закрыта');
     } finally {
       setBusy(false);
     }
   }, [mobile?.shift?.id, facts?.shift?.id, loadMobile, load]);
-
-  const submitHandover = async (summary: string) => {
-    const shift = facts?.shift;
-    if (!shift) return;
-    setBusy(true);
-    try {
-      await command('handover', shift.version, { summary });
-      setHandoverOpen(false);
-      await load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось передать смену');
-    } finally {
-      setBusy(false);
-    }
-  };
-
 
   if (safetyStep && mobile) {
     /*
@@ -699,8 +751,7 @@ export function OperatorShiftV2() {
   if (step === 'acceptance') {
     const cleared = state.blockers.length === 0;
     const documents = facts.clearance.documents;
-    // До открытия смены кнопки внизу нет: машину выбирают из списка, и
-    // единственная закреплённая — тоже выбор, а не подстановка за человека.
+    // Приёмка уже открытой смены (передача от прошлой) — кнопка внизу.
     const canAct = cleared && Boolean(facts.shift);
     return (
       <StepShell
@@ -716,6 +767,16 @@ export function OperatorShiftV2() {
           <>
             {tab === 'shift' && canAct ? (
               <StepButton label="Принять установку" onClick={() => void acceptEquipment()} busy={busy} />
+            ) : null}
+            {/* До открытия смены машину сначала выбирают, а принимают кнопкой —
+                она погашена, пока строка не отмечена. */}
+            {tab === 'shift' && !facts.shift && facts.assignments.length > 0 ? (
+              <StepButton
+                label="Принять установку"
+                onClick={() => { if (acceptTargetId) void acceptOn(acceptTargetId); }}
+                disabled={!acceptTargetId}
+                busy={busy}
+              />
             ) : null}
             <BottomTabs active={tab} onSelect={setTab} />
           </>
@@ -796,9 +857,16 @@ export function OperatorShiftV2() {
           </p>
         )}
 
+        {/* Тип смены — до приёмки установки: он уходит в команду приёмки и
+            определяет смену и отчёт. Догадаться по экрану было нечем. */}
+        {!facts.shift && (
+          <ShiftTypePicker value={shiftType} onChange={setShiftType} />
+        )}
+
         {/* Выбор установки — всегда, даже когда закреплена одна. Список тот,
             что администратор закрепил за оператором; чужую машину сюда не
-            подставить, границу держит команда на сервере. */}
+            подставить, границу держит команда на сервере. Касание строки только
+            отмечает машину — принимает её кнопка внизу. */}
         {!facts.shift && facts.assignments.length > 0 && (
           <>
             <p className="text-base font-medium text-foreground">На какой установке работаете</p>
@@ -808,7 +876,8 @@ export function OperatorShiftV2() {
                   <CheckRow
                     label={assignment.equipmentName}
                     hint={`${assignment.model} · ${assignment.siteName}`}
-                    onToggle={() => void acceptOn(assignment.equipmentId)}
+                    checked={acceptTargetId === assignment.equipmentId}
+                    onToggle={() => setAcceptTargetId(assignment.equipmentId)}
                   />
                 </li>
               ))}
@@ -1054,74 +1123,78 @@ export function OperatorShiftV2() {
       она не может.
     */
     const submitted = mobile?.receipt != null;
+    const unsent = queued.length;
     return (
-      <>
-        <StepShell
-          title={V2_STEP_TITLE.report}
-          subtitle={stepLabel}
-          footer={
-            <StepButton
-              label={submitted ? 'Сдать смену' : 'Отправить отчёт'}
-              onClick={() => submitted
-                ? setHandoverOpen(true)
-                : void submitReport()}
-              busy={busy}
-            />
-          }
-        >
-          <RowList>
-            <li><ValueRow label="Время работы" value={elapsed ?? '—'} /></li>
-            <li>
-              <ValueRow
-                label="Моточасы"
-                value={facts.meterCurrent != null ? `${formatNumber(facts.meterCurrent)} м/ч` : '—'}
-              />
-            </li>
-            <li>
-              <ValueRow label="Сваи выполнено"
-                value={`${totalPiles} шт · ${formatNumber(production?.piles.meters ?? 0)} м.п.`} />
-            </li>
-            <li>
-              <ValueRow label="Бурение"
-                value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
-            </li>
-            <li>
-              <ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)}
-                tone={totalDowntime > 0 ? 'warn' : undefined} />
-            </li>
-            <li>
-              {/* Спрашиваем каталог, а не контур готовности: осмотр после
-                  работы теперь чек-лист ЕО, и строка «не закрыт» по уже
-                  сданному списку — это ложь на последнем экране смены. */}
-              <ValueRow
-                label="ЕО после работы"
-                value={postDone ? 'сдан' : 'не сдан'}
-                tone={postDone ? 'ok' : 'warn'}
-              />
-            </li>
-            <li>
-              <ValueRow
-                label="Отчёт"
-                value={mobile?.receipt?.reportId ?? 'черновик'}
-                tone={submitted ? 'ok' : 'warn'}
-              />
-            </li>
-          </RowList>
-          {!submitted && (
-            <p className="text-sm text-muted-foreground">
-              Сначала отчёт, потом передача: сдать смену с неотправленным отчётом нельзя
+      <StepShell
+        title={V2_STEP_TITLE.report}
+        subtitle={stepLabel}
+        footer={
+          <StepButton
+            label="Закрыть смену и отправить отчёт"
+            onClick={() => void closeShift()}
+            busy={busy}
+            disabled={unsent > 0}
+          />
+        }
+      >
+        {unsent > 0 && (
+          /*
+            Записи, лежащие на телефоне, — те же выработка и простой. После
+            сдачи отчёта и закрытия смены сервер отвечает им 409, и в отчёт они
+            не попадают: сначала очередь, потом сдача (F-R43-1).
+          */
+          <div className="space-y-2 rounded-xl border border-warning bg-warning/10 p-3">
+            <p className="text-sm font-semibold text-warning-strong">
+              Сначала отправьте записи с телефона: {unsent} не отправлено
             </p>
-          )}
-        </StepShell>
-
-        <HandoverSheet
-          open={handoverOpen}
-          equipmentName={facts.equipment?.name ?? null}
-          busy={busy}
-          onClose={() => setHandoverOpen(false)}
-          onSubmit={(summary) => void submitHandover(summary)}
-        />
-      </>
+            <button
+              type="button"
+              onClick={() => void flushQueued()}
+              className="flex min-h-12 w-full items-center justify-center rounded-lg border border-warning bg-card text-base font-semibold text-foreground active:scale-[0.99]"
+            >
+              Отправить сейчас
+            </button>
+          </div>
+        )}
+        <RowList>
+          <li><ValueRow label="Время работы" value={elapsed ?? '—'} /></li>
+          <li>
+            <ValueRow
+              label="Моточасы"
+              value={facts.meterCurrent != null ? `${formatNumber(facts.meterCurrent)} м/ч` : '—'}
+            />
+          </li>
+          <li>
+            <ValueRow label="Сваи выполнено"
+              value={`${totalPiles} шт · ${formatNumber(production?.piles.meters ?? 0)} м.п.`} />
+          </li>
+          <li>
+            <ValueRow label="Бурение"
+              value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
+          </li>
+          <li>
+            <ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)}
+              tone={totalDowntime > 0 ? 'warn' : undefined} />
+          </li>
+          <li>
+            {/* Спрашиваем каталог, а не контур готовности: осмотр после
+                работы теперь чек-лист ЕО, и строка «не закрыт» по уже
+                сданному списку — это ложь на последнем экране смены. */}
+            <ValueRow
+              label="ЕО после работы"
+              value={postDone ? 'сдан' : 'не сдан'}
+              tone={postDone ? 'ok' : 'warn'}
+            />
+          </li>
+          <li>
+            <ValueRow
+              label="Отчёт"
+              value={mobile?.receipt?.reportId ?? 'черновик'}
+              tone={submitted ? 'ok' : 'warn'}
+            />
+          </li>
+        </RowList>
+      </StepShell>
     );
   }
 
@@ -1131,10 +1204,9 @@ export function OperatorShiftV2() {
       title={V2_STEP_TITLE.closed}
       subtitle={stepLabel}
       tone="purple"
-      // «На главную» сбрасывает состояние шагов и перечитывает факты. Раньше
-      // кнопка только перечитывала: смена оставалась в HANDOVER_PENDING, экран
-      // не менялся, и выглядело это как «ничего не происходит». Теперь ниже
-      // прямо сказано, почему экран остаётся здесь, пока смену не приняли.
+      // «На главную» сбрасывает состояние шагов и перечитывает факты. Теперь
+      // смена закрывается сразу (`close-shift`), и этот экран — конечный: ждать
+      // приёмки машины следующим оператором больше не нужно.
       footer={
         <StepButton
           label="На главную"
@@ -1153,7 +1225,7 @@ export function OperatorShiftV2() {
         <p className="mt-4 text-xl font-bold text-foreground">Спасибо!</p>
         <p className="mt-1 text-base text-muted-foreground">Смена успешно завершена</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Экран останется здесь, пока следующий оператор или диспетчер не примет машину
+          Смена закрыта, отчёт отправлен диспетчеру
         </p>
       </div>
       {/* Итог смены показываем здесь же: уводить за ним на чужой экран истории

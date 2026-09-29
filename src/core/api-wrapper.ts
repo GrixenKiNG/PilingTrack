@@ -113,7 +113,7 @@ export function withApi<T extends any[]>(
       } else if (error instanceof CircuitOpenError) {
         const retryAfterSec = Math.ceil(error.retryAfterMs / 1000);
         response = NextResponse.json(
-          { error: 'Service temporarily unavailable', retryAfter: retryAfterSec },
+          { error: 'Сервис временно недоступен. Повторите через минуту.', retryAfter: retryAfterSec },
           { status: 503, headers: { 'Retry-After': String(retryAfterSec) } }
         );
       } else if (isPrismaKnownError(error) && PRISMA_STATUS[error.code]) {
@@ -121,14 +121,14 @@ export function withApi<T extends any[]>(
         // фраза, подробность — в лог.
         logger.warn('API handler hit a Prisma constraint', { domain, code: error.code, message: error.message });
         response = NextResponse.json(
-          { error: error.code === 'P2025' ? 'Not found' : 'Запись с такими данными уже существует' },
+          { error: error.code === 'P2025' ? 'Запись не найдена — возможно, её уже удалили. Обновите страницу.' : 'Запись с такими данными уже существует' },
           { status: PRISMA_STATUS[error.code] }
         );
       } else {
         logger.error('API handler failed', error, { domain });
         Sentry.captureException(error, { tags: { domain, route: request.nextUrl.pathname } });
         response = NextResponse.json(
-          { error: 'Internal server error' },
+          { error: 'Внутренняя ошибка сервера. Повторите попытку; если повторится — сообщите администратору.' },
           { status: 500 }
         );
       }
@@ -150,7 +150,7 @@ export function withApi<T extends any[]>(
  * Разобрать тело запроса как JSON — и ответить 400, а не 500.
  *
  * `request.json()` на битом теле бросает SyntaxError, а withApi выше не
- * отличает его от промаха в коде: клиент получал «Internal server error», в
+ * отличает его от промаха в коде: клиент получал «Внутренняя ошибка сервера», в
  * Sentry падало событие, и любой кривой запрос выглядел как отказ сервера.
  * Ошибка на стороне клиента — это 400.
  *
@@ -201,7 +201,7 @@ export function withMutation<T extends any[]>(
     const source = await rateLimiter.check(`mut:source:${ip}`, MUTATION_SOURCE_LIMIT);
     if (!source.allowed) {
       return NextResponse.json(
-        { error: 'Too many requests' },
+        { error: 'Слишком много запросов. Подождите немного и повторите.' },
         { status: 429, headers: { 'Retry-After': String(source.retryAfter || 60) } }
       );
     }
@@ -213,7 +213,7 @@ export function withMutation<T extends any[]>(
     const rl = await rateLimiter.check(identifier, _opts?.rateLimit ?? MUTATION_RATE_LIMIT);
     if (!rl.allowed) {
       return NextResponse.json(
-        { error: 'Too many requests' },
+        { error: 'Слишком много запросов. Подождите немного и повторите.' },
         { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
       );
     }

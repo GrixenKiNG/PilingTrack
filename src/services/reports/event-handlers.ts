@@ -11,6 +11,8 @@
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { getRedisClient } from '@/lib/redis-cache';
 // Статически (в отличие от обработчиков ниже): динамический import этого
 // модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
 // уходил бы в живую базу из теста. Прод-поведение то же — db это ленивый прокси.
@@ -243,6 +245,29 @@ export function registerAlertEventHandler() {
   on(REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED, handleDowntimeAlert);
 }
 
+/** Окно дедупликации алерта о простое: правки отчёта идут в 24-часовом окне. */
+const DOWNTIME_ALERT_TTL_SECONDS = 48 * 60 * 60;
+
+/**
+ * Ключ дедупликации алерта о простое (F-R33-2).
+ *
+ * `DOWNTIME_ADDED` несёт только `reasonId`/`duration`/`comment` — id самой
+ * строки простоя в `event.data` нет, а времени начала/окончания форма не
+ * собирает вовсе (см. `addDowntime` в report.aggregate.ts). Поэтому стабильный
+ * ключ строки собираем из того, что событие реально содержит: причина +
+ * длительность. Пара `(reportId, reasonId, duration)` совпадает с той, что
+ * советует аудит.
+ *
+ * Без организации ключ не строим: один на все тенанты он столкнул бы алерты
+ * разных организаций между собой.
+ */
+function downtimeAlertKey(event: ReportDomainEvent): string | null {
+  if (!event.tenantId) return null;
+  const reasonId = (event.data.reasonId as string | undefined) || 'no-reason';
+  const duration = (event.data.duration as number) || 0;
+  return `alert:downtime:${event.tenantId}:${event.aggregateId}:${reasonId}:${duration}`;
+}
+
 async function handleDowntimeAlert(event: ReportDomainEvent) {
   // duration is in HOURS (the report form collects hours). This previously
   // used a 120/240 threshold as if it were minutes, so the alert never fired
@@ -262,6 +287,36 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
     return;
   }
 
+  // Дедупликация (F-R33-2): upsertReport пересобирает агрегат со ВСЕМИ
+  // строками и `addDowntime` заново эмитит `DowntimeAdded` на каждую, поэтому
+  // любое сохранение отчёта в окне правки слало диспетчеру повторный алерт о
+  // том же простое — как будто простой новый.
+  const alertKey = downtimeAlertKey(event);
+  let redis: Awaited<ReturnType<typeof getRedisClient>> = null;
+  if (alertKey) {
+    try {
+      redis = await getRedisClient();
+      if (!redis) {
+        // Нет Redis — шлём без дедупа: дубль лучше, чем молчание.
+        logger.warn('Downtime alert: Redis unavailable, sending without dedupe', {
+          reportId: event.aggregateId,
+        });
+      } else if (await redis.get(alertKey)) {
+        logger.info('Downtime alert already sent for this downtime, skipping', {
+          reportId: event.aggregateId, duration,
+        });
+        return;
+      }
+    } catch (err) {
+      // Сбой Redis — тоже не повод молчать.
+      logger.warn('Downtime alert: dedupe check failed, sending anyway', {
+        reportId: event.aggregateId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      redis = null;
+    }
+  }
+
   logger.warn('High downtime detected', {
     duration,
     siteId: event.siteId,
@@ -269,14 +324,70 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
     reasonId: event.data.reasonId,
   });
 
+  // Человекочитаемые название объекта и номер отчёта вместо внутренних id
+  // (cuid), которые диспетчеру ничего не говорят. Один тенантный запрос,
+  // строгое равенство по организации события; при неудаче оставляем прежние
+  // строки с id — фолбэк в telegram.ts.
+  let siteName: string | undefined;
+  let reportNumber: string | undefined;
+  if (event.tenantId) {
+    try {
+      const report = await db.report.findFirst({
+        where: { reportId: event.aggregateId, tenantId: event.tenantId },
+        select: { reportId: true, site: { select: { name: true } } },
+      });
+      siteName = report?.site?.name || undefined;
+      reportNumber = report?.reportId || undefined;
+    } catch (err) {
+      logger.warn('Downtime alert: cannot resolve site name/report number', {
+        reportId: event.aggregateId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Часовой пояс организации для строки времени: серверное время в алерте
+  // отставало от московского на 3 часа (F-R33-1). Незнание зоны — не повод
+  // молчать, поэтому при ошибке оставляем "Europe/Moscow".
+  let timeZone = 'Europe/Moscow';
+  if (event.tenantId) {
+    try {
+      const { getSettings } = await import('@/modules/settings');
+      timeZone = (await getSettings(event.tenantId)).timezone || 'Europe/Moscow';
+    } catch {
+      // Настройки не прочитались — шлём в зоне по умолчанию.
+    }
+  }
+
   try {
     const { telegramNotifier } = await import('@/core/notifications/telegram');
-    await telegramNotifier.sendAlert({
+    const sent = await telegramNotifier.sendAlert({
       severity: duration > 4 ? 'high' : 'medium',
-      message: `Простой ${duration} ч зафиксирован в отчёте`,
+      message: `Простой ${formatDowntimeHours(duration)} зафиксирован в отчёте`,
       siteId: event.siteId,
+      siteName,
       reportId: event.aggregateId,
+      reportNumber,
+      timeZone,
     });
+    // Ключ ставим только ПОСЛЕ успешной отправки: неудачная попытка должна
+    // остаться возможной к повтору, а не глушиться собственным дедупом.
+    if (redis && alertKey) {
+      if (sent) {
+        try {
+          await redis.set(alertKey, '1', 'EX', DOWNTIME_ALERT_TTL_SECONDS);
+        } catch (err) {
+          logger.warn('Downtime alert: failed to set dedupe key', {
+            reportId: event.aggregateId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else {
+        logger.warn('Downtime alert not marked as sent: Telegram rejected it', {
+          reportId: event.aggregateId, duration,
+        });
+      }
+    }
   } catch (err) {
     // Notification must never fail the event — log and continue.
     // The audit/projection paths re-throw on failure (see emitDomainEvent
@@ -303,10 +414,17 @@ async function handleAuditEvent(event: ReportDomainEvent) {
   try {
     const { recordAuditEvent } = await import('@/services/audit/audit-service');
 
+    // Автосдача черновика: смену закрыл планировщик по истечении
+    // производственных суток, оператор отчёт не сдавал, и запись от его имени —
+    // неправда (F-R34-18). Признак `autoClosed` кладёт в payload планировщик;
+    // здесь он решает, что актора у записи нет (лента показывает «система»), а
+    // имя владельца отчёта уходит в текст сообщения.
+    const autoClosed = event.data?.autoClosed === true;
+
     await recordAuditEvent({
       action: event.type,
       scope: 'reports',
-      actorId: event.userId,
+      actorId: autoClosed ? null : event.userId,
       targetId: event.aggregateId,
       tenantId: event.tenantId,
       requestId: event.metadata?.requestId as string,
@@ -315,6 +433,7 @@ async function handleAuditEvent(event: ReportDomainEvent) {
         aggregateType: event.aggregateType,
         version: event.version,
         data: event.data,
+        ...(autoClosed ? { operatorName: await reportOwnerName(event) } : {}),
       },
     });
   } catch (error) {
@@ -322,6 +441,32 @@ async function handleAuditEvent(event: ReportDomainEvent) {
       eventType: event.type,
       aggregateId: event.aggregateId,
     });
+  }
+}
+
+/**
+ * Имя владельца отчёта для текста автосдачи. Имя — украшение записи: сбой его
+ * чтения не повод терять событие, поэтому здесь глушится только он. Запрос
+ * тенантный (строгое равенство по организации события), чтобы имя не приехало
+ * из чужой организации.
+ */
+async function reportOwnerName(event: ReportDomainEvent): Promise<string | null> {
+  if (!event.userId) return null;
+
+  try {
+    const user = await db.user.findFirst({
+      where: event.tenantId
+        ? { id: event.userId, tenantId: event.tenantId }
+        : { id: event.userId },
+      select: { name: true },
+    });
+    return user?.name ?? null;
+  } catch (error) {
+    logger.warn('audit.auto_submitted_owner_lookup_failed', {
+      userId: event.userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 
@@ -456,7 +601,7 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
     '',
     `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
     `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
-    `⏸ Простои: <b>${fmtNum(totalDowntime)}</b> ч`,
+    `⏸ Простои: <b>${formatDowntimeHours(totalDowntime)}</b>`,
   ];
   const caption = lines.join('\n');
 

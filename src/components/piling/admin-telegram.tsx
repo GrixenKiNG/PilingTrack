@@ -28,6 +28,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import type { TelegramConfigDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +45,7 @@ export function AdminTelegram() {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<TelegramConfigDTO | null>(null);
 
   const openCreate = () => {
     setDialogMode('create');
@@ -158,6 +160,8 @@ export function AdminTelegram() {
       toast.success('Конфигурация удалена');
     } catch {
       toast.error('Ошибка удаления');
+    } finally {
+      setPendingDelete(null);
     }
   };
 
@@ -313,7 +317,7 @@ export function AdminTelegram() {
                       {config.enabled ? 'Выключить' : 'Включить'}
                     </button>
                     <button
-                      onClick={() => handleDelete(config.id)}
+                      onClick={() => setPendingDelete(config)}
                       className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-destructive-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-destructive/10"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -387,6 +391,17 @@ export function AdminTelegram() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        title="Удалить канал уведомлений?"
+        description={pendingDelete
+          ? `Канал «${pendingDelete.label}» (Chat ID: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
+          : ''}
+        confirmLabel="Удалить"
+        onConfirm={() => { if (pendingDelete) void handleDelete(pendingDelete.id); }}
+      />
     </div>
   );
 }

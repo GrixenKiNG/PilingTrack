@@ -64,23 +64,50 @@ export interface ReadinessSchedulerResult {
 const UNFINISHED_SHIFT_STATES = ['STARTED'] as const;
 
 /**
- * Час следующих суток, с которого смена прошлых суток считается брошенной.
+ * Час суток, в который заканчивается смена каждого типа.
  *
- * Не полночь: ночная смена 19:00–07:00 после полуночи уже «вчерашняя» по
- * дате, но ещё идёт, и прогон в 00:30 обрывал её посреди работы. Полдень
- * оставляет ночной смене пять часов запаса. Забытую дневную смену до полудня
- * никто не теряет: утром оператор видит её на экране и закрывает сам.
+ * Дневная смена 07:00–19:00 кончается в 19:00 тех же производственных суток,
+ * ночная 19:00–07:00 — в 07:00 следующих. Смены заканчиваются в одном поясе
+ * (поясе смены), поэтому часы сравниваются как часы суток.
  */
-const AUTO_CLOSE_HOUR_NEXT_DAY = 12;
+const SHIFT_END_HOUR = {DAY: 19, NIGHT: 7} as const;
 
-function isAutoCloseDue(productionDate: Date, timezone: string | null, now: Date): boolean {
+/** Запас часов после окончания смены, после которого незакрытая смена брошена. */
+const AUTO_CLOSE_GRACE_HOURS = 5;
+
+/**
+ * Час суток D+1, с которого закрывается смена неизвестного (пустого) типа.
+ * Прежнее правило: полдень следующих суток — не рвём работу, о которой не
+ * знаем, когда она кончается.
+ */
+const AUTO_CLOSE_UNKNOWN_TYPE_HOUR = 12;
+
+/**
+ * Час суток D+1, с которого смена считается брошенной: конец смены плюс запас,
+ * приведённые к суткам после производственной даты.
+ *
+ * Дневная: (19 + 5) % 24 = 0 — с начала D+1. Ночная: (7 + 5) % 24 = 12 — с
+ * полудня D+1, потому что её конец 07:00 уже лежит в D+1.
+ */
+function autoCloseHourNextDay(type: string | null): number {
+  const endHour = type === 'DAY' || type === 'NIGHT' ? SHIFT_END_HOUR[type] : null;
+  if (endHour === null) return AUTO_CLOSE_UNKNOWN_TYPE_HOUR;
+  return (endHour + AUTO_CLOSE_GRACE_HOURS) % 24;
+}
+
+function isAutoCloseDue(
+  productionDate: Date,
+  timezone: string | null,
+  type: string | null,
+  now: Date,
+): boolean {
   const today = tenantProductionDate(now, timezone).getTime();
   const nextDay = productionDate.getTime() + 24 * 60 * 60 * 1000;
   if (today !== nextDay) return today > nextDay;
   const hour = Number(new Intl.DateTimeFormat('en-GB', {
     timeZone: normalizeTenantTimezone(timezone), hour: '2-digit', hourCycle: 'h23',
   }).format(now));
-  return hour >= AUTO_CLOSE_HOUR_NEXT_DAY;
+  return hour >= autoCloseHourNextDay(type);
 }
 
 export async function runReadinessScheduler(
@@ -127,15 +154,16 @@ export async function runReadinessScheduler(
       });
     }
 
-    // 2. Незакрытые смены прошедших производственных суток — с полудня
-    //    следующих (см. AUTO_CLOSE_HOUR_NEXT_DAY). Сравнение идёт по поясу
-    //    самой смены, а не сервера.
+    // 2. Незакрытые смены прошедших производственных суток — конец смены плюс
+    //    пять часов (SHIFT_END_HOUR + AUTO_CLOSE_GRACE_HOURS): с начала
+    //    следующих суток для дневной, с полудня — для ночной. Сравнение идёт
+    //    по поясу самой смены, а не сервера.
     const unfinished = await tx.shift.findMany({
       where: {tenantId, state: {in: [...UNFINISHED_SHIFT_STATES]}},
-      select: {id: true, productionDate: true, timezone: true, version: true, state: true},
+      select: {id: true, productionDate: true, timezone: true, type: true, version: true, state: true},
     });
     const stale = unfinished
-      .filter((shift) => isAutoCloseDue(shift.productionDate, shift.timezone, now));
+      .filter((shift) => isAutoCloseDue(shift.productionDate, shift.timezone, shift.type, now));
     const staleIds = stale.map((shift) => shift.id);
 
     const closed = staleIds.length === 0 ? {count: 0} : await tx.shift.updateMany({

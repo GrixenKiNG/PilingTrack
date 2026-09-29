@@ -87,13 +87,48 @@ describe('ROLE_NAVIGATION', () => {
   });
 
   /**
-   * Механику по-прежнему не место в администраторских разделах: его список —
-   * готовность техники и общий для всех ролей модуль охраны труда, где он
-   * видит свой допуск. Ни объектов, ни отчётов, ни пользователей.
+   * Меню механика — это его права, а не урезанный список диспетчера.
+   *
+   * Раньше здесь стояли две строки: «Готовность техники» и общий для всех
+   * ролей модуль охраны труда. При этом `authorization-service.ts` выдаёт
+   * механику `equipment.read`, `maintenance.manage` и `crews.read`, и каждый из
+   * этих разделов открыт ему своей раскладкой (`admin/equipment/layout.tsx`,
+   * `admin/maintenance/layout.tsx`, `admin/crews/layout.tsx`). Право без
+   * дороги — тот же тупик, что дорога без права: до обслуживания, карточки
+   * установки и бригад механик добирался только набором адреса.
+   *
+   * Сторожим и обратную сторону: чужих разделов (объекты, отчёты, аналитика,
+   * пользователи) у него в меню нет.
    */
-  it('keeps mechanics to readiness and the shared safety module', () => {
-    expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href))
-      .toEqual(['/admin/to', '/admin/safety']);
+  it('gives the mechanic a way to every section his rights open', () => {
+    expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href)).toEqual([
+      '/admin/to',
+      '/admin/equipment',
+      '/admin/maintenance',
+      '/admin/crews',
+      '/admin/safety',
+    ]);
+    // Права, которых у механика нет, — и дорог к ним тоже.
+    for (const closed of ['/admin/sites', '/admin/reports', '/admin/analytics', '/admin/users']) {
+      expect(ROLE_NAVIGATION.MECHANIC.map((item) => item.href)).not.toContain(closed);
+    }
+  });
+
+  /**
+   * Право без дороги — это тот же тупик, что дорога без права.
+   *
+   * `readiness.read` выдан мастеру и раздел `/admin/to` ему открыт
+   * (`(readiness-admin)/layout.tsx`), но пункта в меню не было: сверить по
+   * меню, что роли положено, было нельзя, а сам раздел открывался только по
+   * прямому адресу из уведомления. Подпись сторожится здесь же: место, которое
+   * механик видит как «Готовность техники», не должно называться у мастера
+   * иначе — иначе одно место выглядит как два.
+   */
+  it('gives the foreman a way to the readiness section he may read', () => {
+    const foremanRoutes = ROLE_NAVIGATION.FOREMAN.map((item) => item.href);
+    expect(foremanRoutes).toContain('/admin/to');
+    expect(ROLE_NAVIGATION.FOREMAN.find((item) => item.href === '/admin/to')?.label)
+      .toBe('Готовность техники');
   });
 
   it('folds Telegram and DLQ into Settings (out of top-level navigation)', () => {

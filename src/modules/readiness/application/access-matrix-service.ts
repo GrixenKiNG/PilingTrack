@@ -17,6 +17,7 @@ import {
   type ReadinessAccessMatrix,
 } from '../domain/access-matrix';
 import { bumpVersion } from '../domain/readiness-rules';
+import { recordChainedReadinessAudit } from '../infrastructure/audit/record-audit';
 
 export interface AccessMatrixState {
   published: ReadinessAccessMatrix;
@@ -50,9 +51,15 @@ function toMatrix(row: MatrixRow, fallback = DEFAULT_ACCESS_MATRIX): ReadinessAc
   }, fallback);
 }
 
-export async function getAccessMatrix(tenantId: string): Promise<AccessMatrixState> {
+export async function getAccessMatrix(
+  tenantId: string,
+  // Клиент передаётся там, где вызов уже внутри транзакции: читать через
+  // глобальный `db` изнутри транзакции — значит выйти из неё и завести второе
+  // подключение, а вместе с ним и незащищённое чтение черновика (F-R38-10).
+  client: Pick<typeof db, 'readinessAccessMatrix'> = db,
+): Promise<AccessMatrixState> {
   if (!tenantId) throw new Error('getAccessMatrix: tenantId is required');
-  const rows = await db.readinessAccessMatrix.findMany({
+  const rows = await client.readinessAccessMatrix.findMany({
     where: { tenantId, status: { in: ['PUBLISHED', 'DRAFT'] } },
     orderBy: { updatedAt: 'desc' },
   });
@@ -91,6 +98,23 @@ export async function getPublishedAccessMatrix(
 
 interface MatrixActor { id: string; name: string; role: string; actingAs?: string | null }
 
+/**
+ * Тело события цепочки — канонический JSON: ключ со значением `undefined`
+ * роняет запись («Audit JSON contains unsupported undefined»), а у матрицы
+ * необязательные `updatedAt`/`updatedBy` всегда лежат ключом. Отсутствие
+ * значения записываем как `null` — так строка и читается журналом.
+ */
+function matrixPayload(matrix: ReadinessAccessMatrix) {
+  return {
+    version: matrix.version,
+    status: matrix.status,
+    grants: matrix.grants,
+    updatedAt: matrix.updatedAt ?? null,
+    updatedBy: matrix.updatedBy ?? null,
+    publishedAt: matrix.publishedAt ?? null,
+  };
+}
+
 async function writeAudit(
   tx: Prisma.TransactionClient,
   input: {
@@ -102,23 +126,29 @@ async function writeAudit(
     after: ReadinessAccessMatrix;
   },
 ) {
-  await tx.auditLog.create({
-    data: {
-      entity: 'ReadinessAccessMatrix',
-      action: input.action,
-      entityId: input.entityId,
-      before: input.before ? input.before as unknown as Prisma.InputJsonValue : undefined,
-      after: {
-        version: input.after.version,
-        grants: input.after.grants,
-        // Список отличий — то, ради чего журнал и читают: «кому что выдали».
-        changes: input.before ? describeAccessChanges(input.before, input.after) : [],
-      } as unknown as Prisma.InputJsonValue,
-      userId: input.actor.id,
-      userName: input.actor.name,
-      userRole: input.actor.role,
+  /*
+    Через цепочечный писатель, а не `tx.auditLog.create`: читатель журнала
+    (`audit-repository.ts` readChain) отбирает звенья по `hash: {not: null}`,
+    поэтому прямая запись не попадала ни на экран «Аудит», ни в проверку
+    цепочки — смена прав оставалась без читаемого следа.
+  */
+  await recordChainedReadinessAudit(tx, {
+    tenantId: input.tenantId,
+    action: input.action,
+    entityType: 'ReadinessAccessMatrix',
+    entityId: input.entityId,
+    actor: {
+      id: input.actor.id,
+      name: input.actor.name,
+      role: input.actor.role,
       actingAs: input.actor.actingAs ?? null,
-      tenantId: input.tenantId,
+    },
+    before: input.before ? matrixPayload(input.before) : null,
+    after: {
+      version: input.after.version,
+      grants: input.after.grants,
+      // Список отличий — то, ради чего журнал и читают: «кому что выдали».
+      changes: input.before ? describeAccessChanges(input.before, input.after) : [],
     },
   });
 }
@@ -129,14 +159,22 @@ export async function saveAccessMatrixDraft(
   actor: MatrixActor,
 ): Promise<AccessMatrixState> {
   if (!tenantId) throw new Error('saveAccessMatrixDraft: tenantId is required');
-  const state = await getAccessMatrix(tenantId);
-  const next = sanitizeAccessMatrix(patch, state.draft ?? state.published);
-  const existing = await db.readinessAccessMatrix.findFirst({
-    where: { tenantId, status: 'DRAFT' },
-    select: { id: true },
-  });
 
   await db.$transaction(async (tx) => {
+    // Два администратора, сохраняющих черновик одновременно, без замка успевают
+    // оба не найти действующий DRAFT и создать по своему — в организации
+    // оказывается два черновика матрицы. Замок транзакционный, снимается сам
+    // при коммите или откате; чтение черновика и его запись идут под ним одной
+    // транзакцией (F-R38-10).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
+
+    const state = await getAccessMatrix(tenantId, tx);
+    const next = sanitizeAccessMatrix(patch, state.draft ?? state.published);
+    const existing = await tx.readinessAccessMatrix.findFirst({
+      where: { tenantId, status: 'DRAFT' },
+      select: { id: true },
+    });
+
     const data = {
       version: bumpVersion(state.published.version),
       grants: next.grants as unknown as Prisma.InputJsonValue,
@@ -158,17 +196,25 @@ export async function publishAccessMatrix(
   actor: MatrixActor,
 ): Promise<AccessMatrixState> {
   if (!tenantId) throw new Error('publishAccessMatrix: tenantId is required');
-  const state = await getAccessMatrix(tenantId);
-  const draftRow = await db.readinessAccessMatrix.findFirst({
-    where: { tenantId, status: 'DRAFT' },
-  });
 
-  // Публиковать нечего только когда действующая версия уже в базе. У нового
-  // тенанта её нет: экран показывает значения из кода, и первое нажатие
-  // «Опубликовать» должно закрепить именно их, а не промолчать.
-  if (!draftRow) {
-    if (state.publishedInDb) return state;
-    await db.$transaction(async (tx) => {
+  await db.$transaction(async (tx) => {
+    // Тот же ресурс, что и у сохранения черновика: публикация и сохранение,
+    // идущие одновременно, обязаны сериализоваться. Иначе сохранение,
+    // начатое до публикации, правит своим `update` по id уже опубликованную
+    // матрицу — действующие права меняются без публикации и без черновика
+    // (F-R38-10). Замок транзакционный, снимается сам при коммите или откате.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
+
+    const state = await getAccessMatrix(tenantId, tx);
+    const draftRow = await tx.readinessAccessMatrix.findFirst({
+      where: { tenantId, status: 'DRAFT' },
+    });
+
+    // Публиковать нечего только когда действующая версия уже в базе. У нового
+    // тенанта её нет: экран показывает значения из кода, и первое нажатие
+    // «Опубликовать» должно закрепить именно их, а не промолчать.
+    if (!draftRow) {
+      if (state.publishedInDb) return;
       const published = await tx.readinessAccessMatrix.create({
         data: {
           tenantId,
@@ -182,11 +228,9 @@ export async function publishAccessMatrix(
       await writeAudit(tx, {
         tenantId, action: 'published', entityId: published.id, actor, after: state.published,
       });
-    });
-    return getAccessMatrix(tenantId);
-  }
+      return;
+    }
 
-  await db.$transaction(async (tx) => {
     await tx.readinessAccessMatrix.updateMany({
       where: { tenantId, status: 'PUBLISHED' },
       data: { status: 'ARCHIVED' },

@@ -7,6 +7,7 @@ import {
   listPilePassports,
   pileJournalHeader,
 } from '@/modules/reports/application/queries/pile-passport.service';
+import { getSettings } from '@/modules/settings';
 import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
 
 export const runtime = 'nodejs';
@@ -54,7 +55,12 @@ export const GET = withApi(
       dateTo,
       pileNumber: params.get('pileNumber')?.trim() || undefined,
     });
-    return NextResponse.json({ data: rows, header: pileJournalHeader(rows), truncated });
+    // Титул, как и выгрузка .xlsx, считает день забивки по поясу тенанта, а не
+    // по UTC: свая, забитая 26.09 в 00:30 МСК, в UTC ещё 25.09, и без пояса
+    // «Период забивки» на экране разошёлся бы с файлом и со строками под собой
+    // (F-R37-5).
+    const { timezone } = await getSettings(tenantId);
+    return NextResponse.json({ data: rows, header: pileJournalHeader(rows, timezone), truncated });
   },
   { domain: 'piles' },
 );

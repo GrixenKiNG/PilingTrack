@@ -40,7 +40,7 @@ import { useMainDashboardLayout } from '@/components/piling/main-dashboard/dashb
 import { PageLayoutRenderer, type RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
 import type { SiteAnalyticsDTO } from '@/lib/types';
 import {
-  Empty, KpiTile, PlanTile, RigTile, RiskGroup, Section,
+  Empty, KpiTile, PlanTile, RigTile, RiskGroup, Section, TONE_TAG,
   type FleetCard, type FleetSnapshot, type MaintRow, type RecentReport,
   type Risk, type SiteOption, type Tone,
 } from './admin-dashboard-bits';
@@ -73,6 +73,9 @@ function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; t
 
 export function AdminDashboard() {
   const canReadMaintenance = useAbility('maintenance.manage');
+  // Роль без `equipment.read` (мастер) на этом дашборде — не редкость: `/admin` —
+  // её домашний экран, но карточка установки ей закрыта (`admin/equipment/layout.tsx`).
+  const canReadEquipment = useAbility('equipment.read');
   const router = useRouter();
   const layout = useMainDashboardLayout();
   const [analytics, setAnalytics] = useState<SiteAnalyticsDTO[]>([]);
@@ -398,15 +401,30 @@ export function AdminDashboard() {
             )}
           </Section>
 
-          <Section icon={Truck} title="Парк установок" count={visibleFleet.length} footerLabel="Все установки" onFooter={() => router.push('/admin/equipment')}>
+          <Section icon={Truck} title="Парк установок" count={visibleFleet.length}
+            footerLabel={canReadEquipment ? 'Все установки' : undefined}
+            onFooter={canReadEquipment ? () => router.push('/admin/equipment') : undefined}>
             {fleetRows.length === 0 ? (
               (stale.fleet || stale.maint)
                 ? <Empty text="Не удалось загрузить парк установок. Обновите сводку." tone="warning" />
                 : <Empty text="По выбранным фильтрам установок нет" />
-            ) : (
+            ) : canReadEquipment ? (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {fleetRows.map((r) => (
                   <RigTile key={r.id} r={r} status={rigStatus(r)} onOpen={() => router.push(`/admin/equipment/${r.id}`)} />
+                ))}
+              </div>
+            ) : (
+              /* Плитки и подвал вели в `/admin/equipment`, где вход требует
+                 `equipment.read`: для роли без права клик возвращал её на этот же
+                 дашборд. Сведения о парке остаются, дорога в тупик — нет. */
+              <div className="grid gap-2 p-3 sm:grid-cols-2">
+                {fleetRows.map((r) => (
+                  <div key={r.id} className="flex flex-col gap-1 rounded-lg border border-border bg-card p-3">
+                    <div className="truncate text-sm font-medium text-foreground">{r.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{r.assignedSiteName ?? 'объект не привязан'}</div>
+                    <span className={cn('self-start rounded px-2 py-0.5 text-xs font-medium', TONE_TAG[rigStatus(r).tone])}>{rigStatus(r).label}</span>
+                  </div>
                 ))}
               </div>
             )}

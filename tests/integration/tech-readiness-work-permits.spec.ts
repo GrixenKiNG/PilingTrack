@@ -70,6 +70,7 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
     state?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED';
     risk?: 'NORMAL' | 'ELEVATED';
     version?: number;
+    requiredApprovals?: ReadonlyArray<'DISPATCHER' | 'ADMIN'>;
   }) => {
     /*
       Наряд заводится полным: наименование, место и производитель работ теперь
@@ -80,7 +81,9 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
 
       requiredApprovals задаётся явно: у колонки пустое значение по умолчанию, а
       пустой список означает «согласующие не настроены» и делает наряд
-      несогласуемым. Здесь нужно прежнее поведение обычных работ.
+      несогласуемым. По умолчанию здесь прежнее поведение обычных работ —
+      одна подпись диспетчера; наряд на двух согласующих задаёт тест про
+      одновременную подпись.
     */
     await testDb.query(`
       INSERT INTO "WorkPermit"
@@ -89,11 +92,11 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
          "validFrom", "validTo", "timezone", "authorId", "lastEditedById", "version", "updatedAt")
       VALUES ($1, $2, $3, 'work-type-a', $4, $5, 'Осмотр и мелкий ремонт',
               'Работы на площадке 7А', 'Площадка 7А', 'Смирнов А.В.',
-              ARRAY['DISPATCHER']::"WorkPermitApprovalRole"[], TRUE,
+              $8::"WorkPermitApprovalRole"[], TRUE,
               NOW(), NOW() + INTERVAL '1 day',
               'Europe/Moscow', $6, $6, $7, NOW())
     `, [input.id, tenantA, equipmentA, input.risk ?? 'NORMAL', input.state ?? 'PENDING_APPROVAL', mechanicA,
-      input.version ?? 1]);
+      input.version ?? 1, input.requiredApprovals ?? ['DISPATCHER']]);
   };
 
   beforeAll(async () => {
@@ -320,5 +323,35 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
     expect(await prisma.auditLog.count({where: {tenantId: tenantA, entityId: id}})).toBe(1);
     expect(await prisma.outboxEvent.count({where: {tenantId: tenantA, aggregateId: id}})).toBe(1);
     expect(await prisma.idempotencyKey.count({where: {tenantId: tenantA, key: 'approval-race-one-key'}})).toBe(1);
+  }, 30_000);
+
+  /*
+    F-R38-3: двое согласующих подписывают наряд одновременно. Подписи ложатся в
+    разные строки `WorkPermitApproval`, а саму строку наряда никто из подписавших
+    не меняет — конфликта по строке нет, поэтому ни одна транзакция не уступает
+    другой. Каждая видела только свою подпись, «подписей хватает» не наступало
+    ни у одной, и наряд оставался «на согласовании» со всеми подписями: повтор
+    отбивался 409 «решение по этой роли уже принято», а выхода из этого
+    состояния не было ни у кого. Захват строки наряда (`FOR UPDATE`) ставит
+    подписи в очередь, поэтому вторая считает полноту по уже записанной первой.
+  */
+  it('две одновременные подписи двух согласующих переводят наряд в APPROVED', async () => {
+    const id = 'permit-two-approvers';
+    await insertPermit({id, requiredApprovals: ['DISPATCHER', 'ADMIN']});
+    const approve = (actorId: string, role: string, requestId: string) =>
+      transaction(tenantA, (tx) => approveWorkPermitCommand({
+        tx, context: context(actorId, role, requestId), id, key: requestId,
+        ifMatch: '"work-permit-permit-two-approvers-v1"', expectedVersion: 1,
+      }));
+
+    await Promise.allSettled([
+      approve(dispatcherA, 'DISPATCHER', 'two-approvers-dispatcher'),
+      approve('admin-a', 'ADMIN', 'two-approvers-admin'),
+    ]);
+
+    const row = await prisma.workPermit.findFirstOrThrow({where: {tenantId: tenantA, id}, include: {approvals: true}});
+    expect(row.approvals.filter((approval) => approval.valid && approval.permitVersion === 1)).toHaveLength(2);
+    expect(row.state).toBe('APPROVED');
+    expect(row.approvedAt).not.toBeNull();
   }, 30_000);
 });

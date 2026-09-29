@@ -1,6 +1,8 @@
 import { db } from '@/lib/db';
 import { getOperatorClearance, type ClearanceDocument } from '@/modules/users';
 import { hasPostShiftSection } from '@/modules/inspections';
+import { zonedDayStartUtc } from '@/lib/timezone';
+import { normalizeTenantTimezone, tenantProductionDate } from '../domain/shifts/tenant-production-date';
 
 /**
  * Состояние смены глазами оператора — всё, что нужно его экрану, одним запросом.
@@ -120,8 +122,18 @@ export interface OperatorShiftFacts {
   postShiftAvailable: boolean;
 }
 
-const startOfLocalDay = (now: Date) =>
-  new Date(now.getFullYear(), now.getMonth(), now.getDate());
+/**
+ * Начало суток организации, к которым относится момент `now`.
+ *
+ * Не `new Date(y, m, d)`: сервер живёт в UTC (`Dockerfile` не задаёт `TZ`), и
+ * «локальная полночь» процесса — это 03:00 МСК. Показание счётчика, снятое в
+ * 01:30 МСК, в такое окно не попадало: оператор считался не внесшим показания,
+ * и шаг закрытия смены блокировался. День берётся в поясе организации
+ * (`tenantProductionDate`), а его начало — момент местной полуночи
+ * (`zonedDayStartUtc`), а не UTC-полночь того же дня.
+ */
+const startOfTenantDay = (now: Date, timezone: string): Date =>
+  zonedDayStartUtc(tenantProductionDate(now, timezone).toISOString().slice(0, 10), timezone);
 
 /**
  * Собирает факты по бригаде оператора.
@@ -207,13 +219,22 @@ export async function getOperatorShiftFacts(
     : crews.length === 1 ? crews[0].equipment : null;
   if (!equipment) return { ...empty, assignments };
 
+  // Пояс организации, а не пояса процесса. Нужен до запроса показаний: окно
+  // «сегодня» строится от местной полуночи (см. `startOfTenantDay`).
+  const settings = await db.tenantSettings.findUnique({
+    where: { tenantId },
+    select: { timezone: true },
+  });
+  const timezone = normalizeTenantTimezone(settings?.timezone);
+  const tenantDayStart = startOfTenantDay(now, timezone);
+
   const [current, meterToday, incoming, lastMeter] = await Promise.all([
     db.currentReadiness.findFirst({
       where: { tenantId, equipmentId: equipment.id },
       select: { verdict: true, status: true, score: true, snapshotId: true },
     }),
     db.meterReading.count({
-      where: { tenantId, equipmentId: equipment.id, recordedAt: { gte: startOfLocalDay(now) } },
+      where: { tenantId, equipmentId: equipment.id, recordedAt: { gte: tenantDayStart } },
     }),
     // Передача предыдущей смены, ожидающая решения. Свою собственную оператор
     // принять не сможет — это проверит команда, — но видеть её он должен.

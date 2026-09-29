@@ -107,6 +107,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       type: 'period',
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
+      tenantId: user?.tenantId || null,
       reports: pdfData.reports,
       totalPiles: pdfData.totalPiles,
       totalDrilling: pdfData.totalDrilling,

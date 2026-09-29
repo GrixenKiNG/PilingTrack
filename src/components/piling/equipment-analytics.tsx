@@ -43,6 +43,8 @@ interface EquipmentRow {
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
   nextMaintenanceDate: string | null;
+  maintenanceOverdue: boolean;
+  maintenanceSoon: boolean;
   maintenanceDue: boolean;
 }
 
@@ -278,9 +280,11 @@ function FleetTable({
                   <div className="font-medium text-foreground">{r.name}</div>
                   <div className="text-2xs text-muted-foreground">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
                 </div>
-                {r.maintenanceDue && (
+                {r.maintenanceOverdue ? (
+                  <span className="shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-2xs font-medium text-destructive-strong">ТО просрочено</span>
+                ) : r.maintenanceSoon ? (
                   <span className="shrink-0 rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">ТО скоро</span>
-                )}
+                ) : null}
               </div>
               <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
                 <Stat label="Сваи" value={formatCountMeters(r.piles, r.pileMeters)} />
@@ -335,9 +339,11 @@ function FleetTable({
               <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeHours)}</td>
               <td className="px-3 py-2 text-right font-mono">{r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'}</td>
               <td className="px-3 py-2 text-right">
-                {r.maintenanceDue
-                  ? <span className="rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">скоро</span>
-                  : <span className="text-2xs text-muted-foreground">—</span>}
+                {r.maintenanceOverdue
+                  ? <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-2xs font-medium text-destructive-strong">просрочено</span>
+                  : r.maintenanceSoon
+                    ? <span className="rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">скоро</span>
+                    : <span className="text-2xs text-muted-foreground">—</span>}
               </td>
             </tr>
           ))}

@@ -114,6 +114,15 @@ interface AlertPayload {
   siteId?: string;
   reportId?: string;
   ruleId?: string;
+  /**
+   * Человекочитаемые подстановки: название объекта и номер отчёта. Если они
+   * есть — показываем их, а внутренние id (cuid) оставляем только как фолбэк
+   * для вызывающих, которые эти данные не загрузили. См. F-R33-1.
+   */
+  siteName?: string;
+  reportNumber?: string;
+  /** IANA-зона организации для строки времени; по умолчанию — Москва. */
+  timeZone?: string;
 }
 
 function buildAlertMessage(alert: AlertPayload): { text: string; parse_mode: string } {
@@ -137,11 +146,33 @@ function buildAlertMessage(alert: AlertPayload): { text: string; parse_mode: str
   let text = `${emoji} <b>${label}</b>\n\n`;
   text += `<code>${escapeHtml(alert.message)}</code>\n\n`;
 
-  if (alert.siteId) text += `📍 Объект: <code>${escapeHtml(alert.siteId)}</code>\n`;
-  if (alert.reportId) text += `📄 Отчёт: <code>${escapeHtml(alert.reportId)}</code>\n`;
+  // Название объекта и номер отчёта вместо внутренних cuid, если вызывающий
+  // их загрузил. Строки с id — фолбэк для остальных вызывающих (webhook
+  // Alertmanager, планировщик ТО и т.п.), у которых человекочитаемых данных нет.
+  if (alert.siteName) {
+    text += `📍 Объект: <b>${escapeHtml(alert.siteName)}</b>\n`;
+  } else if (alert.siteId) {
+    text += `📍 Объект: <code>${escapeHtml(alert.siteId)}</code>\n`;
+  }
+  if (alert.reportNumber) {
+    text += `📄 Отчёт: <b>${escapeHtml(alert.reportNumber)}</b>\n`;
+  } else if (alert.reportId) {
+    text += `📄 Отчёт: <code>${escapeHtml(alert.reportId)}</code>\n`;
+  }
   if (alert.ruleId) text += `📏 Правило: <code>${escapeHtml(alert.ruleId)}</code>\n`;
 
-  text += `\n⏰ ${new Date().toLocaleString('ru-RU')}`;
+  // Время — в зоне организации, а не серверной: в контейнере TZ не задан, и
+  // алерт приходил на 3 часа раньше московского (F-R33-1).
+  const timeZone = alert.timeZone || 'Europe/Moscow';
+  const now = new Date().toLocaleString('ru-RU', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  text += `\n⏰ ${now}`;
 
   return { text, parse_mode: 'HTML' };
 }

@@ -71,6 +71,22 @@ const sheet = (name: string): Sheet => {
   return found;
 };
 
+/** Паспорт с отчётом ночной смены — чтобы графа «Смена» была чем заполнена. */
+const nightShift = {
+  ...atMoscowMidnight,
+  pileWork: {
+    pileGrade: null,
+    picket: null,
+    report: {
+      site: { name: 'Объект' },
+      user: { name: 'Иванов' },
+      equipment: { name: 'СО-1' },
+      crew: null,
+      shiftType: 'NIGHT',
+    },
+  },
+};
+
 describe('exportPileJournalXlsx — день тенанта', () => {
   beforeEach(() => {
     sheets.current = [];
@@ -79,7 +95,11 @@ describe('exportPileJournalXlsx — день тенанта', () => {
     userFindMany.mockReset();
     userFindMany.mockResolvedValue([]);
     getSettings.mockReset();
-    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow' });
+    getSettings.mockResolvedValue({
+      timezone: 'Europe/Moscow',
+      companyName: 'ООО «ОРИОН-Строй»',
+      inn: '7701234567',
+    });
   });
 
   it('дату забивки 25.09 21:30 UTC печатает как 26.09.2026 по Москве', async () => {
@@ -105,6 +125,17 @@ describe('exportPileJournalXlsx — день тенанта', () => {
     expect(nextNight < where.drivenAt.lt).toBe(false);
   });
 
+  it('дату выгрузки печатает в поясе тенанта, а не UTC (F-R37-1)', async () => {
+    // Выгрузка 26.09 в 01:00 МСК = 25.09 22:00 UTC.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-25T22:00:00.000Z') });
+    try {
+      await exportPileJournalXlsx({ tenantId: 'orion' });
+      expect(sheet('Титул').rows).toContainEqual(['Журнал выгружен', '26.09.2026 01:00']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('границы дня считает по текущему смещению пояса, а не по фиксированному', async () => {
     getSettings.mockResolvedValue({ timezone: 'America/New_York' });
 
@@ -115,5 +146,92 @@ describe('exportPileJournalXlsx — день тенанта', () => {
     await exportPileJournalXlsx({ tenantId: 'orion', dateFrom: '2026-01-15', dateTo: '2026-01-15' });
     const winter = pileFindMany.mock.calls[1][0].where as { drivenAt: { gte: Date; lt: Date } };
     expect(winter.drivenAt.gte.toISOString()).toBe('2026-01-15T05:00:00.000Z'); // EST, UTC-5
+  });
+});
+
+describe('exportPileJournalXlsx — организация и подписи (F-R44-1)', () => {
+  beforeEach(() => {
+    sheets.current = [];
+    pileFindMany.mockReset();
+    pileFindMany.mockResolvedValue([atMoscowMidnight]);
+    userFindMany.mockReset();
+    userFindMany.mockResolvedValue([]);
+    getSettings.mockReset();
+    getSettings.mockResolvedValue({
+      timezone: 'Europe/Moscow',
+      companyName: 'ООО «ОРИОН-Строй»',
+      inn: '7701234567',
+    });
+  });
+
+  it('печатает название организации и ИНН из настроек тенанта', async () => {
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    expect(sheet('Титул').rows[1]).toEqual(['Организация: ООО «ОРИОН-Строй», ИНН 7701234567']);
+  });
+
+  it('не печатает пустые части: без названия остаётся только ИНН', async () => {
+    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '7701234567' });
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    expect(sheet('Титул').rows[1]).toEqual(['ИНН 7701234567']);
+  });
+
+  it('без организации и ИНН строки на титуле нет', async () => {
+    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    const title = sheet('Титул').rows;
+    expect(title[1][0]).toBe('Объект');
+    expect(title.some((row) => typeof row[0] === 'string' && row[0].startsWith('Организация'))).toBe(false);
+    expect(title.some((row) => typeof row[0] === 'string' && row[0].startsWith('ИНН'))).toBe(false);
+  });
+
+  it('после таблицы печатает дату составления по поясу тенанта и подписи', async () => {
+    // Составление 26.09 в 01:00 МСК = 25.09 22:00 UTC.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-25T22:00:00.000Z') });
+    try {
+      await exportPileJournalXlsx({ tenantId: 'orion' });
+
+      const rows = sheet('Журнал забивки').rows;
+      const dateIndex = rows.findIndex((row) => row[0] === 'Дата составления: 26.09.2026');
+      // Дата и подписи — под таблицей, а не вместо неё.
+      expect(dateIndex).toBeGreaterThan(1);
+      expect(rows).toContainEqual(['Производитель работ ____________ / ФИО /']);
+      expect(rows).toContainEqual(['Представитель технического надзора ____________ / ФИО /']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('exportPileJournalXlsx — графа «Смена» (F-R44-1)', () => {
+  beforeEach(() => {
+    sheets.current = [];
+    pileFindMany.mockReset();
+    userFindMany.mockReset();
+    userFindMany.mockResolvedValue([]);
+    getSettings.mockReset();
+    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
+  });
+
+  it('печатает смену сваи из отчёта', async () => {
+    pileFindMany.mockResolvedValue([nightShift]);
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    const rows = sheet('Журнал забивки').rows;
+    expect(rows[0][2]).toBe('Смена');
+    expect(rows[1][2]).toBe('Ночная');
+  });
+
+  it('без отчёта ячейка смены пуста, а не выдана за дневную', async () => {
+    pileFindMany.mockResolvedValue([atMoscowMidnight]);
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    expect(sheet('Журнал забивки').rows[1][2]).toBe('');
   });
 });

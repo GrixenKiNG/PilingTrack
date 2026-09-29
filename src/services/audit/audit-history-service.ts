@@ -24,6 +24,18 @@ const ACTION_LABELS: Record<string, string> = {
   'user.created': 'Пользователь создан',
   'user.updated': 'Пользователь изменён',
   'user.deleted': 'Пользователь удалён',
+  // Виды документов, документы работника и допуски к технике пишутся в тот же
+  // контур `users` (см. services/users/user-documents.ts и
+  // api/safety/equipment-permits). Без этих строк панель карточки показывала
+  // машинный код вида «user.document.updated».
+  'user.document_type.created': 'Заведён вид документа работника',
+  'user.document_type.updated': 'Изменён вид документа работника',
+  'user.document_type.deleted': 'Удалён вид документа работника',
+  'user.document.created': 'Документ работника добавлен',
+  'user.document.updated': 'Документ работника изменён',
+  'user.document.deleted': 'Документ работника удалён',
+  'user.equipment_permit.saved': 'Допуск к технике выдан или изменён',
+  'user.equipment_permit.deleted': 'Допуск к технике удалён',
   'dictionary.created': 'Элемент создан',
   'dictionary.renamed': 'Переименован',
   'dictionary.archived': 'Архивирован',
@@ -45,6 +57,14 @@ const FIELD_LABELS: Record<string, string> = {
   email: 'Email',
   lengthMm: 'Длина, мм',
   sectionOrDiameter: 'Сечение',
+  // Поля событий по документам работника и допускам к технике.
+  expiresAt: 'Действует до',
+  typeId: 'Вид документа',
+  equipmentKind: 'Вид техники',
+  status: 'Статус',
+  // Состав помощников бригады (metadata `assistants`): без подписи поле
+  // пропускалось диффом и смена помощника выглядела как «ничего не менялось».
+  assistants: 'Помощники',
 };
 
 // Fields that change on every save but carry no evidentiary meaning.
@@ -97,6 +117,14 @@ export async function getEntityHistory(
 
   const renderValue = (field: string, value: unknown): string => {
     if (value === null || value === undefined || value === '') return '—';
+    if (Array.isArray(value)) {
+      // Списки (состав помощников) рисуем именами через запятую; элементы —
+      // строки имён или объекты вида { name }.
+      const names = value
+        .map((item) => (typeof item === 'string' ? item : (item as { name?: unknown } | null)?.name))
+        .filter((name): name is string => typeof name === 'string' && name !== '');
+      return names.length > 0 ? names.join(', ') : '—';
+    }
     if (field === 'isActive') return value ? 'Да' : 'Нет';
     if (field === 'siteId') return siteMap[String(value)] ?? String(value);
     if (field === 'operatorId') return userMap[String(value)] ?? String(value);

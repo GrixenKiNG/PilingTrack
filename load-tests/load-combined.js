@@ -1,36 +1,28 @@
 /**
- * k6 Combined Load Test — HTTP + WS + Event Storm
+ * k6 Combined Load Test — HTTP + Event Storm
  *
  * Full production simulation:
  * - HTTP: operator sync (push + pull)
- * - WS: dispatcher dashboard connections
  * - Event Storm: real-time event flood via Redis
  *
  * Run:
  *   1. Start Event Storm in background:
  *      npx tsx load-tests/event-storm.ts 500 120 &
  *
- *   2. Start WS load test:
- *      k6 run load-tests/load-ws-quick.js --vus 100 --duration 120s
- *
- *   3. Start HTTP load test:
+ *   2. Start HTTP load test:
  *      k6 run load-tests/load-http-aggressive.js --env SESSION_TOKEN=<token> --vus 100 --duration 120s
  *
- * OR run all in one k6 instance (HTTP + WS):
+ * OR run all in one k6 instance (HTTP):
  *   k6 run load-tests/load-combined.js --env SESSION_TOKEN=<token> --vus 200 --duration 120s
  */
 
 import http from 'k6/http';
-import ws from 'k6/ws';
 import { sleep, check, group } from 'k6';
-import { Rate, Trend, Counter } from 'k6/metrics';
+import { Rate, Trend } from 'k6/metrics';
 
 // Custom metrics
 const httpReqDuration = new Trend('http_req_duration', true);
 const syncErrorRate = new Rate('sync_error_rate');
-const wsConnections = new Counter('ws_connections');
-const wsMessages = new Counter('ws_messages');
-const wsConnectErrors = new Rate('ws_connect_errors');
 
 export const options = {
   scenarios: {
@@ -49,12 +41,10 @@ export const options = {
   thresholds: {
     http_req_duration: ['p(95)<500'],
     sync_error_rate: ['rate<0.05'],
-    ws_connect_errors: ['rate<0.05'],
   },
 };
 
 const BASE = __ENV.BASE_URL || 'http://localhost:3000';
-const WS_URL = __ENV.WS_URL || 'ws://localhost:3001';
 const SITE_ID = __ENV.SITE_ID || 'cmnngqini009fvnjo5ccymjmm';
 const SESSION_TOKEN = __ENV.SESSION_TOKEN || '';
 
@@ -115,28 +105,6 @@ export default function runScenario() {
   });
 
   sleep(0.5 + Math.random() * 0.5);
-
-  // ---- WebSocket Connection ----
-  group('ws_connection', function () {
-    const wsRes = ws.connect(WS_URL, {}, function (socket) {
-      socket.on('open', () => {
-        wsConnections.add(1);
-        socket.send(JSON.stringify({ type: 'ping' }));
-      });
-
-      socket.on('message', (_msg) => {
-        wsMessages.add(1);
-      });
-
-      socket.on('close', () => {});
-      socket.on('error', () => {});
-
-      socket.setTimeout(() => { socket.close(); }, 10000);
-    });
-
-    const connected = check(wsRes, { 'ws 101': (r) => r && r.status === 101 });
-    wsConnectErrors.add(!connected);
-  });
 
   sleep(1 + Math.random());
 }

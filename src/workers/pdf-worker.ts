@@ -14,6 +14,7 @@ import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { generatePeriodPdf, generateSinglePdf, savePdfBuffer, PeriodPdfData, SingleReportData } from '@/lib/pdf-generator';
+import { loadCompanyName } from '@/lib/pdf-data';
 import { PdfJobData, PdfJobResult } from '@/lib/pdf-queue';
 import { logger } from '@/lib/logger';
 
@@ -54,7 +55,7 @@ async function processPdfJob(job: Job<PdfJobData, PdfJobResult>): Promise<PdfJob
   let pdfBuffer: Buffer;
 
   if (type === 'period') {
-    const periodData = extractPeriodPdfData(job.data);
+    const periodData = await extractPeriodPdfData(job.data);
     pdfBuffer = await generatePeriodPdf(periodData);
   } else if (type === 'single') {
     const singleData = extractSingleReportData(job.data);
@@ -78,8 +79,8 @@ async function processPdfJob(job: Job<PdfJobData, PdfJobResult>): Promise<PdfJob
   };
 }
 
-function extractPeriodPdfData(data: PdfJobData): PeriodPdfData {
-  return {
+function extractPeriodPdfData(data: PdfJobData): Promise<PeriodPdfData> {
+  return loadCompanyName(data.tenantId).then((companyName) => ({
     dateFrom: data.dateFrom,
     dateTo: data.dateTo,
     siteId: data.siteId,
@@ -87,7 +88,8 @@ function extractPeriodPdfData(data: PdfJobData): PeriodPdfData {
     totalPiles: data.totalPiles || 0,
     totalDrilling: data.totalDrilling || 0,
     totalDowntime: data.totalDowntime || 0,
-  };
+    companyName,
+  }));
 }
 
 function extractSingleReportData(data: PdfJobData): SingleReportData | null {

@@ -13,6 +13,9 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 */
 const {withReadinessTenantTransaction} = vi.hoisted(() => ({withReadinessTenantTransaction: vi.fn()}));
 vi.mock('@/modules/readiness/server', () => ({withReadinessTenantTransaction}));
+// `writeReportAuditRow` пишет след через переданный клиент транзакции; `db`
+// здесь не нужен, а его импорт тянет Prisma-рантайм в тестовый процесс.
+vi.mock('@/lib/db', () => ({db: {}}));
 
 import {logProduction} from '../production';
 import {ensureReport} from '../shared';
@@ -127,5 +130,95 @@ describe('ensureReport — upsert по ключу [tenantId, shiftId]', () => {
       tenantId: 'tenant-a',
       status: 'draft',
     }));
+  });
+});
+
+/*
+  ЗАПИСЬ ВЫРАБОТКИ ОСТАВЛЯЕТ СЛЕД В ИСТОРИИ ОТЧЁТА.
+
+  `ReportAudit` писали только создание и правка отчёта (`report-command.service.ts`),
+  а выработка мобильного контура ложилась без единой строки: в истории отчёта не
+  было видно, что и когда в него дописали (F-R34-2). Строка пишется в ТОЙ ЖЕ
+  транзакции, что и сама запись выработки, и деловым номером отчёта (`RM-…`),
+  потому что история отчёта ищет строки именно по нему.
+*/
+describe('logProduction — след записи выработки в истории отчёта', () => {
+  const auditTx = {
+    shift: {findFirst: vi.fn()},
+    report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
+    crew: {findFirst: vi.fn()},
+    operatorChecklistExecution: {findFirst: vi.fn()},
+    userDocumentType: {findMany: vi.fn()},
+    userDocument: {findMany: vi.fn()},
+    ppeCheck: {findFirst: vi.fn()},
+    equipmentDefect: {findMany: vi.fn()},
+    safetyIncident: {findMany: vi.fn()},
+    equipment: {findFirst: vi.fn()},
+    pileGrade: {findFirst: vi.fn()},
+    pileWork: {findUnique: vi.fn(), create: vi.fn()},
+    reportAudit: {create: vi.fn()},
+  };
+
+  const pilesInput = {
+    tenantId: 'tenant-a',
+    operatorId: 'operator-a',
+    shiftId: 'shift-1234-5678',
+    clientCommandId: 'cmd-piles-1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'grade-1', count: 2},
+    now: new Date('2026-09-26T10:00:00.000Z'),
+  };
+
+  beforeEach(() => {
+    auditTx.shift.findFirst.mockResolvedValue({
+      id: pilesInput.shiftId, state: 'STARTED', equipmentId: 'equipment-1',
+      productionDate: new Date('2026-09-26T00:00:00.000Z'), type: 'DAY',
+      starter: {id: pilesInput.operatorId, role: 'OPERATOR'},
+    });
+    auditTx.report.findFirst.mockResolvedValue(null);
+    auditTx.crew.findFirst.mockResolvedValue({id: 'crew-1', siteId: 'site-1'});
+    // Чек-лист ТБ пройден накануне — срок по инструкции ещё не вышел.
+    auditTx.operatorChecklistExecution.findFirst.mockResolvedValue({
+      startedAt: new Date('2026-09-25T09:00:00.000Z'),
+    });
+    auditTx.userDocumentType.findMany.mockResolvedValue([]);
+    auditTx.userDocument.findMany.mockResolvedValue([]);
+    auditTx.ppeCheck.findFirst.mockResolvedValue(null);
+    auditTx.equipmentDefect.findMany.mockResolvedValue([]);
+    auditTx.safetyIncident.findMany.mockResolvedValue([]);
+    auditTx.equipment.findFirst.mockResolvedValue({isActive: true});
+    auditTx.pileGrade.findFirst.mockResolvedValue({id: 'grade-1', lengthMm: 12000, name: 'С 120.30', isActive: true, archivedAt: null});
+    auditTx.pileWork.findUnique.mockResolvedValue(null);
+    auditTx.pileWork.create.mockResolvedValue({id: 'pw-1'});
+    auditTx.report.upsert.mockResolvedValue({id: 'report-pk-1'});
+    auditTx.report.findUnique.mockResolvedValue({status: 'draft'});
+    auditTx.report.findUniqueOrThrow.mockResolvedValue({reportId: 'RM-shift-12-2026-09-26'});
+    auditTx.reportAudit.create.mockResolvedValue({});
+    withReadinessTenantTransaction.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: фиктивный клиент транзакции вместо Prisma
+      async (_tenantId: string, work: (client: any) => Promise<unknown>) => work(auditTx),
+    );
+  });
+
+  it('пишет строку «updated» деловым номером отчёта через ту же транзакцию', async () => {
+    await expect(logProduction(pilesInput)).resolves.toEqual({reportId: 'report-pk-1'});
+
+    expect(auditTx.report.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: {id: 'report-pk-1'}, select: {reportId: true},
+    });
+    expect(auditTx.reportAudit.create).toHaveBeenCalledTimes(1);
+    const {data} = auditTx.reportAudit.create.mock.calls[0][0];
+    expect(data).toEqual(expect.objectContaining({
+      reportId: 'RM-shift-12-2026-09-26',
+      actorId: 'operator-a',
+      action: 'updated',
+      diff: {'Выработка': {old: null, new: 'сваи: +2 шт (С 120.30)'}},
+    }));
+  });
+
+  it('повтор уже принятой команды след не пишет', async () => {
+    auditTx.pileWork.findUnique.mockResolvedValue({id: 'pw-existing'});
+
+    await expect(logProduction(pilesInput)).resolves.toEqual({reportId: ''});
+    expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
   });
 });

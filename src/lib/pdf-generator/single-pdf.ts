@@ -36,7 +36,7 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     const totalDowntime = data.downtimes.reduce((sum, downtime) => sum + (downtime.duration || 0), 0);
     const hasPilesWithoutLength = data.piles.some((pile) => pileMetersOf(pile) === 0);
 
-    addHeader(doc, 'РАБОЧИЙ ОТЧЁТ ПО СВАЙНЫМ РАБОТАМ', `№ ${shortId(data.reportId)} | ${formatRuDate(data.date)}`);
+    addHeader(doc, 'РАБОЧИЙ ОТЧЁТ ПО СВАЙНЫМ РАБОТАМ', `№ ${shortId(data.reportId)} | ${formatRuDate(data.date)}`, data.companyName);
     addInfoGrid(doc, [
       ['Объект', data.site?.name || '—', 'Дата', formatRuDate(data.date)],
       ['Оператор', data.user?.name || '—', 'Смена', `${shiftLabel(data.shiftType)} ${data.shiftStart || ''}-${data.shiftEnd || ''}`],

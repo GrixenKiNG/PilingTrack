@@ -7,6 +7,7 @@
 
 import { BarChart3 } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
+import { formatNumber, formatPercent } from '@/lib/format';
 
 /** Real period analytics from /api/admin/analytics/overview (computed from reports). */
 export interface OverviewData {
@@ -64,10 +65,11 @@ export interface FleetSnapshotSummary {
   totals: { totalEquipment: number; activeToday: number; pilesToday: number; pileMetersToday: number; drillingToday: number; drillingCountToday: number; downtimeHoursToday: number; crewsOnShiftToday: number; operatorsOnShiftToday: number };
 }
 
+// «36 ч» / «1,5 дн.» с запятой, а не «36.0 ч»: правила чисел — из @/lib/format.
 function fmtHours(h: number | null): string {
   if (h == null) return '—';
-  if (h >= 48) return `${(h / 24).toFixed(1)} дн.`;
-  return `${h.toFixed(1)} ч`;
+  if (h >= 48) return `${formatNumber(h / 24)} дн.`;
+  return `${formatNumber(h)} ч`;
 }
 
 /**
@@ -76,13 +78,13 @@ function fmtHours(h: number | null): string {
  */
 export function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
   const metrics: { label: string; value: string; tone?: string }[] = [
-    { label: 'Готовность парка', value: kpi.availability != null ? `${(kpi.availability * 100).toFixed(1)}%` : '—', tone: 'text-success-strong' },
+    { label: 'Готовность парка', value: kpi.availability != null ? formatPercent(kpi.availability * 100) : '—', tone: 'text-success-strong' },
     { label: 'MTBF', value: fmtHours(kpi.mtbfHours) },
     { label: 'MTTR', value: fmtHours(kpi.mttrHours) },
-    { label: 'Выполнение ППР', value: kpi.pmCompliance != null ? `${(kpi.pmCompliance * 100).toFixed(0)}%` : '—' },
+    { label: 'Выполнение ППР', value: kpi.pmCompliance != null ? formatPercent(kpi.pmCompliance * 100, 0) : '—' },
     { label: 'Отказы за период', value: String(kpi.failureCount), tone: kpi.failureCount > 0 ? 'text-destructive-strong' : undefined },
-    { label: 'Простой по ремонтам', value: fmtHours(kpi.downtimeHours) },
-    { label: 'Затраты на ТО', value: `${kpi.totalCost.toLocaleString('ru')} ₽` },
+    { label: 'Ремонт по ТО, ч', value: fmtHours(kpi.downtimeHours) },
+    { label: 'Затраты на ТО', value: `${formatNumber(kpi.totalCost, 0)} ₽` },
     { label: 'ППР закрыто', value: `${kpi.pmClosed} / ${kpi.pmPlanned}` },
   ];
   return (

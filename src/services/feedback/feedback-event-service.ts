@@ -88,6 +88,27 @@ function getAccessWhere(user: FeedbackUser) {
       };
 }
 
+/**
+ * События, которых в ленте обратной связи нет.
+ *
+ * «Успешный вход» пишется на каждый вход и в списке из 25 событий топит рабочие
+ * записи («Отчёт сдан» и т. п.) — 20 из 25 строк были входами (F-FEED-LOGIN).
+ * Прячем только на чтении ленты: в журнале аудита и в таблице событие остаётся.
+ * Неудачные входы и блокировки (auth.login.failed / auth.login.rate_limited)
+ * остаются видимыми — это сигнал, а не шум.
+ *
+ * Фильтр применяется и к ленте, и к счётчику непрочитанных (summary.unread), и к
+ * read_all: иначе бейдж показывал бы «непрочитанных» больше, чем есть строк.
+ */
+const FEED_HIDDEN_ACTIONS = ['auth.login.succeeded'] as const;
+
+function getFeedWhere(user: FeedbackUser) {
+  return {
+    ...getAccessWhere(user),
+    action: { notIn: [...FEED_HIDDEN_ACTIONS] },
+  };
+}
+
 export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
   return db.feedbackEvent.create({
     data: {
@@ -111,7 +132,7 @@ export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
 
 export async function listFeedbackEventsForUser(user: FeedbackUser, limit = 25) {
   const events = await db.feedbackEvent.findMany({
-    where: getAccessWhere(user),
+    where: getFeedWhere(user),
     select: {
       id: true,
       level: true,
@@ -227,7 +248,7 @@ export async function markFeedbackEventState(
 
 export async function markAllFeedbackEventsRead(user: FeedbackUser, limit = 100) {
   const events = await db.feedbackEvent.findMany({
-    where: getAccessWhere(user),
+    where: getFeedWhere(user),
     select: { id: true },
     take: limit,
     orderBy: { createdAt: 'desc' },

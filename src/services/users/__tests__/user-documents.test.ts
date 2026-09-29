@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { evaluateOperatorClearance } from '../operator-clearance';
 
-const { findFirstUserMock, findFirstTypeMock, findManyTypeMock, findManyDocMock, createDocMock, findFirstDocMock, mediaFindUniqueMock, updateDocMock } = vi.hoisted(() => ({
+const { findFirstUserMock, findFirstTypeMock, findManyTypeMock, findManyDocMock, createDocMock, findFirstDocMock, mediaFindUniqueMock, updateDocMock, recordAuditMock } = vi.hoisted(() => ({
   findFirstUserMock: vi.fn(),
   findFirstTypeMock: vi.fn(),
   findManyTypeMock: vi.fn(),
@@ -10,6 +10,12 @@ const { findFirstUserMock, findFirstTypeMock, findManyTypeMock, findManyDocMock,
   findFirstDocMock: vi.fn(),
   mediaFindUniqueMock: vi.fn(),
   updateDocMock: vi.fn(),
+  recordAuditMock: vi.fn(),
+}));
+
+// След пишется в audit-service; подменяем его, чтобы поймать metadata события.
+vi.mock('@/services/audit/audit-service', () => ({
+  recordAuditEvent: recordAuditMock,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -253,5 +259,49 @@ describe('evaluateOperatorClearance', () => {
   it('чужие виды документов допуск не закрывают', () => {
     const result = evaluateOperatorClearance([type], [{ typeId: 'type-2', expiresAt: day(400) }], now);
     expect(result.cleared).toBe(false);
+  });
+});
+
+describe('след правки документа — прежний срок (F-R34-22)', () => {
+  const ADMIN = { id: 'usr_admin', role: 'ADMIN' };
+
+  beforeEach(() => {
+    recordAuditMock.mockReset();
+    findFirstUserMock.mockResolvedValue({ id: 'usr_other', name: 'Машинист' });
+    findFirstTypeMock.mockResolvedValue({ id: 'type_1', requiresExpiry: true, name: 'Удостоверение' });
+    findFirstDocMock.mockResolvedValue({
+      id: 'doc_1',
+      typeId: 'type_1',
+      issuedAt: new Date('2025-01-01T00:00:00Z'),
+      expiresAt: new Date('2026-01-01T00:00:00Z'),
+      mediaId: null,
+    });
+    updateDocMock.mockResolvedValue({
+      id: 'doc_1',
+      typeId: 'type_1',
+      expiresAt: new Date('2027-01-01T00:00:00Z'),
+    });
+  });
+
+  // Вопрос «насколько продлил удостоверение» требует обоих сроков.
+  it('кладёт прежний срок и вид рядом с новыми', async () => {
+    await updateUserDocument('usr_other', 'doc_1', { expiresAt: '2027-01-01' }, ctx(ADMIN));
+
+    const event = recordAuditMock.mock.calls[0][0];
+    expect(event.action).toBe('user.document.updated');
+    expect(event.metadata.expiresAt).toBe(new Date('2027-01-01T00:00:00Z').toISOString());
+    expect(event.metadata.before).toEqual({
+      typeId: 'type_1',
+      expiresAt: new Date('2026-01-01T00:00:00Z').toISOString(),
+    });
+  });
+
+  it('создание следа с before не пишет — поведение не изменилось', async () => {
+    createDocMock.mockResolvedValue({ id: 'doc_2', typeId: 'type_1', expiresAt: new Date('2027-01-01T00:00:00Z') });
+    await createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01' }, ctx(ADMIN));
+
+    const event = recordAuditMock.mock.calls[0][0];
+    expect(event.action).toBe('user.document.created');
+    expect(event.metadata.before).toBeUndefined();
   });
 });

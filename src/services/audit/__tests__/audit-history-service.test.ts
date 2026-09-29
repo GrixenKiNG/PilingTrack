@@ -52,6 +52,97 @@ describe('getEntityHistory', () => {
     }
   });
 
+  it('событие документа работника подписано по-русски, а не машинным кодом', async () => {
+    asMock(db.feedbackEvent.findMany).mockResolvedValue([
+      {
+        id: 'e1',
+        action: 'user.document.updated',
+        title: 'user.document.updated',
+        actorName: null,
+        actorRole: null,
+        createdAt: new Date('2026-05-02'),
+        metadata: { documentId: 'doc-1', typeId: 'type-1', expiresAt: '2027-05-01T00:00:00.000Z', selfService: false },
+      },
+    ]);
+
+    const [entry] = await getEntityHistory('users', 'usr-1', 'orion');
+
+    expect(entry.action).toBe('user.document.updated');
+    expect(entry.title).toBe('Документ работника изменён');
+  });
+
+  it('поля документов и допусков подписаны: «Действует до», «Вид документа», «Статус», «Вид техники»', async () => {
+    asMock(db.feedbackEvent.findMany).mockResolvedValue([
+      {
+        id: 'e2',
+        action: 'user.equipment_permit.saved',
+        title: 'user.equipment_permit.saved',
+        actorName: null,
+        actorRole: null,
+        createdAt: new Date('2026-05-02'),
+        metadata: {
+          before: { typeId: 'type-1', expiresAt: '2026-05-01T00:00:00.000Z', equipmentKind: 'PILE_DRIVER', status: 'DENIED' },
+          after: { typeId: 'type-2', expiresAt: '2027-05-01T00:00:00.000Z', equipmentKind: 'DRILLING_RIG', status: 'ALLOWED' },
+        },
+      },
+    ]);
+
+    const [entry] = await getEntityHistory('users', 'usr-1', 'orion');
+
+    expect(entry.changes).toEqual([
+      { label: 'Вид документа', before: 'type-1', after: 'type-2' },
+      { label: 'Действует до', before: '2026-05-01T00:00:00.000Z', after: '2027-05-01T00:00:00.000Z' },
+      { label: 'Вид техники', before: 'PILE_DRIVER', after: 'DRILLING_RIG' },
+      { label: 'Статус', before: 'DENIED', after: 'ALLOWED' },
+    ]);
+  });
+
+  it('состав помощников бригады виден в панели изменений: «Помощники»', async () => {
+    asMock(db.feedbackEvent.findMany).mockResolvedValue([
+      {
+        id: 'e3',
+        action: 'crew.updated',
+        title: 'Бригада изменена',
+        actorName: null,
+        actorRole: null,
+        createdAt: new Date('2026-05-02'),
+        metadata: {
+          before: { name: 'Бригада №1', assistants: ['Иванов И.', 'Петров П.'] },
+          after: { name: 'Бригада №1', assistants: ['Иванов И.', 'Сидоров С.'] },
+        },
+      },
+    ]);
+
+    const [entry] = await getEntityHistory('crews', 'crew-1', 'orion');
+
+    expect(entry.changes).toEqual([
+      { label: 'Помощники', before: 'Иванов И., Петров П.', after: 'Иванов И., Сидоров С.' },
+    ]);
+  });
+
+  it('помощники рендерятся именами и из объектов { name }; пустой состав — «—»', async () => {
+    asMock(db.feedbackEvent.findMany).mockResolvedValue([
+      {
+        id: 'e4',
+        action: 'crew.updated',
+        title: 'Бригада изменена',
+        actorName: null,
+        actorRole: null,
+        createdAt: new Date('2026-05-02'),
+        metadata: {
+          before: { assistants: [{ name: 'Иванов И.' }, { name: 'Петров П.' }] },
+          after: { assistants: [] },
+        },
+      },
+    ]);
+
+    const [entry] = await getEntityHistory('crews', 'crew-1', 'orion');
+
+    expect(entry.changes).toEqual([
+      { label: 'Помощники', before: 'Иванов И., Петров П.', after: '—' },
+    ]);
+  });
+
   it.each([
     ['null', null],
     ['undefined', undefined],

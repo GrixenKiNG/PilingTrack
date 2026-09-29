@@ -290,7 +290,12 @@ export function FeedbackCenter() {
                           <p className="mt-1 text-sm text-muted-foreground">{event.message}</p>
                           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground">
                             <span>{formatEventDate(event.createdAt)}</span>
-                            {isPrivileged && event.requestId && <span>requestId: {event.requestId}</span>}
+                            {/* requestId нужен поддержке, но в карточке это
+                                техническая строка: держим его только в
+                                подсказке, а не текстом (F-FEED-LOGIN). */}
+                            {isPrivileged && event.requestId && (
+                              <span title={`requestId: ${event.requestId}`}>ID обращения</span>
+                            )}
                             {event.actorName && <span>Инициатор: {event.actorName}</span>}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">

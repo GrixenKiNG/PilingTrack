@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
 import type { ReportDTO } from '@/lib/types';
-import { pluralizeRu } from '@/lib/format';
+import { pluralizeRu, formatFixed, formatNumber } from '@/lib/format';
 import { pileLengthMeters } from '@/lib/pile-length';
 
 interface ReportDetailDialogProps {
@@ -80,7 +80,7 @@ export function ReportDetailDialog({
                             {p.pileGrade?.name && (
                               <p className="text-3xs text-muted-foreground">
                                 {lengthKnown
-                                  ? `${metersPerPile.toFixed(1)} м × ${p.count} шт. = ${(metersPerPile * p.count).toFixed(1)} м.п.`
+                                  ? `${formatFixed(metersPerPile, 1)} м × ${p.count} шт. = ${formatFixed(metersPerPile * p.count, 1)} м.п.`
                                   : PILE_LENGTH_UNKNOWN_LABEL}
                               </p>
                             )}
@@ -89,7 +89,7 @@ export function ReportDetailDialog({
                             <span className="block">{p.count} шт.</span>
                             <span className="block text-xs text-muted-foreground">
                               {lengthKnown
-                                ? `${(metersPerPile * p.count).toFixed(1)} м.п.`
+                                ? `${formatFixed(metersPerPile * p.count, 1)} м.п.`
                                 : PILE_LENGTH_UNKNOWN_LABEL}
                             </span>
                           </span>
@@ -115,7 +115,7 @@ export function ReportDetailDialog({
                         <span>{d.type?.name || '—'}</span>
                         <span className="text-right font-mono font-semibold">
                           <span className="block">{d.count || 1} шт.</span>
-                          <span className="block text-xs text-muted-foreground">{d.meters} м.п.</span>
+                          <span className="block text-xs text-muted-foreground">{formatFixed(d.meters, 1)} м.п.</span>
                         </span>
                       </div>
                     ))}
@@ -138,7 +138,7 @@ export function ReportDetailDialog({
                           <span>{dt.reason?.name || '—'}</span>
                           {dt.comment && <p className="text-3xs text-muted-foreground">{dt.comment}</p>}
                         </div>
-                        <span className="font-mono font-semibold text-warning-strong">{dt.duration} ч</span>
+                        <span className="font-mono font-semibold text-warning-strong">{formatNumber(dt.duration)} ч</span>
                       </div>
                     ))}
                   </div>

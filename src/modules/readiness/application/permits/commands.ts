@@ -242,6 +242,15 @@ async function versionedAction(input: {
           id: input.id, version: expected, actorId: input.context.actorId,
           reason: input.reason});
       } else {
+        // Строку наряда захватываем до чтения подписей: две одновременные
+        // подписи двух согласующих идут по очереди, а не наслаиваются друг на
+        // друга. Без захвата каждая транзакция видит только свою подпись,
+        // полнота не наступает ни у одной — и наряд остаётся «на согласовании»
+        // со всеми подписями, а повтор отбивается 409. Ниже подписи и полнота
+        // перечитываются из базы (см. `repository.get` после `addApproval`), и
+        // переход в `APPROVED` идёт `updateMany` с текущим статусом — он
+        // случается ровно один раз.
+        await repository.lockForApproval(input.context.tenantId, input.id);
         const permit = toWorkPermitRecord(beforeRow);
         assertPermitTransition(permit.state, 'approve');
         if (beforeRow.validTo <= new Date()) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Просроченный наряд согласовать нельзя');
