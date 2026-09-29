@@ -77,10 +77,10 @@ Rules live in `prometheus/alerts.yml`. Highlights:
 | Alert | Condition | Severity |
 |-------|-----------|----------|
 | `HighAPILatencyP95` | p95 > 500ms for 5m | warning |
-| `HighErrorRate` | 5xx rate > 5% for 2m | critical |
-| `PostgresPoolNearExhaustion` | active connections > 90% of pool | critical |
-| `RedisMemoryHigh` | usage > 80% for 5m | warning |
-| `OutboxBacklogStuck` | pending > 1000 for 10m | warning |
+| `HighAPIErrorRate` | 5xx rate > 1% for 2m | critical |
+| `PostgresConnectionPoolExhausted` | active connections > 90% of pool | critical |
+| `RedisHighMemory` | usage > 80% for 5m | warning |
+| `OutboxBacklog` | pending > 1000 for 10m | warning |
 | `TargetDown` | scrape target unreachable for 2m | critical |
 
 Each alert carries a `runbook_url` annotation pointing to the wiki.
