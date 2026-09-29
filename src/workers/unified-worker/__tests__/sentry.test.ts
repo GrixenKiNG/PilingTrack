@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   runPmScheduler: vi.fn(),
   runReadinessScheduler: vi.fn(),
   forEachTenant: vi.fn(),
+  recordSchedulerHeartbeat: vi.fn(),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -49,6 +50,10 @@ vi.mock('@/modules/equipment', () => ({
 
 vi.mock('@/modules/readiness/application/scheduler', () => ({
   runReadinessScheduler: mocks.runReadinessScheduler,
+}));
+
+vi.mock('@/workers/unified-worker/scheduler-heartbeat', () => ({
+  recordSchedulerHeartbeat: mocks.recordSchedulerHeartbeat,
 }));
 
 const ENV_KEYS = [
@@ -136,5 +141,48 @@ describe('Sentry в процессе воркера', () => {
       'Readiness scheduler pass failed',
       expect.anything(),
     );
+  });
+
+  describe('пульс планировщика (F-SCHEDULER-HEARTBEAT)', () => {
+    it('успешный проход планировщика ТО пишет пульс с именем и интервалом', async () => {
+      process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '0';
+      process.env.PM_SCHEDULER_INTERVAL_MS = '60000';
+      mocks.runPmScheduler.mockResolvedValue({ created: 0, due: 0, overdue: [] });
+
+      const { startPmScheduler } = await import('@/workers/unified-worker/pm-scheduler');
+      const stop = startPmScheduler();
+
+      try {
+        await vi.waitFor(() => {
+          expect(mocks.recordSchedulerHeartbeat).toHaveBeenCalled();
+        });
+      } finally {
+        stop();
+      }
+
+      expect(mocks.recordSchedulerHeartbeat).toHaveBeenCalledWith('pm-scheduler', 60000);
+    });
+
+    it('упавший проход пульса не пишет', async () => {
+      process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '0';
+      process.env.PM_SCHEDULER_INTERVAL_MS = '60000';
+      mocks.runPmScheduler.mockRejectedValue(new Error('pm boom'));
+
+      const { startPmScheduler } = await import('@/workers/unified-worker/pm-scheduler');
+      const stop = startPmScheduler();
+
+      try {
+        await vi.waitFor(() => {
+          expect(mocks.logger.error).toHaveBeenCalledWith(
+            'PM scheduler pass failed',
+            expect.anything(),
+          );
+        });
+      } finally {
+        stop();
+      }
+
+      expect(mocks.recordSchedulerHeartbeat).not.toHaveBeenCalled();
+    });
   });
 });

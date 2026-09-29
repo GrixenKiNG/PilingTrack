@@ -16,6 +16,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { rebuildAll } from '@/modules/reports/application/projections/rebuild';
+import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
 
 const REBUILD_INTERVAL = parseInt(
   process.env.PROJECTION_REBUILD_INTERVAL_MS || String(24 * 60 * 60 * 1000),
@@ -31,6 +32,7 @@ async function runOnce(): Promise<void> {
     const results = await rebuildAll();
     const rows = results.reduce((sum, r) => sum + r.rowsWritten, 0);
     logger.info('Projection rebuild pass', { rows, projections: results.length });
+    await recordSchedulerHeartbeat('projection-rebuild', REBUILD_INTERVAL);
   } catch (error) {
     logger.error('Projection rebuild pass failed', {
       error: error instanceof Error ? error.message : String(error),

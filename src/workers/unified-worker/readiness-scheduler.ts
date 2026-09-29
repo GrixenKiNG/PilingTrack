@@ -15,6 +15,7 @@ import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';
+import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
 
 const INTERVAL = parseInt(process.env.READINESS_SCHEDULER_INTERVAL_MS || String(60 * 60 * 1000), 10);
 const STARTUP_DELAY = parseInt(process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS || '90000', 10);
@@ -35,6 +36,7 @@ async function runOnce(): Promise<void> {
         });
       }
     });
+    await recordSchedulerHeartbeat('readiness-scheduler', INTERVAL);
   } catch (error) {
     logger.error('Readiness scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),
