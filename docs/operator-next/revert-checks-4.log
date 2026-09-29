@@ -1,0 +1,70 @@
+Revert-checks r5 (review No.4): каждый тест должен падать без своей правки.
+Дата: 2026-09-29T17:44:09.712Z. Стенд: vitest, модуль src/components/piling/operator-next.
+
+### A1-память — паспорт не пишется в память оболочки (updatePassportDraft — пустая функция)
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "  /** ОТКАТ: паспорт не запоминается. */\n  const updatePassportDraft = useCallback((next: PassportDraftData) ="
+- Прогон: `npx vitest run <файл> -t "паспорт с тремя залогами"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: паспорт с тремя залогами переживает обходной экран и при отключённом localStorage 303ms
+  Первое сообщение: AssertionError: expected [ <input …(6)></input> ] to have a length of 3 but got 1
+
+### A1-очистка — подтверждённый паспорт не очищается (clearSubmittedEntry — no-op)
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "    if (entry.kind === 'PILE_PASSPORT') {\n      return; // ОТКАТ: подтверждённый паспорт остаётся черновиком\n "
+- Прогон: `npx vitest run <файл> -t "подтверждённый паспорт очищается"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: подтверждённый паспорт очищается сразу, до перечитывания; поля закрыты 1376ms
+  Первое сообщение: Error: expect(element).toHaveValue()
+
+### A2-показ — показ черновиков снова считается по одной смене (draftsAreCurrent без пользователя)
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "  const draftsAreCurrent = drafts.shiftId === shiftId; // ОТКАТ: без пользователя"
+- Прогон: `npx vitest run <файл> -t "смена пользователя"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: смена пользователя А→Б без размонтирования: черновик А исчезает и не уходит под Б 376ms
+  Первое сообщение: AssertionError: expected <input inputmode="numeric" …(6)></input> to be null
+
+### A2-запись — запись копии не проверяет пользователя (черновик А уходит под Б)
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "    if (!userId || !shiftId || drafts.shiftId !== shiftId) return; // ОТКАТ: без пользователя"
+- Прогон: `npx vitest run <файл> -t "смена пользователя"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: смена пользователя А→Б без размонтирования: черновик А исчезает и не уходит под Б 385ms
+  Первое сообщение: AssertionError: expected '{"work":{"mode":"PILES","forms":{"PIL…' not to contain '"count":"5"'
+
+### A2-anon — возвращается общий ключ «anon» для неизвестного пользователя
+- Откат: src/components/piling/operator-next/draft-storage.ts — вернул строку: "  if (!shiftId) return null; // ОТКАТ: общий «anon»\n  return `${KEY_PREFIX}:${userId ?? 'anon'}:${shiftId}`;"
+- Прогон: `npx vitest run <файл> -t "ключа нет"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: ключ — по паре «пользователь + смена»; у неизвестного пользователя ключа нет 7ms
+  Первое сообщение: AssertionError: expected 'piling.onx.drafts.v1:anon:shift-9' to be null
+
+### A3-чтение — ошибка чтения снова трактуется как «пусто» и разрешает запись поверх
+- Откат: src/components/piling/operator-next/draft-storage.ts — вернул строку: "  } catch {\n    return {status: 'ok', value: null}; // ОТКАТ: ошибка чтения = «пусто»\n  }\n  if (raw === null) "
+- Прогон: `npx vitest run <файл> -t "отказ чтения"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: отказ чтения при существующем документе — документ не меняется, запись отклонена 12ms
+  Первое сообщение: AssertionError: expected true to be false // Object.is equality
+
+### A3-статус — статус сохранности не обновляется по результату реальной записи
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "    void ok; // ОТКАТ: статус по реальной записи не обновляется"
+- Прогон: `npx vitest run <файл> -t "отказ записи после успешного старта"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: отказ записи после успешного старта — честный статус на экране формы 1322ms
+  Первое сообщение: TestingLibraryElementError: Unable to find an element with the text: /Черновик не сохранится при перезагрузке страницы/. This could be because the text is broken up by mu
+
+### B4-замок — синхронный замок повторного входа снят (single-flight пропускает второй вызов)
+- Откат: src/components/piling/operator-next/single-flight.ts — вернул строку: "      if (false && busy) return {started: false, value: undefined}; // ОТКАТ"
+- Прогон: `npx vitest run <файл> -t "двойное нажатие"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯; упали: два нажатия подряд — одна отправка 378ms; происшествие: двойное нажатие в одном такте — одна отправка 268ms; поправка: двойное нажатие в одном такте — одна отправка 131ms; запись в очередь: двойное нажатие при обрыве — ровно одна запись 225ms
+  Первое сообщение: AssertionError: expected [ { …(4) }, { …(4) } ] to have a length of 1 but got 2
+
+### B4-позднее — очистка перенесена на конец цикла (после перечитывания), а не по подтверждению
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "        await work();\n        if (kind) keys.renew(kind);\n        settle(true);\n        await reload();\n      "
+- Прогон: `npx vitest run <файл> -t "упал — очистка"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: выработка: «reload» упал — очистка уже сделана, новый ввод цел 1416ms
+  Первое сообщение: Error: expect(element).toHaveValue(null)
+
+### B5-заметка — заметка закрытия снова читается снимком, а не в момент отправки
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "        await sendCommand({command: 'close-shift', shiftId: shift.id, comment: closeNote}); // ОТКАТ: снимок"
+- Прогон: `npx vitest run <файл> -t "B5"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: двойное нажатие — одна подготовка; правка заметки доходит до отправки 240ms
+  Первое сообщение: AssertionError: expected 'старый текст' to be 'новый текст к 19:00' // Object.is equality
+
+### B6-порядок — устаревший ответ чтения снова применяется (requestSeq не отбрасывает)
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "      // ОТКАТ: устаревший ответ применяется.\n      setState(next);"
+- Прогон: `npx vitest run <файл> -t "B6"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: устаревший ответ отброшен; приёмка отправляет последнюю выбранную 202ms
+  Первое сообщение: AssertionError: expected <h2 …(1)></h2> to be null
+
+DONE. Все откаты возвращены; целевые тесты падают без своих правок (проверено).
