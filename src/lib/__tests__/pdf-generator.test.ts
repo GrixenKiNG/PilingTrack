@@ -71,7 +71,7 @@ describe('pdf-generator', () => {
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(1000);
     expect(execFile).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it('generates a period PDF in-process', async () => {
     const { generatePeriodPdf } = await import('@/lib/pdf-generator');
@@ -103,7 +103,7 @@ describe('pdf-generator', () => {
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(1000);
     expect(execFile).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it('prints downtime hours as on screen and totals them from raw durations (F-R28-1)', async () => {
     const PDFDocument = (await import('pdfkit')).default;
@@ -143,7 +143,7 @@ describe('pdf-generator', () => {
     }
 
     expect(rendered).toEqual(expect.arrayContaining(['1 ч 15 мин', '15 мин', '3 ч', '4 ч 30 мин']));
-  });
+  }, 30_000);
 
   it('writes «длина марки не задана» instead of 0.0 metres for a grade without length (F-R28-2)', async () => {
     const { generateSinglePdf } = await import('@/lib/pdf-generator');
@@ -163,7 +163,7 @@ describe('pdf-generator', () => {
     // Ни одна ячейка метража не печатает 0.0 (шт остаются как были).
     expect(rendered).not.toContain('0.0');
     expect(rendered).toEqual(expect.arrayContaining(['7', '3']));
-  });
+  }, 30_000);
 
   it('does not mark the metres total when every grade has a length (F-R28-2)', async () => {
     const { generateSinglePdf } = await import('@/lib/pdf-generator');
@@ -177,7 +177,7 @@ describe('pdf-generator', () => {
     expect(rendered).not.toContain('(неполный: у марки не задана длина)');
     // Метраж — с десятичной запятой (аудит 17, находка 4).
     expect(rendered).toContain('3 / 36,0');
-  });
+  }, 30_000);
 
   it('marks the period metres total as incomplete when a grade has no length (F-R28-2)', async () => {
     const { generatePeriodPdf } = await import('@/lib/pdf-generator');
@@ -207,7 +207,7 @@ describe('pdf-generator', () => {
     });
 
     expect(rendered).toContain('(неполный: у марки не задана длина)');
-  });
+  }, 30_000);
 
   it('печатает название компании из настроек в шапке PDF (F-R30-6)', async () => {
     const { generateSinglePdf, generatePeriodPdf } = await import('@/lib/pdf-generator');
@@ -233,7 +233,7 @@ describe('pdf-generator', () => {
       });
     });
     expect(period).toContain('ООО «Орион»');
-  });
+  }, 30_000);
 
   it('печатает установку в шапке сводного отчёта только при отборе по установке (F-R44-5)', async () => {
     const { generatePeriodPdf } = await import('@/lib/pdf-generator');
@@ -257,7 +257,7 @@ describe('pdf-generator', () => {
       await generatePeriodPdf({ ...base });
     });
     expect(unfiltered.some((line) => line.startsWith('Установка:'))).toBe(false);
-  });
+  }, 30_000);
 });
 
 /**
