@@ -184,3 +184,8 @@ public/__concept-preview.html
 .tmp/
 .tmp-check/
 .openclaw-audit.json
+
+# Снимки живых прогонов /operator/next — на диске, не в git (29.09.2026)
+docs/operator-next/browser/**/*.png
+e2e/operator-next/**/*.png
+e2e/operator-next/*.log
