@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as Sentry from '@sentry/nextjs';
 import { ActiveViewErrorBoundary } from './active-view-error-boundary';
 import { BootstrapBoundary } from './bootstrap-boundary';
+
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }));
 
 function BrokenView(): never {
   throw new Error('view failed');
@@ -26,6 +29,7 @@ function BoundaryWithRetry() {
 
 describe('readiness boundaries', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
       callback(0);
       return 1;
@@ -72,6 +76,22 @@ describe('readiness boundaries', () => {
       </ActiveViewErrorBoundary>,
     );
     expect(screen.getByText('Смены восстановлены')).toBeInTheDocument();
+    consoleError.mockRestore();
+  });
+
+  it('reports an active view failure to Sentry once', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <ActiveViewErrorBoundary activeView="fleet">
+        <BrokenView />
+      </ActiveViewErrorBoundary>,
+    );
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    const [error, options] = vi.mocked(Sentry.captureException).mock.calls[0];
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe('view failed');
+    expect(options).toMatchObject({ extra: { componentStack: expect.any(String) } });
     consoleError.mockRestore();
   });
 });

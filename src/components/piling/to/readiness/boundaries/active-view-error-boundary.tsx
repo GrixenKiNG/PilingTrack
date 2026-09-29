@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { Button } from '@/components/ui/button';
 
 interface ActiveViewErrorBoundaryProps {
@@ -26,6 +27,7 @@ export class ActiveViewErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('Tech readiness active view failed', error, info.componentStack);
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
   }
 
   componentDidUpdate(previousProps: ActiveViewErrorBoundaryProps) {
