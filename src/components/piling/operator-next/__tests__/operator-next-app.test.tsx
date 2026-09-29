@@ -6,6 +6,15 @@ import {OperatorNextApp} from '../operator-next-app';
 import {draftStorageKey, saveShellDrafts} from '../draft-storage';
 import {emptyFormFields, emptyPassportDraft, emptyWorkDraft} from '../drafts';
 import {checklistView, makeChecklist, makeState} from './fixtures';
+import {flushQueue} from '@/components/piling/operator-mobile/offline-queue';
+
+// Считаем вызовы самого flush (ревью №5, B5): «одна отправка элемента очереди»
+// ещё не доказывает, что подготовка была одна, — нужен счётчик непосредственно
+// на flush. Шпион оборачивает настоящую отправку, поведение не меняется.
+vi.mock('@/components/piling/operator-mobile/offline-queue', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/piling/operator-mobile/offline-queue')>();
+  return {...actual, flushQueue: vi.fn(actual.flushQueue)};
+});
 
 /**
  * Сквозные сценарии оболочки: ревью №1 нашло здесь потерю ввода и гонки
@@ -51,6 +60,7 @@ beforeEach(() => {
   // конкретного машиниста — с неизвестным пользователем хранилище не работает.
   usePilingStore.setState({currentUser: DEFAULT_USER});
   sent = [];
+  vi.mocked(flushQueue).mockClear();
   stateImpl = () => json({data: makeState()});
   commandImpl = () => json({data: {ok: true}});
   globalThis.fetch = vi.fn(async (input: unknown, init?: RequestInit) => {
@@ -504,6 +514,7 @@ describe('ревью №2, п.2: подготовка закрытия смен�
     const slowSend = deferred<Response>();
     commandImpl = (body) => (body && body.command === 'log-production' ? slowSend.promise : json({data: {ok: true}}));
 
+    const flushBefore = vi.mocked(flushQueue).mock.calls.length;
     fireEvent.click(screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0]);
     // Подготовка началась: запись из очереди ушла в отправку.
     await waitFor(() => expect(sent.some((item) => item.command === 'log-production')).toBe(true));
@@ -525,6 +536,8 @@ describe('ревью №2, п.2: подготовка закрытия смен�
     const closeBody = sent.find((item) => item.command === 'close-shift') as {comment?: string};
     expect(closeBody.comment).toBe('вывезти грунт к 19:00');
     expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(1);
+    // Двойное нажатие не запустило вторую подготовку: сам flush вызван один раз.
+    expect(vi.mocked(flushQueue).mock.calls.length - flushBefore).toBe(1);
   });
 });
 
@@ -1259,6 +1272,7 @@ describe('ревью №4, B5: заметку меняют во время за�
     commandImpl = (body) => (body && body.clientCommandId === 'q-5' ? slow.promise : json({data: {ok: true}}));
 
     const closeButton = screen.getAllByRole('button', {name: /Закрыть смену и отправить отчёт/})[0];
+    const flushBefore = vi.mocked(flushQueue).mock.calls.length;
     await act(async () => {
       closeButton.click();
       closeButton.click();
@@ -1273,7 +1287,9 @@ describe('ревью №4, B5: заметку меняют во время за�
     await waitFor(() => expect(sent.some((item) => item.command === 'close-shift')).toBe(true));
     const closeBody = sent.find((item) => item.command === 'close-shift') as {comment?: string};
     expect(closeBody.comment).toBe('новый текст к 19:00');
-    // Подготовка ровно одна: запись из очереди ушла один раз, закрытие — одно.
+    // Подготовка ровно одна: сам flush вызван один раз (ревью №5, B5), запись
+    // из очереди ушла один раз, закрытие — одно.
+    expect(vi.mocked(flushQueue).mock.calls.length - flushBefore).toBe(1);
     expect(sent.filter((item) => item.clientCommandId === 'q-5')).toHaveLength(1);
     expect(sent.filter((item) => item.command === 'close-shift')).toHaveLength(1);
   });
