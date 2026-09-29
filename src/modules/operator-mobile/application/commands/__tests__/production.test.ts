@@ -186,7 +186,7 @@ describe('logProduction — след записи выработки в исто
     auditTx.equipmentDefect.findMany.mockResolvedValue([]);
     auditTx.safetyIncident.findMany.mockResolvedValue([]);
     auditTx.equipment.findFirst.mockResolvedValue({isActive: true});
-    auditTx.pileGrade.findFirst.mockResolvedValue({id: 'grade-1', lengthMm: 12000, name: 'С 120.30'});
+    auditTx.pileGrade.findFirst.mockResolvedValue({id: 'grade-1', lengthMm: 12000, name: 'С 120.30', isActive: true, archivedAt: null});
     auditTx.pileWork.findUnique.mockResolvedValue(null);
     auditTx.pileWork.create.mockResolvedValue({id: 'pw-1'});
     auditTx.report.upsert.mockResolvedValue({id: 'report-pk-1'});

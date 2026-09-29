@@ -1,7 +1,36 @@
-import {render, screen} from '@testing-library/react';
-import {describe, expect, it} from 'vitest';
+import {fireEvent, render, screen} from '@testing-library/react';
+import {describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {ClosedScreen} from './closing-screen';
+import {ClosedScreen, ClosingScreen} from './closing-screen';
+
+describe('закрытие смены с неотправленными записями', () => {
+  const state = {
+    assignment: {equipmentName: 'Liebherr LRH 100 №1'},
+    checklists: [{stage: 'EO_AFTER', done: true}],
+    warnings: [],
+    production: {piles: {count: 3, meters: 42}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
+  } as unknown as OperatorMobileState;
+
+  it('не даёт закрыть смену, пока на телефоне есть записи, и предлагает отправить их', () => {
+    const onClose = vi.fn();
+    const onSendNow = vi.fn();
+    render(<ClosingScreen state={state} busy={false} error={null} onOpenService={vi.fn()}
+      onClose={onClose} unsent={2} onSendNow={onSendNow} />);
+
+    expect(screen.getByText('На телефоне не отправлено: 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Закрыть смену и отправить отчёт'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Отправить записи с телефона'}));
+    expect(onSendNow).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('закрывает смену, когда очередь пуста', () => {
+    const onClose = vi.fn();
+    render(<ClosingScreen state={state} busy={false} error={null} onOpenService={vi.fn()} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену и отправить отчёт'}));
+    expect(onClose).toHaveBeenCalled();
+  });
+});
 
 describe('закрытая смена оператора', () => {
   it('показывает проверяемую серверную квитанцию отчёта', () => {

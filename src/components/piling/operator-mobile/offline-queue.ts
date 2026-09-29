@@ -39,6 +39,8 @@ export interface QueuedCommand {
    * положенных до появления поля, владельца нет — их считаем своими.
    */
   ownerId?: string | null;
+  /** Имя владельца — чтобы сменщику было кого назвать (аудит R43 №2). */
+  ownerName?: string | null;
   clientCommandId: string;
   /** Подпись для человека: что именно лежит на устройстве. */
   label: string;
@@ -242,6 +244,20 @@ export function pendingCount(): number {
   return readQueue().length;
 }
 
+/**
+ * Чужие записи на этом устройстве — сколько и чьи.
+ *
+ * Под сессией сменщика они не уходят и уходить не должны: выработка ушла бы
+ * не тому человеку. Но и молчать о них нельзя (аудит R43 №2): если хозяин
+ * больше не войдёт на этом телефоне, сваи потеряются, и никто не узнает.
+ * Сменщику показываем, что они лежат, чтобы он сообщил хозяину или мастеру.
+ */
+export function foreignQueueSummary(): {count: number; owners: string[]} {
+  const foreign = read().filter((item) => !isMine(item));
+  const owners = [...new Set(foreign.map((item) => item.ownerName).filter((name): name is string => !!name))];
+  return {count: foreign.length, owners};
+}
+
 // --- Операции ---
 
 /** Кладём до отправки: обрыв на середине запроса не должен терять запись. */
@@ -250,6 +266,7 @@ export function enqueue(command: {clientCommandId: string}): void {
   if (queue.some((item) => item.clientCommandId === command.clientCommandId)) return;
   queue.push({
     ownerId: currentOwnerId(),
+    ownerName: usePilingStore.getState().currentUser?.name ?? null,
     clientCommandId: command.clientCommandId,
     label: commandLabel(command),
     command,

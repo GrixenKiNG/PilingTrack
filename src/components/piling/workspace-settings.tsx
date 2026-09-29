@@ -148,8 +148,8 @@ export function WorkspaceSettings() {
   // Сервер сам сливает патч с сохранённым значением (sanitizeSettings), поэтому
   // отправляем только изменённые поля: иначе тумблер уведомления уносил бы с
   // собой companyName и timezone, взятые из умолчаний.
-  const save = useCallback(async (patch: Partial<WorkspaceSettingsData>) => {
-    if (!isAdmin) return;
+  const save = useCallback(async (patch: Partial<WorkspaceSettingsData>): Promise<boolean> => {
+    if (!isAdmin) return false;
     setSaving(true);
     try {
       const res = await authFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
@@ -157,12 +157,14 @@ export function WorkspaceSettings() {
         toast.error(res.status === 403
           ? 'Только администратор может изменять настройки рабочего пространства.'
           : 'Настройки не сохранены. Повторите попытку.');
-        return;
+        return false;
       }
       setSettings(await res.json());
       toast.success('Настройки сохранены');
+      return true;
     } catch {
       toast.error('Настройки не сохранены. Проверьте подключение и повторите попытку.');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -173,7 +175,12 @@ export function WorkspaceSettings() {
   const toggleNotification = (key: string) => {
     const value = !(settings.notifications[key] ?? false);
     setSettings((s) => ({ ...s, notifications: { ...s.notifications, [key]: value } }));
-    void save({ notifications: { [key]: value } });
+    // Тумблер переключается сразу, но при отказе сервера возвращается назад:
+    // иначе после «Настройки не сохранены» экран показывал включённое
+    // уведомление, которое на сервере выключено (QA 28.09.2026).
+    void save({ notifications: { [key]: value } }).then((ok) => {
+      if (!ok) setSettings((s) => ({ ...s, notifications: { ...s.notifications, [key]: !value } }));
+    });
   };
 
   return (
@@ -275,7 +282,7 @@ export function WorkspaceSettings() {
                         его некому. Молчать об этом — обманывать администратора. */}
                     {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                   </div>
-                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
+                  <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented || saving} onClick={() => toggleNotification(key)} />
                 </div>
               ))}
             </CardContent>
@@ -332,7 +339,7 @@ export function WorkspaceSettings() {
                       отправителя не должно выглядеть рабочим ни здесь, ни там. */}
                   {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
                 </div>
-                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented} onClick={() => toggleNotification(key)} />
+                <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented || saving} onClick={() => toggleNotification(key)} />
               </div>
             ))}
             {!isAdmin && <p className="text-xs text-muted-foreground">Только администратор может изменять правила уведомлений.</p>}

@@ -83,6 +83,7 @@ export interface FleetSnapshot {
     pilesToday: number;
     pileMetersToday: number;
     drillingToday: number;
+    drillingCountToday: number;
     downtimeHoursToday: number;
     /** Distinct crews that filed a shift report today ("бригады на смене"). */
     crewsOnShiftToday: number;
@@ -158,7 +159,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     return {
       asOf: now.toISOString(),
       today,
-      totals: { totalEquipment: 0, activeToday: 0, workingNow: 0, expected: 0, idle: 0, pilesToday: 0, pileMetersToday: 0, drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0 },
+      totals: { totalEquipment: 0, activeToday: 0, workingNow: 0, expected: 0, idle: 0, pilesToday: 0, pileMetersToday: 0, drillingToday: 0, drillingCountToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0 },
       equipment: [],
     };
   }
@@ -360,6 +361,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     pilesToday: cards.reduce((s, c) => s + (c.todayTotals?.piles ?? 0), 0),
     pileMetersToday: cards.reduce((s, c) => s + (c.todayTotals?.pileMeters ?? 0), 0),
     drillingToday: cards.reduce((s, c) => s + (c.todayTotals?.drillingMeters ?? 0), 0),
+    drillingCountToday: cards.reduce((s, c) => s + (c.todayTotals?.drillingCount ?? 0), 0),
     downtimeHoursToday: cards.reduce((s, c) => s + (c.todayTotals?.downtimeHours ?? 0), 0),
     crewsOnShiftToday,
     operatorsOnShiftToday,

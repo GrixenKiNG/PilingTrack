@@ -53,7 +53,7 @@ describe('POST /api/auth/login', () => {
     const res = await POST(jsonRequest({ email: 'not-an-email', password: 'x'.repeat(8) }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Validation failed');
+    expect(body.error).toBe('Проверьте email и пароль');
     expect(authenticateMock).not.toHaveBeenCalled();
   });
 

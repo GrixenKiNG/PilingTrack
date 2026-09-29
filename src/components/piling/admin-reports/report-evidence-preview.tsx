@@ -153,7 +153,7 @@ export function ReportEvidencePreview({
         */}
         <div className="grid grid-cols-2 divide-x sm:grid-cols-4 rounded-md border border-border">
           <PreviewMetric icon={HardHat} label="Сваи" value={`${formatNumber(totals.piles)} шт.`} sub={`${formatNumber(totals.pileMeters)} м.п.`} />
-          <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м`} />
+          <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м.п.`} />
           <PreviewMetric icon={Clock} label="Простой" value={formatDowntimeHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} />
           <PreviewMetric icon={CheckCircle2} label="Эффективность" value={efficiency == null ? '-' : formatPercentValue(efficiency)} sub="без простоев" />
         </div>
@@ -187,7 +187,7 @@ export function ReportEvidencePreview({
             <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Drill className="h-4 w-4 text-muted-foreground" />Типы работ</h3>
             <div className="space-y-1">
               <ProgressLine label="Сваи" value={`${formatNumber(totals.pileMeters)} м.п.`} pct={(totals.pileMeters / workTotal) * 100} tone="orange" />
-              <ProgressLine label="Бурение" value={`${formatNumber(totals.drillingMeters)} м`} pct={(totals.drillingMeters / workTotal) * 100} tone="blue" />
+              <ProgressLine label="Бурение" value={`${formatNumber(totals.drillingMeters)} м.п.`} pct={(totals.drillingMeters / workTotal) * 100} tone="blue" />
             </div>
           </div>
         </div>

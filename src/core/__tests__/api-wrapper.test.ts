@@ -349,9 +349,38 @@ describe('withMutation', () => {
       method: 'POST', headers: { 'x-acting-as': 'random-1' },
     }));
 
-    const [first, second] = vi.mocked(rateLimiter.check).mock.calls.slice(-2).map(([id]) => id);
+    const [first, second] = vi.mocked(rateLimiter.check).mock.calls
+      .map(([id]) => id).filter((id) => !id.startsWith('mut:source:')).slice(-2);
     expect(second).toBe(first);
     mockReadSessionToken.mockReturnValue(null);
+  });
+
+  it('случайный токен не открывает новый бюджет: общий лимит источника проверяется первым', async () => {
+    const handler = withMutation(async () => NextResponse.json({ ok: true }));
+    vi.mocked(rateLimiter.check).mockClear();
+
+    mockReadSessionToken.mockReturnValue('random-token-1');
+    await handler(mockRequest('POST'));
+    mockReadSessionToken.mockReturnValue('random-token-2');
+    await handler(mockRequest('POST'));
+
+    const ids = vi.mocked(rateLimiter.check).mock.calls.map(([id]) => id);
+    expect(ids[0]).toMatch(/^mut:source:/);
+    expect(ids[2]).toBe(ids[0]);
+    mockReadSessionToken.mockReturnValue(null);
+  });
+
+  it('исчерпанный лимит источника отвечает 429 до обработчика', async () => {
+    vi.mocked(rateLimiter.check).mockResolvedValueOnce({
+      allowed: false, remaining: 0, retryAfter: 20,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape
+    } as any);
+    const inner = vi.fn(async () => NextResponse.json({ ok: true }));
+    const res = await withMutation(inner)(mockRequest('POST'));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('20');
+    expect(inner).not.toHaveBeenCalled();
   });
 
   it('should still catch ServiceError from handler', async () => {

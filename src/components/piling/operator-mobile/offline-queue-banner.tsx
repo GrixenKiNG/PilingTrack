@@ -1,7 +1,22 @@
 'use client';
 
-import {useState} from 'react';
-import {AUTH_WAIT_MESSAGE, describeCommand, type QueuedCommand} from './offline-queue';
+import {useEffect, useState} from 'react';
+import {usePilingStore} from '@/lib/store';
+import {
+  AUTH_WAIT_MESSAGE, describeCommand, foreignQueueSummary, subscribeQueue, type QueuedCommand,
+} from './offline-queue';
+
+/** Чужие записи на устройстве; перечитываются при смене очереди и вошедшего. */
+function useForeignQueue() {
+  const ownerId = usePilingStore((state) => state.currentUser?.id ?? null);
+  const [summary, setSummary] = useState(() => ({count: 0, owners: [] as string[]}));
+  useEffect(() => {
+    const sync = () => setSummary(foreignQueueSummary());
+    sync();
+    return subscribeQueue(sync);
+  }, [ownerId]);
+  return summary;
+}
 
 /**
  * Что записано на устройстве и ещё не ушло на сервер — одна плашка для всех
@@ -18,13 +33,26 @@ export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'spac
   onDiscard: (clientCommandId: string) => void;
   className?: string;
 }) {
-  if (items.length === 0) return null;
+  const foreign = useForeignQueue();
+  if (items.length === 0 && foreign.count === 0) return null;
   const failed = items.filter((item) => item.state === 'FAILED');
   const pending = items.filter((item) => item.state === 'PENDING');
   const waitsForLogin = pending.some((item) => item.lastError === AUTH_WAIT_MESSAGE);
 
   return (
     <div className={className} data-testid="offline-queue-banner">
+      {foreign.count > 0 && (
+        /*
+          Записи прежнего владельца телефона от имени вошедшего не уходят —
+          выработка досталась бы не тому. Но без этой строки они терялись
+          молча, если хозяин больше не входил на этом телефоне (аудит R43 №2).
+        */
+        <div role="status" className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
+          На телефоне лежат неотправленные записи другого сотрудника
+          {foreign.owners.length > 0 ? ` (${foreign.owners.join(', ')})` : ''}: {foreign.count}.
+          {' '}Они уйдут, когда владелец войдёт на этом телефоне. Сообщите ему или мастеру.
+        </div>
+      )}
       {pending.length > 0 && (
         <div role="status" className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
           На устройстве: {pending.map((item) => item.label).join(', ')}.{' '}

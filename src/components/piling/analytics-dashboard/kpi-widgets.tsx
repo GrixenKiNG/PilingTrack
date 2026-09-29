@@ -24,6 +24,7 @@ import {
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from './kpi-catalog';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { formatCountMeters } from '@/lib/format';
 
 export interface AnalyticsKpiData {
   totalEquipment: number;
@@ -31,6 +32,7 @@ export interface AnalyticsKpiData {
   pilesToday: number;
   pileMetersToday: number;
   drillingToday: number;
+  drillingCountToday: number;
   downtimeHoursToday: number;
   crewsOnShiftToday: number;
   operatorsOnShiftToday: number;
@@ -40,11 +42,12 @@ export interface AnalyticsKpiData {
     meters: { value: number; deltaPct: number | null };
     piles: { value: number; deltaPct: number | null };
     drilling: { value: number; deltaPct: number | null };
+    drillingCount: { value: number; deltaPct: number | null };
     downtime: { value: number | null; deltaPp: number | null };
   };
 }
 
-const ANALYTICS_KPI_ICONS: Record<string, PilingIconName> = { 'kpi-equipment': 'equipment-rig', 'kpi-sites': 'site', 'kpi-piles': 'pile-group', 'kpi-pile-meters': 'linear-meters', 'kpi-drilling': 'drilling-auger', 'kpi-downtime': 'downtime', 'kpi-crews': 'crew', 'kpi-operators': 'operator' };
+const ANALYTICS_KPI_ICONS: Record<string, PilingIconName> = { 'kpi-equipment': 'equipment-rig', 'kpi-sites': 'site', 'kpi-piles': 'pile-group', 'kpi-drilling': 'drilling-auger', 'kpi-downtime': 'downtime', 'kpi-crews': 'crew', 'kpi-operators': 'operator' };
 
 function KpiTile({ id, label, value, hint, delta }: { id: string; label: string; value: string; hint: string; delta?: { text: string; good: boolean } | null }) {
   return (
@@ -68,7 +71,6 @@ function KpiTile({ id, label, value, hint, delta }: { id: string; label: string;
   );
 }
 
-const fmtRu = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 const signed = (n: number, suffix: string) => `${n > 0 ? '+' : ''}${n.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}${suffix}`;
 
 export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, RenderablePageWidget> {
@@ -83,18 +85,18 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
   return {
     'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего'),
     'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных'),
+    // Сваи и бурение — одной записью «шт. / м.п.», как на всех экранах
+    // (решение владельца 28.09.2026). Отдельная плитка «Погонные метры» убрана:
+    // её число теперь во второй половине плитки «Сваи». Динамика — по м.п.
     // Данные за сегодня приходят из снимка парка, а он не смотрит на статус
     // отчёта: в «сделано сегодня» входят и несданные смены (черновики). Период
     // же считается по сданным отчётам, поэтому пометка стоит только у дневных
     // значений — иначе она обещала бы несданные смены там, где их нет.
-    'kpi-piles': tile('kpi-piles', 'Сваи (шт)',
-      p ? `${fmtRu(p.piles.value)} шт` : `${d.pilesToday} шт`,
-      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.piles.deltaPct)),
-    'kpi-pile-meters': tile('kpi-pile-meters', 'Погонные метры',
-      p ? `${fmtRu(p.meters.value)} м` : `${Math.round(d.pileMetersToday)} м`,
+    'kpi-piles': tile('kpi-piles', 'Сваи',
+      p ? formatCountMeters(p.piles.value, p.meters.value) : formatCountMeters(d.pilesToday, d.pileMetersToday),
       p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.meters.deltaPct)),
     'kpi-drilling': tile('kpi-drilling', 'Бурение',
-      p ? `${fmtRu(p.drilling.value)} м` : `${Math.round(d.drillingToday)} м`,
+      p ? formatCountMeters(p.drillingCount.value, p.drilling.value) : formatCountMeters(d.drillingCountToday, d.drillingToday),
       p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.drilling.deltaPct)),
     'kpi-downtime': tile('kpi-downtime', p ? 'Доля простоя в смене, %' : 'Простой',
       p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : formatDowntimeHours(d.downtimeHoursToday),
@@ -156,6 +158,7 @@ export function AnalyticsDashboardLayoutEditor() {
           pilesToday: t.pilesToday ?? 0,
           pileMetersToday: t.pileMetersToday ?? 0,
           drillingToday: t.drillingToday ?? 0,
+          drillingCountToday: t.drillingCountToday ?? 0,
           downtimeHoursToday: t.downtimeHoursToday ?? 0,
           crewsOnShiftToday: t.crewsOnShiftToday ?? 0,
           operatorsOnShiftToday: t.operatorsOnShiftToday ?? 0,
@@ -170,7 +173,7 @@ export function AnalyticsDashboardLayoutEditor() {
   const widgets = {
     ...buildAnalyticsKpiWidgets(data ?? {
       totalEquipment: 0, sitesCount: 0, pilesToday: 0, pileMetersToday: 0,
-      drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0,
+      drillingToday: 0, drillingCountToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0,
     }),
     ...buildSectionPlaceholders(),
   };

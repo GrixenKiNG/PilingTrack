@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/services/service-error';
 import { assertNotSelfAction } from '@/services/auth/authorization-service';
-import { computePinLookup, hashPassword, hashPin } from '@/services/auth/auth-service';
+import { hashPassword } from '@/services/auth/auth-service';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { OperationalUserDTO, UserRole } from '@/lib/types';
@@ -145,30 +145,25 @@ export async function listUsers(
 export async function createUser(input: {
   email: string;
   password?: string;
-  pin?: string;
   name: string;
   role?: string;
   phone?: string;
   tenantId?: string | null;
 }, actorUserId?: string | null) {
-  if (!input.email || !input.name || (!input.password && !input.pin)) {
-    throw new ServiceError('Укажите email, имя и пароль или ПИН-код', 400);
+  if (!input.email || !input.name || !input.password) {
+    throw new ServiceError('Укажите email, имя и пароль', 400);
   }
 
   const tenantId = requireTenantId(input.tenantId);
 
   try {
-    const hashedPassword = input.password ? await hashPassword(input.password) : '';
-    const hashedPin = input.pin ? await hashPin(input.pin) : null;
-    const pinLookup = input.pin ? computePinLookup(input.pin) : null;
+    const hashedPassword = await hashPassword(input.password);
 
     const createdUser = await db.user.create({
       data: {
         tenantId,
         email: input.email.trim().toLowerCase(),
         password: hashedPassword,
-        pin: hashedPin,
-        pinLookup,
         name: input.name.trim(),
         phone: String(input.phone || '').trim().slice(0, 20),
         role: input.role || 'OPERATOR',
@@ -206,7 +201,6 @@ export interface UpdateUserInput {
   role?: string;
   isActive?: boolean;
   password?: string;
-  pin?: string;
 }
 
 /**
@@ -234,11 +228,7 @@ export async function updateUser(
   if (input.role !== undefined) data.role = input.role;
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if (input.password) data.password = await hashPassword(input.password);
-  if (input.pin) {
-    data.pin = await hashPin(input.pin);
-    data.pinLookup = computePinLookup(input.pin);
-  }
-  if (input.isActive === false || input.password || input.pin) {
+  if (input.isActive === false || input.password) {
     data.sessionVersion = { increment: 1 };
   }
 

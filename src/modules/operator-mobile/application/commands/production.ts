@@ -254,7 +254,7 @@ export async function logProduction(input: {
       if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество свай должно быть больше нуля');
       // Марка — только своей организации (см. requirePileGrade): чужая
       // записывалась молча и портила расчёт погонных метров.
-      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId);
+      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId, shift.startedAt ?? shift.createdAt);
       await tx.pileWork.create({
         data: {
           reportId,
@@ -272,7 +272,7 @@ export async function logProduction(input: {
       // Длину сваи берём из её марки — единственного источника длины в
       // продукте (см. lib/pile-length). Она нужна правилу глубины: свая не
       // уходит глубже собственной длины, кроме погружения добойником.
-      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId);
+      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId, shift.startedAt ?? shift.createdAt);
 
       const problems = validatePassport({
         pileNumber: entry.passport.pileNumber,

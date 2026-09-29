@@ -1,19 +1,20 @@
 'use client';
 
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
-import {useCallback, useEffect, useMemo, useState} from 'react';
-import {DOWNTIME_MAX_HOURS, formatDowntimeHours} from '@/lib/downtime-hours';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
-  ChecklistStage, ChecklistView, DocumentVerdict, IncidentCategory, IncidentSign,
-  OperatorAnswer, OperatorMobileState,
+  ChecklistAnswer, ChecklistStage, DocumentVerdict, IncidentCategory, IncidentSign,
+  OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
-  PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired,
+  PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS,
 } from '@/modules/operator-mobile/contracts';
+import {ChecklistScreen} from '../screens/checklist-screen';
+import {knownAnswers} from '../safety/known-answers';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
-import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import {documentsSummary} from '../safety/documents-summary';
 import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
@@ -98,8 +99,7 @@ const SCREENS: ScreenDef[] = [
   {id: 'today', n: 1, title: 'Смена', short: 'Лента смены', tab: 'today'},
   {id: 'docs', n: 2, title: 'Документы', short: 'Документы', tab: 'more'},
   {id: 'accept', n: 3, title: 'Принять установку', short: 'Приёмка', tab: 'today'},
-  {id: 'inspect', n: 4, title: 'Предсменный осмотр', short: 'Осмотр', tab: 'today'},
-  {id: 'ready', n: 5, title: 'Готовность', short: 'Готовность', tab: 'today'},
+  {id: 'step', n: 4, title: 'Текущий шаг', short: 'Шаг', tab: 'today'},
   {id: 'work', n: 6, title: 'Работа', short: 'Работа', tab: 'today'},
   {id: 'maint', n: 7, title: 'Ежесменное обслуживание', short: 'Обслуживание', tab: 'equip'},
   {id: 'closing', n: 8, title: 'Закрытие смены', short: 'Закрытие', tab: 'more'},
@@ -127,6 +127,64 @@ const TABS: ScreenTab[] = [
   {key: 'equip', title: 'Техника', icon: 'equip', screen: 'maint'},
   {key: 'more', title: 'Ещё', icon: 'more', screen: 'more'},
 ];
+
+/* ------------------------------------------------------ порядок смены --- */
+
+type Phase = OperatorMobileState['phase'];
+
+/**
+ * Шаги смены — строго по порядку, который ведёт сервер (domain/shift-phases).
+ *
+ * ПОЧЕМУ ЛЕСТНИЦА, А НЕ ВКЛАДКИ (жалоба владельца 28.09.2026: «логика
+ * вразброс, можно сразу закрыть смену»). Экран раньше давал открыть осмотр,
+ * ЕО, работу и закрытие в любом порядке, а сервер отказывал — и человек не
+ * понимал, что за чем. Теперь фаза сервера — единственный источник: сделанные
+ * шаги отмечены, нажать можно только текущий, будущие закрыты до своей очереди.
+ */
+const STEPS: {phase: Phase; title: string}[] = [
+  {phase: 'IDENTITY', title: 'Допуск: СИЗ, инструктаж, проверка знаний'},
+  {phase: 'ADMISSION', title: 'Принять установку'},
+  {phase: 'PRESHIFT_INSPECTION', title: 'Предсменный осмотр'},
+  {phase: 'SITE_READY', title: 'Осмотр площадки'},
+  {phase: 'STARTUP', title: 'Пуск и ЕО перед работой'},
+  {phase: 'WORK', title: 'Работа: сваи, бурение, простой'},
+  {phase: 'CLOSING', title: 'ЕО после работы и закрытие смены'},
+];
+
+/** Чек-лист, который закрывает фазу (тот же, что в domain/shift-phases). */
+const PHASE_STAGE: Partial<Record<Phase, ChecklistStage>> = {
+  PRESHIFT_INSPECTION: 'PRESHIFT_INSPECTION',
+  SITE_READY: 'SITE_READY',
+  STARTUP: 'EO_BEFORE',
+  CLOSING: 'EO_AFTER',
+};
+
+/** Номер текущего шага; для закрытой смены — за последним. */
+function stepIndex(phase: Phase): number {
+  const index = STEPS.findIndex((step) => step.phase === phase);
+  return index === -1 ? STEPS.length : index;
+}
+
+/**
+ * Экран шага, до которого очередь ещё не дошла: вместо формы — что сделать
+ * сначала и кнопка туда. Сервер такой шаг всё равно отверг бы.
+ */
+function NotYet({state, go}: {state: OperatorMobileState; go: Go}) {
+  const current = STEPS[stepIndex(state.phase)];
+  return (
+    <>
+      <Banner tone="warn" title="Этот шаг ещё не открыт" />
+      <Card>
+        <Row icon="check" tone="orange" title="Сначала" note={current ? current.title : 'Смена закрыта'} />
+      </Card>
+      {current ? (
+        <button type="button" className="ov10-btn" onClick={() => go('step')}>
+          Перейти: {current.title}
+        </button>
+      ) : null}
+    </>
+  );
+}
 
 /* ------------------------------------------------------------ состояние --- */
 
@@ -197,37 +255,44 @@ function ScreenToday({state, go}: {state: OperatorMobileState; go: Go}) {
         <Row icon="equip" title="Установка"
           note={state.assignment?.equipmentName ?? 'не закреплена'} chevron onClick={() => go('accept')} />
       </Card>
-      <Card>
-        <Row icon="check" tone="orange" title="Следующее действие" note={nextAction(state)}
-          chevron onClick={() => go(nextScreen(state))} />
-      </Card>
+      <StepLadder state={state} go={go} />
     </>
   );
 }
 
-/** Что делать дальше — по фазе, которую посчитал сервер. */
-function nextAction(state: OperatorMobileState): string {
-  switch (state.phase) {
-    case 'IDENTITY': return 'Пройти допуск: СИЗ, инструктаж, знания';
-    case 'ADMISSION': return 'Принять установку';
-    case 'PRESHIFT_INSPECTION': return 'Пройти предсменный осмотр';
-    case 'STARTUP': return 'Пуск и ежесменное обслуживание';
-    case 'SITE_READY': return 'Осмотреть площадку';
-    case 'WORK': return 'Записывать выработку';
-    case 'CLOSING': return 'Закрыть смену';
-    default: return 'Смена закрыта';
-  }
-}
-
-function nextScreen(state: OperatorMobileState): string {
-  switch (state.phase) {
-    case 'IDENTITY': return 'safety';
-    case 'ADMISSION': return 'accept';
-    case 'PRESHIFT_INSPECTION': return 'inspect';
-    case 'WORK': return 'work';
-    case 'CLOSING': case 'CLOSED': return 'closing';
-    default: return 'maint';
-  }
+/**
+ * Лестница смены: сделанное — галочкой, текущее — единственная активная
+ * строка и большая кнопка «Дальше», будущее — закрыто до своей очереди.
+ */
+function StepLadder({state, go}: {state: OperatorMobileState; go: Go}) {
+  const current = stepIndex(state.phase);
+  const next = STEPS[current];
+  return (
+    <>
+      {next ? (
+        <button type="button" className="ov10-btn" onClick={() => go('step')}>
+          Дальше: {next.title}
+        </button>
+      ) : <Banner tone="info" title="Смена закрыта" />}
+      <Card title="Порядок смены">
+        {STEPS.map((step, index) => {
+          const done = index < current;
+          const now = index === current;
+          return (
+            <Row
+              key={step.phase}
+              icon={done ? 'check' : now ? 'work' : 'list'}
+              tone={done ? 'ok' : now ? 'orange' : ''}
+              title={`${index + 1}. ${step.title}`}
+              note={done ? 'выполнено' : now ? 'сейчас' : 'откроется после предыдущего шага'}
+              chevron={now}
+              onClick={now ? () => go('step') : undefined}
+            />
+          );
+        })}
+      </Card>
+    </>
+  );
 }
 
 function ScreenDocs({state}: {state: OperatorMobileState}) {
@@ -295,157 +360,7 @@ function ScreenAccept({state, busy, onAccept, go}: {
             {busy ? 'Принимаем…' : 'Принять установку'}
           </button>
         )}
-      <button type="button" className="ov10-btn ghost" onClick={() => go('inspect')}>К предсменному осмотру</button>
-    </>
-  );
-}
-
-const ANSWERS: {value: OperatorAnswer; label: string; cls: string}[] = [
-  {value: 'OK', label: 'Норма', cls: 'ok'},
-  {value: 'REMARK', label: 'Замечание', cls: 'warn'},
-  {value: 'FAULT', label: 'Дефект', cls: 'bad'},
-];
-
-/**
- * Предсменный осмотр: ответ по каждому пункту.
- *
- * Разделы эталона оставлены заголовками, но отвечают не за раздел, а за пункт:
- * один ответ на шесть пунктов — это тот же «всё норма», только руками.
- */
-/** Пункты чек-листа с ответами. Одна разметка на осмотр и на ЕО. */
-function ChecklistItems({checklist, answers, measures, onAnswer, onMeasure}: {
-  checklist: ChecklistView;
-  answers: Record<string, OperatorAnswer>;
-  measures: Record<string, string>;
-  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
-  onMeasure: (key: string, value: string) => void;
-}) {
-  return (
-    <>
-      {checklist.sections.map((section) => (
-        <Card key={section.id} title={section.title}>
-          {section.items.map((item) => (
-            <div className="ov10-item" key={item.id}>
-              <div className="t">{item.text}</div>
-              {item.hint ? <div className="s">{item.hint}</div> : null}
-              <div className="ov10-chips">
-                {ANSWERS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={answers[item.id] === option.value}
-                    className={`${answers[item.id] === option.value ? 'on ' : ''}${option.cls}`}
-                    onClick={() => onAnswer(item.id, option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              {item.measure && measureRequired(item, answers[item.id] ?? 'OK') ? (
-                <label className="ov10-field">
-                  <span className="lab">
-                    {item.measure.label}, {item.measure.unit}
-                    {item.measure.max !== undefined
-                      ? ` (от ${item.measure.min ?? 0} до ${item.measure.max})`
-                      : ''}
-                  </span>
-                  <input
-                    inputMode="decimal"
-                    value={measures[item.measure.key] ?? ''}
-                    onChange={(event) => onMeasure(item.measure?.key ?? '', event.target.value)}
-                  />
-                </label>
-              ) : null}
-            </div>
-          ))}
-        </Card>
-      ))}
-    </>
-  );
-}
-
-function ScreenInspect({checklist, answers, measures, onAnswer, onMeasure, go}: {
-  checklist: ChecklistView | undefined;
-  answers: Record<string, OperatorAnswer>;
-  measures: Record<string, string>;
-  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
-  onMeasure: (key: string, value: string) => void;
-  go: Go;
-}) {
-  if (!checklist) {
-    return <Card><Nodata>Осмотр станет доступен после приёма установки</Nodata></Card>;
-  }
-  if (checklist.done) {
-    return (
-      <>
-        <Banner tone="info" title="Осмотр сдан" />
-        <Card title={checklist.title}>
-          <Pair label="Версия" value={checklist.version} />
-          <Pair label="Разделов" value={String(checklist.sections.length)} />
-        </Card>
-      </>
-    );
-  }
-  return (
-    <>
-      <ChecklistItems checklist={checklist} answers={answers} measures={measures}
-        onAnswer={onAnswer} onMeasure={onMeasure} />
-      <button type="button" className="ov10-btn ghost" onClick={() => go('ready')}>К готовности</button>
-    </>
-  );
-}
-
-function ScreenReady({state, checklist, answers, busy, onSubmit, go}: {
-  state: OperatorMobileState;
-  checklist: ChecklistView | undefined;
-  answers: Record<string, OperatorAnswer>;
-  busy: boolean;
-  onSubmit: () => void;
-  go: Go;
-}) {
-  const items = checklist ? checklist.sections.flatMap((section) => section.items) : [];
-  const unanswered = items.filter((item) => !answers[item.id]);
-  const needMeasure = items.filter((item) => {
-    const answer = answers[item.id];
-    return Boolean(answer) && Boolean(item.measure) && measureRequired(item, answer);
-  });
-  const stop = state.warnings.filter((warning) => warning.level === 'STOP');
-  const done = Boolean(checklist?.done);
-
-  return (
-    <>
-      <Card>
-        <Row icon="warning" tone={state.defects.length > 0 ? 'warn' : 'ok'} title="Дефекты"
-          note={state.defects.length > 0 ? `открыто: ${state.defects.length}` : 'нет'}
-          chevron onClick={() => go('maint')} />
-        <Row icon="minus" tone={stop.length > 0 ? 'bad' : 'ok'} title="Блокирующие"
-          note={stop.length > 0 ? stop.map((warning) => warning.title).join('; ') : 'нет'} />
-      </Card>
-      <Card title="Вердикт">
-        <Row
-          icon="shield"
-          tone={done ? 'ok' : 'warn'}
-          title={done ? 'Осмотр сдан' : 'Осмотр не закрыт'}
-          note={done
-            ? 'можно приступать'
-            : `без ответа: ${unanswered.length} из ${items.length}`}
-        />
-      </Card>
-      {needMeasure.length > 0 ? (
-        <Banner tone="warn" title={`Нужен замер по пунктам: ${needMeasure.length}`}>
-          {' '}— их заполняют на рабочем экране смены.
-        </Banner>
-      ) : null}
-      {done ? null : (
-        <button
-          type="button"
-          className="ov10-btn green"
-          disabled={busy || items.length === 0 || unanswered.length > 0 || needMeasure.length > 0}
-          onClick={onSubmit}
-        >
-          {busy ? 'Отправляем…' : unanswered.length > 0 ? `Осталось ответить: ${unanswered.length}` : 'Сдать осмотр'}
-        </button>
-      )}
+      <button type="button" className="ov10-btn ghost" onClick={() => go('today')}>К порядку смены</button>
     </>
   );
 }
@@ -459,55 +374,22 @@ function ScreenReady({state, checklist, answers, busy, onSubmit, go}: {
  *
  * Поля те же, что и в рабочем экране /operator, и уходят той же командой
  * log-production: сервер один, и правила приёмки записи тоже одни.
- *
- * ОКНО ПРОСТОЯ ВИДНО ДО ОТПРАВКИ (F-QA-004). Раньше границы проверял только
- * сервер, и отказ «Простой не может начаться раньше смены…» приходил уже после
- * нажатия «Записать». Оператор тратил цикл «отправил — получил ошибку», а при
- * слабой связи мог решить, что простой записан. Границы здесь те же, что у
- * сервера (domain/downtime-interval): начало не раньше старта смены с допуском
- * пять минут на расхождение часов, конец не в будущем, длительность не больше
- * DOWNTIME_MAX_HOURS. Тексты повторяют серверные дословно — об одном запрете
- * не должно быть двух разных формулировок.
  */
-const CLOCK_SKEW_MIN = 5;
-
-export function downtimeWindowProblem(
-  startValue: string, endValue: string,
-  shiftStartedAt: string | null | undefined,
-  now: Date = new Date(),
-): string | null {
-  const interval = downtimeInterval(startValue, endValue, now);
-  if (!interval || !shiftStartedAt) return null;
-  const startedAt = new Date(interval.startedAt).getTime();
-  const shiftStart = new Date(shiftStartedAt).getTime();
-
-  // Начало раньше смены — то, из-за чего и приходил серверный отказ.
-  if (startedAt < shiftStart - CLOCK_SKEW_MIN * 60_000) {
-    return `Простой не может начаться раньше смены — смена начата в ${hhmm(new Date(shiftStart))}.`;
-  }
-  if (interval.minutes > DOWNTIME_MAX_HOURS * 60) {
-    return `Простой длиннее суток (${Math.round(interval.minutes / 60)} ч). Проверьте время.`;
-  }
-  return null;
-}
-
-export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
+function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly = false}: {
   initialKind?: WorkAction;
   state: OperatorMobileState;
   busy: boolean;
-  /** Признак успеха: по нему форма решает, чистить ли поля. */
+  /** true — сервер принял запись (или она легла в очередь); только тогда форма очищается. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
+  /** После «Завершить работу» сервер принимает только простой — и форма предлагает только его. */
+  downtimeOnly?: boolean;
 }) {
-  const [kind, setKind] = useState<WorkAction>(initialKind);
+  const [kind, setKind] = useState<WorkAction>(downtimeOnly ? 'DOWNTIME' : initialKind);
   const [optionId, setOptionId] = useState('');
   const [count, setCount] = useState('');
   const [meters, setMeters] = useState('');
-  // Простой предзаполнен окном смены: начало — старт смены, конец — сейчас.
-  const shiftStartedAt = state.shift?.startedAt ?? null;
-  const shiftStartDate = shiftStartedAt ? new Date(shiftStartedAt) : null;
-  const shiftStartHm = shiftStartDate ? hhmm(shiftStartDate) : '';
-  const [startedHm, setStartedHm] = useState(initialKind === 'DOWNTIME' ? shiftStartHm : '');
-  const [endedHm, setEndedHm] = useState(initialKind === 'DOWNTIME' ? hhmm(new Date()) : '');
+  const [startedHm, setStartedHm] = useState('');
+  const [endedHm, setEndedHm] = useState('');
 
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
@@ -519,8 +401,8 @@ export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
     setOptionId('');
     setCount('');
     setMeters('');
-    setStartedHm(next === 'DOWNTIME' ? shiftStartHm : '');
-    setEndedHm(next === 'DOWNTIME' ? hhmm(new Date()) : '');
+    setStartedHm('');
+    setEndedHm('');
   };
 
   const amount = Number(count.replace(',', '.'));
@@ -528,38 +410,32 @@ export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   // Простой задаётся интервалом: подпись под полями и то, что уйдёт на
   // сервер, — одна и та же величина (см. downtime-interval).
   const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
-  // Границы окна смены — те же, что проверит сервер: раньше отправки и рядом с
-  // полем, а не только отказом после запроса (F-QA-004).
-  const windowProblem = kind === 'DOWNTIME' ? downtimeWindowProblem(startedHm, endedHm, shiftStartedAt) : null;
-  const earliestHm = shiftStartDate
-    ? hhmm(new Date(shiftStartDate.getTime() - CLOCK_SKEW_MIN * 60_000)) : undefined;
-  const latestHm = hhmm(new Date(Date.now() + CLOCK_SKEW_MIN * 60_000));
   // Запрет закрывает выработку и не трогает простой — domain/production-permit.ts.
   const forbidden = kind !== 'DOWNTIME' && !state.permit.allowed;
   const ready = !forbidden && optionId !== '' && (
     kind === 'DOWNTIME'
-      ? interval !== null && windowProblem === null
+      ? interval !== null
       : Number.isFinite(amount) && amount > 0
         && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
   );
 
-  // Форма чистится только после подтверждения сервером: отказ 400/409 не
-  // должен уничтожить уже набранное число.
+  // Поля очищаются только по успеху: при отказе сервера («простой раньше
+  // начала смены», «пересекается с записанным») введённое остаётся на экране
+  // рядом с причиной отказа, а не исчезает молча (жалоба 28.09.2026:
+  // «простой не записывается»).
   const submit = async () => {
     if (!ready) return;
-    let saved = false;
-    if (kind === 'PILES') {
-      saved = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
-    } else if (kind === 'DRILLING') {
-      saved = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
+    let accepted = false;
+    if (kind === 'PILES') accepted = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
+    else if (kind === 'DRILLING') {
+      accepted = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
     } else if (interval) {
-      saved = await onLog({
+      accepted = await onLog({
         kind: 'DOWNTIME', reasonId: optionId,
         startedAt: interval.startedAt, endedAt: interval.endedAt,
       });
     }
-    if (!saved) return;
-
+    if (!accepted) return;
     setOptionId('');
     setCount('');
     setMeters('');
@@ -569,6 +445,9 @@ export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
 
   return (
     <Card title="Записать выработку">
+      {downtimeOnly ? (
+        <p className="ov10-hint">Работа завершена: сваи и бурение больше не записываются, простой — можно.</p>
+      ) : (
       <div className="ov10-chips on-work">
         <button type="button" className={kind === 'PILES' ? 'on' : ''}
           aria-pressed={kind === 'PILES'} onClick={() => switchKind('PILES')}>Свая</button>
@@ -579,6 +458,7 @@ export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
         <button type="button" className={kind === 'DOWNTIME' ? 'on' : ''}
           aria-pressed={kind === 'DOWNTIME'} onClick={() => switchKind('DOWNTIME')}>Простой</button>
       </div>
+      )}
 
       {/* Паспорт — журнал забивки на одну сваю по СП 45.13330: номер, залоги,
           отказ, отметки головы. Форма общая со всеми модулями: требование к
@@ -614,22 +494,16 @@ export function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
         <>
           <label className="ov10-field">
             <span className="lab">Простой начался</span>
-            <input type="time" value={startedHm} min={earliestHm} max={latestHm}
+            <input type="time" value={startedHm}
               onChange={(event) => setStartedHm(event.target.value)} />
           </label>
           <label className="ov10-field">
             <span className="lab">Закончился</span>
-            <input type="time" value={endedHm} min={earliestHm} max={latestHm}
+            <input type="time" value={endedHm}
               onChange={(event) => setEndedHm(event.target.value)} />
           </label>
           <button type="button" className="ov10-rowbtn"
             onClick={() => setEndedHm(hhmm(new Date()))}>Закончился сейчас</button>
-          {shiftStartHm ? (
-            <p className="ov10-hint">
-              Допустимое время: с {shiftStartHm} до {hhmm(new Date())}, не дольше {DOWNTIME_MAX_HOURS} ч.
-            </p>
-          ) : null}
-          {windowProblem ? <p className="ov10-hint">{windowProblem}</p> : null}
           {interval ? (
             <p className="ov10-hint">Простой: {formatIntervalMinutes(interval.minutes)}</p>
           ) : null}
@@ -667,139 +541,54 @@ function ScreenWork({state, busy, onLog, go}: {
   go: Go;
 }) {
   const [entry, setEntry] = useState<WorkAction | null>(null);
+  // До своей очереди работа не открывается: сервер отверг бы любую запись.
+  if (stepIndex(state.phase) < stepIndex('WORK')) return <NotYet state={state} go={go} />;
+  // После «Завершить работу» — только простой: последний отрезок остановки
+  // обычно вносят уже при сдаче.
+  if (state.phase !== 'WORK') {
+    return (
+      <>
+        <ProductionForm state={state} busy={busy} onLog={onLog} downtimeOnly />
+        <button type="button" className="ov10-btn ghost" onClick={() => go('step')}>К ЕО после работы и закрытию</button>
+      </>
+    );
+  }
   if (entry) return <><button type="button" className="oc-form-back" onClick={()=>setEntry(null)}>← К смене</button><ProductionForm key={entry} state={state} busy={busy} onLog={onLog} initialKind={entry} /></>;
   return <OperatorWorkOverview state={state} variant="v10" busy={busy} onAction={setEntry}
     onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />;
 }
 
-/** Порядок ежесменных чек-листов вкладки «Техника»: от осмотра к ЕО после работы. */
-const MAINT_ORDER: ChecklistStage[] = ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE', 'EO_AFTER'];
-
 /**
- * Незакрытые пункты чек-листа — по разделам.
+ * Техника: чек-листы смены и открытые неисправности.
  *
- * Пункт закрыт, когда есть ответ И заполнен обязательный замер: сервер требует
- * замер тем же правилом `measureRequired`, а «Чек-лист заполнен не полностью»
- * приходило именно из-за незаполненных моточасов и остатка топлива, а не из-за
- * ответов, — и сказать человеку, какой раздел смотреть, было нечем.
+ * ЕО проходят здесь же (решение владельца 18.09.2026), но ПО ОЧЕРЕДИ (жалоба
+ * 28.09.2026 «вразброс»): раньше экран раскладывал сразу все четыре списка,
+ * и человек отвечал на ЕО после работы, не пройдя осмотр, — сервер отказывал.
+ * Теперь сданное отмечено, текущий список открывается кнопкой, будущие закрыты.
  */
-export function gapsBySection(
-  list: ChecklistView,
-  answers: Record<string, OperatorAnswer>,
-  measures: Record<string, string>,
-): {title: string; left: number}[] {
-  return list.sections
-    .map((section) => ({
-      title: section.title,
-      left: section.items.filter((item) => {
-        const answer = answers[item.id];
-        if (!answer) return true;
-        if (!item.measure || !measureRequired(item, answer)) return false;
-        const value = (measures[item.measure.key] ?? '').trim();
-        return value === '' || !Number.isFinite(Number(value.replace(',', '.')));
-      }).length,
-    }))
-    .filter((section) => section.left > 0);
-}
-
-/** «1 пункт», «2 пункта», «5 пунктов». */
-function pointsRu(count: number): string {
-  const last = count % 10;
-  const tail = count % 100;
-  if (tail >= 11 && tail <= 14) return 'пунктов';
-  if (last === 1) return 'пункт';
-  if (last >= 2 && last <= 4) return 'пункта';
-  return 'пунктов';
-}
-
-/** «Не заполнено: «Заправка и заглушение» — 2 пункта». */
-export function gapsNote(gaps: {title: string; left: number}[]): string {
-  return `Не заполнено: ${gaps
-    .map((gap) => `«${gap.title}» — ${gap.left} ${pointsRu(gap.left)}`)
-    .join('; ')}`;
-}
-
-/**
- * ЕО здесь ПРОХОДЯТ, а не читают (решение владельца 18.09.2026).
- *
- * Экран показывал «Не отмечено» и не давал ответить ни на один пункт. Сервер
- * при этом не закрывает смену без ЕО после работы — поэтому смену, начатую в
- * v10, закрыть было нельзя вовсе. Это и была жалоба «не могу закрыть смену».
- *
- * ЧЕК-ЛИСТ ЗДЕСЬ ОДИН — ТЕКУЩЕГО ЭТАПА (F-QA-002). Экран показывал все
- * ежесменные списки сразу, у каждого своя кнопка «Сдать»: площадку, ЕО перед
- * работой и ЕО после работы одновременно. Машинист нажимал послесменную кнопку
- * до работы, получал «Чек-лист заполнен не полностью» и не знал, какой из трёх
- * списков не заполнен. Этап смены считает сервер (`state.phase`), по нему видно,
- * какой список идёт сейчас, а какие ещё закрыты.
- */
-function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSubmit, go}: {
-  state: OperatorMobileState;
-  answers: Record<string, OperatorAnswer>;
-  measures: Record<string, string>;
-  busy: boolean;
-  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
-  onMeasure: (key: string, value: string) => void;
-  onSubmit: (stage: ChecklistStage) => void;
-  go: Go;
-}) {
-  const currentStage = PHASE_CHECKLIST[state.phase] ?? null;
-  const currentIndex = currentStage ? MAINT_ORDER.indexOf(currentStage) : -1;
-  const lists = MAINT_ORDER
-    .map((stage) => state.checklists.find((list) => list.stage === stage))
-    .filter((list): list is ChecklistView => Boolean(list));
-  const currentTitle = lists.find((list) => list.stage === currentStage)?.title;
-
+function ScreenMaint({state, go}: {state: OperatorMobileState; go: Go}) {
+  const currentStage = PHASE_STAGE[state.phase];
+  const lists = state.checklists.filter((list) => list.stage !== 'TB_PILING'
+    && list.stage !== 'TB_DRILLING');
   return (
     <>
-      {lists.length === 0
-        ? <Card><Nodata>Чек-листы обслуживания недоступны</Nodata></Card>
-        : lists.map((list) => {
-          const items = list.sections.flatMap((section) => section.items);
-          if (list.done) {
-            return (
-              <Card key={list.stage} title={list.title}>
-                <Row icon="wrench" tone="ok" title="Выполнено"
-                  note={`${items.length} пунктов · версия ${list.version}`} />
-              </Card>
-            );
-          }
-          // Всё, что идёт после текущего этапа, закрыто до его наступления.
-          // У ЕО после работы этапа в фазе «Работа» нет вовсе, поэтому подсказка
-          // там про конец работы, а не про список.
-          const later = currentStage
-            ? MAINT_ORDER.indexOf(list.stage) > currentIndex
-            : list.stage === 'EO_AFTER';
-          if (later) {
-            return (
-              <Card key={list.stage}>
-                <Row icon="clock" title={list.title} note={currentTitle
-                  ? `Станет доступно после «${currentTitle}»`
-                  : 'Станет доступно после завершения работы'} />
-              </Card>
-            );
-          }
-          const gaps = gapsBySection(list, answers, measures);
-          const left = gaps.reduce((sum, gap) => sum + gap.left, 0);
-          return (
-            <div key={list.stage}>
-              <Card title={list.title}>
-                <Row icon="wrench" tone="warn" title="Не отмечено"
-                  note={`${items.length} пунктов · версия ${list.version}`} />
-              </Card>
-              <ChecklistItems checklist={list} answers={answers} measures={measures}
-                onAnswer={onAnswer} onMeasure={onMeasure} />
-              {/* Раздел и число незакрытых пунктов — ДО отправки: общая строка
-                  сервера «Чек-лист заполнен не полностью» не говорит, куда
-                  смотреть. */}
-              {left > 0 ? <Banner tone="warn" title={gapsNote(gaps)} /> : null}
-              <button type="button" className="ov10-btn green" disabled={busy || left > 0}
-                onClick={() => onSubmit(list.stage)}>
-                {busy ? 'Отправляем…' : left > 0 ? `Осталось ответить: ${left}` : 'Сдать ' + list.title}
-              </button>
-            </div>
-          );
-        })}
+      <Card title="Чек-листы смены">
+        {lists.length === 0
+          ? <Nodata>Чек-листы станут доступны после приёма установки</Nodata>
+          : lists.map((list) => {
+            const items = list.sections.flatMap((section) => section.items).length;
+            if (list.done) {
+              return <Row key={list.stage} icon="wrench" tone="ok" title={list.title} note={`сдано · ${items} пунктов`} />;
+            }
+            if (list.stage === currentStage) {
+              return (
+                <Row key={list.stage} icon="wrench" tone="orange" title={list.title}
+                  note="сейчас — нажмите, чтобы пройти" chevron onClick={() => go('step')} />
+              );
+            }
+            return <Row key={list.stage} icon="list" tone="" title={list.title} note="откроется в свою очередь" />;
+          })}
+      </Card>
       <Card title="Открытые неисправности">
         {state.defects.length === 0
           ? <Nodata>Открытых неисправностей нет</Nodata>
@@ -808,12 +597,10 @@ function ScreenMaint({state, answers, measures, busy, onAnswer, onMeasure, onSub
               note={`${defect.reportedByMe ? 'записали вы' : defect.reportedByName} · ${dateRu(defect.reportedAt)}`} />
           ))}
       </Card>
-      <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>К смене</button>
+      <button type="button" className="ov10-btn ghost" onClick={() => go('today')}>К порядку смены</button>
     </>
   );
 }
-
-
 
 /**
  * Строка ТБ в разделе допуска: срок ближайшего периодического чек-листа.
@@ -854,52 +641,67 @@ function tbNote(state: OperatorMobileState | null): string {
  * чек-листа ТБ по забивке свай» при попытке записать сваю — и пройти этот
  * чек-лист в модуле было НЕГДЕ. Свайный цикл не завершался вовсе.
  */
-function ScreenSafetyChecklists({state, answers, measures, busy, onAnswer, onMeasure, onSubmit, go}: {
+/**
+ * Периодические чек-листы ТБ. Список — сроки; ответы — на общем экране
+ * чек-листа (описание замечаний, фото, замеры), тот же, что в /operator и v7.
+ * Свой список пунктов v10 не спрашивал описания и фото, и сервер отказывал
+ * в сдаче без видимой причины.
+ */
+function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
   state: OperatorMobileState;
-  answers: Record<string, OperatorAnswer>;
-  measures: Record<string, string>;
   busy: boolean;
-  onAnswer: (itemId: string, answer: OperatorAnswer) => void;
-  onMeasure: (key: string, value: string) => void;
-  onSubmit: (stage: ChecklistStage) => void;
+  error: string | null;
+  commandId: string;
+  onSubmit: (stage: ChecklistStage, answers: ChecklistAnswer[]) => Promise<boolean>;
   go: Go;
 }) {
+  const [open, setOpen] = useState<ChecklistStage | null>(null);
   const lists = state.checklists.filter((list) => list.period !== null);
+  const opened = open ? lists.find((list) => list.stage === open) : undefined;
+  if (opened) {
+    return (
+      <ChecklistScreen
+        key={opened.stage}
+        checklist={opened}
+        warnings={state.warnings}
+        busy={busy}
+        error={error}
+        commandId={commandId}
+        lastMeter={state.assignment?.lastMeter ?? null}
+        known={knownAnswers(opened.stage, state)}
+        onBack={() => setOpen(null)}
+        onSubmit={(answers) => {
+          void onSubmit(opened.stage, answers).then((ok) => { if (ok) setOpen(null); });
+        }}
+      />
+    );
+  }
   return (
     <>
-      {lists.length === 0
-        ? <Card><Nodata>Чек-листы ТБ недоступны</Nodata></Card>
-        : lists.map((list) => {
-          const items = list.sections.flatMap((section) => section.items);
-          const left = items.filter((item) => !answers[item.id]).length;
-          const period = list.period;
-          const due = period?.due ?? false;
-          const warn = period?.warn ?? false;
-          return (
-            <div key={list.stage}>
-              <Card title={list.title}>
-                <Row
-                  icon="safety"
-                  tone={due ? 'bad' : warn ? 'warn' : 'ok'}
-                  title={due ? 'Срок подошёл'
-                    : warn ? `Срок через ${period?.daysLeft} дн.`
-                      : 'Действует'}
-                  note={due
-                    ? 'без него запись выработки не примут'
-                    : `до ${dateRu(period?.validUntil)} · ${items.length} пунктов`}
-                />
-              </Card>
-              {/* Пройти заранее — законное действие, за которое не наказывают:
-                  список открыт и когда срок ещё не вышел. */}
-              <ChecklistItems checklist={list} answers={answers} measures={measures}
-                onAnswer={onAnswer} onMeasure={onMeasure} />
-              <button type="button" className="ov10-btn green" disabled={busy || left > 0}
-                onClick={() => onSubmit(list.stage)}>
-                {busy ? 'Отправляем…' : left > 0 ? `Осталось ответить: ${left}` : 'Сдать ' + list.title}
-              </button>
-            </div>
-          );
-        })}
+      <Card title="Чек-листы ТБ">
+        {lists.length === 0
+          ? <Nodata>Чек-листы ТБ недоступны</Nodata>
+          : lists.map((list) => {
+            const period = list.period;
+            const due = period?.due ?? false;
+            const warn = period?.warn ?? false;
+            return (
+              // Пройти заранее — законное действие: список открыт и когда
+              // срок ещё не вышел.
+              <Row
+                key={list.stage}
+                icon="safety"
+                tone={due ? 'bad' : warn ? 'warn' : 'ok'}
+                title={list.title}
+                note={due
+                  ? 'срок подошёл — без него запись выработки не примут'
+                  : warn ? `срок через ${period?.daysLeft} дн.` : `действует до ${dateRu(period?.validUntil)}`}
+                chevron
+                onClick={() => setOpen(list.stage)}
+              />
+            );
+          })}
+      </Card>
       <button type="button" className="ov10-btn ghost" onClick={() => go('safety')}>К разделу ТБ</button>
     </>
   );
@@ -909,27 +711,61 @@ function ScreenSafetyChecklists({state, answers, measures, busy, onAnswer, onMea
  * Закрытие смены. Поля комментария здесь нет (решение владельца 18.09.2026):
  * то, что надо передать следующей смене, — это передача машины, отдельное
  * действие со своим адресатом, а не строчка в закрытии.
- *
- * ЗАПИСИ С ТЕЛЕФОНА ЗАКРЫТИЮ МЕШАЮТ (F-R43-1). Смена, закрытая при непустой
- * очереди, губит отложенное молча: сервер отвечает таким записям 409 «Смена уже
- * закрыта», и в отчёт они не попадают. Пока на устройстве есть неотправленное,
- * закрытие не нажимается, а человеку предложено отправить записи сейчас же.
  */
-export function ScreenClosing({state, busy, onClose, go, unsent, onFlush}: {
+function ScreenClosing({state, busy, onFinish, onClose, go}: {
   state: OperatorMobileState;
   busy: boolean;
+  /** «Завершить работу» — сервер переводит смену в сдачу (finish-work). */
+  onFinish: () => void;
   onClose: () => void;
   go: Go;
-  /** Записей на устройстве, ещё не принятых сервером. */
-  unsent: number;
-  /** Отправить их немедленно. */
-  onFlush: () => void;
 }) {
   const {assignment} = state;
+  const [confirmFinish, setConfirmFinish] = useState(false);
+  // До работы закрывать нечего: закрытие открывается в свою очередь, а не с
+  // первой минуты смены (жалоба 28.09.2026 «можно сразу закрыть смену»).
+  if (stepIndex(state.phase) < stepIndex('WORK')) return <NotYet state={state} go={go} />;
+
+  /*
+   * ЗАВЕРШИТЬ РАБОТУ — ОТДЕЛЬНЫМ ДЕЙСТВИЕМ С ПОДТВЕРЖДЕНИЕМ.
+   *
+   * Раньше кнопка на экране работы только открывала этот экран: на сервер
+   * «работа завершена» не уходило вовсе, и смена оставалась в работе.
+   * После завершения сваи и бурение больше не принимаются — поэтому второе
+   * нажатие, а не одно.
+   */
+  if (state.phase === 'WORK') {
+    return (
+      <>
+        <Card>
+          <Row icon="list" title="Записи выработки" note={String(state.entries.length)} />
+          <Row icon="warning" tone={state.defects.length > 0 ? 'warn' : 'ok'} title="Дефекты"
+            note={String(state.defects.length)} />
+        </Card>
+        <Banner tone="warn" title="После «Завершить работу» сваи и бурение записать будет нельзя">
+          {' '}— только простой. Дальше: ЕО после работы и закрытие смены.
+        </Banner>
+        {confirmFinish ? (
+          <>
+            <button type="button" className="ov10-btn orange" disabled={busy} onClick={onFinish}>
+              {busy ? 'Завершаем…' : 'Да, работа на сегодня закончена'}
+            </button>
+            <button type="button" className="ov10-btn ghost" onClick={() => setConfirmFinish(false)}>Продолжить работу</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="ov10-btn orange" disabled={busy} onClick={() => setConfirmFinish(true)}>
+              Завершить работу
+            </button>
+            <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>К записи выработки</button>
+          </>
+        )}
+      </>
+    );
+  }
+
   const closed = state.phase === 'CLOSED';
-  // Сервер не закроет смену без послесменного обслуживания. Пока экран об
-  // этом молчал, человек упирался в отказ и не знал, куда идти: ЕО после
-  // работы живёт на другом экране, и попасть туда отсюда было нечем.
+  // Сервер не закроет смену без послесменного обслуживания.
   const afterDone = state.checklists.some((list) => list.stage === 'EO_AFTER' && list.done);
   return (
     <>
@@ -959,28 +795,18 @@ export function ScreenClosing({state, busy, onClose, go, unsent, onFlush}: {
       {!closed && !afterDone ? (
         <>
           <Banner tone="warn" title="Сначала ЕО после работы" />
-          <button type="button" className="ov10-btn green" onClick={() => go('maint')}>
-            Выполнить ЕО после работы
+          <button type="button" className="ov10-btn green" onClick={() => go('step')}>
+            Пройти ЕО после работы
           </button>
         </>
       ) : null}
-      {!closed && unsent > 0 ? (
-        <>
-          <Banner tone="warn" title={`Сначала отправьте записи с телефона: ${unsent} не отправлено`} />
-          <button type="button" className="ov10-btn ghost" onClick={onFlush}>
-            Отправить сейчас
-          </button>
-        </>
+      {!closed && afterDone ? (
+        <button type="button" className="ov10-btn orange" disabled={busy} onClick={onClose}>
+          {busy ? 'Закрываем…' : 'Закрыть смену и отправить отчёт'}
+        </button>
       ) : null}
       {!closed ? (
-        <button
-          type="button"
-          className="ov10-btn orange"
-          disabled={busy || !afterDone || unsent > 0}
-          onClick={onClose}
-        >
-          {busy ? 'Закрываем…' : 'Закрыть смену'}
-        </button>
+        <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>Записать простой</button>
       ) : null}
     </>
   );
@@ -1261,27 +1087,6 @@ function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
 /* --------------------------------------------------- шаги допуска (ТБ) --- */
 
 /**
- * Итог подтверждения СИЗ и куда ведёт «Далее».
- *
- * D-20260927-003: подтвердив комплект, человек оставался на том же экране с той
- * же кнопкой — «СИЗ подтверждены» мелькало во всплывающей строке, а «допуск
- * пройден» было видно только в другом разделе. Итог и следующий шаг считаются
- * здесь, разметка — в `ScreenPpe`; правило то же, что в `/operator`: пока сервер
- * держит фазу `IDENTITY`, допуск не объявляем.
- */
-export function ppeOutcome(state: OperatorMobileState): {title: string; note: string; screen: string} {
-  if (state.phase !== 'IDENTITY') {
-    return {title: 'Вы допущены к смене', note: 'Допуск пройден', screen: nextScreen(state)};
-  }
-  const next = admissionSteps(state)
-    .find((step) => step.id !== 'SIGNATURE' && step.opens !== null && !step.done);
-  if (next && next.opens) {
-    return {title: 'СИЗ подтверждены', note: `Дальше: ${next.title}`, screen: STEP_SCREEN[next.opens]};
-  }
-  return {title: 'СИЗ подтверждены', note: 'Все шаги допуска пройдены', screen: 'safety'};
-}
-
-/**
  * СИЗ: отмечают ОТСУТСТВИЕ, нехватка записывается как есть и не запирает экран.
  *
  * ПОЧЕМУ ГАЛОЧКИ СТОЯТ ЗАРАНЕЕ. У работника, вышедшего на смену, комплект
@@ -1293,11 +1098,10 @@ export function ppeOutcome(state: OperatorMobileState): {title: string; note: st
  * добросовестно нажав на каждую строку, СНИМАЛ весь комплект. Подтверждение
  * уходило с пометкой «не хватает каски». Экран должен просить то, что делает.
  */
-function ScreenPpe({state, busy, onConfirm, go}: {
+function ScreenPpe({state, busy, onConfirm}: {
   state: OperatorMobileState;
   busy: boolean;
   onConfirm: (items: string[]) => void;
-  go: Go;
 }) {
   const [items, setItems] = useState<string[]>(
     state.identity.ppe.confirmed && state.identity.ppe.items.length > 0
@@ -1308,9 +1112,6 @@ function ScreenPpe({state, busy, onConfirm, go}: {
   const toggle = (code: string) => setItems((current) => (
     current.includes(code) ? current.filter((value) => value !== code) : [...current, code]
   ));
-  /* Итог показываем, только когда комплект уже подтверждён: до подтверждения
-     «СИЗ подтверждены» — обещание, которого человек ещё не давал. */
-  const outcome = state.identity.ppe.confirmed ? ppeOutcome(state) : null;
 
   return (
     <>
@@ -1332,19 +1133,11 @@ function ScreenPpe({state, busy, onConfirm, go}: {
           нельзя — простой и происшествия записываются как обычно.
         </Banner>
       ) : null}
-      {outcome ? (
-        <Card>
-          <Row icon="check" tone="ok" title={outcome.title} note={outcome.note} />
-        </Card>
-      ) : null}
       <button type="button" className="ov10-btn" disabled={busy} onClick={() => onConfirm(items)}>
         {busy ? 'Записываем…'
           : missing.length === 0 ? 'Комплект в порядке'
             : `Подтвердить (нет: ${missing.length})`}
       </button>
-      {outcome ? (
-        <button type="button" className="ov10-btn green" onClick={() => go(outcome.screen)}>Далее</button>
-      ) : null}
     </>
   );
 }
@@ -1516,11 +1309,20 @@ export function OperatorV10App() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Отказ сервера — отдельно от «Записано» и заметно. Раньше оба жили в одной
+   * голубой полосе вверху страницы: машинист, прокрутивший форму вниз, отказа
+   * не видел — «простой не записывается», «ЕО ничего не делает» (28.09.2026).
+   */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState('today');
-  const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
-  /** Числовые замеры: моточасы, остаток топлива, доливы. */
-  const [measures, setMeasures] = useState<Record<string, string>>({});
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  // Новое сообщение — к нему: полоса вверху, форма могла быть прокручена вниз.
+  useEffect(() => {
+    if (notice || actionError) contentRef.current?.scrollIntoView({block: 'start', behavior: 'smooth'});
+  }, [notice, actionError]);
 
   /**
    * Ключ команды переживает нажатие.
@@ -1570,21 +1372,17 @@ export function OperatorV10App() {
     })();
   }, []);
 
-  // Возвращает признак успеха: форма чистит поля только по нему. Отказ по
-  // существу (400/409) — это false: введённое человеком должно остаться на
-  // экране. Уход в очередь — принятая запись, то есть true.
-  //
-  // Успех — это «сервер принял запись (или она легла в очередь)», а не «весь
-  // обработчик дошёл до конца»: перечитывание экрана идёт отдельным шагом, и
-  // его сбой не отменяет уже записанное.
+  /** true — сервер принял (или запись легла в очередь); формы очищаются только по нему. */
   const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
-    let accepted = true;
+    setActionError(null);
     try {
       await fn();
       setCommandId(newCommandId());
       setNotice(done);
+      await reload();
+      return true;
     } catch (cause) {
       // Запись легла в очередь — это принятая запись, а не отказ: следующая
       // обязана получить новый ключ. Со старым ключом очередь считала её
@@ -1592,36 +1390,19 @@ export function OperatorV10App() {
       if (cause instanceof QueuedOffline) {
         setCommandId(newCommandId());
         setNotice(cause.message);
-      } else {
-        accepted = false;
-        setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
+        return true;
       }
-    }
-    // Отказ по существу (400/409) перечитывать нечего: кнопку отпускаем сразу,
-    // чтобы человек исправил ввод и повторил.
-    if (!accepted) {
-      setBusy(false);
+      setActionError(cause instanceof Error ? cause.message : 'Действие не выполнено');
+      // 409 — сервер уже в другом состоянии: перечитываем, чтобы экран не спорил.
+      if (cause instanceof ApiError && cause.status === 409) void reload();
       return false;
+    } finally {
+      setBusy(false);
     }
-    try {
-      await reload();
-    } catch {
-      // Запись уже принята — сбой перечитывания её не отменяет.
-    }
-    // Кнопка ждёт перечитывания (F-R43-3e). Ключ команды уже заменён, а счётчики
-    // смены приходят только с reload: отпусти раньше — машинист увидит прежние
-    // числа, нажмёт второй раз, и та же выработка уйдёт с новым ключом, то есть
-    // задвоится. Касается и записи, ушедшей в офлайн-очередь.
-    setBusy(false);
-    return true;
   }, [reload]);
 
-  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
-  const inspection = useMemo(
-    () => state?.checklists.find((list) => list.stage === 'PRESHIFT_INSPECTION'),
-    [state],
-  );
 
   const accept = useCallback(() => {
     const equipmentId = state?.assignment?.equipmentId ?? state?.options[0]?.equipmentId;
@@ -1669,50 +1450,33 @@ export function OperatorV10App() {
     }), 'Происшествие записано.');
   }, [commandId, run, state]);
 
-  /** Сдача осмотра: уходят ОТВЕТЫ ЧЕЛОВЕКА, а не «норма» по всем пунктам. */
-  const submitChecklist = useCallback((stage: ChecklistStage) => {
+  /**
+   * Сдача чек-листа: ответы собирает общий экран (описание замечаний, фото,
+   * замеры), здесь только отправка. Успех возвращается, чтобы экран шага
+   * вернул человека к порядку смены, а не оставлял на сданном списке.
+   */
+  const submitChecklist = useCallback(async (stage: ChecklistStage, checklistAnswers: ChecklistAnswer[]): Promise<boolean> => {
     const shiftId = state?.shift?.id;
     const equipmentId = state?.assignment?.equipmentId;
     const list = state?.checklists.find((item) => item.stage === stage);
     if (!shiftId || !equipmentId || !list) {
-      setNotice('Список недоступен: сначала примите установку.');
-      return;
+      setActionError('Список недоступен: сначала примите установку.');
+      return false;
     }
-    // Проверка ДО отправки и с названием раздела: сервер отвечает общей
-    // строкой «Чек-лист заполнен не полностью», по которой не видно, куда
-    // смотреть. Серверный текст остаётся запасным — он печатается в `run`.
-    const gaps = gapsBySection(list, answers, measures);
-    if (gaps.length > 0) {
-      setNotice(gapsNote(gaps));
-      return;
-    }
-    const items = list.sections.flatMap((section) => section.items);
-    void run(() => sendCommand({
+    return run(() => sendCommand({
       command: 'submit-checklist',
       clientCommandId: commandId,
       shiftId,
       equipmentId,
       stage,
-      answers: items.map((item) => ({
-        itemId: item.id,
-        answer: answers[item.id],
-        measures: item.measure && (measures[item.measure.key] ?? '').trim() !== ''
-          ? {[item.measure.key]: Number((measures[item.measure.key] ?? '').replace(',', '.'))}
-          : undefined,
-      })),
+      answers: checklistAnswers,
     }), list.title + ': сдано.');
-    setMeasures({});
-  }, [answers, commandId, measures, run, state]);
-
-  const submitInspection = useCallback(
-    () => submitChecklist('PRESHIFT_INSPECTION'),
-    [submitChecklist],
-  );
+  }, [commandId, run, state]);
 
   const logProduction = useCallback(async (entry: ProductionEntryInput): Promise<boolean> => {
     const shiftId = state?.shift?.id;
     if (!shiftId) {
-      setNotice('Смена не начата: записывать некуда.');
+      setActionError('Смена не начата: записывать некуда.');
       return false;
     }
     return run(
@@ -1721,14 +1485,66 @@ export function OperatorV10App() {
     );
   }, [commandId, run, state]);
 
+  /** Работа закончена: сервер переводит смену в сдачу, дальше ЕО после работы. */
+  const finishWork = useCallback(() => {
+    const shiftId = state?.shift?.id;
+    if (!shiftId) {
+      setActionError('Смена не начата: завершать нечего.');
+      return;
+    }
+    void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена. Дальше — ЕО после работы.')
+      .then((ok) => { if (ok) setActive('step'); });
+  }, [run, state]);
+
   const closeShift = useCallback(() => {
     const shiftId = state?.shift?.id;
     if (!shiftId) {
-      setNotice('Смена не начата: закрывать нечего.');
+      setActionError('Смена не начата: закрывать нечего.');
       return;
     }
     void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
   }, [run, state]);
+
+  /**
+   * Экран текущего шага — по фазе сервера. Одна точка входа вместо
+   * разбросанных «осмотр», «готовность», «обслуживание», «закрытие».
+   */
+  const stepScreen = (current: OperatorMobileState) => {
+    const stage = current.phase === 'CLOSING'
+      && current.checklists.some((list) => list.stage === 'EO_AFTER' && list.done)
+      ? undefined
+      : PHASE_STAGE[current.phase];
+    const list = stage ? current.checklists.find((item) => item.stage === stage) : undefined;
+    if (current.phase === 'IDENTITY') {
+      return <ScreenSafety state={current} view={safety} error={safetyError} go={setActive} />;
+    }
+    if (current.phase === 'ADMISSION') {
+      return <ScreenAccept state={current} busy={busy} onAccept={accept} go={setActive} />;
+    }
+    if (stage) {
+      if (!list) return <Card><Nodata>Список «{stage}» не пришёл с сервера — обновите экран</Nodata></Card>;
+      return (
+        <ChecklistScreen
+          key={list.stage}
+          checklist={list}
+          warnings={current.warnings}
+          busy={busy}
+          error={actionError}
+          commandId={commandId}
+          lastMeter={current.assignment?.lastMeter ?? null}
+          known={knownAnswers(list.stage, current)}
+          onBack={() => setActive('today')}
+          onSubmit={(checklistAnswers) => {
+            void submitChecklist(list.stage, checklistAnswers).then((ok) => {
+              if (ok) setActive(list.stage === 'EO_AFTER' ? 'closing' : 'today');
+            });
+          }}
+        />
+      );
+    }
+    if (current.phase === 'WORK') return <ScreenWork state={current} busy={busy} onLog={logProduction} go={setActive} />;
+    return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive} />;
+  };
 
   const current = SCREENS.find((screen) => screen.id === active) ?? SCREENS[0];
   const activeTab = TABS.find((tab) => tab.screen === current.id)?.key ?? current.tab;
@@ -1748,58 +1564,26 @@ export function OperatorV10App() {
     switch (current.id) {
       case 'docs': return <ScreenDocs state={state} />;
       case 'more': return <ScreenMore state={state} go={setActive} />;
-      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} go={setActive} />;
+      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} />;
       case 'briefing': return <ScreenBriefing state={state} busy={busy} onAcknowledge={acknowledgeBriefing} />;
       case 'knowledge': return <ScreenKnowledge busy={busy} onDone={submitKnowledge} />;
       case 'incidents': return <ScreenIncidents state={state} busy={busy} onReport={reportIncident} />;
       case 'tb': return (
-        <ScreenSafetyChecklists
-          state={state}
-          answers={answers}
-          measures={measures}
-          busy={busy}
-          onAnswer={(itemId, answer) => setAnswers((current2) => ({...current2, [itemId]: answer}))}
-          onMeasure={(key, value) => setMeasures((current2) => ({...current2, [key]: value}))}
-          onSubmit={submitChecklist}
-          go={setActive}
-        />
+        <ScreenSafetyChecklists state={state} busy={busy} error={actionError} commandId={commandId}
+          onSubmit={submitChecklist} go={setActive} />
       );
       case 'accept': return <ScreenAccept state={state} busy={busy} onAccept={accept} go={setActive} />;
-      case 'inspect': return (
-        <ScreenInspect
-          checklist={inspection}
-          answers={answers}
-          measures={measures}
-          onAnswer={(itemId, answer) => setAnswers((current2) => ({...current2, [itemId]: answer}))}
-          onMeasure={(key, value) => setMeasures((current2) => ({...current2, [key]: value}))}
-          go={setActive}
-        />
-      );
-      case 'ready': return (
-        <ScreenReady state={state} checklist={inspection} answers={answers} busy={busy}
-          onSubmit={submitInspection} go={setActive} />
-      );
+      case 'step': return stepScreen(state);
       case 'work': return (
         <ScreenWork state={state} busy={busy} onLog={logProduction} go={setActive} />
       );
-      case 'maint': return (
-        <ScreenMaint
-          state={state}
-          answers={answers}
-          measures={measures}
-          busy={busy}
-          onAnswer={(itemId, answer) => setAnswers((current2) => ({...current2, [itemId]: answer}))}
-          onMeasure={(key, value) => setMeasures((current2) => ({...current2, [key]: value}))}
-          onSubmit={submitChecklist}
-          go={setActive}
-        />
-      );
+      case 'maint': return <ScreenMaint state={state} go={setActive} />;
       case 'closing': return (
-        <ScreenClosing state={state} busy={busy} onClose={closeShift} go={setActive}
-          unsent={queued.length} onFlush={() => void flushQueued()} />
+        <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive} />
       );
       case 'report': return <ScreenReport state={state} />;
-      default: return state.phase === 'WORK' ? <ScreenWork state={state} busy={busy} onLog={logProduction} go={setActive} /> : <ScreenToday state={state} go={setActive} />;
+      // «Смена» — всегда лестница шагов: что сделано, что сейчас, что дальше.
+      default: return <ScreenToday state={state} go={setActive} />;
     }
   })();
 
@@ -1807,7 +1591,7 @@ export function OperatorV10App() {
     <div className="ov10-screen">
       <div className="ov10-top">
         <Navbar
-          title={current.title}
+          title={current.id === 'step' && state ? (STEPS[stepIndex(state.phase)]?.title ?? 'Смена закрыта') : current.title}
           onBack={current.id === 'today' ? undefined : () => setActive('today')}
           right={(
             <button type="button" className="iconbtn" onClick={() => void reload()} aria-label="Обновить">
@@ -1816,8 +1600,9 @@ export function OperatorV10App() {
           )}
         />
       </div>
-      <div className="ov10-content">
+      <div className="ov10-content" ref={contentRef}>
         {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
+        {actionError ? <Banner tone="bad" title={`Не записано: ${actionError}`} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} className="space-y-1" />
         {!loading && !state && !loadError ? <Badge tone="warn">нет данных</Badge> : null}

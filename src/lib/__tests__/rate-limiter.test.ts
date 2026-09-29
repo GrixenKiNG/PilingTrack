@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   rateLimiter,
   AUTH_RATE_LIMIT,
-  PIN_RATE_LIMIT,
   getRateLimitIdentifier,
   getTenantRateLimitIdentifier,
   createRateLimitMiddleware,
@@ -155,24 +154,6 @@ describe('rate-limiter', () => {
       const stats = await rateLimiter.getStats();
       expect(stats.activeIdentifiers).toBe(2);
       expect(stats.blockedIdentifiers).toBe(0);
-    });
-  });
-
-  describe('PIN_RATE_LIMIT', () => {
-    it('has stricter limits', () => {
-      expect(PIN_RATE_LIMIT.maxAttempts).toBe(3);
-      expect(PIN_RATE_LIMIT.windowMs).toBe(10 * 60 * 1000);
-      expect(PIN_RATE_LIMIT.blockDurationMs).toBe(60 * 60 * 1000);
-    });
-
-    it('blocks after 3 attempts', async () => {
-      for (let i = 0; i < 3; i++) {
-        const result = await rateLimiter.check('user-1', PIN_RATE_LIMIT);
-        expect(result.allowed).toBe(true);
-      }
-
-      const result = await rateLimiter.check('user-1', PIN_RATE_LIMIT);
-      expect(result.allowed).toBe(false);
     });
   });
 

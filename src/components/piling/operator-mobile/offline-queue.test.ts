@@ -1,6 +1,6 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {
-  AUTH_WAIT_MESSAGE, discard, enqueue, flushQueue, isQueueable, readQueue, resolve, retry,
+  AUTH_WAIT_MESSAGE, discard, enqueue, flushQueue, foreignQueueSummary, isQueueable, readQueue, resolve, retry,
 } from './offline-queue';
 import {QueuedOffline, sendCommand} from './api';
 import {usePilingStore} from '@/lib/store';
@@ -151,6 +151,21 @@ describe('очередь команд на устройстве', () => {
     // Вернулся хозяин — записи на месте и уходят.
     usePilingStore.setState({currentUser: {id: 'op-day'} as never});
     expect(readQueue()).toHaveLength(1);
+    usePilingStore.setState({currentUser: null});
+  });
+
+  it('сменщик видит, что на телефоне лежат чужие записи, и чьи они', () => {
+    // Аудит R43 №2: чужие записи ждали хозяина молча — если он не входил на
+    // этом телефоне, выработка терялась, и никто об этом не знал.
+    usePilingStore.setState({currentUser: {id: 'op-day', name: 'Иванов И.'} as never});
+    enqueue(piles);
+    enqueue(incident);
+
+    usePilingStore.setState({currentUser: {id: 'op-night', name: 'Петров П.'} as never});
+    expect(foreignQueueSummary()).toEqual({count: 2, owners: ['Иванов И.']});
+
+    usePilingStore.setState({currentUser: {id: 'op-day', name: 'Иванов И.'} as never});
+    expect(foreignQueueSummary()).toEqual({count: 0, owners: []});
     usePilingStore.setState({currentUser: null});
   });
 });

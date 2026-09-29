@@ -11,6 +11,8 @@ interface SiteAnalytics {
   plannedPileMeters: number;
   actualPiles: number;
   actualPileMeters: number;
+  plannedDrillingCount: number;
+  actualDrillingCount: number;
   plannedDrilling: number;
   actualDrilling: number;
   pileProgress: number;

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
+import { invalidateReports } from '@/lib/cached-queries';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { pileLengthMeters } from '@/lib/pile-length';
 import { formatRuDate } from '@/lib/format';
@@ -170,6 +171,7 @@ export const DELETE = withMutation(
       });
     }
 
+    invalidateReports();
     // След в ленте аудита. Пишется после коммита: recordFeedbackEvent
     // сохраняет глобальным клиентом, а не переданной транзакцией, — внутрь
     // `$transaction` выше его не завести. Заголовок задаётся здесь, а не через

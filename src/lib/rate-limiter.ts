@@ -22,16 +22,21 @@ export const AUTH_RATE_LIMIT: RateLimitConfig = {
   blockDurationMs: 30 * 60 * 1000, // блокировка на 30 минут
 };
 
-export const PIN_RATE_LIMIT: RateLimitConfig = {
-  maxAttempts: 3,          // 3 попытки для PIN
-  windowMs: 10 * 60 * 1000, // 10 минут
-  blockDurationMs: 60 * 60 * 1000, // блокировка на 1 час
-};
-
 // Per-IP guard for email login: caps an attacker's TOTAL attempts from one
 // address regardless of how many emails they rotate through. Looser than the
 // per-account limit so a shared office IP with several legitimate users
 // doesn't trip it on normal typos.
+// Общий счётчик по аккаунту со всех адресов (решение владельца 28.09.2026,
+// вариант «б»): без него каждый новый IP давал злоумышленнику ещё 5 попыток
+// на тот же аккаунт. 10 попыток за 15 минут — и вход в аккаунт закрыт на
+// 15 минут. Выше лимита на «почта+IP», чтобы опечатки владельца упирались
+// сначала в него, а не закрывали аккаунт целиком.
+export const ACCOUNT_LOCKOUT_RATE_LIMIT: RateLimitConfig = {
+  maxAttempts: 10,
+  windowMs: 15 * 60 * 1000,
+  blockDurationMs: 15 * 60 * 1000,
+};
+
 export const LOGIN_IP_RATE_LIMIT: RateLimitConfig = {
   maxAttempts: 20,          // 20 попыток суммарно с одного IP
   windowMs: 15 * 60 * 1000, // 15 минут

@@ -50,9 +50,7 @@ vi.mock('@/lib/db', () => {
   return { db: client };
 });
 vi.mock('@/services/auth/auth-service', () => ({
-  computePinLookup: vi.fn((pin: string) => `lookup-${pin}`),
   hashPassword: vi.fn(async () => 'password-hash'),
-  hashPin: vi.fn(async () => 'pin-hash'),
 }));
 vi.mock('@/services/auth/authorization-service', () => ({
   assertNotSelfAction: vi.fn(),
@@ -209,19 +207,13 @@ describe('createUser', () => {
     process.env.DEFAULT_TENANT_ID = prev;
   });
 
-  it('stores a PIN-only credential in the PIN columns', async () => {
-    await createUser(
-      { email: 'a@b.ru', pin: '1234', name: 'A', role: 'OPERATOR', tenantId: 'orion' },
-      'admin-1'
-    );
-
-    expect(createUserMock).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        password: '',
-        pin: 'pin-hash',
-        pinLookup: 'lookup-1234',
-      }),
-    }));
+  // ПИН-вход удалён 27.09.2026 (никто им не пользовался): без пароля войти
+  // нечем, и такого пользователя заводить нельзя.
+  it('refuses to create a user without a password', async () => {
+    await expect(
+      createUser({ email: 'a@b.ru', name: 'A', role: 'OPERATOR', tenantId: 'orion' }, 'admin-1')
+    ).rejects.toMatchObject({ status: 400 });
+    expect(createUserMock).not.toHaveBeenCalled();
   });
 });
 
@@ -357,19 +349,6 @@ describe('updateUser', () => {
     expect(updateUserMock).not.toHaveBeenCalled();
   });
 
-  it('stores a changed PIN in the PIN columns', async () => {
-    findFirstUserMock.mockResolvedValue(existingUser);
-
-    await updateUser('tenant-a', { id: 'user-b', pin: '5678' }, 'admin-a');
-
-    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        pin: 'pin-hash',
-        pinLookup: 'lookup-5678',
-        sessionVersion: { increment: 1 },
-      }),
-    }));
-  });
 });
 
 describe('deleteUser', () => {

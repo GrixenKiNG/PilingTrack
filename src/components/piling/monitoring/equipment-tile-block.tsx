@@ -5,7 +5,7 @@ import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types'
 import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { KIND_LABEL } from '@/components/piling/admin-equipment/equipment-status';
-import { formatFixed, formatHours } from '@/lib/format';
+import { formatCountMeters, formatFixed, formatHours } from '@/lib/format';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
 import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
 import type { EquipmentTileBlock } from './equipment-tile-template';
@@ -157,9 +157,9 @@ export function EquipmentTileBlockContent({
     case 'maintenance':
       return <Value label="Ближайшее ТО" value={hoursLeft != null ? `${Math.max(0, Math.round(hoursLeft))} ч` : '—'} icon={<Wrench className="h-4 w-4" />} />;
     case 'todayPiles':
-      return <Value label="Сваи" value={card.todayTotals ? `${card.todayTotals.piles} / ${formatFixed(card.todayTotals.pileMeters, 1)} м` : '—'} />;
+      return <Value label="Сваи" value={card.todayTotals ? formatCountMeters(card.todayTotals.piles, card.todayTotals.pileMeters) : '—'} />;
     case 'todayDrilling':
-      return <Value label="Бурение" value={card.todayTotals ? `${card.todayTotals.drillingCount} / ${formatFixed(card.todayTotals.drillingMeters, 1)} м` : '—'} />;
+      return <Value label="Бурение" value={card.todayTotals ? formatCountMeters(card.todayTotals.drillingCount, card.todayTotals.drillingMeters) : '—'} />;
     case 'todayDowntime':
       return <Value label="Простой" value={card.todayTotals && card.todayTotals.downtimeHours > 0 ? formatHours(card.todayTotals.downtimeHours) : '—'} />;
     case 'maintenanceAlert': {

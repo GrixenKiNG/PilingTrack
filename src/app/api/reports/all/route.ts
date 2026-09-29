@@ -30,6 +30,7 @@ export const GET = withApi(
       hasMore: paginated.hasMore,
       nextCursor: paginated.nextCursor,
       total: paginated.total,
+      sums: paginated.sums,
     });
   },
   { domain: 'reports', cache: true, cacheTTL: 10_000 }

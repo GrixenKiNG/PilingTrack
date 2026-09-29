@@ -27,7 +27,7 @@ const baseCard: FleetCard = {
 const snapshot: FleetSnapshot = {
   asOf: '2026-07-04T12:00:00.000Z',
   today: '2026-07-04',
-  totals: { totalEquipment: 2, activeToday: 2, expected: 0, idle: 0, pilesToday: 5, drillingToday: 10, downtimeHoursToday: 0, crewsOnShiftToday: 2, operatorsOnShiftToday: 2 },
+  totals: { totalEquipment: 2, activeToday: 2, expected: 0, idle: 0, pilesToday: 5, pileMetersToday: 60, drillingToday: 10, drillingCountToday: 1, downtimeHoursToday: 0, crewsOnShiftToday: 2, operatorsOnShiftToday: 2 },
   equipment: [baseCard, { ...baseCard, id: 'eq-2', name: 'Установка №2', assignedSiteId: 'site-2', assignedSiteName: 'Объект №2', assignedOperatorName: 'Петров' }],
 };
 

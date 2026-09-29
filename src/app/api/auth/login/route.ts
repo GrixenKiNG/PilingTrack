@@ -25,7 +25,7 @@ export const POST = withApi(
     if (!validation.success) {
       return createJsonResponse(
         {
-          error: 'Validation failed',
+          error: 'Проверьте email и пароль',
           requestId,
           details: validation.error.issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
         },

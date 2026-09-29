@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { reportAdminUpsertSchema } from '@/lib/validation-schemas';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
+import { invalidateReports } from '@/lib/cached-queries';
 
 
 export const runtime = 'nodejs';
@@ -63,6 +64,7 @@ export const POST = withMutation(
       { enforceEditWindow: false, actor: user! }
     );
 
+    invalidateReports();
     return NextResponse.json({ report: result });
   },
   { domain: 'reports' }

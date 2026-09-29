@@ -83,7 +83,6 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set (min 32 chars)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
       - DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET:?DEVICE_KEY_LOOKUP_SECRET must be set (min 32 chars)}
-      - PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET:?PIN_LOOKUP_SECRET must be set (min 32 chars)}
       - S3_ENDPOINT=${S3_ENDPOINT:-}
       - S3_REGION=${S3_REGION:-auto}
       - S3_BUCKET=${S3_BUCKET:-pilingtrack-reports}

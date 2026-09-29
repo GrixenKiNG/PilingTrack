@@ -9,7 +9,7 @@ import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
-/** Убрать строку матрицы. Право то же, что у выдачи: `users.manage`. */
+/** Убрать строку матрицы. Право то же, что у выдачи: `safety.permits.manage`. */
 export const DELETE = withMutation(
   async (request: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const { user, error } = await requireAuth(request);
@@ -24,7 +24,7 @@ export const DELETE = withMutation(
       await deleteEquipmentPermit({
         tenantId,
         permitId: id,
-        mayManage: can(actor, 'users.manage'),
+        mayManage: can(actor, 'safety.permits.manage'),
       });
       await recordAuditEvent({
         action: 'user.equipment_permit.deleted',

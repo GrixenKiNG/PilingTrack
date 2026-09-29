@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
-import { formatHours, formatFixed, formatRelative, formatRuDate } from '@/lib/format';
+import { formatCountMeters, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { KpiTile, KPI_GRID, kpiGridStyle } from '@/components/piling/kpi-tile';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
@@ -269,9 +269,9 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
             смены (черновики). Подписываем это прямо на плитках — иначе
             «сделано сегодня» здесь больше, чем в аналитике, и расхождение
             выглядит потерей данных. */}
-        <KpiTile icon="pile-driving" label="Свай" tone="info" value={snap.totals.pilesToday}
+        <KpiTile icon="pile-driving" label="Сваи" tone="info" value={formatCountMeters(snap.totals.pilesToday, snap.totals.pileMetersToday)}
           detail="включая несданные смены" />
-        <KpiTile icon="drilling-auger" label="Бурения, м" tone="info" value={formatFixed(snap.totals.drillingToday, 1)}
+        <KpiTile icon="drilling-auger" label="Бурение" tone="info" value={formatCountMeters(snap.totals.drillingCountToday, snap.totals.drillingToday)}
           detail="включая несданные смены" />
         <KpiTile icon="downtime" label="Простой" tone={snap.totals.downtimeHoursToday > 0 ? 'danger' : 'neutral'}
           value={formatHours(snap.totals.downtimeHoursToday)} detail="включая несданные смены" />

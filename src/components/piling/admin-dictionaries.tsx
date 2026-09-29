@@ -339,7 +339,9 @@ export function AdminDictionaries() {
     }
   };
 
-  const setStatus = async (kind: DictionaryKind, item: RegistryItem, isActive: boolean) => {
+  // Архивация одной записи — без окна, но с «Отменить» в уведомлении (решение
+  // владельца 28.09.2026). Восстановление по «Отменить» само отмены не предлагает.
+  const setStatus = async (kind: DictionaryKind, item: RegistryItem, isActive: boolean, undoable = true) => {
     try {
       const response = await authFetch('/api/dictionary/manage', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -349,13 +351,38 @@ export function AdminDictionaries() {
         toast.error(await responseError(response, 'Не удалось изменить статус'));
         return;
       }
-      toast.success(isActive ? 'Восстановлено' : 'Архивировано');
+      toast.success(
+        isActive ? 'Восстановлено' : `Архивировано: ${item.name}`,
+        !isActive && undoable
+          ? { duration: 10_000, action: { label: 'Отменить', onClick: () => { void setStatus(kind, item, true, false); } } }
+          : undefined,
+      );
       // Keep the inspector in sync when the status of the selected item changed.
       if (selectedItem?.id === item.id) selectItem({ ...selectedItem, isActive });
       await loadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Не удалось изменить статус');
     }
+  };
+
+  const setStatusBulk = async (kind: DictionaryKind, items: RegistryItem[], isActive: boolean) => {
+    const results = await Promise.all(items.map(async (item) => {
+      try {
+        const response = await authFetch('/api/dictionary/manage', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: kind, id: item.id, isActive }),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }));
+    const done = results.filter(Boolean).length;
+    const failed = items.length - done;
+    if (done) toast.success(`${isActive ? 'Восстановлено' : 'Архивировано'}: ${done}`);
+    if (failed) toast.error(`Не удалось изменить статус: ${failed}`);
+    if (!failed && selectedItem && items.some((item) => item.id === selectedItem.id)) selectItem({ ...selectedItem, isActive });
+    await loadData();
   };
 
   const saveLength = async (confirmed = false) => {
@@ -462,6 +489,7 @@ export function AdminDictionaries() {
                 onRename={(item) => setForm({ mode: 'rename', kind, item })}
                 onLength={(item) => setLengthState({ item, value: item.lengthMm == null ? '' : String(item.lengthMm / 1000) })}
                 onStatus={(item, isActive) => void setStatus(kind, item, isActive)}
+                onBulkStatus={(items, isActive) => void setStatusBulk(kind, items, isActive)}
                 onDelete={(item) => setConfirmDelete({ kind, item })}
                 onSelect={selectItem}
                 selectedId={selectedKind === kind ? selectedItem?.id : undefined}

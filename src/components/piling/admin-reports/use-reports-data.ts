@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { authFetch, isAbort, loadJson } from '@/lib/api';
 import { toast } from 'sonner';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
+import type { JournalSums } from './report-totals';
 
 interface OperatorUser {
   id: string;
@@ -44,6 +45,8 @@ export interface UseReportsDataReturn {
   hasMore: boolean;
   /** Сколько отчётов под отбором всего — не сколько подгружено. */
   totalReports: number;
+  /** Итоги сданных отчётов по всему отбору — с сервера; null в режиме периода и при ошибке. */
+  serverSums: JournalSums | null;
   handleApplyPeriod: () => void;
   handleResetPeriod: () => void;
   loadMoreReports: () => Promise<void>;
@@ -76,6 +79,7 @@ export function useReportsData(): UseReportsDataReturn {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalReports, setTotalReports] = useState(0);
+  const [serverSums, setServerSums] = useState<JournalSums | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -216,6 +220,7 @@ export function useReportsData(): UseReportsDataReturn {
             typeof data.total === 'number' ? data.total : reportsArray.length,
           );
           setHasMore(!periodActive && Boolean(data.hasMore));
+          setServerSums(!periodActive && data.sums ? data.sums : null);
           setNextCursor(!periodActive ? data.nextCursor ?? null : null);
         } else {
           // HTTP error (e.g. 500): fetch resolves with res.ok=false and does
@@ -223,6 +228,7 @@ export function useReportsData(): UseReportsDataReturn {
           // if there were simply no reports. Surface it as a real error.
           setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
           setHasMore(false);
+          setServerSums(null);
           setNextCursor(null);
           toast.error('Ошибка загрузки отчётов');
         }
@@ -230,6 +236,7 @@ export function useReportsData(): UseReportsDataReturn {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
           setError('Не удалось загрузить отчёты. Проверьте соединение.');
           setHasMore(false);
+          setServerSums(null);
           setNextCursor(null);
           toast.error('Ошибка загрузки отчётов');
         }
@@ -304,7 +311,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error, filterError, dictionaryError,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, serverSums, error, filterError, dictionaryError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

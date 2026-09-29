@@ -8,7 +8,7 @@
 import { type ReactNode } from 'react';
 import { KIND_LABELS } from '../equipment-form';
 import { type TimelineRow } from './equipment-detail-parts';
-import { formatFixed } from '@/lib/format';
+import { formatCountMeters, formatFixed } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 
@@ -161,8 +161,8 @@ export function OverviewTiles({
       <OverviewTile
         title="Производительность за 30 дней"
         rows={[
-          ['Сваи', `${formatFixed(stats.piles, 0)} шт. / ${formatFixed(stats.pileMeters, 1)} м.п.`],
-          ['Бурение', `${formatFixed(stats.drillingCount, 0)} шт. / ${formatFixed(stats.drillingMeters, 1)} м`],
+          ['Сваи', formatCountMeters(stats.piles, stats.pileMeters)],
+          ['Бурение', formatCountMeters(stats.drillingCount, stats.drillingMeters)],
           ['Простой', formatDowntimeHours(stats.downtimeHours)],
           ['Отчёты', `${stats.reportCount}`],
         ]}

@@ -15,7 +15,7 @@
 #
 # Required env vars (will fail fast if missing — see base compose for the
 # full list of `:?` constraints):
-#   POSTGRES_PASSWORD, SESSION_SECRET, ENCRYPTION_KEY, PIN_LOOKUP_SECRET,
+#   POSTGRES_PASSWORD, SESSION_SECRET, ENCRYPTION_KEY,
 #   DEVICE_KEY_LOOKUP_SECRET
 # ============================================================
 

@@ -24,7 +24,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { telegramNotifier } from '@/core/notifications/telegram';
-import { isNotificationEnabled } from '@/modules/settings';
 import { withTenantContext } from '@/core/security/tenant-enforcement';
 import { rateLimiter, getRateLimitIdentifier, type RateLimitConfig } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
@@ -125,24 +124,14 @@ export async function POST(request: NextRequest) {
   // Полагаться на try/catch здесь нельзя: заявка помечалась бы доставленной,
   // хотя её никто не получил, а именно от этого таблица и заводилась.
   let deliveryError: string | null = null;
-  // Выключатель «Заявки с сайта ОРИОН» (решение владельца 26.09.2026).
-  // Сессии у публичной формы нет, тенант — тот же DEFAULT_TENANT_ID, в чьи
-  // чаты уходит отправка. Выключено — не отправляем, но и доставленной заявку
-  // не помечаем: при выключенном уведомлении компания о ней действительно
-  // может не узнать, а именно такие строки собирает `deliveredAt IS NULL`.
-  if (!await isNotificationEnabled(tenantId, 'orionLeads')) {
-    logger.info('ORION lead Telegram notification suppressed by settings', { leadId });
-    deliveryError = 'Уведомления о заявках с сайта выключены в настройках';
-  } else {
-    try {
-      const sent = await telegramNotifier.sendMessage(text);
-      if (!sent) deliveryError = 'Telegram не принял сообщение или бот не настроен';
-    } catch (error) {
-      deliveryError = error instanceof Error ? error.message : String(error);
-    }
-    if (deliveryError) {
-      logger.error('Failed to forward ORION lead to Telegram', { leadId, deliveryError });
-    }
+  try {
+    const sent = await telegramNotifier.sendMessage(text);
+    if (!sent) deliveryError = 'Telegram не принял сообщение или бот не настроен';
+  } catch (error) {
+    deliveryError = error instanceof Error ? error.message : String(error);
+  }
+  if (deliveryError) {
+    logger.error('Failed to forward ORION lead to Telegram', { leadId, deliveryError });
   }
 
   // Пометка доставки не должна ронять запрос: заявка уже сохранена, и отказ

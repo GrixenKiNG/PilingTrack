@@ -85,6 +85,11 @@ export function SafetyScreen(props: ReferenceUiProps) {
   // тому, кто действительно может выдать допуск.
   const mayManage = can(
     { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
+    'safety.permits.manage',
+  );
+  // Ссылка «Карточка» ведёт в /admin/users — туда пускает только users.manage.
+  const mayOpenUsers = can(
+    { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
     'users.manage',
   );
 
@@ -299,11 +304,11 @@ export function SafetyScreen(props: ReferenceUiProps) {
                   {selected?.id === row.userId ? 'Скрыть допуски' : 'Допуски к технике'}
                 </Button>
                 {/* «Карточка» ведёт в /admin/users — раздел, закрытый правом
-                    users.manage (то же, что и у mayManage выше). Диспетчеру и
+                    users.manage (mayOpenUsers выше). Диспетчеру и
                     инженеру ОТ — рабочим ролям этой вкладки — страница откажет
                     и вернёт на дашборд, поэтому ссылку показываем только тому,
                     кто её действительно откроет. */}
-                {mayManage && (
+                {mayOpenUsers && (
                   <Button asChild variant="outline" className="h-8 text-2xs">
                     <Link href="/admin/users">Карточка</Link>
                   </Button>

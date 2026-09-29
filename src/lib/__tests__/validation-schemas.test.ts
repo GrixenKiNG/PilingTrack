@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   loginSchema,
-  pinAuthSchema,
   createSiteSchema,
   createEquipmentSchema,
   createCrewSchema,
@@ -37,16 +36,6 @@ describe('validation-schemas', () => {
     });
   });
 
-  describe('pinAuthSchema', () => {
-    it.each(['123', '12345678901', '12a4'])('rejects invalid PIN %s', (pin) => {
-      expect(pinAuthSchema.safeParse({ pin }).success).toBe(false);
-    });
-
-    it.each(['1234', '1234567890'])('accepts PIN %s', (pin) => {
-      expect(pinAuthSchema.safeParse({ pin }).success).toBe(true);
-    });
-  });
-
   describe('createUserSchema', () => {
     it('validates valid user with password', () => {
       const result = createUserSchema.safeParse({
@@ -58,17 +47,7 @@ describe('validation-schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('validates valid user with PIN', () => {
-      const result = createUserSchema.safeParse({
-        email: 'user@piling.ru',
-        name: 'Test User',
-        role: 'OPERATOR',
-        pin: '1234',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects when neither password nor PIN provided', () => {
+    it('rejects a user without a password', () => {
       const result = createUserSchema.safeParse({
         email: 'user@piling.ru',
         name: 'Test User',
@@ -87,16 +66,6 @@ describe('validation-schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects invalid PIN format', () => {
-      const result = createUserSchema.safeParse({
-        email: 'user@piling.ru',
-        name: 'Test User',
-        role: 'OPERATOR',
-        pin: 'abc123',
-      });
-      expect(result.success).toBe(false);
-    });
-
     it('rejects a password that becomes shorter than 8 characters after trimming', () => {
       const result = createUserSchema.safeParse({
         email: 'user@piling.ru',
@@ -111,11 +80,11 @@ describe('validation-schemas', () => {
 
   describe('updateUserSchema', () => {
     it('does not inject isActive into a partial credential update', () => {
-      const result = updateUserSchema.safeParse({ id: 'user-1', pin: '5678' });
+      const result = updateUserSchema.safeParse({ id: 'user-1', password: 'newpassword1' });
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data).toEqual({ id: 'user-1', pin: '5678' });
+        expect(result.data).toEqual({ id: 'user-1', password: 'newpassword1' });
       }
     });
   });

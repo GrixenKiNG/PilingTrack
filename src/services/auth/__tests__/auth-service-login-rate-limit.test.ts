@@ -8,6 +8,12 @@
  *
  * The contract now: per-(account+IP) bucket AND per-IP bucket. A block on
  * either denies the attempt; success resets only the account+IP bucket.
+ *
+ * 28.09.2026 владелец выбрал блокировку аккаунта (вариант «б», Codex out13 №4):
+ * с каждого нового IP злоумышленник получал ещё 5 попыток на тот же аккаунт.
+ * Теперь есть и общий счётчик по аккаунту со всех адресов — 10 попыток за
+ * 15 минут, затем вход в аккаунт закрыт на 15 минут. Риск, что чужой нарочно
+ * заблокирует машиниста, владелец принял осознанно.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -65,14 +71,33 @@ describe('authenticateUserByEmailPassword rate limiting', () => {
     expect(findUniqueMock).not.toHaveBeenCalled();
   });
 
-  it('scopes the account bucket to the caller IP — a stranger cannot lock the victim out globally', async () => {
+  it('считает попытки и по аккаунту со всех адресов, с лимитом 10 за 15 минут и блоком 15 минут', async () => {
     checkMock.mockResolvedValue(ALLOWED);
 
-    await authenticateUserByEmailPassword('victim@x.ru', 'x', 'attacker-ip');
+    await authenticateUserByEmailPassword('Victim@X.ru', 'x', 'attacker-ip');
 
-    const keys = checkMock.mock.calls.map(([key]) => key);
-    expect(keys).toContain('login:victim@x.ru:attacker-ip');
-    // No bare-email bucket: blocking must not follow the victim to their own IP.
-    expect(keys).not.toContain('victim@x.ru');
+    const call = checkMock.mock.calls.find(([key]) => key === 'login-acct:victim@x.ru');
+    expect(call).toBeDefined();
+    expect(call?.[1]).toMatchObject({ maxAttempts: 10, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 });
+  });
+
+  it('заблокированный аккаунт не пускает с нового адреса и не ищет пользователя', async () => {
+    checkMock.mockImplementation(async (key: string) =>
+      key.startsWith('login-acct:') ? BLOCKED : ALLOWED,
+    );
+
+    const result = await authenticateUserByEmailPassword('victim@x.ru', 'right-or-wrong', 'fresh-ip');
+
+    expect(result).toMatchObject({ user: null, rateLimited: true, retryAfter: 60 });
+    expect(findUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it('несуществующая почта считается и блокируется так же — по блоку не узнать, есть ли аккаунт', async () => {
+    checkMock.mockResolvedValue(ALLOWED);
+    findUniqueMock.mockResolvedValue(null);
+
+    await authenticateUserByEmailPassword('nobody@x.ru', 'x', '203.0.113.7');
+
+    expect(checkMock.mock.calls.map(([key]) => key)).toContain('login-acct:nobody@x.ru');
   });
 });

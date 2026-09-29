@@ -32,6 +32,7 @@ export type Ability =
   | 'sites.manage_hierarchy'
   | 'users.read'
   | 'users.manage'
+  | 'safety.permits.manage'
   | 'users.documents.read_all'
   | 'equipment.read'
   | 'equipment.manage'
@@ -87,6 +88,12 @@ const abilityRoles: Record<Ability, Role[]> = {
   // services/users/user-documents.ts. Заводить и удалять чужие документы
   // по-прежнему может только админ (users.manage).
   'users.documents.read_all': ['ADMIN', 'DISPATCHER', 'SAFETY_ENGINEER'],
+  // Допуск работника к технике выдаёт и отзывает инженер ОТ — это его прямой
+  // предмет (решение владельца 27.09.2026). Раньше запись шла под
+  // users.manage, и роль не могла выдать ни одного допуска, а администратор
+  // в режиме «Действую как инженер ОТ» терял это право. Заводить работников
+  // и вести их документы инженер ОТ по-прежнему не может.
+  'safety.permits.manage': ['ADMIN', 'SAFETY_ENGINEER'],
   // Карточку установки читает тот, кто по ней работает; заводит и удаляет
   // технику только админ. Раньше карточку закрывало system.read —
   // диагностика системы, взятая как синоним «админ или диспетчер»; механик

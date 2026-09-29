@@ -50,7 +50,7 @@ export function EquipmentPermitMatrix({
   /** Чей это раздел. Пусто — свой (маршрут подставит себя из сессии). */
   userId?: string;
   userName?: string;
-  /** Может ли текущий пользователь выдавать допуски (`users.manage`). */
+  /** Может ли текущий пользователь выдавать допуски (`safety.permits.manage`). */
   editable: boolean;
 }) {
   const [rows, setRows] = useState<PermitRow[] | null>(null);
