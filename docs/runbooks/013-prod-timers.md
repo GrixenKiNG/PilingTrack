@@ -98,5 +98,5 @@ journalctl -u pilingtrack-disk-guard.service -n 50 --no-pager
 - `docs/runbooks/006-postgres-backup-restore.md` — ночной дамп и восстановление.
 - `docs/runbooks/009-pitr-restore.md` — PITR и почему он сейчас выключен (`archive_mode=off`).
 - `docs/runbooks/010-restore-drill.md` — квартальная репетиция восстановления из дампа.
-- `docs/runbooks/008-manual-deploy.md` — выкладка вручную и раздел «Rollback» (пересборка).
+- `docs/runbooks/008-manual-deploy.md` — выкладка вручную, раздел «Rollback» (пересборка) и репетиция миграций на копии боевой базы через `scripts/staging-local.sh` (R57).
 - `docs/audits/hermes-night/R56-dead-metrics.md` — почему метрики бэкапа показывают нули.
