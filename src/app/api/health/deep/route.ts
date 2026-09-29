@@ -14,7 +14,7 @@
  *   - /api/health/deep    → public, minimal detail, all critical deps. ←
  *
  * Security: response body is intentionally narrow — only per-component
- * "ok"/"down" plus overall status. No error messages, no latencies,
+ * "ok"/"degraded"/"down" plus overall status. No error messages, no latencies,
  * no internal hostnames. The admin endpoint owns the diagnostic detail.
  */
 
@@ -43,7 +43,11 @@ export async function GET(_request: NextRequest) {
     components: {
       database: status.components.database.status === 'up' ? 'ok' : 'down',
       redis: status.components.redis.status === 'up' ? 'ok' : 'down',
-      storage: status.components.storage.status === 'up' ? 'ok' : 'down',
+      storage: status.components.storage.status === 'up'
+        ? 'ok'
+        : status.components.storage.status === 'degraded'
+          ? 'degraded'
+          : 'down',
     },
   };
 
