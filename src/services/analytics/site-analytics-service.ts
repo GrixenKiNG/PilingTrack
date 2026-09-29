@@ -99,7 +99,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         SUM(
           spp.count * COALESCE(
             NULLIF(spp."metersPerUnit", 0),
-            substring(pg.name from '[0-9]{3}')::float / 10,
+            pg."lengthMm"::float / 1000,
             0
           )
         )::float AS total_pile_meters

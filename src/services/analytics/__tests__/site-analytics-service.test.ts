@@ -40,6 +40,29 @@ describe('getSiteAnalytics — actual pile meters source', () => {
     expect(actualBlock).not.toContain('metersPerUnit');
     expect(actualBlock).not.toContain('SitePilePlan');
   });
+
+  it('computes planned pile meters from PileGrade.lengthMm, never parsing the grade name (F-16)', async () => {
+    await getSiteAnalytics({ tenantId: 'orion' });
+
+    const [strings] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    // Нигде в запросе имя марки больше не парсится эвристикой.
+    expect(sql).not.toContain('substring');
+    expect(sql).not.toContain('pg.name');
+
+    const planBlockStart = sql.indexOf('spp."siteId"');
+    const planBlockEnd = sql.indexOf(') pp ON');
+    expect(planBlockStart).toBeGreaterThan(-1);
+    expect(planBlockEnd).toBeGreaterThan(planBlockStart);
+    const planBlock = sql.slice(planBlockStart, planBlockEnd);
+
+    // Явный план на объекте (metersPerUnit) остаётся первым, запасной источник —
+    // lengthMm марки, тот же, что и у факта.
+    expect(planBlock).toContain('"lengthMm"');
+    expect(planBlock).toContain('"metersPerUnit"');
+    expect(planBlock).not.toContain('substring');
+  });
 });
 
 /**
