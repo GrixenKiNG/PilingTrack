@@ -66,7 +66,7 @@ export function ReportsModule() {
             type="button"
             onClick={() => openView(tab.id)}
             className={cn(
-              'rounded-t-md border border-b-0 px-3 py-1.5 text-xs font-medium',
+              'rounded-t-md border border-b-0 px-3 py-1.5 text-xs font-medium min-h-11 sm:min-h-0',
               view === tab.id
                 ? 'border-border bg-card text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',

@@ -25,7 +25,7 @@ export function EquipmentViewToggle({
           key={id}
           onClick={() => onChange(id)}
           className={cn(
-            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors min-h-11 sm:min-h-0',
             view === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
           )}
         >

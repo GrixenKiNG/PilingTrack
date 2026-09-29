@@ -33,7 +33,7 @@ export function OpsFilterBar<K extends string>({
             type="button"
             onClick={() => onSelect(filter.key)}
             className={cn(
-              'min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+              'min-h-11 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors sm:min-h-9',
               active === filter.key
                 ? 'border-slate-900 bg-slate-900 text-white'
                 : 'border-border bg-muted text-muted-foreground hover:border-border hover:bg-card',
