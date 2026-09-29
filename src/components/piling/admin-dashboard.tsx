@@ -12,12 +12,14 @@
  *   /api/reports/recent   — сегодняшние отчёты (для риска «без фото»)
  *
  * Период (Весь период / Сегодня / 7 дней / Период) влияет ТОЛЬКО на
- * производственные числа из аналитики (сваи, бурение, простой, объекты,
- * план-факт). Операционные показатели (отчёты, установки, ТО, бригады,
- * риски) — это состояние «сейчас» и период игнорируют. Дефолт — «Весь
- * период» (накопительно с начала), а не «Сегодня»: диспетчер открывает
- * дашборд не только утром смены, а в любой момент, и пустой «сегодня» до
- * первого отчёта выглядит как «ничего не сделано».
+ * производственные числа из аналитики (сваи, бурение, простой, объекты) —
+ * это факт «за период». План-факт и процент выполнения свай/бурения считаются
+ * накопительно, с начала объекта: план — цель всего объекта, дробить его по
+ * календарю нечем (см. site-analytics-service.ts). Операционные показатели
+ * (отчёты, установки, ТО, бригады, риски) — это состояние «сейчас» и период
+ * игнорируют. Дефолт — «Весь период» (накопительно с начала), а не «Сегодня»:
+ * диспетчер открывает дашборд не только утром смены, а в любой момент, и
+ * пустой «сегодня» до первого отчёта выглядит как «ничего не сделано».
  */
 
 import { useAbility } from '@/lib/use-ability';
@@ -267,8 +269,11 @@ export function AdminDashboard() {
   );
   const planRows = useMemo(() => sites.slice(0, 4), [sites]);
   const fleetRows = useMemo(() => visibleFleet.slice(0, 6), [visibleFleet]);
-  const pileProgress = kpis.plannedPileMeters > 0 ? (kpis.actualPileMeters / kpis.plannedPileMeters) * 100 : 0;
-  const drillingProgress = kpis.plannedDrilling > 0 ? (kpis.actualDrilling / kpis.plannedDrilling) * 100 : 0;
+  // Процент выполнения — накопительный (с начала объекта), а не за период:
+  // периодные факты (actualPileMeters/actualDrilling) против всего плана дали
+  // бы 2% на завершённом объекте в режиме «7 дней». См. F-R52.
+  const pileProgress = kpis.plannedPileMeters > 0 ? (kpis.actualPileMetersAllTime / kpis.plannedPileMeters) * 100 : 0;
+  const drillingProgress = kpis.plannedDrilling > 0 ? (kpis.actualDrillingAllTime / kpis.plannedDrilling) * 100 : 0;
   const fleetProgress = kpis.rigsWorking != null && kpis.rigsTotal != null && kpis.rigsTotal > 0
     ? (kpis.rigsWorking / kpis.rigsTotal) * 100
     : null;
