@@ -115,7 +115,7 @@ export function requirePileGrade(tx: Tx, tenantId: string, id: string) {
   return requireDictionaryRow(
     () => tx.pileGrade.findFirst({
       where: {tenantId, id, isActive: true},
-      select: {id: true, lengthMm: true},
+      select: {id: true, lengthMm: true, name: true},
     }),
     'Марка сваи не найдена в справочнике вашей организации',
   );
@@ -135,7 +135,7 @@ export function requireDowntimeReason(tx: Tx, tenantId: string, id: string) {
   return requireDictionaryRow(
     () => tx.downtimeReason.findFirst({
       where: {tenantId, id, isActive: true},
-      select: {id: true},
+      select: {id: true, name: true},
     }),
     'Причина простоя не найдена в справочнике вашей организации',
   );
@@ -397,5 +397,22 @@ export async function ensureReport(tx: Tx, input: {
   });
 
   return report.id;
+}
+
+/**
+ * Деловой номер отчёта (`RM-…`) по первичному ключу.
+ *
+ * ЗАЧЕМ ОТДЕЛЬНОЕ ЧТЕНИЕ. `ensureReport` возвращает первичный ключ `report.id`,
+ * и менять его контракт нельзя — на него завязаны клиенты и тесты. А в след
+ * (`ReportAudit`) идёт деловой номер: история отчёта ищет строки именно по нему
+ * (`report-history-service.ts`). Чтение — в той же транзакции, что и запись,
+ * чтобы след ссылался на уже существующий отчёт.
+ */
+export async function businessReportId(tx: Tx, id: string): Promise<string> {
+  const {reportId} = await tx.report.findUniqueOrThrow({
+    where: {id},
+    select: {reportId: true},
+  });
+  return reportId;
 }
 
