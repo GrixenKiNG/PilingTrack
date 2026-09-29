@@ -107,6 +107,8 @@ vi.mock('@/lib/db', () => ({
 
 import { MediaService } from '../media-service';
 import { db } from '@/lib/db';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 function seedMedia(over: Partial<FakeMediaRow>): FakeMediaRow {
   const row: FakeMediaRow = {
@@ -401,5 +403,48 @@ describe('MediaService.confirmUpload — F-R50-2 download timeout', () => {
     // 'pending' and never writes 'failed' — the id stays retryable.
     expect(db.media.update).not.toHaveBeenCalled();
     expect(mediaTable.get('media-1')?.uploadStatus).toBe('pending');
+  });
+});
+
+describe('MediaService F-MEDIA-PUT-SIZE — declared size is bound into the presigned PUT', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mediaTable.clear();
+  });
+
+  it('rejects a declared size above maxFileSize with 400 before signing — no URL is ever issued', async () => {
+    const service = makeService();
+
+    await expect(service.getPresignedUrl({
+      fileName: 'huge.jpg', contentType: 'image/jpeg',
+      fileSize: 10 * 1024 * 1024 + 1, // one byte over the limit
+      tenantId: 'tenant-a', userId: 'user-1',
+    })).rejects.toMatchObject({ status: 400 });
+
+    // Nothing was signed and no S3 command was even built…
+    expect(getSignedUrl).not.toHaveBeenCalled();
+    expect(PutObjectCommand).not.toHaveBeenCalled();
+    // …and no pending media row was left behind for a rejected request.
+    expect(db.media.create).not.toHaveBeenCalled();
+  });
+
+  it('signs the PUT with ContentLength = the declared size, so storage rejects a body of any other length', async () => {
+    const service = makeService();
+    const declared = 4096;
+
+    await service.getPresignedUrl({
+      fileName: 'photo.jpg', contentType: 'image/jpeg',
+      fileSize: declared,
+      tenantId: 'tenant-a', userId: 'user-1',
+    });
+
+    expect(getSignedUrl).toHaveBeenCalledTimes(1);
+    // The second argument of getSignedUrl is the command being signed — the
+    // very PutObject the URL authorises. Its ContentLength is what the
+    // signature binds; a PUT of a different length fails signature check.
+    const signedCommand = vi.mocked(getSignedUrl).mock.calls[0][1] as unknown as {
+      input: { ContentLength?: number };
+    };
+    expect(signedCommand.input.ContentLength).toBe(declared);
   });
 });
