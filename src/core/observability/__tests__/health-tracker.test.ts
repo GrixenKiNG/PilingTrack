@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { STORAGE_CHECK_TIMEOUT_MS } from '../health-tracker/thresholds';
 
 const mocks = vi.hoisted(() => ({
   queryRaw: vi.fn().mockResolvedValue([{ '?column?': 1 }]),
@@ -66,6 +67,12 @@ vi.mock('fs', () => ({
     readdir: mocks.readdir,
     stat: mocks.stat,
   },
+}));
+
+const s3Mock = vi.hoisted(() => ({ getS3ClientForHealth: vi.fn() }));
+
+vi.mock('../s3-health-check', () => ({
+  getS3ClientForHealth: s3Mock.getS3ClientForHealth,
 }));
 
 describe('health-tracker backup monitoring', () => {
@@ -223,5 +230,86 @@ describe('shouldLogHealthSnapshot', () => {
     const { shouldLogHealthSnapshot } = await import('../health-tracker/tracker');
 
     expect(shouldLogHealthSnapshot('unhealthy|up|down', 'unhealthy|down|down', 1_000)).toBe(true);
+  });
+});
+
+/*
+  Медленный R2 ≠ упавший R2 (F-R50-1).
+
+  Прежде health-чек S3 использовал таймаут БД (2 с) и любой ответ дольше давал
+  storage:'down' → система 'unhealthy' (16 ложных «морганий» в сутки на бою).
+  Теперь у хранилища свой порог (STORAGE_CHECK_TIMEOUT_MS), таймаут отдаёт
+  'degraded', а 'down' остаётся только за явной ошибкой.
+*/
+describe('storage health: медленный S3 ≠ упавший S3 (F-R50-1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mocks.outboxStats.mockResolvedValue({ unpublished: 0, failed: 0, total: 0 });
+    mocks.dlqStats.mockResolvedValue({ pending: 0 });
+    mocks.lagMetrics.mockReturnValue(null);
+    mocks.redisPing.mockResolvedValue('PONG');
+    mocks.statePing.mockResolvedValue('PONG');
+    mocks.redisSmembers.mockResolvedValue(['outbox']);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    mocks.redisGet.mockResolvedValue(null);
+    mocks.stateGet.mockImplementation(async (key: string) =>
+      key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : null);
+    mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
+    delete process.env.BACKUP_ENABLED;
+    process.env.S3_BUCKET = 'test-bucket';
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    delete process.env.S3_BUCKET;
+  });
+
+  it('медленный S3 (дольше порога) → storage degraded, система degraded, запрос отменён', async () => {
+    vi.useFakeTimers();
+    const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+    // S3 «висит», пока таймаут не отменит запрос — как настоящий abortSignal в send.
+    s3Mock.getS3ClientForHealth.mockImplementation(
+      (signal?: AbortSignal) =>
+        new Promise<boolean>((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('aborted'));
+            return;
+          }
+          signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const pending = checkSystemStatus();
+    await vi.advanceTimersByTimeAsync(STORAGE_CHECK_TIMEOUT_MS);
+
+    const status = await pending;
+
+    expect(status.components.storage).toEqual({ status: 'degraded', provider: 's3' });
+    expect(status.status).toBe('degraded');
+    expect(abortSpy).toHaveBeenCalled();
+
+    abortSpy.mockRestore();
+  });
+
+  it('явная ошибка S3 (исключение) → storage down, система unhealthy', async () => {
+    s3Mock.getS3ClientForHealth.mockRejectedValue(new Error('S3 connection refused'));
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(status.components.storage).toEqual({ status: 'down', provider: 's3' });
+    expect(status.status).toBe('unhealthy');
+  });
+
+  it('ok=false (S3 недоступен) → storage down, система unhealthy', async () => {
+    s3Mock.getS3ClientForHealth.mockResolvedValue(false);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(status.components.storage).toEqual({ status: 'down', provider: 's3' });
+    expect(status.status).toBe('unhealthy');
   });
 });

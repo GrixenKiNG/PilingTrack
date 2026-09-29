@@ -33,6 +33,7 @@ function computeOverallStatus(components: SystemComponents): OverallStatus {
     database.status === 'slow' ||
     redis.status === 'slow' ||
     outbox.status === 'backlog' ||
+    storage.status === 'degraded' ||
     backup.status === 'slow'
   ) {
     return 'degraded';

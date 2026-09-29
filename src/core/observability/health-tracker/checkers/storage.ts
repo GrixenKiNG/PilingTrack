@@ -1,5 +1,4 @@
-import { withTimeout } from '../helpers';
-import { DB_CHECK_TIMEOUT_MS } from '../thresholds';
+import { STORAGE_CHECK_TIMEOUT_MS } from '../thresholds';
 import type { StorageHealth, StorageProvider } from '../types';
 
 export function getStorageProvider(): StorageProvider {
@@ -16,15 +15,25 @@ export async function checkStorage(): Promise<StorageHealth> {
     return { status: 'up', provider: 'local' };
   }
 
+  // Таймаут отменяет сам HTTP-запрос (abortSignal в send), а не только
+  // отклоняет промис: иначе при тормозящем R2 каждые 15 с копились бы
+  // висящие запросы с ретраями SDK.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), STORAGE_CHECK_TIMEOUT_MS);
+
   try {
     const { getS3ClientForHealth } = await import('../../s3-health-check');
-    const ok = await withTimeout(getS3ClientForHealth(), DB_CHECK_TIMEOUT_MS, 'S3 health');
+    const ok = await getS3ClientForHealth(controller.signal);
 
     return {
       status: ok ? 'up' : 'down',
       provider: 's3',
     };
   } catch {
-    return { status: 'down', provider: 's3' };
+    // Медленно, но не упало: запрос не успел за порог. Явная ошибка S3
+    // (исключение не по таймауту или ok=false) остаётся 'down'.
+    return { status: controller.signal.aborted ? 'degraded' : 'down', provider: 's3' };
+  } finally {
+    clearTimeout(timer);
   }
 }
